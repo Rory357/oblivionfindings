@@ -303,6 +303,14 @@ class OutingController extends Controller
         }
 
         $outing = DB::transaction(function () use ($data, $request) {
+            // The canonical asset lock serializes this booking producer with
+            // maintenance holds, just like the direct booking/approval paths.
+            if (! empty($data['asset_id'])) {
+                $asset = app(\App\Services\Fleet\MaintenanceAccessService::class)
+                    ->asset($request->user(), (int) $data['asset_id'], true);
+                abort_unless($asset->category === 'vehicle' && $asset->status === 'active', 404);
+                app(\App\Services\Fleet\MaintenanceRestrictionService::class)->assertBookable((int) $asset->id);
+            }
             $outing = FleetOuting::create([
                 'title' => $data['title'],
                 'destination' => $data['destination'],
@@ -311,7 +319,7 @@ class OutingController extends Controller
                 'planned_return' => $data['planned_return'],
                 'asset_id' => $data['asset_id'] ?? null,
                 'driver_user_id' => $data['driver_user_id'] ?? null,
-                'risk_assessment' => $data['risk_assessment'] ? ['notes' => $data['risk_assessment']] : null,
+                'risk_assessment' => ! empty($data['risk_assessment']) ? ['notes' => $data['risk_assessment']] : null,
                 'notes' => $data['notes'] ?? null,
                 'status' => 'planned',
                 'created_by_user_id' => $request->user()->id,

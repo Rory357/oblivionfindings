@@ -183,6 +183,9 @@ class RbacSeeder extends Seeder
             ['key' => 'fleet.bookings.approve', 'description' => 'Approve/reject vehicle bookings', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.incidents.manage', 'description' => 'Manage fleet incidents', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.maintenance.manage', 'description' => 'Manage fleet maintenance', 'group' => 'fleet', 'module' => 'Resources'],
+            ['key' => 'fleet.maintenance.report', 'description' => 'Report a maintenance problem at an approved site', 'group' => 'fleet', 'module' => 'Resources'],
+            ['key' => 'fleet.maintenance.release', 'description' => 'Review a maintenance safety release when separately authorised for the site and asset category', 'group' => 'fleet', 'module' => 'Resources'],
+            ['key' => 'fleet.maintenance.configure', 'description' => 'Configure approved site maintenance routes, exact rules and reviewer grants', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.medication.manage', 'description' => 'Pack, correct, and return medications during transport', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.mileage.approve', 'description' => 'Approve/reject mileage claims', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.outings.manage', 'description' => 'Manage fleet outings', 'group' => 'fleet', 'module' => 'Resources'],
@@ -592,6 +595,8 @@ class RbacSeeder extends Seeder
             'healthSafety.closureExceptions.request',
             'healthSafety.closureExceptions.approve',
             'safeguarding.declassification.approve',
+            'fleet.maintenance.release',
+            'fleet.maintenance.configure',
         ];
         $admin?->permissions()->sync(
             Permission::query()

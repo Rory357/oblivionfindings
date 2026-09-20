@@ -295,6 +295,7 @@ class HandleInertiaRequests extends Middleware
                 'error' => session('error'),
                 'warning' => session('warning'),
                 'info' => session('info'),
+                'maintenance_attachment_id' => session('maintenance_attachment_id'),
                 'clock_out_blockers' => session('clock_out_blockers'),
                 'rostering_report_link' => session('rostering_report_link'),
                 // Raise-a-ticket success pane reads the new ticket's

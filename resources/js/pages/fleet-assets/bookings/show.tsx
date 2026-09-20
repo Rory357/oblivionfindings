@@ -31,6 +31,8 @@ import {
 import { useState } from 'react';
 
 type Props = {
+    maintenance_impacts: Array<{ id: number; followup_state: string; restriction_state: string;
+        work_order_id: number; reference_number: string | null }>;
     booking: {
         id: number;
         reference_number?: string | null;
@@ -60,6 +62,7 @@ type Props = {
     };
     can: {
         manage: boolean;
+        view_maintenance: boolean;
     };
 };
 
@@ -80,7 +83,7 @@ const statusBannerColors: Record<string, string> = {
 
 const statusSteps = ['pending', 'approved', 'checked_out', 'returned'];
 
-export default function BookingShow({ booking, can }: Props) {
+export default function BookingShow({ booking, can, maintenance_impacts }: Props) {
     const b = booking ?? ({} as Props['booking']);
     const canManage = can.manage;
     const checkoutForm = useForm({ odometer_out: '' });
@@ -137,6 +140,15 @@ export default function BookingShow({ booking, can }: Props) {
                         </span>
                     </div>
                 </div>
+
+                {maintenance_impacts.length > 0 && <div role="status" className="rounded-lg border border-status-warning/40 bg-status-warning-bg px-5 py-4 text-sm">
+                    <strong>Maintenance follow-up recorded for this booking</strong>
+                    <p className="mt-1">The booking has not been moved or cancelled. Check its current approval and vehicle readiness before use.</p>
+                    {maintenance_impacts.map((impact) => <p key={impact.id} className="mt-2">
+                        {impact.reference_number ?? `Work ${impact.work_order_id}`} · {impact.restriction_state === 'active' ? 'Hold active' : 'Hold released'} · {impact.followup_state === 'reviewed' ? 'Follow-up reviewed' : 'Follow-up needed'}
+                        {can.view_maintenance && <> · <Link className="text-primary underline" href={`/fleet-assets/maintenance/work-orders/${impact.work_order_id}`}>View maintenance work</Link></>}
+                    </p>)}
+                </div>}
 
                 {/* Status Timeline */}
                 <Card>

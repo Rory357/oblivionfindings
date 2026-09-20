@@ -25,6 +25,7 @@ import { HeroActionButton } from '@/pages/fleet-assets/maintenance/components/he
 import { Head, Link, useForm } from '@inertiajs/react';
 import {
     CheckCircle,
+    CircleHelp,
     ClipboardCheck,
     ClipboardList,
     Loader2,
@@ -54,6 +55,7 @@ type ChecklistRun = {
     asset: { id: number; name: string; asset_tag: string | null } | null;
     user: { id: number; name: string } | null;
     passed: boolean;
+    outcome: 'passed' | 'failed' | 'needs_assessment' | null;
     responses: Record<string, any> | null;
     completed_at: string | null;
     created_at: string | null;
@@ -307,6 +309,7 @@ export default function ChecklistsIndex({
                         ) : templateStepIndex === 1 ? (
                             <WizardStepPane>
                                 <div>
+                                    {Object.keys(templateForm.errors).some((key) => key.startsWith('items')) && <p role="alert" className="text-sm text-destructive">{Object.entries(templateForm.errors).filter(([key]) => key.startsWith('items')).map(([, value]) => value).join(' ')}</p>}
                                     <label className="text-sm font-medium">
                                         Items
                                     </label>
@@ -314,7 +317,7 @@ export default function ChecklistsIndex({
                                         (item, idx) => (
                                             <div
                                                 key={idx}
-                                                className="mt-2 flex items-center gap-2"
+                                                className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border p-3"
                                             >
                                                 <Input
                                                     value={item.label}
@@ -345,7 +348,7 @@ export default function ChecklistsIndex({
                                                         ];
                                                         items[idx] = {
                                                             ...items[idx],
-                                                            type: v,
+                                                            type: v, options: v === 'select' ? [] : null,
                                                         };
                                                         templateForm.setData(
                                                             'items',
@@ -358,7 +361,7 @@ export default function ChecklistsIndex({
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="checkbox">
-                                                            Checkbox
+                                                            Yes / no
                                                         </SelectItem>
                                                         <SelectItem value="text">
                                                             Text
@@ -371,6 +374,15 @@ export default function ChecklistsIndex({
                                                         </SelectItem>
                                                     </SelectContent>
                                                 </Select>
+                                                {item.type === 'select' && <Input className="w-full" aria-label={`Options for item ${idx + 1}`}
+                                                    placeholder="Choices separated by commas, e.g. pass, fail"
+                                                    value={(item.options ?? []).join(',')}
+                                                    onChange={(event) => templateForm.setData('items', templateForm.data.items.map((entry, i) =>
+                                                        i === idx ? { ...entry, options: event.target.value.split(',') } : entry))} />}
+                                                <p className="w-full text-xs text-muted-foreground">{['text', 'number'].includes(item.type)
+                                                    ? 'Observation only. Approved pass/fail rules require yes/no or select questions.'
+                                                    : item.type === 'checkbox' ? 'Choices: yes and no. Approval determines which result passes.'
+                                                    : 'Each choice must be non-empty and unique.'}</p>
                                             </div>
                                         ),
                                     )}
@@ -510,11 +522,11 @@ export default function ChecklistsIndex({
                                         className="flex items-center justify-between rounded-md border p-3 text-sm"
                                     >
                                         <div className="flex items-center gap-3">
-                                            {run.passed ? (
+                                            {run.outcome === 'passed' ? (
                                                 <CheckCircle className="h-5 w-5 text-status-success" />
-                                            ) : (
+                                            ) : run.outcome === 'failed' ? (
                                                 <XCircle className="h-5 w-5 text-status-critical" />
-                                            )}
+                                            ) : <CircleHelp className="h-5 w-5 text-status-warning" />}
                                             <div>
                                                 <div className="font-medium">
                                                     {run.template?.name ??
@@ -547,12 +559,12 @@ export default function ChecklistsIndex({
                                         </div>
                                         <Badge
                                             variant={
-                                                run.passed
+                                                run.outcome === 'passed'
                                                     ? 'default'
-                                                    : 'destructive'
+                                                    : run.outcome === 'failed' ? 'destructive' : 'outline'
                                             }
                                         >
-                                            {run.passed ? 'Passed' : 'Failed'}
+                                            {run.outcome === 'passed' ? 'Passed' : run.outcome === 'failed' ? 'Failed' : 'Needs assessment'}
                                         </Badge>
                                     </div>
                                 ))}

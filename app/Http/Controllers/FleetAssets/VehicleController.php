@@ -397,6 +397,8 @@ class VehicleController extends Controller
                 'shape' => $g->shape,
             ])->values(),
             'work_orders' => $asset->workOrders,
+            'maintenance_restricted' => DB::table('fleet_maintenance_restrictions')
+                ->where('asset_id', $asset->id)->where('state', 'active')->exists(),
             'bookings' => $asset->bookings,
             'incidents' => Schema::hasTable('fleet_incidents') ? FleetIncident::where('asset_id', $asset->id)
                 ->latest('occurred_at')
@@ -417,6 +419,9 @@ class VehicleController extends Controller
             'can' => [
                 'manage' => $this->canManageFleet($user),
                 'inspect' => $this->canManageMaintenance($user),
+                'report_maintenance' => app(\App\Services\Fleet\MaintenanceAccessService::class)->canReport($user)
+                    && in_array((int) $asset->site_id,
+                        app(\App\Services\Fleet\MaintenanceAccessService::class)->approvedSiteIds($user), true),
                 'view_vehicle_technology' => $this->vehicleTechnology->canView($user, $asset),
             ],
             'vehicle_technology' => Inertia::optional(

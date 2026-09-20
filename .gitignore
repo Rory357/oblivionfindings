@@ -20,6 +20,7 @@
 .env.testing
 .phpactor.json
 .phpunit.result.cache
+/phpunit.pkg01.xml
 Homestead.json
 Homestead.yaml
 npm-debug.log

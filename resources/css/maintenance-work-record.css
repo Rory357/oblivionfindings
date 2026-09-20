@@ -1,0 +1,9 @@
+/* Approved PKG-01 work-record hierarchy; scoped to the work detail panels. */
+.maintenance-work-record [data-slot="card"] { gap: 0; padding-block: 0; overflow: clip; }
+.maintenance-work-record [data-slot="card-header"] { padding: 18px 20px; border-bottom: 1px solid var(--border); background: color-mix(in oklch, var(--muted) 30%, var(--card)); }
+.maintenance-work-record [data-slot="card-title"] { display: flex; align-items: center; gap: 10px; font-size: 14px; line-height: 1.4; }
+.maintenance-work-record [data-slot="card-content"] { padding: 20px; }
+.work-section-icon { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 8px; background: color-mix(in oklch, var(--primary) 9%, var(--card)); color: var(--primary); }
+.maintenance-work-record .work-next-action [data-slot="card-header"] { background: var(--card); border: 0; padding-bottom: 0; }
+.maintenance-work-record .work-next-action [data-slot="card-title"] { color: var(--primary); font-size: 12px; font-weight: 500; }
+.maintenance-work-record .work-next-action [data-slot="card-content"] { padding-top: 14px; }

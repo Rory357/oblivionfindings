@@ -1,4 +1,5 @@
 import PageShell from '@/components/page-shell';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
@@ -17,8 +18,10 @@ import {
 } from 'lucide-react';
 
 type ChecklistItem = {
-    result: 'pass' | 'fail' | 'na';
+    result: string;
+    assessment?: string;
     notes?: string;
+    evidence?: { name: string; url: string };
 };
 
 type Inspection = {
@@ -27,60 +30,25 @@ type Inspection = {
     asset: {
         id: number;
         name: string;
+        category: string | null;
         registration_number?: string | null;
     } | null;
     user: { id: number; name: string } | null;
     passed: boolean;
+    outcome: 'passed' | 'failed' | 'needs_assessment';
     notes: string | null;
     odometer: number | null;
     overall_condition: string | null;
     responses: Record<string, ChecklistItem> | null;
+    answer_outcomes: Record<string, string>;
+    presented_template: { name: string; items: Array<{ id?: string; key?: string; label?: string; section?: string; options?: unknown }> } | null;
     completed_at: string | null;
     created_at: string | null;
 };
 
 type Props = {
     inspection: Inspection;
-};
-
-const ITEM_LABELS: Record<string, string> = {
-    tyres_condition: 'Tyres - Condition & Pressure',
-    lights_front: 'Lights - Front',
-    lights_rear: 'Lights - Rear',
-    body_damage: 'Body Damage',
-    windscreen: 'Windscreen',
-    mirrors: 'Mirrors',
-    number_plates: 'Number Plates',
-    seatbelts: 'Seatbelts',
-    horn: 'Horn',
-    wipers: 'Wipers',
-    dashboard_warnings: 'Dashboard Warnings',
-    cleanliness: 'Cleanliness',
-    first_aid_kit: 'First Aid Kit',
-    oil_level: 'Oil Level',
-    coolant: 'Coolant Level',
-    brake_fluid: 'Brake Fluid',
-    battery: 'Battery',
-};
-
-const SECTION_MAP: Record<string, string> = {
-    tyres_condition: 'Exterior',
-    lights_front: 'Exterior',
-    lights_rear: 'Exterior',
-    body_damage: 'Exterior',
-    windscreen: 'Exterior',
-    mirrors: 'Exterior',
-    number_plates: 'Exterior',
-    seatbelts: 'Interior',
-    horn: 'Interior',
-    wipers: 'Interior',
-    dashboard_warnings: 'Interior',
-    cleanliness: 'Interior',
-    first_aid_kit: 'Interior',
-    oil_level: 'Under Bonnet',
-    coolant: 'Under Bonnet',
-    brake_fluid: 'Under Bonnet',
-    battery: 'Under Bonnet',
+    can_report: boolean;
 };
 
 const SECTION_COLORS: Record<string, string> = {
@@ -98,34 +66,47 @@ function ResultIcon({ result }: { result: string }) {
     return <MinusCircle className="h-5 w-5 text-muted-foreground" />;
 }
 
-export default function InspectionShow({ inspection }: Props) {
+export default function InspectionShow({ inspection, can_report }: Props) {
     const insp = inspection ?? ({} as Inspection);
     const responses = insp.responses ?? {};
+    const passed = insp.outcome === 'passed';
+    const failed = insp.outcome === 'failed';
+    const outcomeLabel = passed ? 'Passed' : failed ? 'Failed' : 'Needs assessment';
 
     // Group responses by section
     const sections: Record<
         string,
-        { key: string; label: string; item: ChecklistItem }[]
+        { key: string; label: string; item: ChecklistItem; options: unknown }[]
     > = {};
-    for (const [key, item] of Object.entries(responses)) {
-        const section = SECTION_MAP[key] ?? 'Other';
+    const snapshot = insp.presented_template;
+    const presented: Array<{ key: string; label: string; section: string; item: ChecklistItem; options: unknown }> = snapshot?.items?.map((question) => {
+        const key = String(question.id ?? question.key ?? '');
+        return { key, label: question.label ?? `Question ${key}`, section: question.section ?? 'Checklist',
+            item: { ...(responses[key] ?? { result: 'unknown' }), assessment: insp.answer_outcomes[key] ?? 'needs_assessment' }, options: question.options ?? null };
+    }) ?? Object.entries(responses).map(([key, item]) => ({
+        key, label: `Question ${key} (original wording unavailable)`, section: 'Legacy responses', item, options: null,
+    }));
+    for (const key of Object.keys(responses)) {
+        if (snapshot && !presented.some((question) => question.key === key)) {
+            presented.push({ key, label: `Unmapped response ${key}`, section: 'Needs assessment', item: responses[key], options: null });
+        }
+    }
+    for (const { key, label, section, item, options } of presented) {
         if (!sections[section]) sections[section] = [];
-        sections[section].push({
-            key,
-            label: ITEM_LABELS[key] ?? key.replace(/_/g, ' '),
-            item,
-        });
+        sections[section].push({ key, label, item, options });
     }
 
     // Count pass/fail/na
-    const counts = Object.values(responses).reduce(
-        (acc, item) => {
-            if (item.result === 'pass') acc.pass++;
-            else if (item.result === 'fail') acc.fail++;
-            else acc.na++;
+    const assessment = (item: ChecklistItem) => item.assessment === 'passed' ? 'pass' : item.assessment === 'failed' ? 'fail' : item.assessment === 'not_applicable' ? 'na' : 'unknown';
+    const counts = presented.reduce(
+        (acc, { item }) => {
+            if (assessment(item) === 'pass') acc.pass++;
+            else if (assessment(item) === 'fail') acc.fail++;
+            else if (assessment(item) === 'na') acc.na++;
+            else acc.unknown++;
             return acc;
         },
-        { pass: 0, fail: 0, na: 0 },
+        { pass: 0, fail: 0, na: 0, unknown: 0 },
     );
 
     return (
@@ -139,33 +120,35 @@ export default function InspectionShow({ inspection }: Props) {
             <Head title={`Inspection #${insp.id ?? ''}`} />
             <PageShell>
                 <FleetCompactHero
-                    pill={`Vehicle inspection · ${insp.passed ? 'passed' : 'failed'}`}
+                    pill={`Asset check · ${outcomeLabel.toLowerCase()}`}
                     title={`Inspection #${insp.id ?? ''}`}
                     backHref="/fleet-assets/inspections"
                     backLabel="Inspections"
                 />
+                {can_report && insp.asset && <Card className="flex-row items-center justify-between gap-4 p-4">
+                    <p className="text-sm text-muted-foreground">Found a problem? Send a linked report for assessment. These original answers and evidence are retained.</p>
+                    <Button asChild><Link href={`/fleet-assets/maintenance/work-orders/create?asset_id=${insp.asset.id}&checklist_run_id=${insp.id}`}>Report a problem</Link></Button>
+                </Card>}
 
                 {/* Result Banner */}
                 <div
                     className={cn(
                         'rounded-lg border px-5 py-4',
-                        insp.passed
+                        passed
                             ? 'border-primary bg-primary/10 text-primary dark:border-primary/30 dark:bg-primary/30 dark:text-primary/70'
-                            : 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical',
+                            : failed ? 'border-status-critical/30 bg-status-critical-bg text-status-critical' : 'border-status-warning/30 bg-status-warning-bg text-status-warning',
                     )}
                 >
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            {insp.passed ? (
+                            {passed ? (
                                 <CheckCircle className="h-6 w-6 text-primary dark:text-primary" />
                             ) : (
                                 <XCircle className="h-6 w-6 text-status-critical dark:text-status-critical" />
                             )}
                             <div>
                                 <span className="text-lg font-bold">
-                                    {insp.passed
-                                        ? 'Inspection Passed'
-                                        : 'Inspection Failed'}
+                                    {`Check · ${outcomeLabel}`}
                                 </span>
                                 <span className="mx-2 opacity-50">|</span>
                                 <span className="capitalize">
@@ -174,10 +157,10 @@ export default function InspectionShow({ inspection }: Props) {
                             </div>
                         </div>
                         <Badge
-                            variant={insp.passed ? 'default' : 'destructive'}
+                            variant={passed ? 'default' : failed ? 'destructive' : 'secondary'}
                             className="text-sm"
                         >
-                            {insp.passed ? 'Pass' : 'Fail'}
+                            {outcomeLabel}
                         </Badge>
                     </div>
                 </div>
@@ -199,7 +182,7 @@ export default function InspectionShow({ inspection }: Props) {
                                         <dd className="font-medium">
                                             {insp.asset ? (
                                                 <Link
-                                                    href={`/fleet-assets/vehicles/${insp.asset.id}`}
+                                                    href={`/fleet-assets/${insp.asset.category === 'vehicle' ? 'vehicles' : 'assets'}/${insp.asset.id}`}
                                                     className="text-primary hover:underline"
                                                 >
                                                     {insp.asset.name}
@@ -263,7 +246,7 @@ export default function InspectionShow({ inspection }: Props) {
                             <CardTitle className="text-base">Summary</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-4 gap-3">
                                 <div className="rounded-lg bg-status-success-bg p-3 text-center">
                                     <div className="text-2xl font-bold text-status-success">
                                         {counts.pass}
@@ -287,6 +270,10 @@ export default function InspectionShow({ inspection }: Props) {
                                     <div className="mt-1 text-xs text-muted-foreground">
                                         N/A
                                     </div>
+                                </div>
+                                <div className="rounded-lg bg-status-warning-bg p-3 text-center">
+                                    <div className="text-2xl font-bold text-status-warning">{counts.unknown}</div>
+                                    <div className="mt-1 text-xs text-muted-foreground">Unknown</div>
                                 </div>
                             </div>
                             <div className="mt-4 rounded-md bg-muted/40 p-3">
@@ -317,36 +304,40 @@ export default function InspectionShow({ inspection }: Props) {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
-                                {items.map(({ key, label, item }) => (
+                                {items.map(({ key, label, item, options }) => (
                                     <div
                                         key={key}
                                         className={cn(
                                             'flex items-center gap-3 rounded-lg border p-3 transition-colors',
-                                            item.result === 'fail'
+                                            assessment(item) === 'fail'
                                                 ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
-                                                : item.result === 'pass'
+                                                : assessment(item) === 'pass'
                                                   ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/50'
                                                   : '',
                                         )}
                                     >
-                                        <ResultIcon result={item.result} />
+                                        <ResultIcon result={assessment(item)} />
                                         <span className="flex-1 text-sm font-medium">
                                             {label}
+                                            <small className="mt-1 block font-normal text-muted-foreground">Recorded answer: {item.result === 'unknown' ? 'Not supplied' : item.result}</small>
+                                            {Array.isArray(options) && options.length > 0 && <small className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                                Presented options: {options.map((option: unknown) => typeof option === 'string' ? option
+                                                    : option && typeof option === 'object' && 'label' in option ? String(option.label) : '').filter(Boolean).join(', ')}
+                                            </small>}
                                         </span>
                                         <Badge
                                             variant={
-                                                item.result === 'pass'
+                                                assessment(item) === 'pass'
                                                     ? 'default'
-                                                    : item.result === 'fail'
+                                                    : assessment(item) === 'fail'
                                                       ? 'destructive'
                                                       : 'secondary'
                                             }
                                             className="text-xs"
                                         >
-                                            {item.result === 'na'
-                                                ? 'N/A'
-                                                : item.result}
+                                            {assessment(item) === 'na' ? 'N/A' : assessment(item) === 'unknown' ? 'Needs assessment' : assessment(item) === 'pass' ? 'Passed' : 'Failed'}
                                         </Badge>
+                                        {item.evidence && <a className="text-xs font-medium text-primary underline" href={item.evidence.url}>{item.evidence.name}</a>}
                                         {item.notes && (
                                             <span className="max-w-[200px] truncate text-xs text-muted-foreground italic">
                                                 {item.notes}

@@ -127,6 +127,7 @@ type Props = {
         status: string;
     }>;
     work_orders: Array<Record<string, unknown>>;
+    maintenance_restricted: boolean;
     bookings: Array<Record<string, unknown>>;
     incidents: Array<{
         id: number;
@@ -141,6 +142,7 @@ type Props = {
     can: {
         manage: boolean;
         inspect: boolean;
+        report_maintenance: boolean;
         view_vehicle_technology: boolean;
     };
     service_prediction: {
@@ -177,6 +179,7 @@ export default function VehicleShow({
     fuel_logs,
     driver_sessions,
     work_orders,
+    maintenance_restricted,
     bookings,
     incidents,
     sites,
@@ -361,6 +364,11 @@ export default function VehicleShow({
                         </>
                     }
                 />
+
+                {maintenance_restricted && <div role="status" className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+                    <strong>Do not use — maintenance hold active</strong>
+                    <p className="mt-1">This vehicle stays restricted until an authorised release. A repair or provider appointment alone does not clear it.</p>
+                </div>}
 
                 <Tabs value={activeSection} onValueChange={openSection}>
                     <TabsList className="h-auto flex-wrap gap-1 p-1">
@@ -1150,6 +1158,21 @@ export default function VehicleShow({
                                             Go to Daily Checks
                                         </Link>
                                     </Button>
+                                </CardContent>
+                            </Card>
+                            {/* Checklists */}
+                            <Card>
+                                <CardHeader className="pb-2"><CardTitle className="text-sm">Maintenance work</CardTitle></CardHeader>
+                                <CardContent className="space-y-2">
+                                    {can.report_maintenance && <Button variant="default" size="sm" className="w-full" asChild>
+                                        <Link href={`/fleet-assets/maintenance/work-orders/create?asset_id=${vehicle.id}`}>Report a problem</Link>
+                                    </Button>}
+                                    {[...work_orders].sort((a, b) => Number(b.id) - Number(a.id)).slice(0, 3).map((order) => <Link key={String(order.id)}
+                                        href={`/fleet-assets/maintenance/work-orders/${String(order.id)}`}
+                                        className="block rounded-md border p-2 text-xs text-primary hover:underline">
+                                        {String(order.reference_number ?? `WO-${String(order.id)}`)} · {String(order.title ?? 'Work order')}
+                                    </Link>)}
+                                    {work_orders.length === 0 && <p className="text-xs text-muted-foreground">No recent maintenance work.</p>}
                                 </CardContent>
                             </Card>
                             {/* Checklists */}

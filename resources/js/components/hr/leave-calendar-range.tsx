@@ -62,12 +62,14 @@ export function LeaveCalendarRange({
     onChange,
     holidays = {},
     month,
+    required = true,
 }: {
     start: string | null;
     end: string | null;
     onChange: (start: string | null, end: string | null) => void;
     holidays?: Record<string, string>;
     month?: Date;
+    required?: boolean;
 }) {
     // Local calendar view state — seeds from the current selection / `month` prop.
     const [viewMonth, setViewMonth] = useState<Date>(() => {
@@ -111,7 +113,7 @@ export function LeaveCalendarRange({
         <div>
             <div className="mb-2 flex items-center justify-between">
                 <span className="text-[13px] font-semibold">
-                    Dates <span className="text-status-critical">*</span>
+                    Dates {required && <span className="text-status-critical">*</span>}
                 </span>
                 <div className="flex items-center gap-0.5">
                     <button

@@ -502,6 +502,10 @@ class AssetController extends Controller
 
         return Inertia::render('fleet-assets/assets/show', [
             'asset' => $safeAsset,
+            'active_maintenance_restrictions' => $asset->site_id && $this->hasTable('fleet_maintenance_restrictions')
+                ? \Illuminate\Support\Facades\DB::table('fleet_maintenance_restrictions')
+                    ->where('asset_id', $asset->id)->where('state', 'active')->count()
+                : 0,
             'timeline' => $timeline,
             // Edit wizard (AssetWizardDialog) option lists — mirrors index/create.
             'sites' => $this->deviceAccess->accessibleSites($user)

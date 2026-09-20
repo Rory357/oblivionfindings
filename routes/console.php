@@ -79,6 +79,11 @@ use Illuminate\Support\Facades\Artisan;
 
 app(Schedule::class)->job(new \App\Jobs\SyncWorkCalendarsJob)->everyFifteenMinutes()->withoutOverlapping();
 
+if (config('fleet_maintenance.effects_enabled', false)) {
+    app(Schedule::class)->command('maintenance:dispatch-effects --limit=25')
+        ->everyMinute()->onOneServer()->withoutOverlapping();
+}
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
