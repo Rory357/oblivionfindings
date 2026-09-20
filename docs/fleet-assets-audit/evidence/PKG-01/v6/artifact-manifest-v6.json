@@ -1,0 +1,132 @@
+{
+  "artifact": "PKG-01 desktop mockup v6",
+  "frozenAtUtc": "2026-09-19T22:03:34.0118731Z",
+  "baseline": "e62b569ff42ab471300fb6713a68758b647b2c32",
+  "url": "http://127.0.0.1:4322/",
+  "identityAlgorithm": "SHA-256 of sorted path + space + SHA-256 + LF for preview files",
+  "identitySha256": "ba4bce7c093c411eafccad4f20399478b4bd6a0f55ea10d6dc49e959324166a3",
+  "files": [
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/asset-context.tsx",
+      "bytes": 15575,
+      "sha256": "cf2eab9482259fcca806f50d529cdfecec4cf1d06a7fb01d4414de5e141a89dd"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/attachment-card.tsx",
+      "bytes": 828,
+      "sha256": "57eccc1ecde605bd188c36ea5742baa617e546707561a9c6e2901952632b248c"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/attachments.tsx",
+      "bytes": 17918,
+      "sha256": "a1f9753293d21390196373ce89fc17003d3261c7d075f07374d952e07a8fad3e"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/build.cjs",
+      "bytes": 1372,
+      "sha256": "16f432e594b556218eb145ec755e808cee6c84471747fd8e19e64d7baa92d63f"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/content-primitives.tsx",
+      "bytes": 1041,
+      "sha256": "37651c7c9565f0c546a44a58071baf3904304e49e22137db22023f826f39232a"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/dialog-frame.tsx",
+      "bytes": 8257,
+      "sha256": "20c63be0d498858d1bae72b75160d89ead695fc3b1a1426f6ec50417af6b6cc3"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/index.html",
+      "bytes": 307,
+      "sha256": "44f92e4978013176b5c0be840b6e8b811d1e355b6180fba67b34b8855f7fa6ce"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/layout.css",
+      "bytes": 36796,
+      "sha256": "29f3b06cd23c4ea906c4547ecbb9e9c69b1eb836bcfeca5fcea83b37587864fe"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/maintenance-window.tsx",
+      "bytes": 10705,
+      "sha256": "3999bf5279a3e769708077cc2b658e487084049c644243a438a640358493e0bd"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/owner-picker.tsx",
+      "bytes": 6268,
+      "sha256": "82e0a9cbf1439732a0c2756881dddae07966eff5ec7836b28d4130784896f7b4"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/preview.css",
+      "bytes": 154492,
+      "sha256": "2e395f73b2a462c090fcb915498450d22585b6306777a5ad0113efa427263755"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/preview.js",
+      "bytes": 2686132,
+      "sha256": "f2a615e28ec19f7a11c44a88501eaee7767412fc281bc8463d088fd2a102033f"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/preview.tsx",
+      "bytes": 167129,
+      "sha256": "fd00a2970c51be2c370f4402e8c9ef0024d49a1bed959d017fa292ba44e97d38"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/release-workflow.tsx",
+      "bytes": 18579,
+      "sha256": "cef8254e800e41e9182f7c09d1a7775359633f2840016387628b95d7cb475677"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/serve.cjs",
+      "bytes": 671,
+      "sha256": "b17d434e6b649b474b3687696411a21e8a21faba258b07cdb0157d00ec7b4b4a"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/time-picker.tsx",
+      "bytes": 10423,
+      "sha256": "a45297c45135750cd4da79301fe38aacfde124e59fa4291216b61128e84f6d30"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/work-notes.tsx",
+      "bytes": 8818,
+      "sha256": "c179bc074c53ee321a2fc0b9961092f6e9a5ff4c93e2a7eb4e1ab143d320be09"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/work-overview.tsx",
+      "bytes": 12790,
+      "sha256": "72cfcc6b39bf7f32e05584d0c5c38d50de2189fe51adf919980a75d895d708be"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v6/work-progress.tsx",
+      "bytes": 3622,
+      "sha256": "502c3af358d8dbd22d1a010c9b086096a04bc0c207c4bf9981d07268a803f24c"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v6/01-clock-minutes-1440.jpg",
+      "bytes": 93535,
+      "sha256": "99559b43c81b68b8ed7ced23bdd1f4a3c64b46df27662b8fb37f7dc6534e5ac8"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v6/02-manual-time-1440.jpg",
+      "bytes": 88786,
+      "sha256": "ab357ad2be16b9d5e8ff41fa0056708530357e32bc9491e8f3fcffaf47dd66ad"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v6/03-end-clock-1280.jpg",
+      "bytes": 61472,
+      "sha256": "bfa73a74bf71ddd06836c500a19e8eac1afd6bbb323bad0dcc403ad6db910572"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v6/04-time-review-1280.jpg",
+      "bytes": 67303,
+      "sha256": "355b66ee3a2ab3bf764d4b4a177b18fe878e2711b0a48662140806d64515ab06"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v6/05-clock-hours-1280.jpg",
+      "bytes": 84160,
+      "sha256": "13ed2e62ba64058f0023fd2c06d7b7a057c57d71ca01fef2cdabc39aa8c56223"
+    }
+  ]
+}

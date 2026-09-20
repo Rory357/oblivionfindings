@@ -1,0 +1,65 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\2375\oblivionfindings\phpunit.pkg01.xml
+
+[31;1mE[0m                                                                   1 / 1 (100%)
+  [31;1m⨯[39;22m
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceRollbackTest[22m [90m>[39m Designer review: empty package r… [41;1m QueryException [49;22m  
+[39;1m  SQLSTATE[HY000]: General error: 1553 Cannot drop index 'fleet_cr_work_kind_submitted_idx': needed in a foreign key constraint (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: oblivion_findings_pkg01_2375_test_21000, SQL: alter table `fleet_checklist_runs` drop index `fleet_cr_work_kind_submitted_idx`)[39;22m
+
+  at [32mvendor\laravel\framework\src\Illuminate\Database\Connection.php[39m:[32m587[39m
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+    586▕ 
+  ➜ 587▕             return $statement->execute();
+    588▕         });
+    589▕     }
+    590▕ 
+    591▕     /**
+
+  [33m1   [39m[39;1mvendor\laravel\framework\src\Illuminate\Database\Connection.php[39;22m:[39;1m587[39;22m
+  [33m2   [39m[39;1mvendor\laravel\framework\src\Illuminate\Database\Connection.php[39;22m:[39;1m830[39;22m
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m (2 assertions)[39m
+  [90mDuration:[39m [39m311.39s[39m
+
+
+
+Time: 05:11.357, Memory: 84.00 MB
+
+There was 1 error:
+
+1) P\Tests\Feature\FleetAssets\Pkg01MaintenanceRollbackTest::__pest_evaluable_Designer_review__empty_package_rolls_back_and_every_down_preserves_standalone_and_corrected_sources
+Illuminate\Database\QueryException: SQLSTATE[HY000]: General error: 1553 Cannot drop index 'fleet_cr_work_kind_submitted_idx': needed in a foreign key constraint (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: oblivion_findings_pkg01_2375_test_21000, SQL: alter table `fleet_checklist_runs` drop index `fleet_cr_work_kind_submitted_idx`)
+
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:587
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:797
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:576
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Schema\Blueprint.php:121
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Schema\Builder.php:690
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Schema\Builder.php:496
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Support\Facades\Facade.php:363
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\database\migrations\2026_09_20_000100_pkg01_maintenance_workflow.php:223
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\tests\Feature\FleetAssets\Pkg01MaintenanceRollbackTest.php:23
+
+Caused by
+PDOException: SQLSTATE[HY000]: General error: 1553 Cannot drop index 'fleet_cr_work_kind_submitted_idx': needed in a foreign key constraint
+
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:587
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:797
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:576
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Schema\Blueprint.php:121
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Schema\Builder.php:690
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Schema\Builder.php:496
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\vendor\laravel\framework\src\Illuminate\Support\Facades\Facade.php:363
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\database\migrations\2026_09_20_000100_pkg01_maintenance_workflow.php:223
+C:\Users\steph\.codex\worktrees\2375\oblivionfindings\tests\Feature\FleetAssets\Pkg01MaintenanceRollbackTest.php:23
+
+[37;41mERRORS![0m
+[37;41mTests: 1[0m[37;41m, Assertions: 2[0m[37;41m, Errors: 1[0m[37;41m.[0m

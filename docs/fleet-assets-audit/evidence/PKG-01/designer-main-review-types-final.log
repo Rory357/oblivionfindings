@@ -1,0 +1,6 @@
+Designer verification, 2026-09-20
+Working directory: C:/Users/steph/.codex/worktrees/2375/oblivionfindings
+Command: node node_modules/typescript/bin/tsc --noEmit
+Final session 78538 completed with exit code 0 and no stdout/stderr after the last queue correction and route generation.
+The earlier optional-assessment type mismatch was fixed before this final run.
+Session33886 also passed before the queue-only correction. An overlapping TypeScript run20983 encountered missing generated appearance routes while Vite regenerated them; after generation completed, the final78538 run passed. No settings code or generated-route workaround was added.

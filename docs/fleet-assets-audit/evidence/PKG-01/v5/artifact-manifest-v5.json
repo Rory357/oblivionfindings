@@ -1,0 +1,127 @@
+{
+  "artifact": "PKG-01 desktop mockup v5",
+  "frozenAtUtc": "2026-09-19T21:51:36.0208393Z",
+  "baseline": "e62b569ff42ab471300fb6713a68758b647b2c32",
+  "url": "http://127.0.0.1:4321/",
+  "identityAlgorithm": "SHA-256 of sorted path + space + SHA-256 + LF for preview files",
+  "identitySha256": "af32b9bd9543f6034e7be08e3ccaa6ff66f0e5e25ccb07f128b7c541512e9110",
+  "files": [
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/asset-context.tsx",
+      "bytes": 15575,
+      "sha256": "0e17812dccbb2568f30a040b3fff789af782269c7c7964c21b589c218333d3ee"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/attachment-card.tsx",
+      "bytes": 828,
+      "sha256": "57eccc1ecde605bd188c36ea5742baa617e546707561a9c6e2901952632b248c"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/attachments.tsx",
+      "bytes": 17918,
+      "sha256": "a1f9753293d21390196373ce89fc17003d3261c7d075f07374d952e07a8fad3e"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/build.cjs",
+      "bytes": 1372,
+      "sha256": "15afad498eb496d14ba81b974f648b20cf71aa34a6f3e625f0fe88b99012d025"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/content-primitives.tsx",
+      "bytes": 1041,
+      "sha256": "37651c7c9565f0c546a44a58071baf3904304e49e22137db22023f826f39232a"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/dialog-frame.tsx",
+      "bytes": 8257,
+      "sha256": "20c63be0d498858d1bae72b75160d89ead695fc3b1a1426f6ec50417af6b6cc3"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/index.html",
+      "bytes": 307,
+      "sha256": "aa7b1a49fe79bbb497db3e3fed07a80f2304d4839472c8170e5ae7393683f833"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/layout.css",
+      "bytes": 32868,
+      "sha256": "8fdea69e7adef4ec3c8e21b24e764c8c2c4180c8d074178036c7224e6ee8e7e7"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/maintenance-window.tsx",
+      "bytes": 10705,
+      "sha256": "3999bf5279a3e769708077cc2b658e487084049c644243a438a640358493e0bd"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/owner-picker.tsx",
+      "bytes": 6268,
+      "sha256": "82e0a9cbf1439732a0c2756881dddae07966eff5ec7836b28d4130784896f7b4"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/preview.css",
+      "bytes": 150564,
+      "sha256": "691e77ea942f61e0f8f4390e5a9b54d1fdb4cf87f53d6e53e220edf5826304f9"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/preview.js",
+      "bytes": 2672454,
+      "sha256": "4fd2d546d79ac4e78b4b66dd1c5b3ab6e114be86c800e6f4b940755c30e5b1eb"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/preview.tsx",
+      "bytes": 167965,
+      "sha256": "e69550ca5e3429d42f07fd1ede8f34774bd000b4582229f91b10bb74c01c24d0"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/release-workflow.tsx",
+      "bytes": 18579,
+      "sha256": "cef8254e800e41e9182f7c09d1a7775359633f2840016387628b95d7cb475677"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/serve.cjs",
+      "bytes": 671,
+      "sha256": "c214bd243c58b723d2138cc86b58f5d79c49b525ff37ad92fbef5b74bb15e01a"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/work-notes.tsx",
+      "bytes": 8818,
+      "sha256": "c179bc074c53ee321a2fc0b9961092f6e9a5ff4c93e2a7eb4e1ab143d320be09"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/work-overview.tsx",
+      "bytes": 12790,
+      "sha256": "72cfcc6b39bf7f32e05584d0c5c38d50de2189fe51adf919980a75d895d708be"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-01/v5/work-progress.tsx",
+      "bytes": 3622,
+      "sha256": "502c3af358d8dbd22d1a010c9b086096a04bc0c207c4bf9981d07268a803f24c"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v5/01-appointment-calendar-1440.jpg",
+      "bytes": 80881,
+      "sha256": "63f6cace2b4c186621fc14efb587b727d29315282ff2bad5946ef6de745a3e04"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v5/02-appointment-review-1440.jpg",
+      "bytes": 75739,
+      "sha256": "f05db93ef1c29fe47cd45d3f4de4459dc230c703f423c02f12fb30d16abcb236"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v5/03-time-validation-1280.jpg",
+      "bytes": 72411,
+      "sha256": "a0c3fe42fda3808e5605007db9f70b9f755b889aa94d3e05f8639adcec2da638"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v5/04-single-day-review-1280.jpg",
+      "bytes": 67000,
+      "sha256": "c8370a358a22bc57f57a9ee8b344a66dfe282440016e40bf9fa5a7a2083bc982"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v5/05-appointment-calendar-1280.jpg",
+      "bytes": 76825,
+      "sha256": "d977677a534b9e9a8c4fca9a9f2973fb39f79d47b25009e9b5a1849fca2fba4b"
+    }
+  ]
+}

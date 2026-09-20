@@ -1,0 +1,6 @@
+Designer verification, 2026-09-20
+Working directory: C:/Users/steph/.codex/worktrees/2375/oblivionfindings
+Command: node node_modules/eslint/bin/eslint.js resources/js/components/fleet-assets/maintenance resources/js/pages/fleet-assets/maintenance resources/js/pages/fleet-assets/inspections/show.tsx resources/js/components/hr/leave-calendar-range.tsx --max-warnings 0
+Completed with exit code 0 and no stdout/stderr after the final modal-error-scope change.
+git diff --check also completed separately with exit code 0 and no output.
+After the final queue header/copy correction, index.tsx scoped ESLint --max-warnings 0 passed again with exit0/no output, and git diff --check passed again.

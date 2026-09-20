@@ -1,0 +1,751 @@
+{
+  "capturedUtc": "2026-09-20T09:12:07.604Z",
+  "applicationCommit": "869edf738035e7e42890fdf902d75d914d393a55",
+  "guideCommit": "c008fb0cf3ab45cc56b0b038a542f18ed4cf20ba",
+  "parent": "c008fb0cf3ab45cc56b0b038a542f18ed4cf20ba",
+  "files": [
+    {
+      "path": "docs/fleet-assets-audit/00-project-rules.md",
+      "sha256": "0FCD857BEE3857927A822E32C213F5A0345647AFC9219A98B84452B73EE9AB94",
+      "bytes": 12439,
+      "category": "Main-approved context",
+      "gitBlob": "3b4da5e5c557078d20eaee1559c484ab2ec71feb"
+    },
+    {
+      "path": "docs/fleet-assets-audit/01-domain-ownership.md",
+      "sha256": "58776C64A4F6FB3FE2F874DB9B07FAA97ED2484FBC49092D345F5B6677A2B797",
+      "bytes": 3528,
+      "category": "Main-approved context",
+      "gitBlob": "6428aa23013eb7189f5e4259dbd4859f9a28ebb2"
+    },
+    {
+      "path": "docs/fleet-assets-audit/02-approved-workflows.md",
+      "sha256": "F2F62890A366C9B07EAAECE75D8E79956AB5F329CC37A7580DEF8028A264870D",
+      "bytes": 31715,
+      "category": "Main-approved context",
+      "gitBlob": "036657c7603887562d335060ca2c2a12c728d637"
+    },
+    {
+      "path": "docs/fleet-assets-audit/03-dependency-map.md",
+      "sha256": "059FE852D05A8438E62A8918DBEB4A6F3C0C714D61AD61DE297EA949CC56D9AE",
+      "bytes": 12033,
+      "category": "Main-approved context",
+      "gitBlob": "79144e9744a098b18ad24acdcff7acdbc3e262dc"
+    },
+    {
+      "path": "docs/fleet-assets-audit/04-design-rules.md",
+      "sha256": "A9E4EEB16E2AC1C4639684507B4336CD044B29DA4218775CA4D1FF1B5B8D1FFF",
+      "bytes": 13807,
+      "category": "Main-approved context",
+      "gitBlob": "f213f722502c74ab20b5945cb4767bde80501e95"
+    },
+    {
+      "path": "docs/fleet-assets-audit/05-page-register.md",
+      "sha256": "A24A66BBAC47A9725633BC9BF79021AEDE6B52E5296CA863271A737A1955A2A3",
+      "bytes": 81585,
+      "category": "Main-approved context",
+      "gitBlob": "be568d5fbdf285593148d231e84d775759e41752"
+    },
+    {
+      "path": "docs/fleet-assets-audit/06-model-selection.md",
+      "sha256": "A5671BF752AF1C1CCB0F5716AF36B69A8DE71E40D79DFCF5F9893CCB48301E51",
+      "bytes": 6744,
+      "category": "Main-approved context",
+      "gitBlob": "d3b33251499ad99adaad79989cf8ff63ee075361"
+    },
+    {
+      "path": "docs/fleet-assets-audit/07-model-results.md",
+      "sha256": "F2C90DADF4A9F5E2BDA58F7029C238B073CB6685DC54070DDCC0C1E4EF879975",
+      "bytes": 4000,
+      "category": "Main-approved context",
+      "gitBlob": "6e04c2a8b3e7b9464d97a520f4253bea45e838f8"
+    },
+    {
+      "path": "docs/fleet-assets-audit/08-prompt-codebase-validation.md",
+      "sha256": "6142FA3DFDF1C6F0E56562A3D7763A16DF5C572EBE93F7216C4942C84CE03C63",
+      "bytes": 21442,
+      "category": "Main-approved context",
+      "gitBlob": "2f7da873d98cb037edc6dbd345c3ec83ae2b561f"
+    },
+    {
+      "path": "docs/fleet-assets-audit/09-amendments.md",
+      "sha256": "C8BB498E01C0744FC2F25837CF34DB199C47C787BEDCF02EB2F263AC8AD379C7",
+      "bytes": 19983,
+      "category": "Main-approved context",
+      "gitBlob": "9774631486d46f0435dad314670bea77ea6207c0"
+    },
+    {
+      "path": "docs/fleet-assets-audit/10-full-audit.md",
+      "sha256": "F202F549B4147F70CFF4518156D1B1CED6144D1EA07D5DAE6C6F0E3301D98A1E",
+      "bytes": 51242,
+      "category": "Main-approved context",
+      "gitBlob": "bf08d80d05a1d34c2418ce03f74f38db1a75d945"
+    },
+    {
+      "path": "docs/fleet-assets-audit/11-coverage-register.md",
+      "sha256": "D3096F8940B6B6E1B63906C4EB7E510FB6F8D959B02DCD85877A5E3FB6B36F3E",
+      "bytes": 17231,
+      "category": "Main-approved context",
+      "gitBlob": "c805b621ce60dd78aec610a4fc9931aa3e75b06c"
+    },
+    {
+      "path": "docs/fleet-assets-audit/12-navigation-page-inventory.md",
+      "sha256": "0558C11685C5E78DA1B9ABA912AFFAFEC99D6C523E2D1B8B4051D19DD6FAD336",
+      "bytes": 14368,
+      "category": "Main-approved context",
+      "gitBlob": "4d5f86cf557a82b789fe31559439e29e708f5769"
+    },
+    {
+      "path": "docs/fleet-assets-audit/13-integration-matrix.md",
+      "sha256": "5EEB5B61E9D8B5843453AC9D95F9AA6884836781595411672EA50D234C3FDA23",
+      "bytes": 13917,
+      "category": "Main-approved context",
+      "gitBlob": "b221fe7a612605a2febdc5449288c16babf07792"
+    },
+    {
+      "path": "docs/fleet-assets-audit/14-scope-workflow-approval.md",
+      "sha256": "D56573A349B53B386DBFF911EE71D2654F35BDB99A2C18364E310C1EAD922D18",
+      "bytes": 4476,
+      "category": "Main-approved context",
+      "gitBlob": "4e073583b6185edc76f7e8895f9726f1d0dc1639"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/full-audit-verification.md",
+      "sha256": "37E69D6584EB88CDADCCAC91FDF74A454C64B24D26C6411F0ACFB422B9FA057E",
+      "bytes": 10703,
+      "category": "Main-approved context",
+      "gitBlob": "701a3325e8e3b2d9f55faf59e0be1977b29c60eb"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-approved-design-supplements.patch",
+      "sha256": "2B3E81760EE5FFA99669FDD892DE2BBCD283D1C1C8D746741A836E0000D189B7",
+      "bytes": 35202,
+      "category": "Main-approved context",
+      "gitBlob": "2f58c94380cd414de9f562d7c4680a2f22c68efe"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v1.md",
+      "sha256": "0C234526D64892CE86BC1F8ED645BD3F06D49A7CCCF36F3D76394632CA98E756",
+      "bytes": 1752,
+      "category": "Main-approved context",
+      "gitBlob": "5b1da37962159b86b2a396d7c407b0883692e75c"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v10.md",
+      "sha256": "E2421A0957C942E55B898B0FBA5B6D5280F75DD7E30E315C43BEC15B35B169A7",
+      "bytes": 5822,
+      "category": "Main-approved context",
+      "gitBlob": "8b3d1d64f636543cd5da098422c50f2113cdb03c"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v11.md",
+      "sha256": "6991CF13AF2C8FA4A49BF8B6AD0534EE815776F3F70C1CBA53F494219DEEAA22",
+      "bytes": 6571,
+      "category": "Main-approved context",
+      "gitBlob": "7a4883304eba6364fbc7fb6d47fe58244563842c"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v12.md",
+      "sha256": "D50DB1DE51C7A6DB5950A30B4033752181D25CC7E51BE3C7AA8B21C79C65B198",
+      "bytes": 6502,
+      "category": "Main-approved context",
+      "gitBlob": "25294b2a1fc6104861bdf99cf2e901830c94b0fc"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v13.md",
+      "sha256": "B53F76AB97F0B18C23CAA0C27CA7C7C6E105FCEAB309D3475C64FD1579ECA881",
+      "bytes": 5202,
+      "category": "Main-approved context",
+      "gitBlob": "a483dc68d63dac50aeff44e07ad5b56fe0efafdd"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v2.md",
+      "sha256": "A431B5E8A694458F5F84DA2EC237CA85D79DD3BBF9A4C8B1666046F29277FF4E",
+      "bytes": 2015,
+      "category": "Main-approved context",
+      "gitBlob": "8338c4f5f9d7a46d989ba9be970a67153f4424fc"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v3.md",
+      "sha256": "CF6C770E31ADB83D0154C9B1ABCFECF5A99E428DF2DC48F6202E744572344DF2",
+      "bytes": 2174,
+      "category": "Main-approved context",
+      "gitBlob": "3f32c1556b13c70f8a259a409501e63cd2855202"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v4.md",
+      "sha256": "C8790454E237FE67286078AB0C8C19826B4439C21E3F51748FB8E81E5A06FCC4",
+      "bytes": 3562,
+      "category": "Main-approved context",
+      "gitBlob": "3ddef79a328a87635c3eb671909b1adda604b406"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v5.md",
+      "sha256": "D94C9F62C83C9481E265F08956BEFFC212DF1468448A4C6EECB5F5501DBF527C",
+      "bytes": 4450,
+      "category": "Main-approved context",
+      "gitBlob": "1017831965e00e095d62a3ed30707a165bcf30b9"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v6.md",
+      "sha256": "FBDB7BA57842AFC1B2A6DA96C4F91161944FA703557D95F84377447A053026F2",
+      "bytes": 5470,
+      "category": "Main-approved context",
+      "gitBlob": "f1cc7947faa9e888d1c14a552a3d9dc283a02565"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v7.md",
+      "sha256": "5330DF491E39F3775BB6B29DD36573748143B52D8E418A2C86389DDB45C260C0",
+      "bytes": 6841,
+      "category": "Main-approved context",
+      "gitBlob": "01e65d7e3806ab33073b4e278f560ae864df8422"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v8.md",
+      "sha256": "3652C3E9BEC38376C49B01BAB13AA569C4DD19F8F428F0A3872F861771372DA4",
+      "bytes": 5088,
+      "category": "Main-approved context",
+      "gitBlob": "0c03d1ff15a8fa930129be96df0ca48f9e79c08b"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v9.md",
+      "sha256": "E662CA30856A9329B5264622E0F50CA331F028AA9BD08FF6814DFF6C128C799D",
+      "bytes": 4938,
+      "category": "Main-approved context",
+      "gitBlob": "af9fd26cbf5b9e825abefd9b59cf1982692c6e29"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-main-context-publication-manifest-v1.json",
+      "sha256": "C35FC98C73C88970C2254CEC9CFA2057E0C7832B1350F4A6A9BC9EC06A6BC4DF",
+      "bytes": 7360,
+      "category": "Main-approved context",
+      "gitBlob": "1945d34a30410d12e69542e7356bfaa164a9cde8"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-main-design-review.md",
+      "sha256": "B9DD4EBD9D928449A6865B2CC03F58896252EF960108420039A4C437F0CC3BFA",
+      "bytes": 47172,
+      "category": "Main-approved context",
+      "gitBlob": "5d13fcb0d89d4de10144c440ea2d2a9057a239e0"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-main-integration-preparation.md",
+      "sha256": "7BD41F03785431FD3E7B07D615418B5A04CAA0CC31550927466F26EF23E4DEAC",
+      "bytes": 8683,
+      "category": "Main-approved context",
+      "gitBlob": "ec7f7dfbfc6e3d68aaf207cea6195e25cb563249"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-main-replacement-focused-test.log",
+      "sha256": "133A46C54FA8B2A1CF35ABC8E4F6741874750B8BB72FDD63E8DCDF5FA65AF7F8",
+      "bytes": 515,
+      "category": "Main-approved context",
+      "gitBlob": "d6829e490301dc933b9c5293e4fed2f012d635fb"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-main-replacement-review.md",
+      "sha256": "29CEB46BA5E84240F0B62496D54912C3BCF314C4892EA35C802EB306275DFB68",
+      "bytes": 12241,
+      "category": "Main-approved context",
+      "gitBlob": "2d98c0e781d8b986e7d0713612c623e6ad7b081c"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-main-technical-review.md",
+      "sha256": "4DBD8B8F2D5890F6448BB9C4E4AF4C14D20CA93203356DAC380BFA08BF034CC2",
+      "bytes": 12860,
+      "category": "Main-approved context",
+      "gitBlob": "8f0715300c0775ebc053ffec6ab89c9580ae153f"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-setup-recovery.md",
+      "sha256": "FC1A87A6F8330001DAF49266FDF3A5CF0CB1B1ADA19A07AFFA16C2C07F2F350F",
+      "bytes": 2681,
+      "category": "Main-approved context",
+      "gitBlob": "3fcc5491848a5631cf522872df5718d5f465b547"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-test-server-publication-approval.md",
+      "sha256": "EBEB97BE9BD45B49ED96BF73B87ABC26D9211143B7AE1FAFE769947251A38B03",
+      "bytes": 2761,
+      "category": "Main-approved context",
+      "gitBlob": "f8d15e0597ca76140c895c59f948712db61c98d3"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/section-0-baseline.md",
+      "sha256": "AF1880FE33B57AD288ED7C4C07117B3920E1FD596193DF478D44135541008EE5",
+      "bytes": 7786,
+      "category": "Main-approved context",
+      "gitBlob": "617684295cba5c81cddf04d7a7a2dcdd96e4d9d4"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/source-inventory.md",
+      "sha256": "900A404B2B0B4156E9F9502E0F0F8E78E2F9D256B0D8FE05627981D7F2AC9EC0",
+      "bytes": 74582,
+      "category": "Main-approved context",
+      "gitBlob": "ee6227970bc7b3a7c65461f4a3e785fbf5b1e2ec"
+    },
+    {
+      "path": "docs/fleet-assets-audit/handoffs/PKG-01-context-manifest.md",
+      "sha256": "B5A5859A718B76B97464395DA72FA9584D6217FFBDE73DF370331C9DD6CDEA76",
+      "bytes": 5471,
+      "category": "Main-approved context",
+      "gitBlob": "fc5ec55788a4973f7b5dfa88673ebb8886c8b837"
+    },
+    {
+      "path": "docs/fleet-assets-audit/handoffs/PKG-01-DESIGNER.md",
+      "sha256": "52BA0413D9E75035417F29E203A79754EC238AFBDC30C24344C6B4CEBA612147",
+      "bytes": 23050,
+      "category": "Main-approved context",
+      "gitBlob": "5629ec0dbff86b36788fab2566ea248c10178e67"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-main-context-publication-manifest.json",
+      "sha256": "F59BF5673552B79052E93E51A338B9DA53F4A77C0441297F37E18A02308C9703",
+      "bytes": 8032,
+      "category": "Main-approved manifest",
+      "gitBlob": "756a9ad3cf4ae795ccbeccc578ae6849e5b9a6f2"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/artifact-manifest-v1.json",
+      "sha256": "0746E5A95077EB4C4B92891FAD2C9DCE13E66C8EC36A6FA6148476EE33966D8F",
+      "bytes": 6789,
+      "category": "Designer record",
+      "gitBlob": "c40715abed887cfb5d912d8f18dd7071380c6afc"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/contracts-and-scope-v1.md",
+      "sha256": "CA506C6EB98781F6C5BBCFA6DCBDDD7FA9078D42CFF68233D0D1163E92A78C9C",
+      "bytes": 10576,
+      "category": "Designer record",
+      "gitBlob": "c97368368bbe6b792ef28bcdfb8c239fc10ed945"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/correction1-review.md",
+      "sha256": "9A33904547FBF716F4A3A1EF62F057EEEBC39CDF39DA53A1C8F803CE710B74B7",
+      "bytes": 11495,
+      "category": "Designer record",
+      "gitBlob": "07430e792e3ea9d23fdc12c0284a819bedfa222a"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/correction2-and-designer-takeover-review.md",
+      "sha256": "7BAA4F9CA459667E273F6D07140E93BD784AC712EAE4CA82F59AF45567B750E8",
+      "bytes": 9878,
+      "category": "Designer record",
+      "gitBlob": "9ec91465ec5e7233a0de15152c156be57fa608fb"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/d1-context-receipt-and-v3-conformance.md",
+      "sha256": "46063A2F3F9A6DE5BBE766EB03765F0EB0DBB9C0EE57FA55E876BACFB0B9F7A9",
+      "bytes": 8844,
+      "category": "Designer record",
+      "gitBlob": "53603cdca6307cff25b44a51d1aaba6c85d01706"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-integration-candidate-manifest.json",
+      "sha256": "7E5A61877E5B757B386D3AF486FE405BBE0DA5CC3D72851DAE3572CF372914B4",
+      "bytes": 21407,
+      "category": "Designer record",
+      "gitBlob": "f7a5ce947da95356d7fc6c597e2ea341c385a4ed"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-main-review-candidate-manifest.json",
+      "sha256": "14EA5A91290AE59808C4490613973E9142EA5ABDC99428B8F9788740E5B142D8",
+      "bytes": 20947,
+      "category": "Designer record",
+      "gitBlob": "d322db0e6f72aba0a8a53132dbf7c67afa4449ae"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-main-review-repair-verification.md",
+      "sha256": "A2F38A8802498EFB62A8B37D52199FB906EC11006046BEB85CEC26BFE29B2D90",
+      "bytes": 16074,
+      "category": "Designer record",
+      "gitBlob": "bf935b30d7a162f2888a9abd5a199f7aded51ff5"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-takeover-candidate-manifest.json",
+      "sha256": "CDD07766305CC64B64BCBA9CE02BECC8981259DC9C65CE150E17341798077D18",
+      "bytes": 13112,
+      "category": "Designer record",
+      "gitBlob": "e1b04bea2d36f80b85e980ce557274be3333a6c0"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/implementation-handoff-v1.md",
+      "sha256": "D2E60165C084958D9204D29CEBE98470A7D6A90F9FCD3F76EE105FB915B84282",
+      "bytes": 26279,
+      "category": "Designer record",
+      "gitBlob": "9a4190bf5cf879a85c6cc0329846a81f852a6ae3"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/initial-delivery-candidate-manifest.json",
+      "sha256": "9FFA1DF874838FA5194365C603875E92CEFD478B84957575D76A77291FC9D1D1",
+      "bytes": 9064,
+      "category": "Designer record",
+      "gitBlob": "9f7919d4bbbae7debd5ecf868c56409f246d3ae4"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/initial-delivery-review.md",
+      "sha256": "5C072F2D2D488E39758903587E595A96B0468A569B8260525FEAB4180408D8AA",
+      "bytes": 14016,
+      "category": "Designer record",
+      "gitBlob": "fe97921eb652c75bbd1a2d9518e72f06e416b8ba"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/initial-protected-slice-review.md",
+      "sha256": "B7DD7557CBD8B398556E3946A1F484B878823EDA5899CA43D98B00CBD6C26A49",
+      "bytes": 13488,
+      "category": "Designer record",
+      "gitBlob": "3f6c626f185d07b7f5ad459e24b13ab3bf769ddd"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/integrated-build-verification.json",
+      "sha256": "372006BD2A3159D09B452262B08A88945C87DB56BFB0D4312D6BEE2B1DBC8496",
+      "bytes": 4245,
+      "category": "Designer record",
+      "gitBlob": "97540dfa8d5ac9dd8aa7db100e8e2c392ad9f73f"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/integration-preflight.md",
+      "sha256": "9C956A11231CDE8980EA9C01D210E799E0C15A25FF7D2BB6DE63C871384E2B00",
+      "bytes": 6363,
+      "category": "Designer record",
+      "gitBlob": "6fb5dd04a748c0e005dd2f8a18c4bd08d575da5b"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/integration-ready-checkpoint.md",
+      "sha256": "11B5BE3CCD8FE3B62ED0103CDEB14C093ACEAB46BEA55D28B48DB8DA4AE2B9AC",
+      "bytes": 4383,
+      "category": "Designer record",
+      "gitBlob": "0e27936c499c6fd7f5f3c85fe6986a6890991dfb"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/integration-source-preflight.json",
+      "sha256": "DAE26AA4FB587876AB2410C9D1472EA6DB4FAE532F468768074EC4AA93C267E9",
+      "bytes": 1239,
+      "category": "Designer record",
+      "gitBlob": "a5d634d8da3693ce590f0a4d69b4f378e2a47870"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/main-review-correction-plan.md",
+      "sha256": "5D54CB5E264148B4DE278830A330D1289C3C2C390729222E7AE4071D7511D53F",
+      "bytes": 6263,
+      "category": "Designer record",
+      "gitBlob": "f2c8a3e3536513dd9b10487e28ddf1ba67ebb61d"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/provisional-application-browser-review.md",
+      "sha256": "22A1FE131053762DC4C0110767245B1CA49413E97D8871937CC187CCAA203401",
+      "bytes": 4235,
+      "category": "Designer record",
+      "gitBlob": "f83be0d3314bba132ade370881c7c4f3d816b4a9"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/publication-artifact-boundary.md",
+      "sha256": "73B7247853CEC145D85FE5E0A7F41582FB274EE8FF7B60209158349F2CE3B084",
+      "bytes": 2069,
+      "category": "Designer record",
+      "gitBlob": "ab0494a61b4fc354880e63f768c5f5665a70bad5"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/qa-inventory-v1.md",
+      "sha256": "6FE1CCE5BA6BEF4984DDBF3FE14C0B19EEAB1A301602E5F6CD645D82DBCC7877",
+      "bytes": 2461,
+      "category": "Designer record",
+      "gitBlob": "3ded0bd7a30d459ec18f1c55528dca9ecb484812"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/source-commit-mapping.json",
+      "sha256": "03F76CBC2375C08734DBEEA8831450453E6E38CCEAC50EBD528F19A20F5DB71F",
+      "bytes": 15977,
+      "category": "Designer record",
+      "gitBlob": "fdf2ef945d62ab7ed8a12597047554b4ef690695"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/staged-source-map.json",
+      "sha256": "A593C9650B9AB0ECEC188CDB776B7407EF850EDE4FB64EE472DC374E4C07A6D2",
+      "bytes": 14829,
+      "category": "Designer record",
+      "gitBlob": "e532db4eb4103247a3b30dbbd064ad196b4f59b6"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/verification-v1.md",
+      "sha256": "593BD8B825DF847ADB4C4A6C2CE3F3B18F19A2E9B1E336546A677DFB61D3C2D6",
+      "bytes": 11561,
+      "category": "Designer record",
+      "gitBlob": "e4a5a1d46e02b6b546555307faa942e72eea4853"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v2/revision-and-verification-v2.md",
+      "sha256": "0D3E997D85BE4AE0FE463B65686453C986C6DAC9AF3B7FF456C4F86BF4B8BA58",
+      "bytes": 10421,
+      "category": "Historical design identity; media retained locally",
+      "gitBlob": "b788271cbae6d76beef325aa0028176571922b19"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v2/artifact-manifest-v2.json",
+      "sha256": "C5BCC8F22A89FCE37C5DEB5157D953E53606919BA09452E1CFFF271E9AD53789",
+      "bytes": 6043,
+      "category": "Historical design identity; media retained locally",
+      "gitBlob": "3e43c18f6bc70b4520d7f9d43d32af2055618f7c"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v3/revision-and-verification-v3.md",
+      "sha256": "ABEA108AB6A57D601E154DF43CC5B48C1997C7DA85F792D14AE0394BDA2774E4",
+      "bytes": 9933,
+      "category": "Historical design identity; media retained locally",
+      "gitBlob": "877dc7618f9125514bf73c944e0e7f0ef2484e00"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v3/artifact-manifest-v3.json",
+      "sha256": "611541572428FED52BA384DAAECAFCD3FF23CC2C53A6EE4AD08C7E974E3F1315",
+      "bytes": 7247,
+      "category": "Historical design identity; media retained locally",
+      "gitBlob": "d64a4beb31bfaee7899fbcde7d0feb764764074b"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v4/revision-and-verification-v4.md",
+      "sha256": "B8BBC3E3624AA4AF9A670C31A0E937C92413D9D21CA5F8714D2FBE9782AD3922",
+      "bytes": 18395,
+      "category": "Historical design identity; media retained locally",
+      "gitBlob": "a5e8e23067ac39b9dffd443c8dc199ad64677ebb"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v4/artifact-manifest-v4.json",
+      "sha256": "C3348052D7371F884A979E7422B251B34A77D39F2EAA651E8AD06A212A437C37",
+      "bytes": 7591,
+      "category": "Historical design identity; media retained locally",
+      "gitBlob": "fd1731247227627873bd5b27bb4206d665ad8cbf"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v5/revision-and-verification-v5.md",
+      "sha256": "80A3F3C6596853551D90DD86EBE5E8929AE517EA556ED4481CF66C3F492EE536",
+      "bytes": 6367,
+      "category": "Historical design identity; media retained locally",
+      "gitBlob": "39f8957d2b03e45240254d4068fad5814811e0f0"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v5/artifact-manifest-v5.json",
+      "sha256": "077DBC4116C8AE3BCE5B0280F182447B75FB61E1B9485049DCADF0B56E508FC4",
+      "bytes": 5056,
+      "category": "Historical design identity; media retained locally",
+      "gitBlob": "374b5d6fe5d2f724101e50390e9741e5cbf554f8"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v6/revision-and-verification-v6.md",
+      "sha256": "E659DCD65D6D5409D88E4B8B21EECBB916898BB87B01F83309FED4F02D767A70",
+      "bytes": 6022,
+      "category": "Historical design identity; media retained locally",
+      "gitBlob": "eacfe2b542aa185b5857fed7b7096ba6d8b57067"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v6/artifact-manifest-v6.json",
+      "sha256": "36F9E221056986D33ED12005690ED20526E282A4699E8BECAC778C12AE6184DB",
+      "bytes": 5220,
+      "category": "Historical design identity; media retained locally",
+      "gitBlob": "03cf44358384637430f18a79b5cadbc298518ed5"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v7/revision-and-verification-v7.md",
+      "sha256": "919ADCCB5036B5C8E16A0E79DA5261FCA67037C0F841D979B3563D4F047DD351",
+      "bytes": 7844,
+      "category": "Historical design identity; media retained locally",
+      "gitBlob": "46abd771f56415068f23cce6b98ee977e27c77ca"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v7/artifact-manifest-v7.json",
+      "sha256": "FEF8929E21E40843593A136A9AE61D56F6EDFE94950021088594BB4BDDB116D2",
+      "bytes": 6065,
+      "category": "Historical design identity; media retained locally",
+      "gitBlob": "ef8ce9bb7e414e3be3984579e8ed0f834e1c0339"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v8/revision-and-verification-v8.md",
+      "sha256": "917601855E4BF2489C893B4FB0D1656E587C086E87D0F5CD90D0DE934D47612C",
+      "bytes": 5085,
+      "category": "Historical design identity; media retained locally",
+      "gitBlob": "813d5b1d2a364c456beb358bb9af57c8a033024f"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/v8/artifact-manifest-v8.json",
+      "sha256": "2215CB5555C5767AE5454C48120277DDD5378C33021B4AF8BF578B364EA51F60",
+      "bytes": 4987,
+      "category": "Historical design identity; media retained locally",
+      "gitBlob": "f0322f70e22f48c092839f6165c0a55fbb5920c5"
+    },
+    {
+      "path": "docs/fleet-assets-audit/pages/PKG-01.md",
+      "sha256": "8148991A4A46DBEFEC3F8772C6F81B3C9B50DE0F04215A66EF7514FD4626D47C",
+      "bytes": 64913,
+      "category": "Designer canonical page",
+      "gitBlob": "771491c8e5d8eaf340530462774fcc0238aa4158"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-main-review-full-test.log",
+      "sha256": "7FEB45FD74F56E634565B4625CF6D077FF9E31E1052FA3B0EC7A0A121195FA07",
+      "bytes": 32516,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "c5eb8199ed86060de165857ffde57092854fa035"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-main-review-focused-test.log",
+      "sha256": "ED6D3DDB7F55B37AA5D8DC8B9EADF3C25372F50506286FFE2982FA4490CC87AF",
+      "bytes": 547,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "51e94d71738d8547c385ac967449d21758c7fbc5"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-main-review-source-test.log",
+      "sha256": "5AE1C5577968DC99E208EB74BC4CF7C8AD7C678AB7003023DA2ACF32124C3A01",
+      "bytes": 1989,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "d0dc8ee8003b12464359a37ad298250c0766f32b"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-main-review-rollback-test.log",
+      "sha256": "1B76F4E445F551C730189303DE5C046213D8DAA75050E6B8285F574BDDC06EF3",
+      "bytes": 5261,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "88fb2cf49b5d82f30e6a6881dfa8541871712701"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-main-review-rollback-test-final.log",
+      "sha256": "C920DC2AE0A84F24CD36EC485934CAF3F3522296650B77AC520DEA16B566B8F6",
+      "bytes": 7974,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "8931a5e1434ee57ed6fa1c770b46306204399c76"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-main-review-rollback-verified.log",
+      "sha256": "7C554E1FD9B142B3B02AD4FA94ACB0EC00D3ACD89768C923C38AF835B61BF80E",
+      "bytes": 1988,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "361e23a299f15f978991bd4edc5ad6416167378b"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-main-review-types.log",
+      "sha256": "BA928718AD183B97D880A37FDCF323B2F3A2EA9D34987EE4F3DA0560967EB60E",
+      "bytes": 602,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "12af87a50a84870c9f8f3128b8b447a8de7022a6"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-main-review-types-final.log",
+      "sha256": "9CE3DD6C48E4D3E03C3591E90D8E4858C339CA85F2B0BD53FE7265B3892921FA",
+      "bytes": 647,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "0489a24d3f10e7b4419305b5b980971853d6bece"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-main-review-lint-final.log",
+      "sha256": "58BCA201C2E97FABC1F7C310F83D304AE36A1FDE7EFD9D36E04F29D077033700",
+      "bytes": 692,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "6169fbca2bbb4d96a260f11c772bf0027e072729"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-main-review-php-lint-final.log",
+      "sha256": "7123C5EB72A63FC627647E05E9A9CF8CA91DAB840F7E1AD907F010A25DFA6BCB",
+      "bytes": 3266,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "afac5bcbdd1f26ba3355bb8a865f7f9677949fd4"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-main-review-build-final.log",
+      "sha256": "28C74631DE5E17E3BC968F64463EF18195ADB88DA121A8D4D6462615FCFD0744",
+      "bytes": 164659,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "c8994a4a2d01252a7c557747a035b1d3680ac07a"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/designer-integration-rollback-test.log",
+      "sha256": "55DDFD496093D23F0A3AC5C655CBC1D478A4D735CA8DE618B881E6A265A47B02",
+      "bytes": 1988,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "f8f32d5e1a1561b2982c43a44823895fb8ef1377"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/integrated-build.log",
+      "sha256": "1308268345A3D40A10C992B0DC48881DB3BF772D38F0841852B42E36A21E4421",
+      "bytes": 164659,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "7f19ac9d5f2b1ba4cba9f91359fb92bc4ce8acbe"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/integrated-focused-tests.log",
+      "sha256": "67D51F1203AD5DAD51688926C1D3527EDEEE25AAF5383017D599B53B4F360E0E",
+      "bytes": 9098,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "e13f43e15310eb77a594d85998fc48c2ae884bca"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/integrated-focused-runner-interrupted.log",
+      "sha256": "64C4B297C7706373D17FCB9DAE1BB305F4117502CA64CB3A5A34EAC0455A2A34",
+      "bytes": 86,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "2ec3e373f2fecb78e853ba2946f3fe27eab45bf4"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/integrated-types.log",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+      "bytes": 0,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/integrated-lint.log",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+      "bytes": 0,
+      "category": "Designer verification log; earlier failures retained",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/implementation/correction1-candidate-manifest.json",
+      "sha256": "C7635160DDCDA2B087FAD5750F597EBE8FD98C1ADE5DA98DE4497BC0303C7DEE",
+      "bytes": 12518,
+      "category": "Historical implementer record",
+      "gitBlob": "8df4902a5c7acbb3d8ec53e81a3a5df50f10a70d"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/implementation/correction2-candidate-manifest.json",
+      "sha256": "9A661C26F9D9B55E6DDC17972300043E6B28A89E015EF93625DBBE0A82FA2954",
+      "bytes": 12732,
+      "category": "Historical implementer record",
+      "gitBlob": "7e3e218267096771b9919d3dacae3a3a843d2e0a"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/implementation/implementation-verification.md",
+      "sha256": "6D6E4EB6C45E75FC8E2068754C18373BAE41532C5FFFE942BF1B934F84AFDEFD",
+      "bytes": 16452,
+      "category": "Historical implementer record",
+      "gitBlob": "9b0e4d6effeaaee4392eda01fcee3a1f42bdc6a1"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/implementation/migration-transition-proposal.md",
+      "sha256": "3727B49380F0D838B63BF45B621CC0C2AFC3CA007CD1AB47EAE99F1736F3F79F",
+      "bytes": 14206,
+      "category": "Historical implementer record",
+      "gitBlob": "71be4ef572c186b6235aefec0e4ae4c5f72e6882"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/implementation/protected-slice-checkpoint.md",
+      "sha256": "1BFA6BCB4B5445194935A5C567554536EAF8E830E39A534805A0DA8DD0D12CAC",
+      "bytes": 4408,
+      "category": "Historical implementer record",
+      "gitBlob": "9899f50174801ccec9e5ff3ba9daf9033db6ba0d"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/implementation/setup-preflight.md",
+      "sha256": "C9778D0DAB94F89CDB2C7D2EB8FCEF531BA1BE25376521D66ADA326816818930",
+      "bytes": 4404,
+      "category": "Historical implementer record",
+      "gitBlob": "d6366fbd2f7f957dd127da946a5683f46eee7b83"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/public-context-selection.json",
+      "sha256": "665DA7EEE74B32D185ADD90B3C90059917084F75B6F68C5B1E8B027DD638748F",
+      "bytes": 34485,
+      "category": "Exact inspected source selection",
+      "gitBlob": "a0af64e28cb7f4245d00d396cb0f95dc218c6139"
+    }
+  ],
+  "note": "Exact context staging set. This manifest is also staged but intentionally does not contain its own recursive hash. Source and guide commit mappings cover their earlier66 paths. No raw baseline CI logs, private fixtures, runtime profile, screenshots, build output or helper scripts are included."
+}

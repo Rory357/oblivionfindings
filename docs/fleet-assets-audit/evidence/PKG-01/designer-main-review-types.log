@@ -1,0 +1,5 @@
+resources/js/pages/fleet-assets/inspections/show.tsx(91,99): error TS2322: Type 'ChecklistItem' is not assignable to type 'ChecklistItem & { assessment: string; result: string; notes?: string | undefined; evidence?: { name: string; url: string; } | undefined; }'.
+  Type 'ChecklistItem' is not assignable to type '{ assessment: string; result: string; notes?: string; evidence?: { name: string; url: string; }; }'.
+    Types of property 'assessment' are incompatible.
+      Type 'string | undefined' is not assignable to type 'string'.
+        Type 'undefined' is not assignable to type 'string'.
