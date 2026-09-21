@@ -4,20 +4,21 @@ namespace App\Domain\SecurityDevices\Management\Services;
 
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Services\CurrentAuthorizationReads;
 use Carbon\CarbonImmutable;
 use JsonException;
 use UnexpectedValueException;
 
 final class CommandAssignmentFingerprint
 {
-    public function forDevice(Device|int $device, ?CarbonImmutable $now = null): string
+    public function forDevice(Device|int $device, ?CarbonImmutable $now = null, ?CurrentAuthorizationReads $reads = null): string
     {
         $deviceId = $device instanceof Device ? (int) $device->id : $device;
         if ($deviceId < 1) {
             throw new UnexpectedValueException('Canonical Device assignment reference is invalid.');
         }
         $now ??= CarbonImmutable::now('UTC');
-        $assignments = DeviceAssignment::query()
+        $assignments = ($reads ? $reads->query(DeviceAssignment::query()) : DeviceAssignment::query())
             ->where('device_id', $deviceId)
             ->active()
             ->where('assigned_at', '<=', $now)

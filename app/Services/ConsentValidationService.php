@@ -9,6 +9,7 @@ use App\Models\ConsentRequest;
 use App\Models\ConsentType;
 use App\Models\ConsentTypeVersion;
 use App\Services\Consents\ConsentConsumabilityDecision;
+use App\Services\Consents\CurrentConsentEvidence;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -54,6 +55,34 @@ class ConsentValidationService
         }
 
         $client = self::resolveClient($consent, $client);
+
+        return self::evaluateEvidence($consent, $client, $expectedConsentTypeId, $expectedPurpose);
+    }
+
+    public static function isValidResidentLocationConsentFromCurrentEvidence(CurrentConsentEvidence $evidence, Client|int $client): bool
+    {
+        CurrentConsentEvidence::assertTransaction();
+        $consent = $evidence->consent;
+
+        return in_array((string) $consent->consentType?->name, self::RESIDENT_LOCATION_CONSENT_TYPE_NAMES, true)
+            && self::evaluateEvidence($consent, $evidence->client($client), $consent->consent_type_id, $consent->consentTypeVersion?->purpose)->allowed;
+    }
+
+    public static function isValidTrackingConsentFromCurrentEvidence(CurrentConsentEvidence $evidence, Client|int $client): bool
+    {
+        CurrentConsentEvidence::assertTransaction();
+        $consent = $evidence->consent;
+
+        return Str::contains(Str::lower((string) $consent->consentType?->name), ['tracking', 'tracker', 'location'])
+            && self::evaluateEvidence($consent, $evidence->client($client), $consent->consent_type_id, $consent->consentTypeVersion?->purpose)->allowed;
+    }
+
+    private static function evaluateEvidence(
+        ClientConsent $consent,
+        ?Client $client,
+        ?int $expectedConsentTypeId,
+        ?string $expectedPurpose,
+    ): ConsentConsumabilityDecision {
 
         if (! $client || (int) $consent->client_id !== (int) $client->id) {
             return ConsentConsumabilityDecision::deny('wrong_client');

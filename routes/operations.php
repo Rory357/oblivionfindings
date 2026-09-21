@@ -36,6 +36,9 @@ use App\Http\Controllers\Operations\ClientDailyNoteController;
 use App\Http\Controllers\Operations\ClientFamilyChatController;
 use App\Http\Controllers\Operations\ClientFundController;
 use App\Http\Controllers\Operations\ClientLeaveExcursionController;
+use App\Http\Controllers\Operations\ClientLocationLocateController;
+use App\Http\Controllers\Operations\ClientTrackerModeController;
+use App\Http\Controllers\Operations\ClientLocationZoneDraftController;
 use App\Http\Controllers\Operations\ClientMealLogController;
 use App\Http\Controllers\Operations\ClientOnboardingWorkflowController;
 use App\Http\Controllers\Operations\ClientPathPlanController;
@@ -112,6 +115,30 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->name('operations.clients.show');
 
         // Client Location History (JSON)
+        Route::prefix('/clients/{client}/location/tracker-modes')->whereNumber('client')->middleware('throttle:30,1')->group(function () {
+            Route::get('/', [ClientTrackerModeController::class, 'index'])->name('operations.clients.location.modes.index');
+            Route::post('/', [ClientTrackerModeController::class, 'store']);
+            Route::post('/{command}/resume', [ClientTrackerModeController::class, 'resume'])->whereUuid('command');
+            Route::get('/{command}/confirm-identity', [ClientTrackerModeController::class, 'identity'])->whereUuid('command');
+        });
+        Route::prefix('/clients/{client}/location/locate-requests')->whereNumber('client')
+            ->middleware('permission:fleet.manage|assets.trackers.manage')->group(function (): void {
+                Route::get('/', [ClientLocationLocateController::class, 'index'])->name('operations.clients.location.locate.index');
+                Route::post('/', [ClientLocationLocateController::class, 'store'])->name('operations.clients.location.locate.store');
+                Route::get('/{command}', [ClientLocationLocateController::class, 'show'])->whereUuid('command')->name('operations.clients.location.locate.show');
+                Route::post('/{command}/resume', [ClientLocationLocateController::class, 'resume'])->whereUuid('command')->name('operations.clients.location.locate.resume');
+                Route::get('/{command}/confirm-identity', [ClientLocationLocateController::class, 'confirmIdentity'])->whereUuid('command')->name('operations.clients.location.locate.identity');
+            });
+        Route::get('/clients/{client}/location/zones', [ClientLocationZoneDraftController::class, 'index'])
+            ->whereNumber('client')->name('operations.clients.location.zones.index');
+        Route::post('/clients/{client}/location/zones/address-search', [ClientLocationZoneDraftController::class, 'searchAddress'])
+            ->whereNumber('client')->middleware('throttle:20,1')->name('operations.clients.location.zones.address-search');
+        Route::post('/clients/{client}/location/zones', [ClientLocationZoneDraftController::class, 'store'])
+            ->whereNumber('client')->name('operations.clients.location.zones.store');
+        Route::put('/clients/{client}/location/zones/{zone}', [ClientLocationZoneDraftController::class, 'update'])
+            ->whereNumber(['client', 'zone'])->name('operations.clients.location.zones.update');
+        Route::post('/clients/{client}/location/zones/{zone}/monitoring', [ClientLocationZoneDraftController::class, 'monitoring'])
+            ->whereNumber(['client', 'zone'])->middleware('throttle:20,1')->name('operations.clients.location.zones.monitoring');
         Route::get('/clients/{client}/location/history', [ClientController::class, 'locationHistory'])
             ->whereNumber('client')
             ->middleware([

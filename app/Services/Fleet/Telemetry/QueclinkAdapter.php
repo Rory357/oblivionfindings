@@ -74,6 +74,9 @@ class QueclinkAdapter implements TelemetryAdapterInterface
 
     protected function mapEventType(string $alarm, array $payload): ?string
     {
+        if ($alarm === 'fall_detected') {
+            return 'fall_detected';
+        }
         if (in_array($alarm, ['sos', 'panic', 'emergency'], true)) {
             return 'vehicle_sos';
         }

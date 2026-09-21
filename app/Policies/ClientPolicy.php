@@ -4,7 +4,9 @@ namespace App\Policies;
 
 use App\Models\Client;
 use App\Models\User;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\UserSiteAccessService;
+use Illuminate\Support\Facades\DB;
 
 class ClientPolicy
 {
@@ -24,7 +26,19 @@ class ClientPolicy
 
     public function view(User $user, Client $client): bool
     {
-        if ($user->canAccessClientPortal($client)) {
+        return $this->viewDecision($user, $client);
+    }
+
+    public function viewFromCurrentEvidence(User $user, Client $client, CurrentAuthorizationReads $reads): bool
+    {
+        $reads->assertActive();
+
+        return $this->viewDecision($user, $client, $reads);
+    }
+
+    private function viewDecision(User $user, Client $client, ?CurrentAuthorizationReads $reads = null): bool
+    {
+        if ($user->canAccessClientPortal($client, $reads)) {
             return true;
         }
 
@@ -33,12 +47,13 @@ class ClientPolicy
                 $user,
                 $client,
                 self::SITE_SCOPE_BYPASS_PERMISSIONS,
+                $reads,
             );
         }
 
         return $user->canDo('clients.viewAssigned')
-            && $this->isAssigned($user, $client)
-            && $this->canAccessClientSite($user, $client);
+            && $this->isAssigned($user, $client, $reads)
+            && $this->canAccessClientSite($user, $client, [], $reads);
     }
 
     /**
@@ -141,6 +156,7 @@ class ClientPolicy
         User $user,
         Client $client,
         array $bypassPermissions = [],
+        ?CurrentAuthorizationReads $reads = null,
     ): bool {
         $siteId = is_numeric($client->site_id) && (int) $client->site_id > 0
             ? (int) $client->site_id
@@ -149,13 +165,18 @@ class ClientPolicy
         return $siteId !== null
             && in_array(
                 $siteId,
-                $this->siteAccess->accessibleSiteIds($user, $bypassPermissions),
+                $this->siteAccess->accessibleSiteIds($user, $bypassPermissions, $reads),
                 true,
             );
     }
 
-    private function isAssigned(User $user, Client $client): bool
+    private function isAssigned(User $user, Client $client, ?CurrentAuthorizationReads $reads = null): bool
     {
+        if ($reads) {
+            return $reads->query(DB::table('client_user'))
+                ->where('client_id', $client->id)->where('user_id', $user->id)->exists();
+        }
+
         return $client->relationLoaded('supportWorkers')
             ? $client->supportWorkers->contains('id', $user->id)
             : $client->supportWorkers()->whereKey($user->id)->exists();

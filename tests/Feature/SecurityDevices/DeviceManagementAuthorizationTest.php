@@ -237,7 +237,7 @@ it('requires active purpose consent audience and source access for personal trac
 it('requires canonical Client source access before healthcare Device control', function () {
     $site = Site::factory()->create();
     $actor = managementBoundaryActor($site, 'it_manager');
-    $client = Client::factory()->create(['site_id' => $site->id]);
+    $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
     $device = Device::factory()->iotHealthcare()->create([
         'provider' => 'contract-test',
         'config' => ['management' => ['capabilities' => ['healthcare.calibration_override']]],
@@ -261,6 +261,9 @@ it('requires canonical Client source access before healthcare Device control', f
     expect($withBothSources->allowed)->toBeTrue()
         ->and($withBothSources->workspace)->toBe('healthcare')
         ->and($withBothSources->sensitivity)->toBe('healthcare_technical');
+
+    $client->update(['status' => 'inactive']);
+    expect($authorization->evaluate($actor->fresh(), $device, $capability, fresh: true)->allowed)->toBeFalse();
 });
 
 it('revalidates sensitive source permission before approval and dispatch', function () {

@@ -304,6 +304,8 @@ it('preserves staff profile and history location access with active tracking con
     ]);
     $consent = recordClientLocationTrackingConsent($client, $viewer);
     $device = assignClientLocationConsentTracker($client, $consent);
+    // A current position needs an observation recorded after collection begins.
+    $device->update(['meta' => ['lat' => -36.8485, 'lng' => 174.7633, 'last_location_at' => now()->toISOString()]]);
 
     $this->actingAs($viewer)
         ->get(route('operations.clients.show', $client, false))

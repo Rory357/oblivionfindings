@@ -15,6 +15,13 @@ class StoreDeviceCommandBatchRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'audit_tail_event_id' => ['missing'],
+            'origin_context' => ['missing'],
+            'origin' => ['missing'],
+            'client_id' => ['missing'],
+            'assignment_id' => ['missing'],
+            'consent_id' => ['missing'],
+            'access_fingerprint' => ['missing'],
             'workspace' => ['required', 'string', 'max:40'],
             'device_ids' => ['required', 'array', 'min:2', 'max:100'],
             'device_ids.*' => ['required', 'integer', 'min:1', 'distinct'],

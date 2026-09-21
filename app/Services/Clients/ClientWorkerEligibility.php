@@ -5,6 +5,7 @@ namespace App\Services\Clients;
 use App\Models\Client;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -83,8 +84,20 @@ class ClientWorkerEligibility
         return $this->queryForSite($siteId)->whereKey($userId)->exists();
     }
 
-    public function isEligible(Client $client, User $user): bool
+    public function isEligible(Client $client, User $user, ?CurrentAuthorizationReads $reads = null): bool
     {
+        if ($reads) {
+            // Same role/staff/date/site predicates, with explicit locks in each
+            // nested EXISTS. No inference from a loaded profile or outer lock.
+            $siteId = $this->siteId($client->site_id);
+            if (! $siteId || ! $reads->query(Site::query())->whereKey($siteId)->active()->notArchived()->whereNull('archived_at')->exists()) {
+                return false;
+            }
+
+            return $user->exists && $reads->query($this->siteAccess->applyFleetRecipientEligibility($this->roleEligibleQuery(), $siteId))
+                ->whereKey($user->id)->exists();
+        }
+
         return $user->exists
             && $this->contains($client, (int) $user->getKey());
     }

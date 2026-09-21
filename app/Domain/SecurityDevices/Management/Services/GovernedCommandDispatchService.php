@@ -8,7 +8,6 @@ use App\Domain\SecurityDevices\Management\Contracts\CommandExecutionAdapter;
 use App\Domain\SecurityDevices\Management\Data\CommandExecutionContext;
 use App\Domain\SecurityDevices\Management\Data\CommandExecutionResult;
 use App\Domain\SecurityDevices\Management\Data\CommandExecutionRoute;
-use App\Domain\SecurityDevices\Management\Data\CommandSigningPayload;
 use App\Domain\SecurityDevices\Management\Enums\CommandApprovalDecision;
 use App\Domain\SecurityDevices\Management\Enums\CommandAttemptStatus;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
@@ -18,8 +17,11 @@ use App\Domain\SecurityDevices\Management\Models\DeviceCommandAttempt;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandRequest;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
+use App\Services\Tracking\ClientLocationCommandContext;
 use Carbon\CarbonImmutable;
 use DomainException;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -40,7 +42,7 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
         private readonly DeviceCommandParameterPolicyService $parameterPolicy,
         private readonly CommandExecutionRouteResolver $executionRoutes,
         private readonly CommandChangeEligibilityService $changeEligibility,
-        private readonly CommandRequestSigner $signer,
+        private readonly DeviceCommandContractVerifier $verifier,
         private readonly DeviceCommandAuditService $audit,
         private readonly DeviceCommandBreakGlassService $breakGlass,
     ) {}
@@ -165,12 +167,44 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
         DeviceCommandRequest $request,
         User $triggeredBy,
     ): CommandExecutionRoute {
+        return $this->assertCurrentContract($request, $triggeredBy, [CommandStatus::Ready, CommandStatus::Queued]);
+    }
+
+    /** Reuse the exact command policy at the final client-location delivery claim. */
+    public function assertClientProviderDelivery(DeviceCommandRequest $request, User $requester): CommandExecutionRoute
+    {
+        abort_unless($request->origin_context !== null, 403);
+
+        return $this->assertCurrentContract($request, $requester, [CommandStatus::Accepted, CommandStatus::Running]);
+    }
+
+    private function assertCurrentContract(DeviceCommandRequest $request, User $triggeredBy, array $allowedStatuses): CommandExecutionRoute
+    {
         $request->loadMissing(['device', 'requestedBy', 'approvedBy', 'approvals']);
         $requester = $request->requestedBy;
 
+        if (! $this->verifier->verify($request)) {
+            throw new CommandDispatchPreconditionException('signature_invalid', 'The signed command contract could not be verified. The request was blocked without execution.');
+        }
+        try {
+            $clientContext = app(ClientLocationCommandContext::class)->lockForCommand($request);
+        } catch (AuthorizationException|HttpExceptionInterface|UnexpectedValueException|ModelNotFoundException $error) {
+            throw new CommandDispatchPreconditionException('client_location_context_changed', 'Client location access changed. This request was blocked without execution.');
+        }
+        if ($clientContext !== null) {
+            $requester = $clientContext['actor'];
+            $request->setRelation('requestedBy', $requester);
+            $request->setRelation('device', $clientContext['device']);
+            if ((int) $triggeredBy->id === (int) $requester->id) {
+                $triggeredBy = $requester;
+            }
+        }
+
         abort_unless($triggeredBy->canDo('securityDevices.devices.view'), 403);
         try {
-            $this->access->assertCanViewDevice($triggeredBy, $request->device);
+            if ($clientContext === null || (int) $triggeredBy->id !== (int) $requester->id) {
+                $this->access->assertCanViewDevice($triggeredBy, $request->device);
+            }
         } catch (HttpExceptionInterface $exception) {
             if ((int) $triggeredBy->id === (int) $request->requested_by_user_id) {
                 throw new CommandDispatchPreconditionException(
@@ -209,12 +243,13 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
                 'The risk safeguards changed after this request was approved. The request was blocked without execution.',
             );
         }
-        $triggeredByAuthorization = $this->authorization->evaluate(
-            $triggeredBy,
-            $request->device,
-            $capability,
-            fresh: true,
-        );
+        $triggeredByAuthorization = ($clientContext !== null && (int) $triggeredBy->id === (int) $requester->id)
+            ? $clientContext['authorization'] : $this->authorization->evaluate(
+                $triggeredBy,
+                $request->device,
+                $capability,
+                fresh: true,
+            );
         if (! $triggeredByAuthorization->allowed) {
             if ((int) $triggeredBy->id === (int) $requester->id) {
                 throw new CommandDispatchPreconditionException(
@@ -224,7 +259,7 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
             }
             abort($triggeredByAuthorization->concealed ? 404 : 403);
         }
-        $requesterAuthorization = $this->authorization->evaluate(
+        $requesterAuthorization = $clientContext['authorization'] ?? $this->authorization->evaluate(
             $requester,
             $request->device,
             $capability,
@@ -237,8 +272,10 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
             );
         }
 
-        if (! in_array($request->status, [CommandStatus::Ready, CommandStatus::Queued], true)) {
-            throw ValidationException::withMessages(['command' => 'Only a ready or queued command can be dispatched.']);
+        if (! in_array($request->status, $allowedStatuses, true)) {
+            throw ValidationException::withMessages(['command' => $allowedStatuses === [CommandStatus::Ready, CommandStatus::Queued]
+                ? 'Only a ready or queued command can be dispatched.'
+                : 'This command is no longer awaiting this delivery step.']);
         }
         $now = CarbonImmutable::now('UTC')->startOfSecond();
         if ($request->expires_at->lessThanOrEqualTo($now)) {
@@ -249,8 +286,8 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
             );
         }
         try {
-            $currentSiteId = $this->siteResolver->resolve((int) $request->device_id);
-            $currentAssignmentFingerprint = $this->assignments->forDevice($request->device, $now);
+            $currentSiteId = $clientContext['canonicalSiteId'] ?? $this->siteResolver->resolve((int) $request->device_id);
+            $currentAssignmentFingerprint = $clientContext['assignmentFingerprint'] ?? $this->assignments->forDevice($request->device, $now);
         } catch (UnexpectedValueException) {
             throw new CommandDispatchPreconditionException(
                 'device_ownership_unresolved',
@@ -377,13 +414,6 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
                 'Break-glass governance is no longer complete. The request was blocked without execution.',
             );
         }
-        if (! $this->signatureIsValid($request)) {
-            throw new CommandDispatchPreconditionException(
-                'signature_invalid',
-                'The signed command contract could not be verified. The request was blocked without execution.',
-            );
-        }
-
         $route = $this->executionRoutes->resolve(
             $request->device,
             (int) $request->site_id,
@@ -454,45 +484,6 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
             idempotencyKey: $request->idempotency_key,
             expiresAt: CarbonImmutable::instance($request->expires_at),
         );
-    }
-
-    private function signatureIsValid(DeviceCommandRequest $request): bool
-    {
-        $payload = new CommandSigningPayload(
-            commandUuid: $request->command_uuid,
-            deviceId: $request->device_id,
-            siteId: $request->site_id,
-            requestedByUserId: $request->requested_by_user_id,
-            capability: $request->capability,
-            capabilityVersion: $request->capability_version,
-            managementLevel: $request->management_level->value,
-            risk: $request->risk->value,
-            idempotencyKey: $request->idempotency_key,
-            parametersHash: $this->signer->parametersHash($request->encrypted_parameters),
-            reasonHash: $this->signer->reasonHash($request->reason),
-            expectedState: $request->expected_state,
-            reconciliationRule: $request->reconciliation_rule,
-            expiresAt: CarbonImmutable::instance($request->expires_at),
-            itChangeId: $request->it_change_id,
-            collectorId: $request->collector_id,
-            isBreakGlass: $request->is_break_glass,
-            provider: $request->provider,
-            breakGlassReviewerUserId: $request->break_glass_reviewer_user_id,
-            breakGlassReasonHash: $request->is_break_glass && is_string($request->break_glass_reason)
-                ? $this->signer->reasonHash($request->break_glass_reason)
-                : null,
-            assignmentFingerprint: $request->assignment_fingerprint,
-            confirmationMode: $request->impact_acknowledged_at === null
-                ? null
-                : $request->confirmation_mode?->value,
-            impactAcknowledgedAt: $request->impact_acknowledged_at === null
-                ? null
-                : CarbonImmutable::instance($request->impact_acknowledged_at),
-        );
-
-        return is_string($request->signing_key_id)
-            && is_string($request->signature)
-            && $this->signer->verify($payload, $request->signing_key_id, $request->signature);
     }
 
     private function stepUpIsCurrent(DeviceCommandRequest $request, CarbonImmutable $now): bool

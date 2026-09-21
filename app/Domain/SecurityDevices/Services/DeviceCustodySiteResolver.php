@@ -23,7 +23,7 @@ use UnexpectedValueException;
  */
 final class DeviceCustodySiteResolver
 {
-    public function resolve(string $targetType, int $targetId, bool $lockForUpdate = false): int
+    public function resolve(string $targetType, int $targetId, bool|string $lockForUpdate = false): int
     {
         if (! in_array($targetType, DeviceAssignment::VALID_TARGETS, true) || $targetId < 1) {
             throw new UnexpectedValueException('Device assignment target is invalid.');
@@ -71,21 +71,21 @@ final class DeviceCustodySiteResolver
         ) === (int) $assignment->custody_site_id;
     }
 
-    private function siteTarget(int $targetId, bool $lockForUpdate): int
+    private function siteTarget(int $targetId, bool|string $lockForUpdate): int
     {
         $site = $this->maybeLock(Site::query()->whereKey($targetId), $lockForUpdate)->first(['id']);
 
         return $site ? (int) $site->id : throw new UnexpectedValueException('Device assignment Site was not found.');
     }
 
-    private function roomTarget(int $targetId, bool $lockForUpdate): int
+    private function roomTarget(int $targetId, bool|string $lockForUpdate): int
     {
         $room = $this->maybeLock(SiteRoom::query()->whereKey($targetId), $lockForUpdate)->first(['site_id']);
 
         return $this->positiveId($room?->site_id, 'Device assignment room has no canonical Site.');
     }
 
-    private function clientTarget(int $targetId, bool $lockForUpdate): int
+    private function clientTarget(int $targetId, bool|string $lockForUpdate): int
     {
         $client = $this->maybeLock(
             Client::query()->whereKey($targetId)->where('status', 'active'),
@@ -95,7 +95,7 @@ final class DeviceCustodySiteResolver
         return $this->positiveId($client?->site_id, 'Device assignment Client has no active canonical Site.');
     }
 
-    private function staffTarget(int $targetId, bool $lockForUpdate): int
+    private function staffTarget(int $targetId, bool|string $lockForUpdate): int
     {
         $profile = $this->maybeLock(
             HrEmployeeProfile::query()
@@ -113,7 +113,7 @@ final class DeviceCustodySiteResolver
         return $this->positiveId($profile?->primary_site_id, 'Device assignment staff member has no current primary Site.');
     }
 
-    private function assetTarget(int $targetId, bool $lockForUpdate): int
+    private function assetTarget(int $targetId, bool|string $lockForUpdate): int
     {
         $asset = $this->maybeLock(
             Asset::query()
@@ -175,8 +175,12 @@ final class DeviceCustodySiteResolver
      * @param  Builder<TModel>  $query
      * @return Builder<TModel>
      */
-    private function maybeLock(Builder $query, bool $lockForUpdate): Builder
+    private function maybeLock(Builder $query, bool|string $lockForUpdate): Builder
     {
-        return $lockForUpdate ? $query->lockForUpdate() : $query;
+        if (! in_array($lockForUpdate, [false, true, 'for update nowait', 'for share nowait'], true)) {
+            throw new UnexpectedValueException('Unsupported custody evidence lock mode.');
+        }
+
+        return $lockForUpdate ? $query->lock($lockForUpdate) : $query;
     }
 }

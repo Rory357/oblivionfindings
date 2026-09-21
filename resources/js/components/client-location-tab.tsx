@@ -1,48 +1,15 @@
-import type { MapMarker } from '@/components/leaflet-map';
-import ResidentMap from '@/components/resident-tracking/resident-map';
-import ResidentSidebar from '@/components/resident-tracking/resident-sidebar';
+import LocationWorkspace from '@/components/client-location/location-workspace';
 import type {
     CommandStatus,
     Geofence,
     GeofenceStatus,
-    Resident,
 } from '@/components/resident-tracking/types';
-import { GovernedLocationExportDialog } from '@/components/security-devices/governed-location-export-dialog';
-import { DeviceProfileAccessRequired } from '@/components/security-devices/permission-destinations';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { usePersonalLocationPrivacy } from '@/hooks/use-personal-location-privacy';
-import { formatDateTime, formatRelativeTime } from '@/lib/fleet-utils';
-import { Link, router } from '@inertiajs/react';
-import {
-    Calendar,
-    Clock,
-    Download,
-    ExternalLink,
-    MapPin,
-    Navigation,
-    Radio,
-    RotateCcw,
-    ShieldOff,
-} from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-
-type HistoryPoint = {
-    lat: number;
-    lng: number;
-    address?: string | null;
-    coordinates?: string | null;
-    display_location?: string | null;
-    timestamp: string;
-    speed: number | null;
-    battery: number | null;
-};
-
+import { ShieldOff } from 'lucide-react';
 export type ClientLocationData = {
+    accessFingerprint?: string | null;
+    zonesUrl?: string | null;
     trackingRestricted?: boolean;
     canManage: boolean;
     tracker: {
@@ -85,8 +52,15 @@ export type ClientLocationData = {
         last_power_event?: string | null;
         last_safety_event?: string | null;
         last_safety_event_at?: string | null;
-        panic_active?: boolean;
+        panic_active?: boolean | null;
+        panic_acknowledged_at?: string | null;
+        motion_status?: 'moving' | 'stationary' | null;
+        motion_reported_at?: string | null;
+        fall_report_type?: 'fall_detected' | 'man_down' | null;
+        fall_reported_at?: string | null;
         locate_now_url?: string;
+        locate_requests_url?: string;
+        tracker_modes_url?: string;
         acknowledge_panic_url?: string;
         fleet_dashboard_url?: string;
         history_url?: string;
@@ -106,6 +80,7 @@ export type ClientLocationData = {
         lat: number;
         lng: number;
         address?: string | null;
+        address_source?: 'recorded' | 'nearest' | null;
         coordinates?: string | null;
         display_location?: string | null;
         speed: number | null;
@@ -134,570 +109,46 @@ type Props = {
     location: ClientLocationData;
 };
 
-const REFRESH_INTERVAL = 30_000;
-
-function displayLocation(loc: {
-    lat: number;
-    lng: number;
-    display_location?: string | null;
-    coordinates?: string | null;
-}): string {
-    return (
-        loc.display_location ??
-        loc.coordinates ??
-        `${loc.lat.toFixed(6)}, ${loc.lng.toFixed(6)}`
-    );
-}
-
-export default function ClientLocationTab({
-    clientId,
-    clientName,
-    clientHouse,
-    clientPhoto,
-    location,
-}: Props) {
-    const {
-        tracker,
-        currentLocation,
-        trackingConsent,
-        geofences,
-        geofenceStatus,
-        trackingRestricted = false,
-    } = location;
-
-    const [showHistory, setShowHistory] = useState(false);
-    const [historyLocations, setHistoryLocations] = useState<HistoryPoint[]>(
-        [],
-    );
-    const [loadingHistory, setLoadingHistory] = useState(false);
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
-    const [lastUpdatedAt, setLastUpdatedAt] = useState<string>(
-        new Date().toISOString(),
-    );
-    const [exportOpen, setExportOpen] = useState(false);
-    const {
-        active: privacyActive,
-        checking: privacyChecking,
-        message: privacyMessage,
-        endAccess,
-    } = usePersonalLocationPrivacy({
-        statusUrl: location.privacyStatusUrl,
-        onAccessEnded: () => {
-            setShowHistory(false);
-            setHistoryLocations([]);
-            setExportOpen(false);
-        },
+export default function ClientLocationTab(props: Props) {
+    const privacy = usePersonalLocationPrivacy({
+        statusUrl: props.location.privacyStatusUrl,
+        fingerprint: props.location.accessFingerprint,
     });
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            router.reload({
-                only: ['location'],
-                onSuccess: () => setLastUpdatedAt(new Date().toISOString()),
-            });
-        }, REFRESH_INTERVAL);
-        return () => clearInterval(interval);
-    }, []);
-
-    const hasConsent =
-        trackingConsent?.status === 'active' ||
-        trackingConsent?.status === 'given' ||
-        trackingConsent?.status === 'granted';
-    const hasTracker = tracker !== null;
-    const hasLocation = currentLocation !== null;
-
-    const resident: Resident | null = useMemo(() => {
-        if (!tracker) return null;
-        return {
-            id: tracker.id,
-            device_uid: tracker.device_uid,
-            client_id: clientId,
-            name: clientName,
-            preferred_name: null,
-            house: clientHouse ?? '',
-            site_id: null,
-            photo: clientPhoto ?? null,
-            tracker_name: tracker.name,
-            tracker_serial: tracker.serial,
-            status: tracker.status,
-            health_status: tracker.health_status,
-            last_seen_at: tracker.last_seen_at,
-            lat: currentLocation?.lat ?? null,
-            lng: currentLocation?.lng ?? null,
-            address: currentLocation?.address ?? null,
-            coordinates: currentLocation?.coordinates ?? null,
-            display_location: currentLocation?.display_location ?? null,
-            battery: tracker.battery,
-            battery_status: tracker.battery_status,
-            battery_voltage_mv: tracker.battery_voltage_mv,
-            battery_low_threshold: tracker.battery_low_threshold,
-            battery_updated_at: tracker.battery_updated_at,
-            charging_status: tracker.charging_status,
-            external_power: tracker.external_power,
-            last_power_event: tracker.last_power_event,
-            last_safety_event: tracker.last_safety_event,
-            last_safety_event_at: tracker.last_safety_event_at,
-            panic_active: tracker.panic_active,
-            speed: currentLocation?.speed ?? null,
-            heading: currentLocation?.heading ?? null,
-            accuracy: currentLocation?.accuracy ?? null,
-            altitude: currentLocation?.altitude ?? null,
-            motion: null,
-            imei: tracker.imei,
-            mac: tracker.mac,
-            model: tracker.model,
-            manufacturer: tracker.manufacturer,
-            firmware_version: tracker.firmware_version,
-            provider: tracker.provider,
-            hardware_version: tracker.hardware_version,
-            ble_firmware: tracker.ble_firmware,
-            ble_mac: tracker.ble_mac,
-            sim_iccid: tracker.sim_iccid,
-            imsi: tracker.imsi,
-            network_type: tracker.network_type,
-            rsrp: tracker.rsrp,
-            band: tracker.band,
-            mcc: tracker.mcc,
-            mnc: tracker.mnc,
-            cell_id: tracker.cell_id,
-            lac: tracker.lac,
-            satellites: tracker.satellites,
-            last_frame_at: tracker.last_frame_at,
-            last_location_at: tracker.last_location_at,
-            config_snapshot: tracker.config_snapshot,
-            geofence_status: geofenceStatus ?? 'unknown',
-            on_outing: false,
-            house_geofence: geofences[0] ?? null,
-            locate_now_url: tracker.locate_now_url,
-            acknowledge_panic_url: tracker.acknowledge_panic_url,
-            profile_url: undefined,
-            history_url: tracker.history_url,
-            detail_url: tracker.detail_url,
-            detail_access: tracker.detail_access,
-            last_command_status: tracker.last_command_status,
-        };
-    }, [
-        tracker,
-        currentLocation,
-        geofences,
-        geofenceStatus,
-        clientId,
-        clientName,
-        clientHouse,
-        clientPhoto,
-    ]);
-
-    const mapCenter = useMemo(() => {
-        if (currentLocation)
-            return { lat: currentLocation.lat, lng: currentLocation.lng };
-        if (geofences[0]?.center) return geofences[0].center;
-        return { lat: -41.2865, lng: 174.7762 };
-    }, [currentLocation, geofences]);
-
-    const markers: MapMarker[] = useMemo(() => {
-        if (!currentLocation) return [];
-        return [
-            {
-                id: `client-${clientId}`,
-                lat: currentLocation.lat,
-                lng: currentLocation.lng,
-                title: clientName,
-                type: 'default',
-                status: tracker?.status === 'online' ? 'online' : 'offline',
-                heading: currentLocation.heading ?? undefined,
-                speed: currentLocation.speed ?? undefined,
-                popup: `<strong>${clientName}</strong><br/>
-                    ${displayLocation(currentLocation)}<br/>
-                    ${currentLocation.speed != null ? `Speed: ${currentLocation.speed} km/h<br/>` : ''}
-                    Last seen: ${formatRelativeTime(tracker?.last_seen_at)}`,
-            },
-        ];
-    }, [currentLocation, clientId, clientName, tracker]);
-
-    const polyline = useMemo(() => {
-        if (!showHistory || historyLocations.length < 2) return undefined;
-        return [...historyLocations]
-            .reverse()
-            .map((l) => ({ lat: l.lat, lng: l.lng }));
-    }, [showHistory, historyLocations]);
-
-    const fetchHistory = useCallback(() => {
-        setLoadingHistory(true);
-        const params = new URLSearchParams();
-        if (dateFrom) params.set('date_from', dateFrom);
-        if (dateTo) params.set('date_to', dateTo);
-
-        fetch(
-            `/operations/clients/${clientId}/location/history?${params.toString()}`,
-            {
-                cache: 'no-store',
-                headers: {
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-            },
-        )
-            .then((res) => {
-                if (res.status === 403) {
-                    endAccess('Location access has ended.');
-                    throw new Error('Location access ended');
-                }
-                if (!res.ok)
-                    throw new Error('Location history could not be loaded');
-
-                return res.json();
-            })
-            .then((data) => {
-                setHistoryLocations(data.locations ?? []);
-                setShowHistory(true);
-            })
-            .catch(() => setHistoryLocations([]))
-            .finally(() => setLoadingHistory(false));
-    }, [clientId, dateFrom, dateTo, endAccess]);
-
-    const handleLocateNow = useCallback(() => {
-        if (!tracker?.locate_now_url) return;
-
-        router.post(tracker.locate_now_url, {}, { preserveScroll: true });
-    }, [tracker?.locate_now_url]);
-
-    const handleAcknowledgePanic = useCallback(() => {
-        if (!tracker?.acknowledge_panic_url) return;
-
-        router.post(
-            tracker.acknowledge_panic_url,
-            {},
-            {
-                preserveScroll: true,
-            },
-        );
-    }, [tracker?.acknowledge_panic_url]);
-
-    if (!privacyActive) {
+    if (!privacy.active || props.location.trackingRestricted)
         return (
-            <div className="mt-4">
-                <Card>
-                    <CardContent className="flex items-start gap-3 p-5">
-                        <ShieldOff className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
-                        <div>
-                            <p className="font-medium">
-                                {privacyChecking
-                                    ? 'Checking location access'
-                                    : 'Location access is not active'}
-                            </p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                {privacyChecking
-                                    ? 'Current location, history and export stay hidden until consent and assignment access are confirmed.'
-                                    : `${privacyMessage ?? 'Tracking consent or the personal-tracker assignment is not active.'} Cached location data has been removed from this view.`}
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
-
-    return (
-        <div className="mt-4 space-y-4">
-            {/* Consent banner */}
-            {!hasConsent && (
-                <Card className="border-status-warning/30 bg-status-warning-bg">
-                    <CardContent className="flex items-center gap-3 p-4">
-                        <ShieldOff className="h-5 w-5 shrink-0 text-status-warning" />
-                        <div>
-                            <p className="font-medium text-status-warning">
-                                Location Tracking Consent Not Active
-                            </p>
-                            <p className="text-sm text-status-warning">
-                                Location tracking requires active consent.
-                                Update consent in the Consents tab or contact
-                                the care team.
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* No tracker assigned */}
-            {!hasTracker && !trackingRestricted && (
-                <Card className="border-status-info/30 bg-status-info-bg">
-                    <CardContent className="flex items-center gap-3 p-4">
-                        <Radio className="h-5 w-5 shrink-0 text-status-info" />
-                        <div className="flex-1">
-                            <p className="font-medium text-status-info">
-                                No Personal Tracker Assigned
-                            </p>
-                            <p className="text-sm text-status-info">
-                                Assign a tracker device from the Fleet & Assets
-                                module to enable location tracking.
-                            </p>
-                        </div>
-                        {location.canManage && (
-                            <Link
-                                href="/fleet-assets/resident-tracking?new=1"
-                                className="inline-flex items-center gap-1 rounded-md border border-status-info/30 bg-card px-3 py-1.5 text-xs font-medium text-status-info hover:bg-status-info-bg"
-                            >
-                                Assign Tracker
-                                <ExternalLink className="h-3 w-3" />
-                            </Link>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Main map + sidebar grid */}
-            {hasTracker && resident && (
-                <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
-                    {/* Map */}
-                    <Card className="overflow-hidden">
-                        <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-3">
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <Navigation className="h-4 w-4" />
-                                Current location
-                            </CardTitle>
-                            {tracker.tracking_workspace_url ? (
-                                <Link
-                                    href={tracker.tracking_workspace_url}
-                                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                                >
-                                    Open Tracking workspace
-                                    <ExternalLink className="h-3 w-3" />
-                                </Link>
-                            ) : tracker.tracking_workspace_access?.state ===
-                              'restricted' ? (
-                                <DeviceProfileAccessRequired
-                                    label={
-                                        tracker.tracking_workspace_access.label
-                                    }
-                                    className="min-h-0 text-xs"
-                                />
-                            ) : null}
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            {hasLocation ? (
-                                <ResidentMap
-                                    center={mapCenter}
-                                    zoom={
-                                        showHistory &&
-                                        historyLocations.length > 0
-                                            ? 14
-                                            : 16
-                                    }
-                                    markers={markers}
-                                    geofences={geofences}
-                                    polyline={polyline}
-                                    polylineOptions={
-                                        showHistory
-                                            ? {
-                                                  animated: true,
-                                                  showArrows: true,
-                                                  showEndpoints: true,
-                                                  color: '#7c3aed',
-                                              }
-                                            : undefined
-                                    }
-                                    height={520}
-                                    updatedAt={lastUpdatedAt}
-                                />
-                            ) : (
-                                <div className="flex h-[520px] items-center justify-center text-muted-foreground">
-                                    <div className="text-center">
-                                        <MapPin className="mx-auto h-10 w-10 opacity-30" />
-                                        <p className="mt-2 text-sm">
-                                            No location data available
-                                        </p>
-                                        <p className="text-xs">
-                                            The tracker may be offline or not
-                                            yet reporting
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Sidebar */}
-                    <Card className="flex flex-col">
-                        <CardContent className="flex h-full flex-col p-4">
-                            <ResidentSidebar
-                                resident={resident}
-                                variant="profile-detail"
-                                canManage={location.canManage}
-                                onLocateNow={
-                                    location.canManage && tracker.locate_now_url
-                                        ? handleLocateNow
-                                        : undefined
-                                }
-                                onAcknowledgePanic={
-                                    location.canManage &&
-                                    tracker.acknowledge_panic_url
-                                        ? handleAcknowledgePanic
-                                        : undefined
-                                }
-                            />
-                        </CardContent>
-                    </Card>
+            <section className="mt-4 flex items-start gap-3 rounded-xl border bg-card p-5">
+                <ShieldOff className="mt-1 size-5 shrink-0" />
+                <div>
+                    <h2 className="font-semibold">
+                        {privacy.checking
+                            ? 'Checking location access'
+                            : 'Location access is not active'}
+                    </h2>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                        {privacy.checking
+                            ? 'Current location, history and zone drafts stay hidden until current access is confirmed.'
+                            : privacy.message ||
+                              'Current tracking consent and assignment are required. Cached location data has been removed.'}
+                    </p>
+                    {!privacy.checking && (
+                        <Button
+                            className="mt-3"
+                            variant="outline"
+                            onClick={() => window.location.reload()}
+                        >
+                            Reload current access
+                        </Button>
+                    )}
                 </div>
-            )}
-
-            {/* Movement history */}
-            {hasTracker && (
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <Clock className="h-4 w-4" />
-                            Movement history
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-wrap items-end gap-3">
-                            <div className="space-y-1">
-                                <Label className="text-xs">From</Label>
-                                <Input
-                                    type="date"
-                                    value={dateFrom}
-                                    onChange={(e) =>
-                                        setDateFrom(e.target.value)
-                                    }
-                                    className="w-40"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-xs">To</Label>
-                                <Input
-                                    type="date"
-                                    value={dateTo}
-                                    onChange={(e) => setDateTo(e.target.value)}
-                                    className="w-40"
-                                />
-                            </div>
-                            <Button
-                                onClick={fetchHistory}
-                                size="sm"
-                                disabled={loadingHistory}
-                            >
-                                <Calendar className="mr-2 h-4 w-4" />
-                                {loadingHistory ? 'Loading...' : 'Show history'}
-                            </Button>
-                            {showHistory && (
-                                <>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            setShowHistory(false);
-                                            setHistoryLocations([]);
-                                            setDateFrom('');
-                                            setDateTo('');
-                                        }}
-                                    >
-                                        <RotateCcw className="mr-2 h-4 w-4" />
-                                        Clear
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setExportOpen(true)}
-                                        disabled={
-                                            !location.canExport ||
-                                            !location.exportUrl ||
-                                            historyLocations.length === 0
-                                        }
-                                        title={
-                                            location.canExport
-                                                ? 'Export with a recorded operational reason'
-                                                : 'Location export permission is required'
-                                        }
-                                    >
-                                        <Download className="mr-2 h-4 w-4" />
-                                        Export CSV
-                                    </Button>
-                                    <Badge
-                                        variant="secondary"
-                                        className="ml-auto text-xs"
-                                    >
-                                        {historyLocations.length} points
-                                    </Badge>
-                                </>
-                            )}
-                        </div>
-
-                        {showHistory && historyLocations.length > 0 && (
-                            <>
-                                <Separator className="my-4" />
-                                <div className="max-h-[300px] divide-y overflow-y-auto rounded-md border">
-                                    {historyLocations.map((loc, i) => (
-                                        <div
-                                            key={i}
-                                            className="flex items-start gap-3 px-4 py-3"
-                                        >
-                                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                                                <MapPin className="h-3.5 w-3.5 text-primary" />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="text-xs text-muted-foreground">
-                                                    {formatDateTime(
-                                                        loc.timestamp,
-                                                    )}
-                                                </p>
-                                                <p className="text-sm">
-                                                    {displayLocation(loc)}
-                                                </p>
-                                                <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                                                    {loc.address &&
-                                                        loc.coordinates && (
-                                                            <span>
-                                                                {
-                                                                    loc.coordinates
-                                                                }
-                                                            </span>
-                                                        )}
-                                                    {loc.speed != null && (
-                                                        <span className="flex items-center gap-1">
-                                                            <Navigation className="h-3 w-3" />
-                                                            {loc.speed} km/h
-                                                        </span>
-                                                    )}
-                                                    {loc.battery != null && (
-                                                        <span>
-                                                            {loc.battery}%
-                                                            battery
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-
-                        {showHistory &&
-                            historyLocations.length === 0 &&
-                            !loadingHistory && (
-                                <div className="mt-4 py-8 text-center text-sm text-muted-foreground">
-                                    No movement data found for the selected
-                                    period.
-                                </div>
-                            )}
-                    </CardContent>
-                </Card>
-            )}
-            {location.exportUrl ? (
-                <GovernedLocationExportDialog
-                    open={exportOpen}
-                    onOpenChange={setExportOpen}
-                    exportUrl={location.exportUrl}
-                    subjectLabel={clientName}
-                    dateFrom={dateFrom}
-                    dateTo={dateTo}
-                    retentionDays={location.retentionDays}
-                    onAccessEnded={() =>
-                        endAccess('Location access has ended.')
-                    }
-                />
-            ) : null}
-        </div>
+            </section>
+        );
+    return (
+        <LocationWorkspace
+            key={`${props.clientId}:${props.location.accessFingerprint ?? ''}`}
+            clientId={props.clientId}
+            clientName={props.clientName}
+            location={props.location}
+            endAccess={privacy.endAccess}
+        />
     );
 }

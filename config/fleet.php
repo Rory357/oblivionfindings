@@ -13,6 +13,11 @@ return [
     ],
 
     'maps' => [
+        'client_zone_address_search_enabled' => env('CLIENT_ZONE_ADDRESS_SEARCH_ENABLED', true),
+        'address_search_endpoint' => env('ADDRESS_SEARCH_ENDPOINT', 'https://nominatim.openstreetmap.org'),
+        'address_search_cache_store' => env('ADDRESS_SEARCH_CACHE_STORE', 'database'),
+        'client_location_address_lookup_enabled' => env('CLIENT_LOCATION_ADDRESS_LOOKUP_ENABLED', false),
+        'client_location_geocoder_url' => env('CLIENT_LOCATION_GEOCODER_URL', 'http://127.0.0.1:8088'),
         'api_key' => env('GOOGLE_MAPS_API_KEY'),
         'reverse_geocode_enabled' => env('FLEET_REVERSE_GEOCODE_ENABLED', false),
         'reverse_geocode_provider' => env('FLEET_REVERSE_GEOCODE_PROVIDER', 'google'),

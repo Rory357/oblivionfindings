@@ -213,6 +213,12 @@ class ControlRoomAlertProvenanceService
             || ($alert->fleet_signal_id !== null && ! $this->fleetSignalMatchesAlert($alert));
         $unsafeDeviceReference = $alert->device_id !== null && ! $this->deviceMatchesAlert($alert);
 
+        if (($unsafeClientReference || $unsafeFleetReference || $unsafeDeviceReference)
+            && is_array($context['signal_payload'] ?? null)) {
+            unset($context['signal_payload']['safe_zone']);
+            unset($context['signal_payload']['tracker_event']);
+        }
+
         if ($unsafeClientReference) {
             unset(
                 $context['client_id'],

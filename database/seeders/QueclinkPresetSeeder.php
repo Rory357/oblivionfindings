@@ -76,6 +76,21 @@ class QueclinkPresetSeeder extends Seeder
     private function systemPresets(): array
     {
         return [
+            ...array_map(fn (array $mode): array => [
+                'slug' => $mode['slug'], 'name' => $mode['name'],
+                'description' => $mode['description'].' SOS and GNSS remain enabled. Apply through the governed configuration workflow; verify the tracker readback.',
+                'payload' => ['tracking' => [
+                    'mode_selection' => 1,
+                    'continuous_send_interval_seconds' => $mode['seconds'],
+                    'battery_low_percentage' => 20, 'function_button_mode' => 1, 'sos_report_mode' => 1,
+                    'gnss_enable' => 1, 'agps_mode' => 1, 'wifi_report' => 2, 'led_on' => 1, 'charge_standby_mode' => 0,
+                ]],
+            ], [
+                ['slug' => 'client-live-tracking', 'name' => 'Client live tracking', 'seconds' => 10,
+                    'description' => 'GL30MEU continuous reports every 10 seconds. Uses more battery; return to Standard after use.'],
+                ['slug' => 'client-power-saving', 'name' => 'Client power saving', 'seconds' => 120,
+                    'description' => 'GL30MEU reduced-frequency reports every 2 minutes. Safe-zone detection may be delayed between reports.'],
+            ]),
             [
                 'slug' => 'resident-safety',
                 'name' => 'Resident safety',

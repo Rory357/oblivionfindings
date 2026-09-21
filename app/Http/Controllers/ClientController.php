@@ -20,6 +20,8 @@ use App\Domain\SecurityDevices\Services\PersonalTrackingLocationExportService;
 use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Enums\NextOfKinRelationship;
+use App\Http\Controllers\Operations\ClientLocationLocateController;
+use App\Http\Requests\Operations\StoreClientLocateRequest;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
 use App\Http\Resources\ClientDailyNoteResource;
@@ -63,7 +65,6 @@ use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetOuting;
 use App\Models\FleetOutingResident;
 use App\Models\FleetResidentTransport;
-use App\Models\FleetTelemetryEvent;
 use App\Models\HsRiskAssessment;
 use App\Models\LocationHardware;
 use App\Models\MedicationDashboardAlert;
@@ -98,25 +99,28 @@ use App\Services\Clients\ClientWorkerEligibility;
 use App\Services\ConsentValidationService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\HealthSafety\HsModuleSummaryService;
-use App\Services\Integration\IntegrationEventHistoryService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationTimelineVisibilityService;
 use App\Services\NotificationService;
 use App\Services\Queclink\LocateNowService;
 use App\Services\Respite\ClientRespiteAllocationSummary;
 use App\Services\ShiftCoverageService;
+use App\Services\Tracking\ClientLocationAccessService;
+use App\Services\Tracking\ClientLocationHistoryService;
+use App\Services\Tracking\ClientTrackerStatusService;
+use App\Services\Tracking\ClientLocationLocateService;
 use App\Services\Tracking\GeofenceStatusService;
 use App\Services\UserSiteAccessService;
 use App\Support\ClientSafetyPayload;
 use App\Support\HazardDetailPresenter;
 use App\Support\HealthSafety\RiskAssessmentPresenter;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
-use App\Support\SchemaCache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -3499,10 +3503,7 @@ class ClientController extends Controller
                 ? "/security-devices/devices/{$device->id}"
                 : null;
             $meta = $device->meta ?? [];
-            $lat = $device->latitude ?? $meta['lat'] ?? $meta['latitude'] ?? null;
-            $lng = $device->longitude ?? $meta['lng'] ?? $meta['longitude'] ?? null;
-            $address = $lat !== null && $lng !== null ? $this->latestAddressForDevice($device) : null;
-            $coordinates = $this->formatCoordinates($lat, $lng);
+            $currentLocation = app(ClientLocationHistoryService::class)->current($viewer, $client);
             $rawBattery = $device->battery_level ?? $meta['battery'] ?? $meta['battery_level'] ?? null;
             $battery = $rawBattery === null ? null : (int) $rawBattery;
             $batteryThreshold = (int) ($meta['battery_low_threshold'] ?? 20);
@@ -3534,7 +3535,7 @@ class ClientController extends Controller
                 'lac' => $meta['lac'] ?? null,
                 'satellites' => $meta['satellites'] ?? null,
                 'last_frame_at' => $meta['last_frame_at'] ?? null,
-                'last_location_at' => $meta['last_location_at'] ?? null,
+                'last_location_at' => $currentLocation['timestamp'] ?? null,
                 'config_snapshot' => $meta['config_snapshot'] ?? null,
                 'provider' => $device->provider,
                 'status' => $device->status?->value ?? 'unknown',
@@ -3550,9 +3551,13 @@ class ClientController extends Controller
                 'last_power_event' => $meta['power_event'] ?? null,
                 'last_safety_event' => $meta['last_safety_event'] ?? null,
                 'last_safety_event_at' => $meta['last_safety_event_at'] ?? null,
-                'panic_active' => (bool) ($meta['panic_active'] ?? false),
+                'panic_active' => is_bool($meta['panic_active'] ?? null) ? $meta['panic_active'] : null,
+                'panic_acknowledged_at' => is_string($meta['panic_acknowledged_at'] ?? null) ? $meta['panic_acknowledged_at'] : null,
+                ...app(ClientTrackerStatusService::class)->read($viewer, $client),
                 ...($canManageTrackers ? [
                     'locate_now_url' => route('operations.clients.location.locate-now', ['client' => $client->id], false),
+                    'locate_requests_url' => route('operations.clients.location.locate.index', ['client' => $client->id], false),
+                    'tracker_modes_url' => route('operations.clients.location.modes.index', ['client' => $client->id], false),
                     'acknowledge_panic_url' => route('operations.clients.location.acknowledge-panic', ['client' => $client->id], false),
                 ] : []),
                 'fleet_dashboard_url' => '/fleet-assets/resident-tracking?focus='.$client->id,
@@ -3579,20 +3584,6 @@ class ClientController extends Controller
                         : 'Device Profile access required',
                 ],
             ];
-
-            if ($lat !== null && $lng !== null) {
-                $currentLocation = [
-                    'lat' => (float) $lat,
-                    'lng' => (float) $lng,
-                    'address' => $address,
-                    'coordinates' => $coordinates,
-                    'display_location' => $address ?: $coordinates,
-                    'speed' => $meta['speed'] ?? null,
-                    'heading' => $meta['heading'] ?? null,
-                    'accuracy' => $meta['accuracy'] ?? null,
-                    'altitude' => $meta['altitude'] ?? null,
-                ];
-            }
         }
 
         // Only the resident's explicitly linked or same-site house geofence.
@@ -3602,7 +3593,7 @@ class ClientController extends Controller
         try {
             if (SchemaCache::hasTable('asset_geofences') && is_numeric($client->site_id)) {
                 if ($client->house_geofence_id) {
-                    $houseGeofence = AssetGeofence::query()
+                    $houseGeofence = app(ClientLocationAccessService::class)->eligibleBoundaries($client, (int) $assignment->custody_site_id)
                         ->whereKey($client->house_geofence_id)
                         ->where('site_id', (int) $client->site_id)
                         ->where('is_active', true)
@@ -3613,7 +3604,7 @@ class ClientController extends Controller
                 }
 
                 if (! $houseGeofence && $client->site_id) {
-                    $houseGeofence = AssetGeofence::query()
+                    $houseGeofence = app(ClientLocationAccessService::class)->eligibleBoundaries($client, (int) $assignment->custody_site_id)
                         ->where('site_id', $client->site_id)
                         ->where('is_active', true)
                         ->where(function ($q) {
@@ -3639,8 +3630,13 @@ class ClientController extends Controller
             )
             : GeofenceStatusService::STATUS_UNKNOWN;
 
+        $accessFingerprint = app(ClientLocationAccessService::class)->fingerprint($assignment);
+        app(ClientLocationAccessService::class)->recheck($viewer, $client, $accessFingerprint);
+
         return [
             'trackingRestricted' => false,
+            'accessFingerprint' => $accessFingerprint,
+            'zonesUrl' => route('operations.clients.location.zones.index', ['client' => $client->id], false),
             'canManage' => $canManageTrackers,
             'tracker' => $trackerInfo,
             'currentLocation' => $currentLocation,
@@ -3708,15 +3704,9 @@ class ClientController extends Controller
             ->authorisedClientAssignment($client);
         abort_unless($assignment, 403);
 
-        $locations = app(IntegrationEventHistoryService::class)
-            ->forDevice(
-                $assignment->device,
-                $request->only(['date_from', 'date_to']),
-                false,
-                $assignment->retention_days,
-            );
+        $history = app(ClientLocationHistoryService::class)->read($request->user(), $client, $request->only(['date_from', 'date_to']));
 
-        return response()->json(['locations' => $locations])
+        return response()->json($history)
             ->withHeaders($this->privateLocationHeaders());
     }
 
@@ -3729,6 +3719,7 @@ class ClientController extends Controller
 
         return response()->json([
             'active' => $assignment !== null,
+            'access_fingerprint' => $assignment ? app(ClientLocationAccessService::class)->fingerprint($assignment) : null,
             'checked_at' => now()->toISOString(),
             'retention_days' => $assignment?->retention_days,
             'export_allowed' => $assignment !== null
@@ -3764,6 +3755,12 @@ class ClientController extends Controller
 
     public function locateNow(Request $request, Client $client, LocateNowService $locateNow)
     {
+        if ($request->expectsJson()) {
+            return app(ClientLocationLocateController::class)->store(
+                app(StoreClientLocateRequest::class), $client,
+                app(ClientLocationLocateService::class),
+            );
+        }
         $this->authorize('view', $client);
         abort_unless($this->canManageClientTrackers($request->user()), 403);
         $assignment = app(PersonalTrackingPrivacyService::class)
@@ -3834,27 +3831,5 @@ class ClientController extends Controller
             || $value === '1'
             || $value === 'true'
             || $value === 'yes';
-    }
-
-    private function latestAddressForDevice(Device $device): ?string
-    {
-        return FleetTelemetryEvent::query()
-            ->where('device_id', $device->id)
-            ->where('consent_blocked', false)
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->whereNotNull('address')
-            ->orderByDesc('occurred_at')
-            ->orderByDesc('id')
-            ->value('address');
-    }
-
-    private function formatCoordinates(mixed $lat, mixed $lng): ?string
-    {
-        if ($lat === null || $lng === null) {
-            return null;
-        }
-
-        return sprintf('%.6f, %.6f', (float) $lat, (float) $lng);
     }
 }

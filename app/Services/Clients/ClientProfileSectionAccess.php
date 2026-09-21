@@ -4,7 +4,9 @@ namespace App\Services\Clients;
 
 use App\Models\Client;
 use App\Models\User;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\UserSiteAccessService;
+use Illuminate\Support\Facades\DB;
 
 class ClientProfileSectionAccess
 {
@@ -101,12 +103,7 @@ class ClientProfileSectionAccess
             'family_notes' => $familyNotes,
             'photos' => $dailyLiving,
             'personal_assets' => $personalAssets,
-            'tracking' => $user->canDo('assets.telemetry.view')
-                && (
-                    $user->canDo('fleet.viewAny')
-                    || $user->canDo('assets.viewAny')
-                    || ($assignedCareWorker && $user->canDo('assets.viewAssigned'))
-                ),
+            'tracking' => $this->trackingForAssignment($user, $assignedCareWorker),
             'transport' => $user->canDo('fleet.viewAny')
                 || $user->canDo('assets.viewAny')
                 || ($assignedCareWorker && $user->canDo('assets.viewAssigned')),
@@ -137,6 +134,20 @@ class ClientProfileSectionAccess
                 $user->canDo('clinical.events.viewAssigned')
                 || $user->canDo('clinical.events.view')
             ));
+    }
+
+    public function trackingFromCurrentEvidence(User $user, Client $client, CurrentAuthorizationReads $reads): bool
+    {
+        $assigned = $reads->query(DB::table('client_user'))
+            ->where('client_id', $client->id)->where('user_id', $user->id)->exists();
+
+        return $this->trackingForAssignment($user, $assigned && $this->workerEligibility->isEligible($client, $user, $reads));
+    }
+
+    private function trackingForAssignment(User $user, bool $assignedCareWorker): bool
+    {
+        return $user->canDo('assets.telemetry.view') && ($user->canDo('fleet.viewAny') || $user->canDo('assets.viewAny')
+            || ($assignedCareWorker && $user->canDo('assets.viewAssigned')));
     }
 
     private function isAssignedCareWorker(User $user, Client $client): bool

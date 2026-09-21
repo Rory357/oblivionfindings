@@ -45,6 +45,20 @@ class AuthorizationEvidenceLockService
         array $permissionKeys,
         array $additionalRoleIds = [],
     ): Collection {
+        return $this->hydrateForUsers($users, $permissionKeys, $additionalRoleIds, true);
+    }
+
+    public function lockForUserWithoutWaiting(User|int $user, array $permissionKeys): User
+    {
+        $id = $user instanceof User ? (int) $user->id : $user;
+
+        // Concurrent readers may share policy evidence; policy writers still
+        // require the same rows exclusively. Never wait on their inverse chains.
+        return $this->hydrateForUsers([$id], $permissionKeys, [], 'for share nowait')->get($id);
+    }
+
+    private function hydrateForUsers(iterable $users, array $permissionKeys, array $additionalRoleIds, bool|string $lockMode): Collection
+    {
         if (DB::transactionLevel() < 1) {
             throw new \LogicException('Authorization evidence must be locked inside a transaction.');
         }
@@ -65,7 +79,7 @@ class AuthorizationEvidenceLockService
         $lockedUsers = User::query()
             ->whereIn('id', $userIds->all())
             ->orderBy('id')
-            ->lockForUpdate()
+            ->lock($lockMode)
             ->get()
             ->keyBy(fn (User $lockedUser): int => (int) $lockedUser->id);
         abort_unless($lockedUsers->count() === $userIds->count(), 404);
@@ -80,6 +94,7 @@ class AuthorizationEvidenceLockService
             $permissionQuery->whereIn('key', array_values(array_unique($permissionKeys)));
         }
         $permissions = $permissionQuery
+            ->when($lockMode !== true, fn ($query) => $query->lock($lockMode))
             ->orderBy('id')
             ->get(['id', 'key'])
             ->keyBy(fn (Permission $permission): int => (int) $permission->id);
@@ -95,7 +110,7 @@ class AuthorizationEvidenceLockService
                 ->whereIn('user_id', $userIds->all())
                 ->orderBy('permission_id')
                 ->orderBy('user_id')
-                ->lockForUpdate()
+                ->lock($lockMode)
                 ->get(['permission_id', 'user_id', 'allowed']);
         }
 
@@ -103,7 +118,7 @@ class AuthorizationEvidenceLockService
             ->whereIn('user_id', $userIds->all())
             ->orderBy('role_id')
             ->orderBy('user_id')
-            ->lockForUpdate()
+            ->lock($lockMode)
             ->get(['role_id', 'user_id']);
         $roleIds = $roleAssignments
             ->pluck('role_id')
@@ -121,7 +136,7 @@ class AuthorizationEvidenceLockService
             $roles = Role::query()
                 ->whereIn('id', $roleIds)
                 ->orderBy('id')
-                ->lockForUpdate()
+                ->lock($lockMode)
                 ->get(['id', 'name'])
                 ->keyBy(fn (Role $role): int => (int) $role->id);
             abort_unless($roles->count() === count($roleIds), 404);
@@ -132,7 +147,7 @@ class AuthorizationEvidenceLockService
                     ->whereIn('permission_id', $permissionIds)
                     ->orderBy('role_id')
                     ->orderBy('permission_id')
-                    ->lockForUpdate()
+                    ->lock($lockMode)
                     ->get(['role_id', 'permission_id']);
             }
         }

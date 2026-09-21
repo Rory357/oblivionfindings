@@ -21,15 +21,21 @@ final class DeviceCommandAuditService
         $this->assertSafeContext($safeContext);
 
         return DB::transaction(function () use ($request, $actor, $action, $safeContext): DeviceCommandAuditEvent {
-            $previous = DeviceCommandAuditEvent::query()
-                ->where('device_command_request_id', $request->id)
-                ->latest('id')
-                ->lockForUpdate()
-                ->first();
+            // The request row serializes both the first and later appends.
+            // A tail range query can lock another request's next-key gap.
+            $locked = DeviceCommandRequest::query()->whereKey($request->getKey())->lockForUpdate()->firstOrFail();
+            if (! hash_equals($locked->command_uuid, $request->command_uuid)) {
+                throw new UnexpectedValueException('Audit request identity changed.');
+            }
+            $previous = $locked->audit_tail_event_id === null ? null
+                : DeviceCommandAuditEvent::query()->whereKey($locked->audit_tail_event_id)->lockForUpdate()->first();
+            if ($locked->audit_tail_event_id !== null && (! $previous || (int) $previous->device_command_request_id !== (int) $locked->id)) {
+                throw new UnexpectedValueException('Audit tail evidence is missing or belongs to another request.');
+            }
             $occurredAt = Carbon::now('UTC');
             $context = $this->canonicalJson($safeContext);
             $eventHash = hash('sha256', implode('|', [
-                $request->command_uuid,
+                $locked->command_uuid,
                 (string) ($previous?->event_hash ?? ''),
                 (string) ($actor?->id ?? ''),
                 $action,
@@ -37,8 +43,8 @@ final class DeviceCommandAuditService
                 $occurredAt->format('Y-m-d\TH:i:s.u\Z'),
             ]));
 
-            return DeviceCommandAuditEvent::query()->create([
-                'device_command_request_id' => $request->id,
+            $event = DeviceCommandAuditEvent::query()->create([
+                'device_command_request_id' => $locked->id,
                 'actor_user_id' => $actor?->id,
                 'action' => $action,
                 'safe_context' => $safeContext,
@@ -46,6 +52,12 @@ final class DeviceCommandAuditService
                 'event_hash' => $eventHash,
                 'occurred_at' => $occurredAt,
             ]);
+            // Internal metadata only. Preserve terminal models, signed fields,
+            // lifecycle timestamps, and the caller's potentially stale instance.
+            DB::table('device_command_requests')->where('id', $locked->id)
+                ->update(['audit_tail_event_id' => $event->id]);
+
+            return $event;
         });
     }
 

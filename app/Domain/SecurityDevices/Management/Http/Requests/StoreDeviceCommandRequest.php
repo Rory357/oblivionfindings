@@ -15,6 +15,13 @@ class StoreDeviceCommandRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'audit_tail_event_id' => ['missing'],
+            'origin_context' => ['missing'],
+            'origin' => ['missing'],
+            'client_id' => ['missing'],
+            'assignment_id' => ['missing'],
+            'consent_id' => ['missing'],
+            'access_fingerprint' => ['missing'],
             'capability' => ['required', 'string', 'max:120'],
             'parameters' => ['present', 'array'],
             'reason' => ['required', 'string', 'min:10', 'max:1000'],

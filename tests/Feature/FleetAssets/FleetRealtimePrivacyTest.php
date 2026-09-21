@@ -18,11 +18,15 @@ use App\Models\FleetSignal;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ConsentValidationService;
 use App\Services\Fleet\FleetRealtimeAuthorizationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
@@ -33,6 +37,10 @@ class FleetRealtimePrivacyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        Http::preventStrayRequests();
+        Queue::fake();
+        Notification::fake();
 
         $this->seed(RbacSeeder::class);
     }
@@ -151,6 +159,48 @@ class FleetRealtimePrivacyTest extends TestCase
         $this->assertNull($authorizer->consentedClientForSignal($signal));
     }
 
+    public function test_general_fleet_tracking_consent_does_not_authorize_resident_alerts(): void
+    {
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $user = $this->makeSiteUser($site, ['fleet.viewAny', 'assets.telemetry.view', 'clients.viewAssigned']);
+        $client->supportWorkers()->attach($user->id);
+        $consent = $this->createTrackingConsent($client, 'Fleet Tracking');
+        $device = Device::factory()->tracking()->create();
+        $this->assignDeviceToClient($device, $client, $consent);
+        $asset = Asset::factory()->create([
+            'site_id' => $site->id,
+            'home_site_id' => $site->id,
+            'client_id' => $client->id,
+            'category' => 'Personal Tracker',
+            'status' => 'active',
+        ]);
+        DeviceAssetLink::query()->create([
+            'device_id' => $device->id,
+            'asset_id' => $asset->id,
+            'link_type' => 'installed_in',
+            'linked_at' => now(),
+        ]);
+        $signal = FleetSignal::query()->create([
+            'asset_id' => $asset->id,
+            'device_id' => $device->id,
+            'signal_type' => 'geofence.breach',
+            'severity_hint' => 'high',
+            'occurred_at' => now(),
+            'idempotency_key' => 'realtime-general-consent-denied',
+            'payload' => ['latitude' => -36.8485, 'longitude' => 174.7633],
+        ]);
+
+        $this->assertTrue(ConsentValidationService::isValidTrackingConsent($consent, $client));
+        $this->assertFalse(ConsentValidationService::isValidResidentLocationConsent($consent, $client));
+        $authorizer = app(FleetRealtimeAuthorizationService::class);
+        $this->assertFalse($authorizer->canViewClientAlert($user, $client->id));
+        $this->assertNull($authorizer->consentedClientForSignal($signal));
+        Http::assertNothingSent();
+        Queue::assertNothingPushed();
+        Notification::assertNothingSent();
+    }
+
     public function test_fleet_realtime_events_use_private_record_channels_and_minimal_payloads(): void
     {
         $signalEvent = new FleetSignalEmitted(new FleetSignal([
@@ -200,10 +250,10 @@ class FleetRealtimePrivacyTest extends TestCase
         ]);
     }
 
-    private function createTrackingConsent(Client $client): ClientConsent
+    private function createTrackingConsent(Client $client, string $typeName = 'Personal Tracker (Wandering Risk)'): ClientConsent
     {
         $type = ConsentType::query()->firstOrCreate(
-            ['name' => 'Fleet Tracking'],
+            ['name' => $typeName],
             [
                 'category' => 'operational',
                 'description' => 'Fleet location tracking',

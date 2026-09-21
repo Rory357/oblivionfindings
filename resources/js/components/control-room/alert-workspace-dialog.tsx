@@ -2479,6 +2479,34 @@ function OverviewSection({
 }) {
     const a = d.alert;
     const fleet = (a.fleet_context ?? null) as Record<string, any> | null;
+    const safeZone = (
+        a.context?.signal_payload as
+            | {
+                  safe_zone?: {
+                      name: string;
+                      revision: number;
+                      trigger: string;
+                      response: string;
+                      schedule_window: string;
+                      timezone: string;
+                      accuracy_m: number | null;
+                      reported_at: string;
+                  };
+              }
+            | undefined
+    )?.safe_zone;
+    const trackerEvent = (
+        a.context?.signal_payload as
+            | {
+                  tracker_event?: {
+                      type: string;
+                      reported_at: string;
+                      received_at: string | null;
+                      response: string;
+                  };
+              }
+            | undefined
+    )?.tracker_event;
     return (
         <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex justify-end sm:col-span-2">
@@ -2542,6 +2570,54 @@ function OverviewSection({
                 </div>
             ) : null}
 
+            {trackerEvent?.type === 'fall_detected' && (
+                <ReviewCard icon={Activity} title="Tracker fall report" span>
+                    <ReviewRow
+                        label="Report"
+                        value="Device reported a possible fall"
+                    />
+                    <ReviewRow
+                        label="Reported"
+                        value={formatDateTime(trackerEvent.reported_at)}
+                    />
+                    <ReviewRow
+                        label="Received"
+                        value={formatDateTime(trackerEvent.received_at)}
+                    />
+                    <p className="mt-3 text-sm">{trackerEvent.response}</p>
+                </ReviewCard>
+            )}
+            {safeZone && (
+                <ReviewCard icon={MapPin} title="Safe-zone monitoring" span>
+                    <ReviewRow
+                        label="Zone"
+                        value={`${safeZone.name} · Revision ${safeZone.revision}`}
+                    />
+                    <ReviewRow label="Report" value={safeZone.trigger} />
+                    <ReviewRow
+                        label="Reported at"
+                        value={formatDateTime(safeZone.reported_at)}
+                    />
+                    <ReviewRow
+                        label="GPS accuracy"
+                        value={
+                            safeZone.accuracy_m === null
+                                ? 'Not recorded'
+                                : `${safeZone.accuracy_m} m`
+                        }
+                    />
+                    <p className="mt-3 text-sm font-medium">
+                        Response instructions
+                    </p>
+                    <p className="mt-1 text-sm whitespace-pre-wrap">
+                        {safeZone.response}
+                    </p>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                        A location report requires verification. A later return
+                        to the zone does not resolve this alert automatically.
+                    </p>
+                </ReviewCard>
+            )}
             <ReviewCard icon={FileText} title="What's happening" span>
                 {(() => {
                     const summary = summarise(a);

@@ -22,10 +22,12 @@ use UnexpectedValueException;
 class DeviceCommandRequest extends Model
 {
     public const array IMMUTABLE_CONTRACT_ATTRIBUTES = [
+        'audit_tail_event_id',
         'command_uuid',
         'device_id',
         'site_id',
         'assignment_fingerprint',
+        'origin_context',
         'requested_by_user_id',
         'it_change_id',
         'collector_id',
@@ -55,6 +57,7 @@ class DeviceCommandRequest extends Model
     protected $table = 'device_command_requests';
 
     protected $fillable = [
+        'origin_context',
         'command_uuid', 'device_id', 'site_id', 'assignment_fingerprint', 'requested_by_user_id', 'approved_by_user_id',
         'it_change_id', 'collector_id', 'capability', 'capability_version', 'management_level',
         'risk', 'confirmation_mode', 'status', 'encrypted_parameters', 'safe_parameter_summary', 'reason', 'expected_state',
@@ -69,6 +72,8 @@ class DeviceCommandRequest extends Model
     ];
 
     protected $hidden = [
+        'audit_tail_event_id',
+        'origin_context',
         'assignment_fingerprint',
         'encrypted_parameters',
         'signing_key_id',
@@ -78,6 +83,8 @@ class DeviceCommandRequest extends Model
     ];
 
     protected $casts = [
+        'audit_tail_event_id' => 'integer',
+        'origin_context' => 'array',
         'capability_version' => 'integer',
         'management_level' => ManagementLevel::class,
         'risk' => CommandRisk::class,
@@ -110,6 +117,9 @@ class DeviceCommandRequest extends Model
     protected static function booted(): void
     {
         static::creating(function (self $request): void {
+            if (array_key_exists('audit_tail_event_id', $request->getAttributes())) {
+                throw new UnexpectedValueException('Audit tail metadata is owned by the canonical audit service.');
+            }
             $request->command_uuid ??= (string) Str::orderedUuid();
         });
         static::deleting(function (): never {
