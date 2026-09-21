@@ -1,0 +1,890 @@
+{
+  "status": "Local source-only review commit. Not merged or pushed; MAIN manual200%zoom and technical release pending.",
+  "recordedAtUtc": "2026-09-21T06:25:29.442Z",
+  "commit": "c18f52f648e68c38c48cc9eb51d7e02a35061e0d",
+  "parent": "2302ca33a95616e442a78e957ddce82d8db98669",
+  "tree": "74e04a0d44c5849224906106135e2aab5f6f99d4",
+  "branch": "codex/pkg-02a-client-location-design",
+  "candidateManifest": {
+    "path": "docs/fleet-assets-audit/evidence/PKG-02A/implementation/source-build-manifest-r8.json",
+    "sha256": "A42151A63F39032A96C1E16B75A2E840FD9028451810F15522D8148307D919B7"
+  },
+  "fileCount": 125,
+  "files": [
+    {
+      "path": "app/Domain/Monitoring/Services/CanonicalDeviceSiteResolver.php",
+      "workingTreeSha256": "E825745FD1A710BE27C6FB285323E5BED5AB4AEC390BCB00FCE04CFD371C5654",
+      "committedSha256": "E825745FD1A710BE27C6FB285323E5BED5AB4AEC390BCB00FCE04CFD371C5654",
+      "gitBlob": "343952c26ee6389b4723faced8bccf2a0aba2010",
+      "bytes": 8994
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Data/ClientLocationCommandOrigin.php",
+      "workingTreeSha256": "9F3A3C047362157C089F9F8A8FEE503958AA23EB2331089548A0B0DF2CB9788B",
+      "committedSha256": "9F3A3C047362157C089F9F8A8FEE503958AA23EB2331089548A0B0DF2CB9788B",
+      "gitBlob": "3950054437de280ce86d8007edda719284666ce7",
+      "bytes": 1669
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Data/CommandRequestInput.php",
+      "workingTreeSha256": "67C4B198A113D9B3C25BC3F1AB580033E25C4AE30E5ECE073E9FC7F243985561",
+      "committedSha256": "67C4B198A113D9B3C25BC3F1AB580033E25C4AE30E5ECE073E9FC7F243985561",
+      "gitBlob": "cb0721081e718e3cbfe4509481c5e56e054762c3",
+      "bytes": 776
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Data/CommandSigningPayload.php",
+      "workingTreeSha256": "4FFACDC9529F4EA89C45E0D3E71D4D0406D90AF41CEDAE51C2A623ABC0E66DD3",
+      "committedSha256": "4FFACDC9529F4EA89C45E0D3E71D4D0406D90AF41CEDAE51C2A623ABC0E66DD3",
+      "gitBlob": "557019f32cea8b07241002a8c8ad0ca252b0aa96",
+      "bytes": 3357
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Http/Requests/StoreDeviceCommandBatchRequest.php",
+      "workingTreeSha256": "45150A03CDD11CD0D67D1B17A2E59E379B72D53F4F9048FD65E862E88BC31293",
+      "committedSha256": "45150A03CDD11CD0D67D1B17A2E59E379B72D53F4F9048FD65E862E88BC31293",
+      "gitBlob": "cd6dc18046e9a3e6b072c7f41659ee3281b0d7bf",
+      "bytes": 1442
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Http/Requests/StoreDeviceCommandRequest.php",
+      "workingTreeSha256": "0DBDCFCA7961EA0E4B74AB9C60C997B870C437CE9502BAF9B032BBD5A736BCC9",
+      "committedSha256": "0DBDCFCA7961EA0E4B74AB9C60C997B870C437CE9502BAF9B032BBD5A736BCC9",
+      "gitBlob": "236be5ec347b3da6eb1ad6d74cf3639f56ac2960",
+      "bytes": 1377
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Models/DeviceCommandRequest.php",
+      "workingTreeSha256": "70E01F76ED196537EB3E3394CDEA28AE10A66373EBD60301E471E94F5A07FC4E",
+      "committedSha256": "70E01F76ED196537EB3E3394CDEA28AE10A66373EBD60301E471E94F5A07FC4E",
+      "gitBlob": "27df20dbb8d64b8fb4eb4560685c6440bd56d828",
+      "bytes": 8337
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/CollectorCommandRecoveryService.php",
+      "workingTreeSha256": "EB372A17739F88351E6963B471DA9131FB404214B704F7B4609B189F00C39255",
+      "committedSha256": "EB372A17739F88351E6963B471DA9131FB404214B704F7B4609B189F00C39255",
+      "gitBlob": "03adaeccb6882b3714b35ffc2efb5aa67d7ae18d",
+      "bytes": 4397
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/CommandAssignmentFingerprint.php",
+      "workingTreeSha256": "5B22832E03F5572F33C9B1CC32382C62D283FE5CA56973F832C093099B9796DD",
+      "committedSha256": "5B22832E03F5572F33C9B1CC32382C62D283FE5CA56973F832C093099B9796DD",
+      "gitBlob": "48a0ca817a87bdde61d66b77273adb166969c074",
+      "bytes": 2062
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/DeviceCommandAuditService.php",
+      "workingTreeSha256": "3070FCB4C7425B9BAAB933F7FEE6730C64CFC812390FBCC79A0DA88ECD8D6B03",
+      "committedSha256": "3070FCB4C7425B9BAAB933F7FEE6730C64CFC812390FBCC79A0DA88ECD8D6B03",
+      "gitBlob": "8053438e3c9ff507a5e13fbb321404c0a0bef16d",
+      "bytes": 4004
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/DeviceCommandContractVerifier.php",
+      "workingTreeSha256": "E8B3F012BA9BDA2243AFE5E40D6C8871393388410FA6917754476CC2A98242B1",
+      "committedSha256": "E8B3F012BA9BDA2243AFE5E40D6C8871393388410FA6917754476CC2A98242B1",
+      "gitBlob": "10e1f9eb0c3b7d0d50010b7a36b4019c3b9c1cc4",
+      "bytes": 2804
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/DeviceCommandRequestService.php",
+      "workingTreeSha256": "FFBDF9D13B6AD1E330ED6CB633515DE97C82A5D4458A02409768163DFB035E4A",
+      "committedSha256": "FFBDF9D13B6AD1E330ED6CB633515DE97C82A5D4458A02409768163DFB035E4A",
+      "gitBlob": "f5eccbf131da060b5d2bca0627611b6353e731cc",
+      "bytes": 25419
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/DeviceManagementAuthorizationService.php",
+      "workingTreeSha256": "4E3965D3A00039F133EA4F2F82FACB167D198E05E65E16485234E9E2DDE1E5B8",
+      "committedSha256": "4E3965D3A00039F133EA4F2F82FACB167D198E05E65E16485234E9E2DDE1E5B8",
+      "gitBlob": "dbce4a53db809a19fdb8e8dee5e26d0aa74bc8db",
+      "bytes": 10580
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/GovernedCommandDispatchService.php",
+      "workingTreeSha256": "E4A430A3DDA17D99EBCC5CF5AF6B6942159D062AC35F91EC9BAA678DB92F6897",
+      "committedSha256": "E4A430A3DDA17D99EBCC5CF5AF6B6942159D062AC35F91EC9BAA678DB92F6897",
+      "gitBlob": "f5d51931caad646e148b89c56ef4b7ccf33b43b8",
+      "bytes": 25557
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/DeviceCustodySiteResolver.php",
+      "workingTreeSha256": "DF64E5FE0C13C81B98F20DC86FFBFCF484F31DAAA08B5944CCA50784D0AA0B52",
+      "committedSha256": "DF64E5FE0C13C81B98F20DC86FFBFCF484F31DAAA08B5944CCA50784D0AA0B52",
+      "gitBlob": "11f7b71dcd5167f11c7339cc78b8f01353c62d53",
+      "bytes": 7114
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/PersonalTrackingPrivacyService.php",
+      "workingTreeSha256": "9CF1AA869D1025525DDDFAD29388AA056516201C534D95B88AB614C9A492BF99",
+      "committedSha256": "9CF1AA869D1025525DDDFAD29388AA056516201C534D95B88AB614C9A492BF99",
+      "gitBlob": "8f8ae67f7991c1caa1f1246836cc31b5574215d8",
+      "bytes": 18692
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php",
+      "workingTreeSha256": "B7CF8C24D93193F3675E4D31E99C4A43FA6ADCFF29F61B8F79031E64A0C469ED",
+      "committedSha256": "B7CF8C24D93193F3675E4D31E99C4A43FA6ADCFF29F61B8F79031E64A0C469ED",
+      "gitBlob": "bad5f5d8b341e58299b9dc097918acfec9fe134f",
+      "bytes": 60357
+    },
+    {
+      "path": "app/Http/Controllers/ClientController.php",
+      "workingTreeSha256": "A34F0BCCFDA7CEB869F3117DADBB20720E9FF6F5DC087C4F3A19EF6C087BAAEB",
+      "committedSha256": "A34F0BCCFDA7CEB869F3117DADBB20720E9FF6F5DC087C4F3A19EF6C087BAAEB",
+      "gitBlob": "5854d8cccfc73c06b1026119214a133b3c11e70c",
+      "bytes": 177549
+    },
+    {
+      "path": "app/Http/Controllers/Operations/ClientLocationLocateController.php",
+      "workingTreeSha256": "55AE1C475C03657DE1B93D5DE11A3C6A7E9C1F22DFFF0BB4E6EB710FC70ABC02",
+      "committedSha256": "55AE1C475C03657DE1B93D5DE11A3C6A7E9C1F22DFFF0BB4E6EB710FC70ABC02",
+      "gitBlob": "abfc2f736ccf52d2649041b71a1238687059fd5e",
+      "bytes": 4224
+    },
+    {
+      "path": "app/Http/Controllers/Operations/ClientLocationZoneDraftController.php",
+      "workingTreeSha256": "94F6C7659040D33353E38109197F1D0EB502440A32D750E7A8D42DFBF41A12AF",
+      "committedSha256": "94F6C7659040D33353E38109197F1D0EB502440A32D750E7A8D42DFBF41A12AF",
+      "gitBlob": "2ae5e5c2866c0d85243da65b730c5340bfbee4b4",
+      "bytes": 3563
+    },
+    {
+      "path": "app/Http/Controllers/Operations/ClientTrackerModeController.php",
+      "workingTreeSha256": "56087FFDC9B36E5CEC11D63F4D0CC180DB2886387751406F8EB9A2108CC87686",
+      "committedSha256": "56087FFDC9B36E5CEC11D63F4D0CC180DB2886387751406F8EB9A2108CC87686",
+      "gitBlob": "2e63b7dec9da7c7a08756b8919c678e89d0c6042",
+      "bytes": 4166
+    },
+    {
+      "path": "app/Http/Controllers/Sites/SiteGeocodingController.php",
+      "workingTreeSha256": "B07381E12BFA7F3C5D48DC2BF3FC85742654CE7CB383874E3C530ED28BFC3DA4",
+      "committedSha256": "B07381E12BFA7F3C5D48DC2BF3FC85742654CE7CB383874E3C530ED28BFC3DA4",
+      "gitBlob": "9ebd897ea997d2122c0a8e2228392d4ba59d82fa",
+      "bytes": 5535
+    },
+    {
+      "path": "app/Http/Requests/Operations/StoreClientLocateRequest.php",
+      "workingTreeSha256": "5524B319D19A9FA4DBFAE2258FCAE496DFA6189FFCD9B59AE3E624E1A7778BFE",
+      "committedSha256": "5524B319D19A9FA4DBFAE2258FCAE496DFA6189FFCD9B59AE3E624E1A7778BFE",
+      "gitBlob": "420aaa3db1441d27e836085f16972fc31fe9686f",
+      "bytes": 1155
+    },
+    {
+      "path": "app/Http/Requests/Operations/StoreClientLocationZoneDraftRequest.php",
+      "workingTreeSha256": "D378B6A65D53ABD68AAAA3F5D71939D684450302997C68855294DCFE68D74422",
+      "committedSha256": "D378B6A65D53ABD68AAAA3F5D71939D684450302997C68855294DCFE68D74422",
+      "gitBlob": "a563c5c9beb189cee41cf1804ba8729ef90afba7",
+      "bytes": 7441
+    },
+    {
+      "path": "app/Models/ClientGeofenceMonitor.php",
+      "workingTreeSha256": "F6BCA3D4280C5A93B6A7292BA0AEC3ADC00BA6FC12AE10CCFF6DD95040D9D73C",
+      "committedSha256": "F6BCA3D4280C5A93B6A7292BA0AEC3ADC00BA6FC12AE10CCFF6DD95040D9D73C",
+      "gitBlob": "fb252cb756ccf7e6ca060598db07543e69ce90a5",
+      "bytes": 349
+    },
+    {
+      "path": "app/Models/ClientGeofenceRule.php",
+      "workingTreeSha256": "50B87CFB7E140D66C0E78ACAA4D4391F8199BF8538A4921E38CE96D7F5BB2C7E",
+      "committedSha256": "50B87CFB7E140D66C0E78ACAA4D4391F8199BF8538A4921E38CE96D7F5BB2C7E",
+      "gitBlob": "44ce81b0fff4875304bd7048100119ccb9dae482",
+      "bytes": 387
+    },
+    {
+      "path": "app/Models/ClientGeofenceRuleVersion.php",
+      "workingTreeSha256": "75E40E2259E0825100C6F517C2ECBC60BFA656C5C4854BBC7E353932154DB252",
+      "committedSha256": "75E40E2259E0825100C6F517C2ECBC60BFA656C5C4854BBC7E353932154DB252",
+      "gitBlob": "7561765fe3d51f72934254aeefd250b2b663ce61",
+      "bytes": 609
+    },
+    {
+      "path": "app/Models/Queclink/QueclinkPendingCommand.php",
+      "workingTreeSha256": "D3592EF91BD53FC2BC6609673ACDF9F32C8B8CF295880CAF28812713CA7E9275",
+      "committedSha256": "D3592EF91BD53FC2BC6609673ACDF9F32C8B8CF295880CAF28812713CA7E9275",
+      "gitBlob": "b67a2fa65dc170bc0f2bc21fc83e5ecf57a01fae",
+      "bytes": 5820
+    },
+    {
+      "path": "app/Models/User.php",
+      "workingTreeSha256": "84C21562949AA2F8E71C441F1825BCCB5A272926FD72B1EA8D162D48ABDB7A10",
+      "committedSha256": "84C21562949AA2F8E71C441F1825BCCB5A272926FD72B1EA8D162D48ABDB7A10",
+      "gitBlob": "0ec08e7597e167fdbb2da847c36bdf532a782449",
+      "bytes": 14152
+    },
+    {
+      "path": "app/Policies/ClientPolicy.php",
+      "workingTreeSha256": "D2F447AAA009E807A4E49FE3A4C175DB47B6F29020F1AACA6AAD9650C6AD18DA",
+      "committedSha256": "D2F447AAA009E807A4E49FE3A4C175DB47B6F29020F1AACA6AAD9650C6AD18DA",
+      "gitBlob": "755f9d41c5993606e229736ee2ad874dee8c6c95",
+      "bytes": 5883
+    },
+    {
+      "path": "app/Services/AuthorizationEvidenceLockService.php",
+      "workingTreeSha256": "1BCB05D64D5EB3112BAFDF901B4A5253D3329F7BB13D98E0C8CBD2FC76FFB3EC",
+      "committedSha256": "1BCB05D64D5EB3112BAFDF901B4A5253D3329F7BB13D98E0C8CBD2FC76FFB3EC",
+      "gitBlob": "fd26bf9c8e67eefb21e8e603832a25e4aa0b0e56",
+      "bytes": 9270
+    },
+    {
+      "path": "app/Services/Clients/ClientProfileSectionAccess.php",
+      "workingTreeSha256": "47F2DCA192BCE6A78B9D3A94F4778198412E55D685437072B88547CA545A4843",
+      "committedSha256": "47F2DCA192BCE6A78B9D3A94F4778198412E55D685437072B88547CA545A4843",
+      "gitBlob": "6b5436d63defcd33c4ece290d3a23d927575f216",
+      "bytes": 7624
+    },
+    {
+      "path": "app/Services/Clients/ClientWorkerEligibility.php",
+      "workingTreeSha256": "CE2CD544FDEC7467B5B8065C4761A8BE79D1E5CA9D8D13A2E5E6D426F05C95C2",
+      "committedSha256": "CE2CD544FDEC7467B5B8065C4761A8BE79D1E5CA9D8D13A2E5E6D426F05C95C2",
+      "gitBlob": "5182023d00f03adc5b7890f7ad4635c04eb5dc91",
+      "bytes": 3985
+    },
+    {
+      "path": "app/Services/ConsentValidationService.php",
+      "workingTreeSha256": "958DA4F7EF043B45BF4BDA06CADF804EC8F70AFB138F8FFC4CAC3158F02CDD70",
+      "committedSha256": "958DA4F7EF043B45BF4BDA06CADF804EC8F70AFB138F8FFC4CAC3158F02CDD70",
+      "gitBlob": "fde4861d103b02d61f96a1b7cf327fa14f91766e",
+      "bytes": 24005
+    },
+    {
+      "path": "app/Services/Consents/CurrentConsentEvidence.php",
+      "workingTreeSha256": "0D5B656772C1D602B6EAFA8538D6BFE8C04C5B6772463CF8EF72E90992721396",
+      "committedSha256": "0D5B656772C1D602B6EAFA8538D6BFE8C04C5B6772463CF8EF72E90992721396",
+      "gitBlob": "6687d1b14a6a1cba818826b197e7cd33b1311a43",
+      "bytes": 3837
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomAlertProvenanceService.php",
+      "workingTreeSha256": "F2717E7F7A8C02F64F90F22DCE4E20FBAB696B6987E57104ACA57DD2FD7BC2EE",
+      "committedSha256": "F2717E7F7A8C02F64F90F22DCE4E20FBAB696B6987E57104ACA57DD2FD7BC2EE",
+      "gitBlob": "2552921ff9b59a7c5c3081832e527401c6b9aee0",
+      "bytes": 18389
+    },
+    {
+      "path": "app/Services/ControlRoom/SignalProcessingService.php",
+      "workingTreeSha256": "2BFE2898FF869E49A9EC25B6173C419FDBA34656F80D007478D9C1A9AD630A8E",
+      "committedSha256": "2BFE2898FF869E49A9EC25B6173C419FDBA34656F80D007478D9C1A9AD630A8E",
+      "gitBlob": "2a794eb639ac11f5b2aa604a1fb9a1d0da26b37f",
+      "bytes": 93866
+    },
+    {
+      "path": "app/Services/CurrentAuthorizationReads.php",
+      "workingTreeSha256": "38D31FCB8D24EB9B319045195E239E8834231F532E7BC782AB2B09E781F30413",
+      "committedSha256": "38D31FCB8D24EB9B319045195E239E8834231F532E7BC782AB2B09E781F30413",
+      "gitBlob": "e227a074f0ac460b40d27ab085b4a23ea2070615",
+      "bytes": 2588
+    },
+    {
+      "path": "app/Services/Fleet/FleetTelemetryIngestService.php",
+      "workingTreeSha256": "002187B71AA72A8A7EF83E2E77249C51580872911D35CB3EF02F218BC4E66621",
+      "committedSha256": "002187B71AA72A8A7EF83E2E77249C51580872911D35CB3EF02F218BC4E66621",
+      "gitBlob": "6536f61c07e08b267c6636d583a525c66a190b86",
+      "bytes": 63479
+    },
+    {
+      "path": "app/Services/Fleet/Telemetry/QueclinkAdapter.php",
+      "workingTreeSha256": "2F851AC15A53CE9E6E96428F93931B8E56E9E67672FC07313A93919BA2ECCF8B",
+      "committedSha256": "2F851AC15A53CE9E6E96428F93931B8E56E9E67672FC07313A93919BA2ECCF8B",
+      "gitBlob": "90067e1da5df01a071a52640db4ae4fccc25de44",
+      "bytes": 3442
+    },
+    {
+      "path": "app/Services/Queclink/GovernedCommandLifecycleService.php",
+      "workingTreeSha256": "338C7FDEFD3DB4A255604E428C54321B41E2179FA1EDBE1640D2DD498DAD7A79",
+      "committedSha256": "338C7FDEFD3DB4A255604E428C54321B41E2179FA1EDBE1640D2DD498DAD7A79",
+      "gitBlob": "ba3a3edfbbcb3a99fb4ef3f37e804e9669fc4547",
+      "bytes": 30318
+    },
+    {
+      "path": "app/Services/Queclink/Listener/FrameRouter.php",
+      "workingTreeSha256": "6A6AC662888FCAAC218C572BC5749D5C40087A86EC3151730C138598C5606B62",
+      "committedSha256": "6A6AC662888FCAAC218C572BC5749D5C40087A86EC3151730C138598C5606B62",
+      "gitBlob": "975f1a1da0b7b33f1eaf08235fb72d9e25cec736",
+      "bytes": 25398
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationAccessService.php",
+      "workingTreeSha256": "AACA9E3D437848BE489C8FDC409BE1BE202CE734C453DA20CDE43C90F6F1D1F9",
+      "committedSha256": "AACA9E3D437848BE489C8FDC409BE1BE202CE734C453DA20CDE43C90F6F1D1F9",
+      "gitBlob": "7b4384237d24968e65657390fd571ea76569aba9",
+      "bytes": 3767
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationAddressService.php",
+      "workingTreeSha256": "1DC7E92E0C25BEE7B27989C78287045D50E9C1C6E2CADCAB01D98AF85C04D6A4",
+      "committedSha256": "1DC7E92E0C25BEE7B27989C78287045D50E9C1C6E2CADCAB01D98AF85C04D6A4",
+      "gitBlob": "66b32e23009012ac638a204c3137214c2b5d3ed8",
+      "bytes": 3570
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationCommandContext.php",
+      "workingTreeSha256": "CBE29639B02A9440A6C4C3EF8A8D033D4FDADC49514B6FACD585DD4DA95B8FF7",
+      "committedSha256": "CBE29639B02A9440A6C4C3EF8A8D033D4FDADC49514B6FACD585DD4DA95B8FF7",
+      "gitBlob": "ae35035a1d54f304b5ea55e069f3c71fe6edf05f",
+      "bytes": 7092
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationEvidenceBusy.php",
+      "workingTreeSha256": "648AE5D9CA656FBD1696C92BCDDF6EF1286347C219E30B1DD6109B227BB2E5F2",
+      "committedSha256": "648AE5D9CA656FBD1696C92BCDDF6EF1286347C219E30B1DD6109B227BB2E5F2",
+      "gitBlob": "1d7b8fb94203250a25c942665ba500c829c66c06",
+      "bytes": 214
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationHistoryService.php",
+      "workingTreeSha256": "0662A3EC285559A814291BE019C96DC22DF7DF09CDE2CB14868E1F725328B2D2",
+      "committedSha256": "0662A3EC285559A814291BE019C96DC22DF7DF09CDE2CB14868E1F725328B2D2",
+      "gitBlob": "6e6c716ebbe28ebd3a17d1df4ae9a3f37c01b4dd",
+      "bytes": 8641
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationLocateService.php",
+      "workingTreeSha256": "06A5544C6ACD12E1F23BCAAABB860CC214A03744AD609F50D7B8C15FA2E75643",
+      "committedSha256": "06A5544C6ACD12E1F23BCAAABB860CC214A03744AD609F50D7B8C15FA2E75643",
+      "gitBlob": "79de8f35c529354b9a84cfb82d2051575527e446",
+      "bytes": 9518
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationZoneDraftService.php",
+      "workingTreeSha256": "913E793924789A8663A88D4DBE82610636F641627CB873D25354F8B3EB58CE0E",
+      "committedSha256": "913E793924789A8663A88D4DBE82610636F641627CB873D25354F8B3EB58CE0E",
+      "gitBlob": "76ba044e17508112378e83f85c509cedb9d59c6f",
+      "bytes": 9860
+    },
+    {
+      "path": "app/Services/Tracking/ClientTrackerFallService.php",
+      "workingTreeSha256": "34170B66DF715D1CF099322DE9204EBB9D8EDE4C9BC9835FBD01B4A9AD2D8022",
+      "committedSha256": "34170B66DF715D1CF099322DE9204EBB9D8EDE4C9BC9835FBD01B4A9AD2D8022",
+      "gitBlob": "06ef85a02e263d110f77ffad76095cd4cb1df31f",
+      "bytes": 7611
+    },
+    {
+      "path": "app/Services/Tracking/ClientTrackerModeProfiles.php",
+      "workingTreeSha256": "EACDEBCBB216B4DBB5A17A899B46A3BC3AE3F10E0748BAFCFC8F9C0C8A31AA56",
+      "committedSha256": "EACDEBCBB216B4DBB5A17A899B46A3BC3AE3F10E0748BAFCFC8F9C0C8A31AA56",
+      "gitBlob": "da25a9ae55b261eadf8793c52941f184d91428e2",
+      "bytes": 2790
+    },
+    {
+      "path": "app/Services/Tracking/ClientTrackerModeService.php",
+      "workingTreeSha256": "51AC7C2795DBCF63C5480D2BAFE5C1E606DDD911C4753C6AED9B3C23676E9A05",
+      "committedSha256": "51AC7C2795DBCF63C5480D2BAFE5C1E606DDD911C4753C6AED9B3C23676E9A05",
+      "gitBlob": "ddd0a6f93e887fcb8ca0670623b74926aa7d5d57",
+      "bytes": 10317
+    },
+    {
+      "path": "app/Services/Tracking/ClientTrackerStatusService.php",
+      "workingTreeSha256": "89B0A63A52CC20A323787C46C91BD15E5E2695450451E9904F9065EFC7F8C34D",
+      "committedSha256": "89B0A63A52CC20A323787C46C91BD15E5E2695450451E9904F9065EFC7F8C34D",
+      "gitBlob": "13aa000b3cd49290ae03d0546737c7635f378613",
+      "bytes": 3665
+    },
+    {
+      "path": "app/Services/Tracking/ClientZoneMonitoringService.php",
+      "workingTreeSha256": "A5B836C4FEB8B46C6D137024010B90050AC059BB7A70F154D2AB8D0EEBBA547E",
+      "committedSha256": "A5B836C4FEB8B46C6D137024010B90050AC059BB7A70F154D2AB8D0EEBBA547E",
+      "gitBlob": "6f111a07d8a8453a5c46bc8d78e577bb9fe763ee",
+      "bytes": 18144
+    },
+    {
+      "path": "app/Services/Tracking/ClientZonePosition.php",
+      "workingTreeSha256": "B864B5ED650CBEDA6B9DC9C64E44AA2265CB738A45DAFB29D598860D758E4FE5",
+      "committedSha256": "B864B5ED650CBEDA6B9DC9C64E44AA2265CB738A45DAFB29D598860D758E4FE5",
+      "gitBlob": "6bb6cbbb5913105d940e39258aa33e06222f6213",
+      "bytes": 2124
+    },
+    {
+      "path": "app/Services/Tracking/ClientZoneSchedule.php",
+      "workingTreeSha256": "F12BD2C686EAAAC9BBAA1F9F1E3C5CCD5809012E7C21B839DFC7CA8D347822F2",
+      "committedSha256": "F12BD2C686EAAAC9BBAA1F9F1E3C5CCD5809012E7C21B839DFC7CA8D347822F2",
+      "gitBlob": "94f78b4c59bc0b9753978f7777fcaeba7119a5fd",
+      "bytes": 1153
+    },
+    {
+      "path": "app/Services/UserSiteAccessService.php",
+      "workingTreeSha256": "FFBABBED6350CB096C5FEE5E36AAA121848E350FCA93DBDDE815416C139DC0A9",
+      "committedSha256": "FFBABBED6350CB096C5FEE5E36AAA121848E350FCA93DBDDE815416C139DC0A9",
+      "gitBlob": "1cdba886bf9e9e4973f16077dd08c6902b7f6379",
+      "bytes": 91663
+    },
+    {
+      "path": "config/fleet.php",
+      "workingTreeSha256": "F392DBF35EB563F2DA16FB02E51559E6EA03D1B31E100F42F96275200446C333",
+      "committedSha256": "F392DBF35EB563F2DA16FB02E51559E6EA03D1B31E100F42F96275200446C333",
+      "gitBlob": "a97c6d84d5c12c9484bc66f6be14b1872045cf99",
+      "bytes": 3041
+    },
+    {
+      "path": "database/migrations/2026_09_21_000001_create_client_geofence_rule_drafts.php",
+      "workingTreeSha256": "0ED51243F941A51B9F0AFBDFBB368D5BD76BD5DDFDFE34240D45688F372F097E",
+      "committedSha256": "0ED51243F941A51B9F0AFBDFBB368D5BD76BD5DDFDFE34240D45688F372F097E",
+      "gitBlob": "5a19492f07f4673a4d805c20f651c4bb8497bfb8",
+      "bytes": 2602
+    },
+    {
+      "path": "database/migrations/2026_09_21_000002_add_origin_context_to_device_command_requests.php",
+      "workingTreeSha256": "7419BC947ECCF440A7164067B3468FA63A9C595631DB455C4E85AD01DA816177",
+      "committedSha256": "7419BC947ECCF440A7164067B3468FA63A9C595631DB455C4E85AD01DA816177",
+      "gitBlob": "1f5b9f884a115c102e2ef42af1f0c3eb99d76dff",
+      "bytes": 842
+    },
+    {
+      "path": "database/migrations/2026_09_21_000003_record_queclink_governed_provenance.php",
+      "workingTreeSha256": "F520EBAC0C011716136ADCEFA77D4BEAB4880725C9FF5C164BEB3CC4E8C65BDD",
+      "committedSha256": "F520EBAC0C011716136ADCEFA77D4BEAB4880725C9FF5C164BEB3CC4E8C65BDD",
+      "gitBlob": "8c73368c72418c82b5375d01bc8342b04ffa089b",
+      "bytes": 1231
+    },
+    {
+      "path": "database/migrations/2026_09_21_000004_add_device_command_audit_tail.php",
+      "workingTreeSha256": "431567E652646BFD538F6D17F2AE1B02006E68044C02AE31656DBEB2E424E3D7",
+      "committedSha256": "431567E652646BFD538F6D17F2AE1B02006E68044C02AE31656DBEB2E424E3D7",
+      "gitBlob": "19cb52f9d6aaeb89f62b7da822eed68fba10cc3b",
+      "bytes": 1910
+    },
+    {
+      "path": "database/migrations/2026_09_21_000005_create_client_geofence_monitors.php",
+      "workingTreeSha256": "07914DC16A6868EEABC2080F4F5D9B52D4CF50F4B32BAAC9F00DA76D1AFF86A1",
+      "committedSha256": "07914DC16A6868EEABC2080F4F5D9B52D4CF50F4B32BAAC9F00DA76D1AFF86A1",
+      "gitBlob": "a098ac3058c3c30546e7743005a2dec58ddafd69",
+      "bytes": 1853
+    },
+    {
+      "path": "database/seeders/QueclinkPresetSeeder.php",
+      "workingTreeSha256": "CF88A13ACCF96C295413962A20DFE0610C5E8DB5244EBB543822E02D88E6AACD",
+      "committedSha256": "CF88A13ACCF96C295413962A20DFE0610C5E8DB5244EBB543822E02D88E6AACD",
+      "gitBlob": "25b879c0ed10614b271b6dc18bd98eecf70bee96",
+      "bytes": 6354
+    },
+    {
+      "path": "resources/js/components/client-location-tab.tsx",
+      "workingTreeSha256": "0B1DBC32C90E2E6BEC45DBA95947AA83774AD5DE7A3BA5D5DA0893D97198ABD7",
+      "committedSha256": "0B1DBC32C90E2E6BEC45DBA95947AA83774AD5DE7A3BA5D5DA0893D97198ABD7",
+      "gitBlob": "39c35d1e8dad2e84379b808d9d4168c00829837f",
+      "bytes": 5603
+    },
+    {
+      "path": "resources/js/components/client-location/boundary-geometry.ts",
+      "workingTreeSha256": "8DC70CCE51861AE8E83319DB2F6BC9AD766119B8775EAEEA5F7B215E820DD5B9",
+      "committedSha256": "8DC70CCE51861AE8E83319DB2F6BC9AD766119B8775EAEEA5F7B215E820DD5B9",
+      "gitBlob": "a548b03d3f5d9bad963ec438a38ff66c0b69a667",
+      "bytes": 1018
+    },
+    {
+      "path": "resources/js/components/client-location/client-location-map.test.tsx",
+      "workingTreeSha256": "0FFA2E1728209CB6168EAB96A3DE707724CDBCEC348E28DE901C3889EFE97B5A",
+      "committedSha256": "0FFA2E1728209CB6168EAB96A3DE707724CDBCEC348E28DE901C3889EFE97B5A",
+      "gitBlob": "a08ba8961852530b21e546cf6ab09788888e3269",
+      "bytes": 4792
+    },
+    {
+      "path": "resources/js/components/client-location/client-location-map.tsx",
+      "workingTreeSha256": "1DD3A818BBA15B5EB0A4F3D6A1BC608142CB1FFBB6570BD59565BC7DCF3EFF12",
+      "committedSha256": "1DD3A818BBA15B5EB0A4F3D6A1BC608142CB1FFBB6570BD59565BC7DCF3EFF12",
+      "gitBlob": "be9e9d74e0ed255cfab54b6922d7860a862e9e32",
+      "bytes": 16230
+    },
+    {
+      "path": "resources/js/components/client-location/locate-now-dialog.test.tsx",
+      "workingTreeSha256": "BF0CE834B30E9130D193BE5FCCBA647A576A3AE57A4E7CDA4A0A2A532EF449F4",
+      "committedSha256": "BF0CE834B30E9130D193BE5FCCBA647A576A3AE57A4E7CDA4A0A2A532EF449F4",
+      "gitBlob": "65dd99cf247d9a6f19501c09363c5ff81333bf73",
+      "bytes": 10610
+    },
+    {
+      "path": "resources/js/components/client-location/locate-now-dialog.tsx",
+      "workingTreeSha256": "38014448FF2315372FCF30DBC8FAADF14C2CB05A3DC0109D1D7628E653CC1841",
+      "committedSha256": "38014448FF2315372FCF30DBC8FAADF14C2CB05A3DC0109D1D7628E653CC1841",
+      "gitBlob": "976d3c042587ffe57b01be5e549ca7a8925cd367",
+      "bytes": 26294
+    },
+    {
+      "path": "resources/js/components/client-location/location-address.test.tsx",
+      "workingTreeSha256": "0FA0C2BFE6EE22CCB8536311C5317DBED98BC2F5E093B3741CF8A24B0B1E7A6F",
+      "committedSha256": "0FA0C2BFE6EE22CCB8536311C5317DBED98BC2F5E093B3741CF8A24B0B1E7A6F",
+      "gitBlob": "b5abe3a4713c767fa2d2f68eb16e4cf5cedbff30",
+      "bytes": 1092
+    },
+    {
+      "path": "resources/js/components/client-location/location-address.tsx",
+      "workingTreeSha256": "E818BF95BC7A53A6BFE136B23CB4F9395FF163ACB2F343DE17828CEB25D916D8",
+      "committedSha256": "E818BF95BC7A53A6BFE136B23CB4F9395FF163ACB2F343DE17828CEB25D916D8",
+      "gitBlob": "9e273245cfe74cfd63d05abb0ff111123efeb213",
+      "bytes": 1464
+    },
+    {
+      "path": "resources/js/components/client-location/location-history.tsx",
+      "workingTreeSha256": "7082E0000FEFA629681530EB5574A8127BD4F20F56440AACAA607804FDEFD0A5",
+      "committedSha256": "7082E0000FEFA629681530EB5574A8127BD4F20F56440AACAA607804FDEFD0A5",
+      "gitBlob": "bf6db0e806c9120666079f1f600352810c038581",
+      "bytes": 8165
+    },
+    {
+      "path": "resources/js/components/client-location/location-workspace.css",
+      "workingTreeSha256": "D3863BF69A6B1671753268EFE3CB8E33A2AEF3F6DCE958EE1134BA6B23E881A5",
+      "committedSha256": "D3863BF69A6B1671753268EFE3CB8E33A2AEF3F6DCE958EE1134BA6B23E881A5",
+      "gitBlob": "0b410344bd07187fb1822df6d508f4c5b72fb575",
+      "bytes": 21732
+    },
+    {
+      "path": "resources/js/components/client-location/location-workspace.test.tsx",
+      "workingTreeSha256": "96A3F91FE6DC3CEAB9EDC7450BB503A048A311C9EC4061B366DDDE2BB298CAD8",
+      "committedSha256": "96A3F91FE6DC3CEAB9EDC7450BB503A048A311C9EC4061B366DDDE2BB298CAD8",
+      "gitBlob": "a217d2a2df000921550e6128b378ef60b7dcbf35",
+      "bytes": 3039
+    },
+    {
+      "path": "resources/js/components/client-location/location-workspace.tsx",
+      "workingTreeSha256": "E13DA94E24D9DEFC47464489A89B93C4DF07A0AE87A5D9339DEF79317B1AEA7E",
+      "committedSha256": "E13DA94E24D9DEFC47464489A89B93C4DF07A0AE87A5D9339DEF79317B1AEA7E",
+      "gitBlob": "c7fd32dd6b66b2de7203979dc50e91f95e23bc75",
+      "bytes": 43391
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-battery.test.tsx",
+      "workingTreeSha256": "250EAA2870CF13C6204B0FE03B6ED282BC3ED67BDD47D7DC7A17C1E8CF78FD29",
+      "committedSha256": "250EAA2870CF13C6204B0FE03B6ED282BC3ED67BDD47D7DC7A17C1E8CF78FD29",
+      "gitBlob": "1bfd2e4d27c1e1cce621058dec9ad7355d8623f0",
+      "bytes": 2965
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-battery.tsx",
+      "workingTreeSha256": "4CA75490A4906A95152CBC681EC28267D15403F29943F02061C829A152B7FA5B",
+      "committedSha256": "4CA75490A4906A95152CBC681EC28267D15403F29943F02061C829A152B7FA5B",
+      "gitBlob": "1aaf828f6118e35fe7601c2b2b1daeb5b245e42b",
+      "bytes": 4564
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-indicators.test.tsx",
+      "workingTreeSha256": "0177BEC36FEF51A96A908E8BE747B8494A859150ADC8291F3E02D63A2B8CEA4D",
+      "committedSha256": "0177BEC36FEF51A96A908E8BE747B8494A859150ADC8291F3E02D63A2B8CEA4D",
+      "gitBlob": "4c606597810cdd362e5ab02a2d57ac6138308a65",
+      "bytes": 3139
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-indicators.tsx",
+      "workingTreeSha256": "BBD05B4F87284A4D03EB020568C0592016F2010FF2F4A4901B91B421FAB1E142",
+      "committedSha256": "BBD05B4F87284A4D03EB020568C0592016F2010FF2F4A4901B91B421FAB1E142",
+      "gitBlob": "4fd965a0243db721db4dcab216dca83c36f4a829",
+      "bytes": 5775
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-modes.test.tsx",
+      "workingTreeSha256": "5E59EC553B55578D4EE88B3D951E2881FE73FC1E6D905C775E7949FA0CC89F45",
+      "committedSha256": "5E59EC553B55578D4EE88B3D951E2881FE73FC1E6D905C775E7949FA0CC89F45",
+      "gitBlob": "6bcc28ceef97fb56e689593e33fcb4b255a82e5d",
+      "bytes": 4427
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-modes.tsx",
+      "workingTreeSha256": "C42BC3B8254B9B6F67B99F57C07A7FDCD3D69FD970CD5EDEC7ADA38F74300591",
+      "committedSha256": "C42BC3B8254B9B6F67B99F57C07A7FDCD3D69FD970CD5EDEC7ADA38F74300591",
+      "gitBlob": "2b7327cdd434ada26e7e66deda2f40c622f79eb6",
+      "bytes": 23466
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-panic.test.tsx",
+      "workingTreeSha256": "DCA97A882804DA0ECF848DFC903652EC173880ED42CC1CF8F17813E12D0CFE6C",
+      "committedSha256": "DCA97A882804DA0ECF848DFC903652EC173880ED42CC1CF8F17813E12D0CFE6C",
+      "gitBlob": "d967e5e7f75d45529ca8cc97248048a47de61772",
+      "bytes": 2030
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-panic.tsx",
+      "workingTreeSha256": "B1DCF14EAC041123B8C128C19526AD7233B4638CBF0CBB1A37B2FB32BF630FE6",
+      "committedSha256": "B1DCF14EAC041123B8C128C19526AD7233B4638CBF0CBB1A37B2FB32BF630FE6",
+      "gitBlob": "3905fdf47bddd4b198e7c0939cadfce4da7d7506",
+      "bytes": 3100
+    },
+    {
+      "path": "resources/js/components/client-location/types.ts",
+      "workingTreeSha256": "55CB3B29E1357DA6D2DF7D0C186FF231BE175BD21DDF6E7B37169FDC90245520",
+      "committedSha256": "55CB3B29E1357DA6D2DF7D0C186FF231BE175BD21DDF6E7B37169FDC90245520",
+      "gitBlob": "65efbea9881624f2b63ce905516ea9b6fe1afa0b",
+      "bytes": 5149
+    },
+    {
+      "path": "resources/js/components/client-location/use-recorded-location-refresh.test.tsx",
+      "workingTreeSha256": "C0BE89121AEED52630C1ECAF49C6B153E6444A60D56CA135DFCA53DD73C7708F",
+      "committedSha256": "C0BE89121AEED52630C1ECAF49C6B153E6444A60D56CA135DFCA53DD73C7708F",
+      "gitBlob": "b91fb8ef05e5c74ed1688af08b1327fd15175435",
+      "bytes": 3252
+    },
+    {
+      "path": "resources/js/components/client-location/use-recorded-location-refresh.ts",
+      "workingTreeSha256": "8E13018539552C38EB5D8EEFE64A7508010D926F2053802C95FF98D71F08183C",
+      "committedSha256": "8E13018539552C38EB5D8EEFE64A7508010D926F2053802C95FF98D71F08183C",
+      "gitBlob": "fd7ef5599c80af122d22aa58333c01852cdd599e",
+      "bytes": 1670
+    },
+    {
+      "path": "resources/js/components/client-location/zone-address-search.test.tsx",
+      "workingTreeSha256": "AE3FEDEA4BA67127DCBBDF6EEAEEACA33FA52A7B940457B411B116A9D8A8C10A",
+      "committedSha256": "AE3FEDEA4BA67127DCBBDF6EEAEEACA33FA52A7B940457B411B116A9D8A8C10A",
+      "gitBlob": "6accd4645027991a310210db465bd2f60d6295f6",
+      "bytes": 4233
+    },
+    {
+      "path": "resources/js/components/client-location/zone-address-search.tsx",
+      "workingTreeSha256": "A5E4D05F3106DBF26E5E54ED286B95125590A76DBDEE71C2274DC8B3316345C6",
+      "committedSha256": "A5E4D05F3106DBF26E5E54ED286B95125590A76DBDEE71C2274DC8B3316345C6",
+      "gitBlob": "faa60d7f50871867d195436aaf0dd23460fc8a45",
+      "bytes": 7609
+    },
+    {
+      "path": "resources/js/components/client-location/zone-draft-dialog.test.tsx",
+      "workingTreeSha256": "66FDF6882D2CB6CA32859D1B8C112D33BD466D2DE1860DA4FCDF1A9CEFC7ACCA",
+      "committedSha256": "66FDF6882D2CB6CA32859D1B8C112D33BD466D2DE1860DA4FCDF1A9CEFC7ACCA",
+      "gitBlob": "5d562460932bcb19c531010e224ed7b0c15a8f6e",
+      "bytes": 7700
+    },
+    {
+      "path": "resources/js/components/client-location/zone-draft-dialog.tsx",
+      "workingTreeSha256": "F5A67924E4C08808A8288DD7F5B9471D29A5808E67291CD34FB59739020164D2",
+      "committedSha256": "F5A67924E4C08808A8288DD7F5B9471D29A5808E67291CD34FB59739020164D2",
+      "gitBlob": "6f2b9deaa45ccb235ccec4057111844dcac56e7d",
+      "bytes": 53487
+    },
+    {
+      "path": "resources/js/components/client-location/zone-monitoring-dialog.test.tsx",
+      "workingTreeSha256": "0794B1940686A16A3D784B91337880D071F911405474DA9D686F35FF7AE7816B",
+      "committedSha256": "0794B1940686A16A3D784B91337880D071F911405474DA9D686F35FF7AE7816B",
+      "gitBlob": "bd74e3a1df2b89817841f5aedebfe53a2cb81a37",
+      "bytes": 4942
+    },
+    {
+      "path": "resources/js/components/client-location/zone-monitoring-dialog.tsx",
+      "workingTreeSha256": "55A21373C71F8A211AA507632AE62F121CFD2C3E98FEE3A6CA0AC127964879F2",
+      "committedSha256": "55A21373C71F8A211AA507632AE62F121CFD2C3E98FEE3A6CA0AC127964879F2",
+      "gitBlob": "5e234d12e36528cc1befdb9a8af5ac6851e9e77b",
+      "bytes": 10163
+    },
+    {
+      "path": "resources/js/components/control-room/alert-workspace-dialog.tsx",
+      "workingTreeSha256": "041B27078F1D0FD96A881CC672B8B97767564F52E586A3C26038CE8CFB3A71F0",
+      "committedSha256": "041B27078F1D0FD96A881CC672B8B97767564F52E586A3C26038CE8CFB3A71F0",
+      "gitBlob": "58e29ed8f0f32bcc7c42fed015f8a93d6d995df4",
+      "bytes": 183844
+    },
+    {
+      "path": "resources/js/hooks/use-personal-location-privacy.test.tsx",
+      "workingTreeSha256": "A105F590FBD81FAE230E7DDBBD0BEF63BB57650036C79F9DB39DB1D1E0801C24",
+      "committedSha256": "A105F590FBD81FAE230E7DDBBD0BEF63BB57650036C79F9DB39DB1D1E0801C24",
+      "gitBlob": "0d73fc5677afb2a1d492e1d4fcbf46d920ef647d",
+      "bytes": 5343
+    },
+    {
+      "path": "resources/js/hooks/use-personal-location-privacy.ts",
+      "workingTreeSha256": "807BDE84B84DCC99879CDAF38DF1133DF098037946C68A2677CCF8FBD553CA1F",
+      "committedSha256": "807BDE84B84DCC99879CDAF38DF1133DF098037946C68A2677CCF8FBD553CA1F",
+      "gitBlob": "00ddd28520846a30e04f4ea20e4b4713d8bee485",
+      "bytes": 5379
+    },
+    {
+      "path": "resources/js/pages/operations/clients/show.tsx",
+      "workingTreeSha256": "22496D96DE415636EB4B2DA356DF21492C68FF86EE73C4618CD2F004741D14DC",
+      "committedSha256": "22496D96DE415636EB4B2DA356DF21492C68FF86EE73C4618CD2F004741D14DC",
+      "gitBlob": "c9b3397c385a78937d4bdb25899c9f92d98833db",
+      "bytes": 420775
+    },
+    {
+      "path": "resources/js/test/client-location-tab.test.tsx",
+      "workingTreeSha256": "9E5996FC5F7FE2751B5F3C59C86120917BB247B0025A5DC6D98BDE7AE6C46619",
+      "committedSha256": "9E5996FC5F7FE2751B5F3C59C86120917BB247B0025A5DC6D98BDE7AE6C46619",
+      "gitBlob": "9f5a02d0ffa325994cca2fc1fa3d5eca94990b3b",
+      "bytes": 11643
+    },
+    {
+      "path": "routes/operations.php",
+      "workingTreeSha256": "904DCDE11CD7582DB7EA0336E755CFD0527FA47FDB5A338FF6240D79A42FAA49",
+      "committedSha256": "904DCDE11CD7582DB7EA0336E755CFD0527FA47FDB5A338FF6240D79A42FAA49",
+      "gitBlob": "d846897045d9e1c3a81bf5659516ac0f25e77dc0",
+      "bytes": 86575
+    },
+    {
+      "path": "tests/Feature/FleetAssets/FleetRealtimePrivacyTest.php",
+      "workingTreeSha256": "BC0A566B7F4F0190977262A2FC0A888BBE975FCA3DBA20F3F0F4FD86608028AB",
+      "committedSha256": "BC0A566B7F4F0190977262A2FC0A888BBE975FCA3DBA20F3F0F4FD86608028AB",
+      "gitBlob": "e0822e7054387cce8ff854f12d6c5831a9d1d005",
+      "bytes": 12474
+    },
+    {
+      "path": "tests/Feature/Operations/ClientLocateDeliveryTest.php",
+      "workingTreeSha256": "E335669EA6C90F8F28EA8FD00E681AA406EA19A7CB7A48836B9033DE81F3780F",
+      "committedSha256": "E335669EA6C90F8F28EA8FD00E681AA406EA19A7CB7A48836B9033DE81F3780F",
+      "gitBlob": "44a3ad89065217fc50c84070e88e0c0fddd46060",
+      "bytes": 8458
+    },
+    {
+      "path": "tests/Feature/Operations/ClientLocateMigrationTest.php",
+      "workingTreeSha256": "8D96B5756CE72C44420C6975D81E63008FA224C7FFE996F0CE008D95CF41F49B",
+      "committedSha256": "8D96B5756CE72C44420C6975D81E63008FA224C7FFE996F0CE008D95CF41F49B",
+      "gitBlob": "12763c6785a7330fecade6fee81bb031154d8f04",
+      "bytes": 2808
+    },
+    {
+      "path": "tests/Feature/Operations/ClientLocateRequestTest.php",
+      "workingTreeSha256": "D63B5C5FAFCC7E2600735A311F1B4B15AE8821D6C73FB088FD31B40F1563F382",
+      "committedSha256": "D63B5C5FAFCC7E2600735A311F1B4B15AE8821D6C73FB088FD31B40F1563F382",
+      "gitBlob": "4ee8fcc74c5056b47bb72c297d19ba1776a98ecc",
+      "bytes": 11910
+    },
+    {
+      "path": "tests/Feature/Operations/ClientLocationAddressSearchTest.php",
+      "workingTreeSha256": "2510024899640D394017C500896B5D5E257F679B208F58B627FF04501B5D9764",
+      "committedSha256": "2510024899640D394017C500896B5D5E257F679B208F58B627FF04501B5D9764",
+      "gitBlob": "488db1264414a78f2b42a93e8889ffbb7dd7a605",
+      "bytes": 5929
+    },
+    {
+      "path": "tests/Feature/Operations/ClientLocationConsentDisclosureTest.php",
+      "workingTreeSha256": "53B5B85598BF31EFCAF023D5CC65E015B0847BB3C9F3B53DB047BF424BAE8B0B",
+      "committedSha256": "53B5B85598BF31EFCAF023D5CC65E015B0847BB3C9F3B53DB047BF424BAE8B0B",
+      "gitBlob": "97ae81bb666665291dca9837cc87d189d481a57b",
+      "bytes": 13878
+    },
+    {
+      "path": "tests/Feature/Operations/ClientLocationHistoryBoundaryTest.php",
+      "workingTreeSha256": "3D35487EE0170765142DBE9E68B86E90B74E465E344E5418C48E5C06CD1B29E7",
+      "committedSha256": "3D35487EE0170765142DBE9E68B86E90B74E465E344E5418C48E5C06CD1B29E7",
+      "gitBlob": "89478e643caff06f1cb687f87f5444adf6dd80bf",
+      "bytes": 5714
+    },
+    {
+      "path": "tests/Feature/Operations/ClientLocationZoneDraftTest.php",
+      "workingTreeSha256": "B33E45BF6439470F4DD72DB4E3D890CA4FD07AE58EBCB386912413B6FC06CEAF",
+      "committedSha256": "B33E45BF6439470F4DD72DB4E3D890CA4FD07AE58EBCB386912413B6FC06CEAF",
+      "gitBlob": "b44b58a35c84a128befcf3c8917c3de6e8502112",
+      "bytes": 10899
+    },
+    {
+      "path": "tests/Feature/Operations/ClientTrackerFallTest.php",
+      "workingTreeSha256": "9440F8ADB522173F755EC89F8A1A5018A0B8FBEC5408EE7F4FD3A2E821818615",
+      "committedSha256": "9440F8ADB522173F755EC89F8A1A5018A0B8FBEC5408EE7F4FD3A2E821818615",
+      "gitBlob": "ad0655d1cccb73f909f4c1f1f6edb158c3bc29e0",
+      "bytes": 5836
+    },
+    {
+      "path": "tests/Feature/Operations/ClientTrackerModeTest.php",
+      "workingTreeSha256": "D6FF807021C6010318DB07ECAE70393385467272440FCDA55EBE7072539F87E7",
+      "committedSha256": "D6FF807021C6010318DB07ECAE70393385467272440FCDA55EBE7072539F87E7",
+      "gitBlob": "b76dc9bb468f3177ef0d429c3d21e0f87118c671",
+      "bytes": 8797
+    },
+    {
+      "path": "tests/Feature/Operations/ClientTrackerStatusTest.php",
+      "workingTreeSha256": "C75395DF8BB58AA56A06179DC68187E623B4B373670DE0B1ACFEC66F5C5DFE9C",
+      "committedSha256": "C75395DF8BB58AA56A06179DC68187E623B4B373670DE0B1ACFEC66F5C5DFE9C",
+      "gitBlob": "5a053795e0743a3013e954a2c5388e3414aafcd9",
+      "bytes": 5417
+    },
+    {
+      "path": "tests/Feature/Operations/ClientZoneMonitoringTest.php",
+      "workingTreeSha256": "9F6155229F31C2CCA0C949BF92D96663ECC993BD68C24CA81AF85FFFFB86BDA7",
+      "committedSha256": "9F6155229F31C2CCA0C949BF92D96663ECC993BD68C24CA81AF85FFFFB86BDA7",
+      "gitBlob": "c97262aff60235ea858e6646f568e674c744d06b",
+      "bytes": 16669
+    },
+    {
+      "path": "tests/Feature/SecurityDevices/DeviceManagementAuthorizationTest.php",
+      "workingTreeSha256": "EE3DEC7D659C728E19D2BC9F1C5D389E68BED7E1DC3AA524E0EE97A0CCFB4BAF",
+      "committedSha256": "EE3DEC7D659C728E19D2BC9F1C5D389E68BED7E1DC3AA524E0EE97A0CCFB4BAF",
+      "gitBlob": "5465ffbb5683726721273d40af94cf30af73ce80",
+      "bytes": 14616
+    },
+    {
+      "path": "tests/Support/ClientLocateFixture.php",
+      "workingTreeSha256": "CBCACCD33009031C94425401169C2F808DF7F9F0A9B0CEAB3F2125EB4FE82E07",
+      "committedSha256": "CBCACCD33009031C94425401169C2F808DF7F9F0A9B0CEAB3F2125EB4FE82E07",
+      "gitBlob": "6aa8700bae6373526d47b5a16a58c5c94aa032c3",
+      "bytes": 8983
+    },
+    {
+      "path": "tests/Support/ClientLocationWorkspaceFixture.php",
+      "workingTreeSha256": "AD9B6439C64492BCE2389DA9EF7FE11DE92AED9FED530F1432518A33099E9022",
+      "committedSha256": "AD9B6439C64492BCE2389DA9EF7FE11DE92AED9FED530F1432518A33099E9022",
+      "gitBlob": "aa530cbd03b7e29787c42a6db26a462547a43fbe",
+      "bytes": 4017
+    },
+    {
+      "path": "tests/Support/CommittedDatabaseTestCase.php",
+      "workingTreeSha256": "BF14284A0A458730C352E05F53F54F031E8BEC05BC575A260502DDF975BA5AF3",
+      "committedSha256": "BF14284A0A458730C352E05F53F54F031E8BEC05BC575A260502DDF975BA5AF3",
+      "gitBlob": "8bdbc14d30b1172071bfc1c8df0ce92d526e2389",
+      "bytes": 5948
+    },
+    {
+      "path": "tests/Support/DeviceCommandAuditFixture.php",
+      "workingTreeSha256": "F6A44D6A8C8D1F3BD551309CF70C1DBC9931C06B442BAB667E1A4C6697907520",
+      "committedSha256": "F6A44D6A8C8D1F3BD551309CF70C1DBC9931C06B442BAB667E1A4C6697907520",
+      "gitBlob": "3dea1208d0510f70d964854ac358439ab335eac7",
+      "bytes": 2588
+    },
+    {
+      "path": "tests/Unit/SecurityDevices/ClientLocationCommandSigningTest.php",
+      "workingTreeSha256": "FE7FFE03F3A1B8461276AFC6C45B827EAD8F3ABF1463B0F1465DF7851A381A6A",
+      "committedSha256": "FE7FFE03F3A1B8461276AFC6C45B827EAD8F3ABF1463B0F1465DF7851A381A6A",
+      "gitBlob": "f63c65477ca11581f4b00390d75c92de09716f2f",
+      "bytes": 3761
+    },
+    {
+      "path": "tests/Unit/Tracking/ClientLocateConcurrencyTest.php",
+      "workingTreeSha256": "99F13EC9421A660DE694A813F6DDF61FD16DCAF3DC6047D2953637477CD28B24",
+      "committedSha256": "99F13EC9421A660DE694A813F6DDF61FD16DCAF3DC6047D2953637477CD28B24",
+      "gitBlob": "426373d85ad76c619cb8d5b88ffbf3c13faf1ea6",
+      "bytes": 22548
+    },
+    {
+      "path": "tests/Unit/Tracking/ClientLocationAddressTest.php",
+      "workingTreeSha256": "AB996FB0EB1ECD0F80E705549BA6D228E998C3F9F2226E8703A41F165633616E",
+      "committedSha256": "AB996FB0EB1ECD0F80E705549BA6D228E998C3F9F2226E8703A41F165633616E",
+      "gitBlob": "25908f70432fb450a7cf4d02afaa2cafde5c424f",
+      "bytes": 4040
+    },
+    {
+      "path": "tests/Unit/Tracking/ClientLocationAssignmentConcurrencyTest.php",
+      "workingTreeSha256": "B5D7946E29452B321FEF6FADB01BC0D14EA615D0908F17581A4EA1F7F46B0C15",
+      "committedSha256": "B5D7946E29452B321FEF6FADB01BC0D14EA615D0908F17581A4EA1F7F46B0C15",
+      "gitBlob": "6a32569f9db7971ab0c26241ad668c8930641536",
+      "bytes": 6310
+    },
+    {
+      "path": "tests/Unit/Tracking/ClientLocationDraftMigrationTest.php",
+      "workingTreeSha256": "D487AA0FFF5371FC473471001D346F01AED9F6955CBA2DCDA1C9D66E9A11C629",
+      "committedSha256": "D487AA0FFF5371FC473471001D346F01AED9F6955CBA2DCDA1C9D66E9A11C629",
+      "gitBlob": "7d6b4ed5961c54f0fbeacafc60fa72995cd9d4da",
+      "bytes": 1177
+    },
+    {
+      "path": "tests/Unit/Tracking/CollectorRecoveryInterleavingTest.php",
+      "workingTreeSha256": "B69924EB06F622224E52236EAF285ED5071546E9461893744ACA9E9FA35F1C5F",
+      "committedSha256": "B69924EB06F622224E52236EAF285ED5071546E9461893744ACA9E9FA35F1C5F",
+      "gitBlob": "ce6c4c91854891f22ff6a835c906094450e5ce0a",
+      "bytes": 8780
+    },
+    {
+      "path": "tests/Unit/Tracking/DeviceCommandAuditTailMigrationTest.php",
+      "workingTreeSha256": "2CB384190C7ACA00B455E4260EBD32AAE5FBA17DE1560488E9D43EDC60FB257A",
+      "committedSha256": "2CB384190C7ACA00B455E4260EBD32AAE5FBA17DE1560488E9D43EDC60FB257A",
+      "gitBlob": "9af65f1e58329d44a26dda3ca822227abc207ea3",
+      "bytes": 3098
+    },
+    {
+      "path": "tests/Unit/Tracking/DeviceCommandAuditTailTest.php",
+      "workingTreeSha256": "6FBF65D4FCA147C979394FBEE9806AA91B9BD7642F72BC6D85574C8BEB67EE58",
+      "committedSha256": "6FBF65D4FCA147C979394FBEE9806AA91B9BD7642F72BC6D85574C8BEB67EE58",
+      "gitBlob": "6cceea1152bcd5a14a158909e3f20006d7dfad43",
+      "bytes": 10276
+    },
+    {
+      "path": "tests/Unit/Tracking/PublicAddressSearchBudgetTest.php",
+      "workingTreeSha256": "D22C18817DA6F019F49AEDDE91256C683E34844BB23F05A1E58A9C500D89D3EE",
+      "committedSha256": "D22C18817DA6F019F49AEDDE91256C683E34844BB23F05A1E58A9C500D89D3EE",
+      "gitBlob": "6095c26b0bdd06d7c4343e90c26546f7c37da6fb",
+      "bytes": 4226
+    }
+  ]
+}

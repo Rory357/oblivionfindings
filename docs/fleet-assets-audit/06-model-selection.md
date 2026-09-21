@@ -1,6 +1,18 @@
 # Worker selection policy — Revision 10 §14G
 
-Owner: MAIN ASTRA. Revision: 5. Updated: 2026-09-20.
+Owner: MAIN ASTRA. Revision: 9. Updated: 2026-09-21.
+
+Current Client Location final-review/correction turn01a0c27e-e943-78f2-b95b-ee44e888c917 is independently verified at2026-09-21T05:44:52.361Z as gpt-6-astra/xhigh in both metadata fields. Same sole Designer, no Sol. Stephan has requested the next Designer after publication; its prepared PKG-02B handoff requires explicit gpt-6-astra/xhigh and effective verification before mockup writes. No Implementer is selected or launched by that design-only request; frontend remains Astra Extra High.
+
+A6 timing is approved. Main independently verified new continuation 01a0c0b2-6f35-75e0-93c5-03dd65d8e2d9 at 2026-09-20T21:21:54.547Z as gpt-6-astra/xhigh in both model/effort fields. Same PKG-02A Designer owns frontend/backend, with no Sol. Isolated setup then verified first-slice release follows evidence/PKG-02A-A6-timing-approval.md; no new benchmark, budget, worker or inherited default is introduced.
+
+## Current PKG-02A ownership decision
+
+Stephan explicitly approved v3 implementation by the same Designer alone: frontend and backend, no Sol. Main verified actual message 01a0c099-b873-7ed2-a30e-9b586e278d31 and continuation 01a0c099-b7ee-7e13-95ee-52b64187efc0 as gpt-6-astra/xhigh in both metadata fields. Evidence/PKG-02A-v3-implementation-approval.md records authority and remaining gates. This page-specific assignment supersedes the A5 backend allocation below for PKG-02A only. No worker/model benchmark or general routing change is inferred. Current work is read-only preflight; implementation readiness/sequencing is not settled by model verification.
+
+## Current A5 ownership override
+
+Stephan explicitly instructed on2026-09-20 that the next mockup may start during PKG-01 verification, and that Astra Extra High must implement frontend while Sol may implement backend. For PKG-02A, the Designer uses verified gpt-6-astra/xhigh for design and all frontend implementation/corrections. The same Designer owns interface contracts, frontend fidelity, combined QA and integration. After exact mockup/scope approval and implementation prerequisites, Designer starts one backend-only gpt-5.6-sol assignment, records an appropriate explicit effort and verifies it before writes. Sol must not edit React/pages/components/styles or frontend interaction/copy behavior; backend contracts and tests need explicit ownership, review and one-writer handoff. No backend worker is launched by this design release. PKG-01's Sol remains stopped. Preserve issue histories; this is Stephan's chosen allocation, not evidence of a general model-quality or cost ranking. A5 supersedes the prior bulk-implementation routing only for this new assignment; other approval/safety/privacy/release gates remain.
 Status: The original PKG-01 Sol High assignment and effective model/effort remain historical facts. Stephan has stopped further Sol work; the same Designer Astra Extra High owns remaining corrections/integration. No new worker, policy change, benchmark, accepted package or measured cost winner is introduced. Current outcomes: [07](07-model-results.md); current gate: [05](05-page-register.md). Source: Revision 10 + A1/A2/A3/A4; local audit code baseline `19354ecbc70046d12dfdf9c86f888e65fa1879d1`.
 
 Owner and policy authority: Main. Worker-selection policy remains master §14G; A1 changes its authorisation boundary wording only. No measured cost winner or routing amendment is recorded.

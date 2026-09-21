@@ -1,0 +1,711 @@
+{
+  "status": "r8 bounded publication candidate: r7 application behavior unchanged; portable isolated test/support correction verified. MAIN technical release and operational acceptance are separate.",
+  "recordedAtUtc": "2026-09-21T06:23:18.088Z",
+  "root": "C:\\Users\\steph\\.codex\\worktrees\\2b9f\\oblivionfindings",
+  "branch": "codex/pkg-02a-client-location-design",
+  "head": "2302ca33a95616e442a78e957ddce82d8db98669",
+  "previousManifest": {
+    "path": "docs/fleet-assets-audit/evidence/PKG-02A/implementation/source-build-manifest-r7.json",
+    "bytes": 312198,
+    "sha256": "1715A78D9310302252EA84DC00834F2F7C4738A795DBF1AB93327A0180EC2C7D"
+  },
+  "appFiles": [
+    {
+      "path": "app/Domain/Monitoring/Services/CanonicalDeviceSiteResolver.php",
+      "bytes": 8994,
+      "sha256": "E825745FD1A710BE27C6FB285323E5BED5AB4AEC390BCB00FCE04CFD371C5654"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Data/ClientLocationCommandOrigin.php",
+      "bytes": 1669,
+      "sha256": "9F3A3C047362157C089F9F8A8FEE503958AA23EB2331089548A0B0DF2CB9788B"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Data/CommandRequestInput.php",
+      "bytes": 776,
+      "sha256": "67C4B198A113D9B3C25BC3F1AB580033E25C4AE30E5ECE073E9FC7F243985561"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Data/CommandSigningPayload.php",
+      "bytes": 3357,
+      "sha256": "4FFACDC9529F4EA89C45E0D3E71D4D0406D90AF41CEDAE51C2A623ABC0E66DD3"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Http/Requests/StoreDeviceCommandBatchRequest.php",
+      "bytes": 1442,
+      "sha256": "45150A03CDD11CD0D67D1B17A2E59E379B72D53F4F9048FD65E862E88BC31293"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Http/Requests/StoreDeviceCommandRequest.php",
+      "bytes": 1377,
+      "sha256": "0DBDCFCA7961EA0E4B74AB9C60C997B870C437CE9502BAF9B032BBD5A736BCC9"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Models/DeviceCommandRequest.php",
+      "bytes": 8337,
+      "sha256": "70E01F76ED196537EB3E3394CDEA28AE10A66373EBD60301E471E94F5A07FC4E"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/CollectorCommandRecoveryService.php",
+      "bytes": 4397,
+      "sha256": "EB372A17739F88351E6963B471DA9131FB404214B704F7B4609B189F00C39255"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/CommandAssignmentFingerprint.php",
+      "bytes": 2062,
+      "sha256": "5B22832E03F5572F33C9B1CC32382C62D283FE5CA56973F832C093099B9796DD"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/DeviceCommandAuditService.php",
+      "bytes": 4004,
+      "sha256": "3070FCB4C7425B9BAAB933F7FEE6730C64CFC812390FBCC79A0DA88ECD8D6B03"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/DeviceCommandContractVerifier.php",
+      "bytes": 2804,
+      "sha256": "E8B3F012BA9BDA2243AFE5E40D6C8871393388410FA6917754476CC2A98242B1"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/DeviceCommandRequestService.php",
+      "bytes": 25419,
+      "sha256": "FFBDF9D13B6AD1E330ED6CB633515DE97C82A5D4458A02409768163DFB035E4A"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/DeviceManagementAuthorizationService.php",
+      "bytes": 10580,
+      "sha256": "4E3965D3A00039F133EA4F2F82FACB167D198E05E65E16485234E9E2DDE1E5B8"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/GovernedCommandDispatchService.php",
+      "bytes": 25557,
+      "sha256": "E4A430A3DDA17D99EBCC5CF5AF6B6942159D062AC35F91EC9BAA678DB92F6897"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/DeviceCustodySiteResolver.php",
+      "bytes": 7114,
+      "sha256": "DF64E5FE0C13C81B98F20DC86FFBFCF484F31DAAA08B5944CCA50784D0AA0B52"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/PersonalTrackingPrivacyService.php",
+      "bytes": 18692,
+      "sha256": "9CF1AA869D1025525DDDFAD29388AA056516201C534D95B88AB614C9A492BF99"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php",
+      "bytes": 60357,
+      "sha256": "B7CF8C24D93193F3675E4D31E99C4A43FA6ADCFF29F61B8F79031E64A0C469ED"
+    },
+    {
+      "path": "app/Http/Controllers/ClientController.php",
+      "bytes": 177549,
+      "sha256": "A34F0BCCFDA7CEB869F3117DADBB20720E9FF6F5DC087C4F3A19EF6C087BAAEB"
+    },
+    {
+      "path": "app/Http/Controllers/Operations/ClientLocationLocateController.php",
+      "bytes": 4224,
+      "sha256": "55AE1C475C03657DE1B93D5DE11A3C6A7E9C1F22DFFF0BB4E6EB710FC70ABC02"
+    },
+    {
+      "path": "app/Http/Controllers/Operations/ClientLocationZoneDraftController.php",
+      "bytes": 3563,
+      "sha256": "94F6C7659040D33353E38109197F1D0EB502440A32D750E7A8D42DFBF41A12AF"
+    },
+    {
+      "path": "app/Http/Controllers/Operations/ClientTrackerModeController.php",
+      "bytes": 4166,
+      "sha256": "56087FFDC9B36E5CEC11D63F4D0CC180DB2886387751406F8EB9A2108CC87686"
+    },
+    {
+      "path": "app/Http/Controllers/Sites/SiteGeocodingController.php",
+      "bytes": 5535,
+      "sha256": "B07381E12BFA7F3C5D48DC2BF3FC85742654CE7CB383874E3C530ED28BFC3DA4"
+    },
+    {
+      "path": "app/Http/Requests/Operations/StoreClientLocateRequest.php",
+      "bytes": 1155,
+      "sha256": "5524B319D19A9FA4DBFAE2258FCAE496DFA6189FFCD9B59AE3E624E1A7778BFE"
+    },
+    {
+      "path": "app/Http/Requests/Operations/StoreClientLocationZoneDraftRequest.php",
+      "bytes": 7441,
+      "sha256": "D378B6A65D53ABD68AAAA3F5D71939D684450302997C68855294DCFE68D74422"
+    },
+    {
+      "path": "app/Models/ClientGeofenceMonitor.php",
+      "bytes": 349,
+      "sha256": "F6BCA3D4280C5A93B6A7292BA0AEC3ADC00BA6FC12AE10CCFF6DD95040D9D73C"
+    },
+    {
+      "path": "app/Models/ClientGeofenceRule.php",
+      "bytes": 387,
+      "sha256": "50B87CFB7E140D66C0E78ACAA4D4391F8199BF8538A4921E38CE96D7F5BB2C7E"
+    },
+    {
+      "path": "app/Models/ClientGeofenceRuleVersion.php",
+      "bytes": 609,
+      "sha256": "75E40E2259E0825100C6F517C2ECBC60BFA656C5C4854BBC7E353932154DB252"
+    },
+    {
+      "path": "app/Models/Queclink/QueclinkPendingCommand.php",
+      "bytes": 5820,
+      "sha256": "D3592EF91BD53FC2BC6609673ACDF9F32C8B8CF295880CAF28812713CA7E9275"
+    },
+    {
+      "path": "app/Models/User.php",
+      "bytes": 14152,
+      "sha256": "84C21562949AA2F8E71C441F1825BCCB5A272926FD72B1EA8D162D48ABDB7A10"
+    },
+    {
+      "path": "app/Policies/ClientPolicy.php",
+      "bytes": 5883,
+      "sha256": "D2F447AAA009E807A4E49FE3A4C175DB47B6F29020F1AACA6AAD9650C6AD18DA"
+    },
+    {
+      "path": "app/Services/AuthorizationEvidenceLockService.php",
+      "bytes": 9270,
+      "sha256": "1BCB05D64D5EB3112BAFDF901B4A5253D3329F7BB13D98E0C8CBD2FC76FFB3EC"
+    },
+    {
+      "path": "app/Services/Clients/ClientProfileSectionAccess.php",
+      "bytes": 7624,
+      "sha256": "47F2DCA192BCE6A78B9D3A94F4778198412E55D685437072B88547CA545A4843"
+    },
+    {
+      "path": "app/Services/Clients/ClientWorkerEligibility.php",
+      "bytes": 3985,
+      "sha256": "CE2CD544FDEC7467B5B8065C4761A8BE79D1E5CA9D8D13A2E5E6D426F05C95C2"
+    },
+    {
+      "path": "app/Services/ConsentValidationService.php",
+      "bytes": 24005,
+      "sha256": "958DA4F7EF043B45BF4BDA06CADF804EC8F70AFB138F8FFC4CAC3158F02CDD70"
+    },
+    {
+      "path": "app/Services/Consents/CurrentConsentEvidence.php",
+      "bytes": 3837,
+      "sha256": "0D5B656772C1D602B6EAFA8538D6BFE8C04C5B6772463CF8EF72E90992721396"
+    },
+    {
+      "path": "app/Services/ControlRoom/ControlRoomAlertProvenanceService.php",
+      "bytes": 18389,
+      "sha256": "F2717E7F7A8C02F64F90F22DCE4E20FBAB696B6987E57104ACA57DD2FD7BC2EE"
+    },
+    {
+      "path": "app/Services/ControlRoom/SignalProcessingService.php",
+      "bytes": 93866,
+      "sha256": "2BFE2898FF869E49A9EC25B6173C419FDBA34656F80D007478D9C1A9AD630A8E"
+    },
+    {
+      "path": "app/Services/CurrentAuthorizationReads.php",
+      "bytes": 2588,
+      "sha256": "38D31FCB8D24EB9B319045195E239E8834231F532E7BC782AB2B09E781F30413"
+    },
+    {
+      "path": "app/Services/Fleet/FleetTelemetryIngestService.php",
+      "bytes": 63479,
+      "sha256": "002187B71AA72A8A7EF83E2E77249C51580872911D35CB3EF02F218BC4E66621"
+    },
+    {
+      "path": "app/Services/Fleet/Telemetry/QueclinkAdapter.php",
+      "bytes": 3442,
+      "sha256": "2F851AC15A53CE9E6E96428F93931B8E56E9E67672FC07313A93919BA2ECCF8B"
+    },
+    {
+      "path": "app/Services/Queclink/GovernedCommandLifecycleService.php",
+      "bytes": 30318,
+      "sha256": "338C7FDEFD3DB4A255604E428C54321B41E2179FA1EDBE1640D2DD498DAD7A79"
+    },
+    {
+      "path": "app/Services/Queclink/Listener/FrameRouter.php",
+      "bytes": 25398,
+      "sha256": "6A6AC662888FCAAC218C572BC5749D5C40087A86EC3151730C138598C5606B62"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationAccessService.php",
+      "bytes": 3767,
+      "sha256": "AACA9E3D437848BE489C8FDC409BE1BE202CE734C453DA20CDE43C90F6F1D1F9"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationAddressService.php",
+      "bytes": 3570,
+      "sha256": "1DC7E92E0C25BEE7B27989C78287045D50E9C1C6E2CADCAB01D98AF85C04D6A4"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationCommandContext.php",
+      "bytes": 7092,
+      "sha256": "CBE29639B02A9440A6C4C3EF8A8D033D4FDADC49514B6FACD585DD4DA95B8FF7"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationEvidenceBusy.php",
+      "bytes": 214,
+      "sha256": "648AE5D9CA656FBD1696C92BCDDF6EF1286347C219E30B1DD6109B227BB2E5F2"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationHistoryService.php",
+      "bytes": 8641,
+      "sha256": "0662A3EC285559A814291BE019C96DC22DF7DF09CDE2CB14868E1F725328B2D2"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationLocateService.php",
+      "bytes": 9518,
+      "sha256": "06A5544C6ACD12E1F23BCAAABB860CC214A03744AD609F50D7B8C15FA2E75643"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationZoneDraftService.php",
+      "bytes": 9860,
+      "sha256": "913E793924789A8663A88D4DBE82610636F641627CB873D25354F8B3EB58CE0E"
+    },
+    {
+      "path": "app/Services/Tracking/ClientTrackerFallService.php",
+      "bytes": 7611,
+      "sha256": "34170B66DF715D1CF099322DE9204EBB9D8EDE4C9BC9835FBD01B4A9AD2D8022"
+    },
+    {
+      "path": "app/Services/Tracking/ClientTrackerModeProfiles.php",
+      "bytes": 2790,
+      "sha256": "EACDEBCBB216B4DBB5A17A899B46A3BC3AE3F10E0748BAFCFC8F9C0C8A31AA56"
+    },
+    {
+      "path": "app/Services/Tracking/ClientTrackerModeService.php",
+      "bytes": 10317,
+      "sha256": "51AC7C2795DBCF63C5480D2BAFE5C1E606DDD911C4753C6AED9B3C23676E9A05"
+    },
+    {
+      "path": "app/Services/Tracking/ClientTrackerStatusService.php",
+      "bytes": 3665,
+      "sha256": "89B0A63A52CC20A323787C46C91BD15E5E2695450451E9904F9065EFC7F8C34D"
+    },
+    {
+      "path": "app/Services/Tracking/ClientZoneMonitoringService.php",
+      "bytes": 18144,
+      "sha256": "A5B836C4FEB8B46C6D137024010B90050AC059BB7A70F154D2AB8D0EEBBA547E"
+    },
+    {
+      "path": "app/Services/Tracking/ClientZonePosition.php",
+      "bytes": 2124,
+      "sha256": "B864B5ED650CBEDA6B9DC9C64E44AA2265CB738A45DAFB29D598860D758E4FE5"
+    },
+    {
+      "path": "app/Services/Tracking/ClientZoneSchedule.php",
+      "bytes": 1153,
+      "sha256": "F12BD2C686EAAAC9BBAA1F9F1E3C5CCD5809012E7C21B839DFC7CA8D347822F2"
+    },
+    {
+      "path": "app/Services/UserSiteAccessService.php",
+      "bytes": 91663,
+      "sha256": "FFBABBED6350CB096C5FEE5E36AAA121848E350FCA93DBDDE815416C139DC0A9"
+    },
+    {
+      "path": "config/fleet.php",
+      "bytes": 3041,
+      "sha256": "F392DBF35EB563F2DA16FB02E51559E6EA03D1B31E100F42F96275200446C333"
+    },
+    {
+      "path": "database/migrations/2026_09_21_000001_create_client_geofence_rule_drafts.php",
+      "bytes": 2602,
+      "sha256": "0ED51243F941A51B9F0AFBDFBB368D5BD76BD5DDFDFE34240D45688F372F097E"
+    },
+    {
+      "path": "database/migrations/2026_09_21_000002_add_origin_context_to_device_command_requests.php",
+      "bytes": 842,
+      "sha256": "7419BC947ECCF440A7164067B3468FA63A9C595631DB455C4E85AD01DA816177"
+    },
+    {
+      "path": "database/migrations/2026_09_21_000003_record_queclink_governed_provenance.php",
+      "bytes": 1231,
+      "sha256": "F520EBAC0C011716136ADCEFA77D4BEAB4880725C9FF5C164BEB3CC4E8C65BDD"
+    },
+    {
+      "path": "database/migrations/2026_09_21_000004_add_device_command_audit_tail.php",
+      "bytes": 1910,
+      "sha256": "431567E652646BFD538F6D17F2AE1B02006E68044C02AE31656DBEB2E424E3D7"
+    },
+    {
+      "path": "database/migrations/2026_09_21_000005_create_client_geofence_monitors.php",
+      "bytes": 1853,
+      "sha256": "07914DC16A6868EEABC2080F4F5D9B52D4CF50F4B32BAAC9F00DA76D1AFF86A1"
+    },
+    {
+      "path": "database/seeders/QueclinkPresetSeeder.php",
+      "bytes": 6354,
+      "sha256": "CF88A13ACCF96C295413962A20DFE0610C5E8DB5244EBB543822E02D88E6AACD"
+    },
+    {
+      "path": "resources/js/components/client-location-tab.tsx",
+      "bytes": 5603,
+      "sha256": "0B1DBC32C90E2E6BEC45DBA95947AA83774AD5DE7A3BA5D5DA0893D97198ABD7"
+    },
+    {
+      "path": "resources/js/components/client-location/boundary-geometry.ts",
+      "bytes": 1018,
+      "sha256": "8DC70CCE51861AE8E83319DB2F6BC9AD766119B8775EAEEA5F7B215E820DD5B9"
+    },
+    {
+      "path": "resources/js/components/client-location/client-location-map.test.tsx",
+      "bytes": 4792,
+      "sha256": "0FFA2E1728209CB6168EAB96A3DE707724CDBCEC348E28DE901C3889EFE97B5A"
+    },
+    {
+      "path": "resources/js/components/client-location/client-location-map.tsx",
+      "bytes": 16230,
+      "sha256": "1DD3A818BBA15B5EB0A4F3D6A1BC608142CB1FFBB6570BD59565BC7DCF3EFF12"
+    },
+    {
+      "path": "resources/js/components/client-location/locate-now-dialog.test.tsx",
+      "bytes": 10610,
+      "sha256": "BF0CE834B30E9130D193BE5FCCBA647A576A3AE57A4E7CDA4A0A2A532EF449F4"
+    },
+    {
+      "path": "resources/js/components/client-location/locate-now-dialog.tsx",
+      "bytes": 26294,
+      "sha256": "38014448FF2315372FCF30DBC8FAADF14C2CB05A3DC0109D1D7628E653CC1841"
+    },
+    {
+      "path": "resources/js/components/client-location/location-address.test.tsx",
+      "bytes": 1092,
+      "sha256": "0FA0C2BFE6EE22CCB8536311C5317DBED98BC2F5E093B3741CF8A24B0B1E7A6F"
+    },
+    {
+      "path": "resources/js/components/client-location/location-address.tsx",
+      "bytes": 1464,
+      "sha256": "E818BF95BC7A53A6BFE136B23CB4F9395FF163ACB2F343DE17828CEB25D916D8"
+    },
+    {
+      "path": "resources/js/components/client-location/location-history.tsx",
+      "bytes": 8165,
+      "sha256": "7082E0000FEFA629681530EB5574A8127BD4F20F56440AACAA607804FDEFD0A5"
+    },
+    {
+      "path": "resources/js/components/client-location/location-workspace.css",
+      "bytes": 21732,
+      "sha256": "D3863BF69A6B1671753268EFE3CB8E33A2AEF3F6DCE958EE1134BA6B23E881A5"
+    },
+    {
+      "path": "resources/js/components/client-location/location-workspace.test.tsx",
+      "bytes": 3039,
+      "sha256": "96A3F91FE6DC3CEAB9EDC7450BB503A048A311C9EC4061B366DDDE2BB298CAD8"
+    },
+    {
+      "path": "resources/js/components/client-location/location-workspace.tsx",
+      "bytes": 43391,
+      "sha256": "E13DA94E24D9DEFC47464489A89B93C4DF07A0AE87A5D9339DEF79317B1AEA7E"
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-battery.test.tsx",
+      "bytes": 2965,
+      "sha256": "250EAA2870CF13C6204B0FE03B6ED282BC3ED67BDD47D7DC7A17C1E8CF78FD29"
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-battery.tsx",
+      "bytes": 4564,
+      "sha256": "4CA75490A4906A95152CBC681EC28267D15403F29943F02061C829A152B7FA5B"
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-indicators.test.tsx",
+      "bytes": 3139,
+      "sha256": "0177BEC36FEF51A96A908E8BE747B8494A859150ADC8291F3E02D63A2B8CEA4D"
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-indicators.tsx",
+      "bytes": 5775,
+      "sha256": "BBD05B4F87284A4D03EB020568C0592016F2010FF2F4A4901B91B421FAB1E142"
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-modes.test.tsx",
+      "bytes": 4427,
+      "sha256": "5E59EC553B55578D4EE88B3D951E2881FE73FC1E6D905C775E7949FA0CC89F45"
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-modes.tsx",
+      "bytes": 23466,
+      "sha256": "C42BC3B8254B9B6F67B99F57C07A7FDCD3D69FD970CD5EDEC7ADA38F74300591"
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-panic.test.tsx",
+      "bytes": 2030,
+      "sha256": "DCA97A882804DA0ECF848DFC903652EC173880ED42CC1CF8F17813E12D0CFE6C"
+    },
+    {
+      "path": "resources/js/components/client-location/tracker-panic.tsx",
+      "bytes": 3100,
+      "sha256": "B1DCF14EAC041123B8C128C19526AD7233B4638CBF0CBB1A37B2FB32BF630FE6"
+    },
+    {
+      "path": "resources/js/components/client-location/types.ts",
+      "bytes": 5149,
+      "sha256": "55CB3B29E1357DA6D2DF7D0C186FF231BE175BD21DDF6E7B37169FDC90245520"
+    },
+    {
+      "path": "resources/js/components/client-location/use-recorded-location-refresh.test.tsx",
+      "bytes": 3252,
+      "sha256": "C0BE89121AEED52630C1ECAF49C6B153E6444A60D56CA135DFCA53DD73C7708F"
+    },
+    {
+      "path": "resources/js/components/client-location/use-recorded-location-refresh.ts",
+      "bytes": 1670,
+      "sha256": "8E13018539552C38EB5D8EEFE64A7508010D926F2053802C95FF98D71F08183C"
+    },
+    {
+      "path": "resources/js/components/client-location/zone-address-search.test.tsx",
+      "bytes": 4233,
+      "sha256": "AE3FEDEA4BA67127DCBBDF6EEAEEACA33FA52A7B940457B411B116A9D8A8C10A"
+    },
+    {
+      "path": "resources/js/components/client-location/zone-address-search.tsx",
+      "bytes": 7609,
+      "sha256": "A5E4D05F3106DBF26E5E54ED286B95125590A76DBDEE71C2274DC8B3316345C6"
+    },
+    {
+      "path": "resources/js/components/client-location/zone-draft-dialog.test.tsx",
+      "bytes": 7700,
+      "sha256": "66FDF6882D2CB6CA32859D1B8C112D33BD466D2DE1860DA4FCDF1A9CEFC7ACCA"
+    },
+    {
+      "path": "resources/js/components/client-location/zone-draft-dialog.tsx",
+      "bytes": 53487,
+      "sha256": "F5A67924E4C08808A8288DD7F5B9471D29A5808E67291CD34FB59739020164D2"
+    },
+    {
+      "path": "resources/js/components/client-location/zone-monitoring-dialog.test.tsx",
+      "bytes": 4942,
+      "sha256": "0794B1940686A16A3D784B91337880D071F911405474DA9D686F35FF7AE7816B"
+    },
+    {
+      "path": "resources/js/components/client-location/zone-monitoring-dialog.tsx",
+      "bytes": 10163,
+      "sha256": "55A21373C71F8A211AA507632AE62F121CFD2C3E98FEE3A6CA0AC127964879F2"
+    },
+    {
+      "path": "resources/js/components/control-room/alert-workspace-dialog.tsx",
+      "bytes": 183844,
+      "sha256": "041B27078F1D0FD96A881CC672B8B97767564F52E586A3C26038CE8CFB3A71F0"
+    },
+    {
+      "path": "resources/js/hooks/use-personal-location-privacy.test.tsx",
+      "bytes": 5343,
+      "sha256": "A105F590FBD81FAE230E7DDBBD0BEF63BB57650036C79F9DB39DB1D1E0801C24"
+    },
+    {
+      "path": "resources/js/hooks/use-personal-location-privacy.ts",
+      "bytes": 5379,
+      "sha256": "807BDE84B84DCC99879CDAF38DF1133DF098037946C68A2677CCF8FBD553CA1F"
+    },
+    {
+      "path": "resources/js/pages/operations/clients/show.tsx",
+      "bytes": 420775,
+      "sha256": "22496D96DE415636EB4B2DA356DF21492C68FF86EE73C4618CD2F004741D14DC"
+    },
+    {
+      "path": "resources/js/test/client-location-tab.test.tsx",
+      "bytes": 11643,
+      "sha256": "9E5996FC5F7FE2751B5F3C59C86120917BB247B0025A5DC6D98BDE7AE6C46619"
+    },
+    {
+      "path": "routes/operations.php",
+      "bytes": 86575,
+      "sha256": "904DCDE11CD7582DB7EA0336E755CFD0527FA47FDB5A338FF6240D79A42FAA49"
+    },
+    {
+      "path": "tests/Feature/FleetAssets/FleetRealtimePrivacyTest.php",
+      "bytes": 12474,
+      "sha256": "BC0A566B7F4F0190977262A2FC0A888BBE975FCA3DBA20F3F0F4FD86608028AB"
+    },
+    {
+      "path": "tests/Feature/Operations/ClientLocateDeliveryTest.php",
+      "bytes": 8458,
+      "sha256": "E335669EA6C90F8F28EA8FD00E681AA406EA19A7CB7A48836B9033DE81F3780F"
+    },
+    {
+      "path": "tests/Feature/Operations/ClientLocateMigrationTest.php",
+      "bytes": 2808,
+      "sha256": "8D96B5756CE72C44420C6975D81E63008FA224C7FFE996F0CE008D95CF41F49B"
+    },
+    {
+      "path": "tests/Feature/Operations/ClientLocateRequestTest.php",
+      "bytes": 11910,
+      "sha256": "D63B5C5FAFCC7E2600735A311F1B4B15AE8821D6C73FB088FD31B40F1563F382"
+    },
+    {
+      "path": "tests/Feature/Operations/ClientLocationAddressSearchTest.php",
+      "bytes": 5929,
+      "sha256": "2510024899640D394017C500896B5D5E257F679B208F58B627FF04501B5D9764"
+    },
+    {
+      "path": "tests/Feature/Operations/ClientLocationConsentDisclosureTest.php",
+      "bytes": 13878,
+      "sha256": "53B5B85598BF31EFCAF023D5CC65E015B0847BB3C9F3B53DB047BF424BAE8B0B"
+    },
+    {
+      "path": "tests/Feature/Operations/ClientLocationHistoryBoundaryTest.php",
+      "bytes": 5714,
+      "sha256": "3D35487EE0170765142DBE9E68B86E90B74E465E344E5418C48E5C06CD1B29E7"
+    },
+    {
+      "path": "tests/Feature/Operations/ClientLocationZoneDraftTest.php",
+      "bytes": 10899,
+      "sha256": "B33E45BF6439470F4DD72DB4E3D890CA4FD07AE58EBCB386912413B6FC06CEAF"
+    },
+    {
+      "path": "tests/Feature/Operations/ClientTrackerFallTest.php",
+      "bytes": 5836,
+      "sha256": "9440F8ADB522173F755EC89F8A1A5018A0B8FBEC5408EE7F4FD3A2E821818615"
+    },
+    {
+      "path": "tests/Feature/Operations/ClientTrackerModeTest.php",
+      "bytes": 8797,
+      "sha256": "D6FF807021C6010318DB07ECAE70393385467272440FCDA55EBE7072539F87E7"
+    },
+    {
+      "path": "tests/Feature/Operations/ClientTrackerStatusTest.php",
+      "bytes": 5417,
+      "sha256": "C75395DF8BB58AA56A06179DC68187E623B4B373670DE0B1ACFEC66F5C5DFE9C"
+    },
+    {
+      "path": "tests/Feature/Operations/ClientZoneMonitoringTest.php",
+      "bytes": 16669,
+      "sha256": "9F6155229F31C2CCA0C949BF92D96663ECC993BD68C24CA81AF85FFFFB86BDA7"
+    },
+    {
+      "path": "tests/Feature/SecurityDevices/DeviceManagementAuthorizationTest.php",
+      "bytes": 14616,
+      "sha256": "EE3DEC7D659C728E19D2BC9F1C5D389E68BED7E1DC3AA524E0EE97A0CCFB4BAF"
+    },
+    {
+      "path": "tests/Support/ClientLocateFixture.php",
+      "bytes": 8983,
+      "sha256": "CBCACCD33009031C94425401169C2F808DF7F9F0A9B0CEAB3F2125EB4FE82E07"
+    },
+    {
+      "path": "tests/Support/ClientLocationWorkspaceFixture.php",
+      "bytes": 4017,
+      "sha256": "AD9B6439C64492BCE2389DA9EF7FE11DE92AED9FED530F1432518A33099E9022"
+    },
+    {
+      "path": "tests/Support/CommittedDatabaseTestCase.php",
+      "bytes": 5948,
+      "sha256": "BF14284A0A458730C352E05F53F54F031E8BEC05BC575A260502DDF975BA5AF3"
+    },
+    {
+      "path": "tests/Support/DeviceCommandAuditFixture.php",
+      "bytes": 2588,
+      "sha256": "F6A44D6A8C8D1F3BD551309CF70C1DBC9931C06B442BAB667E1A4C6697907520"
+    },
+    {
+      "path": "tests/Unit/SecurityDevices/ClientLocationCommandSigningTest.php",
+      "bytes": 3761,
+      "sha256": "FE7FFE03F3A1B8461276AFC6C45B827EAD8F3ABF1463B0F1465DF7851A381A6A"
+    },
+    {
+      "path": "tests/Unit/Tracking/ClientLocateConcurrencyTest.php",
+      "bytes": 22548,
+      "sha256": "99F13EC9421A660DE694A813F6DDF61FD16DCAF3DC6047D2953637477CD28B24"
+    },
+    {
+      "path": "tests/Unit/Tracking/ClientLocationAddressTest.php",
+      "bytes": 4040,
+      "sha256": "AB996FB0EB1ECD0F80E705549BA6D228E998C3F9F2226E8703A41F165633616E"
+    },
+    {
+      "path": "tests/Unit/Tracking/ClientLocationAssignmentConcurrencyTest.php",
+      "bytes": 6310,
+      "sha256": "B5D7946E29452B321FEF6FADB01BC0D14EA615D0908F17581A4EA1F7F46B0C15"
+    },
+    {
+      "path": "tests/Unit/Tracking/ClientLocationDraftMigrationTest.php",
+      "bytes": 1177,
+      "sha256": "D487AA0FFF5371FC473471001D346F01AED9F6955CBA2DCDA1C9D66E9A11C629"
+    },
+    {
+      "path": "tests/Unit/Tracking/CollectorRecoveryInterleavingTest.php",
+      "bytes": 8780,
+      "sha256": "B69924EB06F622224E52236EAF285ED5071546E9461893744ACA9E9FA35F1C5F"
+    },
+    {
+      "path": "tests/Unit/Tracking/DeviceCommandAuditTailMigrationTest.php",
+      "bytes": 3098,
+      "sha256": "2CB384190C7ACA00B455E4260EBD32AAE5FBA17DE1560488E9D43EDC60FB257A"
+    },
+    {
+      "path": "tests/Unit/Tracking/DeviceCommandAuditTailTest.php",
+      "bytes": 10276,
+      "sha256": "6FBF65D4FCA147C979394FBEE9806AA91B9BD7642F72BC6D85574C8BEB67EE58"
+    },
+    {
+      "path": "tests/Unit/Tracking/PublicAddressSearchBudgetTest.php",
+      "bytes": 4226,
+      "sha256": "D22C18817DA6F019F49AEDDE91256C683E34844BB23F05A1E58A9C500D89D3EE"
+    }
+  ],
+  "testCorrection": {
+    "path": "docs/fleet-assets-audit/evidence/PKG-02A/implementation/test-isolation-r8-changes.json",
+    "bytes": 3034,
+    "sha256": "6EF9237F16C05D98DA4B15F8C556BFB131A1032F37B52E7F9C5F1813ECF6BCD1"
+  },
+  "buildManifestSha256": "1DA452F3818931BFF67ABCDFC66ECBDF0D1FF89CFCAE29361EA1106B67A0060A",
+  "buildAssetsManifest": "source-build-manifest-r7.json (unchanged application build; local evidence only)",
+  "logs": [
+    {
+      "path": ".pkg02a-publication-final.log",
+      "bytes": 79808,
+      "sha256": "FDF6CE96F079A876D24DDDFF034583BDA168862402B875BFD4C234B7589E7E8A"
+    },
+    {
+      "path": ".pkg02a-publication-corrected.log",
+      "bytes": 11150,
+      "sha256": "E20C9D4A59859982A426CB0847753EEF0FB896739FFE82334260440F2321921F"
+    },
+    {
+      "path": ".pkg02a-publication-frontend-verified.log",
+      "bytes": 257,
+      "sha256": "F24853C27E4F7999D584423D40048F64CE3B75DEF959AE169EDD83A5AB312E25"
+    },
+    {
+      "path": ".pkg02a-publication-types.log",
+      "bytes": 0,
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
+      "path": ".pkg02a-publication-eslint.log",
+      "bytes": 0,
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
+      "path": ".pkg02a-publication-pint-verified.log",
+      "bytes": 35,
+      "sha256": "ACBF5DA6385237B6F4CD342C4454D93F6C4DF8BFCF1687838EDB3B651981C4E1"
+    },
+    {
+      "path": ".pkg02a-complete-build.log",
+      "bytes": 181106,
+      "sha256": "B06D47DE40492CA935E6692EF6C2C02F64D83B9B993CA0822103BAA5866CD740"
+    }
+  ],
+  "verification": {
+    "fullScope": "216 tests /3541 assertions; one intermediate test-support raw-counter error and one Delivery RefreshDatabase depth failure. All other cases passed. Runner exit2, outer tool process exit1. This is explicitly not a whole-run green claim.",
+    "correctedScope": "75 tests /2168 assertions passed, runner exit0, in one process: committed Unit proofs, Locate request/delivery/migration, mode/fall, and subsequent approval/batch/break-glass cases. No functional assertion weakened.",
+    "sourceMapping": "The 216-test run used unchanged r7 application code and the r8 test correction except the subsequently removed test-only counter-reset metadata and intermediate Delivery RefreshDatabase base. The corrected run covers every committed-base family and actual downstream count/sole/approval checks. Unchanged native provider, consent, Control Room and other Feature passes are reused explicitly.",
+    "frontend": "60 tests /14 files; full TypeScript; all touched TS/TSX ESLint; test/support Pint passed. Production build reused on byte-identical application source.",
+    "browser": "1440x900 and1024x768 resize/focus loop/Escape; map Shift+F10; rectangle/whole-shape keyboard movement and exact Undo; no saved mutation or console errors; viewport reset. MAIN independently checked1280x720. Genuine200% browser zoom remains MAIN-owned manual check.",
+    "scope": "Outing/check-in adapters and merged plans/ControlRoom/outing Activity remain unfinished approved scope. Sharing/self-access needs an approved privacy-owner contract. No production rollout or physical hardware acceptance."
+  },
+  "ledger": {
+    "path": "docs/fleet-assets-audit/evidence/PKG-02A/implementation/publication-handoff-r8.md",
+    "bytes": 16084,
+    "sha256": "EB45E3D90B0D7E7E2F10B8C1CEB587F44308EF4233534BFD1A6C91C39CD4975B"
+  },
+  "preservation": {
+    "path": "docs/fleet-assets-audit/evidence/PKG-02A/implementation/publication-preservation.json",
+    "bytes": 3803,
+    "sha256": "C35C0F5D8210929706CD42DDA946AD151DFCA92CF41918963A4CD72B8C7FD314"
+  },
+  "excludedLocalPatterns": [
+    ".pkg02a-*",
+    "phpunit.pkg02a.xml",
+    "vitest.pkg02a.config.ts",
+    "vendor",
+    "node_modules",
+    "public/build",
+    "storage runtime files",
+    "raw logs and synthetic fixtures"
+  ]
+}

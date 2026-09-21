@@ -1,0 +1,8 @@
+{
+    "extends": "../../../../../tsconfig.json",
+    "include": [
+        "main.tsx",
+        "location-workspace.tsx",
+        "../../../../../resources/js/types/**/*.d.ts"
+    ]
+}

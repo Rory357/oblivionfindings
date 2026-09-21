@@ -1,0 +1,5 @@
+{
+  "url": "http://127.0.0.1:4335/operations/clients/1?tab=location",
+  "logs": [],
+  "result": "No warnings or errors in the final loaded document. Earlier missing-manifest rebuild transient is separately documented."
+}

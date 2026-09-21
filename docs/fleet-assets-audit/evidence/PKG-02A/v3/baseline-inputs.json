@@ -1,0 +1,163 @@
+{
+  "baseline": "2302ca33a95616e442a78e957ddce82d8db98669",
+  "model": "gpt-6-astra",
+  "effort": "xhigh",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "2972A5612C834F4745010658AEAA2CD4640D4D7A29D932E9952E406C790718ED"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Models/DeviceAssignment.php",
+      "sha256": "B76493BC5B3CD4B3AC04025FA6F0595227F7EDC7E4CD3434A0B4A6D223FC1362"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/PersonalTrackingLocationExportService.php",
+      "sha256": "8B38DC37924B1C2A3914D8B6CF235A914B9949A723313C5FC158AEE516A558CE"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/PersonalTrackingPrivacyService.php",
+      "sha256": "51199B021C76F45369F1E0A7880908C0254B40F0E21EAB6686249FF6251BE150"
+    },
+    {
+      "path": "app/Http/Controllers/ClientController.php",
+      "sha256": "EFFA3DA76C7EC5E87C99A0E4ED15429377C3D35B7E5C9D7791C1A140AB688730"
+    },
+    {
+      "path": "app/Http/Controllers/Portal/PortalLocationController.php",
+      "sha256": "C3AA2DA4020C346C796909FBD13C23D63BCD7D20D69305AA6AE40F8A20C5B189"
+    },
+    {
+      "path": "app/Jobs/PrunePersonalTrackingTelemetry.php",
+      "sha256": "3BD8ACB386D9F1A329347898307E4FA099C26A3CBC73830878AB1885C9223AA4"
+    },
+    {
+      "path": "app/Models/AssetGeofence.php",
+      "sha256": "2CCB1483F0D95AD0B29333518ED03358DE4F6F1405F5C031530B048860D2E593"
+    },
+    {
+      "path": "app/Models/User.php",
+      "sha256": "0D184EBE6A28395B34B195751FFB62390F4C32828C982103AD613430BC4E59AE"
+    },
+    {
+      "path": "app/Policies/ClientConsentPolicy.php",
+      "sha256": "E305F0AF9704D55FC9347E8C74215EAF714963BEAFAC7DA632D6834C4E0821D5"
+    },
+    {
+      "path": "app/Services/Clients/ClientProfileSectionAccess.php",
+      "sha256": "394C4835EA82393A2B613A5648F22C146ED9F607437BBDD391EA271CA0A0E388"
+    },
+    {
+      "path": "app/Services/Fleet/FleetGeofenceService.php",
+      "sha256": "F3B90BC98733E87D89BEB7FC9C9B20990C00039AD5B55366B0204F2CF7EDCA84"
+    },
+    {
+      "path": "app/Services/Fleet/FleetRealtimeAuthorizationService.php",
+      "sha256": "313CC28818025E7E4C72B309C0316003B4409802D3BE6A91E25D435159D779FC"
+    },
+    {
+      "path": "app/Services/Queclink/LocateNowService.php",
+      "sha256": "29A17974B309B542C66D03389090981E6504C661AE3BB2FA2D960F8BC7ED8C9C"
+    },
+    {
+      "path": "app/Services/Tracking/GeofenceStatusService.php",
+      "sha256": "CEEAF64A9B803350F4D8F76DB81C58F9260067930C19402EA9370FD6A1C4390E"
+    },
+    {
+      "path": "design_styles/APP_SHELL_STYLE_GUIDE.md",
+      "sha256": "4F433617E4D0DF8B51795F6CEB0DBB125913803949DE8FB421E7DD9624469201"
+    },
+    {
+      "path": "design_styles/BUTTON_STYLE_GUIDE.md",
+      "sha256": "86259475C987D6E30001604316379EB608AEA9F83E16941B6AA476A94BCA6957"
+    },
+    {
+      "path": "design_styles/DESIGN_TOKENS.md",
+      "sha256": "43F99F4360DE9C00B75C326F4E0FBAB47378AAA8224D42BE56E62E2B8BA3F48B"
+    },
+    {
+      "path": "design_styles/NAVIGATION_STYLE_GUIDE.md",
+      "sha256": "9295CDB1386322B8A088AE03DE41BC3C75A0FBE3E8FA3331C92C704CCB15895D"
+    },
+    {
+      "path": "design_styles/PAGE_HEADER_STYLE_GUIDE.md",
+      "sha256": "33AEEB0E4434D3BB4D3023E3CE95FFEE12E95BA1FE62C02F36601F8219827FAA"
+    },
+    {
+      "path": "design_styles/POPUP_STYLE_GUIDE.md",
+      "sha256": "3D41375AA9AAD71CFF5CFA58D2A2A60933BCE18EC957E74C0F7E7E6DEF28C7E1"
+    },
+    {
+      "path": "design_styles/WORK_RECORD_STYLE_GUIDE.md",
+      "sha256": "66908EF279682E2C9EB67412150B39FDBB403B2C8DE2C41E25260E07FCD5AA29"
+    },
+    {
+      "path": "DESIGN.md",
+      "sha256": "C3D733AC6C5ECF12AC9E21E746C52109AD35EBF0FEF8D25675B35D16B7AC05AD"
+    },
+    {
+      "path": "docs/architecture/single-tenant-application.md",
+      "sha256": "3DEA6218DB87CE22BED3CAB6B9C500D1A850445D04E9325CB16C23A604979B3C"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "2FDEC15606F7D4FAFF29A5DDFE64707FBB2DA2098C334E9FBCBD2D39B85A6140"
+    },
+    {
+      "path": "resources/css/app.css",
+      "sha256": "4FE49B94D074DDE840D79D0813ADEBA3759DFF243956BBFA404325BD00DF149A"
+    },
+    {
+      "path": "resources/js/components/client-location-tab.tsx",
+      "sha256": "E11BB8BC74476ECC7587D07C362BE7D1B3729E46BB77509B1EA04B80CF7ECA2D"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/date-picker.tsx",
+      "sha256": "462557D79A15AAF512D6C61D03A53DB9D2DC54DE633DF614A9A13EE76B170B8F"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/date-time-field.tsx",
+      "sha256": "E31C726E8B7296A2FEB5ED986044CE48255151247135FF3518B52BAF10B97B05"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/time-picker.tsx",
+      "sha256": "CD92205033CAE16ECFA8F59436F6E2F02C9C14B1FFA5E8443091BC88135DFADD"
+    },
+    {
+      "path": "resources/js/components/geofence-draw-map.tsx",
+      "sha256": "F65E1518F625639CC3994BAF098B61D3D279EDC2A32446986BB51B32DB65D013"
+    },
+    {
+      "path": "resources/js/components/page/grouped-profile-nav.tsx",
+      "sha256": "BC98EC02B540DBB86DB6ABE59F5F0956652A1CF9250C3E21DA07AEBFCD4AD5CD"
+    },
+    {
+      "path": "resources/js/components/page/page-header.tsx",
+      "sha256": "FBD198FE142BF1DC2321878BC924C9A8BAA1EED6B0ADD0CC7E28A40E70F01427"
+    },
+    {
+      "path": "resources/js/components/wizard/shell.tsx",
+      "sha256": "A8EA265DAA622FA839A6C714188118B6605E4F6A21ED900CF57D71DC7A552C7E"
+    },
+    {
+      "path": "resources/js/hooks/use-personal-location-privacy.ts",
+      "sha256": "660999AB4BB88F8E29D26A8051E44F7EAE42057625B66B6C7EBE73AC91FF00CB"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/geofences/create.tsx",
+      "sha256": "266BB8F9EE5BE9288F7A92B55C62F944F6E4BC385DCAA102DAFF58EFF98E7599"
+    },
+    {
+      "path": "resources/js/pages/operations/clients/show.tsx",
+      "sha256": "F5B1F89C9B768D43598B333247C878C1B3158035B3AE9C787F7076F404172A20"
+    },
+    {
+      "path": "routes/operations.php",
+      "sha256": "E06E7BD0689A16F6CD308B569A6F011F74F6E2FA462743ADB1BEA3830A91C5F0"
+    },
+    {
+      "path": "routes/portal.php",
+      "sha256": "B13E0BA71C6D87F6EAE42A9B7EA377BB3D94266E1DB393F2C0E23A8DD980ACC4"
+    }
+  ]
+}

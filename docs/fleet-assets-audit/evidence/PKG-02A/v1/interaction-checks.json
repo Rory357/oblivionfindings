@@ -1,0 +1,28 @@
+{
+  "historyStates": [
+    {
+      "state": "empty",
+      "text": "ach named recipient.\n\nView sharing review\n\nClient self-access follows a separate decision. It is not a family sharing grant.\n\nObservation history\n\nHistory remains subject to the same current access and assignment checks.\n\nHide history\nFrom\n20 Sep 2026\nTo\n20 Sep 2026\nShow observations\nPacific/Auckland · local calendar dates\nDemo history response\nObservations\nNo observations\nLoading\nNetwork failure\nAccess ended\nNo observations in this period\n\nThis does not establish anyone’s location or wellbeing.",
+      "rows": 0
+    },
+    {
+      "state": "loading",
+      "text": "his location\n\nA separate, valid sharing decision is required for each named recipient.\n\nView sharing review\n\nClient self-access follows a separate decision. It is not a family sharing grant.\n\nObservation history\n\nHistory remains subject to the same current access and assignment checks.\n\nHide history\nFrom\n20 Sep 2026\nTo\n20 Sep 2026\nShow observations\nPacific/Auckland · local calendar dates\nDemo history response\nObservations\nNo observations\nLoading\nNetwork failure\nAccess ended\nLoading observations…",
+      "rows": 0
+    },
+    {
+      "state": "error",
+      "text": " sharing review\n\nClient self-access follows a separate decision. It is not a family sharing grant.\n\nObservation history\n\nHistory remains subject to the same current access and assignment checks.\n\nHide history\nFrom\n20 Sep 2026\nTo\n20 Sep 2026\nShow observations\nPacific/Auckland · local calendar dates\nDemo history response\nObservations\nNo observations\nLoading\nNetwork failure\nAccess ended\nObservation history could not be loaded\nThis is not an empty result. Your date range has been kept.\nRetry history",
+      "rows": 0
+    }
+  ],
+  "withdrawal": {
+    "requiredReason": true,
+    "focus": "withdraw-reason",
+    "mapRetained": 1
+  },
+  "exactMinute": "01:17 PM retained after cancelling 01:28 PM",
+  "calendarCancel": "20 Sep 2026 retained after browsing next month",
+  "wizardFocusReturn": "Review sharing",
+  "noGrantOutcome": "Review prepared. No access change."
+}

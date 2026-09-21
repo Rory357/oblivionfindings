@@ -1,0 +1,411 @@
+diff --git a/tests/Feature/Operations/ClientLocateDeliveryTest.php b/tests/Feature/Operations/ClientLocateDeliveryTest.php
+index 762a77792..44a3ad890 100644
+--- a/tests/Feature/Operations/ClientLocateDeliveryTest.php
++++ b/tests/Feature/Operations/ClientLocateDeliveryTest.php
+@@ -18,9 +18,9 @@
+ use Illuminate\Support\Facades\Notification;
+ use Illuminate\Support\Facades\Queue;
+ use Tests\Support\ClientLocateFixture;
+-use Tests\TestCase;
++use Tests\Support\CommittedDatabaseTestCase;
+ 
+-class ClientLocateDeliveryTest extends TestCase
++class ClientLocateDeliveryTest extends CommittedDatabaseTestCase
+ {
+     protected function setUp(): void
+     {
+diff --git a/tests/Feature/Operations/ClientLocateMigrationTest.php b/tests/Feature/Operations/ClientLocateMigrationTest.php
+index 5bdf29a8a..12763c678 100644
+--- a/tests/Feature/Operations/ClientLocateMigrationTest.php
++++ b/tests/Feature/Operations/ClientLocateMigrationTest.php
+@@ -10,10 +10,10 @@
+ use Illuminate\Support\Facades\Queue;
+ use Illuminate\Support\Facades\Schema;
+ use Tests\Support\ClientLocateFixture;
+-use Tests\TestCase;
++use Tests\Support\CommittedDatabaseTestCase;
+ 
+-/** Run in its own isolated PID schema: this exercises actual additive DDL. */
+-class ClientLocateMigrationTest extends TestCase
++/** Actual additive DDL with committed-fixture cleanup in the generated schema. */
++class ClientLocateMigrationTest extends CommittedDatabaseTestCase
+ {
+     public function test_empty_rollback_backfill_and_evidence_retention(): void
+     {
+@@ -23,7 +23,7 @@ public function test_empty_rollback_backfill_and_evidence_retention(): void
+         Notification::fake();
+         $origin = require database_path('migrations/2026_09_21_000002_add_origin_context_to_device_command_requests.php');
+         $provenance = require database_path('migrations/2026_09_21_000003_record_queclink_governed_provenance.php');
+-        $this->assertSame(0, DB::table('device_command_requests')->count(), 'Run this migration test in a fresh isolated schema.');
++        $this->assertSame(0, DB::table('device_command_requests')->count(), 'Previous cases must not leak committed fixtures.');
+         $origin->down();
+         $provenance->down();
+         $this->assertFalse(Schema::hasColumn('device_command_requests', 'origin_context'));
+diff --git a/tests/Feature/Operations/ClientLocateRequestTest.php b/tests/Feature/Operations/ClientLocateRequestTest.php
+index 3c2c2b4a2..4ee8fcc74 100644
+--- a/tests/Feature/Operations/ClientLocateRequestTest.php
++++ b/tests/Feature/Operations/ClientLocateRequestTest.php
+@@ -12,6 +12,7 @@
+ use App\Domain\SecurityDevices\Management\Services\DeviceCommandQueueService;
+ use App\Domain\SecurityDevices\Management\Services\DeviceCommandRequestService;
+ use Carbon\CarbonImmutable;
++use Illuminate\Foundation\Testing\RefreshDatabase;
+ use Illuminate\Support\Facades\DB;
+ use Illuminate\Support\Facades\Http;
+ use Illuminate\Support\Facades\Mail;
+@@ -26,6 +27,8 @@
+ 
+ class ClientLocateRequestTest extends TestCase
+ {
++    use RefreshDatabase;
++
+     protected function setUp(): void
+     {
+         parent::setUp();
+diff --git a/tests/Unit/Tracking/ClientLocateConcurrencyTest.php b/tests/Unit/Tracking/ClientLocateConcurrencyTest.php
+index 2bf180272..426373d85 100644
+--- a/tests/Unit/Tracking/ClientLocateConcurrencyTest.php
++++ b/tests/Unit/Tracking/ClientLocateConcurrencyTest.php
+@@ -33,9 +33,9 @@
+ use Illuminate\Support\Str;
+ use Illuminate\Validation\ValidationException;
+ use Tests\Support\ClientLocateFixture;
+-use Tests\TestCase;
++use Tests\Support\CommittedDatabaseTestCase;
+ 
+-class ClientLocateConcurrencyTest extends TestCase
++class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
+ {
+     protected function setUp(): void
+     {
+diff --git a/tests/Unit/Tracking/ClientLocationAddressTest.php b/tests/Unit/Tracking/ClientLocationAddressTest.php
+index b0b5a9645..25908f704 100644
+--- a/tests/Unit/Tracking/ClientLocationAddressTest.php
++++ b/tests/Unit/Tracking/ClientLocationAddressTest.php
+@@ -9,15 +9,16 @@
+ use Illuminate\Support\Facades\Queue;
+ use Symfony\Component\HttpKernel\Exception\HttpException;
+ use Tests\Support\ClientLocationWorkspaceFixture;
+-use Tests\TestCase;
++use Tests\Support\CommittedDatabaseTestCase;
+ 
+-class ClientLocationAddressTest extends TestCase
++class ClientLocationAddressTest extends CommittedDatabaseTestCase
+ {
+     protected function setUp(): void
+     {
+         parent::setUp();
+         $cache = Cache::store('database')->getStore();
+-        $this->assertStringStartsWith('oblivion_findings_pkg02a_2b9f_test_', $cache->getConnection()->getDatabaseName());
++        $this->assertIsolatedTestConnection($cache->getConnection());
++        $this->assertIsolatedTestConnection($cache->getLockConnection());
+         $this->assertSame($cache->getConnection()->getDatabaseName(), $cache->getLockConnection()->getDatabaseName());
+     }
+ 
+diff --git a/tests/Unit/Tracking/ClientLocationAssignmentConcurrencyTest.php b/tests/Unit/Tracking/ClientLocationAssignmentConcurrencyTest.php
+index e9aa98e2c..6a32569f9 100644
+--- a/tests/Unit/Tracking/ClientLocationAssignmentConcurrencyTest.php
++++ b/tests/Unit/Tracking/ClientLocationAssignmentConcurrencyTest.php
+@@ -18,25 +18,14 @@
+ use Illuminate\Support\Facades\Http;
+ use Illuminate\Support\Facades\Notification;
+ use Illuminate\Support\Facades\Queue;
+-use PHPUnit\Framework\Attributes\PreserveGlobalState;
+-use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+ use Symfony\Component\HttpKernel\Exception\HttpException;
+ use Tests\Support\ClientLocationWorkspaceFixture;
+-use Tests\TestCase;
++use Tests\Support\CommittedDatabaseTestCase;
+ 
+-// Pest does not define PHPUnit's child-process autoload entry point. Supply the
+-// same local Composer entry point used by PHPUnit, without preserving mutable
+-// globals (including another test process's isolated database identity).
+-if (! defined('PHPUNIT_COMPOSER_INSTALL')) {
+-    define('PHPUNIT_COMPOSER_INSTALL', dirname(__DIR__, 3).'/vendor/autoload.php');
+-}
+-
+-#[RunTestsInSeparateProcesses]
+-#[PreserveGlobalState(false)]
+-class ClientLocationAssignmentConcurrencyTest extends TestCase
++class ClientLocationAssignmentConcurrencyTest extends CommittedDatabaseTestCase
+ {
+-    // Committed fixtures are required for two connections. A separate process
+-    // gives each test the existing harness's PID schema and shutdown cleanup.
++    // Committed fixtures remain visible to both PDO connections. The support
++    // base restores test data before the next ordinary suite case executes.
+     protected function setUp(): void
+     {
+         parent::setUp();
+diff --git a/tests/Unit/Tracking/ClientLocationDraftMigrationTest.php b/tests/Unit/Tracking/ClientLocationDraftMigrationTest.php
+index 7fdfdbd90..7d6b4ed59 100644
+--- a/tests/Unit/Tracking/ClientLocationDraftMigrationTest.php
++++ b/tests/Unit/Tracking/ClientLocationDraftMigrationTest.php
+@@ -3,19 +3,24 @@
+ namespace Tests\Unit\Tracking;
+ 
+ use Illuminate\Support\Facades\Schema;
+-use Tests\TestCase;
++use Tests\Support\CommittedDatabaseTestCase;
+ 
+-class ClientLocationDraftMigrationTest extends TestCase
++class ClientLocationDraftMigrationTest extends CommittedDatabaseTestCase
+ {
+     public function test_empty_draft_schema_rolls_back_and_can_be_reinstalled(): void
+     {
+         // No RefreshDatabase transaction: MySQL DDL commits implicitly.
+         $migration = require database_path('migrations/2026_09_21_000001_create_client_geofence_rule_drafts.php');
++        $monitoring = require database_path('migrations/2026_09_21_000005_create_client_geofence_monitors.php');
++        $monitoring->down();
++        $this->assertFalse(Schema::hasTable('client_geofence_monitors'));
+         $migration->down();
+         $this->assertFalse(Schema::hasTable('client_geofence_rules'));
+         $this->assertFalse(Schema::hasTable('client_geofence_rule_versions'));
+         $migration->up();
++        $monitoring->up();
+         $this->assertTrue(Schema::hasTable('client_geofence_rules'));
+         $this->assertTrue(Schema::hasColumn('client_geofence_rule_versions', 'geometry_proposal'));
++        $this->assertTrue(Schema::hasTable('client_geofence_monitors'));
+     }
+ }
+diff --git a/tests/Unit/Tracking/CollectorRecoveryInterleavingTest.php b/tests/Unit/Tracking/CollectorRecoveryInterleavingTest.php
+index 387b0b528..ce6c4c918 100644
+--- a/tests/Unit/Tracking/CollectorRecoveryInterleavingTest.php
++++ b/tests/Unit/Tracking/CollectorRecoveryInterleavingTest.php
+@@ -19,10 +19,10 @@
+ use Illuminate\Support\Facades\DB;
+ use Illuminate\Support\Facades\Http;
+ use Illuminate\Support\Facades\Queue;
++use Tests\Support\CommittedDatabaseTestCase;
+ use Tests\Support\DeviceCommandAuditFixture;
+-use Tests\TestCase;
+ 
+-class CollectorRecoveryInterleavingTest extends TestCase
++class CollectorRecoveryInterleavingTest extends CommittedDatabaseTestCase
+ {
+     private string $primary;
+ 
+@@ -33,7 +33,7 @@ protected function setUp(): void
+         Queue::fake();
+         $this->primary = DB::getDefaultConnection();
+         $this->assertSame(0, DB::transactionLevel());
+-        $this->assertStringStartsWith('oblivion_findings_pkg02a_2b9f_test_', DB::connection()->getDatabaseName());
++        $this->assertIsolatedTestConnection(DB::connection());
+         config(['database.connections.recovery_interleaving' => [...DB::connection()->getConfig(), 'name' => 'recovery_interleaving']]);
+         $other = DB::connection('recovery_interleaving');
+         $other->statement('SET SESSION innodb_lock_wait_timeout = 1');
+diff --git a/tests/Unit/Tracking/DeviceCommandAuditTailMigrationTest.php b/tests/Unit/Tracking/DeviceCommandAuditTailMigrationTest.php
+index 55c1171d2..9af65f1e5 100644
+--- a/tests/Unit/Tracking/DeviceCommandAuditTailMigrationTest.php
++++ b/tests/Unit/Tracking/DeviceCommandAuditTailMigrationTest.php
+@@ -9,19 +9,19 @@
+ use Illuminate\Support\Facades\Http;
+ use Illuminate\Support\Facades\Queue;
+ use Illuminate\Support\Facades\Schema;
++use Tests\Support\CommittedDatabaseTestCase;
+ use Tests\Support\DeviceCommandAuditFixture;
+-use Tests\TestCase;
+ 
+-class DeviceCommandAuditTailMigrationTest extends TestCase
++class DeviceCommandAuditTailMigrationTest extends CommittedDatabaseTestCase
+ {
+     public function test_empty_rollback_backfill_and_evidence_preserving_rollback(): void
+     {
+         Http::preventStrayRequests();
+         Queue::fake();
+         $this->assertSame(0, DB::transactionLevel());
+-        $this->assertStringStartsWith('oblivion_findings_pkg02a_2b9f_test_', DB::connection()->getDatabaseName());
+-        // Run this class first in its fresh PID schema: DDL is never wrapped in
+-        // RefreshDatabase's transaction, and the shared test harness is unchanged.
++        $this->assertIsolatedTestConnection(DB::connection());
++        // Fixture restoration also permits this proof after other Unit families.
++        // DDL is never wrapped in a RefreshDatabase transaction.
+         $this->assertSame(0, DB::table('device_command_audit_events')->count());
+         $migration = require base_path('database/migrations/2026_09_21_000004_add_device_command_audit_tail.php');
+         $migration->down();
+diff --git a/tests/Unit/Tracking/DeviceCommandAuditTailTest.php b/tests/Unit/Tracking/DeviceCommandAuditTailTest.php
+index 46f802388..6cceea115 100644
+--- a/tests/Unit/Tracking/DeviceCommandAuditTailTest.php
++++ b/tests/Unit/Tracking/DeviceCommandAuditTailTest.php
+@@ -15,10 +15,10 @@
+ use Illuminate\Support\Facades\Http;
+ use Illuminate\Support\Facades\Queue;
+ use Illuminate\Support\Facades\Validator;
++use Tests\Support\CommittedDatabaseTestCase;
+ use Tests\Support\DeviceCommandAuditFixture;
+-use Tests\TestCase;
+ 
+-class DeviceCommandAuditTailTest extends TestCase
++class DeviceCommandAuditTailTest extends CommittedDatabaseTestCase
+ {
+     private string $primary;
+ 
+@@ -29,7 +29,7 @@ protected function setUp(): void
+         Queue::fake();
+         $this->primary = DB::getDefaultConnection();
+         $this->assertSame(0, DB::transactionLevel());
+-        $this->assertStringStartsWith('oblivion_findings_pkg02a_2b9f_test_', DB::connection()->getDatabaseName());
++        $this->assertIsolatedTestConnection(DB::connection());
+         config(['database.connections.audit_interleaving' => [...DB::connection()->getConfig(), 'name' => 'audit_interleaving']]);
+         $other = DB::connection('audit_interleaving');
+         $other->statement('SET SESSION innodb_lock_wait_timeout = 1');
+diff --git a/tests/Unit/Tracking/PublicAddressSearchBudgetTest.php b/tests/Unit/Tracking/PublicAddressSearchBudgetTest.php
+index b19d99585..6095c26b0 100644
+--- a/tests/Unit/Tracking/PublicAddressSearchBudgetTest.php
++++ b/tests/Unit/Tracking/PublicAddressSearchBudgetTest.php
+@@ -7,16 +7,16 @@
+ use Illuminate\Support\Facades\Cache;
+ use Illuminate\Support\Facades\DB;
+ use Illuminate\Support\Facades\Http;
+-use Tests\TestCase;
++use Tests\Support\CommittedDatabaseTestCase;
+ 
+-class PublicAddressSearchBudgetTest extends TestCase
++class PublicAddressSearchBudgetTest extends CommittedDatabaseTestCase
+ {
+     public function test_independent_connections_share_locks_spacing_and_endpoint_scoped_results(): void
+     {
+         Http::preventStrayRequests();
+         $this->assertSame(0, DB::transactionLevel());
+         $database = DB::connection()->getDatabaseName();
+-        $this->assertStringStartsWith('oblivion_findings_pkg02a_2b9f_test_', $database);
++        $this->assertIsolatedTestConnection(DB::connection());
+         config([
+             'fleet.maps.address_search_cache_store' => 'database',
+             'cache.stores.database.connection' => DB::getDefaultConnection(),
+diff --git a//dev/null b/tests/Support/CommittedDatabaseTestCase.php
+index e69de29bb..8bdbc14d3 100644
+--- a//dev/null
++++ b/tests/Support/CommittedDatabaseTestCase.php
+@@ -0,0 +1,132 @@
++<?php
++
++namespace Tests\Support;
++
++use Illuminate\Database\Connection;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Http;
++use Illuminate\Support\Facades\Mail;
++use Illuminate\Support\Facades\Notification;
++use Illuminate\Support\Facades\Queue;
++use PDO;
++use Tests\TestCase;
++
++/** Real commits for independent PDO/DDL proofs, with bounded fixture restoration. */
++abstract class CommittedDatabaseTestCase extends TestCase
++{
++    private ?PDO $fixturePdo = null;
++
++    private array $fixtureRows = [];
++
++    private int $fixtureForeignKeys = 1;
++
++    protected function setUp(): void
++    {
++        parent::setUp();
++        Http::preventStrayRequests();
++        Queue::fake();
++        Mail::fake();
++        Notification::fake();
++        $this->assertIsolatedTestConnection(DB::connection());
++        $this->assertSame(0, DB::transactionLevel());
++        $this->fixturePdo = DB::connection()->getPdo();
++        $this->fixtureForeignKeys = (int) $this->fixturePdo->query('SELECT @@FOREIGN_KEY_CHECKS')->fetchColumn();
++        foreach ($this->fixtureTables() as $table) {
++            $this->fixtureRows[$table] = $this->readFixtureRows($table);
++        }
++    }
++
++    protected function assertIsolatedTestConnection(Connection $connection): void
++    {
++        $this->assertSame('testing', app()->environment());
++        $this->assertTrue(static::$isolatedMysqlPrepared);
++        $this->assertNotEmpty(static::$testDatabaseBaseName);
++        $expected = static::$testDatabaseBaseName.'_'.$this->resolveProcessToken();
++        $this->assertSame($expected, static::$isolatedMysqlDatabase);
++        $this->assertNotSame(static::$testDatabaseBaseName, $expected);
++        $this->assertSame('mysql', $connection->getDriverName());
++        $this->assertSame($expected, $connection->getDatabaseName());
++        $this->assertSame($expected, $connection->getPdo()->query('SELECT DATABASE()')->fetchColumn());
++    }
++
++    protected function tearDown(): void
++    {
++        try {
++            if ($this->fixturePdo !== null) {
++                // Close every test-owned transaction before restoring committed
++                // fixtures. Do not touch a foreign connection or schema.
++                foreach (DB::getConnections() as $connection) {
++                    $this->assertIsolatedTestConnection($connection);
++                    $connection->rollBack(0);
++                }
++                $this->assertSame(static::$isolatedMysqlDatabase, $this->fixturePdo->query('SELECT DATABASE()')->fetchColumn());
++                $this->assertSame(array_keys($this->fixtureRows), $this->fixtureTables(), 'DDL proofs must reinstall their schema.');
++                $changed = [];
++                foreach ($this->fixtureRows as $table => $rows) {
++                    if ($this->readFixtureRows($table) !== $rows) {
++                        $changed[$table] = $rows;
++                    }
++                }
++                $this->fixturePdo->exec('SET FOREIGN_KEY_CHECKS = 0');
++                try {
++                    $this->fixturePdo->beginTransaction();
++                    foreach ($changed as $table => $rows) {
++                        $quoted = $this->quoteIdentifier($table);
++                        $this->fixturePdo->exec('DELETE FROM '.$quoted);
++                        if ($rows !== []) {
++                            $columns = array_keys($rows[0]);
++                            $insert = $this->fixturePdo->prepare('INSERT INTO '.$quoted.' ('.implode(',', array_map($this->quoteIdentifier(...), $columns)).') VALUES ('.implode(',', array_fill(0, count($columns), '?')).')');
++                            foreach ($rows as $row) {
++                                $insert->execute(array_values($row));
++                            }
++                        }
++                    }
++                    $this->fixturePdo->commit();
++                } finally {
++                    if ($this->fixturePdo->inTransaction()) {
++                        $this->fixturePdo->rollBack();
++                    }
++                    $this->fixturePdo->exec('SET FOREIGN_KEY_CHECKS = '.$this->fixtureForeignKeys);
++                }
++                foreach ($changed as $table => $rows) {
++                    $this->assertSame($rows, $this->readFixtureRows($table), 'Committed fixture cleanup: '.$table);
++                }
++                $this->assertSame($this->fixtureForeignKeys, (int) $this->fixturePdo->query('SELECT @@FOREIGN_KEY_CHECKS')->fetchColumn());
++            }
++        } catch (\Throwable $error) {
++            // PHPUnit retains the original test failure when teardown throws a
++            // non-assertion exception. Also report cleanup trouble explicitly.
++            fwrite(STDERR, 'Committed fixture cleanup failed: '.$error->getMessage().PHP_EOL);
++            throw new \RuntimeException('Committed fixture cleanup failed.', 0, $error);
++        } finally {
++            $this->fixturePdo = null;
++            parent::tearDown();
++        }
++    }
++
++    private function fixtureTables(): array
++    {
++        $tables = $this->fixturePdo->query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'")->fetchAll(PDO::FETCH_COLUMN);
++        sort($tables, SORT_STRING);
++
++        return $tables;
++    }
++
++    private function readFixtureRows(string $table): array
++    {
++        // Only disposable, process-owned test data is eligible. Fail before a
++        // broad cleanup if a future fixture exceeds this explicit size bound.
++        $rows = $this->fixturePdo->query('SELECT * FROM '.$this->quoteIdentifier($table).' LIMIT 10001')->fetchAll(PDO::FETCH_ASSOC);
++        if (count($rows) > 10000) {
++            throw new \RuntimeException('Fixture snapshot bound exceeded: '.$table);
++        }
++        usort($rows, static fn (array $left, array $right): int => strcmp(serialize($left), serialize($right)));
++
++        return $rows;
++    }
++
++    private function quoteIdentifier(string $identifier): string
++    {
++        return '`'.str_replace('`', '``', $identifier).'`';
++    }
++}

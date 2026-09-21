@@ -1,0 +1,11 @@
+# PKG-02A v3 — verified user direction
+
+Owner MAIN ASTRA. Revision 1, 2026-09-21. Bounded mockup direction; no implementation approval.
+
+Main independently read the actual user message 01a0c058-8fed-78a3-8106-06d821517d97 in Designer task 01a0be31-19ef-7d10-86a9-cbe968989a76, continuation 01a0c058-1a50-7553-b014-e16641679033. The user requests right-click options, an easier and more complete way to draw and define safe zones, and Locate now in Tracking source to poll the unit. This is a direct instruction to improve the mockup, not exact v2 approval, a real polling request or a backend release.
+
+The same v3 should combine this direction with the three Main review findings in PKG-02A-v2-main-design-review.md. Make drawing a zone discoverable from the map, support clear circle/custom-boundary drawing and completion/undo/review, and provide context menus with visible keyboard-accessible alternatives. Locate now should demonstrate explicit local request/pending, success, timeout/offline and permission-limited outcomes. A command acknowledgement is distinct from a new timestamped observation; failure or a missing response cannot prove safety. Preserve existing source details and the separate collection, staff access and recipient-sharing boundaries. User wording "safe zones" does not authorize a safety guarantee, automatic alert exemption, shared geometry overwrite or new policy values.
+
+Designer should revalidate the existing governed device-command/source contract and canonical geofence ownership before representing those interactions. All people, locations, geometry and command outcomes remain synthetic and local. No live map provider, real unit poll, production source, schema, consent/grant or rule change is authorized. No new engine, task or package. Preserve frozen v1/v2 and protected Rory references; give v3 its own source/build/evidence/server identity.
+
+Main independently verified this continuation at 2026-09-20T19:43:14.624Z as gpt-6-astra/xhigh in both effective metadata fields. Its earlier bounded v3 release also covers this directly authorized page direction. Exact finished-version approval and all PKG-01, privacy, technical, frontend/backend ownership and later programme gates remain unchanged.

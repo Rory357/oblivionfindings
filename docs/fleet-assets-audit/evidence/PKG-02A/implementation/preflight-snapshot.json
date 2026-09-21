@@ -1,0 +1,139 @@
+{
+  "recordedAtUtc": "2026-09-20T21:03:36.7439903+00:00",
+  "state": "read-only source/runtime preflight; no application, dependency install, test, build or database writes",
+  "head": "2302ca33a95616e442a78e957ddce82d8db98669",
+  "remoteMain": "2302ca33a95616e442a78e957ddce82d8db98669",
+  "remoteVerification": "git ls-remote origin refs/heads/main succeeded after approved read-only network escalation",
+  "php": {
+    "path": "C:/Users/steph/.config/herd/bin/php84/php.exe",
+    "version": "8.4.16",
+    "requiredExtensionsPresent": true
+  },
+  "localVendorPresent": false,
+  "appEnvironmentPresent": false,
+  "testingEnvironmentPresent": false,
+  "cachedConfigurationPresent": false,
+  "testProcessTokenNames": [],
+  "frozenArtifacts": [
+    {
+      "version": "v1",
+      "sha256": "657A34B88376594534309E87F083C8F23C05B57502E20053D504B70BF9398154",
+      "fileCount": 29,
+      "mismatches": []
+    },
+    {
+      "version": "v2",
+      "sha256": "771EF5CE311F5C44BA77A3ADC319B2F566AE11A443B6C40D57FB5B675972963A",
+      "fileCount": 34,
+      "mismatches": []
+    },
+    {
+      "version": "v3",
+      "sha256": "1BA5E6B75D44964C2C20B6BC21FB735B79F1CE0C30BE3BD613C7FA7299F737B9",
+      "fileCount": 40,
+      "mismatches": []
+    }
+  ],
+  "inspectedInputs": [
+    {
+      "path": "app/Http/Controllers/ClientController.php",
+      "sha256": "EFFA3DA76C7EC5E87C99A0E4ED15429377C3D35B7E5C9D7791C1A140AB688730"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/PersonalTrackingPrivacyService.php",
+      "sha256": "51199B021C76F45369F1E0A7880908C0254B40F0E21EAB6686249FF6251BE150"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/PersonalTrackingLocationExportService.php",
+      "sha256": "8B38DC37924B1C2A3914D8B6CF235A914B9949A723313C5FC158AEE516A558CE"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Models/DeviceAssignment.php",
+      "sha256": "B76493BC5B3CD4B3AC04025FA6F0595227F7EDC7E4CD3434A0B4A6D223FC1362"
+    },
+    {
+      "path": "app/Services/Integration/IntegrationEventHistoryService.php",
+      "sha256": "75EF8EF902FEF798DF970BB00AC188EC3F6CAD6B6B92CFFB408F64337DBA6E1B"
+    },
+    {
+      "path": "app/Services/Queclink/LocateNowService.php",
+      "sha256": "29A17974B309B542C66D03389090981E6504C661AE3BB2FA2D960F8BC7ED8C9C"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/DeviceCommandRequestService.php",
+      "sha256": "232CAB1CF4545BF1BAA6DA949908791F257A944A678375AE0A548DA9B7BED7BB"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Services/DeviceCommandQueueService.php",
+      "sha256": "1C0F2FA478ABE6E562E8CF9EC602497C81C3BC1D469B055E5F0882238C09A9F2"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Management/Adapters/QueclinkTrackingCommandAdapter.php",
+      "sha256": "DB73C03020D968BEC58A4C7D9BE30C5B42A2401AC86F8BE567C7508818C0AD99"
+    },
+    {
+      "path": "app/Models/AssetGeofence.php",
+      "sha256": "2CCB1483F0D95AD0B29333518ED03358DE4F6F1405F5C031530B048860D2E593"
+    },
+    {
+      "path": "app/Services/Fleet/FleetGeofenceService.php",
+      "sha256": "F3B90BC98733E87D89BEB7FC9C9B20990C00039AD5B55366B0204F2CF7EDCA84"
+    },
+    {
+      "path": "app/Services/Tracking/GeofenceStatusService.php",
+      "sha256": "CEEAF64A9B803350F4D8F76DB81C58F9260067930C19402EA9370FD6A1C4390E"
+    },
+    {
+      "path": "app/Rules/GeofenceShape.php",
+      "sha256": "B5482879AC5B3A810708052C186011D08083089B5FE42A9F2C4D3DA79E178A54"
+    },
+    {
+      "path": "app/Models/FleetOuting.php",
+      "sha256": "90256283DF0100BCD69DE91FEE496183D70A78CDAE9B811D85D121EE13145452"
+    },
+    {
+      "path": "app/Models/FleetOutingResident.php",
+      "sha256": "FF5AB3D0D7A304731AB5CD78DE570953AB1641CF1BF827D68690E0D2D788C3C6"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/OutingController.php",
+      "sha256": "E64FCB203C89DC561DA1C84FB9A198463E8076A423CC531956F5E40B801CB648"
+    },
+    {
+      "path": "resources/js/components/client-location-tab.tsx",
+      "sha256": "E11BB8BC74476ECC7587D07C362BE7D1B3729E46BB77509B1EA04B80CF7ECA2D"
+    },
+    {
+      "path": "resources/js/components/geofence-draw-map.tsx",
+      "sha256": "F65E1518F625639CC3994BAF098B61D3D279EDC2A32446986BB51B32DB65D013"
+    },
+    {
+      "path": "resources/js/hooks/use-personal-location-privacy.ts",
+      "sha256": "660999AB4BB88F8E29D26A8051E44F7EAE42057625B66B6C7EBE73AC91FF00CB"
+    },
+    {
+      "path": "resources/js/components/resident-tracking/resident-map.tsx",
+      "sha256": "57ED58BDE510A53380273333CC7EE795B6ABF00BAB876D87D468869F0D3ED59C"
+    },
+    {
+      "path": "routes/operations.php",
+      "sha256": "E06E7BD0689A16F6CD308B569A6F011F74F6E2FA462743ADB1BEA3830A91C5F0"
+    },
+    {
+      "path": "tests/TestCase.php",
+      "sha256": "89872E92712993D42361D9D444A80A92EC5F633EEDFC2179C78447ADF337330F"
+    },
+    {
+      "path": "tests/Pest.php",
+      "sha256": "0A35C2E320ADC03F78AF122BAFF0562CCB9945D0199172EAE00985723D979800"
+    },
+    {
+      "path": "composer.lock",
+      "sha256": "B741C4EE36D4B562ADA6E571A57DD0A7DAC1047277B658054E6D74C88DA04EF9"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "2FDEC15606F7D4FAFF29A5DDFE64707FBB2DA2098C334E9FBCBD2D39B85A6140"
+    }
+  ]
+}

@@ -1,0 +1,362 @@
+[
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "authorised",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n2:32 pm · 20 Sep 2026\nNZST (UTC+12) · 3 min before the view check\nINDIVIDUAL PLAN\nObserved in Garden walks\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nExample Gardens\nObserved 2:32 pm · ±24 m\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n2:32 pm\nBattery sample\n68% · sampled 2:32 pm\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1280,
+    "workspace": true
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "no-device",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nDecision recorded\n\nA decision alone does not assign a device.\n\nView decision\nYour staff access\nPermitted for this client\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nNo tracking device is assigned\n\nA location observation needs a current device assignment linked to the applicable collection decision.\n\nView tracking assignment",
+    "width": 1280,
+    "workspace": false
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "missing",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Not recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nNot recorded\n\nReview the applicable canonical decision.\n\nView decision\nYour staff access\nPermitted for this client\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nNo collection decision is linked\n\nLocation and history stay hidden until the applicable authority is recorded and linked to this assignment.\n\nOpen Consents",
+    "width": 1280,
+    "workspace": false
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "unknown",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Needs review\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nNeeds review\n\nReview the applicable canonical decision.\n\nView decision\nYour staff access\nPermitted for this client\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nCollection authority needs review\n\nThe decision is recorded, but its authority evidence could not be verified. No location is shown.\n\nReview collection decision",
+    "width": 1280,
+    "workspace": false
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "purpose",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Purpose mismatch\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nPurpose mismatch\n\nReview the applicable canonical decision.\n\nView decision\nYour staff access\nPermitted for this client\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nThis decision does not cover location tracking\n\nThe linked decision covers a different purpose. It cannot authorise this location view.\n\nOpen Consents",
+    "width": 1280,
+    "workspace": false
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "denied",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nRefresh view\nCollection: Details restricted\nStaff: Restricted\nSharing: Restricted\nAccess & sharing details\nCollection authority\nDetails restricted\n\nSensitive decision details are restricted.\n\nYour staff access\nNot permitted\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nDetails restricted\n\nNo recipient or grant details are disclosed.\n\nLocation access\nYou do not have access to this location\n\nClient profile access does not include location access. Location, history and sensitive authority details are hidden.\n\nView access guidance",
+    "width": 1280,
+    "workspace": false
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "expired",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Expired\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nExpired\n\nReview the applicable canonical decision.\n\nView decision\nYour staff access\nPermitted for this client\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nThe collection decision has expired\n\nLocation access has ended. A permitted reviewer must check the current decision before tracking can resume.\n\nOpen Consents",
+    "width": 1280,
+    "workspace": false
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "withdrawn",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Withdrawn\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nWithdrawn\n\nReview the applicable canonical decision.\n\nView decision\nYour staff access\nPermitted for this client\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nThe collection decision was withdrawn\n\nLocation and history have been removed from this view. Retained evidence remains subject to the approved retention policy.\n\nView withdrawn decision",
+    "width": 1280,
+    "workspace": false
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "reassigned",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nDecision recorded\n\nBound to the current client, purpose and assignment.\n\nView decision\nYour staff access\nPermitted for this client\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nThe tracking assignment has changed\n\nThe previous device’s location has been cleared. The current assignment and its decision must be checked before another observation is shown.\n\nReview tracking assignment",
+    "width": 1280,
+    "workspace": false
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "stale",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n11:10 am · older observation\n3 hr 25 min before the view check\nINDIVIDUAL PLAN\nZone status cannot be confirmed\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nExample Gardens\nObserved 11:10 am\n\nThis older point does not confirm a current zone or position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n11:10 am\nBattery sample\n68% · sampled 11:10 am\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1280,
+    "workspace": true
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "unavailable",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\nUnavailable\nNo position inferred\nINDIVIDUAL PLAN\nZone status cannot be confirmed\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nNo current device observation\n\nZone presence cannot be determined. Scheduled places do not establish where Alex is.\n\nView tracking assignment\nPosition unavailable\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\nNot available\nBattery sample\nNot supplied\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1280,
+    "workspace": true
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "loading",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Checking\nStaff: Checking\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nChecking\n\nBound to the current client, purpose and assignment.\n\nView decision\nYour staff access\nChecking\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nChecking location access\n\nCollection authority, your access and the current assignment are being checked before any location is displayed.",
+    "width": 1280,
+    "workspace": false
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "empty",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\nUnavailable\nNo position inferred\nINDIVIDUAL PLAN\nZone status cannot be confirmed\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nNo observation recorded\n\nZone presence cannot be determined. Scheduled places do not establish where Alex is.\n\nView tracking assignment\nPosition unavailable\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\nNot available\nBattery sample\nNot supplied\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1280,
+    "workspace": true
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "network",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Not verified\nStaff: Not verified\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nNot verified\n\nBound to the current client, purpose and assignment.\n\nView decision\nYour staff access\nNot verified\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nLocation access could not be checked\n\nLocation and history are hidden because access could not be revalidated. This is a connection failure, not an empty history.\n\nRetry access check",
+    "width": 1280,
+    "workspace": false
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "limited",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: View only\nSharing: No sharing grant\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n2:32 pm · 20 Sep 2026\nNZST (UTC+12) · 3 min before the view check\nINDIVIDUAL PLAN\nObserved in Garden walks\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nExample Gardens\nObserved 2:32 pm · ±24 m\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n2:32 pm\nBattery sample\n68% · sampled 2:32 pm\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1280,
+    "workspace": true
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "accuracy",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n2:32 pm · 20 Sep 2026\nNZST (UTC+12) · 3 min before the view check\nINDIVIDUAL PLAN\nZone status cannot be confirmed\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nNear the Garden walks boundary\nObserved 2:32 pm · accuracy uncertain\n\nAccuracy was not supplied. No accuracy area or confirmed zone is inferred.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n2:32 pm\nBattery sample\nNot supplied\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1280,
+    "workspace": true
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "shared",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: One named recipient\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n2:32 pm · 20 Sep 2026\nNZST (UTC+12) · 3 min before the view check\nINDIVIDUAL PLAN\nObserved in Garden walks\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nExample Gardens\nObserved 2:32 pm · ±24 m\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n2:32 pm\nBattery sample\n68% · sampled 2:32 pm\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1280,
+    "workspace": true
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "share-expired",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: Sharing expired\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n2:32 pm · 20 Sep 2026\nNZST (UTC+12) · 3 min before the view check\nINDIVIDUAL PLAN\nObserved in Garden walks\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nExample Gardens\nObserved 2:32 pm · ±24 m\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n2:32 pm\nBattery sample\n68% · sampled 2:32 pm\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1280,
+    "workspace": true
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "share-withdrawn",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: Sharing withdrawn\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n2:32 pm · 20 Sep 2026\nNZST (UTC+12) · 3 min before the view check\nINDIVIDUAL PLAN\nObserved in Garden walks\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nExample Gardens\nObserved 2:32 pm · ±24 m\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n2:32 pm\nBattery sample\n68% · sampled 2:32 pm\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1280,
+    "workspace": true
+  },
+  {
+    "height": 800,
+    "overflow": false,
+    "state": "self",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n2:32 pm · 20 Sep 2026\nNZST (UTC+12) · 3 min before the view check\nINDIVIDUAL PLAN\nObserved in Garden walks\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nExample Gardens\nObserved 2:32 pm · ±24 m\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n2:32 pm\nBattery sample\n68% · sampled 2:32 pm\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1280,
+    "workspace": true
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "authorised",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n2:32 pm · 20 Sep 2026\nNZST (UTC+12) · 3 min before the view check\nINDIVIDUAL PLAN\nObserved in Garden walks\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nExample Gardens\nObserved 2:32 pm · ±24 m\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n2:32 pm\nBattery sample\n68% · sampled 2:32 pm\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1440,
+    "workspace": true
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "no-device",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nDecision recorded\n\nA decision alone does not assign a device.\n\nView decision\nYour staff access\nPermitted for this client\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nNo tracking device is assigned\n\nA location observation needs a current device assignment linked to the applicable collection decision.\n\nView tracking assignment",
+    "width": 1440,
+    "workspace": false
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "missing",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Not recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nNot recorded\n\nReview the applicable canonical decision.\n\nView decision\nYour staff access\nPermitted for this client\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nNo collection decision is linked\n\nLocation and history stay hidden until the applicable authority is recorded and linked to this assignment.\n\nOpen Consents",
+    "width": 1440,
+    "workspace": false
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "unknown",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Needs review\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nNeeds review\n\nReview the applicable canonical decision.\n\nView decision\nYour staff access\nPermitted for this client\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nCollection authority needs review\n\nThe decision is recorded, but its authority evidence could not be verified. No location is shown.\n\nReview collection decision",
+    "width": 1440,
+    "workspace": false
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "purpose",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Purpose mismatch\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nPurpose mismatch\n\nReview the applicable canonical decision.\n\nView decision\nYour staff access\nPermitted for this client\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nThis decision does not cover location tracking\n\nThe linked decision covers a different purpose. It cannot authorise this location view.\n\nOpen Consents",
+    "width": 1440,
+    "workspace": false
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "denied",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nRefresh view\nCollection: Details restricted\nStaff: Restricted\nSharing: Restricted\nAccess & sharing details\nCollection authority\nDetails restricted\n\nSensitive decision details are restricted.\n\nYour staff access\nNot permitted\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nDetails restricted\n\nNo recipient or grant details are disclosed.\n\nLocation access\nYou do not have access to this location\n\nClient profile access does not include location access. Location, history and sensitive authority details are hidden.\n\nView access guidance",
+    "width": 1440,
+    "workspace": false
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "expired",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Expired\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nExpired\n\nReview the applicable canonical decision.\n\nView decision\nYour staff access\nPermitted for this client\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nThe collection decision has expired\n\nLocation access has ended. A permitted reviewer must check the current decision before tracking can resume.\n\nOpen Consents",
+    "width": 1440,
+    "workspace": false
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "withdrawn",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Withdrawn\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nWithdrawn\n\nReview the applicable canonical decision.\n\nView decision\nYour staff access\nPermitted for this client\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nThe collection decision was withdrawn\n\nLocation and history have been removed from this view. Retained evidence remains subject to the approved retention policy.\n\nView withdrawn decision",
+    "width": 1440,
+    "workspace": false
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "reassigned",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nDecision recorded\n\nBound to the current client, purpose and assignment.\n\nView decision\nYour staff access\nPermitted for this client\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nThe tracking assignment has changed\n\nThe previous device’s location has been cleared. The current assignment and its decision must be checked before another observation is shown.\n\nReview tracking assignment",
+    "width": 1440,
+    "workspace": false
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "stale",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n11:10 am · older observation\n3 hr 25 min before the view check\nINDIVIDUAL PLAN\nZone status cannot be confirmed\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nExample Gardens\nObserved 11:10 am\n\nThis older point does not confirm a current zone or position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n11:10 am\nBattery sample\n68% · sampled 11:10 am\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1440,
+    "workspace": true
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "unavailable",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\nUnavailable\nNo position inferred\nINDIVIDUAL PLAN\nZone status cannot be confirmed\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nNo current device observation\n\nZone presence cannot be determined. Scheduled places do not establish where Alex is.\n\nView tracking assignment\nPosition unavailable\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\nNot available\nBattery sample\nNot supplied\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1440,
+    "workspace": true
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "loading",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Checking\nStaff: Checking\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nChecking\n\nBound to the current client, purpose and assignment.\n\nView decision\nYour staff access\nChecking\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nChecking location access\n\nCollection authority, your access and the current assignment are being checked before any location is displayed.",
+    "width": 1440,
+    "workspace": false
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "empty",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\nUnavailable\nNo position inferred\nINDIVIDUAL PLAN\nZone status cannot be confirmed\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nNo observation recorded\n\nZone presence cannot be determined. Scheduled places do not establish where Alex is.\n\nView tracking assignment\nPosition unavailable\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\nNot available\nBattery sample\nNot supplied\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1440,
+    "workspace": true
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "network",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Not verified\nStaff: Not verified\nSharing: No sharing grant\nAccess & sharing details\nCollection authority\nNot verified\n\nBound to the current client, purpose and assignment.\n\nView decision\nYour staff access\nNot verified\n\nStaff role, approved site and location permission are checked separately.\n\nView access\nRecipient sharing\nNo sharing grant\n\nA portal relationship or tracking decision does not grant sharing.\n\nReview sharing\nLocation access\nLocation access could not be checked\n\nLocation and history are hidden because access could not be revalidated. This is a connection failure, not an empty history.\n\nRetry access check",
+    "width": 1440,
+    "workspace": false
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "limited",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: View only\nSharing: No sharing grant\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n2:32 pm · 20 Sep 2026\nNZST (UTC+12) · 3 min before the view check\nINDIVIDUAL PLAN\nObserved in Garden walks\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nExample Gardens\nObserved 2:32 pm · ±24 m\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n2:32 pm\nBattery sample\n68% · sampled 2:32 pm\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1440,
+    "workspace": true
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "accuracy",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n2:32 pm · 20 Sep 2026\nNZST (UTC+12) · 3 min before the view check\nINDIVIDUAL PLAN\nZone status cannot be confirmed\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nNear the Garden walks boundary\nObserved 2:32 pm · accuracy uncertain\n\nAccuracy was not supplied. No accuracy area or confirmed zone is inferred.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n2:32 pm\nBattery sample\nNot supplied\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1440,
+    "workspace": true
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "shared",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: One named recipient\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n2:32 pm · 20 Sep 2026\nNZST (UTC+12) · 3 min before the view check\nINDIVIDUAL PLAN\nObserved in Garden walks\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nExample Gardens\nObserved 2:32 pm · ±24 m\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n2:32 pm\nBattery sample\n68% · sampled 2:32 pm\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1440,
+    "workspace": true
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "share-expired",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: Sharing expired\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n2:32 pm · 20 Sep 2026\nNZST (UTC+12) · 3 min before the view check\nINDIVIDUAL PLAN\nObserved in Garden walks\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nExample Gardens\nObserved 2:32 pm · ±24 m\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n2:32 pm\nBattery sample\n68% · sampled 2:32 pm\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1440,
+    "workspace": true
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "share-withdrawn",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: Sharing withdrawn\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n2:32 pm · 20 Sep 2026\nNZST (UTC+12) · 3 min before the view check\nINDIVIDUAL PLAN\nObserved in Garden walks\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nExample Gardens\nObserved 2:32 pm · ±24 m\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n2:32 pm\nBattery sample\n68% · sampled 2:32 pm\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1440,
+    "workspace": true
+  },
+  {
+    "height": 900,
+    "overflow": false,
+    "state": "self",
+    "summaries": 1,
+    "text": "Location\n\nObserved location, agreed zones and today’s plan for Alex.\n\nOpen Consents\nRefresh view\nCollection: Decision recorded\nStaff: Permitted\nSharing: No sharing grant\nAccess & sharing details\nToday\nSafe zones & schedule\nOutings\nActivity\nScenario\nRoutine outing\nOutside active zones\nArrival not confirmed\nTracker unavailable\nBoundary uncertain\nLATEST DEVICE OBSERVATION\n2:32 pm · 20 Sep 2026\nNZST (UTC+12) · 3 min before the view check\nINDIVIDUAL PLAN\nObserved in Garden walks\nHome and Garden walks scheduled now\nNEXT PLANNED CHANGE\n3:00 pm · garden walk ends\nReview today’s outings\nLatest observation & agreed places\n\nSynthetic Sunday 20 September · view checked 2:35 pm\n\nZones\nDraw safe zone\nExample House\nDay programme\nExample Gardens\nTown library\nFictional map · illustrative geometry, no live tracking\nMap actions\nExample Gardens\nObserved 2:32 pm · ±24 m\n\nA device observation does not establish wellbeing or a current position.\n\nGarden walks\nG-DEMO-03 · rule 1 · Agreed place · 10:00 AM–04:00 PM\nView rule\nToday’s plan\n\nAgreed places and time-bound outings\n\nView schedule\nGarden walk\n\n1:30–3:00 pm · Jamie Taylor\n\nIllustrative outing in progress\nView outing and travel context\nLibrary visit\n\n3:00–4:30 pm · Priya Chen\n\nPlanned\n\nTemporary plan ends at 4:30 pm\n\nPlan an outing\nTracking source\nView\nPersonal tracker · T-DEMO-08\n\nAssignment A-DEMO-052 · Alex Hale\n\nLast contact\n2:32 pm\nBattery sample\n68% · sampled 2:32 pm\nLocate now\nCollection, staff access and recipient sharing are separate.\nReview sharing",
+    "width": 1440,
+    "workspace": true
+  }
+]

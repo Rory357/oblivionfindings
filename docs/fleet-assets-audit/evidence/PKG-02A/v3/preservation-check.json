@@ -1,0 +1,18 @@
+[
+  {
+    "version": "v1",
+    "manifestSha256": "657A34B88376594534309E87F083C8F23C05B57502E20053D504B70BF9398154",
+    "artifactCount": 29,
+    "artifactMismatches": [],
+    "baselineCount": 33,
+    "baselineMismatches": []
+  },
+  {
+    "version": "v2",
+    "manifestSha256": "771EF5CE311F5C44BA77A3ADC319B2F566AE11A443B6C40D57FB5B675972963A",
+    "artifactCount": 34,
+    "artifactMismatches": [],
+    "baselineCount": 38,
+    "baselineMismatches": []
+  }
+]

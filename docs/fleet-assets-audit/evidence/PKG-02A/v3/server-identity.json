@@ -1,0 +1,65 @@
+[
+  {
+    "port": 4332,
+    "status": 200,
+    "identity": {
+      "version": "PKG-02A-v1",
+      "baseline": "2302ca33a95616e442a78e957ddce82d8db98669",
+      "worktree": "2b9f",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "synthetic": true
+    },
+    "cache": [
+      "no-store, max-age=0, private"
+    ],
+    "csp": [
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    ],
+    "previewHeader": [
+      "PKG-02A-v1-2b9f"
+    ]
+  },
+  {
+    "port": 4333,
+    "status": 200,
+    "identity": {
+      "version": "PKG-02A-v2",
+      "baseline": "2302ca33a95616e442a78e957ddce82d8db98669",
+      "worktree": "2b9f",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "synthetic": true
+    },
+    "cache": [
+      "no-store, max-age=0, private"
+    ],
+    "csp": [
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    ],
+    "previewHeader": [
+      "PKG-02A-v2-2b9f"
+    ]
+  },
+  {
+    "port": 4334,
+    "status": 200,
+    "identity": {
+      "version": "PKG-02A-v3",
+      "baseline": "2302ca33a95616e442a78e957ddce82d8db98669",
+      "worktree": "2b9f",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "synthetic": true
+    },
+    "cache": [
+      "no-store, max-age=0, private"
+    ],
+    "csp": [
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    ],
+    "previewHeader": [
+      "PKG-02A-v3-2b9f"
+    ]
+  }
+]

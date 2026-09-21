@@ -1,0 +1,20 @@
+[
+  {
+    "version": "v1",
+    "manifest_sha256": "657A34B88376594534309E87F083C8F23C05B57502E20053D504B70BF9398154",
+    "count": 29,
+    "mismatches": []
+  },
+  {
+    "version": "v2",
+    "manifest_sha256": "771EF5CE311F5C44BA77A3ADC319B2F566AE11A443B6C40D57FB5B675972963A",
+    "count": 34,
+    "mismatches": []
+  },
+  {
+    "version": "v3",
+    "manifest_sha256": "1BA5E6B75D44964C2C20B6BC21FB735B79F1CE0C30BE3BD613C7FA7299F737B9",
+    "count": 40,
+    "mismatches": []
+  }
+]

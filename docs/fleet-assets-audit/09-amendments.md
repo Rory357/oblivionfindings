@@ -1,7 +1,31 @@
 # Approved programme amendments
 
-Owner: MAIN ASTRA. Revision: 6. Updated: 2026-09-20.
-Current source: Revision 10 + A1/A2/A3/A4; separate D1–D4 reference permissions recorded below. Earlier approval and verification checkpoints retain their historical source versions. Main audit code baseline unchanged: 19354ecbc70046d12dfdf9c86f888e65fa1879d1.
+Owner: MAIN ASTRA. Revision: 9. Updated: 2026-09-21.
+Current source: Revision 10 + A1/A2/A3/A4/A5/A6; separate D1–D4 reference permissions recorded below. Earlier approval and verification checkpoints retain their historical source versions. Main audit code baseline unchanged: 19354ecbc70046d12dfdf9c86f888e65fa1879d1.
+
+## Latest explicit publication and next-design direction
+
+On21September Stephan requested: “since the designer is done now can you merge and push to main and then start the new designer please”. This authorises the existing Client Location Designer's publication after Main technical review and one next Designer after verified publication, without a duplicate permission request. The next assignment is the prepared Vehicle profile/readiness desktop mockup under existing workflows. It does not establish operational page acceptance, close Maintenance, release parallel application implementation or change product/design-reference requirements. This is a recorded direct task direction; the canonical master file/hash above has not been rewritten. [Current review and evidence](evidence/PKG-02A-main-final-review.md).
+
+## A6 — bounded PKG-02A implementation timing approved and applied
+
+Main independently verified Stephan's actual "please continue" message 01a0c0b2-6fa9-7de3-9430-2521b54bf669 and the immediately preceding explicit explanation of the timing proposal in the Client Location Designer task. Evidence/PKG-02A-A6-timing-approval.md records that context, exact scope, model verification and custody/setup sequence. PKG-02A may proceed after technical/privacy/isolation verification while Maintenance acceptance/configuration/closure remain open. One writer, protected references, existing policy and all later review/publication/acceptance gates remain; A4 is not extended. The same Designer owns frontend/backend without Sol under the earlier verified user assignment.
+
+Canonical master input AAD1B712C20F5387CE6E1AF7FD7F76EFA74F7121BEE0CB5E3CCC170AB5D1D2FA was checked. Three unique metadata replacements plus one A6 paragraph were applied; exact in-memory reversal reproduced the prior text. Output SHA256 **C4837AB675F9DFFDB6A8597636F49D5761DA114E6C155DC08E6BB8A209D63FD0**. No other master body or product requirement changed; no application/guide/frozen-preview change accompanies this amendment. Historical publication manifests remain untouched.
+
+## A5 — next mockup overlap and frontend/backend ownership
+
+Stephan directly instructed Main on2026-09-20:
+
+> while that one is busy can you start the next mockup sesion but this time sol can implement backend but Astra Extra high must do frontend. because 5.6 solis failing with front end
+
+This explicitly changes the prior no-background-next-page rule for one isolated next mockup while PKG-01 finishes verification/acceptance. Main bounds the first approved PKG-02 surface as **PKG-02A Client Location — authorised tracking/sharing and truthful observation status**. It is a design-only release, not implementation or acceptance. Remaining PKG-02 sibling surfaces stay queued.
+
+The new Designer and future frontend implementation/corrections must use verified gpt-6-astra/xhigh. Designer may launch one Sol backend assignment after exact mockup/scope approval and technical prerequisites; define contracts, file ownership and one-writer handoffs first. Sol must not implement frontend. The next implementation still waits for PKG-01's required closure unless Stephan separately changes that timing. PKG-01's existing Designer remains sole writer and its stopped Sol assignment remains stopped. No issue history, correction budget, product requirement, protected design reference, safety/privacy decision, Main technical/publication review or final page-acceptance gate is removed. No general model benchmark/cost claim is made.
+
+Applied to the canonical Downloads master before new-task launch: one A5 paragraph plus amendment heading/effective version/boundary wording. Input hash77F404510B6E5C1A270904650A22D6AD7DD0FB8A6842183D33DAB0C687D31C56 was checked; each edit anchor was unique and in-memory reversal reproduced the exact prior text. Output SHA256 **AAD1B712C20F5387CE6E1AF7FD7F76EFA74F7121BEE0CB5E3CCC170AB5D1D2FA**. No other master body was rewritten. Main's three protected guide hashes remain8875A3AB,3D41375A,66908EF2 with their full identities retained in the prior manifest. A5 grants no new guide edit.
+
+Affects00,03,05,06,07 and the new PKG-02A handoff/page records. PKG-01's committed delivery/publication manifests remain historical and are not rehashed to pretend these later documents were published in2302ca3. No application code, operational data, existing preview or main-branch/index change accompanies this amendment.
 
 ## A4 — bounded PKG-01 staged development approved and applied
 
