@@ -13,6 +13,7 @@ use App\Services\Queclink\AtTrackProtocolParser;
 use App\Services\Queclink\Exceptions\IntakeRejected;
 use App\Services\Queclink\GovernedCommandLifecycleService;
 use App\Services\Queclink\SerialNumberAllocator;
+use App\Services\Tracking\ClientLocationEvidenceBusy;
 use App\Support\SafeOperationalData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -458,100 +459,115 @@ class FrameRouter
         QueclinkDevice $device,
         ?string $sessionId,
     ): ?QueclinkPendingCommand {
-        return DB::transaction(function () use ($commandId, $device, $sessionId): ?QueclinkPendingCommand {
-            QueclinkDevice::query()->whereKey($device->id)->lockForUpdate()->firstOrFail();
+        $outerLevel = DB::transactionLevel();
+        try {
+            return DB::transaction(function () use ($commandId, $device, $sessionId): ?QueclinkPendingCommand {
+                QueclinkDevice::query()->whereKey($device->id)->lockForUpdate()->firstOrFail();
 
-            $pending = QueclinkPendingCommand::query()->lockForUpdate()->find($commandId);
-            if (! $pending
-                || (int) $pending->queclink_device_id !== (int) $device->id
-                || $pending->status !== QueclinkPendingCommand::STATUS_QUEUED
-                || $pending->isExpired()) {
-                return null;
-            }
-
-            // A row can be requeued by legacy repair or corrupted state while
-            // still carrying proof that its bytes reached a device. Never
-            // retransmit that row or let its own id evade the tombstone query.
-            if ($pending->sent_at !== null
-                || $pending->sent_session_id !== null
-                || $pending->acked_at !== null
-                || $pending->ack_response !== null) {
-                Log::warning('Queclink requeued command with transmission provenance rejected.', SafeOperationalData::logContext([
-                    'provider' => 'queclink',
-                    'device_id' => $device->device_id,
-                    'items_errored' => 1,
-                ]));
-
-                return null;
-            }
-
-            $rawCommand = $pending->raw_command;
-            $storedSerial = (string) $pending->serial_number;
-            if (! is_string($rawCommand)
-                || preg_match('/^[0-9A-F]{4}$/', $storedSerial) !== 1
-                || preg_match('/,([0-9A-F]{4})\$$/i', $rawCommand, $rawMatch) !== 1
-                || strtoupper($rawMatch[1]) !== $storedSerial) {
-                Log::warning('Queclink queued command serial binding rejected.', SafeOperationalData::logContext([
-                    'provider' => 'queclink',
-                    'device_id' => $device->device_id,
-                    'items_errored' => 1,
-                ]));
-
-                return null;
-            }
-
-            $now = now();
-            $reserved = QueclinkPendingCommand::query()
-                ->forDevice($device->id)
-                ->where('id', '<>', $pending->id)
-                ->where(function (Builder $query) use ($now): void {
-                    $query->where(function (Builder $queued) use ($now): void {
-                        $queued->where('status', QueclinkPendingCommand::STATUS_QUEUED)
-                            ->where(function (Builder $lifetime) use ($now): void {
-                                $lifetime->whereNull('expires_at')->orWhere('expires_at', '>', $now);
-                            });
-                    })->orWhere(function (Builder $transmitted): void {
-                        $this->constrainTransmittedSerial($transmitted);
-                    });
-                })
-                ->lockForUpdate()
-                ->pluck('serial_number')
-                ->map(fn (mixed $serial): string => strtoupper(trim((string) $serial)))
-                ->filter(fn (string $serial): bool => preg_match('/^[0-9A-F]{4}$/', $serial) === 1)
-                ->unique()
-                ->values()
-                ->all();
-
-            if (in_array($storedSerial, $reserved, true)) {
-                try {
-                    $newSerial = $this->serials->nextExcluding($reserved);
-                } catch (RuntimeException) {
-                    return null;
-                }
-                if (preg_match('/^[0-9A-F]{4}$/', $newSerial) !== 1
-                    || in_array($newSerial, $reserved, true)) {
+                $pending = QueclinkPendingCommand::query()->lockForUpdate()->find($commandId);
+                if (! $pending
+                    || (int) $pending->queclink_device_id !== (int) $device->id
+                    || $pending->status !== QueclinkPendingCommand::STATUS_QUEUED) {
                     return null;
                 }
 
-                $rewritten = preg_replace(
-                    '/,[0-9A-F]{4}\$$/i',
-                    ','.$newSerial.'$',
-                    $rawCommand,
-                    1,
-                    $replacementCount,
-                );
-                if (! is_string($rewritten) || $replacementCount !== 1) {
+                // A row can be requeued by legacy repair or corrupted state while
+                // still carrying proof that its bytes reached a device. Never
+                // retransmit that row or let its own id evade the tombstone query.
+                if ($pending->sent_at !== null
+                    || $pending->sent_session_id !== null
+                    || $pending->acked_at !== null
+                    || $pending->ack_response !== null) {
+                    Log::warning('Queclink requeued command with transmission provenance rejected.', SafeOperationalData::logContext([
+                        'provider' => 'queclink',
+                        'device_id' => $device->device_id,
+                        'items_errored' => 1,
+                    ]));
+
                     return null;
                 }
 
-                $pending->forceFill([
-                    'serial_number' => $newSerial,
-                    'raw_command' => $rewritten,
-                ])->save();
+                $pending->setRelation('device', $device);
+                if (! $this->governedCommands->authoriseDelivery($pending) || $pending->isExpired()) {
+                    return null;
+                }
+
+                $rawCommand = $pending->raw_command;
+                $storedSerial = (string) $pending->serial_number;
+                if (! is_string($rawCommand)
+                    || preg_match('/^[0-9A-F]{4}$/', $storedSerial) !== 1
+                    || preg_match('/,([0-9A-F]{4})\$$/i', $rawCommand, $rawMatch) !== 1
+                    || strtoupper($rawMatch[1]) !== $storedSerial) {
+                    Log::warning('Queclink queued command serial binding rejected.', SafeOperationalData::logContext([
+                        'provider' => 'queclink',
+                        'device_id' => $device->device_id,
+                        'items_errored' => 1,
+                    ]));
+
+                    return null;
+                }
+
+                $now = now();
+                $reserved = QueclinkPendingCommand::query()
+                    ->forDevice($device->id)
+                    ->where('id', '<>', $pending->id)
+                    ->where(function (Builder $query) use ($now): void {
+                        $query->where(function (Builder $queued) use ($now): void {
+                            $queued->where('status', QueclinkPendingCommand::STATUS_QUEUED)
+                                ->where(function (Builder $lifetime) use ($now): void {
+                                    $lifetime->whereNull('expires_at')->orWhere('expires_at', '>', $now);
+                                });
+                        })->orWhere(function (Builder $transmitted): void {
+                            $this->constrainTransmittedSerial($transmitted);
+                        });
+                    })
+                    ->lockForUpdate()
+                    ->pluck('serial_number')
+                    ->map(fn (mixed $serial): string => strtoupper(trim((string) $serial)))
+                    ->filter(fn (string $serial): bool => preg_match('/^[0-9A-F]{4}$/', $serial) === 1)
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                if (in_array($storedSerial, $reserved, true)) {
+                    try {
+                        $newSerial = $this->serials->nextExcluding($reserved);
+                    } catch (RuntimeException) {
+                        return null;
+                    }
+                    if (preg_match('/^[0-9A-F]{4}$/', $newSerial) !== 1
+                        || in_array($newSerial, $reserved, true)) {
+                        return null;
+                    }
+
+                    $rewritten = preg_replace(
+                        '/,[0-9A-F]{4}\$$/i',
+                        ','.$newSerial.'$',
+                        $rawCommand,
+                        1,
+                        $replacementCount,
+                    );
+                    if (! is_string($rewritten) || $replacementCount !== 1) {
+                        return null;
+                    }
+
+                    $pending->forceFill([
+                        'serial_number' => $newSerial,
+                        'raw_command' => $rewritten,
+                    ])->save();
+                }
+
+                return $this->governedCommands->markSent($pending, $sessionId);
+            }, 3);
+        } catch (ClientLocationEvidenceBusy $error) {
+            // A nested caller must unwind its owning transaction too: releasing
+            // a savepoint does not guarantee release of earlier evidence locks.
+            if ($outerLevel > 0) {
+                throw $error;
             }
 
-            return $this->governedCommands->markSent($pending, $sessionId);
-        }, 3);
+            return null; // Same queued request may be claimed on a later frame.
+        }
     }
 
     private function constrainTransmittedSerial(Builder $query): void

@@ -474,6 +474,7 @@ type ServiceSchedule = {
 };
 
 type Props = {
+    active_maintenance_restrictions: number;
     asset: {
         id: number;
         name: string;
@@ -579,6 +580,7 @@ function isExpired(dateStr: string | null): boolean {
 
 export default function AssetShow({
     asset,
+    active_maintenance_restrictions,
     timeline,
     hr_asset,
     can_view_hr_assets,
@@ -748,6 +750,12 @@ export default function AssetShow({
                     backHref="/fleet-assets/assets"
                     backLabel="Assets"
                 />
+
+                {active_maintenance_restrictions > 0 && <div role="status" className="rounded-lg border border-status-critical/40 bg-status-critical-bg px-5 py-4 text-sm text-status-critical">
+                    <strong>Do not use — {active_maintenance_restrictions} active maintenance {active_maintenance_restrictions === 1 ? 'hold' : 'holds'}</strong>
+                    <p className="mt-1">An authorised release is required. Review the maintenance work below before planning use.</p>
+                    <Link className="mt-2 inline-block underline" href={`/fleet-assets/maintenance/work-orders?asset_id=${asset.id}`}>View maintenance work</Link>
+                </div>}
 
                 {/* Header Banner Card */}
                 <div

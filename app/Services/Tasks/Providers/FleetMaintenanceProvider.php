@@ -2,10 +2,11 @@
 
 namespace App\Services\Tasks\Providers;
 
-use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Models\Asset;
 use App\Models\FleetServiceSchedule;
 use App\Models\FleetWorkOrder;
 use App\Models\User;
+use App\Services\Fleet\MaintenanceAccessService;
 use App\Services\Tasks\Contracts\ProvidesTaskSourceAliases;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
@@ -45,11 +46,13 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, SiteScopedT
 
     public function legacySourceAliasForId(User $user, int $id): ?string
     {
-        $assetIds = app(SecurityDevicesAccessService::class)->authorizedAssetIds($user);
+        $assetIds = Asset::query()->whereNotNull('site_id')
+            ->whereIn('site_id', app(MaintenanceAccessService::class)->approvedSiteIds($user))->select('id');
 
         // Historical provider order was work orders first, then schedules.
         // Resolve by record existence, never by due horizon or lifecycle state.
-        if (FleetWorkOrder::query()->whereKey($id)->whereIn('asset_id', $assetIds)->exists()) {
+        if (app(MaintenanceAccessService::class)->canRead($user)
+            && app(MaintenanceAccessService::class)->scopedWorkOrders($user)->whereKey($id)->exists()) {
             return 'fleet_work_order';
         }
 
@@ -62,7 +65,7 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, SiteScopedT
 
     public function canView(User $user): bool
     {
-        return $user->canDo('fleet.viewAny') || $user->canDo('assets.viewAny');
+        return app(MaintenanceAccessService::class)->canRead($user);
     }
 
     public function authorizedTasks(User $user, array $filters = []): array
@@ -73,11 +76,7 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, SiteScopedT
         );
     }
 
-    /**
-     * Open/overdue work orders with a due date past or inside the horizon.
-     *
-     * @return TaskItem[]
-     */
+    /** Work enters All Tasks only with a target inside the approved horizon. @return TaskItem[] */
     private function workOrders(User $user, array $filters): array
     {
         $query = FleetWorkOrder::query()
@@ -85,7 +84,7 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, SiteScopedT
             ->whereNotNull('due_at')
             ->where('due_at', '<=', now()->addDays(self::HORIZON_DAYS))
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
-            ->orderBy('due_at')
+            ->orderByRaw('due_at IS NULL')->orderBy('due_at')
             ->limit(300);
 
         if (empty($filters['include_done'])) {
@@ -98,7 +97,9 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, SiteScopedT
             $query,
             fn ($scoped, User $actor) => $scoped->whereIn(
                 'asset_id',
-                app(SecurityDevicesAccessService::class)->authorizedAssetIds($actor),
+                Asset::query()->whereNotNull('site_id')
+                    ->whereIn('site_id', app(MaintenanceAccessService::class)->approvedSiteIds($actor))
+                    ->select('id'),
             ),
             function (FleetWorkOrder $order) {
                 $title = $order->title ?: 'Work order';
@@ -162,7 +163,9 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, SiteScopedT
             $query,
             fn ($scoped, User $actor) => $scoped->whereIn(
                 'asset_id',
-                app(SecurityDevicesAccessService::class)->authorizedAssetIds($actor),
+                Asset::query()->whereNotNull('site_id')
+                    ->whereIn('site_id', app(MaintenanceAccessService::class)->approvedSiteIds($actor))
+                    ->select('id'),
             ),
             function (FleetServiceSchedule $schedule) {
                 $title = 'Service due';

@@ -156,6 +156,20 @@ class SignalProcessingService
         return DB::transaction(function () use ($signal) {
             $signal = Signal::query()->whereKey($signal->id)->lockForUpdate()->firstOrFail();
             $this->assertFacilityProjectionBeforeProcessing($signal);
+            if (data_get($signal->normalized_data, 'client_zone_monitor_id') !== null || data_get($signal->normalized_data, 'client_tracker_fall') === true) {
+                $fleet = FleetSignal::query()->find(data_get($signal->normalized_data, 'fleet_signal_id'));
+                if (! $fleet) {
+                    throw new SafetySignalUnroutable('Client zone source evidence is unavailable.');
+                }
+                $projection = data_get($signal->normalized_data, 'client_tracker_fall') === true
+                    ? app(\App\Services\Tracking\ClientTrackerFallService::class)->projection($fleet)
+                    : app(\App\Services\Tracking\ClientZoneMonitoringService::class)->projection($fleet);
+                foreach (['idempotency_key', 'signal_source_id', 'signal_type_code', 'client_id', 'site_id', 'asset_id'] as $field) {
+                    if ((string) $signal->{$field} !== (string) $projection[$field]) {
+                        throw new SafetySignalUnroutable('Client zone projection does not match canonical evidence.');
+                    }
+                }
+            }
 
             // Typed alert provenance is the durable recovery point. It wins
             // over a stale in-memory lifecycle state left by historical or
@@ -252,7 +266,7 @@ class SignalProcessingService
             $rule = $rules->first();
 
             // Check for deduplication
-            if ($rule->deduplicate && $incident === null) {
+            if ($rule->deduplicate && $incident === null && data_get($signal->normalized_data, 'client_zone_monitor_id') === null) {
                 $existingAlert = $this->findCorrelatedAlert($signal, $rule);
                 if ($existingAlert) {
                     $this->assertAlertCanGroupSignal($signal, $existingAlert);
@@ -1654,6 +1668,12 @@ class SignalProcessingService
      */
     public function ingestFromFleetSignal(FleetSignal $fleetSignal): Signal
     {
+        if ($fleetSignal->signal_type === \App\Services\Tracking\ClientTrackerFallService::SIGNAL) {
+            return $this->ingest(app(\App\Services\Tracking\ClientTrackerFallService::class)->projection($fleetSignal));
+        }
+        if ($fleetSignal->signal_type === \App\Services\Tracking\ClientZoneMonitoringService::SIGNAL) {
+            return $this->ingest(app(\App\Services\Tracking\ClientZoneMonitoringService::class)->projection($fleetSignal));
+        }
         // The canonical outbox worker owns the surrounding transaction. Keep the
         // source configuration stable until signal and alert publication finish.
         $fleetSource = SignalSource::query()->where('slug', 'queclink_fleet')->lockForUpdate()->first();

@@ -1,0 +1,28 @@
+{
+    "root": "C:\\Users\\steph\\.codex\\worktrees\\2b9f\\oblivionfindings",
+    "php": "8.4.16",
+    "autoload": {
+        "App\\Models\\Client": "C:\\Users\\steph\\.codex\\worktrees\\2b9f\\oblivionfindings\\app\\Models\\Client.php",
+        "Tests\\TestCase": "C:\\Users\\steph\\.codex\\worktrees\\2b9f\\oblivionfindings\\tests\\TestCase.php"
+    },
+    "xml_valid": true,
+    "no_environment_or_cached_config": true,
+    "inherited_tokens_and_connection_urls_absent": true,
+    "app_env": "testing",
+    "connection": "mysql:127.0.0.1:3306",
+    "base": "oblivion_findings_pkg02a_2b9f_test",
+    "this_process_example": "oblivion_findings_pkg02a_2b9f_test_12136",
+    "matching_existing_schemas": [],
+    "selected_database": null,
+    "queue": "null",
+    "mail": "array",
+    "broadcast": "null",
+    "ddl_or_bootstrap_executed": false,
+    "hashes": {
+        "composer.lock": "b741c4ee36d4b562ada6e571a57dd0a7dac1047277b658054e6d74c88da04ef9",
+        "package-lock.json": "2fdec15606f7d4faff29a5ddfe64707fbb2da2098c334e9fbcbd2d39b85a6140",
+        "phpunit.pkg02a.xml": "cac8963a48816bb625ae8f0de1acb7ef999bd6061ed8b47f4b0cdf984cf1b29e",
+        "tests/TestCase.php": "89872e92712993d42361d9d444a80a92ec5f633eedfc2179c78447adf337330f",
+        "vendor/composer/autoload_psr4.php": "8a0f7d0868c617417771fc936e1021384b80f418fcd0fad331619fb15dbf9f23"
+    }
+}

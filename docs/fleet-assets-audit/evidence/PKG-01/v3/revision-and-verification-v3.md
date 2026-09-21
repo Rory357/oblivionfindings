@@ -1,0 +1,49 @@
+# PKG-01 v3 — requested revision and verification
+
+Owner: DESIGNER ASTRA. Design-only continuation, 19 September 2026 UTC / 20 September NZST. Same task and worktree. Application code, approved design references, dependencies, operational data, Git history and publication remain unchanged.
+
+## Authority and exact scope
+
+Stephan directly requested the existing premium upload treatment for Finance invoices and check/evidence photos/documents; a searchable affected-asset picker; maintenance-specific notes similar to IT support; direct vehicle/asset links; and further usability improvements. Main acknowledged this authorised design iteration and recorded global register revision 10 / review revision 6. It is not approval to implement, change operational policy, launch an Implementer or start a sibling package.
+
+Actual turn metadata checked before writes: `2026-09-19T19:51:21.563Z`, turn `01a0bb39-2c6f-7980-8bfa-90ee4054dbfa`, model `gpt-6-astra`, effort `xhigh` in both effort fields. Master Rev10+A1/A2/A3 hash remained `A61469ED0C48B0A1F179D873A43E73B1254FFB9754733C3556CE6BC88AFFD990`. Baseline remains `e62b569ff42ab471300fb6713a68758b647b2c32`.
+
+## Resulting behaviour
+
+- Actual shared `FileDropzone` and `StagedFileCard` supply the premium upload chrome. The preview composes them without calling the operational `AttachmentUploader` transport. Reports, conditional check photos, optional check documents, work evidence, repair-completion evidence and Finance files now use this treatment.
+- Staged files show thumbnails/glyphs, names, sizes, category, description/source, remove controls and ready/retry states. Empty and unsupported files are rejected; repeated selection is detected. Documents cannot be categorised as condition photos. Preview constraints are 20 MB per file / 10 staged files; production rules must reuse the applicable validated configuration, not infer approval from these fixtures.
+- A searchable file register retains category, original source, author and time. It offers image/PDF/text preview where supported and a download link otherwise. Actual PDF rendering and download clicks were not exercised. Recorded files have no silent overwrite/delete control.
+- Finance presents invoices, receipts and quotes from the same attachment objects shown in Checks & evidence. Cost documents remain unverified and unapproved. No estimate becomes an actual posted cost. A file or note never releases a hold.
+- The affected-asset picker uses the shared Command primitives, 55 synthetic assets, eight visible results at a time, Show more, site/type filters and accent-insensitive name/tag/registration/location search. Duplicate names show distinct tags, registrations, locations and hold indicators. Selection uses asset identity, not display name. A contextual report retains its locked parent asset.
+- Notes & updates uses a ticket-style composer and attributed thread tailored to observations, provider updates and handover notes. Notes are internal source context, not sent messages and not changes to immutable check answers. Search, timestamps, Ctrl+Enter, blank-note prevention, retained drafts and retry are demonstrated. The full IT ticket component is not mounted because its live transport, notification and IT-specific contracts are out of scope.
+- A direct vehicle/asset link remains beside the All Tasks reference across work tabs and appears in the work summary. Secondary work summaries link to their asset too. The in-preview destination and back link demonstrate correct record identity while preserving work context and note drafts; the full sibling modules are not redesigned.
+- Additional fixes found during review: correctly focus and describe the searchable asset field on validation; keep report/check attachments through review and source viewing; include optional check documents in review; protect attachment-only check drafts; clear resolved check errors; count added evidence; preserve the original failed check; and remove duplicate React child keys in the preview dialog adapter.
+
+## Observed browser verification
+
+The isolated build succeeded using existing dependencies. Browser checks used the final v3 interaction design at desktop CSS viewports 1440×1000 and 1280×900. The final adapter correction changed only React child identity; source-to-attachment viewing was retested after rebuilding it. Screenshots document the listed surfaces; earlier transient animation captures were replaced where identified.
+
+1. Picker: initial required validation focused the real Command input, with `aria-invalid=true` and `aria-describedby=report-asset-error`. Searching Pool car showed VH-003 and VH-005 with distinct sites/registrations; filtering to Kōwhai House and ArrowDown/Enter selected VH-005. KWH014 found the van. A no-match query showed the empty state without silently replacing the selected asset.
+2. Report: selected by registration, entered observations, staged a real browser-local demo document, reviewed the filename/category, linked to WO-0264, submitted RP-0184, and opened its source and attachment viewer. The source retained the actual filename and asset tag. The text viewer rendered the harmless synthetic content.
+3. Check: a supporting document without the required image remained Incomplete; submit returned to the photo field with the error association. Selecting the synthetic JPEG satisfied the image requirement, but the failed brake answer kept the result Failed. Review showed both photo and supporting document. CHK-0084 was a new immutable submission. CHK-0082 remained Failed with its original missing-image answer.
+4. Upload validation: a chosen JPEG was accepted; an HTML file and an empty text file were rejected with named inline messages. Duplicate selection produced one staged file and an explanatory message. Cancel → Keep editing retained the selected image; explicit Discard removed the draft. File-size/count limits and drag/drop are source-implemented but were not separately browser-exercised.
+5. Invoice: the shared dialog retained its reason, category and file through Review, simulated save failure and retry; exactly one invoice appeared. The same file appeared in Finance and evidence. Approval stayed Awaiting approval and posting stayed Not posted.
+6. Notes: a failed save retained the draft; retry added one attributed note. Opening the vehicle and returning retained unsaved text. Note search narrowed to the matching update. View-only mode hid the composer and upload entry from the overview. This verifies presentation only, not backend permission enforcement.
+7. Navigation: vehicle VH-014 and non-vehicle AS-117 opened their respective fixture routes and returned to WO-0264 and WO-0258. The viewer showed the correct source tag/site. No live operational route was visited.
+8. Completion: a staged service record appeared in Review; recording completion retained the maintenance hold and independent Finance state. Release review still showed blocked requirements.
+9. Evidence filtering: filename search found the invoice; clearing via normal keyboard input and selecting Photos showed the JPEG while excluding the documents. Source-file preview remained linked to CHK/RP identity.
+10. Layout: no page horizontal overflow at 1280 px; upload outer frame measured 1100×794 at 1280×900, with scrollWidth 1098. Shared frame/scroll/footer styling remained. Final inspected browser console after the corrected build contained no warnings/errors; source-to-file viewing was specifically retested. Temporary viewport overrides were reset and the v3 browser tab was retained for review.
+
+QA files are synthetic only. `fixtures/synthetic-check-image.jpg` is a copy of the v2 mockup screenshot, used to exercise image selection/preview, not a claimed photograph of a real vehicle. The other fixtures contain only explicit test text. No upload request or external data transfer occurs.
+
+## Production contracts and remaining boundaries
+
+The implementation would need to bind these views to the existing authorised canonical records and attachment storage. Asset search must use bounded, cancellable, permission/site-scoped server queries and preserve exact selected identity. The in-memory 55-row catalogue does not establish production scale or privacy acceptance.
+
+Files need source ownership, server validation, storage/scan readiness, authorised view/download, retained request identity and recovery. Notes need source-scoped permission, author/time, retained draft/retry identity and attributable corrections. Finance documents must follow the source's privacy rules and existing Finance approval/posting ownership. Browser-only labels and client validation are not security controls. Existing v1 policy groups still apply; no actual template, release authority, response target or Finance approval policy is invented here.
+
+No architecture or workflow expansion was inferred from the general improvement request. Notes do not introduce provider messaging/watchers, approvals or automatic transitions. Quicklinks do not redesign sibling pages. Uploads do not grant cost approval. All Tasks keeps the existing canonical work-order reference and visibility/filter contract from v2.
+
+This remains a synthetic desktop design, not feature-complete software or production acceptance. Actual storage/upload transport, server search/pagination, multi-user concurrency, backend security, Finance posting and large-file handling remain unverified. PDF rendering/download behaviour, browser zoom, rendered reduced motion, full screen-reader/contrast checks and cross-browser testing are not claimed. Desktop-only programme scope continues.
+
+The exact frozen identity and screenshots are in `artifact-manifest-v3.json`. Frozen v1/v2 are preserved. Main must review this exact v3 and Stephan must approve the concrete mockup and bounded scope before any implementation gate can advance. No correction budget has been consumed.

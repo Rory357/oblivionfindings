@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Cache\Repository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -10,39 +11,59 @@ use Illuminate\Support\Facades\Http;
 
 class SiteGeocodingController extends Controller
 {
-    public function search(Request $request): JsonResponse
+    public function search(Request $request, bool $failOnError = false): JsonResponse
     {
         $request->validate([
             'q' => ['required', 'string', 'min:3', 'max:200'],
         ]);
 
         $query = trim($request->input('q'));
-        $cacheKey = 'site-geocode:'.sha1(strtolower($query));
+        $endpoint = rtrim((string) config('fleet.maps.address_search_endpoint', 'https://nominatim.openstreetmap.org'), '/');
+        $cacheKey = 'site-geocode:'.sha1($endpoint.'|'.strtolower($query));
 
         // Cache only non-empty hits — if a query returned nothing, let the
         // user retry tomorrow without waiting 24h for the cache to expire.
-        $cached = Cache::get($cacheKey);
+        try {
+            $cache = $this->providerCache();
+            $cached = $cache->get($cacheKey);
+        } catch (\Throwable $error) {
+            if ($failOnError) {
+                throw new \RuntimeException('Address search is temporarily unavailable.', 0, $error);
+            }
+
+            return response()->json(['results' => []]);
+        }
         if (is_array($cached) && count($cached) > 0) {
             return response()->json(['results' => $cached]);
         }
 
         // First pass: NZ-restricted (most common case for this CRM)
-        $results = $this->callNominatim($query, 'nz');
+        $results = $this->callNominatim($query, 'nz', $failOnError);
 
         // Fallback: if NZ returned nothing, retry globally so addresses
         // Nominatim hasn't tagged with a country still surface
         if (count($results) === 0) {
-            $results = $this->callNominatim($query, null);
+            $results = $this->callNominatim($query, null, $failOnError);
         }
 
         if (count($results) > 0) {
-            Cache::put($cacheKey, $results, now()->addDay());
+            $cache->put($cacheKey, $results, now()->addDay());
         }
 
         return response()->json(['results' => $results]);
     }
 
-    private function callNominatim(string $query, ?string $countrycodes): array
+    private function providerCache(): Repository
+    {
+        $store = (string) config('fleet.maps.address_search_cache_store', 'database');
+        if (! in_array(config('cache.stores.'.$store.'.driver'), ['database', 'redis'], true)) {
+            throw new \RuntimeException('Address search requires a shared cache store.');
+        }
+
+        return Cache::store($store);
+    }
+
+    private function callNominatim(string $query, ?string $countrycodes, bool $failOnError = false): array
     {
         $params = [
             'q' => $query,
@@ -55,18 +76,42 @@ class SiteGeocodingController extends Controller
         }
 
         try {
-            $response = Http::withHeaders([
-                'User-Agent' => 'OblivionFindings-CRM/1.0 (+'.config('app.url').')',
-                'Accept-Language' => 'en-NZ,en',
-            ])
-                ->timeout(12)
-                ->get('https://nominatim.openstreetmap.org/search', $params);
+            $cache = $this->providerCache();
+            $endpoint = rtrim((string) config('fleet.maps.address_search_endpoint', 'https://nominatim.openstreetmap.org'), '/');
+            if (! in_array(parse_url($endpoint, PHP_URL_SCHEME), ['http', 'https'], true) || ! parse_url($endpoint, PHP_URL_HOST)) {
+                throw new \RuntimeException('Address search endpoint is not configured.');
+            }
+            // One provider-wide budget, shared by ordinary Site searches and
+            // Client Location. The NZ/global fallback must use the same slot.
+            $budget = 'geocoding:nominatim:'.hash('sha256', $endpoint);
+            $response = $cache->lock($budget.':lock', 20)->block(2, function () use ($params, $cache, $endpoint, $budget) {
+                $lastStart = (float) $cache->get($budget.':last-start', 0);
+                $delay = 1.05 - (microtime(true) - $lastStart);
+                if ($delay > 0) {
+                    usleep((int) ceil($delay * 1000000));
+                }
+                $cache->put($budget.':last-start', microtime(true), now()->addMinute());
+
+                return Http::withHeaders([
+                    'User-Agent' => 'OblivionFindings-CRM/1.0 (+'.config('app.url').')',
+                    'Accept-Language' => 'en-NZ,en',
+                ])->withoutRedirecting()->timeout(12)
+                    ->get($endpoint.'/search', $params);
+            });
         } catch (\Throwable $e) {
+            if ($failOnError) {
+                throw new \RuntimeException('Address search is temporarily unavailable.', 0, $e);
+            }
             \Log::warning('Nominatim request failed', ['error' => $e->getMessage()]);
+
             return [];
         }
 
         if (! $response->successful()) {
+            if ($failOnError) {
+                throw new \RuntimeException('Address search is temporarily unavailable.');
+            }
+
             return [];
         }
 

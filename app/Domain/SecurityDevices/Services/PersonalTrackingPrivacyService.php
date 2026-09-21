@@ -9,6 +9,7 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Services\AuditLogger;
+use App\Services\Consents\CurrentConsentEvidence;
 use App\Services\ConsentValidationService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -135,6 +136,35 @@ class PersonalTrackingPrivacyService
         $device = $assignment->device;
         $clientModel = Client::query()->find($clientId, ['id', 'site_id']);
 
+        return $this->evaluateClientAssignment($assignment, $clientId, $clientModel, $consent, $device,
+            app(DeviceCustodySiteResolver::class)->assignmentMatchesCurrentTarget($assignment), $consentAuthorisesPurpose);
+    }
+
+    public function assignmentAuthorisesResidentLocationFromCurrentEvidence(
+        DeviceAssignment $assignment,
+        Device $device,
+        CurrentConsentEvidence $evidence,
+        Client $client,
+    ): bool {
+        CurrentConsentEvidence::assertTransaction();
+        $currentClient = $evidence->client($client);
+        $custodySite = app(DeviceCustodySiteResolver::class)->resolve(DeviceAssignment::TARGET_CLIENT, (int) $client->id, 'for share nowait');
+
+        return (int) $assignment->consent_id === (int) $evidence->consent->id
+            && $this->evaluateClientAssignment($assignment, (int) $client->id, $currentClient, $evidence->consent, $device,
+                $custodySite === (int) $assignment->custody_site_id,
+                fn (ClientConsent $consent): bool => ConsentValidationService::isValidResidentLocationConsentFromCurrentEvidence($evidence, $client));
+    }
+
+    private function evaluateClientAssignment(
+        DeviceAssignment $assignment,
+        int $clientId,
+        ?Client $clientModel,
+        ?ClientConsent $consent,
+        ?Device $device,
+        bool $custodyMatches,
+        callable $consentAuthorisesPurpose,
+    ): bool {
         return $assignment->assignable_type === DeviceAssignment::TARGET_CLIENT
             && (int) $assignment->assignable_id === (int) $clientId
             && $assignment->assigned_at?->lessThanOrEqualTo(now())
@@ -142,7 +172,7 @@ class PersonalTrackingPrivacyService
             && $clientModel instanceof Client
             && is_numeric($clientModel->site_id)
             && (int) $assignment->custody_site_id === (int) $clientModel->site_id
-            && app(DeviceCustodySiteResolver::class)->assignmentMatchesCurrentTarget($assignment)
+            && $custodyMatches
             && $device instanceof Device
             && (int) $device->id === (int) $assignment->device_id
             && $device->domain === 'tracking'
@@ -166,6 +196,23 @@ class PersonalTrackingPrivacyService
             && (int) $assignment->retention_days > 0
             && $assignment->collection_started_at?->lessThanOrEqualTo(now())
             && $consentAuthorisesPurpose($consent);
+    }
+
+    public function assignmentAuthorisesClientFromCurrentEvidence(DeviceAssignment $assignment, Device $device): bool
+    {
+        CurrentConsentEvidence::assertTransaction();
+        if (! $assignment->consent_id) {
+            return false;
+        }
+        $evidence = CurrentConsentEvidence::lock((int) $assignment->consent_id);
+        $client = $evidence->client((int) $assignment->assignable_id);
+        if (! $client) {
+            return false;
+        }
+
+        return $this->evaluateClientAssignment($assignment, (int) $client->id, $client, $evidence->consent, $device,
+            app(DeviceCustodySiteResolver::class)->resolve(DeviceAssignment::TARGET_CLIENT, (int) $client->id, 'for share nowait') === (int) $assignment->custody_site_id,
+            fn () => ConsentValidationService::isValidTrackingConsentFromCurrentEvidence($evidence, $client));
     }
 
     /**

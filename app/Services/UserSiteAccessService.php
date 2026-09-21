@@ -68,7 +68,21 @@ class UserSiteAccessService
      * @param  array<int, string>  $bypassPermissions
      * @return array<int, int>
      */
-    public function accessibleSiteIds(?User $user, array $bypassPermissions = []): array
+    public function accessibleSiteIds(?User $user, array $bypassPermissions = [], ?CurrentAuthorizationReads $reads = null): array
+    {
+        if ($reads) {
+            $reads->assertActive();
+            // A per-call clone avoids reading or altering the ordinary cache.
+            $current = clone $this;
+            $current->accessibleSiteIdsCache = [];
+
+            return $current->currentAccessibleSiteIds($user, $bypassPermissions, $reads);
+        }
+
+        return $this->currentAccessibleSiteIds($user, $bypassPermissions);
+    }
+
+    private function currentAccessibleSiteIds(?User $user, array $bypassPermissions, ?CurrentAuthorizationReads $reads = null): array
     {
         $cacheKey = implode('|', [
             $user ? (string) ($user->getKey() ?? 'unsaved') : 'guest',
@@ -84,7 +98,7 @@ class UserSiteAccessService
         }
 
         if ($this->canBypass($user, $bypassPermissions)) {
-            return $this->accessibleSiteIdsCache[$cacheKey] = Site::query()
+            return $this->accessibleSiteIdsCache[$cacheKey] = ($reads ? $reads->query(Site::query()) : Site::query())
                 ->active()
                 ->notArchived()
                 ->whereNull('archived_at')
@@ -94,7 +108,11 @@ class UserSiteAccessService
                 ->all();
         }
 
-        $user->loadMissing('hrEmployeeProfile');
+        if ($reads) {
+            $user->setRelation('hrEmployeeProfile', $reads->query(HrEmployeeProfile::query())->where('user_id', $user->id)->first());
+        } else {
+            $user->loadMissing('hrEmployeeProfile');
+        }
 
         $profile = $user->hrEmployeeProfile;
         if (! $profile || ! $this->isCurrentEmployeeProfile($profile)) {
@@ -120,7 +138,7 @@ class UserSiteAccessService
             return $this->accessibleSiteIdsCache[$cacheKey] = [];
         }
 
-        $currentSiteIds = Site::query()
+        $currentSiteIds = ($reads ? $reads->query(Site::query()) : Site::query())
             ->active()
             ->notArchived()
             ->whereNull('archived_at')

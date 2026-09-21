@@ -25,7 +25,8 @@ import {
     type WizardStep,
 } from '@/components/wizard/shell';
 import { cn } from '@/lib/utils';
-import { useForm } from '@inertiajs/react';
+import { ConfiguredQuestions, applicableAnswers, type ConfiguredAnswer, type ConfiguredQuestion } from '@/components/fleet-assets/maintenance/configured-questions';
+import { Link, router, useForm } from '@inertiajs/react';
 import {
     ArrowLeft,
     ArrowRight,
@@ -43,6 +44,11 @@ export type WizardVehicle = {
     id: number;
     name: string;
     registration_number?: string | null;
+    template_id: number | null;
+    template_name: string | null;
+    template_items: Array<{ id?: string; label?: string; options?: string[] | null }>;
+    rule_version_id: number | null;
+    policy_questions: ConfiguredQuestion[] | null;
 };
 
 export type WizardPreTripResult = {
@@ -123,10 +129,13 @@ const CHECKLIST_SECTIONS = [
     },
 ];
 
-type ChecklistResult = 'pass' | 'fail' | 'na';
+type ChecklistResult = '' | 'pass' | 'fail' | 'na';
 
 type FormData = {
     asset_id: string;
+    template_id: string;
+    rule_version_id: string;
+    request_key: string;
     inspection_type: string;
     odometer: string;
     overall_condition: string;
@@ -138,17 +147,13 @@ type FormData = {
     new_damage: string;
 };
 
-function allItemKeys(): string[] {
-    return CHECKLIST_SECTIONS.flatMap((s) => s.items.map((i) => i.key));
-}
-
-function buildInitialChecklist(): Record<
+function buildInitialChecklist(items: WizardVehicle['template_items'] = []): Record<
     string,
     { result: ChecklistResult; notes: string }
 > {
     const obj: Record<string, { result: ChecklistResult; notes: string }> = {};
-    for (const key of allItemKeys()) {
-        obj[key] = { result: 'pass', notes: '' };
+    for (const [index, item] of items.entries()) {
+        obj[String(item.id ?? index)] = { result: '', notes: '' };
     }
     return obj;
 }
@@ -159,6 +164,7 @@ export function InspectionCreateWizard({
     open,
     onClose,
     vehicles,
+    workOrders,
     preselectedAssetId,
     preselectedType,
     bookingId,
@@ -167,20 +173,30 @@ export function InspectionCreateWizard({
     open: boolean;
     onClose: () => void;
     vehicles: WizardVehicle[];
+    workOrders: Array<{ id: number; asset_id: number; reference_number: string | null; title: string;
+        attachments: Array<{ id: number; original_name: string }> }>;
     preselectedAssetId?: number | string | null;
     preselectedType?: string;
     bookingId?: number | string | null;
     preTripResults?: WizardPreTripResult | null;
 }) {
     const [stepIndex, setStepIndex] = useState(0);
+    const [selectedWorkId, setSelectedWorkId] = useState('');
+    const [configuredAnswers, setConfiguredAnswers] = useState<Record<string, ConfiguredAnswer>>({});
+    const [configuredBusy, setConfiguredBusy] = useState(false);
+    const [configuredErrors, setConfiguredErrors] = useState<Record<string, string>>({});
+    const initialVehicle = vehicles.find((vehicle) => String(vehicle.id) === String(preselectedAssetId ?? ''));
 
     const form = useForm<FormData>({
         asset_id: preselectedAssetId ? String(preselectedAssetId) : '',
+        template_id: initialVehicle?.template_id ? String(initialVehicle.template_id) : '',
+        rule_version_id: initialVehicle?.rule_version_id ? String(initialVehicle.rule_version_id) : '',
+        request_key: crypto.randomUUID(),
         inspection_type: preselectedType ?? 'pre-trip',
         odometer: '',
         overall_condition: 'good',
         notes: '',
-        checklist: buildInitialChecklist(),
+        checklist: buildInitialChecklist(initialVehicle?.template_items),
         booking_id: bookingId ? String(bookingId) : '',
         fuel_level_return: '',
         items_left: '',
@@ -188,12 +204,28 @@ export function InspectionCreateWizard({
     });
 
     const isPostTrip = form.data.inspection_type === 'post-trip';
-    const hasAnyFail = Object.values(form.data.checklist).some(
-        (v) => v.result === 'fail',
-    );
     const selectedVehicle =
         vehicles.find((v) => String(v.id) === form.data.asset_id) ?? null;
-    const stepOneValid = form.data.asset_id !== '';
+    const isConfigured = Boolean(selectedVehicle?.rule_version_id && selectedVehicle.policy_questions?.length);
+    const selectedWork = workOrders.find((order) => String(order.id) === selectedWorkId && String(order.asset_id) === form.data.asset_id);
+    const liveAnswers = selectedVehicle?.policy_questions ? applicableAnswers(configuredAnswers, selectedVehicle.policy_questions) : {};
+    const displayedAnswers = isConfigured ? liveAnswers : form.data.checklist;
+    const displayedHasFail = Object.values(displayedAnswers).some((answer) => answer.result === 'fail');
+    const stepOneValid = form.data.asset_id !== '' && form.data.template_id !== '';
+    const checklistItems = (selectedVehicle?.template_items ?? []).map((item, index) => ({
+        key: String(item.id ?? index), label: item.label ?? `Question ${index + 1}`,
+    }));
+    const checklistSections = checklistItems.length === 17
+        ? [
+            { section: 'Exterior', color: CHECKLIST_SECTIONS[0].color, items: checklistItems.slice(0, 7) },
+            { section: 'Interior', color: CHECKLIST_SECTIONS[1].color, items: checklistItems.slice(7, 13) },
+            { section: 'Under bonnet', color: CHECKLIST_SECTIONS[2].color, items: checklistItems.slice(13) },
+        ]
+        : [{ section: selectedVehicle?.template_name ?? 'Inspection questions', color: 'bg-primary', items: checklistItems }];
+    const allAnswered = isConfigured ? Boolean(selectedWork && selectedVehicle?.policy_questions?.every((question) =>
+        question.when && liveAnswers[question.when.question_id]?.result !== question.when.equals
+            ? true : Boolean(liveAnswers[question.id]?.result)))
+        : checklistItems.length > 0 && checklistItems.every((item) => form.data.checklist[item.key]?.result);
 
     const setChecklistItem = (
         key: string,
@@ -211,6 +243,16 @@ export function InspectionCreateWizard({
     };
 
     const submit = () => {
+        if (isConfigured) {
+            if (!selectedWork || !selectedVehicle?.policy_questions) return;
+            setConfiguredBusy(true); setConfiguredErrors({});
+            router.post('/fleet-assets/inspections', { ...form.data,
+                checklist: applicableAnswers(configuredAnswers, selectedVehicle.policy_questions),
+                work_order_id: selectedWork.id,
+            }, { onError: (errors) => { setConfiguredErrors(errors); setStepIndex(1); },
+                onFinish: () => setConfiguredBusy(false) });
+            return;
+        }
         form.post('/fleet-assets/inspections', {
             // Store redirects to the new inspection's show page on success; on
             // validation failure, jump back to the step that owns the first error.
@@ -232,14 +274,30 @@ export function InspectionCreateWizard({
             },
         });
     };
+    const uploadQuestionEvidence = (questionId: string, file: File) => {
+        if (!selectedWork) return;
+        const body = new FormData();
+        body.append('parent_type', 'work'); body.append('parent_id', '0');
+        body.append('request_key', crypto.randomUUID()); body.append('file', file);
+        body.append('category', `inspection question ${questionId}`);
+        setConfiguredBusy(true); setConfiguredErrors({});
+        router.post(`/fleet-assets/maintenance/work-orders/${selectedWork.id}/attachments`, body, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                const id = Number((page.props.flash as { maintenance_attachment_id?: number } | undefined)?.maintenance_attachment_id);
+                if (id > 0) setConfiguredAnswers((answers) => ({ ...answers,
+                    [questionId]: { ...(answers[questionId] ?? { result: '' }), evidence_attachment_id: id } }));
+            }, onError: (errors) => setConfiguredErrors(errors), onFinish: () => setConfiguredBusy(false),
+        });
+    };
 
-    const resultBadge = hasAnyFail ? (
+    const resultBadge = displayedHasFail ? (
         <Badge variant="destructive" className="text-xs">
             <XCircle className="mr-1 h-3.5 w-3.5" /> Issues found
         </Badge>
     ) : (
-        <Badge variant="default" className="bg-status-success text-xs">
-            <CheckCircle className="mr-1 h-3.5 w-3.5" /> All clear
+        <Badge variant="outline" className="text-xs">
+            <CheckCircle className="mr-1 h-3.5 w-3.5" /> {allAnswered ? 'Responses complete' : 'Answer every question'}
         </Badge>
     );
 
@@ -284,7 +342,7 @@ export function InspectionCreateWizard({
                     ) : (
                         <Button
                             onClick={submit}
-                            disabled={form.processing || !stepOneValid}
+                            disabled={form.processing || configuredBusy || !stepOneValid || !allAnswered}
                         >
                             {form.processing && (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -306,12 +364,16 @@ export function InspectionCreateWizard({
                                         ? NONE
                                         : form.data.asset_id
                                 }
-                                onValueChange={(v) =>
-                                    form.setData(
-                                        'asset_id',
-                                        v === NONE ? '' : v,
-                                    )
-                                }
+                                onValueChange={(v) => {
+                                    const vehicle = vehicles.find((item) => String(item.id) === v);
+                                    setSelectedWorkId(''); setConfiguredAnswers({});
+                                    form.setData((data) => ({ ...data,
+                                        asset_id: v === NONE ? '' : v,
+                                        template_id: vehicle?.template_id ? String(vehicle.template_id) : '',
+                                        rule_version_id: vehicle?.rule_version_id ? String(vehicle.rule_version_id) : '',
+                                        checklist: buildInitialChecklist(vehicle?.template_items),
+                                    }));
+                                }}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select vehicle" />
@@ -450,7 +512,20 @@ export function InspectionCreateWizard({
             {stepIndex === 1 && (
                 <WizardStepPane>
                     <div className="space-y-5">
-                        {CHECKLIST_SECTIONS.map((section) => {
+                        {isConfigured && selectedVehicle && <div className="space-y-4">
+                            <p className="text-sm text-muted-foreground">This approved inspection uses the current question choices and private evidence rules. Select a work record for the vehicle.</p>
+                            <Select value={selectedWorkId} onValueChange={(value) => { setSelectedWorkId(value); setConfiguredAnswers({}); }}>
+                                <SelectTrigger aria-label="Work order for inspection"><SelectValue placeholder="Choose a work order" /></SelectTrigger>
+                                <SelectContent>{workOrders.filter((order) => String(order.asset_id) === form.data.asset_id).map((order) =>
+                                    <SelectItem key={order.id} value={String(order.id)}>{order.reference_number ?? `WO-${order.id}`} · {order.title}</SelectItem>)}</SelectContent>
+                            </Select>
+                            {!selectedWork && <p className="text-sm text-muted-foreground">A work order is needed for private evidence. <Link className="text-primary underline" href={`/fleet-assets/maintenance/work-orders/create?asset_id=${form.data.asset_id}`}>Report a problem</Link> to start one.</p>}
+                            {selectedWork && <ConfiguredQuestions items={selectedVehicle.template_items} questions={selectedVehicle.policy_questions ?? []}
+                                answers={configuredAnswers} attachments={selectedWork.attachments} onChange={setConfiguredAnswers}
+                                onUpload={uploadQuestionEvidence} busy={configuredBusy} />}
+                            {Object.keys(configuredErrors).length > 0 && <p role="alert" className="text-sm text-destructive">{Object.values(configuredErrors).join(' ')}</p>}
+                        </div>}
+                        {!isConfigured && checklistSections.map((section) => {
                             const sectionPassCount = section.items.filter(
                                 (item) =>
                                     form.data.checklist[item.key]?.result ===
@@ -767,14 +842,14 @@ export function InspectionCreateWizard({
                                     label="Result"
                                     value={
                                         <span className="inline-flex items-center gap-1.5">
-                                            {hasAnyFail ? (
+                                            {displayedHasFail ? (
                                                 <XCircle className="h-3.5 w-3.5 text-status-critical" />
                                             ) : (
                                                 <CheckCircle className="h-3.5 w-3.5 text-status-success" />
                                             )}
-                                            {hasAnyFail
+                                            {displayedHasFail
                                                 ? 'Issues found'
-                                                : 'All clear'}
+                                                : 'No failed answer recorded · rule assessment follows'}
                                         </span>
                                     }
                                 />
@@ -782,7 +857,7 @@ export function InspectionCreateWizard({
                                     label="Failed items"
                                     value={String(
                                         Object.values(
-                                            form.data.checklist,
+                                            displayedAnswers,
                                         ).filter((v) => v.result === 'fail')
                                             .length,
                                     )}
@@ -791,7 +866,7 @@ export function InspectionCreateWizard({
                                     label="N/A items"
                                     value={String(
                                         Object.values(
-                                            form.data.checklist,
+                                            displayedAnswers,
                                         ).filter((v) => v.result === 'na')
                                             .length,
                                     )}

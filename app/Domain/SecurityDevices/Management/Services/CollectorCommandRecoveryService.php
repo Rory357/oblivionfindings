@@ -38,12 +38,16 @@ final class CollectorCommandRecoveryService
 
         foreach ($ids as $id) {
             $outcome = DB::transaction(function () use ($id, $at): ?string {
-                $attempt = DeviceCommandAttempt::query()->lockForUpdate()->find($id);
-                if (! $attempt || $attempt->status->isTerminal()) {
+                $requestId = DeviceCommandAttempt::query()->whereKey($id)->value('device_command_request_id');
+                if (! $requestId) {
                     return null;
                 }
-                $request = DeviceCommandRequest::query()->lockForUpdate()->find($attempt->device_command_request_id);
-                if (! $request
+                $request = DeviceCommandRequest::query()->lockForUpdate()->find($requestId);
+                $attempt = DeviceCommandAttempt::query()->lockForUpdate()->find($id);
+                if (! $request || ! $attempt
+                    || (int) $attempt->device_command_request_id !== (int) $request->id
+                    || $attempt->runtime !== 'collector'
+                    || ! in_array($attempt->status, [CommandAttemptStatus::Dispatching, CommandAttemptStatus::Accepted, CommandAttemptStatus::Running], true)
                     || $request->expires_at->greaterThan($at)
                     || ! in_array($request->status, [
                         CommandStatus::Dispatching,

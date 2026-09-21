@@ -31,6 +31,7 @@ final readonly class CommandSigningPayload
         public ?string $assignmentFingerprint = null,
         public ?string $confirmationMode = null,
         public ?CarbonImmutable $impactAcknowledgedAt = null,
+        public ?ClientLocationCommandOrigin $originContext = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -71,6 +72,11 @@ final readonly class CommandSigningPayload
             $payload['confirmation_mode'] = $this->confirmationMode;
             $payload['impact_acknowledged_at'] = $this->impactAcknowledgedAt->utc()->format('Y-m-d\TH:i:s.u\Z');
             $payload['schema_version'] = $this->isBreakGlass ? 7 : 6;
+        }
+
+        if ($this->originContext !== null) {
+            $payload['origin_context'] = $this->originContext->toArray();
+            $payload['schema_version'] = 8;
         }
 
         return $payload;

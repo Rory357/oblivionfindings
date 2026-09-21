@@ -253,6 +253,249 @@ Picker rules:
   tile is not warning/critical).
 - `aria-pressed` on every tile.
 
+## Searchable record selectors
+
+Approved addition by Stephan, 2026-09-20. Applies to record selection in simple
+dialogs and wizard steps; it does not change the two dialog tiers or type-picker
+rules above.
+
+**Use search for a directory that can grow** — affected assets, vehicles, staff,
+clients, sites, suppliers or similar existing records. Do not require scrolling
+through a long dropdown. Small fixed enum choices keep their existing select or
+tile control. A record locked by the parent context stays a read-only context
+card; do not add a search control that can silently change its parent.
+
+Reuse the shared `Popover` and `Command` primitives from
+[`components/ui/popover.tsx`](../resources/js/components/ui/popover.tsx) and
+[`components/ui/command.tsx`](../resources/js/components/ui/command.tsx).
+[`MultiSelectCombobox`](../resources/js/components/ui/multi-select-combobox.tsx)
+is an existing option for bounded multi-selection; it is not a server directory
+or a single-record selector. For scoped server-search behavior, inspect
+[`CatalogueEntityPicker`](../resources/js/components/it/catalogue-entity-picker.tsx)
+and [`ProvisioningPicker`](../resources/js/components/it/provisioning-picker.tsx).
+Their IT endpoints, permissions and field schemas remain IT-owned: reuse the
+interaction pattern with the target module's authorised source, not its transport
+or business rules. Do not fork the visual primitives into each modal.
+
+- Search by the displayed name and useful permitted identifiers, such as asset
+  tag, registration or reference. Show name first, with reference and site/type
+  where they distinguish similar records. Store the canonical record ID; typed
+  search text does not create a record or become its identity. Keep custom-value
+  entry disabled for existing-record relationships.
+- Show the current selection clearly, including when it is outside the current
+  result page. Provide Change and, only for optional fields, Clear. Cancelling
+  search leaves the prior selection intact; never auto-select the first match.
+- Small, complete authorised lists may filter locally. Large directories use
+  bounded, paged server search and an explicit way to obtain more results.
+  Search the permitted directory, not just the first loaded page. Debounce and
+  cancel/ignore obsolete requests so an old query cannot replace current results.
+- Distinguish loading, no matching records, load failure with Retry, and loss of
+  access. A failed request is not an empty directory. Do not imply that a limited
+  result page is the entire list. Retain valid selection/form entries on transient
+  failure; if access or eligibility changes, make the invalid selection explicit
+  and require a valid choice rather than silently substituting another record.
+- Scope both results and selected-record resolution to the action's roles,
+  permissions, approved sites and canonical ownership. Submission revalidates
+  that scope. Hidden options or a read-only field are not authorisation checks.
+- Label the control and search field; support keyboard open, typing, arrow-key
+  navigation and Enter selection, with visible focus and announced selection.
+  Escape closes the open picker first and returns focus to its trigger; it must
+  not accidentally discard the parent form. Keep the result list scrollable
+  within the modal and visible above its overlay without escaping its focus trap.
+  Associate errors with the selector and focus it on failed validation.
+
+## Premium attachment uploads
+
+Approved addition by Stephan, 2026-09-20. Invoice, check/evidence photo and
+document attachment fields use the existing premium upload appearance in both
+simple dialogs and wizard steps. A plain visible file input or a one-off dashed
+box is not the attachment design contract.
+
+Reuse [`FileDropzone` and `StagedFileCard`](../resources/js/components/ui/file-dropzone.tsx):
+the shared dashed drop area, upload icon tile, browse affordance, semantic token
+colours, image thumbnail/file glyph, filename, size and remove action. Keep the
+same treatment across modules; labels and per-file metadata can describe the
+owning record. Existing specialist image-editing/cropping flows keep their purpose.
+
+`FileDropzone` supplies selection chrome and emits `File[]`; it does not validate
+an upload policy, store files or certify a successful upload. `StagedFileCard`
+shows a local selection. `AttachmentUploader` composes them for an existing record
+with a compatible single-file endpoint and optional note/category/sensitivity
+fields. Where the module's transport differs, compose these same primitives with
+that module's adapter. Do not invent an endpoint or copy another module's access
+rules to make the appearance work.
+
+- Offer both drag/drop and Browse; Enter/Space must open file selection. Name the
+  field, associate instructions/errors with it, and give each file action an
+  accessible name identifying the file. Long filenames must remain identifiable
+  without pushing the dialog or footer outside the viewport.
+- State accepted types and file/count/size limits from the owning module's
+  validated contract. Do not invent a universal quota or promise unsupported
+  formats. Apply the same selection checks to dropped and browsed files; the
+  server remains authoritative. Show actionable per-file or batch errors and
+  retain the valid earlier selections when another file is rejected.
+- For a new-record form, stage files and metadata until its established submit
+  flow attaches them to the intended record; explain when upload occurs. For an
+  existing record, make the upload action and target clear. Show staged,
+  uploading, saved and failed states honestly: selection or a local thumbnail
+  is not "Uploaded", and progress percentages require real progress data.
+- Preserve text, selected files and supported metadata through Review/Back and
+  failed saves within the form's supported lifetime. Explain when a file must be
+  selected again; do not promise cross-session recovery of browser file objects.
+  A partial failure distinguishes confirmed files from pending/failed files and
+  retries only unresolved work using the owning module's recovery contract.
+- Removing a staged file affects that local selection only. Existing attachment
+  deletion/replacement follows the record's permissions, confirmation and audit
+  rules; removing a card does not silently delete saved evidence. Guard close or
+  navigation when it would lose staged files, and explain any upload still in
+  progress. Cancelling a dialog does not imply a completed server upload rolled
+  back.
+- After server confirmation, show the persisted attachment identity and permitted
+  view/download actions, with filename/type/size and author/time where available.
+  Open/download access stays with the canonical record and approved site/privacy
+  rules. A preview URL, sensitivity toggle or hidden button does not grant access.
+  An uploaded invoice is evidence, not financial approval/posting; a new photo or
+  document does not rewrite a submitted check or release a safety restriction.
+
+These are required interaction and integration outcomes for callers. Importing
+the shared visual components alone is not evidence that validation, recovery,
+storage or access control has been implemented.
+
+## Calendar date and range selection
+
+Approved addition by Stephan, 2026-09-20. Operational planning forms such as
+Report a problem and Plan appointment share a consistent calendar interaction
+and visible selected-date/range summary in simple dialogs and wizard steps.
+Keep the current dialog shell and the separate approved full-calendar display
+pattern; this section governs date entry inside the form.
+
+Inspect the existing [`LeaveCalendarRange`](../resources/js/components/hr/leave-calendar-range.tsx)
+and its [`leave-request-dialog`](../resources/js/components/hr/leave-request-dialog.tsx)
+caller for month navigation, day selection, endpoint/range highlighting and
+summary treatment. Reuse that interaction where the field contract fits. The
+current HR component has required-date/holiday wording; module-specific labels
+and optional mode need supported composition or an explicitly approved shared
+component change. Do not fork a separate visual calendar per modal, copy HR
+entitlement/working-hour rules, or claim the current component already supplies
+every caller's required behavior.
+
+- Label the purpose clearly, such as Estimated maintenance window or Appointment
+  dates. Show the chosen day or both endpoints in a readable summary, including
+  month/year where needed. Explain how to select a single day or range. Keep
+  selection visible while navigating months, and distinguish an incomplete range
+  from a complete one. Do not fabricate an end date from a partial selection.
+- Required and optional states follow the owning workflow. An optional estimate
+  may offer Choose dates / Not known yet; choosing unknown clears the submitted
+  estimate with an explicit summary. An appointment that requires dates must
+  validate them and cannot inherit an unknown-date option merely for consistency.
+  Any earliest/latest-date restriction comes from the module's real contract.
+- For timed appointments, present separate labelled start and end time fields
+  below the calendar, with the applicable organisation/site timezone visible.
+  Support a same-day or multi-day interval as permitted. Validate the resulting
+  end after start and explain invalid/missing dates or times next to the controls.
+- Preserve date-only values as local calendar dates; avoid UTC conversions that
+  shift the chosen day. Timed values use the established timezone utilities and
+  explicit handling of ambiguous/nonexistent daylight-saving times. A browser's
+  local timezone must not silently change the meaning of a scheduled interval.
+  State inclusive range/day-count or timed-duration semantics accurately; calendar
+  days are not automatically paid hours, working days or confirmed downtime.
+- Provide labelled month navigation, keyboard-operable day controls, visible
+  focus and announced selection. Associate instructions and errors with the
+  relevant field/group and focus it after failed validation. Keep the calendar
+  within the modal's scroll/focus bounds and the action footer reachable.
+- Retain valid dates, times and other entries through Review/Back, supported
+  draft/close recovery and failed saves. Review shows the same interval and
+  timezone before recording. If the parent resource changes, make the retained
+  or cleared range explicit and submit against the current canonical parent.
+- The owning source decides storage, calendar projection, permissions and any
+  availability effect. Estimated windows, internal appointments, provider
+  confirmation and actual restrictions stay distinguishable. Calendar selection
+  alone does not confirm a provider booking, approve an expense or release a hold.
+
+### Single-date observation and deadline fields
+
+Approved clarification by Stephan, 2026-09-20. Observation timestamps and
+next-action deadlines use the same calendar-selection visual with a single-day
+contract. Label the field's purpose, show one selected date and a readable
+single-date summary, and avoid range/day-count instructions on these fields.
+Appointment or estimated-window fields keep ranges where their workflow needs
+them; single-date selection does not inherit HR policy or required-date rules.
+
+For a popover, open from the current value with a local pending selection. Month
+navigation must not select a date. Use date applies the chosen day; Cancel,
+Escape or dismissal without Apply retain the prior value and leave the parent
+open, with focus returned to its trigger. Opening with no value must not silently
+assign today; require selection before Apply. Keyboard opening focuses the
+selected day, or an appropriate available day when no day is selected.
+
+Applying a date preserves its paired time, and applying a time preserves its
+date. Follow the Clock and manual time entry contract below for canonical values,
+exact-minute input, timezone/DST, validation and recovery rather than inventing
+another contract. A partial pair is a draft and must not be saved as a complete
+timestamp. Both blank is valid only where the owning field permits it. Any clear
+action must explain its actual effect, including when blank means keep the
+current deadline. Retain applied values through Review/Back, draft resume and
+failed-save recovery. Reuse or adapt approved primitives; the isolated prototype
+does not authorise a production component change.
+
+## Clock and manual time entry
+
+Approved addition by Stephan, 2026-09-20, following the PKG-01 v6 clock/manual
+appointment picker and the subsequent request for consistency across the mockup.
+Operational date/time fields use the same interaction, including observed-at
+timestamps, next-action deadlines and appointment Start/End. Keep the existing
+dialog/wizard shell and the owning workflow's date control, required/optional
+state and timestamp/interval meaning. An observation time is not an estimated
+maintenance window, and a deadline is not a provider appointment.
+
+Compose approved shared Popover/Button primitives, labelled input controls and
+semantic design tokens. Use an existing suitable shared time component when one
+is available and verified. The isolated v6 reference is a design composition,
+not proof that a production shared time component exists. Creating or extending
+one requires the applicable implementation approval; do not copy a separate
+visual time picker into every modal or introduce a new design system.
+
+- Show the current time and an obvious clock/typing affordance. Provide Hours
+  and Minutes clock faces, editable hour/minute fields, AM/PM controls and a
+  visible Type time / Clock switch. Selecting an hour can advance to minutes.
+  Five-minute dial marks are a convenience; manual entry accepts every minute
+  from 00 to 59 and must never silently round an exact value.
+- Keep the field's canonical `HH:mm` value separate from its display format.
+  In the 12-hour picker, accept hours 1–12 and map 12 AM to 00 and 12 PM to 12.
+  Show AM/PM clearly in both the picker and selected-value summary. Reopening
+  must represent the saved/current canonical value without changing it.
+- Opening creates a local edit draft. Use time applies a valid draft; Cancel,
+  Escape and dismissal without Apply retain the previously applied value.
+  Cancelled picker edits must not mark the parent form dirty. Handle Escape at
+  the picker first, keep the parent dialog open and return focus to its trigger.
+  Support Enter to apply valid typed values without submitting the parent form.
+- Give both time triggers and each hour/minute field meaningful labels. Clock
+  marks and mode/AM-PM controls must be keyboard operable with visible focus and
+  announced selection; a visual clock hand is decorative, not the only control.
+  Provide keyboard adjustments and manual input without requiring pointer drag.
+- Reject empty, nonnumeric and out-of-range values with an associated inline
+  error and focus the affected input; never silently coerce them to another time.
+  The parent still validates required dates/times and its full start/end interval
+  before saving, including same-day, overnight or multi-day rules as applicable.
+- Show the applicable organisation/site timezone. `HH:mm` alone is not an instant:
+  combine it with the selected local date and timezone through established
+  utilities, explicitly resolving or rejecting ambiguous/nonexistent DST times.
+  Never let the browser's timezone silently change the scheduled interval.
+- Preserve applied dates/times and other valid entries through Review/Back,
+  supported draft/close recovery and failed saves. Review must show the same
+  interval/timezone. Retrying a failed save must follow the owning workflow's
+  duplicate-prevention contract rather than creating another appointment.
+- Use collision-aware placement and appropriate bounds so the digits, clock,
+  errors and Use time/Cancel footer remain reachable at the approved viewport
+  sizes and supported zoom. Verify focus with the parent dialog; positioning
+  must not trap controls outside the viewport or introduce horizontal overflow.
+
+The reference prototype demonstrates UI and local state only. Its lexical
+wall-clock comparison does not resolve Auckland DST ambiguity/nonexistent times;
+that remains an implementation requirement. This pattern does not supply server
+validation, permissions, persistence, provider confirmation, availability rules
+or release authority, and it does not approve changes to those contracts.
+
 ## Field group rules
 
 Use Tailwind's `grid gap-3 sm:grid-cols-2` for the body, then `sm:col-span-2`
@@ -264,6 +507,9 @@ on full-width fields. Group related fields in the same row.
   `mt-1 text-xs text-status-critical`.
 - Placeholders are realistic examples (`+64 21 …`, `e.g. Approval of Annual Budget 2026`),
   not field repetitions.
+- Operational date/time fields follow Clock and manual time entry above, plus
+  Calendar date and range selection where applicable; the native input defaults
+  below apply to fields outside those scoped patterns.
 - Date inputs use `type="datetime-local"` for date+time, `type="date"` for
   date-only.
 
@@ -382,6 +628,21 @@ final check.
 - [ ] Width uses one of the canonical tokens (`max-w-md / max-w-xl / max-w-2xl`).
 - [ ] Header has icon + title + one-line description.
 - [ ] Tile picker for any category choice (not `<Select>`).
+- [ ] Growing record lists use searchable, scoped selectors with visible selection,
+      keyboard support and distinct loading / no-results / error states.
+- [ ] Attachment fields reuse the premium upload pattern, state the actual file
+      limits and distinguish staged files from confirmed uploads.
+- [ ] Search/upload failures and Review/Back preserve valid entries; dirty-close
+      behavior, error focus and attachment access follow the owning record.
+- [ ] Planning dates use the shared calendar-selection pattern and visible summary;
+      required/optional behavior, separate times/timezone, validation and recovery
+      follow the owning workflow without importing HR policy.
+- [ ] Operational time fields provide clock/manual exact-minute entry, correct
+      AM/PM conversion, local draft with Cancel/Apply, picker-first Escape/focus,
+      associated validation, visible timezone and a reachable action footer.
+- [ ] Observation/deadline calendars select one day, preserve the paired time,
+      and use local Cancel/Use date; ranges and blank/clear semantics follow the
+      owning field. Month browsing must not silently change the selection.
 - [ ] Required fields marked with `*` and validated server-side.
 - [ ] `Loader2` shown while processing.
 - [ ] Cancel button on the left, primary submit on the right.

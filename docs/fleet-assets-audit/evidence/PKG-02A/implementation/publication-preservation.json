@@ -1,0 +1,105 @@
+{
+  "recordedAtUtc": "2026-09-21T06:23:17.977Z",
+  "frozenArtifacts": [
+    {
+      "version": "v1",
+      "manifest": {
+        "path": "docs/fleet-assets-audit/evidence/PKG-02A/v1/artifact-manifest.json",
+        "bytes": 6967,
+        "sha256": "657A34B88376594534309E87F083C8F23C05B57502E20053D504B70BF9398154"
+      },
+      "artifactCount": 29,
+      "mismatches": []
+    },
+    {
+      "version": "v2",
+      "manifest": {
+        "path": "docs/fleet-assets-audit/evidence/PKG-02A/v2/artifact-manifest.json",
+        "bytes": 7971,
+        "sha256": "771EF5CE311F5C44BA77A3ADC319B2F566AE11A443B6C40D57FB5B675972963A"
+      },
+      "artifactCount": 34,
+      "mismatches": []
+    },
+    {
+      "version": "v3",
+      "manifest": {
+        "path": "docs/fleet-assets-audit/evidence/PKG-02A/v3/artifact-manifest.json",
+        "bytes": 9223,
+        "sha256": "1BA5E6B75D44964C2C20B6BC21FB735B79F1CE0C30BE3BD613C7FA7299F737B9"
+      },
+      "artifactCount": 40,
+      "mismatches": []
+    }
+  ],
+  "guides": [
+    {
+      "path": "DESIGN.md",
+      "bytes": 47007,
+      "sha256": "C3D733AC6C5ECF12AC9E21E746C52109AD35EBF0FEF8D25675B35D16B7AC05AD"
+    },
+    {
+      "path": "design_styles/POPUP_STYLE_GUIDE.md",
+      "bytes": 34793,
+      "sha256": "3D41375AA9AAD71CFF5CFA58D2A2A60933BCE18EC957E74C0F7E7E6DEF28C7E1"
+    },
+    {
+      "path": "design_styles/WORK_RECORD_STYLE_GUIDE.md",
+      "bytes": 7873,
+      "sha256": "66908EF279682E2C9EB67412150B39FDBB403B2C8DE2C41E25260E07FCD5AA29"
+    }
+  ],
+  "pageArchive": {
+    "originalPath": "docs/fleet-assets-audit/pages/PKG-02A.md",
+    "archivePath": "docs/fleet-assets-audit/evidence/PKG-02A/v1/PKG-02A-page-frozen.md",
+    "sha256": "6ADDEDBEEF76CD2B6B8B9541F7A11AE178B177837F293F656CE1EEA4EAD5C5E2",
+    "reason": "MAIN-approved publication archive. The historical v1 manifest is unchanged; the current page path will receive MAIN-owned final context."
+  },
+  "localOnlyHistoricalBuilds": [
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02A/v1/dist/assets/index-BJAy_kvE.js",
+      "bytes": 625473,
+      "sha256": "039A68EB11AE9E80908FA802A200DB13FDDB08F31FBFF3D9BD8FDEE22250D0F3"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02A/v1/dist/assets/index-D-w_L8JU.css",
+      "bytes": 312319,
+      "sha256": "CF95A93E2F8DA4386D296FEB5B01428D01E0A8056B64DE388DA72E546062140C"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02A/v1/dist/index.html",
+      "bytes": 446,
+      "sha256": "4071C5977A216D11372C94A3D7B12BA3F4B663B994515218F7946490CA439C02"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02A/v2/dist/assets/index-CFD4DWbf.css",
+      "bytes": 323777,
+      "sha256": "F8D9D88EAF7A3B9AF036F9B83BF357D0874E8421C0004A3D5DE20FA8926F3F5B"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02A/v2/dist/assets/index-CV9jGpsy.js",
+      "bytes": 662169,
+      "sha256": "2692FAECD46F1AD9F1A0DCF6DC2BF80F2095A6DF45865BF3F1C680EA0B9E6691"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02A/v2/dist/index.html",
+      "bytes": 448,
+      "sha256": "875F63C9B3124750F804FAF63C66ECD79924107DB496C7762AA7DF5D5EFBDF5D"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02A/v3/dist/assets/index-C_FCh2DF.css",
+      "bytes": 331087,
+      "sha256": "F923EC9F8167F3B4E416204770C53C14B53E2F825184BC5D22F362E1350EAB65"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02A/v3/dist/assets/index-ZbjsAw3h.js",
+      "bytes": 684602,
+      "sha256": "ECF668E861E9D97D0859815C996BD5A353EBE0E718D09BE86A606A6D136F4D7D"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02A/v3/dist/index.html",
+      "bytes": 450,
+      "sha256": "4545D13B0C60F0AC7E63884D19261F26E9D23C98CFC8F3B2E1BF3886E0308CF4"
+    }
+  ]
+}

@@ -19,5 +19,6 @@ final readonly class CommandRequestInput
         public ?int $breakGlassReviewerUserId = null,
         public bool $impactAcknowledged = false,
         public ?string $confirmationText = null,
+        public ?ClientLocationCommandOrigin $originContext = null,
     ) {}
 }

@@ -1,0 +1,394 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\2375\oblivionfindings\phpunit.pkg01.xml
+
+.....................                                             21 / 21 (100%)
+  [33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m[33;1m![39;22m
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m queue and related-work search retain ide…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m Finance projection conceals a bill whose…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m Auckland local minutes reject daylight g…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m approved configuration versions route, r…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m custody receipt access follows the lates…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m a restriction flags existing bookings on…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m report identity preserves both submissio…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m report-only HTTP entry and search stay n…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m checks keep unknown provenance and only…    
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m approved advisory check failures do not…    
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m required evidence cannot be bypassed by…    
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m single transitions guard completion, rep…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m triage deadlines and provider responses…    
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m release requires an independent category…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m a completed held repair can recover a ne…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m an overlapping booking decision waits fo…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m Designer review: work detail uses permit…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m Designer review: actual default administ…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m Designer review: authored template confi…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m Designer review: Outing booking waits fo…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[22m [90m>[39m Designer review: two completed jobs clea…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\2375\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+
+  [90mTests:[39m    [33;1m21 warnings[39;22m[90m (454 assertions)[39m
+  [90mDuration:[39m [39m1605.10s[39m
+
+
+
+Time: 26:44.928, Memory: 144.00 MB
+
+[30;42mOK (21 tests, 454 assertions)[0m

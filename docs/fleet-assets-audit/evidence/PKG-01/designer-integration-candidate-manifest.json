@@ -1,0 +1,507 @@
+{
+  "capturedUtc": "2026-09-20T08:47:06.539Z",
+  "sourceRoot": "C:/Users/steph/.codex/worktrees/2375/oblivionfindings",
+  "head": "e62b569ff42ab471300fb6713a68758b647b2c32",
+  "branch": "codex/pkg-01-maintenance",
+  "deliveryState": "Local integration candidate; test-only renewal pending Main approval; no publication",
+  "soleWriter": "Designer Astra; Sol stopped under direct user override",
+  "outgoingManifestSha256": "CDD07766305CC64B64BCBA9CE02BECC8981259DC9C65CE150E17341798077D18",
+  "changedSinceOutgoing": [
+    "app/Http/Controllers/FleetAssets/ChecklistController.php",
+    "app/Http/Controllers/FleetAssets/InspectionController.php",
+    "app/Http/Controllers/FleetAssets/OutingController.php",
+    "app/Http/Controllers/FleetAssets/WorkOrderController.php",
+    "app/Services/Fleet/MaintenanceCheckService.php",
+    "app/Services/Fleet/MaintenanceConfigurationService.php",
+    "app/Services/Fleet/MaintenanceRollbackGuard.php",
+    "app/Services/Fleet/MaintenanceTransitionService.php",
+    "database/migrations/2026_09_20_000100_pkg01_maintenance_workflow.php",
+    "database/migrations/2026_09_20_000110_pkg01_booking_impacts.php",
+    "database/migrations/2026_09_20_000120_pkg01_configuration_history.php",
+    "database/migrations/2026_09_20_000130_pkg01_report_corrections.php",
+    "database/seeders/RbacSeeder.php",
+    "resources/css/maintenance-work-record.css",
+    "resources/js/components/fleet-assets/maintenance/configured-questions.tsx",
+    "resources/js/components/fleet-assets/maintenance/date-range.tsx",
+    "resources/js/components/hr/leave-calendar-range.tsx",
+    "resources/js/pages/fleet-assets/inspections/show.tsx",
+    "resources/js/pages/fleet-assets/maintenance/checklists/index.tsx",
+    "resources/js/pages/fleet-assets/maintenance/checklists/run.tsx",
+    "resources/js/pages/fleet-assets/maintenance/work-orders/create-wizard.tsx",
+    "resources/js/pages/fleet-assets/maintenance/work-orders/index.tsx",
+    "resources/js/pages/fleet-assets/maintenance/work-orders/report.tsx",
+    "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+    "routes/fleet-assets.php",
+    "tests/Feature/FleetAssets/Pkg01MaintenanceProtectedSliceTest.php",
+    "tests/Feature/FleetAssets/Pkg01MaintenanceRollbackTest.php"
+  ],
+  "sourceFiles": [
+    {
+      "path": ".gitignore",
+      "sha256": "C0FE434D345E39260F1CD1CC02AF7812718EF1AB00EF8183021782D563BB8257"
+    },
+    {
+      "path": "app/Console/Commands/ConfigureMaintenance.php",
+      "sha256": "B50E477CB5556CD17F2D94E9F22339360463F280B4B735A51938E04A977CE012"
+    },
+    {
+      "path": "app/Console/Commands/DispatchMaintenanceEffects.php",
+      "sha256": "BB90FB933C7A4AEBCF0E04A6C5ABDEB1925E5167E095707368CB7510A3A3A86C"
+    },
+    {
+      "path": "app/Console/Commands/ReconcileMaintenanceLegacy.php",
+      "sha256": "2680532FF47F8C8E2D96ADE7E8541910352B346E6545CFAF8AC56D61141FCC02"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/AssetController.php",
+      "sha256": "2CBB6E01309C1926D23329345BAB5DFF368DCBE33127BEFC6259BE9EC3651F73"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/ChecklistController.php",
+      "sha256": "25BBBB1B3ADF507010D1558F928B2C956137900CA0DAE00C316438766FFEC1F5"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/InspectionController.php",
+      "sha256": "2FB96A985B3699502383B0E35E709FDC53D94BF6569CDE276FB56A1423FBB991"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/MaintenanceAttachmentController.php",
+      "sha256": "9A5928CD93EB2842065D1A31C5CDBA0ACBC0D4D3EB259D5FEB16C618F7EE086F"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/OutingController.php",
+      "sha256": "E64FCB203C89DC561DA1C84FB9A198463E8076A423CC531956F5E40B801CB648"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/VehicleBookingController.php",
+      "sha256": "330693C9010FD209E1C213D3F833A01EA2617434D3852F742690C225C36A428F"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/VehicleController.php",
+      "sha256": "999B975C3CE8902E852F56193A810BF467BBC06F9DF5378F54165C1457B4977C"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/WorkOrderController.php",
+      "sha256": "B07152FD4F9D72C45B7ABFD3E96BF77EC30986CA44B616CFB5AC5C48F6F2595E"
+    },
+    {
+      "path": "app/Http/Middleware/HandleInertiaRequests.php",
+      "sha256": "5230B957172586117878AE04795A61A2ADC0C2FDA5238A92AA1EFF63F5DFDD93"
+    },
+    {
+      "path": "app/Models/FleetChecklistRun.php",
+      "sha256": "A1CA1AD18AC51B59082229FD39EBA892881D785934FA51D258648D6EA97DD9B1"
+    },
+    {
+      "path": "app/Models/FleetWorkOrder.php",
+      "sha256": "D5F7F764542970FDD8256CDCEC171C71F4661048EA2727E776026384998A468D"
+    },
+    {
+      "path": "app/Observers/FleetWorkOrderObserver.php",
+      "sha256": "0DEC12B3FDB08DD60C8F2945404FD0411DC5BF74262801AA87C4D2C7CEB480CB"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceAccessService.php",
+      "sha256": "08152760A128300640F4B8533F6C644FE850338DACEF9114374CD2DF83511766"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceAttachmentService.php",
+      "sha256": "A8200A8E0F073EEEF142B1970014CA1FEE7D6F555D84E686F9B15BEEF894E2F0"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceCheckService.php",
+      "sha256": "4AADFCEFF743EADA73792868D2874F278802F6325C9DF5C8E7A99DDF94E75805"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceConfigurationService.php",
+      "sha256": "B7B2372909CF54E9117484F6BC5489952B696B3AF4D4D84CB29507855573A9D9"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceEffectDispatcher.php",
+      "sha256": "08708BC09471E99C615500B94B87CFF9FE1FA985B1DD6B48A24BCE782A499FCD"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceFinanceService.php",
+      "sha256": "ED3C67C0017DC03082B4BBACF9362288280DAA03D9807A55C8987924C9D60002"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceFingerprint.php",
+      "sha256": "B35E143C2065F234621FF79858389D90E52EA82328DD14811199E563AC36B968"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceLocalTime.php",
+      "sha256": "B4D8CAFE7E5B963F68071B83D1D85D86546A6E9E868F7D6BD813B961017E9994"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenancePolicyService.php",
+      "sha256": "8DA3AF86FB8274CC6121027A5DDDA830AB89CAC1B0B094CD1D4C3DBE42B25865"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceReportService.php",
+      "sha256": "883DD88B98F3A6391397E9EF23545FCA5E267D656D2D767BB11E382F4BFFB796"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceRestrictionService.php",
+      "sha256": "44B660FE43CBA4249B1E2F2E2FC3C1E8CEF4FD8C78D74B345886F0FC16397AD5"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceRollbackGuard.php",
+      "sha256": "69ECF6E392CFBEFBA9670775BCDC76D2BBA45AAC849AB00832BD712251846D0A"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceTransitionService.php",
+      "sha256": "1FA12D15E39A12899CC29558957D4C082D914A4076145D5F0B569EB97E6AE4DC"
+    },
+    {
+      "path": "app/Services/Sites/Calendar/Providers/MaintenanceWindowObligationProvider.php",
+      "sha256": "FDE8AD7D065B76D24AC24E88CDE56DD959F41D9B1C8D28B8D3CB5FB31C372F99"
+    },
+    {
+      "path": "app/Services/Sites/Calendar/SiteCalendarAggregator.php",
+      "sha256": "95591727D829F3CE314F8786BBAEA86A602F675A7F615341EE67769A4616700D"
+    },
+    {
+      "path": "app/Services/Tasks/Providers/FleetMaintenanceProvider.php",
+      "sha256": "87DA700358A1CA32EC1C88EBBC9A12A177829F65AC713AAFFC5F2B9962721DC5"
+    },
+    {
+      "path": "config/fleet_maintenance.php",
+      "sha256": "7CF64575BCD875A5902D8758AB0C8348224E6DD0F95C40B3CD987CCFD87309C4"
+    },
+    {
+      "path": "database/migrations/2026_09_20_000100_pkg01_maintenance_workflow.php",
+      "sha256": "B85702265176839BB00CA299807404F29BB514320C95D78EEDE5B56166810FEC"
+    },
+    {
+      "path": "database/migrations/2026_09_20_000110_pkg01_booking_impacts.php",
+      "sha256": "B510A10F7330E63C7BCE066328EF0B70272923C14ADF24942C15C3F4A1AB40F9"
+    },
+    {
+      "path": "database/migrations/2026_09_20_000120_pkg01_configuration_history.php",
+      "sha256": "9BCEFC92042BC62270036727F64D87297F0F646C02E4537D00BE84460874E88C"
+    },
+    {
+      "path": "database/migrations/2026_09_20_000130_pkg01_report_corrections.php",
+      "sha256": "3B8E29EF6F751F4D2AE9DE39E154ED20C2FF929C631317695CE5B2B94CA8C1DC"
+    },
+    {
+      "path": "database/seeders/RbacSeeder.php",
+      "sha256": "42197E361BC311BEE60F59F901CF6EC69BA1C49B679334C46A4ED3DF932164A1"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/implementation/browser-seed.php",
+      "sha256": "8DA27AA37D7B76A5506D18203B0A5F644C7B1A6508069BC66AA7B0D551B2186E"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/implementation/correction1-candidate-manifest.json",
+      "sha256": "C7635160DDCDA2B087FAD5750F597EBE8FD98C1ADE5DA98DE4497BC0303C7DEE"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/implementation/correction2-candidate-manifest.json",
+      "sha256": "9A661C26F9D9B55E6DDC17972300043E6B28A89E015EF93625DBBE0A82FA2954"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/implementation/implementation-verification.md",
+      "sha256": "6D6E4EB6C45E75FC8E2068754C18373BAE41532C5FFFE942BF1B934F84AFDEFD"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/implementation/migration-transition-proposal.md",
+      "sha256": "3727B49380F0D838B63BF45B621CC0C2AFC3CA007CD1AB47EAE99F1736F3F79F"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/implementation/protected-slice-checkpoint.md",
+      "sha256": "1BFA6BCB4B5445194935A5C567554536EAF8E830E39A534805A0DA8DD0D12CAC"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01/implementation/setup-preflight.md",
+      "sha256": "C9778D0DAB94F89CDB2C7D2EB8FCEF531BA1BE25376521D66ADA326816818930"
+    },
+    {
+      "path": "resources/css/app.css",
+      "sha256": "4FE49B94D074DDE840D79D0813ADEBA3759DFF243956BBFA404325BD00DF149A"
+    },
+    {
+      "path": "resources/css/maintenance-date-time.css",
+      "sha256": "991EF34CBD5B1D5FB3D4E4476DCB78845876E3D6E86A8DB72347A1CC8B6E1917"
+    },
+    {
+      "path": "resources/css/maintenance-work-record.css",
+      "sha256": "90492C43C86366DF857F9693395FE4BB3007BDE00CD898FDC9C904797FC0C55C"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/configured-questions.tsx",
+      "sha256": "7300B6CD981B2991774400AF9378B09321665FA1608E87D9EC1900EA9F605F4F"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/date-picker.tsx",
+      "sha256": "462557D79A15AAF512D6C61D03A53DB9D2DC54DE633DF614A9A13EE76B170B8F"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/date-range.tsx",
+      "sha256": "7B29CA51A0BCB0B5A9C55EC93E4A99A5B11F07B4EB2983689C76008D6F8FD89B"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/date-time-field.tsx",
+      "sha256": "E31C726E8B7296A2FEB5ED986044CE48255151247135FF3518B52BAF10B97B05"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/time-picker.tsx",
+      "sha256": "CD92205033CAE16ECFA8F59436F6E2F02C9C14B1FFA5E8443091BC88135DFADD"
+    },
+    {
+      "path": "resources/js/components/hr/leave-calendar-range.tsx",
+      "sha256": "CAC7E3A14857159EF67F1248AE20CF1B3744DFA270598362BA11EC2BEC8C0C08"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/assets/show.tsx",
+      "sha256": "6E3FCA4A9776E1A4F2BA59B08D528FBD6DA85558F208075C107220F6A1D1BDD5"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/bookings/show.tsx",
+      "sha256": "409BD022DB714FD477F0B7C5C1515367C45CCF711F285C7CF63B4736FA3E2839"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/inspections/create-wizard.tsx",
+      "sha256": "3EC0BE8CE88A606300DE0C6D125DCBD938DDF52B7FB6F30E780944E478AE46CA"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/inspections/index.tsx",
+      "sha256": "1BC420ADCA6E4A0175022A6AF98D1D9D3098A2E8947DE46AC5D0BE6867CAD61E"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/inspections/show.tsx",
+      "sha256": "40EF326C48A59D594F00627D4012A98857D68D4DA6425793BEDF1B0AE9C50E38"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/maintenance/checklists/index.tsx",
+      "sha256": "A1B5CD1A10DE11A1D03568B815438582BBC789ACDDACFE029CC012866DCDCFDE"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/maintenance/checklists/run.tsx",
+      "sha256": "3D44724DC6AEEBB3F2D66F851032055F3B98D0B44F4DB4BB2BAF2F15F5CC933C"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/maintenance/work-orders/create-wizard.tsx",
+      "sha256": "276DD38267D3DE61F551E96485CFF4C06D9387219711F23DFC5A60B84559318C"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/maintenance/work-orders/index.tsx",
+      "sha256": "9F7FFC5E3B655F600831FF7C6A5CD1E5ED87AACB7152856268C40AEF614E4892"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/maintenance/work-orders/report.tsx",
+      "sha256": "4142B379FCF43EA42CA4B902088A00705DFFC6A340D4AECA7E623F6D82031B88"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+      "sha256": "33CA7C7DD780DF0C9615C4439DAFEDC8C792E464FEC4C1F792F9CD3EB52FB031"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/vehicles/show.tsx",
+      "sha256": "653C208AC90350ED348714E8707410E26A4FA931412E0054CF40450469A6BEC5"
+    },
+    {
+      "path": "routes/console.php",
+      "sha256": "FB53D08CAD832009CD303F47703D7CE339F979CD0D44A6ED54C9879841DDB6B0"
+    },
+    {
+      "path": "routes/fleet-assets.php",
+      "sha256": "DD6237C4C0DBA659C441486639BB94581F10547F08664D4DDB50821DAB2B7FFF"
+    },
+    {
+      "path": "tests/Feature/FleetAssets/Pkg01MaintenanceProtectedSliceTest.php",
+      "sha256": "FE3C7CD8B1A4A30FFEFA98AED5C13721CBA9CAEFB00137BAFBB5A78695E7E00B"
+    },
+    {
+      "path": "tests/Feature/FleetAssets/Pkg01MaintenanceRollbackTest.php",
+      "sha256": "F6765E8DAC133A4DF508D6D3E26C13C4FF70F1A2385AFBE8786D30EDB1904F21"
+    }
+  ],
+  "testHarnessFiles": [
+    {
+      "path": "phpunit.pkg01.xml",
+      "sha256": "2D89FA8D3A1034F2C1C410F375BDD8E53E39AC9C992CD0961482D0D3239E0901"
+    },
+    {
+      "path": "storage/app/pkg01-browser-fixture.php",
+      "sha256": "A5CAD2ADCBD0EF460D070F743F66FBE75D21259DF0F241D678A1537973515700"
+    }
+  ],
+  "buildManifestSha256": "E6CC55C83B2BD57048FA734FA123781BD88F6F5CA5E9465F34C4D39FA3E0C692",
+  "buildFiles": [
+    {
+      "entry": "resources/js/app.tsx",
+      "sourceEntry": "resources/js/app.tsx",
+      "file": "assets/app-DpcluT-n.js",
+      "sha256": "B494E227A19C63B0A1F4DFB98B1E7B4C1AD8A1F5F191219B2880BE2008D98108"
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/maintenance/work-orders/index.tsx",
+      "sourceEntry": "resources/js/pages/fleet-assets/maintenance/work-orders/index.tsx",
+      "file": "assets/index-S5MkzXTI.js",
+      "sha256": "63D496E331767BC5A37AC7FECA88732F8DFFE6A5B34BE249640788D8BA8B7B8B"
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+      "sourceEntry": "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+      "file": "assets/show-BBjsvSZ3.js",
+      "sha256": "A6EEC7DA40C448054E0AC31BB6457FB8EC265C6A9B27156BBFE751EE81AE3F89"
+    },
+    {
+      "entry": "_create-wizard-dBcwBrS3.js",
+      "sourceEntry": "resources/js/pages/fleet-assets/maintenance/work-orders/create-wizard.tsx",
+      "file": "assets/create-wizard-dBcwBrS3.js",
+      "sha256": "DA2E8DD7174B66CDC82867E00E5C6D552717832DF06380137DADA9913F9BC3F5"
+    },
+    {
+      "entry": "resources/css/app.css",
+      "sourceEntry": "resources/css/app.css",
+      "file": "assets/app-LE-vFZSW.css",
+      "sha256": "913D27FB0FD76DB8CD2BCE8817FE96B9249E636A7EA54BA579B8BDDC89152D29"
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/maintenance/work-orders/report.tsx",
+      "sourceEntry": "resources/js/pages/fleet-assets/maintenance/work-orders/report.tsx",
+      "file": "assets/report-DgeiHpPv.js",
+      "sha256": "74BC78A018EA0FFDB05231C50874AFD32915549EE16C8D559B34ECA9EFFDB82A"
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/maintenance/checklists/run.tsx",
+      "sourceEntry": "resources/js/pages/fleet-assets/maintenance/checklists/run.tsx",
+      "file": "assets/run-DHDxHCGs.js",
+      "sha256": "EDBE81E6D1A5A80655AB3956041EE2D6F61F26CD7C89222D1EF64A582E115B73"
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/maintenance/checklists/index.tsx",
+      "sourceEntry": "resources/js/pages/fleet-assets/maintenance/checklists/index.tsx",
+      "file": "assets/index-D7YuKqnW.js",
+      "sha256": "591E1F6F8323A652A625A515BD2D6B9C610BF874223315DCE067F265BC898D0E"
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/inspections/show.tsx",
+      "sourceEntry": "resources/js/pages/fleet-assets/inspections/show.tsx",
+      "file": "assets/show-DYwHGkjj.js",
+      "sha256": "D0C87FC6D842B3FA28D2263F63A6E8B565F9C411E67407A6B3B2D66A1A044137"
+    }
+  ],
+  "evidenceLogs": [
+    {
+      "path": "designer-main-review-full-test.log",
+      "sha256": "7FEB45FD74F56E634565B4625CF6D077FF9E31E1052FA3B0EC7A0A121195FA07"
+    },
+    {
+      "path": "designer-main-review-focused-test.log",
+      "sha256": "ED6D3DDB7F55B37AA5D8DC8B9EADF3C25372F50506286FFE2982FA4490CC87AF"
+    },
+    {
+      "path": "designer-main-review-source-test.log",
+      "sha256": "5AE1C5577968DC99E208EB74BC4CF7C8AD7C678AB7003023DA2ACF32124C3A01"
+    },
+    {
+      "path": "designer-main-review-rollback-verified.log",
+      "sha256": "7C554E1FD9B142B3B02AD4FA94ACB0EC00D3ACD89768C923C38AF835B61BF80E"
+    },
+    {
+      "path": "designer-main-review-types-final.log",
+      "sha256": "9CE3DD6C48E4D3E03C3591E90D8E4858C339CA85F2B0BD53FE7265B3892921FA"
+    },
+    {
+      "path": "designer-main-review-lint-final.log",
+      "sha256": "58BCA201C2E97FABC1F7C310F83D304AE36A1FDE7EFD9D36E04F29D077033700"
+    },
+    {
+      "path": "designer-main-review-php-lint-final.log",
+      "sha256": "7123C5EB72A63FC627647E05E9A9CF8CA91DAB840F7E1AD907F010A25DFA6BCB"
+    },
+    {
+      "path": "designer-main-review-build-final.log",
+      "sha256": "28C74631DE5E17E3BC968F64463EF18195ADB88DA121A8D4D6462615FCFD0744"
+    }
+  ],
+  "masterSha256": "77F404510B6E5C1A270904650A22D6AD7DD0FB8A6842183D33DAB0C687D31C56",
+  "contextFiles": [
+    {
+      "path": "00-project-rules.md",
+      "sha256": "3E7B1C0246FC910B857592E5552B1C55B3137ED37DE11A46AB09700E9CDBD8B5"
+    },
+    {
+      "path": "01-domain-ownership.md",
+      "sha256": "58776C64A4F6FB3FE2F874DB9B07FAA97ED2484FBC49092D345F5B6677A2B797"
+    },
+    {
+      "path": "02-approved-workflows.md",
+      "sha256": "F2F62890A366C9B07EAAECE75D8E79956AB5F329CC37A7580DEF8028A264870D"
+    },
+    {
+      "path": "03-dependency-map.md",
+      "sha256": "7105CC8496EF14550C43C69F94D084E403C1FCA18457D302C8AB4A1E000C2436"
+    },
+    {
+      "path": "04-design-rules.md",
+      "sha256": "02431E15E6E44BEC87AE756CAD564012F11E310E57A7C152F208C63CC5EC67BB"
+    },
+    {
+      "path": "06-model-selection.md",
+      "sha256": "120242788F8BA34FB42322DCC54D1479604423462B8129A12A0797788B269F2A"
+    },
+    {
+      "path": "07-model-results.md",
+      "sha256": "3F36321270091000F01F0E52F3FE9528E8F5D14231AC0378B69C0678E2A2A5E8"
+    },
+    {
+      "path": "09-amendments.md",
+      "sha256": "C8BB498E01C0744FC2F25837CF34DB199C47C787BEDCF02EB2F263AC8AD379C7"
+    },
+    {
+      "path": "10-full-audit.md",
+      "sha256": "F202F549B4147F70CFF4518156D1B1CED6144D1EA07D5DAE6C6F0E3301D98A1E"
+    },
+    {
+      "path": "11-coverage-register.md",
+      "sha256": "D3096F8940B6B6E1B63906C4EB7E510FB6F8D959B02DCD85877A5E3FB6B36F3E"
+    },
+    {
+      "path": "12-navigation-page-inventory.md",
+      "sha256": "0558C11685C5E78DA1B9ABA912AFFAFEC99D6C523E2D1B8B4051D19DD6FAD336"
+    },
+    {
+      "path": "13-integration-matrix.md",
+      "sha256": "5EEB5B61E9D8B5843453AC9D95F9AA6884836781595411672EA50D234C3FDA23"
+    },
+    {
+      "path": "14-scope-workflow-approval.md",
+      "sha256": "D56573A349B53B386DBFF911EE71D2654F35BDB99A2C18364E310C1EAD922D18"
+    },
+    {
+      "path": "handoffs/PKG-01-DESIGNER.md",
+      "sha256": "26208CF741B90B5D0045AFEEE52F38C8CD4A9505239E3DC7A55129987081C1D5"
+    },
+    {
+      "path": "../../DESIGN.md",
+      "sha256": "8875A3AB93D5F8215665929C17D3F787E5B757049611FDC271D30D0CEEB572C0"
+    },
+    {
+      "path": "../../design_styles/POPUP_STYLE_GUIDE.md",
+      "sha256": "3D41375AA9AAD71CFF5CFA58D2A2A60933BCE18EC957E74C0F7E7E6DEF28C7E1"
+    },
+    {
+      "path": "../../design_styles/WORK_RECORD_STYLE_GUIDE.md",
+      "sha256": "66908EF279682E2C9EB67412150B39FDBB403B2C8DE2C41E25260E07FCD5AA29"
+    }
+  ],
+  "frozenV8Identity": "b05ea36ccf287d7a898713939dbdbc03db0fb70c38d47f26db8e033544b314eb",
+  "frozenV8FileCountVerified": 21,
+  "priorApprovedManifestSha256": "14EA5A91290AE59808C4490613973E9142EA5ABDC99428B8F9788740E5B142D8",
+  "changedSincePriorApproval": [
+    "tests/Feature/FleetAssets/Pkg01MaintenanceRollbackTest.php"
+  ],
+  "integrationRollbackVerification": {
+    "tests": 1,
+    "assertions": 38,
+    "exitCode": 0,
+    "warnings": 1,
+    "durationSeconds": 223.13,
+    "log": "designer-integration-rollback-test.log",
+    "sha256": "55DDFD496093D23F0A3AC5C655CBC1D478A4D735CA8DE618B881E6A265A47B02"
+  }
+}

@@ -13,6 +13,7 @@ use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
+use App\Services\CurrentAuthorizationReads;
 use Database\Factories\UserFactory;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -194,18 +195,20 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(UserPushSubscription::class);
     }
 
-    public function canAccessClientPortal(Client $client): bool
+    public function canAccessClientPortal(Client $client, ?CurrentAuthorizationReads $reads = null): bool
     {
         if (
             ! $this->exists
             || ! $client->exists
             || ! $this->hasRole('client', 'next_of_kin')
-            || $this->hrEmployeeProfile()->withTrashed()->exists()
+            || ($reads ? $reads->query($this->hrEmployeeProfile()->withTrashed()->getQuery()) : $this->hrEmployeeProfile()->withTrashed())->exists()
         ) {
             return false;
         }
 
-        return $this->portalClients()->whereKey($client->getKey())->exists();
+        $query = $this->portalClients()->whereKey($client->getKey());
+
+        return ($reads ? $reads->query($query->getQuery()) : $query)->exists();
     }
 
     public function staffProfile()

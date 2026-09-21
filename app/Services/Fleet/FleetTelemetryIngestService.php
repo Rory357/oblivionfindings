@@ -623,7 +623,11 @@ class FleetTelemetryIngestService
                 ]);
             }
 
+            if (! $privacyBlocked) {
+                app(\App\Services\Tracking\ClientTrackerFallService::class)->evaluate($event);
+            }
             if (! $privacyBlocked && $normalized['latitude'] !== null && $normalized['longitude'] !== null) {
+                app(\App\Services\Tracking\ClientZoneMonitoringService::class)->evaluate($event);
                 $this->geofences->evaluate(
                     $asset,
                     (float) $normalized['latitude'],

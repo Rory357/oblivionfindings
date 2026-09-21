@@ -1,0 +1,216 @@
+{
+  "capturedUtc": "2026-09-20T03:58:53.0905263Z",
+  "sourceRoot": "C:/Users/steph/.codex/worktrees/2375/oblivionfindings",
+  "head": "e62b569ff42ab471300fb6713a68758b647b2c32",
+  "branch": "codex/pkg-01-maintenance",
+  "deliveryState": "Uncommitted initial delivery; sole writer Sol frozen for Designer QA",
+  "sourceFiles": [
+    {
+      "path": ".gitignore",
+      "sha256": "C0FE434D345E39260F1CD1CC02AF7812718EF1AB00EF8183021782D563BB8257"
+    },
+    {
+      "path": "app/Console/Commands/DispatchMaintenanceEffects.php",
+      "sha256": "BB90FB933C7A4AEBCF0E04A6C5ABDEB1925E5167E095707368CB7510A3A3A86C"
+    },
+    {
+      "path": "app/Console/Commands/ReconcileMaintenanceLegacy.php",
+      "sha256": "2680532FF47F8C8E2D96ADE7E8541910352B346E6545CFAF8AC56D61141FCC02"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/ChecklistController.php",
+      "sha256": "CFFAD911E3AEA36759904A1D2DCD529CF98BD6A77BB0D20BAF65ADB5C29B73B5"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/InspectionController.php",
+      "sha256": "C7492BF7CA0B83D707CBE5C6379400E0D6864B844E3316D813A9ED4AF4EC793C"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/MaintenanceAttachmentController.php",
+      "sha256": "6EF3157FFE9912E057B29D206E1AEA036A56D8874C848B1923B167FE93F68AFC"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/VehicleBookingController.php",
+      "sha256": "AF6CB0FB88B7968D7442225F30CD077362BBE7EF81AB860578CB64287B1EB2A2"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/VehicleController.php",
+      "sha256": "999B975C3CE8902E852F56193A810BF467BBC06F9DF5378F54165C1457B4977C"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/WorkOrderController.php",
+      "sha256": "44950B4DB4F27B5284B12E19FFAD0FBBBD8226BA83DD28C8E0C998A6CD839F20"
+    },
+    {
+      "path": "app/Models/FleetChecklistRun.php",
+      "sha256": "A1CA1AD18AC51B59082229FD39EBA892881D785934FA51D258648D6EA97DD9B1"
+    },
+    {
+      "path": "app/Models/FleetWorkOrder.php",
+      "sha256": "D5F7F764542970FDD8256CDCEC171C71F4661048EA2727E776026384998A468D"
+    },
+    {
+      "path": "app/Observers/FleetWorkOrderObserver.php",
+      "sha256": "0DEC12B3FDB08DD60C8F2945404FD0411DC5BF74262801AA87C4D2C7CEB480CB"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceAccessService.php",
+      "sha256": "1C52EE34AD1EA77C7B13372ABA6199C8928FD92B0DD5847963FA2FD679F0E9C8"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceAttachmentService.php",
+      "sha256": "3A210AF1CA53E9B9D9CAD1AD59CFBA43A041B6BFAFB50673312DBC301BBAF5EB"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceCheckService.php",
+      "sha256": "DF5F7C0D69D9B75DF36F668833D929598D2B7B2D940FD81290390A6D07DEC1B9"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceEffectDispatcher.php",
+      "sha256": "08708BC09471E99C615500B94B87CFF9FE1FA985B1DD6B48A24BCE782A499FCD"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceFinanceService.php",
+      "sha256": "ED3C67C0017DC03082B4BBACF9362288280DAA03D9807A55C8987924C9D60002"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceFingerprint.php",
+      "sha256": "B35E143C2065F234621FF79858389D90E52EA82328DD14811199E563AC36B968"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceLocalTime.php",
+      "sha256": "B4D8CAFE7E5B963F68071B83D1D85D86546A6E9E868F7D6BD813B961017E9994"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenancePolicyService.php",
+      "sha256": "8DA3AF86FB8274CC6121027A5DDDA830AB89CAC1B0B094CD1D4C3DBE42B25865"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceReportService.php",
+      "sha256": "424093FBB8DDBC3A479A4177FC2956526F6C250C38FF59998BBF4E26A82DB93A"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceRestrictionService.php",
+      "sha256": "44B660FE43CBA4249B1E2F2E2FC3C1E8CEF4FD8C78D74B345886F0FC16397AD5"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceTransitionService.php",
+      "sha256": "700B17EDD69F274FA5C3B1F73296CB63C65137D6BCD8CCA5D3EE1F03F45D0567"
+    },
+    {
+      "path": "app/Services/Sites/Calendar/Providers/MaintenanceWindowObligationProvider.php",
+      "sha256": "112C120A5A5A53B166619837087EA5A34FC81BA32C85759129B63F51ECE5C977"
+    },
+    {
+      "path": "app/Services/Sites/Calendar/SiteCalendarAggregator.php",
+      "sha256": "95591727D829F3CE314F8786BBAEA86A602F675A7F615341EE67769A4616700D"
+    },
+    {
+      "path": "app/Services/Tasks/Providers/FleetMaintenanceProvider.php",
+      "sha256": "436B9416F2FEF0C2A020E08833FEE50E236C88B58176CB6CF0B9DD10C1434689"
+    },
+    {
+      "path": "database/migrations/2026_09_20_000100_pkg01_maintenance_workflow.php",
+      "sha256": "DA143389F36A354645A594E74F4B8EDF46F785D9617AAFA728BFFF99DE4B5A39"
+    },
+    {
+      "path": "database/seeders/RbacSeeder.php",
+      "sha256": "687ADBC6AD287755941666E80D624E8519628D976DA0FB833E3EBF716D66936D"
+    },
+    {
+      "path": "resources/css/app.css",
+      "sha256": "4FE49B94D074DDE840D79D0813ADEBA3759DFF243956BBFA404325BD00DF149A"
+    },
+    {
+      "path": "resources/css/maintenance-date-time.css",
+      "sha256": "991EF34CBD5B1D5FB3D4E4476DCB78845876E3D6E86A8DB72347A1CC8B6E1917"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/date-picker.tsx",
+      "sha256": "462557D79A15AAF512D6C61D03A53DB9D2DC54DE633DF614A9A13EE76B170B8F"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/date-time-field.tsx",
+      "sha256": "E31C726E8B7296A2FEB5ED986044CE48255151247135FF3518B52BAF10B97B05"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/time-picker.tsx",
+      "sha256": "CD92205033CAE16ECFA8F59436F6E2F02C9C14B1FFA5E8443091BC88135DFADD"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/inspections/create-wizard.tsx",
+      "sha256": "153260DF1D300640F217706A32D7F7955BD97BB9D6A06ED349E6FD1D06ABDE59"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/inspections/index.tsx",
+      "sha256": "5A73610589CC9C49909DC2BCB5A9573AF6AC41F955A358A1AC1A779CC3D5F027"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/inspections/show.tsx",
+      "sha256": "F734ACAF9E4E16A80EC85294E5C3705678D799B02BA2664D3CDB85BB89639CDD"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/maintenance/checklists/index.tsx",
+      "sha256": "8E73086BC95BDB05166767F7FE609FC0A285CB9F5F8EF032136AC00AC9CC0A17"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/maintenance/checklists/run.tsx",
+      "sha256": "D206958F7729D60A480E37C2CC862833B01390AAFBD9EBEAB0D79245BB237129"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/maintenance/work-orders/create-wizard.tsx",
+      "sha256": "408FD4DB1E7FFDF6B56614848CD902200D5310E2868B8072DC9AC24AF4E64E98"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/maintenance/work-orders/index.tsx",
+      "sha256": "4DF369E33A6E322426E0B249516272F57FFC164C70E6763C6986C7172E9214F4"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/maintenance/work-orders/report.tsx",
+      "sha256": "B616DB86CB9F11BE8B7DBC4F5182393B429E1420964E574F0C95027B3B64F47C"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+      "sha256": "EB604EBFADCD267FEF55C19D50A96304C6AE884D9D2D261FD766E8AB068FAD12"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/vehicles/show.tsx",
+      "sha256": "653C208AC90350ED348714E8707410E26A4FA931412E0054CF40450469A6BEC5"
+    },
+    {
+      "path": "routes/fleet-assets.php",
+      "sha256": "A09E506B7272DF8881DE3B7439DA54CDFF309547C82D4052DDBADAB34A29A072"
+    },
+    {
+      "path": "tests/Feature/FleetAssets/Pkg01MaintenanceProtectedSliceTest.php",
+      "sha256": "FDEE38415C12AA6DB998560F3BCA06E741C14D1C4201C75539725FCE4F731633"
+    }
+  ],
+  "buildFiles": [
+    {
+      "entry": "resources/js/app.tsx",
+      "file": "assets/app-B5gjlRo7.js",
+      "sha256": "F7E37FAC0430BAE8FF98485E2CE6A2B0BCE429B57A60E055DB5210C568A9406B"
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/maintenance/work-orders/index.tsx",
+      "file": "assets/index-BAIJkG0n.js",
+      "sha256": "1406E0B417FB49543B315C9F82736F420F2A11882A9BF79619AB60029C56BD9C"
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+      "file": "assets/show-BtgKqOJX.js",
+      "sha256": "D50C947AE4B559CF02A2EC9593F4AFCCED268C78BF15A0E98AC5D51FCA08BD19"
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/maintenance/work-orders/create-wizard.tsx",
+      "file": "assets/create-wizard-DHwNmXge.js",
+      "sha256": "D979BCE4D2CC2C5BCC1FBC1971E065023FBF9C44EAE91D720B56214DB7611FE2"
+    },
+    {
+      "entry": "resources/css/app.css",
+      "file": "assets/app-BUGo9VPK.css",
+      "sha256": "BDCFDB027FE35B22CDF0D62F187FC21F39AF5BBCEEEC502CB8D9B3D68EBE31F6"
+    }
+  ]
+}

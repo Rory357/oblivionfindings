@@ -1,0 +1,43 @@
+{
+  "main": {
+    "base": "grayscale(1)",
+    "loadedTiles": 4,
+    "markerFill": "#6d4aff",
+    "overlay": "none"
+  },
+  "editor": {
+    "base": "grayscale(1)",
+    "boundary": "#6d4aff",
+    "handles": [
+      {
+        "color": "rgb(117, 85, 217)",
+        "filter": "none"
+      },
+      {
+        "color": "rgb(117, 85, 217)",
+        "filter": "none"
+      },
+      {
+        "color": "rgb(117, 85, 217)",
+        "filter": "none"
+      },
+      {
+        "color": "rgb(117, 85, 217)",
+        "filter": "none"
+      }
+    ],
+    "loadedTiles": 8,
+    "overlay": "none"
+  },
+  "history": {
+    "base": "grayscale(1)",
+    "headings": [
+      "Selected historical observation",
+      "Recorded observations",
+      "Tracking source"
+    ],
+    "latest": "LATEST RECORDED LOCATION-36.849700, 174.760000Mon 21 Sept, 9:54 am · Pacific/AucklandOBSERVATION QUALITYAccuracy not recordedA recorded location does not confirm current wellbeing.ZONE PLANNING1 saved draftsDraft schedules are not monitoring or sending alerts.",
+    "overlay": "none"
+  },
+  "console": []
+}

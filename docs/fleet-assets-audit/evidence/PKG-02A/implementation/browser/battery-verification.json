@@ -1,0 +1,26 @@
+{
+  "final": {
+    "animated": "true",
+    "boltAnimation": "tracker-charge-pulse",
+    "color": "#37d391",
+    "fill": "width: 82%;",
+    "fillAnimation": "tracker-charge-flow",
+    "horizontalOverflow": false,
+    "text": "BATTERYLast reported82%Charginglast reportedBattery measured Mon 21 Sept, 11:20 am",
+    "url": "http://127.0.0.1:4335/operations/clients/1?tab=location"
+  },
+  "normal": {
+    "text": "82% · Not charging · last reported",
+    "animated": false,
+    "bolts": 0,
+    "fillAnimation": "none"
+  },
+  "unknown": {
+    "text": "Unknown · Charging not reported · Battery measured — time not reported",
+    "animated": false,
+    "bolts": 0,
+    "fillAnimation": "none"
+  },
+  "reducedMotion": "Component test verifies initial preference and live preference change; browser emulation unavailable, not claimed",
+  "console": []
+}

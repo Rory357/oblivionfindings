@@ -11,11 +11,30 @@ use App\Models\Asset;
 use App\Models\Client;
 use App\Models\Site;
 use App\Models\SiteRoom;
+use App\Services\CurrentAuthorizationReads;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use UnexpectedValueException;
 
 final class CanonicalDeviceSiteResolver
 {
+    private ?CurrentAuthorizationReads $currentReads = null;
+
+    public function forCurrentEvidence(CurrentAuthorizationReads $reads): self
+    {
+        $reads->assertActive();
+        $current = clone $this;
+        $current->currentReads = $reads;
+        $current->activeSiteCache = [];
+
+        return $current;
+    }
+
+    private function current(Builder $query): Builder
+    {
+        return $this->currentReads ? $this->currentReads->query($query) : $query;
+    }
+
     /** @var array<int, bool> */
     private array $activeSiteCache = [];
 
@@ -51,17 +70,17 @@ final class CanonicalDeviceSiteResolver
             throw new UnexpectedValueException('Canonical Device reference is invalid.');
         }
 
-        $device = Device::query()
+        $device = $this->current(Device::query())
             ->whereKey($deviceId)
             ->when($operationalOnly, fn ($query) => $query->whereIn('status', [
                 DeviceStatus::Active->value,
                 DeviceStatus::Degraded->value,
                 DeviceStatus::Offline->value,
             ]))
-            ->with(['assignments' => fn ($query) => $query
+            ->with(['assignments' => fn ($query) => $this->current($query->getQuery())
                 ->active()
                 ->where('assigned_at', '<=', now())
-                ->orderBy('id'), 'activeAssetLinks' => fn ($query) => $query->orderBy('id')])
+                ->orderBy('id'), 'activeAssetLinks' => fn ($query) => $this->current($query->getQuery())->orderBy('id')])
             ->first();
 
         if ($device === null) {
@@ -95,7 +114,7 @@ final class CanonicalDeviceSiteResolver
         }
 
         $siteId = $siteIds->first();
-        $siteIsActive = $this->activeSiteCache[$siteId] ??= Site::query()
+        $siteIsActive = $this->activeSiteCache[$siteId] ??= $this->current(Site::query())
             ->whereKey($siteId)
             ->where('is_active', true)
             ->where(fn ($query) => $query->whereNull('archived')->orWhere('archived', false))
@@ -114,10 +133,10 @@ final class CanonicalDeviceSiteResolver
         return match ($assignment->assignable_type) {
             DeviceAssignment::TARGET_SITE => [(int) $assignment->assignable_id],
             DeviceAssignment::TARGET_ROOM => $this->oneSiteId(
-                SiteRoom::query()->whereKey($assignment->assignable_id)->value('site_id'),
+                $this->current(SiteRoom::query())->whereKey($assignment->assignable_id)->value('site_id'),
             ),
             DeviceAssignment::TARGET_CLIENT => $this->oneSiteId(
-                Client::query()
+                $this->current(Client::query())
                     ->whereKey($assignment->assignable_id)
                     ->where('status', 'active')
                     ->value('site_id'),
@@ -131,7 +150,7 @@ final class CanonicalDeviceSiteResolver
     /** @return list<int> */
     private function staffSiteIds(int $userId): array
     {
-        return HrEmployeeProfile::query()
+        return $this->current(HrEmployeeProfile::query())
             ->where('user_id', $userId)
             ->where('is_active', true)
             ->where(fn ($query) => $query->whereNull('start_date')->orWhereDate('start_date', '<=', today()))
@@ -148,7 +167,7 @@ final class CanonicalDeviceSiteResolver
     /** @return list<int> */
     private function vehicleSiteIds(int $assetId): array
     {
-        $asset = Asset::query()
+        $asset = $this->current(Asset::query())
             ->whereKey($assetId)
             ->where(fn ($query) => $query
                 ->whereRaw('LOWER(category) = ?', ['vehicle'])
@@ -163,7 +182,7 @@ final class CanonicalDeviceSiteResolver
         $siteIds = Collection::make([$asset->site_id, $asset->home_site_id]);
 
         if ($asset->client_id !== null) {
-            $client = Client::query()
+            $client = $this->current(Client::query())
                 ->whereKey($asset->client_id)
                 ->where('status', 'active')
                 ->first(['site_id']);
@@ -186,7 +205,7 @@ final class CanonicalDeviceSiteResolver
     /** @return list<int> */
     private function assetSiteIds(int $assetId): array
     {
-        $asset = Asset::query()
+        $asset = $this->current(Asset::query())
             ->whereKey($assetId)
             ->where('status', 'active')
             ->first(['site_id', 'home_site_id', 'client_id']);
@@ -197,7 +216,7 @@ final class CanonicalDeviceSiteResolver
 
         $siteIds = Collection::make([$asset->site_id, $asset->home_site_id]);
         if ($asset->client_id !== null) {
-            $client = Client::query()
+            $client = $this->current(Client::query())
                 ->whereKey($asset->client_id)
                 ->where('status', 'active')
                 ->first(['site_id']);

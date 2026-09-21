@@ -2070,7 +2070,7 @@ export default function ClientShow({
             <Head title={`${name} — Client Profile`} />
 
             <PageLayout
-                width="wide"
+                width={tab === 'location' ? 'full' : 'wide'}
                 hero={
                     <PageHeader
                         variant="profile"

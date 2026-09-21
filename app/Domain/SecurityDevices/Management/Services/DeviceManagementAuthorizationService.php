@@ -10,6 +10,7 @@ use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
+use App\Services\CurrentAuthorizationReads;
 use Illuminate\Support\Collection;
 
 /**
@@ -23,6 +24,17 @@ use Illuminate\Support\Collection;
  */
 final class DeviceManagementAuthorizationService
 {
+    private ?CurrentAuthorizationReads $currentReads = null;
+
+    public function forCurrentEvidence(CurrentAuthorizationReads $reads, int $deviceId): self
+    {
+        $reads->assertActive();
+        $current = new self($this->access->forCurrentEvidence($reads, $deviceId), $this->trackingPrivacy);
+        $current->currentReads = $reads;
+
+        return $current;
+    }
+
     /** @var array<string, bool> */
     private array $permissionCache = [];
 
@@ -162,7 +174,7 @@ final class DeviceManagementAuthorizationService
             return false;
         }
 
-        return $assignments->every(function (DeviceAssignment $assignment) use ($actor): bool {
+        return $assignments->every(function (DeviceAssignment $assignment) use ($actor, $device): bool {
             if (! $assignment->isCollectionActive()
                 || trim((string) $assignment->tracking_purpose) === ''
                 || trim((string) $assignment->authority_basis) === '') {
@@ -170,10 +182,9 @@ final class DeviceManagementAuthorizationService
             }
 
             if ($assignment->assignable_type === DeviceAssignment::TARGET_CLIENT
-                && ! $this->trackingPrivacy->assignmentAuthorisesClient(
-                    $assignment,
-                    (int) $assignment->assignable_id,
-                )) {
+                && ! ($this->currentReads
+                    ? $this->trackingPrivacy->assignmentAuthorisesClientFromCurrentEvidence($assignment, $device)
+                    : $this->trackingPrivacy->assignmentAuthorisesClient($assignment, (int) $assignment->assignable_id))) {
                 return false;
             }
 
@@ -194,7 +205,7 @@ final class DeviceManagementAuthorizationService
     private function activeAssignments(Device $device, bool $fresh): Collection
     {
         if ($fresh || ! isset($this->assignmentCache[(int) $device->id])) {
-            $this->assignmentCache[(int) $device->id] = DeviceAssignment::query()
+            $this->assignmentCache[(int) $device->id] = ($this->currentReads ? $this->currentReads->query(DeviceAssignment::query()) : DeviceAssignment::query())
                 ->with('consent.consentType')
                 ->where('device_id', $device->id)
                 ->active()
@@ -231,9 +242,10 @@ final class DeviceManagementAuthorizationService
     {
         $key = $actor->id.'|'.$permission;
         if ($fresh || ! array_key_exists($key, $this->explicitDenyCache)) {
-            $this->explicitDenyCache[$key] = $actor->permissionOverrides()
+            $query = $actor->permissionOverrides()->getQuery();
+            $this->explicitDenyCache[$key] = ($this->currentReads ? $this->currentReads->query($query) : $query)
                 ->where('permissions.key', $permission)
-                ->wherePivot('allowed', false)
+                ->where('permission_user.allowed', false)
                 ->exists();
         }
 

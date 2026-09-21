@@ -1,0 +1,170 @@
+{
+  "revision": 1,
+  "capturedUtc": "2026-09-20T08:50:37.0723657Z",
+  "sourceRoot": "C:/Users/steph/Herd/oblivionfindings",
+  "state": "Approved non-sensitive Main context snapshot for local integration preparation; publication paused pending deployment consequence",
+  "files": [
+    {
+      "path": "docs/fleet-assets-audit/00-project-rules.md",
+      "sha256": "A595F9B4CD08E68D7A6D97EF5EDBD901FF9D63CC8814BAA6CDED6D1178DBAAFF"
+    },
+    {
+      "path": "docs/fleet-assets-audit/01-domain-ownership.md",
+      "sha256": "58776C64A4F6FB3FE2F874DB9B07FAA97ED2484FBC49092D345F5B6677A2B797"
+    },
+    {
+      "path": "docs/fleet-assets-audit/02-approved-workflows.md",
+      "sha256": "F2F62890A366C9B07EAAECE75D8E79956AB5F329CC37A7580DEF8028A264870D"
+    },
+    {
+      "path": "docs/fleet-assets-audit/03-dependency-map.md",
+      "sha256": "7B88A0FE6A8D5EA667DA3802CF2D195F5902AC337A6DC047E362078EB44D2966"
+    },
+    {
+      "path": "docs/fleet-assets-audit/04-design-rules.md",
+      "sha256": "A9E4EEB16E2AC1C4639684507B4336CD044B29DA4218775CA4D1FF1B5B8D1FFF"
+    },
+    {
+      "path": "docs/fleet-assets-audit/05-page-register.md",
+      "sha256": "C7D433054F57176F55656108BB98D5A31BFBD3A090DBF209364938000BB7E9AB"
+    },
+    {
+      "path": "docs/fleet-assets-audit/06-model-selection.md",
+      "sha256": "A5671BF752AF1C1CCB0F5716AF36B69A8DE71E40D79DFCF5F9893CCB48301E51"
+    },
+    {
+      "path": "docs/fleet-assets-audit/07-model-results.md",
+      "sha256": "4D2A95321147977D9ABD53E5A194447DB699A718C6D3E1CF46769F65775492D5"
+    },
+    {
+      "path": "docs/fleet-assets-audit/08-prompt-codebase-validation.md",
+      "sha256": "6142FA3DFDF1C6F0E56562A3D7763A16DF5C572EBE93F7216C4942C84CE03C63"
+    },
+    {
+      "path": "docs/fleet-assets-audit/09-amendments.md",
+      "sha256": "C8BB498E01C0744FC2F25837CF34DB199C47C787BEDCF02EB2F263AC8AD379C7"
+    },
+    {
+      "path": "docs/fleet-assets-audit/10-full-audit.md",
+      "sha256": "F202F549B4147F70CFF4518156D1B1CED6144D1EA07D5DAE6C6F0E3301D98A1E"
+    },
+    {
+      "path": "docs/fleet-assets-audit/11-coverage-register.md",
+      "sha256": "D3096F8940B6B6E1B63906C4EB7E510FB6F8D959B02DCD85877A5E3FB6B36F3E"
+    },
+    {
+      "path": "docs/fleet-assets-audit/12-navigation-page-inventory.md",
+      "sha256": "0558C11685C5E78DA1B9ABA912AFFAFEC99D6C523E2D1B8B4051D19DD6FAD336"
+    },
+    {
+      "path": "docs/fleet-assets-audit/13-integration-matrix.md",
+      "sha256": "5EEB5B61E9D8B5843453AC9D95F9AA6884836781595411672EA50D234C3FDA23"
+    },
+    {
+      "path": "docs/fleet-assets-audit/14-scope-workflow-approval.md",
+      "sha256": "D56573A349B53B386DBFF911EE71D2654F35BDB99A2C18364E310C1EAD922D18"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/full-audit-verification.md",
+      "sha256": "37E69D6584EB88CDADCCAC91FDF74A454C64B24D26C6411F0ACFB422B9FA057E"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-approved-design-supplements.patch",
+      "sha256": "2B3E81760EE5FFA99669FDD892DE2BBCD283D1C1C8D746741A836E0000D189B7"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v1.md",
+      "sha256": "0C234526D64892CE86BC1F8ED645BD3F06D49A7CCCF36F3D76394632CA98E756"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v10.md",
+      "sha256": "E2421A0957C942E55B898B0FBA5B6D5280F75DD7E30E315C43BEC15B35B169A7"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v11.md",
+      "sha256": "6991CF13AF2C8FA4A49BF8B6AD0534EE815776F3F70C1CBA53F494219DEEAA22"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v12.md",
+      "sha256": "D50DB1DE51C7A6DB5950A30B4033752181D25CC7E51BE3C7AA8B21C79C65B198"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v2.md",
+      "sha256": "A431B5E8A694458F5F84DA2EC237CA85D79DD3BBF9A4C8B1666046F29277FF4E"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v3.md",
+      "sha256": "CF6C770E31ADB83D0154C9B1ABCFECF5A99E428DF2DC48F6202E744572344DF2"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v4.md",
+      "sha256": "C8790454E237FE67286078AB0C8C19826B4439C21E3F51748FB8E81E5A06FCC4"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v5.md",
+      "sha256": "D94C9F62C83C9481E265F08956BEFFC212DF1468448A4C6EECB5F5501DBF527C"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v6.md",
+      "sha256": "FBDB7BA57842AFC1B2A6DA96C4F91161944FA703557D95F84377447A053026F2"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v7.md",
+      "sha256": "5330DF491E39F3775BB6B29DD36573748143B52D8E418A2C86389DDB45C260C0"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v8.md",
+      "sha256": "3652C3E9BEC38376C49B01BAB13AA569C4DD19F8F428F0A3872F861771372DA4"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-context-manifest-v9.md",
+      "sha256": "E662CA30856A9329B5264622E0F50CA331F028AA9BD08FF6814DFF6C128C799D"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-main-design-review.md",
+      "sha256": "B9DD4EBD9D928449A6865B2CC03F58896252EF960108420039A4C437F0CC3BFA"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-main-integration-preparation.md",
+      "sha256": "7BD41F03785431FD3E7B07D615418B5A04CAA0CC31550927466F26EF23E4DEAC"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-main-replacement-focused-test.log",
+      "sha256": "133A46C54FA8B2A1CF35ABC8E4F6741874750B8BB72FDD63E8DCDF5FA65AF7F8"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-main-replacement-review.md",
+      "sha256": "29CEB46BA5E84240F0B62496D54912C3BCF314C4892EA35C802EB306275DFB68"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-main-technical-review.md",
+      "sha256": "4DBD8B8F2D5890F6448BB9C4E4AF4C14D20CA93203356DAC380BFA08BF034CC2"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-01-setup-recovery.md",
+      "sha256": "FC1A87A6F8330001DAF49266FDF3A5CF0CB1B1ADA19A07AFFA16C2C07F2F350F"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/section-0-baseline.md",
+      "sha256": "AF1880FE33B57AD288ED7C4C07117B3920E1FD596193DF478D44135541008EE5"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/source-inventory.md",
+      "sha256": "900A404B2B0B4156E9F9502E0F0F8E78E2F9D256B0D8FE05627981D7F2AC9EC0"
+    },
+    {
+      "path": "docs/fleet-assets-audit/handoffs/PKG-01-context-manifest.md",
+      "sha256": "B53F76AB97F0B18C23CAA0C27CA7C7C6E105FCEAB309D3475C64FD1579ECA881"
+    },
+    {
+      "path": "docs/fleet-assets-audit/handoffs/PKG-01-DESIGNER.md",
+      "sha256": "5BAB0F5793BBCF8D1D272C13C46A4C8E3759D712B2C9AF1DBEE9264C98002594"
+    }
+  ],
+  "excluded": [
+    "docs/fleet-assets-audit/pages/PKG-01.md (use current Designer page)",
+    "docs/fleet-assets-audit/PLAN.md (existing historical file)",
+    "private/local harness, seed, .env, storage and temporary preview/build/media artifacts",
+    "public/.user.ini"
+  ]
+}

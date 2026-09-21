@@ -1,0 +1,253 @@
+/* PKG-01 single-date and clock controls adapted from the frozen v8 desktop preview. */
+.date-time-field .inline-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.date-time-field .field > label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 600; }
+.date-time-field .upload-error { color: var(--destructive); }
+@media (max-width: 640px) { .date-time-field .inline-fields { grid-template-columns: 1fr; } .date-picker-popover, .time-picker-popover { width: min(94vw, 390px); } }
+.time-picker-trigger {
+  height: auto;
+  min-height: 66px;
+  width: 100%;
+  justify-content: flex-start;
+  padding: 12px 14px;
+  text-align: left;
+}
+.date-time-field {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  background: var(--card);
+}
+.date-time-field legend {
+  padding: 0 6px;
+  font-weight: 600;
+  font-size: 13px;
+}
+.date-time-field legend span {
+  font-weight: 400;
+  color: var(--muted-foreground);
+  margin-left: 8px;
+  font-size: 11px;
+}
+.date-time-field .inline-fields {
+  align-items: start;
+}
+.date-time-field .field {
+  margin: 0;
+  min-width: 0;
+}
+.date-picker-popover {
+  width: 390px;
+  padding: 20px;
+  border-radius: 20px;
+  max-height: min(640px, var(--radix-popover-content-available-height));
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+/* The source calendar is shared with HR; these timestamp dates stay optional. */
+.date-time-calendar > div > div:first-child > span > span {
+  display: none;
+}
+.date-picker-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: 14px;
+  margin-top: 12px;
+}
+.date-picker-summary strong,
+.date-picker-summary small {
+  display: block;
+}
+.date-picker-summary strong {
+  font-size: 13px;
+}
+.date-picker-summary small {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 3px;
+}
+.date-picker-footer {
+  margin-top: 16px;
+}
+.date-time-field > p {
+  margin-top: 12px;
+}
+.time-picker-trigger > span:nth-child(2) {
+  flex: 1;
+}
+.time-picker-trigger strong {
+  display: block;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.time-picker-trigger small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 400;
+  margin-top: 3px;
+}
+.time-picker-icon {
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary) 10%, var(--card));
+}
+.time-picker-popover {
+  width: 346px;
+  padding: 20px;
+  border-radius: 20px;
+  max-height: min(640px, var(--radix-popover-content-available-height));
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+.time-picker-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.time-picker-heading strong {
+  font-size: 15px;
+}
+.time-picker-heading small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 4px;
+}
+.time-picker-mode-label {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  padding-top: 3px;
+}
+.time-picker-digits {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  justify-content: center;
+}
+.time-picker-digits label {
+  display: block;
+  margin: 0 0 7px 4px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.time-picker-digits input {
+  width: 83px;
+  height: 76px;
+  background: var(--muted);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  text-align: center;
+  padding: 8px;
+  font-size: 40px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--foreground);
+}
+.time-picker-digits input[data-active="true"] {
+  background: color-mix(in oklch, var(--primary) 13%, var(--card));
+  color: var(--primary);
+  border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
+}
+.time-picker-digits input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.time-picker-colon {
+  font-size: 32px;
+  line-height: 76px;
+  color: var(--muted-foreground);
+}
+.time-picker-period {
+  display: grid;
+  gap: 4px;
+  padding-left: 6px;
+}
+.time-picker-period button {
+  height: 36px;
+  min-width: 50px;
+}
+.time-picker-face-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 16px 0 12px;
+}
+.time-picker-dial {
+  width: 256px;
+  height: 256px;
+  position: relative;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: color-mix(in oklch, var(--primary) 5%, var(--muted));
+}
+.time-picker-dial svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.time-picker-dial line {
+  stroke: var(--primary);
+  stroke-width: 2;
+}
+.time-picker-dial circle {
+  fill: var(--primary);
+}
+.time-picker-mark {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--foreground);
+  background: transparent;
+  border: 0;
+}
+.time-picker-mark:hover {
+  background: color-mix(in oklch, var(--primary) 12%, var(--card));
+}
+.time-picker-mark[aria-pressed="true"] {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  box-shadow: 0 3px 10px color-mix(in oklch, var(--primary) 25%, transparent);
+}
+.time-picker-mark:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.time-picker-help {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.6;
+  min-height: 34px;
+  margin-top: 14px;
+}
+.time-picker-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 10px;
+}
+.time-picker-footer > div {
+  display: flex;
+  gap: 4px;
+}

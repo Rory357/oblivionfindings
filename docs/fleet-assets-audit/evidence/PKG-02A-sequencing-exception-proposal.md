@@ -1,0 +1,9 @@
+# Proposed A6 — bounded PKG-02A implementation timing
+
+Owner MAIN ASTRA. Historical proposal revision 1, 2026-09-21. **Subsequently approved and applied as A6**; see PKG-02A-A6-timing-approval.md for verified actual reply, amended master and current release boundaries. The proposal text below is preserved as the exact proposed scope and is not an independent write release.
+
+Exact proposed exception: PKG-02A Client Location may begin its approved v3 implementation after Main verifies the concrete technical/privacy/test-isolation prerequisites, while PKG-01 remains publication verified but awaits its own operating configuration, Stephan acceptance and final accepted-context closure. This changes only A5's requirement to wait for PKG-01 closure before PKG-02A implementation. It does not accept or close Maintenance, expand Client Location scope, authorize a second simultaneous application writer, approve unresolved operating/privacy policy, activate tracking or disclosure, or waive either package's QA, Main technical approval, publication verification or final acceptance.
+
+The existing PKG-02A Designer is already explicitly assigned all frontend/backend work at verified GPT-6 Astra Extra High, with no Sol. It would become the sole application writer when technical preflight is released. PKG-01 application edits must remain paused during that custody; any necessary return to Maintenance requires an explicit recorded writer handoff. Main's old dirty checkout and the frozen Maintenance and Client Location previews remain preserved.
+
+Code-independent preflight/documentation may continue pending the decision. After explicit approval Main must record the actual answer and update the canonical master plus affected context before releasing work under the changed sequencing rule. Existing unknown policy decisions remain gates; PKG-01's A4 exception is not extended by this timing proposal.

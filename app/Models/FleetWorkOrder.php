@@ -26,6 +26,9 @@ class FleetWorkOrder extends Model
         'priority',
         'category',
         'status',
+        'version',
+        'waiting_reason',
+        'next_action',
         'due_at',
         'started_at',
         'completed_at',
@@ -42,6 +45,7 @@ class FleetWorkOrder extends Model
         'completed_at' => 'datetime',
         'estimated_cost' => 'decimal:2',
         'actual_cost' => 'decimal:2',
+        'version' => 'integer',
     ];
 
     public function asset(): BelongsTo

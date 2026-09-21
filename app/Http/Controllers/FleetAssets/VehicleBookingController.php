@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Notifications\Fleet\FleetBookingApprovedNotification;
 use App\Notifications\Fleet\FleetBookingRejectedNotification;
 use App\Services\AuditLogger;
+use App\Services\Fleet\MaintenanceRestrictionService;
 use App\Services\Fleet\VehicleBookingAccessService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
@@ -25,6 +26,7 @@ class VehicleBookingController extends Controller
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
         private readonly VehicleBookingAccessService $bookingAccess,
+        private readonly MaintenanceRestrictionService $maintenanceRestrictions,
     ) {}
 
     public function index(Request $request)
@@ -400,6 +402,7 @@ class VehicleBookingController extends Controller
 
             $asset = $this->bookingAccess->vehicle($actor, (int) $identifiers['asset_id'], true);
             abort_unless($asset && $asset->status === 'active', 404);
+            $this->maintenanceRestrictions->assertBookable((int) $asset->id);
 
             $data = $request->validate([
                 'asset_id' => ['required', 'integer'],
@@ -475,11 +478,20 @@ class VehicleBookingController extends Controller
         $booking = $this->bookingAccess->booking($actor, (int) $booking->getKey());
         abort_unless($booking, 404);
         $booking->load(['asset:id,name,asset_tag', 'user:id,name,email']);
+        $maintenanceImpacts = DB::table('fleet_maintenance_booking_impacts as impact')
+            ->join('fleet_maintenance_restrictions as restriction', 'restriction.id', '=', 'impact.restriction_id')
+            ->join('fleet_work_orders as work', 'work.id', '=', 'impact.work_order_id')
+            ->where('impact.booking_id', $booking->id)->where('impact.asset_id', $booking->asset_id)
+            ->orderByDesc('impact.id')
+            ->get(['impact.id', 'impact.followup_state', 'restriction.state as restriction_state',
+                'work.id as work_order_id', 'work.reference_number']);
 
         return Inertia::render('fleet-assets/bookings/show', [
             'booking' => $booking,
+            'maintenance_impacts' => $maintenanceImpacts,
             'can' => [
                 'manage' => (bool) $request->user()?->canDo('fleet.manage'),
+                'view_maintenance' => app(\App\Services\Fleet\MaintenanceAccessService::class)->canRead($actor),
             ],
         ]);
     }
@@ -491,6 +503,7 @@ class VehicleBookingController extends Controller
             $canonical = $this->lockBooking($actor, (int) $booking->getKey());
             abort_if($canonical->user_id === $actor->id, 403, 'Cannot approve your own booking.');
             abort_unless($canonical->status === 'pending', 422, 'Only pending bookings can be approved.');
+            $this->maintenanceRestrictions->assertBookable((int) $canonical->asset_id);
 
             $canonical->update([
                 'status' => 'approved',
@@ -548,6 +561,7 @@ class VehicleBookingController extends Controller
         DB::transaction(function () use ($request, $booking, $actor): void {
             $canonical = $this->lockBooking($actor, (int) $booking->getKey());
             abort_unless($canonical->status === 'approved', 422, 'Only approved bookings can be checked out.');
+            $this->maintenanceRestrictions->assertBookable((int) $canonical->asset_id);
 
             $data = $request->validate([
                 'odometer_out' => ['nullable', 'numeric', 'min:0'],

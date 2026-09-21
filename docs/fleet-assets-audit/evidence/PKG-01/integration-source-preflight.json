@@ -1,0 +1,23 @@
+{
+  "capturedUtc": "2026-09-20T08:44:33.813Z",
+  "approvedManifestSha256": "14EA5A91290AE59808C4490613973E9142EA5ABDC99428B8F9788740E5B142D8",
+  "changedSinceApproval": [
+    "tests/Feature/FleetAssets/Pkg01MaintenanceRollbackTest.php"
+  ],
+  "changedTestSha256": "F6765E8DAC133A4DF508D6D3E26C13C4FF70F1A2385AFBE8786D30EDB1904F21",
+  "sourceFileCount": 63,
+  "omittedLocalEvidence": [
+    "docs/fleet-assets-audit/evidence/PKG-01/implementation/browser-seed.php",
+    "docs/fleet-assets-audit/evidence/PKG-01/implementation/correction1-candidate-manifest.json",
+    "docs/fleet-assets-audit/evidence/PKG-01/implementation/correction2-candidate-manifest.json",
+    "docs/fleet-assets-audit/evidence/PKG-01/implementation/implementation-verification.md",
+    "docs/fleet-assets-audit/evidence/PKG-01/implementation/migration-transition-proposal.md",
+    "docs/fleet-assets-audit/evidence/PKG-01/implementation/protected-slice-checkpoint.md",
+    "docs/fleet-assets-audit/evidence/PKG-01/implementation/setup-preflight.md"
+  ],
+  "omittedHarness": [
+    "phpunit.pkg01.xml",
+    "storage/app/pkg01-browser-fixture.php"
+  ],
+  "publicationState": "Local preparation only; renewed changed-test approval and publication/release gates pending"
+}

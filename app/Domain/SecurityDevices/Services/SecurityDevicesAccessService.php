@@ -13,6 +13,8 @@ use App\Models\LocationHardware;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
+use App\Policies\ClientPolicy;
+use App\Services\CurrentAuthorizationReads;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
@@ -29,6 +31,45 @@ use Illuminate\Support\Facades\Schema;
  */
 class SecurityDevicesAccessService
 {
+    private ?CurrentAuthorizationReads $currentReads = null;
+
+    private ?int $currentDeviceId = null;
+
+    public function forCurrentEvidence(CurrentAuthorizationReads $reads, int $deviceId): self
+    {
+        $reads->assertActive();
+        $current = clone $this;
+        $current->currentReads = $reads;
+        $current->currentDeviceId = $deviceId;
+
+        return $current;
+    }
+
+    private function current(Builder $query): Builder
+    {
+        if (! $this->currentReads) {
+            return $query;
+        }
+        if ($query->getModel() instanceof DeviceAssignment || $query->getModel() instanceof DeviceAssetLink) {
+            $query->where('device_id', $this->currentDeviceId);
+        }
+
+        return $this->currentReads->query($query);
+    }
+
+    private function clientIsVisible(User $user, Client $client): bool
+    {
+        return $this->currentReads
+            ? app(ClientPolicy::class)->viewFromCurrentEvidence($user, $client, $this->currentReads)
+            : Gate::forUser($user)->allows('view', $client);
+    }
+
+    private function assetIsVisible(User $user, Asset $asset): bool
+    {
+        // AssetPolicy::view delegates to this exact canonical predicate.
+        return $this->currentReads ? $this->canAccessAsset($user, $asset) : Gate::forUser($user)->allows('view', $asset);
+    }
+
     private const ASSIGNMENT_PICKER_LIMIT = 500;
 
     /** @return list<int> */
@@ -38,7 +79,7 @@ class SecurityDevicesAccessService
             return $this->operationalSites()->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
         }
 
-        $profile = HrEmployeeProfile::query()
+        $profile = $this->current(HrEmployeeProfile::query())
             ->where('user_id', $user->getKey())
             ->where('is_active', true)
             ->where(function (Builder $query): void {
@@ -57,7 +98,7 @@ class SecurityDevicesAccessService
         // Historic schemas may carry a direct pointer. It is accepted only as
         // a Site identifier; Site remains the canonical authorization record.
         if (Schema::hasColumn('users', 'site_id')) {
-            $ids->push(User::query()->whereKey($user->getKey())->value('site_id'));
+            $ids->push($this->current(User::query())->whereKey($user->getKey())->value('site_id'));
         }
 
         $ids = $ids
@@ -133,7 +174,7 @@ class SecurityDevicesAccessService
     public function assignableStaff(User $user): Builder
     {
         $siteIds = $this->accessibleSiteIds($user);
-        $query = User::query()
+        $query = $this->current(User::query())
             ->whereNotNull('approved_at')
             ->whereHas('hrEmployeeProfile', fn (Builder $profile): Builder => $this->applyCurrentStaffSiteScope($profile, $siteIds));
 
@@ -187,7 +228,7 @@ class SecurityDevicesAccessService
             ->orderBy('id')
             ->limit(self::ASSIGNMENT_PICKER_LIMIT)
             ->get()
-            ->filter(fn (Client $client): bool => Gate::forUser($user)->allows('view', $client))
+            ->filter(fn (Client $client): bool => $this->clientIsVisible($user, $client))
             ->values();
 
         if ($selectedId !== null && ! $clients->contains('id', $selectedId)) {
@@ -208,7 +249,7 @@ class SecurityDevicesAccessService
         }
         $client = $query->first();
 
-        return $client instanceof Client && Gate::forUser($user)->allows('view', $client)
+        return $client instanceof Client && $this->clientIsVisible($user, $client)
             ? $client
             : null;
     }
@@ -218,7 +259,7 @@ class SecurityDevicesAccessService
     {
         return $this->assignableClientQuery($user)
             ->get()
-            ->filter(fn (Client $client): bool => Gate::forUser($user)->allows('view', $client))
+            ->filter(fn (Client $client): bool => $this->clientIsVisible($user, $client))
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
@@ -237,7 +278,7 @@ class SecurityDevicesAccessService
             ->orderBy('id')
             ->limit(self::ASSIGNMENT_PICKER_LIMIT)
             ->get()
-            ->filter(fn (Asset $asset): bool => $user->canDo('fleet.viewAny') || Gate::forUser($user)->allows('view', $asset))
+            ->filter(fn (Asset $asset): bool => $user->canDo('fleet.viewAny') || $this->assetIsVisible($user, $asset))
             ->values();
 
         if ($selectedId !== null && ! $assets->contains('id', $selectedId)) {
@@ -284,7 +325,7 @@ class SecurityDevicesAccessService
         $asset = $query->first();
 
         return $asset instanceof Asset
-            && ($user->canDo('fleet.viewAny') || Gate::forUser($user)->allows('view', $asset))
+            && ($user->canDo('fleet.viewAny') || $this->assetIsVisible($user, $asset))
                 ? $asset
                 : null;
     }
@@ -355,14 +396,14 @@ class SecurityDevicesAccessService
     public function authorizedAssetIds(User $user): array
     {
         return $this->assetCandidateQuery($user)
-            ->with('categoryRef:id,slug')
+            ->with(['categoryRef' => fn ($query) => $this->currentReads ? $this->currentReads->query($query->getQuery()) : $query])
             ->get()
             ->filter(function (Asset $asset) use ($user): bool {
                 $isVehicle = strcasecmp((string) $asset->category, 'vehicle') === 0
                     || $asset->categoryRef?->slug === 'vehicle';
 
                 return ($isVehicle && $user->canDo('fleet.viewAny'))
-                    || Gate::forUser($user)->allows('view', $asset);
+                    || $this->assetIsVisible($user, $asset);
             })
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
@@ -374,12 +415,12 @@ class SecurityDevicesAccessService
         $siteIds = $this->accessibleSiteIds($user);
         $roomIds = $siteIds === []
             ? []
-            : SiteRoom::query()->whereIn('site_id', $siteIds)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+            : $this->current(SiteRoom::query())->whereIn('site_id', $siteIds)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
         $clientIds = $this->accessibleAssignedClientIds($user);
         $staffIds = array_values(array_unique([(int) $user->getKey(), ...$this->accessibleAssignedStaffIds($user)]));
         $assetIds = $this->accessibleAssetIds($user);
 
-        $query = Device::query()->where(function (Builder $availability) use (
+        $query = $this->current(Device::query())->where(function (Builder $availability) use (
             $user,
             $siteIds,
             $roomIds,
@@ -493,21 +534,21 @@ class SecurityDevicesAccessService
             return $query->whereRaw('1 = 0');
         }
 
-        $roomIds = SiteRoom::query()
+        $roomIds = $this->current(SiteRoom::query())
             ->where('site_id', $siteId)
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
-        $clientIds = Client::query()
+        $clientIds = $this->current(Client::query())
             ->where('site_id', $siteId)
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
-        $staffIds = $this->applyCurrentStaffSiteScope(HrEmployeeProfile::query(), [$siteId])
+        $staffIds = $this->applyCurrentStaffSiteScope($this->current(HrEmployeeProfile::query()), [$siteId])
             ->pluck('user_id')
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
-        $assetIds = $this->applyAssetSiteScope(Asset::query(), [$siteId])
+        $assetIds = $this->applyAssetSiteScope($this->current(Asset::query()), [$siteId])
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
@@ -663,7 +704,7 @@ class SecurityDevicesAccessService
             return collect();
         }
 
-        return DeviceAssetLink::query()
+        return $this->current(DeviceAssetLink::query())
             ->active()
             ->whereIn('asset_id', $ids)
             ->whereIn('device_id', $this->visibleDevices($user)->select('devices.id'))
@@ -678,14 +719,14 @@ class SecurityDevicesAccessService
         $siteIds = $this->accessibleSiteIds($user);
         $roomIds = $siteIds === []
             ? []
-            : SiteRoom::query()->whereIn('site_id', $siteIds)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+            : $this->current(SiteRoom::query())->whereIn('site_id', $siteIds)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
         $assetIds = array_values(array_unique([
             ...$this->authorizedAssetIds($user),
             ...$this->accessibleHistoricalLinkedAssetIds($user),
         ]));
         $assetTargets = $assetIds === []
             ? collect()
-            : Asset::query()->whereKey($assetIds)->get(['client_id', 'primary_driver_user_id']);
+            : $this->current(Asset::query())->whereKey($assetIds)->get(['client_id', 'primary_driver_user_id']);
         $clientIds = array_values(array_unique([
             ...$this->authorizedClientIds($user),
             ...$this->accessibleHistoricalAssignedClientIds($user),
@@ -697,7 +738,7 @@ class SecurityDevicesAccessService
             ...$assetTargets->pluck('primary_driver_user_id')->filter()->map(fn (mixed $id): int => (int) $id)->all(),
         ]));
 
-        $query = Device::query()->where(function (Builder $visibility) use (
+        $query = $this->current(Device::query())->where(function (Builder $visibility) use (
             $siteIds,
             $roomIds,
             $clientIds,
@@ -772,7 +813,7 @@ class SecurityDevicesAccessService
             return [];
         }
 
-        $candidateIds = DeviceAssignment::query()
+        $candidateIds = $this->current(DeviceAssignment::query())
             ->active()
             ->where('assignable_type', DeviceAssignment::TARGET_STAFF)
             ->distinct()
@@ -781,7 +822,7 @@ class SecurityDevicesAccessService
             return [];
         }
 
-        return User::query()
+        return $this->current(User::query())
             ->whereKey($candidateIds)
             ->whereNotNull('approved_at')
             ->whereHas('hrEmployeeProfile', fn (Builder $profile): Builder => $this->applyCurrentStaffSiteScope(
@@ -796,10 +837,10 @@ class SecurityDevicesAccessService
     /** @return list<int> */
     public function accessibleAssetIds(User $user): array
     {
-        $candidateIds = DeviceAssetLink::query()
+        $candidateIds = $this->current(DeviceAssetLink::query())
             ->active()
             ->pluck('asset_id')
-            ->merge(DeviceAssignment::query()
+            ->merge($this->current(DeviceAssignment::query())
                 ->active()
                 ->where('assignable_type', DeviceAssignment::TARGET_VEHICLE)
                 ->pluck('assignable_id'))
@@ -810,15 +851,15 @@ class SecurityDevicesAccessService
             return [];
         }
 
-        return $this->applyAssetSiteScope(Asset::query()->whereKey($candidateIds), $this->accessibleSiteIds($user))
-            ->with('categoryRef:id,slug')
+        return $this->applyAssetSiteScope($this->current(Asset::query())->whereKey($candidateIds), $this->accessibleSiteIds($user))
+            ->with(['categoryRef' => fn ($query) => $this->currentReads ? $this->currentReads->query($query->getQuery()) : $query])
             ->get()
             ->filter(function (Asset $asset) use ($user): bool {
                 $isVehicle = strcasecmp((string) $asset->category, 'vehicle') === 0
                     || $asset->categoryRef?->slug === 'vehicle';
 
                 return ($isVehicle && $user->canDo('fleet.viewAny'))
-                    || Gate::forUser($user)->allows('view', $asset);
+                    || $this->assetIsVisible($user, $asset);
             })
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
@@ -828,7 +869,7 @@ class SecurityDevicesAccessService
     /** @return list<int> */
     private function accessibleAssignedClientIds(User $user): array
     {
-        $candidateIds = DeviceAssignment::query()
+        $candidateIds = $this->current(DeviceAssignment::query())
             ->active()
             ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
             ->distinct()
@@ -840,7 +881,7 @@ class SecurityDevicesAccessService
         return $this->assignableClientQuery($user)
             ->whereKey($candidateIds)
             ->get()
-            ->filter(fn (Client $client): bool => Gate::forUser($user)->allows('view', $client))
+            ->filter(fn (Client $client): bool => $this->clientIsVisible($user, $client))
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
@@ -849,7 +890,7 @@ class SecurityDevicesAccessService
     /** @return list<int> */
     private function accessibleHistoricalAssignedClientIds(User $user): array
     {
-        $candidateIds = DeviceAssignment::query()
+        $candidateIds = $this->current(DeviceAssignment::query())
             ->active()
             ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
             ->distinct()
@@ -869,7 +910,7 @@ class SecurityDevicesAccessService
             ->whereIn('site_id', $siteIds)
             ->whereHas('site', fn (Builder $site): Builder => $this->applyOperationalSiteScope($site))
             ->get()
-            ->filter(fn (Client $client): bool => Gate::forUser($user)->allows('view', $client))
+            ->filter(fn (Client $client): bool => $this->clientIsVisible($user, $client))
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
@@ -878,7 +919,7 @@ class SecurityDevicesAccessService
     /** @return list<int> */
     private function accessibleHistoricalLinkedAssetIds(User $user): array
     {
-        $candidateIds = DeviceAssetLink::query()
+        $candidateIds = $this->current(DeviceAssetLink::query())
             ->active()
             ->distinct()
             ->pluck('asset_id');
@@ -891,7 +932,7 @@ class SecurityDevicesAccessService
             return [];
         }
 
-        $assets = Asset::query()
+        $assets = $this->current(Asset::query())
             ->whereKey($candidateIds)
             ->whereNotNull('site_id')
             ->whereIn('site_id', $siteIds)
@@ -908,7 +949,7 @@ class SecurityDevicesAccessService
                     : $asset->site_id;
 
                 return (int) $historicalSiteId === (int) $asset->site_id
-                    && Gate::forUser($user)->allows('view', $asset);
+                    && $this->assetIsVisible($user, $asset);
             })
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
@@ -966,7 +1007,7 @@ class SecurityDevicesAccessService
 
         return match ($targetType) {
             DeviceAssignment::TARGET_SITE => $this->siteIsAccessible($user, $targetId),
-            DeviceAssignment::TARGET_ROOM => SiteRoom::query()
+            DeviceAssignment::TARGET_ROOM => $this->current(SiteRoom::query())
                 ->whereKey($targetId)
                 ->whereIn('site_id', $this->accessibleSiteIds($user))
                 ->whereHas('site', fn (Builder $site): Builder => $this->applyOperationalSiteScope($site))
@@ -1020,14 +1061,14 @@ class SecurityDevicesAccessService
         }
 
         return ($vehicleOnly && $user->canDo('fleet.viewAny'))
-            || Gate::forUser($user)->allows('view', $asset);
+            || $this->assetIsVisible($user, $asset);
     }
 
     private function assignableClientQuery(User $user): Builder
     {
         $siteIds = $this->accessibleSiteIds($user);
 
-        return Client::query()
+        return $this->current(Client::query())
             ->where('status', 'active')
             ->whereNotNull('site_id')
             ->when($siteIds === [], fn (Builder $query): Builder => $query->whereRaw('1 = 0'))
@@ -1037,7 +1078,7 @@ class SecurityDevicesAccessService
 
     private function assetCandidateQuery(User $user, bool $vehicleOnly = false): Builder
     {
-        $query = $this->applyAssetSiteScope(Asset::query(), $this->accessibleSiteIds($user));
+        $query = $this->applyAssetSiteScope($this->current(Asset::query()), $this->accessibleSiteIds($user));
 
         return $vehicleOnly ? $query->vehicles() : $query;
     }
@@ -1046,7 +1087,7 @@ class SecurityDevicesAccessService
     {
         return match ($targetType) {
             DeviceAssignment::TARGET_SITE => $this->siteIsAccessible($user, $targetId),
-            DeviceAssignment::TARGET_ROOM => SiteRoom::query()
+            DeviceAssignment::TARGET_ROOM => $this->current(SiteRoom::query())
                 ->whereKey($targetId)
                 ->whereIn('site_id', $this->accessibleSiteIds($user))
                 ->whereHas('site', fn (Builder $site): Builder => $this->applyOperationalSiteScope($site))
@@ -1057,14 +1098,14 @@ class SecurityDevicesAccessService
                 return ($client instanceof Client
                     && is_numeric($client->site_id)
                     && $this->siteIsAccessible($user, (int) $client->site_id)
-                    && Gate::forUser($user)->allows('view', $client))
-                    || Asset::query()
+                    && $this->clientIsVisible($user, $client))
+                    || $this->current(Asset::query())
                         ->whereKey($this->authorizedAssetIds($user))
                         ->where('client_id', $targetId)
                         ->exists();
             })(),
             DeviceAssignment::TARGET_STAFF => $this->assignableStaffMember($user, $targetId) !== null
-                || Asset::query()
+                || $this->current(Asset::query())
                     ->whereKey($this->authorizedAssetIds($user))
                     ->where('primary_driver_user_id', $targetId)
                     ->exists(),
@@ -1086,7 +1127,7 @@ class SecurityDevicesAccessService
 
     private function operationalSites(): Builder
     {
-        return $this->applyOperationalSiteScope(Site::query());
+        return $this->applyOperationalSiteScope($this->current(Site::query()));
     }
 
     private function applyOperationalSiteScope(Builder $query): Builder
@@ -1195,10 +1236,10 @@ class SecurityDevicesAccessService
             return $query->whereRaw('1 = 0');
         }
 
-        $assignedClientIds = Client::query()
+        $assignedClientIds = $this->current(Client::query())
             ->select('clients.id')
             ->whereHas('supportWorkers', fn (Builder $workers): Builder => $workers->whereKey($user->id));
-        $assignedClientSiteIds = Client::query()
+        $assignedClientSiteIds = $this->current(Client::query())
             ->select('clients.site_id')
             ->whereNotNull('clients.site_id')
             ->whereHas('supportWorkers', fn (Builder $workers): Builder => $workers->whereKey($user->id));

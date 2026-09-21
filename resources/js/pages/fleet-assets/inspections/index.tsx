@@ -55,6 +55,7 @@ type Inspection = {
     } | null;
     user: { id: number; name: string } | null;
     passed: boolean;
+    outcome: 'passed' | 'failed' | 'needs_assessment' | null;
     notes: string | null;
     odometer: number | null;
     overall_condition: string | null;
@@ -65,6 +66,8 @@ type Inspection = {
 type Props = {
     inspections: Inspection[];
     vehicles: WizardVehicle[];
+    work_orders: Array<{ id: number; asset_id: number; reference_number: string | null; title: string;
+        attachments: Array<{ id: number; original_name: string }> }>;
     filters: {
         search?: string;
         vehicle_id?: string;
@@ -86,8 +89,11 @@ type Props = {
     };
 };
 
-function resultBadge(passed: boolean) {
-    return passed ? (
+function resultBadge(outcome: Inspection['outcome']) {
+    if (outcome !== 'passed' && outcome !== 'failed') {
+        return <Badge variant="outline">Needs assessment</Badge>;
+    }
+    return outcome === 'passed' ? (
         <Badge variant="default" className="bg-status-success">
             <CheckCircle className="mr-1 h-3 w-3" /> Pass
         </Badge>
@@ -108,6 +114,7 @@ function typeBadge(type: string) {
 export default function InspectionsIndex({
     inspections,
     vehicles,
+    work_orders,
     filters,
     stats,
     preselected_asset_id,
@@ -301,6 +308,9 @@ export default function InspectionsIndex({
                                         <SelectItem value="fail">
                                             Fail
                                         </SelectItem>
+                                        <SelectItem value="needs_assessment">
+                                            Needs assessment
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -409,7 +419,7 @@ export default function InspectionsIndex({
                                                 )}
                                             </TableCell>
                                             <TableCell data-fleet-row-status>
-                                                {resultBadge(insp.passed)}
+                                                {resultBadge(insp.outcome)}
                                             </TableCell>
                                             <TableCell className="capitalize">
                                                 {insp.overall_condition ??
@@ -446,6 +456,7 @@ export default function InspectionsIndex({
                         open={wizardOpen}
                         onClose={() => setWizardOpen(false)}
                         vehicles={vehicles ?? []}
+                        workOrders={work_orders ?? []}
                         preselectedAssetId={preselected_asset_id}
                         preselectedType={preselected_type}
                         bookingId={booking_id}

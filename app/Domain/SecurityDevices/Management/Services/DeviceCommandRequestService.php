@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Management\Services;
 
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
+use App\Domain\SecurityDevices\Management\Data\ClientLocationCommandOrigin;
 use App\Domain\SecurityDevices\Management\Data\CommandCapabilityDefinition;
 use App\Domain\SecurityDevices\Management\Data\CommandRequestInput;
 use App\Domain\SecurityDevices\Management\Data\CommandSigningPayload;
@@ -11,9 +12,13 @@ use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandRequest;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Models\Client;
 use App\Models\User;
+use App\Services\Tracking\ClientLocationCommandContext;
+use App\Services\Tracking\ClientLocationEvidenceBusy;
 use Carbon\CarbonImmutable;
 use DomainException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -44,8 +49,54 @@ final class DeviceCommandRequestService
 
     public function request(Device $device, User $actor, CommandRequestInput $input): DeviceCommandRequest
     {
+        $reserved = str_starts_with(strtolower(trim($input->idempotencyKey)), 'client-location');
+        if ($reserved && ($input->originContext === null
+            || preg_match('/^client-location:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/D', $input->idempotencyKey) !== 1)) {
+            throw ValidationException::withMessages(['idempotency_key' => 'This request key requires a valid server-owned client context.']);
+        }
+        if ($input->originContext === null) {
+            return $this->requestCanonical($device, $actor, $input);
+        }
+        if ($input->breakGlass || ($input->capability === 'tracking.location_refresh' && $input->itChangeId !== null)) {
+            throw ValidationException::withMessages(['capability' => 'This client tracking request is not supported.']);
+        }
+        app(ClientLocationCommandContext::class)->assertSupported($device, $input->capability, $input->parameters);
+
+        $owningTransaction = DB::transactionLevel() === 0;
+        for ($retry = 0; $retry < 3; $retry++) {
+            try {
+                return DB::transaction(function () use ($device, $actor, $input): DeviceCommandRequest {
+                    $existing = DeviceCommandRequest::query()->where('device_id', $device->id)
+                        ->where('requested_by_user_id', $actor->id)->where('capability', $input->capability)
+                        ->where('idempotency_key', $input->idempotencyKey)->lockForUpdate()->first();
+                    if ($existing && ($existing->origin_context === null
+                        || ClientLocationCommandOrigin::fromArray($existing->origin_context)->toArray() !== $input->originContext->toArray())) {
+                        throw ValidationException::withMessages(['idempotency_key' => 'This request key belongs to a different client context.']);
+                    }
+                    $client = Client::query()->findOrFail($input->originContext->clientId);
+                    $current = app(ClientLocationCommandContext::class)->lock($input->originContext, $actor, (int) $device->id, (int) $client->site_id, $input->capability);
+                    app(ClientLocationCommandContext::class)->assertSupported($current['device'], $input->capability, $input->parameters);
+
+                    return $this->requestCanonical($current['device'], $current['actor'], $input, $existing, $current);
+                }, 3);
+            } catch (UniqueConstraintViolationException $error) {
+                // Under READ COMMITTED an absent-key read has no gap lock.
+                // Never acquire the winner's request beneath context evidence:
+                // unwind first, then repeat with the existing-command order.
+                if (! $owningTransaction || $retry === 2) {
+                    throw new ClientLocationEvidenceBusy('This request is being recorded. Retry the same request.', previous: $error);
+                }
+            }
+        }
+        throw new \LogicException('Unreachable request retry state.');
+    }
+
+    private function requestCanonical(Device $device, User $actor, CommandRequestInput $input, ?DeviceCommandRequest $clientExisting = null, ?array $clientCurrent = null): DeviceCommandRequest
+    {
         abort_unless($actor->canDo('securityDevices.devices.view'), 403);
-        $this->access->assertCanViewDevice($actor, $device);
+        if ($clientCurrent === null) {
+            $this->access->assertCanViewDevice($actor, $device);
+        }
         try {
             $capability = $this->capabilities->definition($input->capability);
         } catch (DomainException) {
@@ -53,7 +104,7 @@ final class DeviceCommandRequestService
                 'capability' => 'This management action is not recognised.',
             ]);
         }
-        $authorization = $this->authorization->evaluate(
+        $authorization = $clientCurrent['authorization'] ?? $this->authorization->evaluate(
             $actor,
             $device,
             $capability,
@@ -75,8 +126,8 @@ final class DeviceCommandRequestService
         }
 
         try {
-            $siteId = $this->siteResolver->resolve((int) $device->id);
-            $assignmentFingerprint = $this->assignments->forDevice($device);
+            $siteId = $clientCurrent['canonicalSiteId'] ?? $this->siteResolver->resolve((int) $device->id);
+            $assignmentFingerprint = $clientCurrent['assignmentFingerprint'] ?? $this->assignments->forDevice($device);
         } catch (UnexpectedValueException) {
             abort(404);
         }
@@ -174,7 +225,7 @@ final class DeviceCommandRequestService
         $change = $input->itChangeId !== null
             ? $this->changeEligibility->assertEligible($input->itChangeId, $actor, $device, $siteId, $now)
             : null;
-        $existing = DeviceCommandRequest::query()
+        $existing = $input->originContext !== null ? $clientExisting : DeviceCommandRequest::query()
             ->where('idempotency_key', $idempotencyKey)
             ->where('device_id', $device->id)
             ->where('requested_by_user_id', $actor->id)
@@ -193,6 +244,7 @@ final class DeviceCommandRequestService
                 $breakGlassReviewer?->id,
                 $stepUpConfirmedAt,
                 $now,
+                $input->originContext,
             );
             $this->intakeAudit->recordAllowed($resumed, $actor);
 
@@ -242,6 +294,7 @@ final class DeviceCommandRequestService
             assignmentFingerprint: $assignmentFingerprint,
             confirmationMode: $capability->isHighRisk() ? $capability->confirmationMode->value : null,
             impactAcknowledgedAt: $impactAcknowledgedAt,
+            originContext: $input->originContext,
         );
         $signature = $this->signer->sign($payload);
 
@@ -269,7 +322,9 @@ final class DeviceCommandRequestService
             $breakGlassReason,
             $now,
         ): DeviceCommandRequest {
-            $existing = DeviceCommandRequest::query()
+            // Client intake already checked and locked the key before its
+            // evidence graph. A concurrent insertion is handled after rollback.
+            $existing = $input->originContext !== null ? null : DeviceCommandRequest::query()
                 ->where('idempotency_key', $idempotencyKey)
                 ->where('device_id', $device->id)
                 ->where('requested_by_user_id', $actor->id)
@@ -285,6 +340,7 @@ final class DeviceCommandRequestService
                     $input->breakGlass,
                     $breakGlassReason,
                     $breakGlassReviewer?->id,
+                    $input->originContext,
                 );
                 $this->intakeAudit->recordAllowed($existing, $actor);
 
@@ -296,6 +352,7 @@ final class DeviceCommandRequestService
                 'device_id' => $device->id,
                 'site_id' => $siteId,
                 'assignment_fingerprint' => $assignmentFingerprint,
+                'origin_context' => $input->originContext?->toArray(),
                 'requested_by_user_id' => $actor->id,
                 'it_change_id' => $change?->id,
                 'collector_id' => $collectorId,
@@ -374,6 +431,7 @@ final class DeviceCommandRequestService
         ?int $breakGlassReviewerUserId,
         ?CarbonImmutable $stepUpConfirmedAt,
         CarbonImmutable $now,
+        ?ClientLocationCommandOrigin $originContext,
     ): DeviceCommandRequest {
         $this->assertIdempotentContract(
             $existing,
@@ -383,6 +441,7 @@ final class DeviceCommandRequestService
             $isBreakGlass,
             $breakGlassReason,
             $breakGlassReviewerUserId,
+            $originContext,
         );
 
         return DB::transaction(function () use ($existing, $actor, $capability, $stepUpConfirmedAt, $now): DeviceCommandRequest {
@@ -436,8 +495,11 @@ final class DeviceCommandRequestService
         bool $isBreakGlass,
         ?string $breakGlassReason,
         ?int $breakGlassReviewerUserId,
+        ?ClientLocationCommandOrigin $originContext,
     ): void {
-        if ($existing->encrypted_parameters !== $parameters
+        $existingOrigin = $existing->origin_context === null ? null : ClientLocationCommandOrigin::fromArray($existing->origin_context)->toArray();
+        if ($existingOrigin !== $originContext?->toArray()
+            || $existing->encrypted_parameters !== $parameters
             || $existing->reason !== $reason
             || (int) ($existing->it_change_id ?? 0) !== (int) ($itChangeId ?? 0)
             || $existing->is_break_glass !== $isBreakGlass

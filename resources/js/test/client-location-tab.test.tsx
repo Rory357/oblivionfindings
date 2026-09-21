@@ -28,7 +28,7 @@ vi.mock('@inertiajs/react', () => ({
     },
 }));
 
-vi.mock('@/components/leaflet-map', () => ({
+vi.mock('@/components/client-location/client-location-map', () => ({
     default: () => <div data-testid="client-location-map" />,
 }));
 
@@ -39,12 +39,19 @@ beforeEach(() => {
         vi.fn().mockResolvedValue({
             ok: true,
             status: 200,
-            json: async () => ({ active: true, export_allowed: false }),
+            json: async () => ({
+                active: true,
+                export_allowed: false,
+                access_fingerprint: 'a'.repeat(64),
+                available: true,
+                request: null,
+                checked_at: '2026-09-21T01:00:00Z',
+            }),
         }),
     );
 });
 
-it('renders the unified resident sidebar and queues Locate Now', async () => {
+it('renders the location workspace and opens the governed Locate now workflow', async () => {
     render(
         <ClientLocationTab
             clientId={9012}
@@ -53,6 +60,7 @@ it('renders the unified resident sidebar and queues Locate Now', async () => {
             clientPhoto={null}
             location={{
                 privacyStatusUrl: '/privacy-status',
+                accessFingerprint: 'a'.repeat(64),
                 canManage: true,
                 tracker: {
                     id: 12,
@@ -73,6 +81,8 @@ it('renders the unified resident sidebar and queues Locate Now', async () => {
                     panic_active: false,
                     locate_now_url:
                         '/operations/clients/9012/location/locate-now',
+                    locate_requests_url:
+                        '/operations/clients/9012/location/locate-requests',
                     acknowledge_panic_url:
                         '/operations/clients/9012/location/acknowledge-panic',
                     last_command_status: 'acked',
@@ -91,6 +101,7 @@ it('renders the unified resident sidebar and queues Locate Now', async () => {
                 currentLocation: {
                     lat: -37.723657,
                     lng: 175.241655,
+                    address: '12 Example Street, Hamilton',
                     speed: 0,
                     heading: null,
                     accuracy: 8,
@@ -106,8 +117,12 @@ it('renders the unified resident sidebar and queues Locate Now', async () => {
         />,
     );
 
-    expect(await screen.findByText('Panic not currently active')).toBeVisible();
-    expect(screen.getByText('No panic events recorded')).toBeVisible();
+    expect(await screen.findByText('Status unconfirmed')).toBeVisible();
+    expect(screen.getByText('12 Example Street, Hamilton')).toBeVisible();
+    expect(screen.getByLabelText('Coordinates')).toHaveTextContent(
+        '-37.723657, 175.241655',
+    );
+    expect(screen.getByText('Alert time not recorded')).toBeVisible();
     expect(screen.getAllByText(/Charging/i).length).toBeGreaterThan(0);
     expect(screen.getByText('Acknowledged')).toBeVisible();
     expect(
@@ -122,11 +137,13 @@ it('renders the unified resident sidebar and queues Locate Now', async () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Locate Now/i }));
 
-    expect(inertiaMocks.post).toHaveBeenCalledWith(
-        '/operations/clients/9012/location/locate-now',
-        {},
-        expect.objectContaining({ preserveScroll: true }),
-    );
+    expect(
+        await screen.findByRole('dialog', { name: 'Locate now' }),
+    ).toBeVisible();
+    expect(
+        await screen.findByRole('button', { name: 'Request location' }),
+    ).toBeVisible();
+    expect(inertiaMocks.post).not.toHaveBeenCalled();
 });
 
 it('shows the active panic banner and acknowledges it', async () => {
@@ -176,7 +193,9 @@ it('shows the active panic banner and acknowledges it', async () => {
         />,
     );
 
-    expect(await screen.findByText('SOS received')).toBeVisible();
+    expect(
+        (await screen.findAllByText('Panic alert active')).length,
+    ).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: /Acknowledge/i }));
     expect(inertiaMocks.post).toHaveBeenCalledWith(
         '/operations/clients/42/location/acknowledge-panic',
@@ -236,9 +255,10 @@ it('does not expose tracker commands when the server omits management URLs', asy
         />,
     );
 
+    await screen.findByText('Read-only pendant');
     expect(
-        await screen.findByRole('button', { name: /Locate Now/i }),
-    ).toBeDisabled();
+        screen.queryByRole('button', { name: /Locate Now/i }),
+    ).not.toBeInTheDocument();
     expect(
         screen.queryByRole('button', { name: /Acknowledge/i }),
     ).not.toBeInTheDocument();
@@ -253,7 +273,6 @@ it('does not expose tracker commands when the server omits management URLs', asy
         screen.queryByRole('link', { name: /Device Profile/i }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Locate Now/i }));
     expect(inertiaMocks.post).not.toHaveBeenCalled();
 });
 
@@ -277,7 +296,7 @@ it('does not offer tracker assignment to a read-only location viewer', async () 
     );
 
     expect(
-        await screen.findByText('No Personal Tracker Assigned'),
+        await screen.findByText('No personal tracker assigned'),
     ).toBeVisible();
     expect(
         screen.queryByRole('link', { name: /Assign Tracker/i }),

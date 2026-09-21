@@ -1,0 +1,37 @@
+{
+  "cards": [
+    {
+      "childrenFit": true,
+      "height": 94,
+      "text": "Next shift3:00 pmJamie Taylor · Example House",
+      "width": 242
+    },
+    {
+      "childrenFit": true,
+      "height": 94,
+      "text": "Needs attention1A care review is due",
+      "width": 242
+    },
+    {
+      "childrenFit": true,
+      "height": 94,
+      "text": "SafetyCare planView current support guidance",
+      "width": 242
+    },
+    {
+      "childrenFit": true,
+      "height": 94,
+      "text": "Care plan goals2 of 3Recorded goal progress",
+      "width": 242
+    },
+    {
+      "childrenFit": true,
+      "height": 93.99998474121094,
+      "text": "Daily notes4Notes recorded today",
+      "width": 491
+    }
+  ],
+  "height": 400,
+  "overflow": false,
+  "width": 640
+}

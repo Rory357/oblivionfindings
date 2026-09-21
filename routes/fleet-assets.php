@@ -18,6 +18,7 @@ use App\Http\Controllers\FleetAssets\InspectionController;
 use App\Http\Controllers\FleetAssets\KeyController;
 use App\Http\Controllers\FleetAssets\LiveMapController;
 use App\Http\Controllers\FleetAssets\MaintenanceDashboardController;
+use App\Http\Controllers\FleetAssets\MaintenanceAttachmentController;
 use App\Http\Controllers\FleetAssets\MileageController;
 use App\Http\Controllers\FleetAssets\OutingController;
 use App\Http\Controllers\FleetAssets\ReportController;
@@ -161,8 +162,6 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     Route::middleware('permission:fleet.viewAny|assets.viewAny')->group(function () {
         Route::get('/maintenance/dashboard', MaintenanceDashboardController::class)->name('fleet-assets.maintenance.dashboard');
         Route::get('/maintenance/work-orders', [WorkOrderController::class, 'index'])->name('fleet-assets.work-orders.index');
-        Route::get('/maintenance/work-orders/create', [WorkOrderController::class, 'create'])->name('fleet-assets.work-orders.create');
-        Route::get('/maintenance/work-orders/{workOrder}', [WorkOrderController::class, 'show'])->whereNumber('workOrder')->name('fleet-assets.work-orders.show');
 
         Route::get('/maintenance/checklists', [ChecklistController::class, 'index'])->name('fleet-assets.checklists.index');
         Route::get('/maintenance/checklists/run', [ChecklistController::class, 'runPage'])->name('fleet-assets.checklists.run-page');
@@ -175,12 +174,26 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::get('/inspections/{run}', [InspectionController::class, 'show'])->whereNumber('run')->name('fleet-assets.inspections.show');
     });
 
-    // Maintenance — write (requires maintenance manage or fleet manage)
-    Route::middleware('permission:fleet.maintenance.manage|fleet.manage')->group(function () {
+    // Frontline workers can submit a scoped report without management access.
+    Route::middleware('permission:fleet.maintenance.report|fleet.maintenance.manage|fleet.manage')->group(function () {
+        Route::get('/maintenance/work-orders/create', [WorkOrderController::class, 'create'])->name('fleet-assets.work-orders.create');
         Route::get('/maintenance/work-orders/options/search', [WorkOrderController::class, 'searchOptions'])->name('fleet-assets.work-orders.options.search');
         Route::post('/maintenance/work-orders', [WorkOrderController::class, 'store'])->name('fleet-assets.work-orders.store');
-        Route::put('/maintenance/work-orders/{workOrder}', [WorkOrderController::class, 'update'])->whereNumber('workOrder')->name('fleet-assets.work-orders.update');
+    });
+    Route::get('/maintenance/work-orders/{workOrder}', [WorkOrderController::class, 'show'])->whereNumber('workOrder')->name('fleet-assets.work-orders.show');
+    Route::put('/maintenance/work-orders/{workOrder}', [WorkOrderController::class, 'update'])->whereNumber('workOrder')->name('fleet-assets.work-orders.update');
+    Route::post('/maintenance/work-orders/{workOrder}/attachments', [MaintenanceAttachmentController::class, 'store'])->whereNumber('workOrder')->name('fleet-assets.work-orders.attachments.store');
+    Route::get('/maintenance/work-orders/{workOrder}/attachments/{attachment}', [MaintenanceAttachmentController::class, 'download'])->whereNumber('workOrder')->whereNumber('attachment')->name('fleet-assets.work-orders.attachments.download');
+
+    Route::get('/maintenance/checklists/runs/{run}/evidence/{question}', [ChecklistController::class, 'evidence'])
+        ->whereNumber('run')->name('fleet-assets.checklists.evidence');
+
+    // Maintenance — write (requires maintenance manage or fleet manage)
+    Route::middleware('permission:fleet.maintenance.manage|fleet.manage')->group(function () {
         Route::post('/maintenance/work-orders/bulk-action', [WorkOrderController::class, 'bulkAction'])->name('fleet-assets.work-orders.bulk-action');
+        Route::post('/maintenance/work-orders/{workOrder}/retests', [WorkOrderController::class, 'retest'])->whereNumber('workOrder')->name('fleet-assets.work-orders.retests.store');
+        Route::post('/maintenance/work-orders/{workOrder}/checks', [WorkOrderController::class, 'check'])->whereNumber('workOrder')->name('fleet-assets.work-orders.checks.store');
+        Route::post('/maintenance/work-orders/{workOrder}/finance-bills', [WorkOrderController::class, 'linkBill'])->whereNumber('workOrder')->name('fleet-assets.work-orders.finance-bills.store');
 
         Route::post('/maintenance/checklists', [ChecklistController::class, 'store'])->name('fleet-assets.checklists.store');
         Route::post('/maintenance/checklists/{template}/run', [ChecklistController::class, 'run'])->whereNumber('template')->name('fleet-assets.checklists.run');

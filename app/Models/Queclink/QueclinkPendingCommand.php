@@ -60,6 +60,7 @@ class QueclinkPendingCommand extends Model
     ];
 
     protected $hidden = [
+        'was_governed',
         'raw_command',
         'raw_command_encrypted',
         'ack_response',
@@ -67,6 +68,7 @@ class QueclinkPendingCommand extends Model
     ];
 
     protected $casts = [
+        'was_governed' => 'boolean',
         'governed_sequence' => 'integer',
         'sent_at' => 'datetime',
         'acked_at' => 'datetime',
@@ -75,6 +77,20 @@ class QueclinkPendingCommand extends Model
         'cancelled_at' => 'datetime',
         'expires_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $command): void {
+            if ($command->getRawOriginal('was_governed') && ! $command->was_governed) {
+                throw new \LogicException('Governed command provenance cannot be removed.');
+            }
+            // Not fillable: linkage itself establishes server-owned provenance,
+            // in the very same INSERT/UPDATE, including partial corrupt linkage.
+            if ($command->device_command_request_id !== null || $command->device_command_attempt_id !== null) {
+                $command->was_governed = true;
+            }
+        });
+    }
 
     protected function rawCommand(): Attribute
     {

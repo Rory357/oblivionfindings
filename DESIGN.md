@@ -157,6 +157,55 @@ meter row).
 - **Simple dialogs** (single-section forms, confirmations, detail viewers) —
   follow `design_styles/POPUP_STYLE_GUIDE.md` exactly (shell/body split,
   `_dialogs.tsx` co-location, width tokens, tile pickers).
+- **Premium attachment uploads** (approved by Stephan 2026-09-20) — invoice,
+  evidence, photo and document fields reuse `FileDropzone` + `StagedFileCard`
+  from `components/ui/file-dropzone.tsx`. Keep browse and keyboard access
+  alongside drag/drop, show the owning module's file limits and truthful
+  staged/uploading/saved/error states, and retain entries on failure.
+  `AttachmentUploader` is for compatible existing-record endpoints; shared
+  upload chrome does not supply storage, permissions or business approval.
+  Full contract: `design_styles/POPUP_STYLE_GUIDE.md` § "Premium attachment uploads".
+- **Searchable record selection in dialogs** (approved by Stephan 2026-09-20) —
+  growing directories such as assets, vehicles, people and sites use a
+  searchable picker, not a long unsearchable dropdown. Reuse shared
+  `Popover` / `Command` primitives and an appropriate existing domain picker;
+  show names with useful references/context and retain the canonical ID.
+  Large lists use scoped server search with bounded results and clear
+  loading/empty/error states. Small fixed choices keep their existing control;
+  locked parent context stays locked. Full contract:
+  `design_styles/POPUP_STYLE_GUIDE.md` § "Searchable record selectors".
+- **Calendar date and range selection** (approved by Stephan 2026-09-20) —
+  operational planning forms use the same visible calendar-selection pattern
+  and chosen-date/range summary, including Report a problem and Plan appointment.
+  Inspect `components/hr/leave-calendar-range.tsx` for the existing interaction;
+  keep HR entitlement/hours/holiday policy with HR. Required dates stay required;
+  offer Not known yet only where the owning workflow permits it. For timed
+  appointments, place separate start/end times with a visible timezone below
+  the dates. Preserve local-date meaning, validation and drafts. Full contract:
+  `design_styles/POPUP_STYLE_GUIDE.md` § "Calendar date and range selection".
+  The single-date variant (approved by Stephan 2026-09-20) also covers observation
+  dates and deadlines: reuse the calendar interaction with one selected day,
+  local Cancel/Use date and preservation of the paired time. Keep date ranges
+  only where the owning workflow needs a range; see that guide's single-date
+  clarification.
+- **Clock and manual time entry** (approved by Stephan 2026-09-20) — operational
+  date/time fields pair a consistent hour/minute clock picker with obvious manual
+  entry and AM/PM controls. Accept every exact minute without rounding; keep
+  local edits pending until Use time, and preserve the prior value on Cancel or
+  Escape. Show the applicable timezone, keep controls labelled and keyboard
+  operable, and preserve parent interval validation and recovery. Canonical
+  `HH:mm` values stay separate from display; real scheduling requires explicit
+  daylight-saving handling. Reuse shared primitives/tokens; the design prototype
+  is not an existing production time component. Full contract:
+  `design_styles/POPUP_STYLE_GUIDE.md` § "Clock and manual time entry".
+- **Ticket-style work/record details** (approved by Stephan 2026-09-20) —
+  suitable work orders, support issues and other owned-action records share a
+  consistent body hierarchy: concise summary and linked sources, compact notes,
+  prominent next action/progress, ownership, evidence and guarded completion.
+  Keep the existing PageHeader/navigation and modal contracts. Each module owns
+  terminology, fields, tabs, statuses, permissions and lifecycle; do not rename
+  every record Ticket or copy Maintenance's release process into other modules.
+  Full contract: `design_styles/WORK_RECORD_STYLE_GUIDE.md`.
 - **Buttons — the "soft depth" treatment (approved 2026-09-04).** Primary
   (`default`) = gradient-lit primary with inner highlight + violet glow;
   secondary (`outline`) = card surface with soft shadow and
@@ -626,6 +675,34 @@ file. Concrete, mechanically-checkable probes:
     remaining readiness/onboarding displays. `pages/sites/index.tsx`
     (2026-09-06, the reference) and
     `pages/operations/clients/index.tsx` (2026-09-07) are migrated.
+19. **Attachment and selector coverage** (approved by Stephan 2026-09-20) —
+    flag plain visible file inputs or bespoke upload chrome for document /
+    invoice / evidence fields instead of the shared premium pattern; missing
+    type/size/count guidance or false "uploaded" states; and growing record
+    directories rendered as unsearchable selects. Check keyboard access,
+    error/retry/selection retention and scoped search against
+    `design_styles/POPUP_STYLE_GUIDE.md`. These are conformance targets,
+    not a claim that every existing caller already meets them.
+20. **Planning-date consistency** (approved by Stephan 2026-09-20) — check
+    operational date/range forms against the shared calendar-selection pattern,
+    visible range summary, module-specific required/optional states, separate
+    times/timezone where applicable, error focus and retained entries in
+    `design_styles/POPUP_STYLE_GUIDE.md`. Flag copied HR policy, silent date
+    shifts and a calendar selection presented as a confirmed booking.
+21. **Time-entry consistency** (approved by Stephan 2026-09-20) — check operational
+    time fields for clock and manual entry, exact-minute retention, correct
+    noon/midnight conversion, labelled keyboard controls, invalid-input feedback,
+    Cancel/Apply and picker-first Escape/focus. Check timezone/interval rules,
+    Review/Back and failed-save retention, and a visible action footer against
+    `design_styles/POPUP_STYLE_GUIDE.md`. A styled picker does not prove DST,
+    persistence or scheduling conformance, or authorise a shared-component edit.
+22. **Work-record detail consistency** (approved by Stephan 2026-09-20) —
+    check suitable owned-action detail pages against
+    `design_styles/WORK_RECORD_STYLE_GUIDE.md`: stable identity/source links,
+    summary/action hierarchy, compact recoverable notes, accountable ownership,
+    module-owned progress and an obvious guarded completion path. Flag copied
+    domain statuses, forced Ticket terminology, hidden essential blockers and
+    parallel task/evidence identities. This is not a bulk migration instruction.
 
 Report findings grouped by pattern with file:line references; fix only when
 asked, and migrate one pattern at a time.
@@ -650,6 +727,7 @@ This file only works if it reflects reality. The loop:
 - `design_styles/DESIGN_TOKENS.md` — full token reference, charts, adding tokens
 - `design_styles/APP_SHELL_STYLE_GUIDE.md` — the global shell: ink header + sidebar chrome, collapse behaviour, grey page ground
 - `design_styles/POPUP_STYLE_GUIDE.md` — dialog anatomy and conventions
+- `design_styles/WORK_RECORD_STYLE_GUIDE.md` — ticket-style work/issue detail hierarchy with module-owned terminology and lifecycle
 - `design_styles/BUTTON_STYLE_GUIDE.md` — the soft-depth button spec (primary/outline)
 - `design_styles/NAVIGATION_STYLE_GUIDE.md` — two-tier section nav (connected tab + toned strip)
 - `design_styles/LOADER_STYLE_GUIDE.md` — the Event Horizon brand loader (+ ring-only inline variant)
