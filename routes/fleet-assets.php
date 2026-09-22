@@ -27,6 +27,7 @@ use App\Http\Controllers\FleetAssets\ResidentTransportController;
 use App\Http\Controllers\FleetAssets\ServiceScheduleController;
 use App\Http\Controllers\FleetAssets\VehicleBookingController;
 use App\Http\Controllers\FleetAssets\VehicleController;
+use App\Http\Controllers\FleetAssets\VehicleEvidenceController;
 use App\Http\Controllers\FleetAssets\WanderingAlertController;
 use App\Http\Controllers\FleetAssets\WorkOrderController;
 use Illuminate\Support\Facades\Route;
@@ -63,6 +64,10 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::put('/vehicles/{asset}', [VehicleController::class, 'update'])->whereNumber('asset')->name('fleet-assets.vehicles.update');
         Route::post('/vehicles/bulk-action', [VehicleController::class, 'bulkAction'])->name('fleet-assets.vehicles.bulk-action');
         Route::post('/vehicles/{asset}/alerts-config', [VehicleController::class, 'saveAlertsConfig'])->whereNumber('asset')->name('fleet-assets.vehicles.alerts-config.save');
+        Route::post('/vehicles/{asset}/compliance/{kind}', [VehicleEvidenceController::class, 'compliance'])
+            ->whereNumber('asset')->whereIn('kind', ['registration', 'wof', 'cof', 'ruc'])->name('fleet-assets.vehicles.compliance.store');
+        Route::post('/vehicles/{asset}/odometer-observations', [VehicleEvidenceController::class, 'odometer'])
+            ->whereNumber('asset')->name('fleet-assets.vehicles.odometer.store');
         Route::post('/trips/{trip}/toggle-personal', [VehicleController::class, 'markPersonal'])->whereNumber('trip')->name('fleet-assets.trips.toggle-personal');
         Route::post('/fuel', [VehicleController::class, 'storeFuel'])->name('fleet-assets.fuel.store');
     });

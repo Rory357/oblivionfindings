@@ -6,6 +6,7 @@ use App\Domain\Finance\Presenters\AssetFinanceTechnologyProjectionPresenter;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
+use App\Models\AssetCategory;
 use App\Models\AssetAssignment;
 use App\Models\Client;
 use App\Models\ClientEmergencyContact;
@@ -574,6 +575,10 @@ class AssetController extends Controller
             'maintenance_due_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
+        if ($this->payloadIsVehicle($data)
+            && $request->hasAny(['registration_expires_at', 'wof_expires_at', 'cof_expires_at', 'odometer_km'])) {
+            throw ValidationException::withMessages(['vehicle_evidence' => 'Create the vehicle first, then record compliance and odometer evidence through its versioned evidence actions.']);
+        }
 
         $fleetFields = ['home_site_id', 'registration_number', 'registration_expires_at', 'wof_expires_at', 'cof_expires_at', 'fuel_type', 'odometer_km'];
         if (! $this->hasFleetFields()) {
@@ -655,6 +660,10 @@ class AssetController extends Controller
             'maintenance_due_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
+        if ((Asset::vehicles()->whereKey($asset->id)->exists() || $this->payloadIsVehicle($data))
+            && $request->hasAny(['registration_expires_at', 'wof_expires_at', 'cof_expires_at', 'odometer_km'])) {
+            throw ValidationException::withMessages(['vehicle_evidence' => 'Record compliance and odometer evidence through the versioned vehicle evidence actions.']);
+        }
 
         $fleetFields = ['home_site_id', 'registration_number', 'registration_expires_at', 'wof_expires_at', 'cof_expires_at', 'fuel_type', 'odometer_km'];
         if (! $this->hasFleetFields()) {
@@ -717,5 +726,17 @@ class AssetController extends Controller
         }
 
         return $query->first() ?? abort(404);
+    }
+
+    /** @param array<string,mixed> $data */
+    private function payloadIsVehicle(array $data): bool
+    {
+        if (strcasecmp((string) ($data['category'] ?? ''), 'vehicle') === 0) {
+            return true;
+        }
+
+        return ! empty($data['asset_category_id'])
+            && AssetCategory::query()->whereKey((int) $data['asset_category_id'])
+                ->whereRaw('LOWER(slug) = ?', ['vehicle'])->exists();
     }
 }

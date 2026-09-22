@@ -281,6 +281,16 @@ class Asset extends Model
         return $this->hasMany(FleetServiceSchedule::class);
     }
 
+    public function complianceRecords(): HasMany
+    {
+        return $this->hasMany(FleetVehicleComplianceRecord::class);
+    }
+
+    public function odometerObservations(): HasMany
+    {
+        return $this->hasMany(FleetVehicleOdometerObservation::class);
+    }
+
     public function fleetIncidents(): HasMany
     {
         return $this->hasMany(FleetIncident::class);

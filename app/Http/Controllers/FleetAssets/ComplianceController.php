@@ -2,21 +2,31 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
-use App\Models\Asset;
+use App\Models\User;
+use App\Services\Fleet\Data\VehicleReadinessContext;
+use App\Services\Fleet\VehicleReadinessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class ComplianceController extends Controller
 {
+    public function __construct(
+        private readonly SecurityDevicesAccessService $access,
+        private readonly VehicleReadinessService $readiness,
+    ) {}
+
     public function index(Request $request)
     {
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 403);
         $hasFleetFields = Schema::hasColumn('assets', 'home_site_id');
 
         $eagerLoads = ['homeSite'];
 
-        $query = Asset::vehicles();
+        $query = $this->access->accessibleAssets($actor, true);
         if ($hasFleetFields) {
             $query->with($eagerLoads);
         }
@@ -63,6 +73,11 @@ class ComplianceController extends Controller
                 $status = 'warning';
             }
 
+            $readiness = $this->readiness->assess($v, new VehicleReadinessContext);
+            if (! $readiness->canProceed) {
+                $status = 'critical';
+            }
+
             return [
                 'id' => $v->id,
                 'name' => $v->name,
@@ -78,6 +93,7 @@ class ComplianceController extends Controller
                 ] : null,
                 'status' => $status,
                 'worst_days' => $worstDays === PHP_INT_MAX ? null : (int) $worstDays,
+                'readiness' => $readiness->toArray(),
             ];
         });
 
