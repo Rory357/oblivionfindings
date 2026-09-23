@@ -1,0 +1,249 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button "Home":
+      - generic: Home
+    - button "My day":
+      - generic: My day
+    - button "Clients":
+      - generic: Clients
+    - button "Sites":
+      - generic: Sites
+    - generic: Fleet & assets
+    - button "Overview":
+      - generic: Overview
+    - button "Vehicles":
+      - generic: Vehicles
+    - button "Bookings":
+      - generic: Bookings
+    - button "Maintenance":
+      - generic: Maintenance
+    - button "Assets":
+      - generic: Assets
+    - button "Reports":
+      - generic: Reports
+    - button "Settings":
+      - generic: Settings
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Overview":
+      - generic: Overview
+    - tab "Service & compliance":
+      - generic: Service & compliance
+    - tab "Checks & inspections":
+      - generic: Checks & inspections
+    - tab "Maintenance":
+      - generic: Maintenance
+    - tab "Map" [selected]:
+      - generic: Map
+    - button "More views (2)":
+      - generic: More
+    - button "Find a section":
+      - generic: Find
+      - generic: /
+  - tablist "Vehicle sections":
+    - tab "Location & geofences":
+      - text: Location & geofences
+    - tab "Vehicle telemetry":
+      - text: Vehicle telemetry
+    - tab "Driving insights" [active] [selected]:
+      - text: Driving insights
+    - tab "Alerts & Control Room":
+      - text: Alerts & Control Room
+  - tabpanel:
+    - navigation "Driving workspace":
+      - button "Analytics" [pressed]
+      - button "Reviews & coaching"
+      - button "Speed limits"
+    - generic: DRIVING INSIGHTS
+    - heading "Driving analytics" [level=2]
+    - paragraph: Trip trends, driving events and response workflows.
+    - combobox "Driving period":
+      - option "Last 7 days" [selected]
+      - option "Today"
+    - combobox "Driver assignment":
+      - option "All assignments" [selected]
+      - option "Jamie Taylor"
+      - option "Alex Morgan"
+      - option "Unassigned"
+    - button "Score rules":
+      - text: Score rules
+    - strong:
+      - text: "95"
+      - generic: /100
+    - generic: VEHICLE PERIOD SCORE
+    - heading "Know what shaped the score" [level=3]
+    - paragraph: 2 of 3 trips scored · 10.5 km eligible. Partial trips excluded.
+    - generic: Illustrative · SCORE-DEMO-v2
+    - button "See calculation":
+      - text: See calculation
+    - generic: Recorded distance
+    - strong: 16.9 km
+    - generic: 3 trips · estimated
+    - generic: Overspeed episodes
+    - strong: "1"
+    - generic: 42s over trigger
+    - generic: Idle time
+    - strong: 8 min
+    - generic: 15% of recorded time
+    - generic: Driving events / 100 km
+    - strong: "28.6"
+    - generic: 10.5 km eligible · small sample
+    - generic: DAILY VEHICLE SCORE
+    - heading "See change over time" [level=3]
+    - generic: 0–100 points
+    - generic: "0"
+    - generic: "50"
+    - generic: "100"
+    - generic: 20 Sept 2026
+    - strong: "99"
+    - generic: 21 Sept 2026
+    - strong: "82"
+    - generic: 22 Sept 2026
+    - emphasis: Insufficient coverage
+    - strong: —
+    - paragraph: Distance-weighted eligible trips per day · synthetic samples. Gaps are not zero scores. No previous-period comparison is available.
+    - generic: OVERSPEED → CONTROL ROOM
+    - heading "Review the threshold event" [level=3]
+    - strong:
+      - text: "68"
+      - generic: km/h peak
+    - text: +18 km/h over fleet threshold
+    - text: 42 seconds above trigger
+    - paragraph: 21 Sept 2026 · 8:07 am · Jamie Taylor
+    - generic: Road speed limit unverified
+    - button "Review trip"
+    - button "Preview overspeed → Control Room":
+      - text: Preview overspeed → Control Room
+    - paragraph: One sustained episode creates one response record. Repeated reports are correlated; the alert is routed even when the driver is unconfirmed.
+    - heading "Insights by trip" [level=3]
+    - generic: 2 scored · 1 partial
+    - button "— /100 Kōwhai House → Community centre 22 Sept 2026 · Unassigned · 6.4 km · 72% coverage 1 driving events 0 vehicle faults":
+      - text: —
+      - generic: /100
+      - strong: Kōwhai House → Community centre
+      - generic: 22 Sept 2026 · Unassigned · 6.4 km · 72% coverage
+      - text: 1 driving events
+      - text: 0 vehicle faults
+    - button "82 /100 Kōwhai House → Community pickup area 21 Sept 2026 · Jamie Taylor · 2.4 km · 98% coverage 3 driving events 1 overspeed episode":
+      - text: "82"
+      - generic: /100
+      - strong: Kōwhai House → Community pickup area
+      - generic: 21 Sept 2026 · Jamie Taylor · 2.4 km · 98% coverage
+      - text: 3 driving events
+      - text: 1 overspeed episode
+    - button "99 /100 Community transport route → Kōwhai House 20 Sept 2026 · Alex Morgan · 8.1 km · 97% coverage 0 driving events 1 vehicle faults":
+      - text: "99"
+      - generic: /100
+      - strong: Community transport route → Kōwhai House
+      - generic: 20 Sept 2026 · Alex Morgan · 8.1 km · 97% coverage
+      - text: 0 driving events
+      - text: 1 vehicle faults
+    - heading "Events to review" [level=3]
+    - combobox "Driving event type":
+      - option "All driving events" [selected]
+      - option "Overspeed threshold"
+      - option "Harsh braking"
+      - option "Harsh acceleration"
+    - button "Harsh braking 22 Sept 2026 · 9:12 am · Unassigned":
+      - strong: Harsh braking
+      - generic: 22 Sept 2026 · 9:12 am · Unassigned
+    - button "Harsh braking 21 Sept 2026 · 8:04 am · Jamie Taylor":
+      - strong: Harsh braking
+      - generic: 21 Sept 2026 · 8:04 am · Jamie Taylor
+    - button "Harsh acceleration 21 Sept 2026 · 8:06 am · Jamie Taylor":
+      - strong: Harsh acceleration
+      - generic: 21 Sept 2026 · 8:06 am · Jamie Taylor
+    - button "Overspeed threshold 21 Sept 2026 · 8:07 am · Jamie Taylor":
+      - strong: Overspeed threshold
+      - generic: 21 Sept 2026 · 8:07 am · Jamie Taylor
+    - generic: MAKE THE SCORE TRUSTWORTHY
+    - heading "Evidence before attribution" [level=3]
+    - strong: Driver identity
+    - generic: 0 confirmed trip(s)
+    - strong: Coverage
+    - generic: 1 partial trip(s) excluded
+    - strong: Harsh cornering
+    - generic: Not decoded in this preview
+    - strong: Road speed limits
+    - generic: No verified limit source connected
+    - paragraph: The proposed driver score needs confirmed checkout / driver handover, at least 5 eligible trips and 100 km in the period. These minimums and weights need operational approval.
+    - button "Create coaching follow-up"
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged
+- status:
+  - generic: Evidence retained with its owning record.
+  - button "Undo"
+  - button "Dismiss"

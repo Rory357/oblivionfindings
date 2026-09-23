@@ -1,6 +1,19 @@
 # PKG-02B build checkpoint
 
-22 September 2026. **Implementation active; not complete, not integration-approved.** Same Designer task 01a0c2bb-fcff-7cb1-8bab-882d84477c6c, worktree 5b0a, branch codex/pkg-02b-vehicle-profile-design. Verified HEAD and freshly fetched origin/main: 5307692ec59be84f3503c06354419b7da95be805.
+22 September 2026. **PAUSED at Stephan's explicit request to conserve tokens. Not complete, not integration-approved.** Same Designer task 01a0c2bb-fcff-7cb1-8bab-882d84477c6c, worktree 5b0a, branch codex/pkg-02b-vehicle-profile-design. Integration baseline 5307692ec59be84f3503c06354419b7da95be805; latest application checkpoint 71dfa1a90.
+
+## Pause checkpoint — resume here
+
+The user explicitly requested a pause during root's frontend increment. Backend worker was interrupted; do not restart it or continue implementation until the user resumes. No Main update or integration/publication was performed.
+
+- Backend checkpoint `71dfa1a90` contains 20 I1 backend/migration/route files. Isolation preflight and PHP lint passed; VehiclePageContractTest passed 3 tests/26 assertions. I1 focused tests and remaining regressions are still incomplete.
+- Worker explicitly returned application/test writer custody to root after that commit. Root owns custody at pause. Worker subsequently performed read-only verification only. BookingSitePrivacy suite has 4 compatibility failures among 9 tests/129 assertions: old overlap expectation versus retained pending requests, missing canonical compliance/current driver prerequisites, and a downstream stale-lifecycle expectation. Preserve failures and update explicit fixtures/approved expectations, not safety guards.
+- Root's uncommitted frontend foundations are saved under `resources/js/components/fleet-assets/vehicle-workspace/`: typed source DTOs, List/Cards collection, searchable selector, recoverable idempotent JSON command, three-step compliance evidence editor with direct dates entry, compliance panel and mileage panel. **They are not yet wired into the production vehicle page or browser-verified.** No prototype store or synthetic records are imported.
+- `tsconfig.pkg02b.json` scoped TypeScript passed after the final frontend edits. Scoped ESLint passed (`i1-ui-lint-final.log`). Four command-recovery tests passed (`i1-ui-command-tests.log`) using `vitest.pkg02b.config.mjs`, native config loader and a worktree-local cache. Earlier sandbox startup failure and the resolved single lint warning are retained. Whole-app type check still has the 63 baseline missing generated route modules; route generation and full recheck remain required.
+- Next backend completion, after explicit custody return, must finish focused I1 tests, the scoped paginated compliance/odometer read DTOs specified in the frontend types, and a manual Auckland wall-time adapter reusing MaintenanceLocalTime::toUtc with optional DST offset. Root requested preparation only; no grant was made for these remaining writes.
+- `I2A-CONTRACT.md` is prepared for private/versioned documents, profile photo and persistent catalogues. It is not a custody grant. Other I2/I3/I4 preparation and browser plan remain in the implementation folder. Full workspace scope and final consolidated Main review still apply.
+
+On resume: verify actual root Astra/xhigh continuation and HEAD, inspect worker's interrupted status/results, preserve the uncommitted files, and continue from this checkpoint. Do not restart the design or send routine Main pings.
 
 ## Authority and invariants
 
@@ -25,12 +38,15 @@ All applicable approved v13 premium uploads, searchable persistent Add new catal
 
 ## Current custody and progress
 
-- Root Designer owns setup and documentation. No application source changes yet.
-- One backend-only worker `/root/vehicle_backend` launched with gpt-5.6-sol/high. Actual rollout source binds the worker to this root: session `01a0c7b5-813e-70e0-bcb0-2b404b315942`, turn `01a0c7b5-81d2-70f1-acb3-61cf98a8d0de`, 2026-09-22T06:02:38.094Z, model `gpt-5.6-sol`, effort `high`, including collaboration settings. **Read-only initial contract audit only** until explicit writer custody. No frontend/guide/frozen edits or further workers.
+- Setup and baseline committed `0744e5ffd`; reviewed I1 contract committed `622836e0d`. Root granted sole I1 application-writer custody to `/root/vehicle_backend` after that commit. Root is now read-only on application source while retaining its own evidence/source-mapping documentation. Worker must commit exact I1 scope and explicitly relinquish custody before root frontend writes.
+- One backend-only worker `/root/vehicle_backend` launched with gpt-5.6-sol/high. Actual rollout source binds the worker to this root: session `01a0c7b5-813e-70e0-bcb0-2b404b315942`, turn `01a0c7b5-81d2-70f1-acb3-61cf98a8d0de`, 2026-09-22T06:02:38.094Z, model `gpt-5.6-sol`, effort `high`, including collaboration settings. **I1 custody active** under `I1-CONTRACT.md`. No frontend/guide/frozen edits or further workers.
 - Root same-turn settings reverified at 2026-09-22T06:10:43.681Z: `gpt-6-astra/xhigh`, including collaboration settings.
+- Root continuation settings reverified at 2026-09-22T06:41:42.223Z: same turn, `gpt-6-astra/xhigh`, including collaboration settings. Root has made documentation-only changes while I1 custody remains with the worker. `I2A-CONTRACT.md` now defines the next bounded private-document/catalogue increment; it is preparation, not an application-writer grant.
+- Read-only I1 integration observations sent to the initial implementer before stable handoff: current-time/overdue custody and driver checks; non-vehicle Maintenance release compatibility; manual versus trusted-source odometer provenance and future observations. These are initial implementation requirements, not claimed final defects or reset correction counts. Root requested a committed implementation checkpoint and explicit custody return so frontend foundations can proceed while read-only backend verification runs.
 - Local locked offline Composer install completed with scripts/plugins disabled. No shared dependency or lock-file modification. No .env/.env.testing/cached config; node_modules is a read-only junction to Main.
 - phpunit.pkg02b.xml forces package database base oblivion_findings_pkg02b_5b0a_test; inherited process tokens/URLs must be absent. Existing TestCase appends actual PID and only prunes dead numeric siblings of that exact base. Preflight verification must pass before any Laravel bootstrap/tests/DDL. Browser storage will use a different package-specific schema.
 - Preflight passed (`isolation-proof.json`). Unmodified application baseline passed: `VehiclePageContractTest` and `VehicleBookingSitePrivacyTest`, 12 tests / 179 assertions, PHP 8.4.16 / PHPUnit 12.5.23, 3:43.610, evidence `baseline-vehicle-booking.log`. No application source changes at this checkpoint.
+- Root frontend baseline `tsc --noEmit --pretty false` exited 2 with 63 TS2307 missing-module errors, all missing generated route modules and none in Fleet page/component paths (`baseline-types.log`). No TypeScript writes occurred. This is checkout generation/setup evidence, not a claimed code defect or a waived final type check. Generate routes under isolated configuration at root's next application custody boundary, then recheck.
 
 ## Planned sequential increments
 

@@ -736,3 +736,8 @@ This file only works if it reflects reality. The loop:
 - `resources/css/app.css` — the tokens themselves (source of truth)
 - `resources/js/lib/status-colors.ts` — status → class map
 - `resources/js/lib/derive-palette.ts` — brand colour → derived palette
+# User-authorized additions · 22 September 2026
+
+- Maps and cross-profile geofencing follow [MAP_GEOFENCING_STYLE_GUIDE.md](design_styles/MAP_GEOFENCING_STYLE_GUIDE.md), based on the inspected Client Location implementation. Greyscale base tiles, coloured overlays, canonical shared boundaries, separate profile assignments and separate monitoring authority are required.
+- Structured form choices follow the searchable catalog and interval amendment in [POPUP_STYLE_GUIDE.md](design_styles/POPUP_STYLE_GUIDE.md). Service types and service interval presets use searchable choices with explicit **Add custom** where the field represents a configurable catalog. Service recurrence is expressed in calendar months by default, with distance as an independent trigger.
+- Vehicle checks require a reusable library owned with Maintenance checklists, editable questions and evidence requirements, profile/category assignment, controlled versions, and immutable submitted question/answer snapshots. A changed template must not rewrite previous checks. Workflow previews demonstrate configuration; approval of operational checklist content remains with its responsible owner.

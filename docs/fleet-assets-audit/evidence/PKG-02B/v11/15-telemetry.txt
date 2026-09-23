@@ -1,0 +1,198 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button "Home":
+      - generic: Home
+    - button "My day":
+      - generic: My day
+    - button "Clients":
+      - generic: Clients
+    - button "Sites":
+      - generic: Sites
+    - generic: Fleet & assets
+    - button "Overview":
+      - generic: Overview
+    - button "Vehicles":
+      - generic: Vehicles
+    - button "Bookings":
+      - generic: Bookings
+    - button "Maintenance":
+      - generic: Maintenance
+    - button "Assets":
+      - generic: Assets
+    - button "Reports":
+      - generic: Reports
+    - button "Settings":
+      - generic: Settings
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Overview":
+      - generic: Overview
+    - tab "Service & compliance":
+      - generic: Service & compliance
+    - tab "Checks & inspections":
+      - generic: Checks & inspections
+    - tab "Maintenance":
+      - generic: Maintenance
+    - tab "Map" [selected]:
+      - generic: Map
+    - button "More views (2)":
+      - generic: More
+    - button "Find a section":
+      - generic: Find
+      - generic: /
+  - tablist "Vehicle sections":
+    - tab "Location & geofences":
+      - text: Location & geofences
+    - tab "Vehicle telemetry" [active] [selected]:
+      - text: Vehicle telemetry
+    - tab "Driving insights":
+      - text: Driving insights
+    - tab "Alerts & Control Room":
+      - text: Alerts & Control Room
+  - tabpanel:
+    - generic: CONNECTED VEHICLE
+    - heading "GV500CG · vehicle telemetry" [level=2]
+    - paragraph: Vehicle state, power and mileage with source confidence.
+    - generic: Current sample · DEMO
+    - text: Synthetic sample · 22 Sep 2026 · 9:28 am
+    - text: State
+    - combobox "Tracker preview state":
+      - option "Parked" [selected]
+      - option "Moving"
+      - option "Offline"
+      - option "Unplugged"
+    - button "Next sample · +12 km"
+    - generic: Ignition
+    - strong: "Off"
+    - paragraph: Virtual ignition · inferred
+    - generic: Motion
+    - strong: Stationary
+    - paragraph: 0 km/h · GNSS
+    - generic: Vehicle voltage
+    - strong: 12.6 V
+    - paragraph: External supply · sample, not battery health
+    - generic: Tracker backup
+    - strong: 92%
+    - paragraph: Internal tracker battery · separate from vehicle
+    - generic: Connection
+    - strong: LTE Cat 1
+    - paragraph: GV500CG-DEMO-14 · synthetic device
+    - generic: Distance counter
+    - strong: 632 km
+    - paragraph: Tracker cumulative distance · not dashboard OBD
+    - generic: GV500CG · DISTANCE FEED
+    - heading "Connect mileage to service planning" [level=3]
+    - generic: Cross-check
+    - generic: Dashboard record
+    - strong: 82,460 km
+    - generic: Retained original observation
+    - generic: Tracker estimate
+    - strong: 82,472 km
+    - generic: 22 Sep 2026 · 9:28 am · sample
+    - generic: Difference since dashboard record
+    - strong: +12 km
+    - generic: May include travel since observation
+    - paragraph: Planning uses the recorded dashboard reading. Tracker distance is an estimate; verify the dashboard and source documents. WoF and registration dates come from their own evidence.
+    - button "Cross-check & configure"
+    - generic: MODEL CAPABILITIES
+    - heading "What this unit can contribute" [level=3]
+    - strong: Location & trip reconstruction
+    - generic: GNSS points, speed and tracker distance
+    - strong: Virtual ignition & motion
+    - generic: Derived state; preserve method and confidence
+    - strong: Crash & driving events
+    - generic: Requires device configuration and verified decoding
+    - strong: BLE 5.2 accessories
+    - generic: Additional supported hardware and pairing required
+    - strong: Buffered reports & OTA
+    - generic: Late reports retain observed time; configuration needs device acknowledgement
+    - button "Open vehicle alerts":
+      - text: Open vehicle alerts
+    - generic: VEHICLE IDENTITY
+    - heading "VIN stays with the vehicle record" [level=3]
+    - paragraph: Not recorded
+    - generic: Manually recorded
+    - paragraph: GV500CG uses the OBD connector for power only. It does not read ECU VIN, dashboard odometer, diagnostic trouble codes, engine RPM or fuel level directly.
+    - button "Review vehicle identity"
+    - generic "Sources and feature availability"
+    - button "Mileage history":
+      - text: Mileage history
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged
+- status:
+  - generic: Evidence retained with its owning record.
+  - button "Undo"
+  - button "Dismiss"

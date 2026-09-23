@@ -1,0 +1,193 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button:
+    - button:
+    - button:
+    - button:
+    - button
+    - button
+    - button
+    - button
+    - button
+    - button
+    - button:
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Service & compliance" [selected]:
+      - generic: Service & compliance
+    - button "More views (6)":
+      - generic: More
+    - button "Find a section":
+  - tablist "Vehicle sections":
+    - tab "Evidence & due dates" [selected]:
+      - text: Evidence & due dates
+    - tab "Service schedules":
+      - text: Service schedules
+    - tab "Reminders":
+      - text: Reminders
+    - tab "Service history":
+      - text: Service history
+    - tab "Mileage":
+      - text: Mileage
+  - tabpanel:
+    - generic: EVIDENCE & OBLIGATIONS
+    - heading "Service & compliance" [level=2]
+    - group "Compliance requirements layout":
+      - button "List" [pressed]:
+        - text: List
+      - button "Cards":
+        - text: Cards
+    - button "Service schedules":
+      - text: Service schedules
+    - generic "Compliance requirements":
+      - generic: Compliance requirements
+      - generic: 4 records shown
+      - table:
+        - row "WoF WOF-DEMO-14 Recorded status Passed Applicable Next due / coverage 9 Apr 2027 Owner & evidence Kōwhai House Coordinator 0 files · add evidence Actions for WoF":
+          - cell "WoF WOF-DEMO-14":
+            - generic: WoF
+            - generic: WOF-DEMO-14
+          - cell "Recorded status Passed Applicable":
+            - generic: Recorded status
+            - generic: Passed
+            - generic: Applicable
+          - cell "Next due / coverage 9 Apr 2027":
+            - generic: Next due / coverage
+            - strong: 9 Apr 2027
+          - cell "Owner & evidence Kōwhai House Coordinator 0 files · add evidence":
+            - generic: Owner & evidence
+            - generic: Kōwhai House Coordinator
+            - button "0 files · add evidence":
+              - text: 0 files · add evidence
+          - cell "Actions for WoF":
+            - button "Actions for WoF":
+        - row "Registration REG-DEMO-14 Recorded status Recorded Applicable Next due / coverage 8 Oct 2026 Owner & evidence Kōwhai House Coordinator 0 files · add evidence Actions for Registration":
+          - cell "Registration REG-DEMO-14":
+            - generic: Registration
+            - generic: REG-DEMO-14
+          - cell "Recorded status Recorded Applicable":
+            - generic: Recorded status
+            - generic: Recorded
+            - generic: Applicable
+          - cell "Next due / coverage 8 Oct 2026":
+            - generic: Next due / coverage
+            - strong: 8 Oct 2026
+          - cell "Owner & evidence Kōwhai House Coordinator 0 files · add evidence":
+            - generic: Owner & evidence
+            - generic: Kōwhai House Coordinator
+            - button "0 files · add evidence":
+              - text: 0 files · add evidence
+          - cell "Actions for Registration":
+            - button "Actions for Registration":
+        - row "RUC RUC-DEMO-14 Recorded status Needs assessment Unknown Next due / coverage Not recorded Owner & evidence Kōwhai House Coordinator 0 files · add evidence Actions for RUC":
+          - cell "RUC RUC-DEMO-14":
+            - generic: RUC
+            - generic: RUC-DEMO-14
+          - cell "Recorded status Needs assessment Unknown":
+            - generic: Recorded status
+            - generic: Needs assessment
+            - generic: Unknown
+          - cell "Next due / coverage Not recorded":
+            - generic: Next due / coverage
+            - strong: Not recorded
+          - cell "Owner & evidence Kōwhai House Coordinator 0 files · add evidence":
+            - generic: Owner & evidence
+            - generic: Kōwhai House Coordinator
+            - button "0 files · add evidence":
+              - text: 0 files · add evidence
+          - cell "Actions for RUC":
+            - button "Actions for RUC":
+        - row "CoF COF-DEMO-14 Recorded status Needs assessment Unknown Next due / coverage Not recorded Owner & evidence Kōwhai House Coordinator 0 files · add evidence Actions for CoF":
+          - cell "CoF COF-DEMO-14":
+            - generic: CoF
+            - generic: COF-DEMO-14
+          - cell "Recorded status Needs assessment Unknown":
+            - generic: Recorded status
+            - generic: Needs assessment
+            - generic: Unknown
+          - cell "Next due / coverage Not recorded":
+            - generic: Next due / coverage
+            - strong: Not recorded
+          - cell "Owner & evidence Kōwhai House Coordinator 0 files · add evidence":
+            - generic: Owner & evidence
+            - generic: Kōwhai House Coordinator
+            - button "0 files · add evidence":
+              - text: 0 files · add evidence
+          - cell "Actions for CoF":
+            - button "Actions for CoF":
+    - text: Reminders have their own owner and delivery history.
+    - button "Review reminders":
+      - text: Review reminders
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged

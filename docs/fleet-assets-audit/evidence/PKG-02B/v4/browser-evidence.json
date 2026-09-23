@@ -1,0 +1,182 @@
+[
+  {
+    "check": "Overview compact dashboard",
+    "result": "No nested scrolling; 1043px total page height at 1440x1000"
+  },
+  {
+    "check": "Profile photo upload",
+    "result": 2
+  },
+  {
+    "check": "Service schedule uploads",
+    "result": true
+  },
+  {
+    "check": "Reminder tab",
+    "result": "\n    - generic: FOLLOW-UP\n    - heading \"Reminders & delivery\" [level=2]\n    - generic: 1 delivery failures\n    - strong: Routine service\n    - generic: Kōwhai House Coordinator · 24 Sept 2026\n    - generic: Delivery failed\n    - button \"Retry\"\n    - button \"Record actions\":\n    - strong: Passenger lift service\n    - generic: Equipment Coordinator · 12 Nov 2026\n    - generic: Scheduled\n    - button \"Acknowledge\"\n    - button \"Record actions\":\n    - strong: WoF\n    - generic: Kōwhai House Coordinator · 9 Apr 2027\n    - generic: Scheduled\n    - button \"Acknowledge\"\n    - button \"Record actions\":\n    - strong: Registration\n    - generic: Kōwhai House Coordinator · 8 Oct 2026\n    - generic: Scheduled\n    - button \"Acknowledge\"\n    - button \"Record actions\":\n    - paragraph: \"Acknowledgement keeps the obligation open. Backup owner: Operations Manager. Example lead times are managed with each schedule.\"\n  - generic: PKG-02B v4 · All people, records, dates and outcomes are synthetic.\n  - generic: Design review · Application unchanged\n- status:\n  - generic: Evidence retained with its owning record.\n  - button \"Undo\"\n  - button \"Dismiss\""
+  },
+  {
+    "check": "Mileage tab",
+    "result": "\n    - heading \"Mileage history\" [level=2]\n    - paragraph: Original observations are retained; corrections add attributable records\n    - button \"Record mileage\"\n    - strong: Latest selected reading\n    - generic: ODO-DEMO-03 · 21 Sep 2026 · 08:10 AM · Pacific/Auckland · Alex Morgan\n    - generic: 82,460 km\n    - button \"View Latest selected reading\":\n    - paragraph: CHK-0182 · manual reading\n    - button \"Correct reading\"\n    - strong: Previous recorded reading\n    - generic: ODO-DEMO-02 · 20 Sep 2026 · 05:10 PM · Pacific/Auckland · Jamie Taylor\n    - generic: 82,418 km\n    - button \"View Previous recorded reading\":\n    - paragraph: Return condition record\n    - strong: Previous recorded reading\n    - generic: ODO-DEMO-01 · 24 Mar 2026 · 11:00 AM · Pacific/Auckland · Workshop report\n    - generic: 74,800 km\n    - button \"View Previous recorded reading\":\n    - paragraph: WO-0188\n  - generic: PKG-02B v4 · All people, records, dates and outcomes are synthetic.\n  - generic: Design review · Application unchanged"
+  },
+  {
+    "check": "Check upload retained",
+    "result": "\n    - generic: ORIGINAL OBSERVATIONS\n    - heading \"Checks & inspections\" [level=2]\n    - button \"Start check\":\n      - text: Start check\n    - button \"Return condition record CHK-DEMO-0183 · DEMO-2 · 21 Sept 2026 Passed\":\n      - strong: Return condition record\n      - generic: CHK-DEMO-0183 · DEMO-2 · 21 Sept 2026\n      - generic: Passed\n    - text: 1 evidence files\n    - button \"Upload evidence\":\n      - text: Upload evidence\n    - button \"Add amendment\"\n    - button \"Vehicle condition record CHK-0182 · DEMO-3 · 21 Sept 2026 Failed\":\n      - strong: Vehicle condition record\n      - generic: CHK-0182 · DEMO-3 · 21 Sept 2026\n      - generic: Failed\n    - text: 0 evidence files\n    - button \"Upload evidence\":\n      - text: Upload evidence\n    - button \"Add amendment\"\n    - complementary:\n      - generic: NEXT REQUIREMENT\n      - heading \"Vehicle condition\" [level=2]\n      - strong: 23 Sept 2026\n      - generic: Scheduled\n      - term: Owner\n      - definition: Shift lead\n      - term: Template\n      - definition: DEMO-3 · example requirement\n      - button \"Manage requirement\"\n      - button \"Start a retest\"\n      - paragraph: Original answers and files stay with the submitted version. A pass does not release a restriction.\n  - generic: PKG-02B v4 · All people, records, dates and outcomes are synthetic.\n  - generic: Design review · Application unchanged"
+  },
+  {
+    "check": "Work record Appointment",
+    "result": "\n    - tab \"Overview\"\n    - tab \"Appointment\" [active] [selected]\n    - tab \"Evidence\"\n    - tab \"Costs\"\n  - heading \"Provider appointment\" [level=2]\n  - button \"Manage appointment\"\n  - term: Provider\n  - definition: Harbour Workshop · DEMO\n  - term: Start\n  - definition: 24 Sep 2026 · 09:00 AM · Pacific/Auckland\n  - term: End\n  - definition: 24 Sep 2026 · 11:00 AM · Pacific/Auckland\n  - term: Confirmation\n  - definition: Internal plan only\n  - term: Availability\n  - definition: Vehicle unavailable during appointment\n  - term: Estimated maintenance\n  - definition: No estimate recorded\n  - paragraph: Provider confirmation, appointment dates and advisory estimates retain separate meanings.\n  - generic \"Activity · 1 entries\"\n  - complementary:\n    - generic: VEHICLE CONTROL\n    - heading \"Restriction active\" [level=2]\n    - paragraph: Work completion keeps the restriction in place until an authorised release is recorded.\n    - button \"Review vehicle release\"\n    - button \"Back to vehicle\":\n      - text: Back to vehicle\n  - generic: PKG-02B v4 · All people, records, dates and outcomes are synthetic.\n  - generic: Design review · Application unchanged"
+  },
+  {
+    "check": "Work record Evidence",
+    "result": "\n    - tab \"Overview\"\n    - tab \"Appointment\"\n    - tab \"Evidence\" [active] [selected]\n    - tab \"Costs\"\n  - heading \"Work evidence 0\" [level=3]\n  - button \"Upload\":\n    - text: Upload\n  - generic: PDFs, photos and supporting records\n  - strong: Completion evidence reference\n  - generic: Not recorded\n  - button \"Open original source\"\n  - generic \"Activity · 1 entries\"\n  - complementary:\n    - generic: VEHICLE CONTROL\n    - heading \"Restriction active\" [level=2]\n    - paragraph: Work completion keeps the restriction in place until an authorised release is recorded.\n    - button \"Review vehicle release\"\n    - button \"Back to vehicle\":\n      - text: Back to vehicle\n  - generic: PKG-02B v4 · All people, records, dates and outcomes are synthetic.\n  - generic: Design review · Application unchanged"
+  },
+  {
+    "check": "Work record Costs",
+    "result": "\n    - tab \"Overview\"\n    - tab \"Appointment\"\n    - tab \"Evidence\"\n    - tab \"Costs\" [active] [selected]\n  - heading \"Costs & Finance context\" [level=2]\n  - term: Quote / estimate\n  - definition: Not recorded\n  - term: Approval reference\n  - definition: Not recorded\n  - term: Parts\n  - definition: Not recorded\n  - term: Labour\n  - definition: Not recorded\n  - button \"Update recorded costs\"\n  - paragraph: Finance owns spend and invoice approval. These references do not approve payment.\n  - generic \"Activity · 1 entries\"\n  - complementary:\n    - generic: VEHICLE CONTROL\n    - heading \"Restriction active\" [level=2]\n    - paragraph: Work completion keeps the restriction in place until an authorised release is recorded.\n    - button \"Review vehicle release\"\n    - button \"Back to vehicle\":\n      - text: Back to vehicle\n  - generic: PKG-02B v4 · All people, records, dates and outcomes are synthetic.\n  - generic: Design review · Application unchanged"
+  },
+  {
+    "check": "Historical work tab",
+    "result": true
+  },
+  {
+    "check": "Map actual rendering",
+    "result": "453px Leaflet viewport; 12 loaded OSM tiles; geofence overlay and vehicle trail visible"
+  },
+  {
+    "check": "Select shared geofence",
+    "result": 1
+  },
+  {
+    "check": "Create shared geofence",
+    "result": true
+  },
+  {
+    "check": "Trip filter",
+    "result": "\n    - generic: DEDICATED VEHICLE HISTORY · VH-014\n    - heading \"Trip history\" [level=2]\n    - textbox \"Search trips\":\n      - /placeholder: Driver, journey or reference…\n    - combobox \"Trip date filter\":\n      - option \"All recorded dates\"\n      - option \"21 Sep 2026\"\n      - option \"20 Sep 2026\" [selected]\n    - strong: \"1\"\n    - text: recorded trips\n    - strong: 8.1 km\n    - text: GPS estimate\n    - strong: 28 min\n    - text: recorded travel\n    - generic: Historical · synthetic\n    - button \"20 Sept 8.1 km Community transport route → Kōwhai House 4:40 pm – 5:08 pm · Alex Morgan TRIP-DEMO-11\":\n      - strong: 20 Sept\n      - generic: 8.1 km\n      - paragraph: Community transport route → Kōwhai House\n      - generic: 4:40 pm – 5:08 pm · Alex Morgan\n      - generic: TRIP-DEMO-11\n    - button \"A\":\n      - generic: A\n    - button \"B\":\n      - generic: B\n    - button \"Zoom in\": +\n    - button \"Zoom out\": −\n    - button \"Layers\"\n    - link \"Leaflet\":\n      - /url: https://leafletjs.com\n      - text: Leaflet\n    - text: \"| ©\"\n    - link \"OpenStreetMap\":\n      - /url: https://www.openstreetmap.org/copyright\n    - text: contributors\n    - strong: Community transport route\n    - generic: Departure · 4:40 pm\n    - strong: Kōwhai House\n    - generic: Arrival · 5:08 pm\n    - strong: Alex Morgan\n    - generic: 82,450 → 82,458 km · recorded odometer\n    - button \"Source record\":\n      - text: Source record\n    - paragraph: GPS distance is an estimate. Odometer readings retain their own evidence. The illustrative trail does not establish a continuous route or current location.\n  - generic: PKG-02B v4 · All people, records, dates and outcomes are synthetic.\n  - generic: Design review · Application unchanged"
+  },
+  {
+    "check": "Event right click",
+    "result": "Open source record and Manage appointment displayed"
+  },
+  {
+    "check": "Blank slot right click",
+    "result": "Tuesday 22 September creation menu displayed"
+  },
+  {
+    "check": "No-approval validation",
+    "result": "Submission blocked until a reason or file is supplied"
+  },
+  {
+    "check": "Restricted no-approval request",
+    "result": 1
+  },
+  {
+    "check": "Ready no-approval with evidence only",
+    "result": "Confirmed; check-out action available",
+    "confirmed": true
+  },
+  {
+    "check": "End-to-end booking custody",
+    "result": " [level=2]\n  - button \"Add unavailable period\"\n  - button \"Request booking\"\n  - strong: \"1\"\n  - text: Request & evidence\n  - strong: \"2\"\n  - text: Approval route\n  - strong: \"3\"\n  - text: Confirmed\n  - strong: \"4\"\n  - text: Keys & checkout\n  - strong: \"5\"\n  - text: Return & condition\n  - strong: Evidence-backed booking · DEMO\n  - generic: BOOK-DEMO-1 · 22 Sep 2026 · 09:00 AM · Pacific/Auckland → 22 Sep 2026 · 10:00 AM · Pacific/Auckland\n  - paragraph: Jamie Taylor · Approval not required\n  - paragraph: Checkout 82,460 km → return 82,475 km\n  - generic: Returned\n  - button \"Actions for BOOK-DEMO-1\":\n  - paragraph: Approval not required is an explicit, evidenced decision by an authorised coordinator. Restrictions and conflicts always block confirmation or checkout. Report-only staff still need coordinator verification.\n  - generic: PKG-02B v4 · All people, records, dates and outcomes are synthetic.\n  - generic: Design review · Application unchanged\n- status:\n  - generic: Booking return recorded.\n  - button \"Undo\"\n  - button \"Dismiss\""
+  },
+  {
+    "check": "Week timed-event context menu",
+    "result": "Source and appointment actions displayed"
+  },
+  {
+    "check": "Calendar Day",
+    "result": "true"
+  },
+  {
+    "check": "Calendar Agenda",
+    "result": "true"
+  },
+  {
+    "check": "Calendar Timeline",
+    "result": "true"
+  },
+  {
+    "check": "Calendar Month",
+    "result": "true"
+  },
+  {
+    "check": "Final booking guard and reason route",
+    "result": true
+  },
+  {
+    "check": "Report-only exemption request",
+    "result": "Pending approval; approval action disabled",
+    "approvalDisabled": true
+  },
+  {
+    "check": "View-only photo protection",
+    "result": true
+  },
+  {
+    "check": "View-only geofence protection",
+    "createDisabled": true,
+    "selectDisabled": true
+  },
+  {
+    "check": "No tracker state",
+    "result": "\n    - generic: LOCATION · VH-014\n    - heading \"Home site context\" [level=2]\n    - generic: No tracker\n    - button \"Recenter\":\n      - text: Recenter\n    - button \"Trail\" [disabled] [pressed]:\n      - text: Trail\n    - button \"Geofences\" [pressed]:\n      - text: Geofences\n    - generic: Pan · zoom · select a marker\n    - button:\n    - button \"Zoom in\": +\n    - button \"Zoom out\": −\n    - button \"Layers\"\n    - link \"Leaflet\":\n      - /url: https://leafletjs.com\n      - text: Leaflet\n    - text: \"| ©\"\n    - link \"OpenStreetMap\":\n      - /url: https://www.openstreetmap.org/copyright\n    - text: contributors\n    - text: No vehicle location reported\n    - button \"Trip history\":\n      - text: Trip history\n    - complementary:\n      - generic: REPORTED STATE\n      - heading \"KWH014\" [level=2]\n      - 'button \"Motion: Unknown. Show report details\"':\n        - generic: Motion\n        - strong: Unknown\n      - generic: Tracker\n      - strong: Not assigned\n      - generic: None\n      - heading \"Linked geofences\" [level=3]\n      - generic: \"1\"\n      - strong: Kōwhai House grounds\n      - generic: Site · Kōwhai House\n      - button \"Select existing\"\n      - button \"Create\":\n        - text: Create\n      - paragraph: One shared geofence record can be selected from vehicle, client, site or house maps. This preview shows the proposed interaction.\n      - button \"Location & readiness\":\n        - text: Location & readiness\n  - generic: PKG-02B v4 · All people, records, dates and outcomes are synthetic.\n  - generic: Design review · Application unchanged"
+  },
+  {
+    "check": "First-use overview",
+    "result": "\n    - generic: VEHICLE READINESS\n    - heading \"Readiness needs review\" [level=2]\n    - paragraph: Review missing, stale or overdue evidence before confirming use.\n    - generic: Needs assessment\n    - generic: Next action\n    - strong: Resolve outstanding evidence\n    - generic: Kōwhai House Coordinator\n    - button \"Review evidence\":\n      - text: Review evidence\n    - button \"Open work 0\":\n      - generic: Open work\n      - strong: \"0\"\n    - button \"Next check 23 Sept 2026\":\n      - generic: Next check\n      - strong: 23 Sept 2026\n    - button \"Latest mileage No reading\":\n      - generic: Latest mileage\n      - strong: No reading\n    - generic: LOOKING AHEAD\n    - heading \"Next service\" [level=2]\n    - button \"All\":\n      - text: All\n    - paragraph: No service schedule recorded.\n    - button \"Set up service schedule\"\n    - heading \"Compliance at a glance\" [level=2]\n    - button \"View evidence\":\n      - text: View evidence\n    - button \"WoF Needs evidence\":\n      - strong: WoF\n      - generic: Needs evidence\n    - button \"Registration Needs evidence\":\n      - strong: Registration\n      - generic: Needs evidence\n    - button \"RUC Needs evidence\":\n      - strong: RUC\n      - generic: Needs evidence\n    - button \"CoF Needs evidence\":\n      - strong: CoF\n      - generic: Needs evidence\n    - heading \"What happens next\" [level=2]\n    - button \"Calendar\":\n      - text: Calendar\n    - strong: Vehicle condition check\n    - generic: 23 Sept 2026 · Shift lead\n    - button \"Start check\"\n    - strong: Reminder follow-up\n    - generic: Service and compliance owners\n    - button \"Review\"\n  - generic: PKG-02B v4 · All people, records, dates and outcomes are synthetic.\n  - generic: Design review · Application unchanged"
+  },
+  {
+    "check": "Empty trip history",
+    "result": true
+  },
+  {
+    "check": "Denied access",
+    "result": " - button \"My day\":\n      - generic: My day\n    - button \"Clients\":\n      - generic: Clients\n    - button \"Sites\":\n      - generic: Sites\n    - generic: Fleet & assets\n    - button \"Overview\":\n      - generic: Overview\n    - button \"Vehicles\":\n      - generic: Vehicles\n    - button \"Bookings\":\n      - generic: Bookings\n    - button \"Maintenance\":\n      - generic: Maintenance\n    - button \"Assets\":\n      - generic: Assets\n    - button \"Reports\":\n      - generic: Reports\n    - button \"Settings\":\n      - generic: Settings\n  - button \"Collapse sidebar\":\n- main:\n  - navigation \"Breadcrumb\":\n    - button \"Home\"\n    - generic: ›\n    - button \"Fleet & assets\"\n    - generic: ›\n    - button \"Vehicles\"\n    - generic: ›\n    - generic: Restricted record\n  - heading \"This vehicle is not available to you\" [level=1]\n  - paragraph: Your role or approved site access does not allow this record. Vehicle details and actions are hidden.\n  - button \"Back to permitted vehicles\"\n  - generic: PKG-02B v4 · All people, records, dates and outcomes are synthetic.\n  - generic: Design review · Application unchanged"
+  },
+  {
+    "check": "Map failure fallback",
+    "result": true
+  },
+  {
+    "check": "1280 desktop map",
+    "result": {
+      "mapHeight": 453,
+      "scrollWidth": 1280,
+      "width": 1280
+    }
+  },
+  {
+    "check": "History chronological order",
+    "result": "\n    - generic: VEHICLE RECORD\n    - heading \"Service & work history\" [level=2]\n    - textbox \"Find service history\":\n      - /placeholder: Find a service or reference…\n    - combobox \"Service history filter\":\n      - option \"All outcomes\" [selected]\n      - option \"Completed\"\n      - option \"Cancelled\"\n    - strong: \"1\"\n    - generic: Completed records\n    - strong: \"1\"\n    - generic: Source evidence\n    - strong: \"1\"\n    - generic: Cancelled visits\n    - article:\n      - strong: 18 Sept\n      - generic: \"2026\"\n      - heading \"Cancelled provider visit\" [level=3]\n      - paragraph: WO-0210 · Provider visit\n      - generic: Cancelled\n      - paragraph: Provider unavailable. No work performed. Replaced by WO-0268.\n      - text: No mileage recorded\n      - text: Cancellation reason retained\n      - button \"Open service record\":\n        - text: Open service record\n      - button \"Upload evidence\":\n        - text: Upload evidence\n    - article:\n      - strong: 24 Mar\n      - generic: \"2026\"\n      - heading \"Routine service\" [level=3]\n      - paragraph: WO-0188 · Harbour Workshop · DEMO\n      - generic: Completed\n      - paragraph: Oil, filter and recorded inspection completed.\n      - text: 74,800 km\n      - text: EV-DEMO-0188 · service report\n      - button \"Open service record\":\n        - text: Open service record\n      - button \"Upload evidence\":\n        - text: Upload evidence\n  - generic: PKG-02B v4 · All people, records, dates and outcomes are synthetic.\n  - generic: Design review · Application unchanged"
+  },
+  {
+    "check": "Servicing regression",
+    "result": "Completion retained restriction and awaits release",
+    "status": 2
+  },
+  {
+    "check": "Next service recalculation",
+    "result": "\n    - generic: PLANNED MAINTENANCE\n    - heading \"Service schedules\" [level=2]\n    - button \"Add schedule\"\n    - heading \"Routine service\" [level=3]\n    - text: SCH-DEMO-07\n    - button \"Record actions\":\n    - generic: Next due\n    - strong: 24 Mar 2027\n    - generic: Scheduled\n    - generic: 82,460 km current\n    - strong: 10,000 km remaining\n    - progressbar \"Routine service distance interval used\"\n    - generic: Due at 92,460 km\n    - term: Interval\n    - definition: 183 days or 10,000 km\n    - term: Owner\n    - definition: Kōwhai House Coordinator\n    - term: Last service\n    - definition: 22 Sept 2026\n    - button \"Plan service\"\n    - button \"Upload evidence\":\n      - text: Upload evidence\n    - heading \"Passenger lift service\" [level=3]\n    - text: SCH-DEMO-08\n    - button \"Record actions\":\n    - generic: Next due\n    - strong: 12 Nov 2026\n    - generic: Scheduled\n    - generic: Date-based interval\n    - strong: 51 days remaining\n    - progressbar \"Passenger lift service date interval used\"\n    - generic: Next service by 12 Nov 2026\n    - term: Interval\n    - definition: 183 days\n    - term: Owner\n    - definition: Equipment Coordinator\n    - term: Last service\n    - definition: 13 May 2026\n    - button \"Plan service\"\n    - button \"Upload evidence\":\n      - text: Upload evidence\n    - paragraph: The first reached date or distance trigger needs action. Intervals and reminder lead times are synthetic examples.\n  - generic: PKG-02B v4 · All people, records, dates and outcomes are synthetic.\n  - generic: Design review · Application unchanged\n- status:\n  - generic: Outcome recorded. Service history, reminders and next-due context updated.\n  - button \"Undo\"\n  - button \"Dismiss\""
+  },
+  {
+    "check": "Final bundle map transition/unmount regression",
+    "result": "Map selection, recenter, trip filter, rapid theme changes and unmount completed",
+    "bundle": "index-C8x0I40p.js"
+  },
+  {
+    "check": "Photo dirty guard",
+    "result": true
+  },
+  {
+    "check": "Approval completeness",
+    "result": "67% with purpose, justification and readiness review still missing"
+  },
+  {
+    "check": "Final map dimensions and imagery",
+    "result": {
+      "mapHeight": 453,
+      "tiles": 12
+    }
+  }
+]
