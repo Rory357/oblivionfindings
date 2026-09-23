@@ -649,3 +649,23 @@ final check.
 - [ ] `preserveScroll` and `preserveState` set on the Inertia request.
 - [ ] Trigger button gated by permission.
 - [ ] Accessible (`DialogTitle`, `DialogDescription`, `aria-label`, `aria-pressed`).
+# User-authorized catalog and interval amendment · 22 September 2026
+
+Apply this alongside the searchable record-selector contract below. Use shared Popover + Command controls for growing configurable catalogs such as service types, checklist purposes and interval presets. Search existing values before offering a clearly labelled **Add custom: [value]** action; preserve the selected value, trim/normalize input, reject duplicates and invalid numeric values, and support keyboard selection. Creation must be explicit and permission-aware, with a returned catalog identity and audit trail in the implemented application. A prototype may demonstrate local creation if it clearly states that scope.
+
+This is not a blanket free-text substitute for existing-record relationships. Staff, clients, vehicles, sites and providers must resolve to permitted canonical records. Creating such a record requires its owning workflow and appropriate permission. Small fixed enums (status, yes/no, answer type) remain concise selects or choices; do not add arbitrary custom approval states.
+
+Service recurrence uses **calendar months**, not a fixed conversion to days. Offer searchable month presets and positive whole-number custom months; clamp month-end recurrence to the target month's last valid date. Offer distance presets plus a positive custom kilometre interval. Either trigger may apply; show both and say which is first due. Recalculate suggested next triggers from actual completion date/odometer and require review. Reminder lead times may still use days because they represent offsets rather than service recurrence.
+
+Every structured form must show meaningful initial choices, concise guidance, optional/required state, validation and a useful review. Preserve selected custom values through step changes and retry. Do not leave large blank free-text fields where users should choose a known catalog option. Keep the shared wizard rail/header/footer contract and avoid nested scrolling in the page body.
+
+
+## User-requested catalogue and document follow-up · PKG-02B v7
+
+An explicit Add new action must return a selectable value and make it available in future uses of the same catalogue. Normalize whitespace, reject case-insensitive duplicates, bound name length, and surface creation/storage errors. Preserve optional-field identity: changing a label to include “optional” must not create a separate catalogue. Do not save arbitrary search text automatically. A local mockup may use browser persistence when it states that scope; the application uses canonical IDs, central persistence, creation history and catalogue-management permission.
+
+Catalogue creation and form save are separate actions. If creating a catalogue entry survives cancelling the parent form, make that behavior clear. Report-only users choose existing options and can explain an unlisted concern in notes; controlled approval/lifecycle enums do not gain arbitrary new states. Person/provider/Finance relationships use the owning record workflow.
+
+Vehicle document forms must support the actual files, classification, reference, optional expiry, version replacement and a visible source owner. Offer a renewal reminder where useful. Preserve original files and require an archive reason. Flag conflicts between a document expiry and profile metadata rather than silently replacing one with the other. Reuse existing evidence by reference where possible.
+
+Review steps show readable record names, not only opaque IDs. Finance handoffs show the source, evidence, receiving owner and pending status; editing a vehicle or completing work does not approve or post Finance transactions.

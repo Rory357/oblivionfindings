@@ -27,6 +27,11 @@ use App\Http\Controllers\FleetAssets\ResidentTransportController;
 use App\Http\Controllers\FleetAssets\ServiceScheduleController;
 use App\Http\Controllers\FleetAssets\VehicleBookingController;
 use App\Http\Controllers\FleetAssets\VehicleController;
+use App\Http\Controllers\FleetAssets\FleetCatalogueController;
+use App\Http\Controllers\FleetAssets\VehicleDocumentController;
+use App\Http\Controllers\FleetAssets\VehicleEvidenceController;
+use App\Http\Controllers\FleetAssets\VehicleReminderController;
+use App\Http\Controllers\FleetAssets\VehicleServiceScheduleController;
 use App\Http\Controllers\FleetAssets\WanderingAlertController;
 use App\Http\Controllers\FleetAssets\WorkOrderController;
 use Illuminate\Support\Facades\Route;
@@ -56,6 +61,39 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::get('/trips/{trip}/playback', [FleetTripController::class, 'show'])->whereNumber('trip')->name('fleet-assets.trips.playback');
         Route::get('/trips/{trip}/playback/data', [FleetTripController::class, 'playback'])->whereNumber('trip')->name('fleet-assets.trips.playback.data');
         Route::get('/fuel', [VehicleController::class, 'fuel'])->name('fleet-assets.fuel.index');
+
+        // PKG-02B vehicle documents. Downloads recheck access per file;
+        // commands check AssetPolicy::manageDocuments on the vehicle.
+        Route::get('/vehicles/{asset}/documents/{document}/file', [VehicleDocumentController::class, 'file'])
+            ->whereNumber(['asset', 'document'])->name('fleet-assets.vehicles.documents.file');
+        Route::post('/vehicles/{asset}/documents', [VehicleDocumentController::class, 'store'])
+            ->whereNumber('asset')->name('fleet-assets.vehicles.documents.store');
+        Route::post('/vehicles/{asset}/documents/{set}/revisions', [VehicleDocumentController::class, 'replace'])
+            ->whereNumber(['asset', 'set'])->name('fleet-assets.vehicles.documents.replace');
+        Route::put('/vehicles/{asset}/documents/{set}', [VehicleDocumentController::class, 'update'])
+            ->whereNumber(['asset', 'set'])->name('fleet-assets.vehicles.documents.update');
+        Route::post('/vehicles/{asset}/document-files/{document}/archive', [VehicleDocumentController::class, 'archive'])
+            ->whereNumber(['asset', 'document'])->name('fleet-assets.vehicles.documents.archive');
+        Route::post('/vehicles/{asset}/document-files/{document}/retry', [VehicleDocumentController::class, 'retry'])
+            ->whereNumber(['asset', 'document'])->name('fleet-assets.vehicles.documents.retry');
+        Route::post('/vehicles/{asset}/document-files/{document}/verify', [VehicleDocumentController::class, 'verify'])
+            ->whereNumber(['asset', 'document'])->name('fleet-assets.vehicles.documents.verify');
+        Route::post('/vehicles/{asset}/photo', [VehicleDocumentController::class, 'uploadPhoto'])
+            ->whereNumber('asset')->name('fleet-assets.vehicles.photo.store');
+        Route::delete('/vehicles/{asset}/photo', [VehicleDocumentController::class, 'removePhoto'])
+            ->whereNumber('asset')->name('fleet-assets.vehicles.photo.destroy');
+        Route::post('/catalogue/{kind}', [FleetCatalogueController::class, 'store'])
+            ->where('kind', '[a-z_]+')->name('fleet-assets.catalogue.store');
+    });
+
+    // PKG-02B service schedules and recorded services (maintenance managers too).
+    Route::middleware('permission:fleet.manage|fleet.maintenance.manage')->group(function () {
+        Route::post('/vehicles/{asset}/service-schedules', [VehicleServiceScheduleController::class, 'store'])
+            ->whereNumber('asset')->name('fleet-assets.vehicles.service-schedules.store');
+        Route::put('/vehicles/{asset}/service-schedules/{schedule}', [VehicleServiceScheduleController::class, 'update'])
+            ->whereNumber(['asset', 'schedule'])->name('fleet-assets.vehicles.service-schedules.update');
+        Route::post('/vehicles/{asset}/service-schedules/{schedule}/completions', [VehicleServiceScheduleController::class, 'complete'])
+            ->whereNumber(['asset', 'schedule'])->name('fleet-assets.vehicles.service-schedules.complete');
     });
 
     // Vehicles — write (requires fleet manage)
@@ -63,6 +101,17 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::put('/vehicles/{asset}', [VehicleController::class, 'update'])->whereNumber('asset')->name('fleet-assets.vehicles.update');
         Route::post('/vehicles/bulk-action', [VehicleController::class, 'bulkAction'])->name('fleet-assets.vehicles.bulk-action');
         Route::post('/vehicles/{asset}/alerts-config', [VehicleController::class, 'saveAlertsConfig'])->whereNumber('asset')->name('fleet-assets.vehicles.alerts-config.save');
+        Route::post('/vehicles/{asset}/compliance/{kind}', [VehicleEvidenceController::class, 'compliance'])
+            ->whereNumber('asset')->whereIn('kind', ['registration', 'wof', 'cof', 'ruc'])->name('fleet-assets.vehicles.compliance.store');
+        Route::post('/vehicles/{asset}/odometer-observations', [VehicleEvidenceController::class, 'odometer'])
+            ->whereNumber('asset')->name('fleet-assets.vehicles.odometer.store');
+        Route::post('/vehicles/{asset}/reminders', [VehicleReminderController::class, 'store'])
+            ->whereNumber('asset')->name('fleet-assets.vehicles.reminders.store');
+        Route::put('/vehicles/{asset}/reminders/{reminder}', [VehicleReminderController::class, 'update'])
+            ->whereNumber(['asset', 'reminder'])->name('fleet-assets.vehicles.reminders.update');
+        Route::post('/vehicles/{asset}/reminders/{reminder}/{action}', [VehicleReminderController::class, 'act'])
+            ->whereNumber(['asset', 'reminder'])->whereIn('action', ['acknowledge', 'complete', 'pause', 'resume'])
+            ->name('fleet-assets.vehicles.reminders.act');
         Route::post('/trips/{trip}/toggle-personal', [VehicleController::class, 'markPersonal'])->whereNumber('trip')->name('fleet-assets.trips.toggle-personal');
         Route::post('/fuel', [VehicleController::class, 'storeFuel'])->name('fleet-assets.fuel.store');
     });

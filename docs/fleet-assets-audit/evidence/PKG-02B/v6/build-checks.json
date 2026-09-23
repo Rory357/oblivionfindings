@@ -1,0 +1,37 @@
+{
+  "at": "2026-09-21T23:30:40.863348+00:00",
+  "typescript": "pass: tsc --project v6/tsconfig.json --noEmit",
+  "vite": "pass: 2521 modules",
+  "warnings": [
+    "Main bundle exceeds 500kB",
+    "Leaflet both static and dynamic imports"
+  ],
+  "server": [
+    {
+      "path": "/__preview",
+      "method": "GET",
+      "status": 200,
+      "pass": true
+    },
+    {
+      "path": "/",
+      "method": "POST",
+      "status": 405,
+      "pass": true
+    },
+    {
+      "path": "/report-tiles/17/1/1.png",
+      "method": "GET",
+      "status": 404,
+      "pass": true
+    },
+    {
+      "path": "/.env",
+      "method": "GET",
+      "status": 404,
+      "pass": true
+    }
+  ],
+  "frozenV5FilesVerified": 72,
+  "productionTrackedChanges": false
+}

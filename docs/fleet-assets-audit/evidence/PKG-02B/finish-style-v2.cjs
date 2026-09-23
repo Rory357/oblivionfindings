@@ -1,0 +1,12 @@
+const fs=require('node:fs');
+const root='docs/fleet-assets-audit/previews/PKG-02B/v2/';
+let flows=fs.readFileSync(root+'flows.tsx','utf8').replaceAll('\r\n','\n');
+flows=flows.replace('<WizardStepPane k={section}>','<WizardStepPane key={section}>');
+flows=flows.replace(/<Notice title="Synthetic checklist" tone="info">[\s\S]*?<\/Notice>/,'<p className="fixture-note">Demonstration template · These example fields are not an operational safety checklist.</p>');
+fs.writeFileSync(root+'flows.tsx',flows);
+let cal=fs.readFileSync(root+'vehicle-calendar.tsx','utf8');
+cal=cal.replace('tabs={<PageHeaderRail items={viewItems} activeKey={view} onChange={key=>setView(key as View)} findable={false}/>}','rail={<PageHeaderRail items={viewItems} value={view} onSelect={key=>setView(key as View)} ariaLabel="Calendar views"/>}');
+fs.writeFileSync(root+'vehicle-calendar.tsx',cal);
+let main=fs.readFileSync(root+'main.tsx','utf8');
+main=main.replace('import "./styles.css";','import "./styles.css";\nimport "./enhancements.css";');
+fs.writeFileSync(root+'main.tsx',main);

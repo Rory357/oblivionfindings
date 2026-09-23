@@ -1,0 +1,51 @@
+.vehicle-record-table [role='row']:not(:first-child) {
+    height: auto;
+    min-height: 76px;
+    padding-block: 12px;
+}
+.vehicle-record-table [role='cell'] {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.vehicle-record-table [role='cell'] .truncate {
+    white-space: normal;
+    text-overflow: initial;
+}
+.vehicle-record-card {
+    min-width: 0;
+    height: auto;
+}
+.vehicle-record-card dl {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.vehicle-workspace-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr);
+    gap: 18px;
+}
+.vehicle-workspace-grid > * {
+    min-width: 0;
+}
+.vehicle-wizard-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+}
+.vehicle-wizard-fields > * {
+    min-width: 0;
+}
+.vehicle-wizard-fields .time-picker-trigger {
+    width: 100%;
+}
+@media (max-width: 980px) {
+    .vehicle-workspace-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+@media (max-width: 620px) {
+    .vehicle-wizard-fields {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

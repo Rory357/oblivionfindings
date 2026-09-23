@@ -1,0 +1,37 @@
+{
+  "at": "2026-09-21T23:53:31.487Z",
+  "checks": [
+    {
+      "name": "Expiry before issue is rejected",
+      "result": "pass"
+    },
+    {
+      "name": "Reminder requires expiry",
+      "result": "pass"
+    },
+    {
+      "name": "Document and linked renewal reminder saved",
+      "result": "pass"
+    },
+    {
+      "name": "Replacement keeps original and lineage",
+      "result": "pass"
+    },
+    {
+      "name": "Finance requires uploaded or existing evidence",
+      "result": "pass"
+    },
+    {
+      "name": "Finance request retains existing document relationship",
+      "result": "pass"
+    },
+    {
+      "name": "Duplicate open Finance request rejected",
+      "result": "pass"
+    },
+    {
+      "name": "Archive retains original file and reason",
+      "result": "pass"
+    }
+  ]
+}

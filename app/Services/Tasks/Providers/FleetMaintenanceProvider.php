@@ -4,6 +4,7 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\Asset;
 use App\Models\FleetServiceSchedule;
+use App\Models\FleetVehicleReminder;
 use App\Models\FleetWorkOrder;
 use App\Models\User;
 use App\Services\Fleet\MaintenanceAccessService;
@@ -41,6 +42,7 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, SiteScopedT
         return [
             'fleet_work_order',
             'fleet_service_schedule',
+            'fleet_vehicle_reminder',
         ];
     }
 
@@ -73,6 +75,61 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, SiteScopedT
         return array_merge(
             $this->workOrders($user, $filters),
             $this->serviceSchedules($user, $filters),
+            $this->vehicleReminders($user, $filters),
+        );
+    }
+
+    /**
+     * Vehicle follow-ups due within the horizon (or overdue). Completing one
+     * here records the follow-up only; its obligation stays with its source.
+     *
+     * @return TaskItem[]
+     */
+    private function vehicleReminders(User $user, array $filters): array
+    {
+        $states = empty($filters['include_done']) ? ['scheduled', 'acknowledged'] : ['scheduled', 'acknowledged', 'completed'];
+        $query = FleetVehicleReminder::query()
+            ->whereIn('state', $states)
+            ->where('due_at', '<=', now()->addDays(self::HORIZON_DAYS))
+            ->with(['asset:id,name', 'owner:id,name'])
+            ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
+            ->orderBy('due_at')
+            ->limit(300);
+
+        return app(TaskProviderAuthorization::class)->siteScoped(
+            $user,
+            $this->canView($user),
+            $query,
+            fn ($scoped, User $actor) => $scoped->whereIn(
+                'asset_id',
+                Asset::query()->whereNotNull('site_id')
+                    ->whereIn('site_id', app(MaintenanceAccessService::class)->approvedSiteIds($actor))
+                    ->select('id'),
+            ),
+            function (FleetVehicleReminder $reminder) {
+                $overdue = $reminder->state !== 'completed' && $reminder->due_at->isPast();
+
+                return new TaskItem(
+                    id: 'fleet_vehicle_reminder-'.$reminder->id,
+                    source: $this->sourceKey(),
+                    sourceLabel: $this->label(),
+                    ref: null,
+                    title: $reminder->title.($reminder->asset ? ' — '.$reminder->asset->name : ''),
+                    status: $reminder->state === 'completed' ? 'completed' : ($overdue ? 'overdue' : $reminder->state),
+                    bucket: match ($reminder->state) {
+                        'completed' => TaskItem::BUCKET_DONE,
+                        'acknowledged' => TaskItem::BUCKET_IN_PROGRESS,
+                        default => TaskItem::BUCKET_OPEN,
+                    },
+                    severity: $overdue ? 'high' : 'medium',
+                    assignee: $reminder->owner ? ['id' => $reminder->owner->id, 'name' => (string) $reminder->owner->name] : null,
+                    dueAt: $reminder->due_at->toIso8601String(),
+                    createdAt: optional($reminder->created_at)->toIso8601String(),
+                    link: "/fleet-assets/vehicles/{$reminder->asset_id}?tab=service&view=reminders",
+                    type: 'Vehicle reminder',
+                    description: $reminder->action_text ? str($reminder->action_text)->limit(140)->toString() : null,
+                );
+            },
         );
     }
 
@@ -191,7 +248,7 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, SiteScopedT
                     assignee: null,
                     dueAt: $schedule->next_due_at->toIso8601String(),
                     createdAt: optional($schedule->created_at)->toIso8601String(),
-                    link: '/fleet-assets/maintenance/schedules',
+                    link: "/fleet-assets/vehicles/{$schedule->asset_id}?tab=service&view=schedules",
                     type: 'Service schedule',
                 );
             },

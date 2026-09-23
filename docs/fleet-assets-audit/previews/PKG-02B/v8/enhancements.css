@@ -1,0 +1,396 @@
+.preview-dialog .modal-header {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 24px 52px 20px 24px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    flex-shrink: 0;
+}
+.modal-icon {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    border-radius: 12px;
+    background: color-mix(in oklch, var(--primary) 10%, var(--card));
+    color: var(--primary);
+    border: 1px solid color-mix(in oklch, var(--primary) 22%, var(--border));
+}
+.preview-dialog .dialog-body {
+    padding: 20px 24px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    gap: 18px;
+}
+.preview-dialog .modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    background: var(--muted);
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: space-between;
+}
+.preview-dialog .evidence-row {
+    padding: 14px 0;
+}
+.preview-dialog .row-value {
+    max-width: 58%;
+}
+.preview-dialog .row-label {
+    min-width: 0;
+}
+.preview-dialog .row-label strong {
+    font-size: 12px;
+}
+.preview-dialog .row-value {
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+.detail-rail-summary {
+    display: grid;
+    gap: 10px;
+    padding: 16px 8px;
+    color: var(--muted-foreground);
+    font-size: 11px;
+}
+.fixture-note {
+    font-size: 11px;
+    color: var(--muted-foreground);
+    line-height: 1.6;
+    border-left: 2px solid var(--border);
+    padding-left: 10px;
+}
+.estimate-summary {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
+}
+.estimate-summary svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--primary);
+}
+#estimate-window:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 5px;
+    border-radius: 6px;
+}
+.flow-stack .locked {
+    background: color-mix(in oklch, var(--primary) 6%, var(--card));
+    border-color: color-mix(in oklch, var(--primary) 22%, var(--border));
+    align-items: center;
+}
+.flow-stack .section-intro {
+    justify-content: space-between;
+    align-items: flex-start;
+}
+.flow-stack .field select {
+    min-height: 44px;
+}
+.calendar-date-anchor {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.calendar-date-anchor > div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    line-height: 1.2;
+}
+.calendar-date-anchor strong {
+    font-size: 17px;
+}
+.calendar-date-anchor span {
+    font-size: 13px;
+    font-weight: 600;
+}
+.calendar-date-anchor .eh-meter-big {
+    font-size: 36px;
+    line-height: 1;
+}
+.calendar-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+.calendar-period {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+.calendar-period button {
+    min-height: 30px;
+}
+.calendar-density {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+}
+.calendar-density select {
+    padding: 5px 9px;
+    color: var(--primary-foreground);
+    background: color-mix(in oklch, var(--primary-foreground) 10%, transparent);
+    border: 1px solid
+        color-mix(in oklch, var(--primary-foreground) 25%, transparent);
+    border-radius: 7px;
+}
+.calendar-density option {
+    color: var(--foreground);
+    background: var(--card);
+}
+.calendar-source-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 18px 0 14px;
+}
+.calendar-source-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 8px 11px;
+    min-height: 38px;
+    font-size: 11px;
+    background: var(--card);
+    color: var(--muted-foreground);
+}
+.calendar-source-pill[aria-pressed='true'] {
+    color: var(--foreground);
+    box-shadow: 0 1px 2px color-mix(in oklch, var(--foreground) 5%, transparent);
+}
+.calendar-source-pill[aria-pressed='false'] {
+    opacity: 0.58;
+}
+.calendar-source-pill > span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+}
+.calendar-source-pill small {
+    padding-left: 4px;
+    font-weight: 600;
+}
+.calendar-restriction {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    border: 1px solid
+        color-mix(in oklch, var(--status-critical) 24%, var(--border));
+    background: var(--status-critical-bg);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    color: var(--status-critical);
+}
+.calendar-restriction > div {
+    display: grid;
+    gap: 3px;
+    flex: 1;
+}
+.calendar-restriction strong {
+    font-size: 12px;
+}
+.calendar-restriction span {
+    font-size: 11px;
+    line-height: 1.5;
+}
+.calendar-restriction > svg {
+    flex-shrink: 0;
+}
+.calendar-layout {
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+}
+.calendar-view {
+    height: 620px;
+    min-width: 0;
+    flex: 1;
+}
+.calendar-footnote {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin: 14px 0;
+    color: var(--muted-foreground);
+    font-size: 11px;
+    line-height: 1.6;
+}
+.calendar-footnote svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+.vehicle-calendar .eh-header {
+    min-width: 0;
+}
+.vehicle-calendar .eh-meter-block {
+    min-width: 0;
+}
+.vehicle-map-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 305px;
+    gap: 20px;
+}
+.vehicle-map-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 15px;
+    overflow: hidden;
+    min-width: 0;
+    box-shadow: 0 2px 5px color-mix(in oklch, var(--foreground) 5%, transparent);
+}
+.map-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 21px 22px 16px;
+}
+.map-title p {
+    font-size: 11px;
+    color: var(--muted-foreground);
+    margin-top: 5px;
+}
+.map-toolbar {
+    display: flex;
+    gap: 7px;
+    flex-wrap: wrap;
+    padding: 0 22px 18px;
+}
+.map-toolbar button[aria-pressed='true'] {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: color-mix(in oklch, var(--primary) 6%, var(--card));
+}
+.vehicle-map-canvas {
+    height: 470px;
+    width: 100%;
+    position: relative;
+    isolation: isolate;
+    z-index: 0;
+    background: var(--muted);
+}
+.vehicle-map-canvas .leaflet-container {
+    height: 100% !important;
+    border-radius: 0 !important;
+    background: var(--muted);
+}
+.vehicle-map-canvas > div {
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+}
+.vehicle-map-canvas .leaflet-tile-pane {
+    filter: grayscale(1);
+}
+.vehicle-map-canvas .leaflet-control-layers {
+    display: none;
+}
+.vehicle-map-canvas .leaflet-control-zoom a {
+    width: 36px;
+    height: 36px;
+    line-height: 36px;
+    background: var(--card);
+    color: var(--foreground);
+}
+.vehicle-map-canvas .leaflet-popup-content-wrapper {
+    background: var(--card);
+    color: var(--foreground);
+}
+.vehicle-map-canvas .leaflet-popup-tip {
+    background: var(--card);
+}
+.map-caption {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 13px 20px;
+    font-size: 11px;
+    color: var(--muted-foreground);
+    line-height: 1.5;
+    border-top: 1px solid var(--border);
+}
+.map-caption svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.map-observation-icon {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 14px;
+    border-radius: 10px;
+    background: var(--muted);
+    margin-bottom: 10px;
+    color: var(--primary);
+}
+.map-observation-icon > div {
+    display: grid;
+    gap: 4px;
+}
+.map-observation-icon strong {
+    font-size: 12px;
+    color: var(--foreground);
+}
+.map-observation-icon small {
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+.vehicle-map-layout .evidence-row {
+    align-items: flex-start;
+}
+.vehicle-map-layout .row-value {
+    max-width: 58%;
+    font-size: 11px;
+}
+.map-unavailable {
+    height: 470px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 35px;
+    text-align: center;
+    background: var(--muted);
+    color: var(--muted-foreground);
+}
+.map-unavailable p {
+    max-width: 340px;
+    font-size: 12px;
+    line-height: 1.7;
+}
+@media (max-width: 1100px) {
+    .vehicle-map-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .vehicle-map-layout > .stack {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        align-items: start;
+    }
+    .calendar-controls {
+        align-items: flex-start;
+    }
+    .calendar-layout {
+        gap: 12px;
+    }
+}
