@@ -19,11 +19,19 @@ use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\IncidentFollowup;
+use App\Models\ItKbArticle;
+use App\Models\ItProvisioningRequest;
+use App\Models\ItRecurrencePlan;
+use App\Models\ItReplyTemplate;
+use App\Models\ItTicket;
+use App\Models\ItTicketApproval;
+use App\Models\ItWorkTask;
 use App\Models\MedicationError;
 use App\Models\Permission;
 use App\Models\RespiteBooking;
 use App\Models\RespiteTask;
 use App\Models\RestraintEvent;
+use App\Models\Role;
 use App\Models\SafeguardingActionPlan;
 use App\Models\SafeguardingConcern;
 use App\Models\Shift;
@@ -33,8 +41,11 @@ use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteHazard;
+use App\Models\SiteVendor;
 use App\Models\TaskWatcher;
 use App\Models\User;
+use App\Models\VendorAgreement;
+use App\Models\VendorRenewalFollowup;
 use App\Models\WorkplaceInjury;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\Tasks\TaskItem;
@@ -88,7 +99,7 @@ function taskRbacStaff(Site $site, string $name): User
 
 /**
  * Build one open row for every registered provider at each Site, plus the
- * three product-defined organisation-wide sources.
+ * product-defined organisation-wide sources.
  *
  * @return array{
  *   actor: User,
@@ -96,7 +107,8 @@ function taskRbacStaff(Site $site, string $name): User
  *   siteB: Site,
  *   matrix: array<string, array{visible: list<array{id: string, source: string, numeric_id: int, token: string}>, hidden: list<array{id: string, source: string, numeric_id: int, token: string}>}>,
  *   sitePermissions: list<string>,
- *   globalBypasses: list<string>
+ *   globalBypasses: list<string>,
+ *   withoutSiteBypass: list<string>
  * }
  */
 function taskRbacMatrix(): array
@@ -123,6 +135,9 @@ function taskRbacMatrix(): array
         'hazards.view',
         'safeguarding.viewAny',
         'controlRoom.viewAny',
+        'it.manage',
+        'it.knowledge.author',
+        'vendors.contracts.view',
         'fleet.viewAny',
         'assets.viewAny',
         'medications.view',
@@ -137,6 +152,12 @@ function taskRbacMatrix(): array
         'privacy.viewRequests',
         'governance.actions.view',
     ];
+    // Vendor commercial records also require an approved leadership role; a
+    // role with no seeded grants adds that gate and nothing else.
+    $actor->roles()->attach(Role::query()->firstOrCreate(
+        ['name' => 'manager'],
+        ['label' => 'Manager', 'level' => 40, 'type' => 'system'],
+    )->id);
     taskRbacGrant($actor, $sitePermissions);
 
     $clientA = Client::factory()->create([
@@ -325,6 +346,146 @@ function taskRbacMatrix(): array
         'alert_type' => 'TASK-RBAC private alert',
         'assigned_to_user_id' => $actor->id,
     ]));
+
+    $itWorkTicketA = ItTicket::factory()->create(['reference' => 'IT-91001', 'site_id' => $siteA->id, 'status' => 'open']);
+    $itWorkTicketB = ItTicket::factory()->create(['reference' => 'IT-92001', 'site_id' => $siteB->id, 'status' => 'open']);
+    $itWorkTaskA = ItWorkTask::factory()->create([
+        'ticket_id' => $itWorkTicketA->id,
+        'title' => 'TASK-RBAC visible IT work task',
+        'assigned_to_user_id' => $actor->id,
+    ]);
+    $itWorkTaskB = ItWorkTask::factory()->create([
+        'ticket_id' => $itWorkTicketB->id,
+        'title' => 'TASK-RBAC private IT work task',
+        'assigned_to_user_id' => $actor->id,
+    ]);
+    $itApprovalTicketA = ItTicket::factory()->create(['reference' => 'IT-91002', 'site_id' => $siteA->id, 'status' => 'open', 'requires_approval' => true]);
+    $itApprovalTicketB = ItTicket::factory()->create(['reference' => 'IT-92002', 'site_id' => $siteB->id, 'status' => 'open', 'requires_approval' => true]);
+    $itApprovalA = ItTicketApproval::query()->create([
+        'it_ticket_id' => $itApprovalTicketA->id,
+        'requested_by' => $staffA->id,
+        'status' => 'pending',
+        'primary_approver_user_id' => $actor->id,
+        'request_reason' => 'TASK-RBAC visible approval reason',
+        'request_reason_recorded_at' => now(),
+        'assignment_recorded_at' => now(),
+        'expires_at' => now()->addDays(2),
+    ]);
+    $itApprovalB = ItTicketApproval::query()->create([
+        'it_ticket_id' => $itApprovalTicketB->id,
+        'requested_by' => $staffB->id,
+        'status' => 'pending',
+        'primary_approver_user_id' => $actor->id,
+        'request_reason' => 'TASK-RBAC private approval reason',
+        'request_reason_recorded_at' => now(),
+        'assignment_recorded_at' => now(),
+        'expires_at' => now()->addDays(2),
+    ]);
+    $knowledgeA = ItKbArticle::factory()->published()->create([
+        'title' => 'TASK-RBAC visible knowledge document',
+        'audience' => 'specific_sites',
+        'site_scope' => [$siteA->id],
+        'author_user_id' => $actor->id,
+        'owner_user_id' => $actor->id,
+        'review_due_at' => today()->addDays(3),
+    ]);
+    $knowledgeB = ItKbArticle::factory()->published()->create([
+        'title' => 'TASK-RBAC private knowledge document',
+        'audience' => 'specific_sites',
+        'site_scope' => [$siteB->id],
+        'author_user_id' => $actor->id,
+        'owner_user_id' => $actor->id,
+        'review_due_at' => today()->addDays(3),
+    ]);
+    // Reply templates and recurrence plans are organisation-wide IT setup:
+    // the owner sees their review work whichever Site a plan's tickets target.
+    $replyTemplate = ItReplyTemplate::query()->create([
+        'name' => 'TASK-RBAC reply template',
+        'audience' => 'public',
+        'body' => 'TASK-RBAC reply template body',
+        'owner_user_id' => $actor->id,
+        'review_due_at' => today()->addDays(3),
+        'is_active' => true,
+    ]);
+    $recurrenceA = ItRecurrencePlan::query()->create([
+        'name' => 'TASK-RBAC Site A recurring plan',
+        'cron_expression' => '0 9 * * *',
+        'starts_on' => today()->subMonth(),
+        'owner_user_id' => $actor->id,
+        'ticket_template' => ['title' => 'TASK-RBAC Site A recurring ticket', 'site_id' => $siteA->id],
+        'status' => 'active',
+    ]);
+    $recurrenceB = ItRecurrencePlan::query()->create([
+        'name' => 'TASK-RBAC Site B recurring plan',
+        'cron_expression' => '0 9 * * *',
+        'starts_on' => today()->subMonth(),
+        'owner_user_id' => $actor->id,
+        'ticket_template' => ['title' => 'TASK-RBAC Site B recurring ticket', 'site_id' => $siteB->id],
+        'status' => 'active',
+    ]);
+    foreach ([$recurrenceA, $recurrenceB] as $plan) {
+        $plan->runs()->create([
+            'occurrence_key' => now()->subHour()->toIso8601String(),
+            'status' => 'failed',
+            'detail' => 'TASK-RBAC synthetic failure',
+            'created_at' => now()->subHour(),
+        ]);
+    }
+    $vendorA = SiteVendor::query()->create([
+        'site_id' => $siteA->id,
+        'service_type' => 'software',
+        'company_name' => 'TASK-RBAC visible vendor',
+        'preferred_contact_method' => 'email',
+        'is_active' => true,
+    ]);
+    $vendorB = SiteVendor::query()->create([
+        'site_id' => $siteB->id,
+        'service_type' => 'software',
+        'company_name' => 'TASK-RBAC private vendor',
+        'preferred_contact_method' => 'email',
+        'is_active' => true,
+    ]);
+    $agreementA = VendorAgreement::query()->create([
+        'vendor_id' => $vendorA->id,
+        'site_id' => $siteA->id,
+        'owner_user_id' => $actor->id,
+        'kind' => 'licence',
+        'title' => 'TASK-RBAC visible agreement',
+        'renews_on' => today()->addDays(10),
+    ]);
+    $agreementB = VendorAgreement::query()->create([
+        'vendor_id' => $vendorB->id,
+        'site_id' => $siteB->id,
+        'owner_user_id' => $actor->id,
+        'kind' => 'licence',
+        'title' => 'TASK-RBAC private agreement',
+        'renews_on' => today()->addDays(10),
+    ]);
+    $renewalA = VendorRenewalFollowup::query()->create([
+        'agreement_id' => $agreementA->id,
+        'owner_user_id' => $actor->id,
+        'due_on' => today()->addDays(3),
+        'status' => 'due',
+    ]);
+    $renewalB = VendorRenewalFollowup::query()->create([
+        'agreement_id' => $agreementB->id,
+        'owner_user_id' => $actor->id,
+        'due_on' => today()->addDays(3),
+        'status' => 'due',
+    ]);
+    $provisioningA = ItProvisioningRequest::query()->create([
+        'employee_profile_id' => HrEmployeeProfile::query()->where('user_id', $staffA->id)->value('id'),
+        'type' => 'account',
+        'item' => 'TASK-RBAC visible provisioning request',
+        'status' => 'pending',
+    ]);
+    $provisioningB = ItProvisioningRequest::query()->create([
+        'employee_profile_id' => HrEmployeeProfile::query()->where('user_id', $staffB->id)->value('id'),
+        'type' => 'account',
+        'item' => 'TASK-RBAC private provisioning request',
+        'status' => 'pending',
+    ]);
+
     $fleetIncidentA = FleetIncident::withoutEvents(fn () => FleetIncident::factory()->create([
         'reference_number' => 'FLT-91001',
         'asset_id' => $assetA->id,
@@ -577,9 +738,11 @@ function taskRbacMatrix(): array
         'request_details' => 'TASK-RBAC explicit global DSR',
         'status' => 'received',
     ]);
+    // Meeting and resolution actions also need access to their parent record;
+    // a risk review action isolates the explicit governance.actions.view grant.
     $action = ActionItem::query()->create([
         'action_reference' => 'ACT-93001',
-        'source_type' => 'meeting',
+        'source_type' => 'risk_review',
         'source_id' => 93001,
         'description' => 'TASK-RBAC explicit global action',
         'assigned_to' => $actor->id,
@@ -622,6 +785,19 @@ function taskRbacMatrix(): array
         'safeguarding' => $pair('safeguarding', $concernA, $concernB, 'SAF-91001', 'SAF-92001'),
         'safeguarding_action' => $pair('safeguarding_action', $safeguardingActionA, $safeguardingActionB, 'SAF-91001', 'SAF-92001'),
         'alert' => $pair('alert', $alertA, $alertB, 'ALT-91001', 'ALT-92001'),
+        'it_work_task' => $pair('it_work_task', $itWorkTaskA, $itWorkTaskB, 'IT-91001', 'IT-92001'),
+        'it_approval' => $pair('it_approval', $itApprovalA, $itApprovalB, 'IT-91002', 'IT-92002'),
+        'it_knowledge_review' => $pair('it_knowledge_review', $knowledgeA, $knowledgeB, 'KB-'.$knowledgeA->id, 'KB-'.$knowledgeB->id),
+        'it_automation_review' => ['visible' => [['id' => 'it_automation_review-'.$replyTemplate->id, 'source' => 'it_automation_review', 'numeric_id' => (int) $replyTemplate->id, 'token' => 'TPL-'.$replyTemplate->id]], 'hidden' => []],
+        'it_recurrence_failure' => [
+            'visible' => [
+                ['id' => 'it_recurrence_failure-'.$recurrenceA->id, 'source' => 'it_recurrence_failure', 'numeric_id' => (int) $recurrenceA->id, 'token' => 'REC-'.$recurrenceA->id],
+                ['id' => 'it_recurrence_failure-'.$recurrenceB->id, 'source' => 'it_recurrence_failure', 'numeric_id' => (int) $recurrenceB->id, 'token' => 'REC-'.$recurrenceB->id],
+            ],
+            'hidden' => [],
+        ],
+        'vendor_renewal' => $pair('vendor_renewal', $renewalA, $renewalB, 'AGR-'.$agreementA->id, 'AGR-'.$agreementB->id),
+        'it_provisioning' => $pair('it_provisioning', $provisioningA, $provisioningB, 'TASK-RBAC visible provisioning request', 'TASK-RBAC private provisioning request'),
         'fleet_incident' => $pair('fleet_incident', $fleetIncidentA, $fleetIncidentB, 'FLT-91001', 'FLT-92001'),
         'fleet_maintenance' => [
             'visible' => [
@@ -660,7 +836,11 @@ function taskRbacMatrix(): array
             'clinical.accessAllSites',
             'hr.employees.viewAllSites',
             'clients.viewAny',
+            'it.organisationWide',
         ],
+        // it.organisationWide only reaches Site-less IT records, so Site-bound
+        // IT ticket and provisioning work never widens beyond approved Sites.
+        'withoutSiteBypass' => ['it_work_task', 'it_approval', 'it_provisioning'],
     ];
 }
 
@@ -865,7 +1045,7 @@ it('applies site revocation reassignment and explicit application wide permissio
     $matrix = $fixture['matrix'];
     $visibleA = collect(taskRbacRows($matrix, 'visible'))->pluck('id')->sort()->values()->all();
     $visibleB = collect(taskRbacRows($matrix, 'hidden'))->pluck('id')->sort()->values()->all();
-    $globalIds = collect(['breach', 'dsr', 'action_item'])
+    $globalIds = collect(['it_automation_review', 'it_recurrence_failure', 'breach', 'dsr', 'action_item'])
         ->flatMap(fn (string $source) => collect($matrix[$source]['visible'])->pluck('id'))
         ->sort()
         ->values()
@@ -902,12 +1082,17 @@ it('applies site revocation reassignment and explicit application wide permissio
 
     taskRbacGrant($actor, $fixture['globalBypasses']);
     $actor = taskRbacFreshRequest($actor);
-    $allIds = collect([...$visibleA, ...$visibleB])->unique()->sort()->values()->all();
-    $this->actingAs($actor)
-        ->get('/tasks')
-        ->assertInertia(fn ($page) => $page
-            ->where('pagination.total', count($allIds))
-            ->where('items', fn ($items) => collect($items)->pluck('id')->sort()->values()->all() === $allIds));
+    $staysAtSiteA = collect($fixture['withoutSiteBypass'])
+        ->flatMap(fn (string $source) => collect($matrix[$source]['visible'])->pluck('id'))
+        ->all();
+    $allIds = collect([...$visibleA, ...$visibleB])->unique()->diff($staysAtSiteA)->sort()->values()->all();
+    // Both Sites together outgrow one /tasks page, so read every page.
+    $pagination = $this->actingAs($actor)->get('/tasks')->assertOk()->inertiaProps('pagination');
+    $listedIds = collect(range(1, (int) ceil($pagination['total'] / $pagination['perPage'])))
+        ->flatMap(fn (int $page) => $this->actingAs($actor)->get('/tasks?page='.$page)->assertOk()->inertiaProps('items'))
+        ->pluck('id')->sort()->values()->all();
+    expect($pagination['total'])->toBe(count($allIds))
+        ->and($listedIds)->toBe($allIds);
 
     taskRbacGrant($actor, $fixture['globalBypasses'], false);
     $actor = taskRbacFreshRequest($actor);
@@ -918,10 +1103,10 @@ it('applies site revocation reassignment and explicit application wide permissio
             ->where('items', fn ($items) => collect($items)->pluck('id')->sort()->values()->all() === $expectedAtB));
 });
 
-it('requires the three explicit global permissions and scopes the staff lookup independently', function () {
+it('requires the explicit global permissions and scopes the staff lookup independently', function () {
     $fixture = taskRbacMatrix();
     $actor = $fixture['actor'];
-    $globalSources = ['breach', 'dsr', 'action_item'];
+    $globalSources = ['it_automation_review', 'it_recurrence_failure', 'breach', 'dsr', 'action_item'];
 
     $genericAdmin = User::factory()->create([
         'name' => 'TASK-RBAC generic admin field only',
@@ -932,17 +1117,18 @@ it('requires the three explicit global permissions and scopes the staff lookup i
         ->toBeEmpty();
 
     foreach ([
-        'privacy.reportBreaches' => 'breach',
-        'privacy.viewRequests' => 'dsr',
-        'governance.actions.view' => 'action_item',
-    ] as $permission => $source) {
+        'it.manage' => ['it_automation_review', 'it_recurrence_failure'],
+        'privacy.reportBreaches' => ['breach'],
+        'privacy.viewRequests' => ['dsr'],
+        'governance.actions.view' => ['action_item'],
+    ] as $permission => $sources) {
         taskRbacGrant($actor, [$permission], false);
         $actor = taskRbacFreshRequest($actor);
-        expect(collect((new TaskAggregator)->itemsFor($actor))->pluck('source'))->not->toContain($source);
+        expect(collect((new TaskAggregator)->itemsFor($actor))->pluck('source')->intersect($sources))->toBeEmpty();
 
         taskRbacGrant($actor, [$permission], true);
         $actor = taskRbacFreshRequest($actor);
-        expect(collect((new TaskAggregator)->itemsFor($actor))->pluck('source'))->toContain($source);
+        expect(collect((new TaskAggregator)->itemsFor($actor))->pluck('source'))->toContain(...$sources);
     }
 
     $this->actingAs($actor)
