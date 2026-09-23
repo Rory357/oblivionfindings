@@ -173,6 +173,16 @@ class MaintenanceReportService
             return;
         }
 
+        // PKG-02B: a vehicle's Control Room response can be the source of the
+        // Maintenance assessment it decided on (the caller checks the response).
+        if ($type === 'control_room_alert') {
+            if (! $id || ! DB::table('control_room_alerts')->where('id', $id)->where('asset_id', $assetId)->exists()) {
+                throw ValidationException::withMessages(['source_id' => 'Choose a Control Room response for this asset.']);
+            }
+
+            return;
+        }
+
         if ($type !== 'fleet_checklist_run' || ! $id || ! DB::table('fleet_checklist_runs')
             ->where('id', $id)->where('asset_id', $assetId)->exists()) {
             throw ValidationException::withMessages(['source_id' => 'Choose a permitted check for this asset.']);

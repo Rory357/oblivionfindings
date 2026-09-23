@@ -755,6 +755,14 @@ app(Schedule::class)
     ->everyFifteenMinutes()
     ->withoutOverlapping();
 
+// Vehicle obligation reminders (service schedules, registration, WoF, CoF,
+// RUC): tell owners what is coming due, and retry yesterday's failures.
+app(Schedule::class)
+    ->command('fleet:deliver-obligation-reminders')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('07:00')
+    ->withoutOverlapping();
+
 app(Schedule::class)
     ->command('governance:check-risk-reviews')
     ->timezone('Pacific/Auckland')

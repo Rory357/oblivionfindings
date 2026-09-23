@@ -62,6 +62,8 @@ class AssetDocumentController extends Controller
     {
         $this->authorize('view', $asset);
         abort_unless($document->asset_id === $asset->id, 404);
+        // PKG-02B vehicle finance: review evidence (quotes, invoices) opens only for Finance viewers.
+        abort_if($document->source_type === 'finance_review_request' && ! $request->user()?->canDo('finance.assets.view'), 404);
 
         AuditLogger::log('assets.documents.download', $document, [
             'asset_id' => $asset->id,

@@ -7,6 +7,7 @@ use App\Models\FleetTrip;
 use App\Models\FleetTripSegment;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Jobs\ReverseGeocodeFleetTrip;
+use App\Support\SchemaCache;
 use Illuminate\Support\Carbon;
 
 class FleetTripService
@@ -64,6 +65,13 @@ class FleetTripService
 
             if ($distanceKm > 0) {
                 $openTrip->distance_km += $distanceKm;
+            }
+
+            // Highest reported speed during the trip; the trips list reads it.
+            if ($event->speed_kph !== null
+                && SchemaCache::hasColumn('fleet_trips', 'max_speed_kph')
+                && ($openTrip->max_speed_kph === null || (float) $event->speed_kph > (float) $openTrip->max_speed_kph)) {
+                $openTrip->max_speed_kph = (float) $event->speed_kph;
             }
 
             if ($event->occurred_at && $openTrip->started_at) {

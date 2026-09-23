@@ -23,7 +23,7 @@
 .vehicle-workspace-grid {
     display: grid;
     grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr);
-    gap: 18px;
+    gap: 20px;
 }
 .vehicle-workspace-grid > * {
     min-width: 0;

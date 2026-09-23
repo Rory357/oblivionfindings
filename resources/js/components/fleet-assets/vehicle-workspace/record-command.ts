@@ -1,7 +1,39 @@
 import { useRef, useState } from 'react';
 
 type FieldErrors = Record<string, string>;
-type PendingCommand = { key: string; body: string; url: string };
+type PendingCommand = { key: string; signature: string; url: string };
+type CommandOptions = { method?: 'POST' | 'PUT' | 'DELETE' };
+
+/** A stable identity for a payload, including staged files, so a retry reuses its key. */
+function signatureOf(data: Record<string, unknown> | FormData): string {
+    if (!(data instanceof FormData)) return JSON.stringify(data);
+    const parts: string[] = [];
+    data.forEach((value, key) => {
+        parts.push(
+            value instanceof File
+                ? `${key}=file:${value.name}:${value.size}:${value.lastModified}`
+                : `${key}=${String(value)}`,
+        );
+    });
+
+    return parts.join('&');
+}
+
+function csrfHeaders(): Record<string, string> {
+    const xsrf = document.cookie
+        .split('; ')
+        .find((part) => part.startsWith('XSRF-TOKEN='))
+        ?.slice(11);
+    const csrf = document.querySelector<HTMLMetaElement>(
+        'meta[name="csrf-token"]',
+    )?.content;
+
+    return xsrf
+        ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) }
+        : csrf
+          ? { 'X-CSRF-TOKEN': csrf }
+          : {};
+}
 
 /** Keep an uncertain request's exact identity until its result is confirmed. */
 export function useVehicleRecordCommand<T>(
@@ -17,46 +49,40 @@ export function useVehicleRecordCommand<T>(
 
     async function submit(
         url: string,
-        data: Record<string, unknown>,
+        data: Record<string, unknown> | FormData,
+        options: CommandOptions = {},
     ): Promise<T | null> {
         if (busy.current || requiresReload) return null;
-        const body = JSON.stringify(data);
+        const signature = signatureOf(data);
         if (
             !uncertain &&
-            (pending.current?.body !== body || pending.current?.url !== url)
+            (pending.current?.signature !== signature ||
+                pending.current?.url !== url)
         ) {
-            pending.current = { key: crypto.randomUUID(), body, url };
+            pending.current = { key: crypto.randomUUID(), signature, url };
         }
         const command = pending.current;
         if (!command) return null;
+        const isForm = data instanceof FormData;
+        // An uncertain retry resends the original body, whatever the caller now holds.
+        const body = isForm ? data : uncertain ? command.signature : signature;
         busy.current = true;
         setProcessing(true);
         setErrors({});
         setMessage('');
         try {
-            const xsrf = document.cookie
-                .split('; ')
-                .find((part) => part.startsWith('XSRF-TOKEN='))
-                ?.slice(11);
-            const csrf = document.querySelector<HTMLMetaElement>(
-                'meta[name="csrf-token"]',
-            )?.content;
             const response = await fetch(command.url, {
-                method: 'POST',
+                method: options.method ?? 'POST',
                 credentials: 'same-origin',
                 cache: 'no-store',
                 headers: {
                     Accept: 'application/json',
-                    'Content-Type': 'application/json',
+                    ...(isForm ? {} : { 'Content-Type': 'application/json' }),
                     'X-Requested-With': 'XMLHttpRequest',
                     'Idempotency-Key': command.key,
-                    ...(xsrf
-                        ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) }
-                        : csrf
-                          ? { 'X-CSRF-TOKEN': csrf }
-                          : {}),
+                    ...csrfHeaders(),
                 },
-                body: command.body,
+                body,
             });
             const result: unknown = await response.json().catch(() => null);
             if (response.ok && isResult(result)) {
@@ -64,6 +90,13 @@ export function useVehicleRecordCommand<T>(
                 setUncertain(false);
                 return result;
             }
+            const serverMessage =
+                result &&
+                typeof result === 'object' &&
+                'message' in result &&
+                typeof result.message === 'string'
+                    ? result.message
+                    : '';
             if (
                 response.status === 422 &&
                 result &&
@@ -88,8 +121,11 @@ export function useVehicleRecordCommand<T>(
                 setUncertain(false);
                 setMessage(
                     response.status === 409
-                        ? 'This record changed while you were editing. Review its latest version before saving again.'
-                        : 'Your access or session has changed. Reload this vehicle to check what is available.',
+                        ? serverMessage ||
+                              'This record changed while you were editing. Review its latest version before saving again.'
+                        : response.status === 403
+                          ? 'You no longer have access to make this change. Reload this vehicle to check what is available.'
+                          : 'Your access or session has changed. Reload this vehicle to check what is available.',
                 );
             } else {
                 setUncertain(true);
@@ -115,6 +151,14 @@ export function useVehicleRecordCommand<T>(
             delete next[field];
             return next;
         });
+    /** Forget any pending identity once the caller has reloaded the source. */
+    const reset = () => {
+        pending.current = null;
+        setErrors({});
+        setMessage('');
+        setUncertain(false);
+        setRequiresReload(false);
+    };
     return {
         submit,
         processing,
@@ -123,6 +167,13 @@ export function useVehicleRecordCommand<T>(
         message,
         uncertain,
         requiresReload,
+        reset,
         locked: processing || uncertain || requiresReload,
     };
 }
+
+/** Accepts any JSON object response as the command result. */
+export const isJsonObject = (
+    value: unknown,
+): value is Record<string, unknown> =>
+    !!value && typeof value === 'object' && !Array.isArray(value);

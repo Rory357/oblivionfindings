@@ -1,5 +1,29 @@
 # PKG-02B build checkpoint
 
+## 23 September 2026 (evening): every v13 view rebuilt to the mockup
+
+Stephan rejected the slice (a) delivery because it did not match the approved v13 mockup, and asked for every view to be rebuilt section for section, with real backends and no stubbed buttons, then re-reviewed for gaps. That is done for all 19 views (Overview ×4, Service & compliance ×5, Checks ×2, Maintenance ×2, Map ×4, Trip history, Calendar). The slice plan below is superseded.
+
+- The mockup's stylesheets are ported by `scripts/port-pkg02b-mockup-css.cjs` into `vehicle-workspace/mockup-port.css` (scoped to `.vehicle-studio`, tokens only), so the build uses the mockup's own structure.
+- New backends and migrations: calendar & bookings (`000200`), Finance links and review requests (`000300`), trip history (`000400`), obligation reminders (`000500`), tracker distance feed (`000600`), geofence assignments (`000700`), versioned checks (`000800`), plus Driving insights and Alerts & Control Room.
+- Side-by-side re-audit: `MOCKUP-FIDELITY-AUDIT.md`. Summary for Main, decisions to review and test results: `SLICE-A-MAIN-SUMMARY.md`.
+- Not merged to `main` and not pushed.
+
+## 23 September 2026: build taken over by Claude (Claude Code), slice (a) delivered
+
+Stephan paused the ChatGPT/Codex Designer and approved Claude to finish the build in four slices, each tested and merged to `main` on its own: (a) I1 readiness, Overview, and Service & compliance with documents and reminders; (b) Checks & inspections and Maintenance; (c) Calendar & bookings; (d) Map, trips, telemetry and exports. The Codex worktree and Main's uncommitted records were not touched. Codex's paused work was committed unchanged as `e9432132d`.
+
+- `5891b62e3`: I1 finished (readiness B01/B02 plus the RUC lower bound, odometer, compliance validation, booking rules, the legacy evidence guard) and the workspace records backend (migration `2026_09_23_000100`, private documents, reminders, schedules, catalogue, presenter).
+- Slice (a) closing commit: the rebuilt vehicle page (`pages/fleet-assets/vehicles/show.tsx` plus `components/fleet-assets/vehicle-workspace/`), JSON-aware versioned vehicle update, prefixed document-reminder errors, a workspace rollback test and model tests.
+- Full summary for Main, including the decisions to review: `SLICE-A-MAIN-SUMMARY.md`.
+- Next: slice (b), Checks & inspections and Maintenance, against v13 and the I2/I3 notes in this folder.
+
+The historical Codex checkpoint follows unchanged for reference.
+
+---
+
+## 22 September 2026: Codex checkpoint (historical)
+
 22 September 2026. **PAUSED at Stephan's explicit request to conserve tokens. Not complete, not integration-approved.** Same Designer task 01a0c2bb-fcff-7cb1-8bab-882d84477c6c, worktree 5b0a, branch codex/pkg-02b-vehicle-profile-design. Integration baseline 5307692ec59be84f3503c06354419b7da95be805; latest application checkpoint 71dfa1a90.
 
 ## Pause checkpoint — resume here

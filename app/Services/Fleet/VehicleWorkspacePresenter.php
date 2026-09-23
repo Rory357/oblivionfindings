@@ -2,16 +2,17 @@
 
 namespace App\Services\Fleet;
 
-use App\Domain\Finance\Presenters\AssetFinanceTechnologyProjectionPresenter;
 use App\Models\Asset;
 use App\Models\AssetDocument;
 use App\Models\AssetDocumentSet;
+use App\Models\FleetChecklistRun;
 use App\Models\FleetServiceCompletion;
 use App\Models\FleetServiceSchedule;
 use App\Models\FleetVehicleComplianceRecord;
 use App\Models\FleetVehicleComplianceVersion;
 use App\Models\FleetVehicleOdometerObservation;
 use App\Models\FleetVehicleReminder;
+use App\Models\FleetVehicleUnavailablePeriod;
 use App\Models\FleetWorkOrder;
 use App\Models\User;
 use App\Services\Fleet\Data\VehicleReadinessAssessment;
@@ -37,7 +38,8 @@ class VehicleWorkspacePresenter
         private readonly VehicleStaffDirectory $staff,
         private readonly FleetCatalogueService $catalogue,
         private readonly MaintenanceAccessService $maintenance,
-        private readonly AssetFinanceTechnologyProjectionPresenter $finance,
+        private readonly VehicleObligationReminderService $obligationReminders,
+        private readonly VehicleMileageFeedService $mileageFeed,
     ) {}
 
     /** @return array<string,mixed> */
@@ -46,9 +48,14 @@ class VehicleWorkspacePresenter
         $asset->loadMissing(['site:id,name', 'homeSite:id,name', 'primaryDriver:id,name', 'fleetResponsible:id,name', 'profilePhoto']);
         $assessment = $this->readiness->assess($asset);
         $can = $this->permissions($viewer, $asset, $canViewTechnology);
-        $schedules = $this->schedules($asset, $assessment);
         // Files follow the asset register's own access rule (AssetPolicy::view).
         $documents = $can['view_documents'] ? $this->documents($asset) : [];
+        // Service and RUC planning may use the calibrated tracker distance; readiness never does.
+        // Tracker figures are separately permissioned, so other viewers plan from recorded readings.
+        $currentReading = $assessment->odometerObservationId
+            ? FleetVehicleOdometerObservation::query()->find($assessment->odometerObservationId) : null;
+        $planning = $this->mileageFeed->planning($asset, $currentReading, $canViewTechnology ? $assessment->trackerEstimate : null);
+        $schedules = $this->schedules($asset, $assessment, $documents, $planning['planning_km']);
 
         return [
             'vehicle' => $this->vehicle($asset),
@@ -58,10 +65,12 @@ class VehicleWorkspacePresenter
             'schedules' => $schedules,
             'service_history' => $this->serviceHistory($asset),
             'reminders' => $this->reminders($asset),
+            'obligation_reminders' => $this->obligationReminders->forVehicle($viewer, $asset, $planning['planning_km']),
+            'mileage_feed' => $this->mileageFeed->present($viewer, $asset, $currentReading, $assessment->trackerEstimate, $canViewTechnology),
             'documents' => array_values(array_filter($documents, fn (array $set): bool => $set['source'] === null)),
+            'linked_documents' => $this->linkedDocuments($asset, $documents),
             'work' => $this->work($viewer, $asset),
             'checks' => $this->checks($asset),
-            'finance' => $can['view_finance'] ? $this->financeData($viewer, $asset) : null,
             'catalogues' => $this->catalogue->options(),
             'people' => $can['manage'] || $can['manage_schedules'] || $can['manage_documents']
                 ? $this->staff->candidates($asset, null, array_filter([$asset->fleet_responsible_user_id]))->all()
@@ -87,6 +96,8 @@ class VehicleWorkspacePresenter
             'report_maintenance' => $this->maintenance->canReport($viewer)
                 && in_array((int) $asset->site_id, $this->maintenance->approvedSiteIds($viewer), true),
             'view_maintenance' => $this->maintenance->canRead($viewer),
+            'schedule_service' => $this->maintenance->canManage($viewer)
+                && in_array((int) $asset->site_id, $this->maintenance->approvedSiteIds($viewer), true),
             'book' => $viewer->canDo('fleet.viewAny') || $viewer->canDo('assets.viewAny'),
             'view_vehicle_technology' => $canViewTechnology,
         ];
@@ -250,16 +261,30 @@ class VehicleWorkspacePresenter
     }
 
     /** @return list<array<string,mixed>> */
-    private function schedules(Asset $asset, VehicleReadinessAssessment $assessment): array
+    /** @param  list<array<string,mixed>>  $documents */
+    private function schedules(Asset $asset, VehicleReadinessAssessment $assessment, array $documents = [], ?float $planningKm = null): array
     {
+        $planningKm ??= $assessment->odometerKm;
         $today = CarbonImmutable::now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+        // Supporting files kept with each schedule (current revisions only).
+        $files = [];
+        foreach ($documents as $set) {
+            if (($set['source']['type'] ?? null) !== 'service_schedule') {
+                continue;
+            }
+            foreach ($set['files'] as $file) {
+                if ($file['current']) {
+                    $files[(int) $set['source']['id']][] = ['id' => $file['id'], 'name' => $file['name'], 'url' => $file['url']];
+                }
+            }
+        }
 
         return FleetServiceSchedule::query()->where('asset_id', $asset->id)->with('owner:id,name')
             ->orderByDesc('is_active')->orderByRaw('next_due_at IS NULL')->orderBy('next_due_at')->orderBy('id')->get()
-            ->map(function (FleetServiceSchedule $schedule) use ($assessment, $today): array {
+            ->map(function (FleetServiceSchedule $schedule) use ($planningKm, $today, $files): array {
                 $dueDate = $schedule->next_due_at?->toDateString();
                 $dueKm = $schedule->next_due_km === null ? null : (float) $schedule->next_due_km;
-                $kmOverdue = $dueKm !== null && $assessment->odometerKm !== null && $assessment->odometerKm >= $dueKm;
+                $kmOverdue = $dueKm !== null && $planningKm !== null && $planningKm >= $dueKm;
 
                 return [
                     'id' => $schedule->id,
@@ -277,7 +302,8 @@ class VehicleWorkspacePresenter
                     'is_active' => (bool) $schedule->is_active,
                     'lock_version' => (int) ($schedule->lock_version ?? 1),
                     'overdue' => (bool) $schedule->is_active && (($dueDate !== null && $dueDate < $today) || $kmOverdue),
-                    'km_remaining' => $dueKm !== null && $assessment->odometerKm !== null ? round($dueKm - $assessment->odometerKm, 1) : null,
+                    'km_remaining' => $dueKm !== null && $planningKm !== null ? round($dueKm - $planningKm, 1) : null,
+                    'files' => $files[$schedule->id] ?? [],
                 ];
             })->values()->all();
     }
@@ -304,8 +330,33 @@ class VehicleWorkspacePresenter
                 'recorded_by' => $completion->recordedBy?->name,
             ]);
         $work = FleetWorkOrder::query()->where('asset_id', $asset->id)->whereIn('status', ['completed', 'cancelled'])
-            ->orderByDesc(DB::raw('COALESCE(completed_at, updated_at)'))->limit(self::HISTORY)->get()
-            ->map(fn (FleetWorkOrder $order): array => [
+            ->orderByDesc(DB::raw('COALESCE(completed_at, updated_at)'))->limit(self::HISTORY)->get();
+        $workIds = $work->pluck('id')->all();
+        $providers = [];
+        $cancelReasons = [];
+        if ($workIds !== []) {
+            DB::table('fleet_maintenance_actions')->whereIn('work_order_id', $workIds)
+                ->whereIn('action_type', ['plan_provider', 'cancel'])->orderBy('id')
+                ->get(['work_order_id', 'action_type', 'payload_json'])
+                ->each(function (object $action) use (&$providers, &$cancelReasons): void {
+                    $payload = json_decode((string) $action->payload_json, true) ?: [];
+                    if ($action->action_type === 'plan_provider' && ! empty($payload['provider_name'])) {
+                        $providers[(int) $action->work_order_id] = (string) $payload['provider_name'];
+                    }
+                    if ($action->action_type === 'cancel' && ! empty($payload['reason'])) {
+                        $cancelReasons[(int) $action->work_order_id] = (string) $payload['reason'];
+                    }
+                });
+        }
+        $workFiles = $workIds === [] ? collect() : DB::table('fleet_maintenance_attachments')->whereIn('work_order_id', $workIds)
+            ->groupBy('work_order_id')->selectRaw('work_order_id, COUNT(*) as files')->pluck('files', 'work_order_id');
+        $awaiting = $workIds === [] ? [] : DB::table('fleet_maintenance_restrictions')->whereIn('work_order_id', $workIds)
+            ->where('state', 'active')->pluck('work_order_id')->map(fn (mixed $id): int => (int) $id)->all();
+        $completionFiles = $completions->isEmpty() ? collect() : DB::table('asset_documents')->where('asset_id', $asset->id)
+            ->where('source_type', 'service_completion')->whereIn('source_id', $completions->pluck('id'))->whereNull('archived_at')
+            ->groupBy('source_id')->selectRaw('source_id, COUNT(*) as files')->pluck('files', 'source_id');
+        $completions = $completions->map(fn (array $row): array => $row + ['files' => (int) ($completionFiles[$row['id']] ?? 0), 'awaiting_release' => false]);
+        $work = $work->map(fn (FleetWorkOrder $order): array => [
                 'key' => 'work-'.$order->id,
                 'kind' => 'work',
                 'id' => $order->id,
@@ -313,12 +364,16 @@ class VehicleWorkspacePresenter
                 'date' => ($order->completed_at ?? $order->updated_at)?->setTimezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
                 'odometer_km' => null,
                 'status' => $order->status,
-                'provider' => null,
+                'provider' => $providers[$order->id] ?? null,
                 'evidence_reference' => null,
-                'notes' => $order->completion_notes,
+                'notes' => $order->status === 'cancelled'
+                    ? ($cancelReasons[$order->id] ?? $order->completion_notes)
+                    : $order->completion_notes,
                 'reference' => $order->reference_number,
                 'work_order_id' => $order->id,
                 'recorded_by' => null,
+                'files' => (int) ($workFiles[$order->id] ?? 0),
+                'awaiting_release' => $order->status === 'completed' && in_array((int) $order->id, $awaiting, true),
             ]);
 
         return $completions->concat($work)->sortByDesc(fn (array $row): string => ($row['date'] ?? '').'#'.$row['key'])
@@ -376,6 +431,48 @@ class VehicleWorkspacePresenter
     }
 
     /** Document sets with their files, newest first. Includes source-owned evidence. @return list<array<string,mixed>> */
+    /**
+     * Files kept with another record of this vehicle, so the document library
+     * can follow each one to its source. Booking and Finance files keep their
+     * own access rules and are listed only where those records are shown.
+     *
+     * @param  list<array<string,mixed>>  $documents
+     * @return list<array<string,mixed>>
+     */
+    private function linkedDocuments(Asset $asset, array $documents): array
+    {
+        $sets = collect($documents)->filter(fn (array $set): bool => in_array($set['source']['type'] ?? null,
+            ['compliance_version', 'odometer_observation', 'service_completion', 'service_schedule', 'unavailable_period', 'checklist_run'], true));
+        $labels = [];
+        foreach ($sets->groupBy(fn (array $set): string => $set['source']['type']) as $type => $group) {
+            $ids = $group->map(fn (array $set): int => (int) $set['source']['id'])->unique()->values()->all();
+            $rows = match ($type) {
+                'compliance_version' => FleetVehicleComplianceVersion::query()->whereIn('id', $ids)
+                    ->whereHas('record', fn ($record) => $record->where('asset_id', $asset->id))->with('record:id,kind')->get()
+                    ->mapWithKeys(fn (FleetVehicleComplianceVersion $version): array => [$version->id => (VehicleComplianceService::LABELS[$version->record?->kind] ?? 'Compliance').' · version '.$version->version]),
+                'odometer_observation' => FleetVehicleOdometerObservation::query()->whereIn('id', $ids)->where('asset_id', $asset->id)
+                    ->pluck('value_km', 'id')->map(fn (mixed $km): string => 'Reading · '.number_format((float) $km).' km'),
+                'service_completion' => FleetServiceCompletion::query()->whereIn('id', $ids)->where('asset_id', $asset->id)->with('schedule:id,name')->get()
+                    ->mapWithKeys(fn (FleetServiceCompletion $completion): array => [$completion->id => ($completion->schedule?->name ?? 'Service').' · completed '.$completion->completed_on?->format('j M Y')]),
+                'service_schedule' => FleetServiceSchedule::query()->whereIn('id', $ids)->where('asset_id', $asset->id)->pluck('name', 'id')
+                    ->map(fn (string $name): string => 'Service schedule · '.$name),
+                'unavailable_period' => FleetVehicleUnavailablePeriod::query()->whereIn('id', $ids)->where('asset_id', $asset->id)->get(['id', 'starts_at'])
+                    ->mapWithKeys(fn (FleetVehicleUnavailablePeriod $period): array => [$period->id => 'Unavailable from '.$period->starts_at?->setTimezone(config('app.worker_timezone', 'Pacific/Auckland'))->format('j M Y')]),
+                'checklist_run' => FleetChecklistRun::query()->whereIn('id', $ids)->where('asset_id', $asset->id)->with('template:id,name')->get()
+                    ->mapWithKeys(fn (FleetChecklistRun $run): array => [$run->id => ($run->template?->name ?? 'Vehicle check').' · '.$run->submitted_at?->setTimezone(config('app.worker_timezone', 'Pacific/Auckland'))->format('j M Y')]),
+                default => collect(),
+            };
+            foreach ($rows as $id => $label) {
+                $labels[$type.':'.$id] = (string) $label;
+            }
+        }
+
+        // A source that no longer belongs to this vehicle is left out rather than guessed.
+        return $sets->filter(fn (array $set): bool => isset($labels[$set['source']['type'].':'.$set['source']['id']]))
+            ->map(fn (array $set): array => array_replace($set, ['source' => $set['source'] + ['label' => $labels[$set['source']['type'].':'.$set['source']['id']]]]))
+            ->values()->all();
+    }
+
     private function documents(Asset $asset): array
     {
         $sets = AssetDocumentSet::query()->where('asset_id', $asset->id)->with(['files' => fn ($files) => $files->with('uploadedBy:id,name')->orderByDesc('revision')->orderBy('id')])
@@ -429,8 +526,17 @@ class VehicleWorkspacePresenter
             return ['can_view' => false, 'open_count' => null, 'open' => [], 'active_restrictions' => 0];
         }
         $open = FleetWorkOrder::query()->where('asset_id', $asset->id)->whereNotIn('status', ['completed', 'cancelled'])
-            ->orderByRaw('due_at IS NULL')->orderBy('due_at')->orderByDesc('id')->limit(10)
-            ->get(['id', 'reference_number', 'title', 'status', 'priority', 'due_at']);
+            ->with('assignedTo:id,name')
+            ->orderByRaw('due_at IS NULL')->orderBy('due_at')->orderByDesc('id')->limit(50)
+            ->get(['id', 'reference_number', 'title', 'status', 'priority', 'due_at', 'assigned_to_user_id', 'next_action']);
+        $sources = $this->workSources($open->pluck('id')->all());
+        // The latest provider step on each open work order (planned, confirmed, ...).
+        $provider = DB::table('fleet_maintenance_actions')->whereIn('work_order_id', $open->pluck('id'))
+            ->whereIn('action_type', ['plan_provider', 'record_provider_confirmation', 'record_provider_cancellation', 'record_provider_completion'])
+            ->orderBy('id')->get(['work_order_id', 'action_type'])
+            ->mapWithKeys(fn (object $action): array => [(int) $action->work_order_id => $action->action_type])->all();
+        $held = DB::table('fleet_maintenance_restrictions')->whereIn('work_order_id', $open->pluck('id'))
+            ->where('state', 'active')->pluck('work_order_id')->map(fn (mixed $id): int => (int) $id)->all();
 
         return [
             'can_view' => true,
@@ -438,6 +544,15 @@ class VehicleWorkspacePresenter
             'open' => $open->map(fn (FleetWorkOrder $order): array => [
                 'id' => $order->id, 'reference' => $order->reference_number, 'title' => $order->title,
                 'status' => $order->status, 'priority' => $order->priority, 'due_at' => $order->due_at?->toIso8601String(),
+                'owner' => $order->assignedTo?->name,
+                'next_action' => $order->next_action,
+                'source' => $sources[$order->id] ?? ['label' => 'Maintenance record', 'failed_check' => false],
+                'restricted' => in_array((int) $order->id, $held, true),
+                'provider_state' => match ($provider[$order->id] ?? null) {
+                    'plan_provider' => 'planned', 'record_provider_confirmation' => 'confirmed',
+                    'record_provider_completion' => 'completed', 'record_provider_cancellation' => 'cancelled',
+                    default => null,
+                },
             ])->values()->all(),
             'active_restrictions' => DB::table('fleet_maintenance_restrictions')->where('asset_id', $asset->id)->where('state', 'active')->count(),
             'awaiting_release' => DB::table('fleet_maintenance_restrictions as restriction')
@@ -446,6 +561,44 @@ class VehicleWorkspacePresenter
                 ->where('work.status', 'completed')->exists(),
             'total' => FleetWorkOrder::query()->where('asset_id', $asset->id)->count(),
         ];
+    }
+
+    /**
+     * Where each work order came from: its first report's check, or a manual report.
+     *
+     * @param  list<int>  $workIds
+     * @return array<int,array{label:string,failed_check:bool}>
+     */
+    private function workSources(array $workIds): array
+    {
+        if ($workIds === []) {
+            return [];
+        }
+        $reports = DB::table('fleet_maintenance_reports as report')
+            ->leftJoin('fleet_checklist_runs as run', function ($join): void {
+                $join->on('run.id', '=', 'report.source_id')->where('report.source_type', 'fleet_checklist_run');
+            })
+            ->whereIn('report.work_order_id', $workIds)->whereNull('report.duplicate_of_report_id')
+            ->orderBy('report.id')
+            ->get(['report.work_order_id', 'report.source_type', 'report.source_id', 'run.outcome']);
+        // PKG-02B: work created from a Control Room response shows its reference.
+        $responses = DB::table('control_room_alerts')
+            ->whereIn('id', $reports->where('source_type', 'control_room_alert')->pluck('source_id')->filter()->unique()->values()->all())
+            ->pluck('reference_number', 'id');
+        $sources = [];
+        foreach ($reports as $report) {
+            $id = (int) $report->work_order_id;
+            if (isset($sources[$id])) {
+                continue;
+            }
+            $sources[$id] = match ($report->source_type) {
+                'fleet_checklist_run' => ['label' => 'CHK-'.$report->source_id, 'failed_check' => $report->outcome !== null && $report->outcome !== 'passed'],
+                'control_room_alert' => ['label' => (string) ($responses[$report->source_id] ?? 'Control Room response'), 'failed_check' => false],
+                default => ['label' => 'Manual report', 'failed_check' => false],
+            };
+        }
+
+        return $sources;
     }
 
     /** @return array<string,mixed> */
@@ -464,17 +617,6 @@ class VehicleWorkspacePresenter
                 'submitted_at' => CarbonImmutable::parse($latest->submitted_at, 'UTC')->toIso8601String(),
             ] : null,
             'next_due_at' => $asset->inspection_due_at?->toDateString(),
-        ];
-    }
-
-    /** @return array<string,mixed>|null */
-    private function financeData(User $viewer, Asset $asset): ?array
-    {
-        $projection = $this->finance->forOperationalAsset($viewer, $asset);
-
-        return [
-            'fixed_asset' => $projection['finance'] ?? null,
-            'link' => $projection['links']['finance'] ?? null,
         ];
     }
 }

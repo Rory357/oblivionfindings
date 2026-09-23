@@ -26,7 +26,7 @@ class VehicleReminderService
     /** Owning records a reminder may point at, all checked to belong to the vehicle. */
     public const SOURCES = ['vehicle', 'document_set', 'service_schedule', 'compliance_record', 'work_order'];
 
-    public const ACTIONS = ['acknowledge', 'complete', 'pause', 'resume'];
+    public const ACTIONS = ['acknowledge', 'complete', 'pause', 'resume', 'snooze'];
 
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
@@ -97,15 +97,16 @@ class VehicleReminderService
         }, 3);
     }
 
-    public function act(User $actor, int $assetId, int $reminderId, string $action, string $note, int $expectedVersion, string $requestKey): FleetVehicleReminder
+    public function act(User $actor, int $assetId, int $reminderId, string $action, string $note, int $expectedVersion, string $requestKey, ?string $remindLocal = null, ?string $remindOffset = null): FleetVehicleReminder
     {
         abort_unless(in_array($action, self::ACTIONS, true), 404);
 
-        return DB::transaction(function () use ($actor, $assetId, $reminderId, $action, $note, $expectedVersion, $requestKey): FleetVehicleReminder {
+        return DB::transaction(function () use ($actor, $assetId, $reminderId, $action, $note, $expectedVersion, $requestKey, $remindLocal, $remindOffset): FleetVehicleReminder {
             [$current, $asset] = $this->resolve($actor, $assetId);
             self::assertKey($requestKey);
             $reminder = $this->lockReminder($asset, $reminderId);
-            $fingerprint = MaintenanceFingerprint::of(['actor' => (int) $current->id, 'reminder' => $reminderId, 'action' => $action, 'note' => trim($note)]);
+            $fingerprint = MaintenanceFingerprint::of(['actor' => (int) $current->id, 'reminder' => $reminderId, 'action' => $action,
+                'note' => trim($note), 'remind_local' => $action === 'snooze' ? $remindLocal : null]);
             if ($replay = $this->replay($reminder, $requestKey, $fingerprint)) {
                 return $replay;
             }
@@ -115,17 +116,30 @@ class VehicleReminderService
             }
             $allowed = match ($action) {
                 'acknowledge' => $reminder->state === 'scheduled',
-                'complete', 'pause' => $reminder->isOpen(),
+                'complete', 'pause', 'snooze' => $reminder->isOpen(),
                 'resume' => $reminder->state === 'paused',
             };
             if (! $allowed) {
                 throw ValidationException::withMessages(['note' => 'This reminder can\'t be '.self::pastTense($action).' in its current state.']);
+            }
+            $snoozeTo = null;
+            if ($action === 'snooze') {
+                try {
+                    $snoozeTo = CarbonImmutable::parse(MaintenanceLocalTime::toUtc((string) $remindLocal, $remindOffset), 'UTC');
+                } catch (ValidationException $exception) {
+                    throw ValidationException::withMessages(['remind_local' => collect($exception->errors())->flatten()->first()]);
+                }
+                if (! $snoozeTo->greaterThan(now()) || ! $snoozeTo->greaterThan($reminder->due_at)) {
+                    throw ValidationException::withMessages(['remind_local' => 'Choose a time after the current reminder and after now.']);
+                }
             }
             $before = $this->snapshot($reminder);
             $changes = match ($action) {
                 'acknowledge' => ['state' => 'acknowledged'],
                 'pause' => ['state' => 'paused'],
                 'resume' => ['state' => 'scheduled'],
+                // Only the follow-up moves; its linked obligation is unchanged.
+                'snooze' => ['state' => 'scheduled', 'due_at' => $snoozeTo],
                 // A repeating reminder moves on by whole calendar months from
                 // its own due time; a one-off is completed.
                 'complete' => $reminder->repeat_months > 0
@@ -159,14 +173,20 @@ class VehicleReminderService
 
             return $existing;
         }
-        $values = $this->validated($asset, [
-            ...$plan,
-            'title' => $set->category.' renewal',
-            'action_text' => $plan['action_text'] ?? 'Renew '.mb_strtolower($set->category).' and upload the new document.',
-            'source_type' => 'document_set',
-            'source_id' => $set->id,
-            'repeat_months' => 0,
-        ], $existing);
+        try {
+            $values = $this->validated($asset, [
+                ...$plan,
+                'title' => $set->category.' renewal',
+                'action_text' => $plan['action_text'] ?? 'Renew '.mb_strtolower($set->category).' and upload the new document.',
+                'source_type' => 'document_set',
+                'source_id' => $set->id,
+                'repeat_months' => 0,
+            ], $existing);
+        } catch (ValidationException $exception) {
+            // The document form nests its reminder fields under "reminder.".
+            throw ValidationException::withMessages(collect($exception->errors())
+                ->mapWithKeys(fn (array $messages, string $field): array => ['reminder.'.$field => $messages])->all());
+        }
         if ($set->expires_on && $values['due_at']->greaterThan(CarbonImmutable::parse($set->expires_on->toDateString().' 23:59', config('app.worker_timezone', 'Pacific/Auckland')))) {
             throw ValidationException::withMessages(['reminder.remind_local' => 'The renewal reminder must be on or before expiry. For an expired document, add a follow-up from Reminders.']);
         }
@@ -324,6 +344,6 @@ class VehicleReminderService
 
     private static function pastTense(string $action): string
     {
-        return ['acknowledge' => 'acknowledged', 'complete' => 'completed', 'pause' => 'paused', 'resume' => 'resumed'][$action];
+        return ['acknowledge' => 'acknowledged', 'complete' => 'completed', 'pause' => 'paused', 'resume' => 'resumed', 'snooze' => 'snoozed'][$action];
     }
 }

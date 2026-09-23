@@ -10,13 +10,32 @@ export type MapMarker = {
     lat: number;
     lng: number;
     title?: string;
-    type?: 'vehicle' | 'house' | 'asset' | 'default';
+    /** `point` draws a small dot (e.g. one recorded position) instead of a pin. */
+    type?: 'vehicle' | 'house' | 'asset' | 'default' | 'point';
     status?: 'online' | 'offline' | 'idle' | 'moving' | string;
     heading?: number;
     popup?: string;
     speed?: number;
     /** Explicit override; accepts any CSS colour value including `var(--token)`. */
     color?: string;
+    /**
+     * Label/value pairs shown in a compact card on hover and keyboard focus
+     * (e.g. Speed / Ignition / Motion). Omit for the plain popup behaviour.
+     */
+    stats?: [string, string][];
+    /** One-line note at the foot of the stats card (e.g. how to open actions). */
+    hint?: string;
+};
+
+/** A right-click (or context-menu key) on the map or on a marker. */
+export type MapContextPoint = {
+    lat: number;
+    lng: number;
+    /** Viewport position of the pointer, for placing a menu. */
+    x: number;
+    y: number;
+    /** Set when the right-click was on a marker. */
+    markerId?: string | number;
 };
 
 export type MapGeofence = {
@@ -34,6 +53,8 @@ type PolylineOptions = {
     showArrows?: boolean;
     showEndpoints?: boolean;
     color?: string;
+    /** SVG dash pattern, e.g. `'7 7'` for a route with missing reports. */
+    dashArray?: string;
 };
 
 type LeafletMapProps = {
@@ -49,6 +70,22 @@ type LeafletMapProps = {
     darkMode?: boolean;
     onMarkerClick?: (id: string | number) => void;
     onMapClick?: (latlng: { lat: number; lng: number }) => void;
+    /** Fit the view to the polyline (or the markers) once the map loads. */
+    autoFit?: boolean;
+    /** Re-fit to the markers whenever they change. Defaults to true. */
+    fitMarkers?: boolean;
+    /** Pan to this point; change `nonce` to pan again to the same point. */
+    focus?: { lat: number; lng: number; nonce: number };
+    /** Recalculate the map size whenever its container resizes. */
+    observeResize?: boolean;
+    /**
+     * Right-click actions. When set, a right-click on the map or on a marker
+     * calls this instead of opening the browser menu. Omit to keep the
+     * browser's own menu.
+     */
+    onContext?: (point: MapContextPoint) => void;
+    /** Street tiles loading or failing, e.g. to offer an unavailable state. */
+    onTileStatus?: (status: 'loaded' | 'failed') => void;
 };
 
 // OpenStreetMap's standard tile server — keyless and reliable. (The former
@@ -131,6 +168,37 @@ export function mapMarkerPopupHtml(marker: MapMarker): string {
     return `<div class="text-sm font-medium">${title}</div>${popup}`;
 }
 
+// Outline icons (lucide geometry) for the stats card; unknown labels get a dot.
+const STAT_ICON_PATHS: Record<string, string> = {
+    Ignition: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
+    Speed: '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
+    Motion: '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
+    Voltage:
+        '<rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2"/><path d="M6 12h8"/>',
+    Location:
+        '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+    Time: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+};
+
+/** Compact label/value card for a marker's hover and focus tooltip. */
+export function mapMarkerStatsHtml(marker: MapMarker): string {
+    const rows = (marker.stats ?? [])
+        .map(([label, value]) => {
+            const path =
+                STAT_ICON_PATHS[label] ?? '<circle cx="12" cy="12" r="4"/>';
+            return `<section><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg><span>${escapeMapHtml(label)}</span><b>${escapeMapHtml(value)}</b></section>`;
+        })
+        .join('');
+    const popup = marker.popup
+        ? `<small>${escapeMapHtml(marker.popup)}</small>`
+        : '';
+    const hint = marker.hint
+        ? `<footer>${escapeMapHtml(marker.hint)}</footer>`
+        : '';
+
+    return `<div class="leaflet-map-stats-card"><strong>${escapeMapHtml(marker.title ?? '')}</strong>${popup}<div>${rows}</div>${hint}</div>`;
+}
+
 const CAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>`;
 
 function createVehicleDivIcon(
@@ -206,6 +274,72 @@ function createDivIcon(leaflet: typeof import('leaflet'), marker: MapMarker) {
         return createVehicleDivIcon(leaflet, marker);
     }
     return createDefaultDivIcon(leaflet, marker);
+}
+
+/** A pin (div icon), or a small vector dot for `point` markers. */
+function createLeafletMarker(
+    leaflet: typeof import('leaflet'),
+    marker: MapMarker,
+) {
+    if (marker.type === 'point') {
+        return leaflet.circleMarker([marker.lat, marker.lng], {
+            radius: 4.5,
+            color: 'var(--card)',
+            weight: 1.5,
+            fillColor: getMapMarkerColor(marker),
+            fillOpacity: 1,
+        });
+    }
+    return leaflet.marker([marker.lat, marker.lng], {
+        icon: createDivIcon(leaflet, marker),
+    });
+}
+
+/** Hover/focus stats card; opens on keyboard focus as well as hover. */
+function bindStatsTooltip(layer: any, marker: MapMarker) {
+    if (!marker.stats?.length) return;
+    layer.bindTooltip(mapMarkerStatsHtml(marker), {
+        direction: 'auto',
+        offset: [20, 0],
+        className: 'leaflet-map-stats-tooltip',
+        opacity: 1,
+    });
+    layer.on('add', () => {
+        const element = layer.getElement?.();
+        element?.addEventListener('focus', () => layer.openTooltip());
+        element?.addEventListener('blur', () => layer.closeTooltip());
+    });
+}
+
+type HandlerRef<T> = { current: ((value: T) => void) | undefined };
+
+/** Right-click on a marker: the marker's actions, not the map's. */
+function bindMarkerContext(
+    leaflet: typeof import('leaflet'),
+    layer: any,
+    marker: MapMarker,
+    handler: HandlerRef<MapContextPoint>,
+) {
+    if (!handler.current) return;
+    layer.on('contextmenu', (e: any) => {
+        // Stop Leaflet passing the event on to the map's own handler.
+        leaflet.DomEvent.stopPropagation(e);
+        if (e.originalEvent) leaflet.DomEvent.preventDefault(e.originalEvent);
+        handler.current?.({
+            lat: marker.lat,
+            lng: marker.lng,
+            x: e.originalEvent?.clientX ?? 0,
+            y: e.originalEvent?.clientY ?? 0,
+            markerId: marker.id,
+        });
+    });
+}
+
+/** Report street tiles loading (per batch) or failing (per tile). */
+function bindTileStatus(layer: any, handler: HandlerRef<'loaded' | 'failed'>) {
+    if (!handler.current) return;
+    layer.on('load', () => handler.current?.('loaded'));
+    layer.on('tileerror', () => handler.current?.('failed'));
 }
 
 // ── Clustering helpers ──────────────────────────────────────────────────────
@@ -361,8 +495,21 @@ export default function LeafletMap({
     darkMode,
     onMarkerClick,
     onMapClick,
+    autoFit = false,
+    fitMarkers = true,
+    focus,
+    observeResize = false,
+    onContext,
+    onTileStatus,
 }: LeafletMapProps) {
+    // Read at event time so the latest handlers run; registered only when a
+    // handler exists, so other maps keep the browser's own right-click menu.
+    const onContextRef = useRef(onContext);
+    onContextRef.current = onContext;
+    const onTileStatusRef = useRef(onTileStatus);
+    onTileStatusRef.current = onTileStatus;
     const containerRef = useRef<HTMLDivElement>(null);
+    const resizeObserverRef = useRef<ResizeObserver | null>(null);
     const mapRef = useRef<any>(null);
     const markersLayerRef = useRef<any>(null);
     const polylineLayerRef = useRef<any>(null);
@@ -387,6 +534,9 @@ export default function LeafletMap({
         polylineOptions,
         geofences,
         zoom,
+        autoFit,
+        fitMarkers,
+        observeResize,
     });
     propsRef.current = {
         markers,
@@ -396,6 +546,9 @@ export default function LeafletMap({
         polylineOptions,
         geofences,
         zoom,
+        autoFit,
+        fitMarkers,
+        observeResize,
     };
 
     // Resolve dark mode: explicit prop or auto-detect from html element
@@ -422,13 +575,14 @@ export default function LeafletMap({
             clusters.forEach((group) => {
                 if (group.markers.length === 1) {
                     const m = group.markers[0];
-                    const icon = createDivIcon(L!, m);
-                    const leafletMarker = L!.marker([m.lat, m.lng], { icon });
+                    const leafletMarker = createLeafletMarker(L!, m);
                     if (m.popup || m.title) {
                         leafletMarker.bindPopup(mapMarkerPopupHtml(m));
                     }
                     if (onMarkerClick)
                         leafletMarker.on('click', () => onMarkerClick(m.id));
+                    bindStatsTooltip(leafletMarker, m);
+                    bindMarkerContext(L!, leafletMarker, m, onContextRef);
                     markersLayerRef.current.addLayer(leafletMarker);
                 } else {
                     const clusterIcon = createClusterIcon(
@@ -451,8 +605,7 @@ export default function LeafletMap({
             });
         } else {
             markers.forEach((m) => {
-                const icon = createDivIcon(L!, m);
-                const leafletMarker = L!.marker([m.lat, m.lng], { icon });
+                const leafletMarker = createLeafletMarker(L!, m);
 
                 if (m.popup || m.title) {
                     leafletMarker.bindPopup(mapMarkerPopupHtml(m));
@@ -460,6 +613,8 @@ export default function LeafletMap({
 
                 if (onMarkerClick)
                     leafletMarker.on('click', () => onMarkerClick(m.id));
+                bindStatsTooltip(leafletMarker, m);
+                bindMarkerContext(L!, leafletMarker, m, onContextRef);
                 markersLayerRef.current.addLayer(leafletMarker);
             });
         }
@@ -470,13 +625,31 @@ export default function LeafletMap({
     // called from the zoomend handler.
     function fitBoundsToMarkers() {
         if (!L || !mapRef.current) return;
-        const { markers, clustering } = propsRef.current;
+        const { markers, clustering, fitMarkers } = propsRef.current;
+        if (!fitMarkers) return;
         if (clustering && markers.length > 20) return;
         if (markers.length <= 1) return;
         const bounds = L.latLngBounds(
             markers.map((m) => [m.lat, m.lng] as [number, number]),
         );
         mapRef.current.fitBounds(bounds, { padding: [40, 40] });
+    }
+
+    // Opt-in (`autoFit`): show the whole route, or all markers without one.
+    function fitToContent() {
+        if (!L || !mapRef.current || !propsRef.current.autoFit) return;
+        const { polyline, markers } = propsRef.current;
+        const points =
+            polyline && polyline.length > 1
+                ? polyline
+                : markers.map((m) => ({ lat: m.lat, lng: m.lng }));
+        if (points.length < 2) return;
+        mapRef.current.fitBounds(
+            L.latLngBounds(
+                points.map((p) => [p.lat, p.lng] as [number, number]),
+            ),
+            { padding: [45, 45], maxZoom: 16 },
+        );
     }
 
     function renderPolyline() {
@@ -498,6 +671,7 @@ export default function LeafletMap({
                 className: opts.animated
                     ? 'leaflet-animated-polyline'
                     : undefined,
+                ...(opts.dashArray ? { dashArray: opts.dashArray } : {}),
             },
         );
         polylineLayerRef.current.addLayer(line);
@@ -627,6 +801,7 @@ export default function LeafletMap({
                     maxZoom: 19,
                 });
 
+                bindTileStatus(streetLayer, onTileStatusRef);
                 streetLayer.addTo(mapRef.current);
                 tileLayerRef.current = streetLayer;
                 satelliteLayerRef.current = satelliteLayer;
@@ -638,6 +813,18 @@ export default function LeafletMap({
                         { position: 'topright' },
                     )
                     .addTo(mapRef.current);
+
+                // Only maps that offer their own actions take over right-click.
+                if (onContextRef.current) {
+                    mapRef.current.on('contextmenu', (e: any) =>
+                        onContextRef.current?.({
+                            lat: e.latlng.lat,
+                            lng: e.latlng.lng,
+                            x: e.originalEvent?.clientX ?? 0,
+                            y: e.originalEvent?.clientY ?? 0,
+                        }),
+                    );
+                }
 
                 markersLayerRef.current = L.layerGroup().addTo(mapRef.current);
                 polylineLayerRef.current = L.layerGroup().addTo(mapRef.current);
@@ -653,6 +840,16 @@ export default function LeafletMap({
                     }
                 });
 
+                if (
+                    propsRef.current.observeResize &&
+                    typeof ResizeObserver !== 'undefined'
+                ) {
+                    resizeObserverRef.current = new ResizeObserver(() =>
+                        mapRef.current?.invalidateSize({ pan: false }),
+                    );
+                    resizeObserverRef.current.observe(containerRef.current);
+                }
+
                 initRef.current = true;
 
                 // Imperatively render initial layer state. This replaces the
@@ -661,6 +858,7 @@ export default function LeafletMap({
                 renderMarkers();
                 fitBoundsToMarkers();
                 renderPolyline();
+                fitToContent();
                 renderGeofences();
                 syncClusterZoomListenerRef.current();
             }
@@ -708,6 +906,7 @@ export default function LeafletMap({
             maxZoom: 19,
         });
 
+        bindTileStatus(streetLayer, onTileStatusRef);
         streetLayer.addTo(mapRef.current);
         tileLayerRef.current = streetLayer;
         satelliteLayerRef.current = satelliteLayer;
@@ -741,6 +940,27 @@ export default function LeafletMap({
         renderPolyline();
     }, [polyline, polylineOptions]);
 
+    // Opt-in: refit when a different route arrives.
+    useEffect(() => {
+        if (!initRef.current) return;
+        fitToContent();
+    }, [polyline]);
+
+    // Pan to a focused point (e.g. a selected journey event).
+    const focusLat = focus?.lat;
+    const focusLng = focus?.lng;
+    const focusNonce = focus?.nonce;
+    useEffect(() => {
+        if (
+            focusLat === undefined ||
+            focusLng === undefined ||
+            !mapRef.current ||
+            !initRef.current
+        )
+            return;
+        mapRef.current.panTo([focusLat, focusLng], { animate: false });
+    }, [focusLat, focusLng, focusNonce]);
+
     // Re-render geofences when geofences change
     useEffect(() => {
         if (!initRef.current) return;
@@ -758,6 +978,8 @@ export default function LeafletMap({
                     );
                     clusterZoomHandlerRef.current = null;
                 }
+                resizeObserverRef.current?.disconnect();
+                resizeObserverRef.current = null;
                 mapRef.current.remove();
                 mapRef.current = null;
                 initRef.current = false;

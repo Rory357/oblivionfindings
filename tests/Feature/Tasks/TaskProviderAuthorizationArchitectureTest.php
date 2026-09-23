@@ -16,6 +16,7 @@ use App\Services\Tasks\Providers\ControlRoomAlertProvider;
 use App\Services\Tasks\Providers\DataBreachProvider;
 use App\Services\Tasks\Providers\DataSubjectRequestProvider;
 use App\Services\Tasks\Providers\FirstAidFollowupProvider;
+use App\Services\Tasks\Providers\FleetFinanceReviewProvider;
 use App\Services\Tasks\Providers\FleetIncidentProvider;
 use App\Services\Tasks\Providers\FleetMaintenanceProvider;
 use App\Services\Tasks\Providers\HrCaseProvider;
@@ -23,6 +24,11 @@ use App\Services\Tasks\Providers\HsCorrectiveActionProvider;
 use App\Services\Tasks\Providers\HsEventProvider;
 use App\Services\Tasks\Providers\HsInvestigationProvider;
 use App\Services\Tasks\Providers\IncidentFollowupProvider;
+use App\Services\Tasks\Providers\ItApprovalTaskProvider;
+use App\Services\Tasks\Providers\ItAutomationReviewTaskProvider;
+use App\Services\Tasks\Providers\ItKnowledgeReviewTaskProvider;
+use App\Services\Tasks\Providers\ItProvisioningTaskProvider;
+use App\Services\Tasks\Providers\ItRecurrenceFailureTaskProvider;
 use App\Services\Tasks\Providers\ItWorkTaskProvider;
 use App\Services\Tasks\Providers\MedicationErrorProvider;
 use App\Services\Tasks\Providers\RespiteTaskProvider;
@@ -32,6 +38,7 @@ use App\Services\Tasks\Providers\SafeguardingConcernProvider;
 use App\Services\Tasks\Providers\ShiftTaskProvider;
 use App\Services\Tasks\Providers\SiteChecklistRunProvider;
 use App\Services\Tasks\Providers\SiteHazardProvider;
+use App\Services\Tasks\Providers\VendorRenewalTaskProvider;
 use App\Services\Tasks\Providers\WorkplaceInjuryProvider;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\Tasks\TaskAssignmentNotifier;
@@ -41,7 +48,7 @@ use Illuminate\Support\Facades\Route;
 it('registers every task source behind exactly one authorization boundary', function () {
     $providers = TaskAggregator::defaultProviders();
 
-    expect($providers)->toHaveCount(24);
+    expect($providers)->toHaveCount(31);
     expect(collect($providers)->mapWithKeys(fn (TaskProvider $provider): array => [
         $provider::class => $provider->sourceKey(),
     ])->all())->toBe([
@@ -56,8 +63,15 @@ it('registers every task source behind exactly one authorization boundary', func
         SafeguardingActionPlanProvider::class => 'safeguarding_action',
         ControlRoomAlertProvider::class => 'alert',
         ItWorkTaskProvider::class => 'it_work_task',
+        ItApprovalTaskProvider::class => 'it_approval',
+        ItKnowledgeReviewTaskProvider::class => 'it_knowledge_review',
+        ItAutomationReviewTaskProvider::class => 'it_automation_review',
+        ItRecurrenceFailureTaskProvider::class => 'it_recurrence_failure',
+        VendorRenewalTaskProvider::class => 'vendor_renewal',
+        ItProvisioningTaskProvider::class => 'it_provisioning',
         FleetIncidentProvider::class => 'fleet_incident',
         FleetMaintenanceProvider::class => 'fleet_maintenance',
+        FleetFinanceReviewProvider::class => 'fleet_finance_review',
         MedicationErrorProvider::class => 'med_error',
         CdLossReportProvider::class => 'cd_loss',
         DataBreachProvider::class => 'breach',

@@ -575,6 +575,15 @@ before.
   page)", counted from the current page of a paginated list. Either the
   controller returns the real total for the current filter, or the block
   goes; a label that admits the number is wrong is not a fix.
+- **Approximating an approved mockup** (corrected 2026-09-23, PKG-02B
+  vehicle profile) — an approved design is built "in spirit": sections
+  re-laid-out, tables turned into tiles, extra cards added, or whole views
+  left as restyled legacy "interim" content (the vehicle Calendar shipped
+  as a bookings list instead of the approved five-view calendar). Every
+  approved view is built to the mockup, section for section. Before
+  calling a UI change done, open the mockup and the build side by side at
+  the same width and walk every view, then record the comparison. Views
+  not yet built stay unreleased; don't substitute interim content for them.
 
 ## Conformance sweep (run on request)
 

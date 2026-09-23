@@ -126,12 +126,21 @@ class Pkg02bVehicleWorkspaceTest extends TestCase
                 ->where('workspace.vehicle.history.0.reason', 'Registration papers checked')
                 ->etc());
 
+        // The workspace saves through fetch: JSON answers carry the new version.
+        $this->actingAs($manager)->putJson("/fleet-assets/vehicles/{$vehicle->id}", ['profile_version' => 2, 'reason' => 'Seats counted', 'seating_capacity' => 7])
+            ->assertOk()->assertJsonPath('vehicle.profile_version', 3);
+        $this->actingAs($manager)->putJson("/fleet-assets/vehicles/{$vehicle->id}", ['profile_version' => 2, 'reason' => 'Stale', 'seating_capacity' => 6])
+            ->assertStatus(409)->assertJsonPath('message', "This vehicle's details changed while you were editing. Reload before saving.");
+        $this->actingAs($manager)->putJson("/fleet-assets/vehicles/{$vehicle->id}", ['profile_version' => 3, 'seating_capacity' => 6])
+            ->assertUnprocessable()->assertJsonValidationErrors('reason');
+        $this->assertSame(7, $vehicle->fresh()->seating_capacity);
+
         FleetVehicleBooking::query()->create([
             'asset_id' => $vehicle->id, 'user_id' => $manager->id, 'purpose' => 'Active trip',
             'starts_at' => now()->addDay(), 'ends_at' => now()->addDay()->addHour(), 'status' => 'approved',
         ]);
         $this->actingAs($manager)->put("/fleet-assets/vehicles/{$vehicle->id}", [
-            'profile_version' => 2, 'reason' => 'Retire', 'status' => 'retired',
+            'profile_version' => 3, 'reason' => 'Retire', 'status' => 'retired',
         ])->assertSessionHasErrors(['status' => 'Resolve active bookings and open Maintenance work before retiring this vehicle.']);
     }
 
@@ -248,6 +257,12 @@ class Pkg02bVehicleWorkspaceTest extends TestCase
             'reason' => 'Reminder after expiry', 'expected_version' => 3, 'request_key' => 'edit-2',
             'reminder' => ['enabled' => true, 'remind_local' => '2027-12-01T09:00', 'owner_user_id' => $owner->id],
         ])->assertUnprocessable()->assertJsonValidationErrors('reminder.remind_local');
+        $outsider = $this->siteUser([$this->foreignSite], []);
+        $this->actingAs($manager)->putJson("/fleet-assets/vehicles/{$vehicle->id}/documents/{$created['set']['id']}", [
+            'category' => 'Insurance policy', 'document_date' => '2027-01-01', 'expires_on' => '2027-06-30',
+            'reason' => 'Owner elsewhere', 'expected_version' => 3, 'request_key' => 'edit-3',
+            'reminder' => ['enabled' => true, 'remind_local' => '2027-06-01T09:00', 'owner_user_id' => $outsider->id],
+        ])->assertUnprocessable()->assertJsonValidationErrors('reminder.owner_user_id');
     }
 
     public function test_documents_need_document_authority_and_conceal_other_vehicles_files(): void

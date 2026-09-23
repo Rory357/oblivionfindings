@@ -52,10 +52,12 @@ class DashboardHeroContractTest extends TestCase
         Asset::factory()->vehicle()->forSite($site)->create([
             'registration_expires_at' => now()->addDays(10),
             'cof_expires_at' => now()->addDays(10),
+            'insurance_expires_at' => now()->addDays(10),
         ]);
         Asset::factory()->vehicle()->forSite($site)->create([
             'registration_expires_at' => now()->subDay(),
             'cof_expires_at' => now()->subDay(),
+            'insurance_expires_at' => now()->subDay(),
         ]);
 
         $this->actingAs($user)
@@ -68,8 +70,9 @@ class DashboardHeroContractTest extends TestCase
                 ->where('stats.rego_expired', 1)
                 ->where('stats.cof_due', 1)
                 ->where('stats.cof_expired', 1)
-                ->where('stats.insurance_expiring', null)
-                ->where('stats.insurance_expired', null)
+                // The vehicle profile's insurance expiry is counted like the other dates.
+                ->where('stats.insurance_expiring', 1)
+                ->where('stats.insurance_expired', 1)
                 ->has('stats.transports_today')
                 ->has('stats.open_wandering_alerts')
                 ->has('stats.overdue_count_scoped')

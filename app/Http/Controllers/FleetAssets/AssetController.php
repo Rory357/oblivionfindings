@@ -423,7 +423,9 @@ class AssetController extends Controller
                 'last_seen_at' => optional($asset->fleetState->last_seen_at)->toISOString(),
                 'consent_blocked' => (bool) $asset->fleetState->consent_blocked,
             ] : null,
-            'documents' => $asset->documents->map(fn ($d) => [
+            // PKG-02B vehicle finance: review evidence is listed only for Finance viewers.
+            'documents' => $asset->documents->reject(fn ($d) => $d->source_type === 'finance_review_request'
+                && ! $user->canDo('finance.assets.view'))->map(fn ($d) => [
                 'id' => $d->id,
                 'name' => $d->title ?: ($d->original_name ?: 'Document'),
                 'type' => $d->category ?: ($d->mime_type ?: 'document'),

@@ -62,6 +62,7 @@ type Props = {
     };
     can: {
         manage: boolean;
+        approve?: boolean;
         view_maintenance: boolean;
     };
 };
@@ -86,6 +87,8 @@ const statusSteps = ['pending', 'approved', 'checked_out', 'returned'];
 export default function BookingShow({ booking, can, maintenance_impacts }: Props) {
     const b = booking ?? ({} as Props['booking']);
     const canManage = can.manage;
+    // Approvers without full fleet management still decide pending requests.
+    const canApprove = can.approve ?? can.manage;
     const checkoutForm = useForm({ odometer_out: '' });
     const returnForm = useForm({
         odometer_in: '',
@@ -438,7 +441,7 @@ export default function BookingShow({ booking, can, maintenance_impacts }: Props
                 {/* Action Buttons - More Prominent */}
                 <div className="space-y-4">
                     {/* Pending: Approve / Reject */}
-                    {canManage && b.status === 'pending' && (
+                    {canApprove && b.status === 'pending' && (
                         <Card className="border-2 border-status-warning/30 dark:border-status-warning/30">
                             <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
                                 <div>

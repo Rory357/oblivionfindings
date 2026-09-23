@@ -9,11 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
-use App\Models\FleetDriverSession;
 use App\Models\FleetFuelLog;
-use App\Models\FleetIncident;
-use App\Models\FleetServiceSchedule;
-use App\Models\FleetSignal;
 use App\Models\FleetTrip;
 use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleStateSnapshot;
@@ -21,8 +17,9 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Assets\AssetMutationIntegrityService;
 use App\Services\AuditLogger;
-use App\Services\Fleet\FleetTimelineService;
 use App\Services\Fleet\Data\VehicleReadinessContext;
+use App\Services\Fleet\MaintenanceAccessService;
+use App\Services\Fleet\VehicleFinancePresenter;
 use App\Services\Fleet\VehicleLegacyEvidenceGuard;
 use App\Services\Fleet\VehicleReadinessService;
 use App\Services\Fleet\VehicleStaffDirectory;
@@ -252,77 +249,9 @@ class VehicleController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         $asset = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey()) ?? abort(404);
-        $hasFleetFields = $this->hasFleetFields();
 
-        $eagerLoads = [
-            'fleetState',
-            'geofences',
-            'workOrders' => fn ($q) => $q->latest()->limit(10),
-            'bookings' => fn ($q) => $q->with('user:id,name')->orderByDesc('starts_at')->limit(10),
-        ];
-        if ($hasFleetFields) {
-            $eagerLoads[] = 'homeSite';
-            $eagerLoads[] = 'primaryDriver';
-        }
-
-        $asset->load($eagerLoads);
-
-        $trips = FleetTrip::query()
-            ->where('asset_id', $asset->id)
-            ->latest('started_at')
-            ->limit(20)
-            ->get()
-            ->map(fn ($trip) => [
-                'id' => $trip->id,
-                'started_at' => optional($trip->started_at)->toISOString(),
-                'ended_at' => optional($trip->ended_at)->toISOString(),
-                'distance_km' => $trip->distance_km,
-                'duration_s' => $trip->duration_s,
-                'status' => $trip->status,
-                'start_address' => $trip->start_address,
-                'end_address' => $trip->end_address,
-            ])->values();
-
-        $signals = FleetSignal::query()
-            ->where('asset_id', $asset->id)
-            ->latest('occurred_at')
-            ->limit(20)
-            ->get()
-            // Raw device payloads are not needed by the profile and stay server-side.
-            ->map(fn ($s) => [
-                'id' => $s->id,
-                'signal_type' => $s->signal_type,
-                'severity' => $s->severity_hint,
-                'occurred_at' => optional($s->occurred_at)->toISOString(),
-            ])->values();
-
-        $fuelLogs = FleetFuelLog::query()
-            ->where('asset_id', $asset->id)
-            ->latest('logged_at')
-            ->limit(10)
-            ->get()
-            ->map(fn ($log) => [
-                'id' => $log->id,
-                'logged_at' => optional($log->logged_at)->toISOString(),
-                'fuel_type' => $log->fuel_type,
-                'quantity_litres' => $log->quantity_litres,
-                'total_cost' => $log->total_cost,
-                'odometer_km' => $log->odometer_km,
-            ])->values();
-
-        $driverSessions = FleetDriverSession::query()
-            ->where('asset_id', $asset->id)
-            ->with('user:id,name')
-            ->latest('started_at')
-            ->limit(10)
-            ->get()
-            ->map(fn ($s) => [
-                'id' => $s->id,
-                'driver' => $s->user ? ['id' => $s->user->id, 'name' => $s->user->name] : null,
-                'started_at' => optional($s->started_at)->toISOString(),
-                'ended_at' => optional($s->ended_at)->toISOString(),
-                'status' => $s->status,
-            ])->values();
+        // Each view of the workspace loads its own records (trips, map, checks,
+        // calendar, finance); the page itself only needs the workspace summary.
 
         // Only the sites and drivers this user could actually assign (update()
         // refuses anything else), rather than every site and driver.
@@ -342,160 +271,25 @@ class VehicleController extends Controller
             ])->values();
 
         return Inertia::render('fleet-assets/vehicles/show', [
-            'asset' => [
-                'id' => $asset->id,
-                'name' => $asset->name,
-                'asset_tag' => $asset->asset_tag,
-                'category' => $asset->category,
-                'status' => $asset->status,
-                'registration_number' => $hasFleetFields ? $asset->registration_number : null,
-                'registration_expires_at' => $hasFleetFields ? optional($asset->registration_expires_at)->toDateString() : null,
-                'wof_expires_at' => $hasFleetFields ? optional($asset->wof_expires_at)->toDateString() : null,
-                'cof_expires_at' => $hasFleetFields ? optional($asset->cof_expires_at)->toDateString() : null,
-                'fuel_type' => $hasFleetFields ? $asset->fuel_type : null,
-                'odometer_km' => $hasFleetFields ? $asset->odometer_km : null,
-                'manufacturer' => $asset->manufacturer,
-                'model' => $asset->model,
-                'serial_number' => $asset->serial_number,
-                'home_site' => $hasFleetFields && $asset->homeSite ? [
-                    'id' => $asset->homeSite->id,
-                    'name' => $asset->homeSite->name,
-                ] : null,
-                'primary_driver' => $hasFleetFields && $asset->primaryDriver ? [
-                    'id' => $asset->primaryDriver->id,
-                    'name' => $asset->primaryDriver->name,
-                    'email' => $asset->primaryDriver->email,
-                ] : null,
-                'has_wheelchair_ramp' => (bool) $asset->has_wheelchair_ramp,
-                'has_hoist' => (bool) $asset->has_hoist,
-                'has_child_seat_anchors' => (bool) $asset->has_child_seat_anchors,
-                'has_medical_storage' => (bool) $asset->has_medical_storage,
-                'seating_capacity' => $asset->seating_capacity,
-                'accessibility_notes' => $asset->accessibility_notes,
-                'inspection_due_at' => optional($asset->inspection_due_at)->toDateString(),
-            ],
-            'state' => $asset->fleetState ? [
-                'status' => $asset->fleetState->status,
-                'last_seen_at' => optional($asset->fleetState->last_seen_at)->toISOString(),
-                'lat' => $asset->fleetState->latitude,
-                'lng' => $asset->fleetState->longitude,
-                'speed_kph' => $asset->fleetState->speed_kph,
-                'heading_deg' => $asset->fleetState->heading_deg,
-                'battery_pct' => $asset->fleetState->battery_pct,
-                'consent_blocked' => $asset->fleetState->consent_blocked,
-            ] : null,
-            'trips' => $trips,
-            'signals' => $signals,
-            'fuel_logs' => $fuelLogs,
-            'driver_sessions' => $driverSessions,
-            'geofences' => $asset->geofences->map(fn ($g) => [
-                'id' => $g->id,
-                'name' => $g->name,
-                'type' => $g->type,
-                'breach_type' => $g->breach_type,
-                'is_active' => $g->is_active,
-                'shape' => $g->shape,
-            ])->values(),
-            'work_orders' => $asset->workOrders->map(fn ($order) => [
-                'id' => $order->id,
-                'reference_number' => $order->reference_number,
-                'title' => $order->title,
-                'status' => $order->status,
-                'priority' => $order->priority,
-                'due_at' => optional($order->due_at)->toISOString(),
-                'created_at' => optional($order->created_at)->toISOString(),
-            ])->values(),
-            'maintenance_restricted' => DB::table('fleet_maintenance_restrictions')
-                ->where('asset_id', $asset->id)->where('state', 'active')->exists(),
-            'bookings' => $asset->bookings->map(fn ($booking) => [
-                'id' => $booking->id,
-                'reference_number' => $booking->reference_number,
-                'purpose' => $booking->purpose,
-                'status' => $booking->status,
-                'starts_at' => optional($booking->starts_at)->toISOString(),
-                'ends_at' => optional($booking->ends_at)->toISOString(),
-                'driver' => $booking->user?->name,
-            ])->values(),
             'workspace' => app(VehicleWorkspacePresenter::class)->present($user, $asset, $this->vehicleTechnology->canView($user, $asset)),
-            'incidents' => Schema::hasTable('fleet_incidents') ? FleetIncident::where('asset_id', $asset->id)
-                ->latest('occurred_at')
-                ->limit(10)
-                ->get()
-                ->map(fn ($i) => [
-                    'id' => $i->id,
-                    'incident_type' => $i->incident_type,
-                    'severity' => $i->severity,
-                    'occurred_at' => optional($i->occurred_at)->toISOString(),
-                    'status' => $i->status,
-                    'location' => $i->location,
-                ])
-                ->values() : collect(),
             'sites' => $sites,
             'eligible_drivers' => $eligibleDrivers,
-            'service_prediction' => $this->buildServicePrediction($asset),
             'can' => [
                 'manage' => $this->canManageFleet($user),
                 'inspect' => $this->canManageMaintenance($user),
-                'report_maintenance' => app(\App\Services\Fleet\MaintenanceAccessService::class)->canReport($user)
+                'report_maintenance' => app(MaintenanceAccessService::class)->canReport($user)
                     && in_array((int) $asset->site_id,
-                        app(\App\Services\Fleet\MaintenanceAccessService::class)->approvedSiteIds($user), true),
+                        app(MaintenanceAccessService::class)->approvedSiteIds($user), true),
                 'view_vehicle_technology' => $this->vehicleTechnology->canView($user, $asset),
             ],
             'vehicle_technology' => Inertia::optional(
                 fn () => $this->vehicleTechnology->present($user, $asset),
             ),
-            'timeline' => Inertia::optional(fn () => app(FleetTimelineService::class)
-                ->forVehicle($asset->id, now()->subDays(14), 40)
-                ->toArray()
+            // Overview › Finance loads its links and review requests on demand.
+            'finance_workspace' => Inertia::optional(
+                fn () => app(VehicleFinancePresenter::class)->present($user, $asset),
             ),
         ]);
-    }
-
-    private function buildServicePrediction(Asset $asset): ?array
-    {
-        if (! Schema::hasTable('fleet_service_schedules') || ! Schema::hasTable('fleet_trips')) {
-            return null;
-        }
-
-        $schedule = FleetServiceSchedule::where('asset_id', $asset->id)
-            ->where('is_active', true)
-            ->whereNotNull('next_due_km')
-            ->first();
-
-        if (! $schedule) {
-            return null;
-        }
-
-        $currentOdometer = (float) ($asset->odometer_km ?? 0);
-        $nextDueKm = (float) $schedule->next_due_km;
-        $thirtyDaysAgo = now()->subDays(30);
-
-        $totalTripKm = FleetTrip::where('asset_id', $asset->id)
-            ->where('started_at', '>=', $thirtyDaysAgo)
-            ->sum('distance_km');
-        $avgDailyKm = round((float) $totalTripKm / 30, 1);
-
-        $remainingKm = max(0, $nextDueKm - $currentOdometer);
-        $predictedDays = $avgDailyKm > 0 ? (int) round($remainingKm / $avgDailyKm) : null;
-
-        // km sparkline data from recent trips
-        $kmTrend = FleetTrip::where('asset_id', $asset->id)
-            ->latest('started_at')
-            ->limit(14)
-            ->pluck('distance_km')
-            ->reverse()
-            ->values()
-            ->map(fn ($v) => round((float) $v, 1))
-            ->toArray();
-
-        return [
-            'predicted_days' => $predictedDays,
-            'avg_daily_km' => $avgDailyKm,
-            'current_km' => round($currentOdometer, 0),
-            'next_service_km' => round($nextDueKm, 0),
-            'schedule_name' => $schedule->name,
-            'km_trend' => $kmTrend,
-        ];
     }
 
     public function update(Request $request, Asset $asset)
@@ -599,6 +393,14 @@ class VehicleController extends Controller
 
             return $locked->fresh();
         }, 3);
+
+        // The vehicle workspace saves through fetch and needs the new version.
+        if ($request->expectsJson() && ! $request->header('X-Inertia')) {
+            return response()->json(['vehicle' => [
+                'id' => $asset->id,
+                'profile_version' => (int) ($asset->vehicle_profile_version ?? 1),
+            ]]);
+        }
 
         return back()->with('success', 'Vehicle updated successfully.');
     }
