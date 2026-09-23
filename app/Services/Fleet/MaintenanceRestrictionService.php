@@ -26,6 +26,44 @@ class MaintenanceRestrictionService
         return ['restriction_ids' => $restrictionIds, 'check_run_ids' => $blockingRuns];
     }
 
+    /**
+     * Maintenance blockers for several vehicles in a fixed number of queries,
+     * with the same semantics as blockers() (projection only, no locks).
+     *
+     * @param  list<int>  $assetIds
+     * @return array<int, array{restriction_ids: list<int>, check_run_ids: list<int>}>
+     */
+    public function blockersMany(array $assetIds): array
+    {
+        $result = array_fill_keys($assetIds, ['restriction_ids' => [], 'check_run_ids' => []]);
+        if ($assetIds === []) {
+            return $result;
+        }
+        DB::table('fleet_maintenance_restrictions')->whereIn('asset_id', $assetIds)->where('state', 'active')
+            ->orderBy('id')->get(['id', 'asset_id'])
+            ->each(function (object $row) use (&$result): void {
+                $result[(int) $row->asset_id]['restriction_ids'][] = (int) $row->id;
+            });
+        $latestRelease = DB::table('fleet_maintenance_actions as action')
+            ->join('fleet_work_orders as work', 'work.id', '=', 'action.work_order_id')
+            ->whereIn('work.asset_id', $assetIds)->where('action.action_type', 'release')
+            ->groupBy('work.asset_id')->selectRaw('work.asset_id, MAX(action.id) as action_id');
+        $releasedAt = DB::table('fleet_maintenance_actions as released')
+            ->joinSub($latestRelease, 'latest', 'latest.action_id', '=', 'released.id')
+            ->pluck('released.occurred_at', 'latest.asset_id');
+        DB::table('fleet_checklist_runs')->whereIn('asset_id', $assetIds)->whereNotNull('submitted_at')
+            ->where(fn ($q) => $q->whereNull('outcome')->orWhere('outcome', '!=', 'passed'))
+            ->orderBy('id')->get(['id', 'asset_id', 'submitted_at', 'outcome', 'rule_version_id', 'rule_snapshot_json'])
+            ->each(function (object $run) use (&$result, $releasedAt): void {
+                $release = $releasedAt[$run->asset_id] ?? null;
+                if (($release === null || $run->submitted_at >= $release) && self::blocksAvailability($run)) {
+                    $result[(int) $run->asset_id]['check_run_ids'][] = (int) $run->id;
+                }
+            });
+
+        return $result;
+    }
+
     /** Call only while holding the canonical asset row in the same transaction. */
     public function assertBookable(int $assetId): void
     {

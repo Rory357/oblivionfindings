@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\FleetServiceSchedule;
 use App\Models\FleetVehicleBooking;
@@ -17,7 +18,11 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
 });
 
-function makeFleetMaintenanceUser(array $permissionKeys): User
+/**
+ * Fleet task rows are scoped to the reader's approved sites (PKG-01), so a
+ * permitted reader also needs current staff placement at the asset's site.
+ */
+function makeFleetMaintenanceUser(array $permissionKeys, ?Site $site = null): User
 {
     $user = User::factory()->create(['approved_at' => now()]);
 
@@ -27,6 +32,17 @@ function makeFleetMaintenanceUser(array $permissionKeys): User
             ['description' => str_replace('.', ' ', $permissionKey), 'group' => explode('.', $permissionKey)[0]],
         );
         $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
+    }
+
+    if ($site) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
+        ]);
     }
 
     return $user;
@@ -77,7 +93,7 @@ it('surfaces an active service schedule as a calendar obligation', function () {
         ->and($items[0]->id)->toBe("fleet-service-{$schedule->id}")
         ->and($items[0]->source)->toBe('asset')
         ->and($items[0]->title)->toContain('Service due — Hiace 1')
-        ->and($items[0]->link)->toBe('/fleet-assets/maintenance/schedules');
+        ->and($items[0]->link)->toBe("/fleet-assets/vehicles/{$asset->id}?tab=service&view=schedules");
 });
 
 it('skips inactive schedules and schedules for other sites', function () {
@@ -111,9 +127,11 @@ it('skips inactive schedules and schedules for other sites', function () {
 /* ------------------------------------------------------------------ */
 
 it('returns an overdue work order on /tasks for a permitted user', function () {
-    $user = makeFleetMaintenanceUser(['fleet.viewAny']);
+    $site = Site::factory()->create();
+    $user = makeFleetMaintenanceUser(['fleet.viewAny'], $site);
 
     $order = FleetWorkOrder::factory()->create([
+        'asset_id' => Asset::factory()->vehicle()->forSite($site)->create()->id,
         'status' => 'open',
         'priority' => 'high',
         'due_at' => now()->subDays(2),
@@ -130,9 +148,10 @@ it('returns an overdue work order on /tasks for a permitted user', function () {
 });
 
 it('returns a service schedule due this week as a task', function () {
-    $user = makeFleetMaintenanceUser(['assets.viewAny']);
+    $site = Site::factory()->create();
+    $user = makeFleetMaintenanceUser(['assets.viewAny'], $site);
 
-    $asset = Asset::factory()->vehicle()->create(['name' => 'Hiace 2']);
+    $asset = Asset::factory()->vehicle()->forSite($site)->create(['name' => 'Hiace 2']);
     $schedule = FleetServiceSchedule::create([
         'asset_id' => $asset->id,
         'name' => 'WOF prep service',
@@ -145,13 +164,14 @@ it('returns a service schedule due this week as a task', function () {
 
     expect($item)->not->toBeNull()
         ->and($item->title)->toContain('Hiace 2')
-        ->and($item->link)->toBe('/fleet-assets/maintenance/schedules');
+        ->and($item->link)->toBe("/fleet-assets/vehicles/{$asset->id}?tab=service&view=schedules");
 });
 
 it('keeps composite fleet task identities distinct through detail and following actions', function () {
-    $user = makeFleetMaintenanceUser(['fleet.viewAny']);
+    $site = Site::factory()->create();
+    $user = makeFleetMaintenanceUser(['fleet.viewAny'], $site);
     $recordId = 9001;
-    $asset = Asset::factory()->vehicle()->create(['name' => 'Shared identity vehicle']);
+    $asset = Asset::factory()->vehicle()->forSite($site)->create(['name' => 'Shared identity vehicle']);
     $order = FleetWorkOrder::factory()->create([
         'id' => $recordId,
         'asset_id' => $asset->id,
@@ -184,7 +204,7 @@ it('keeps composite fleet task identities distinct through detail and following 
         ]))
         ->assertOk()
         ->assertJsonPath('item.id', 'fleet_service_schedule-'.$schedule->id)
-        ->assertJsonPath('item.link', '/fleet-assets/maintenance/schedules');
+        ->assertJsonPath('item.link', "/fleet-assets/vehicles/{$asset->id}?tab=service&view=schedules");
 
     $this->actingAs($user)
         ->post("/tasks/fleet_work_order/{$recordId}/watch", ['watching' => true])
@@ -217,7 +237,7 @@ it('keeps composite fleet task identities distinct through detail and following 
         'item_id' => $recordId,
         'user_id' => $user->id,
     ]);
-    $legacyUser = makeFleetMaintenanceUser(['fleet.viewAny']);
+    $legacyUser = makeFleetMaintenanceUser(['fleet.viewAny'], $site);
     TaskWatcher::query()->create([
         'source' => 'fleet_maintenance',
         'item_id' => $recordId,
@@ -294,19 +314,30 @@ it('hides fleet maintenance items from a user without fleet or asset permissions
 });
 
 it('excludes completed work orders and far-future due dates', function () {
-    $user = makeFleetMaintenanceUser(['fleet.viewAny']);
+    $site = Site::factory()->create();
+    $user = makeFleetMaintenanceUser(['fleet.viewAny'], $site);
+    $assetId = Asset::factory()->vehicle()->forSite($site)->create()->id;
 
+    $due = FleetWorkOrder::factory()->create([
+        'asset_id' => $assetId,
+        'status' => 'open',
+        'due_at' => now()->subDay(),
+    ]);
     $done = FleetWorkOrder::factory()->create([
+        'asset_id' => $assetId,
         'status' => 'completed',
         'due_at' => now()->subDay(),
     ]);
     $farOut = FleetWorkOrder::factory()->create([
+        'asset_id' => $assetId,
         'status' => 'open',
         'due_at' => now()->addDays(30),
     ]);
 
     $ids = collect((new TaskAggregator)->itemsFor($user, []))->pluck('id');
 
-    expect($ids)->not->toContain('fleet_work_order-'.$done->id)
+    // The permitted due item proves the exclusions are not an empty feed.
+    expect($ids)->toContain('fleet_work_order-'.$due->id)
+        ->and($ids)->not->toContain('fleet_work_order-'.$done->id)
         ->and($ids)->not->toContain('fleet_work_order-'.$farOut->id);
 });

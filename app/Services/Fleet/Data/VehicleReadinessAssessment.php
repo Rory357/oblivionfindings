@@ -21,6 +21,12 @@ final readonly class VehicleReadinessAssessment
         public string $inputFingerprint,
     ) {}
 
+    /** @return list<VehicleReadinessReason> */
+    public function blockingReasons(): array
+    {
+        return array_values(array_filter($this->reasons, fn (VehicleReadinessReason $reason): bool => $reason->blocksDecision));
+    }
+
     public function toArray(bool $includeTracker = false): array
     {
         return [

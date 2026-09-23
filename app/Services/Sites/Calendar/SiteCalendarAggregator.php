@@ -12,6 +12,7 @@ use App\Services\Sites\Calendar\Providers\DamageObligationProvider;
 use App\Services\Sites\Calendar\Providers\DrillObligationProvider;
 use App\Services\Sites\Calendar\Providers\EmergencyPlanObligationProvider;
 use App\Services\Sites\Calendar\Providers\FleetServiceScheduleObligationProvider;
+use App\Services\Sites\Calendar\Providers\FleetVehicleReminderObligationProvider;
 use App\Services\Sites\Calendar\Providers\HazardObligationProvider;
 use App\Services\Sites\Calendar\Providers\InspectionObligationProvider;
 use App\Services\Sites\Calendar\Providers\MealPlanObligationProvider;
@@ -72,6 +73,7 @@ class SiteCalendarAggregator
             new AssetMaintenanceObligationProvider(),
             new MaintenanceWindowObligationProvider(),
             new FleetServiceScheduleObligationProvider(),
+            new FleetVehicleReminderObligationProvider(),
             new EmergencyPlanObligationProvider(),
             new DrillObligationProvider(),
             new PpeObligationProvider(),

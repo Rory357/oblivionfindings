@@ -70,9 +70,21 @@ class Asset extends Model
         'has_medical_storage',
         'seating_capacity',
         'accessibility_notes',
+        // PKG-02B vehicle details. The profile photo and profile version are
+        // set only through their guarded commands, never mass-assigned.
+        'body_type',
+        'use_purpose',
+        'ownership_arrangement',
+        'fleet_responsible_user_id',
+        'insurance_provider',
+        'insurance_policy_reference',
+        'insurance_expires_at',
+        'warranty_reference',
     ];
 
     protected $casts = [
+        'insurance_expires_at' => 'date',
+        'vehicle_profile_version' => 'integer',
         'purchase_date' => 'date',
         'warranty_expires_at' => 'date',
         'registration_expires_at' => 'date',
@@ -289,6 +301,26 @@ class Asset extends Model
     public function odometerObservations(): HasMany
     {
         return $this->hasMany(FleetVehicleOdometerObservation::class);
+    }
+
+    public function documentSets(): HasMany
+    {
+        return $this->hasMany(AssetDocumentSet::class);
+    }
+
+    public function vehicleReminders(): HasMany
+    {
+        return $this->hasMany(FleetVehicleReminder::class);
+    }
+
+    public function fleetResponsible(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'fleet_responsible_user_id');
+    }
+
+    public function profilePhoto(): BelongsTo
+    {
+        return $this->belongsTo(AssetDocument::class, 'profile_photo_document_id');
     }
 
     public function fleetIncidents(): HasMany

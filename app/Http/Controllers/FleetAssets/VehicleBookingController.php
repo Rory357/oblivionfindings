@@ -190,14 +190,14 @@ class VehicleBookingController extends Controller
                 ->map($mapBooking)
                 ->values();
 
-            $vehicles = $this->bookingAccess->activeVehicles($actor)
-                ->sortBy([['name', 'asc'], ['id', 'asc']])
-                ->map(fn ($v) => [
-                    'id' => $v->id,
-                    'name' => $v->name,
-                    'asset_tag' => $v->asset_tag,
-                    'readiness' => $this->readiness->assess($v, new VehicleReadinessContext)->toArray(),
-                ]);
+            $activeVehicles = $this->bookingAccess->activeVehicles($actor)->sortBy([['name', 'asc'], ['id', 'asc']]);
+            $readiness = $this->readiness->projections($activeVehicles);
+            $vehicles = $activeVehicles->map(fn ($v) => [
+                'id' => $v->id,
+                'name' => $v->name,
+                'asset_tag' => $v->asset_tag,
+                'readiness' => $readiness[(int) $v->id]->toArray(),
+            ])->values();
 
             $data['calendar_bookings'] = $calendarBookings;
             $data['vehicles'] = $vehicles;
@@ -421,18 +421,38 @@ class VehicleBookingController extends Controller
                 'approval_route' => ['nullable', 'in:required,not_required'],
                 'approval_not_required_reason' => ['nullable', 'string', 'max:2000'],
                 'approval_not_required_evidence' => ['nullable', 'string', 'max:255'],
+                'readiness_acknowledged' => ['nullable', 'boolean'],
             ]);
             $approvalRoute = $data['approval_route'] ?? 'required';
             $noApprovalReason = trim((string) ($data['approval_not_required_reason'] ?? ''));
             $noApprovalEvidence = trim((string) ($data['approval_not_required_evidence'] ?? ''));
+            // Anyone may ask for the approval-not-required route with a reason
+            // or evidence; only a holder of booking authority can confirm it,
+            // and only after explicitly reviewing readiness and the driver.
+            $holdsAuthority = $actor->canDo('fleet.bookings.approve') || $actor->canDo('fleet.manage');
             if ($approvalRoute === 'not_required') {
-                $currentActor = User::query()->findOrFail($actor->id);
-                abort_unless($currentActor->canDo('fleet.bookings.approve') || $currentActor->canDo('fleet.manage'), 403);
                 if ($noApprovalReason === '' && $noApprovalEvidence === '') {
                     throw \Illuminate\Validation\ValidationException::withMessages([
-                        'approval_not_required_reason' => 'Record why independent approval is not required, or provide the authority evidence reference.',
+                        'approval_not_required_reason' => 'Add a reason or evidence for approval not required.',
                     ]);
                 }
+                if ($holdsAuthority && ! $request->boolean('readiness_acknowledged')) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'readiness_acknowledged' => 'Review readiness and driver authority for the approval-not-required path.',
+                    ]);
+                }
+            }
+
+            $startsAt = Carbon::parse($data['starts_at'])->utc();
+            $endsAt = Carbon::parse($data['ends_at'])->utc();
+            $overlapping = FleetVehicleBooking::query()->where('asset_id', $asset->id)
+                ->whereIn('status', ['pending', 'approved', 'checked_out'])
+                ->where('starts_at', '<', $endsAt)->where('ends_at', '>', $startsAt)
+                ->lockForUpdate()->exists();
+            if ($overlapping) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'asset_id' => 'This vehicle is already booked for the selected time period.',
+                ]);
             }
 
             // client_id is minimum-necessary compatibility input for the
@@ -447,17 +467,20 @@ class VehicleBookingController extends Controller
             if ($approvalRoute === 'required') {
                 unset($bookingData['approval_not_required_reason'], $bookingData['approval_not_required_evidence']);
             }
+            unset($bookingData['readiness_acknowledged']);
             $created = FleetVehicleBooking::create($bookingData);
 
+            $confirming = $approvalRoute === 'not_required' && $holdsAuthority;
             $assessment = $this->readiness->assess($asset, new VehicleReadinessContext(
-                purpose: $approvalRoute === 'not_required' ? 'booking_confirmation' : 'booking_request',
+                purpose: $confirming ? 'booking_confirmation' : 'booking_request',
                 driverUserId: (int) $created->user_id,
                 startsAt: $created->starts_at,
                 endsAt: $created->ends_at,
                 bookingId: (int) $created->id,
             ), true);
-            if ($approvalRoute === 'not_required') {
-                $this->readiness->assertCanProceed($assessment);
+            // Readiness problems never confirm a booking; the request is kept
+            // pending so it can be confirmed once they are resolved.
+            if ($confirming && $assessment->canProceed) {
                 $created->update([
                     'status' => 'approved',
                     'approval_authority_recorded_by' => $actor->id,
@@ -468,14 +491,24 @@ class VehicleBookingController extends Controller
 
             AuditLogger::logOrFail('fleet.booking.create', $created, [
                 'asset_id' => $asset->id,
+                'approval_route' => $approvalRoute,
                 'readiness' => $this->decisionEvidence($assessment),
             ], $request);
 
-            return $created;
+            return [$created, $assessment];
         });
+        [$booking, $assessment] = $booking;
 
-        return redirect()->route('fleet-assets.bookings.show', $booking)
-            ->with('success', $booking->status === 'approved' ? 'Booking confirmed.' : 'Booking request submitted.');
+        $redirect = redirect()->route('fleet-assets.bookings.show', $booking);
+        if ($booking->status === 'approved') {
+            return $redirect->with('success', 'Booking confirmed with approval-not-required authority recorded.');
+        }
+        $blocking = $assessment->blockingReasons();
+
+        return $blocking === []
+            ? $redirect->with('success', 'Booking request submitted.')
+            : $redirect->with('warning', 'Booking request submitted. It stays pending until this is resolved: '
+                .implode(' ', array_map(fn ($reason): string => $reason->message, array_slice($blocking, 0, 3))));
     }
 
     public function show(Request $request, FleetVehicleBooking $booking)
@@ -508,9 +541,11 @@ class VehicleBookingController extends Controller
         $booking = DB::transaction(function () use ($request, $booking, $actor): FleetVehicleBooking {
             $currentActor = $this->freshApprovalActor($actor);
             $canonical = $this->lockBooking($currentActor, (int) $booking->getKey());
-            abort_if($canonical->user_id === $currentActor->id, 403, 'Cannot approve your own booking.');
+            $independent = $canonical->approval_route !== 'not_required';
+            // Independent approval can never be self-approval. On the
+            // approval-not-required route the authority holder confirms.
+            abort_if($independent && $canonical->user_id === $currentActor->id, 403, 'Cannot approve your own booking.');
             abort_unless($canonical->status === 'pending', 422, 'Only pending bookings can be approved.');
-            abort_unless($canonical->approval_route === 'required', 422, 'This booking does not use the independent approval route.');
             $asset = $this->bookingAccess->vehicle($currentActor, (int) $canonical->asset_id) ?? abort(404);
             $assessment = $this->readiness->assess($asset, new VehicleReadinessContext(
                 purpose: 'booking_approval', driverUserId: (int) $canonical->user_id,
@@ -518,14 +553,20 @@ class VehicleBookingController extends Controller
             ), true);
             $this->readiness->assertCanProceed($assessment);
 
-            $canonical->update([
+            $canonical->update($independent ? [
                 'status' => 'approved',
                 'approved_by_user_id' => $currentActor->id,
+                'approved_at' => now(),
+            ] : [
+                'status' => 'approved',
+                'approval_authority_recorded_by' => $currentActor->id,
+                'approval_authority_recorded_at' => now(),
                 'approved_at' => now(),
             ]);
 
             AuditLogger::logOrFail('fleet.booking.approve', $canonical, [
                 'booking_id' => $canonical->id,
+                'approval_route' => $canonical->approval_route,
                 'readiness' => $this->decisionEvidence($assessment),
             ], $request);
 
@@ -535,7 +576,7 @@ class VehicleBookingController extends Controller
         $booking->load(['asset:id,name', 'user']);
         $booking->user->notify(new FleetBookingApprovedNotification($booking));
 
-        return back()->with('success', 'Booking approved.');
+        return back()->with('success', $booking->approval_route === 'not_required' ? 'Booking confirmed.' : 'Booking approved.');
     }
 
     public function reject(Request $request, FleetVehicleBooking $booking)
@@ -624,6 +665,13 @@ class VehicleBookingController extends Controller
                 'condition_on_return' => ['nullable', 'string', 'max:50'],
                 'return_notes' => ['nullable', 'string', 'max:1000'],
             ]);
+            if (isset($data['odometer_in']) && $canonical->odometer_out !== null
+                && (float) $data['odometer_in'] < (float) $canonical->odometer_out) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'odometer_in' => 'The return reading can\'t be lower than the checkout reading of '
+                        .number_format((float) $canonical->odometer_out).' km.',
+                ]);
+            }
 
             $observation = isset($data['odometer_in'])
                 ? $this->odometer->record($currentActor, (int) $canonical->asset_id, [

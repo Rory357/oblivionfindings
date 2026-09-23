@@ -12,7 +12,7 @@ class FleetVehicleOdometerObservation extends Model
 
     protected $fillable = [
         'asset_id', 'value_km', 'observed_at', 'source_kind', 'source_type', 'source_id',
-        'source_reference', 'recorded_by_user_id', 'corrects_observation_id', 'correction_reason',
+        'source_reference', 'recorded_by_user_id', 'corrects_observation_id', 'correction_reason', 'notes',
         'request_key', 'request_fingerprint', 'created_at',
     ];
 

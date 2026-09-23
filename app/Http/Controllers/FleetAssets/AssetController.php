@@ -14,6 +14,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Assets\AssetMutationIntegrityService;
 use App\Services\AuditLogger;
+use App\Services\Fleet\VehicleLegacyEvidenceGuard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -575,9 +576,11 @@ class AssetController extends Controller
             'maintenance_due_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
-        if ($this->payloadIsVehicle($data)
-            && $request->hasAny(['registration_expires_at', 'wof_expires_at', 'cof_expires_at', 'odometer_km'])) {
-            throw ValidationException::withMessages(['vehicle_evidence' => 'Create the vehicle first, then record compliance and odometer evidence through its versioned evidence actions.']);
+        if ($this->payloadIsVehicle($data)) {
+            // A new vehicle starts without evidence; its registration, WoF,
+            // CoF, RUC and odometer are recorded as versioned evidence.
+            VehicleLegacyEvidenceGuard::assertUnchanged($request, null);
+            $data = VehicleLegacyEvidenceGuard::strip($data);
         }
 
         $fleetFields = ['home_site_id', 'registration_number', 'registration_expires_at', 'wof_expires_at', 'cof_expires_at', 'fuel_type', 'odometer_km'];
@@ -660,9 +663,9 @@ class AssetController extends Controller
             'maintenance_due_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
-        if ((Asset::vehicles()->whereKey($asset->id)->exists() || $this->payloadIsVehicle($data))
-            && $request->hasAny(['registration_expires_at', 'wof_expires_at', 'cof_expires_at', 'odometer_km'])) {
-            throw ValidationException::withMessages(['vehicle_evidence' => 'Record compliance and odometer evidence through the versioned vehicle evidence actions.']);
+        if (Asset::vehicles()->whereKey($asset->id)->exists() || $this->payloadIsVehicle($data)) {
+            VehicleLegacyEvidenceGuard::assertUnchanged($request, $asset);
+            $data = VehicleLegacyEvidenceGuard::strip($data);
         }
 
         $fleetFields = ['home_site_id', 'registration_number', 'registration_expires_at', 'wof_expires_at', 'cof_expires_at', 'fuel_type', 'odometer_km'];
