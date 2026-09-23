@@ -85,7 +85,14 @@ Every write uses an idempotency key with a fingerprint (a replay returns the sam
 
 ### Test results
 
-(Filled in when the full fleet run completes.)
+Run on the isolated `phpunit.pkg02b.xml` configuration (per-process MySQL schema), 24 September 2026:
+
+- **Every PKG-02B suite passes**: MileageFeed, ObligationReminders, VehicleCalendar, VehicleChecks, VehicleFinance, VehicleMap, VehicleReadiness, VehicleTripHistory, VehicleWorkspace, WorkspaceRollback (now all nine package migrations in reverse) and VehicleDrivingAlerts.
+- **Regressions pass**: Pkg01MaintenanceProtectedSliceTest (21 of 21, run after the Control Room report source was added to the maintenance report service), VehiclePageContractTest, VehicleBookingSitePrivacyTest, FleetVehicleTechnologyProjectionTest, FleetMaintenanceWiringTest, DashboardHeroContractTest, FleetControlRoomAlertHeroScopeTest, FleetAvailabilityRecoveryTest, and the daily-check case of FleetHeroRolloutContractTest.
+- **Frontend**: whole-app `tsc --noEmit` clean; vitest 14 files / 117 tests pass (workspace, checks, finance, map, trip and driving/alerts models, vehicle pages, Leaflet map, IT/security interaction audit); ESLint and Prettier clean on changed files; new PHP files Pint-clean.
+- **Failing on a clean `main` too (not caused by this branch; raised as a separate task)**: 16 tests in FleetBoundedOptionsTest, FleetDashboardResidentSiteIsolationTest, FleetHeroRolloutContractTest (overdue filter, status transitions), FleetPermissionBoundaryTest, FleetWorkOrderSiteScopeTest, TrackingWorkspaceTest and AssetTrackerRetirementTest.
+- **Environment-guarded**: Pkg01MaintenanceRollbackTest only runs on the `pkg01_2375_test` or `codex_test` schemas.
+- **Order-dependent**: FleetAvailabilityRecoveryTest and TrackingWorkspaceTest pass on their own but fail after Pkg01MaintenanceProtectedSliceTest in the same process (its worker processes commit data outside the per-test transaction); included in the separate task.
 
 ### Driving insights and alerts
 
