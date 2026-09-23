@@ -812,6 +812,10 @@ it('keeps catalogue authoring publishing and entity choices governed end to end'
     $setupPath = $root.'/resources/js/components/it/it-catalogue-management.tsx';
     $setup = is_file($setupPath) ? file_get_contents($setupPath) : '';
     $requester = file_get_contents($root.'/resources/js/components/it/it-service-catalogue.tsx');
+    $requestWizardPath = $root.'/resources/js/components/it/catalogue-request-wizard.tsx';
+    $requestWizard = is_file($requestWizardPath) ? file_get_contents($requestWizardPath) : '';
+    $requestFieldsPath = $root.'/resources/js/components/it/catalogue-request-fields.tsx';
+    $requestFields = is_file($requestFieldsPath) ? file_get_contents($requestFieldsPath) : '';
 
     expect($routes)
         ->toContain('/it/setup/catalogue-items/{catalogItem}/publish')
@@ -834,7 +838,14 @@ it('keeps catalogue authoring publishing and entity choices governed end to end'
         ->toContain('min-h-11')
         ->and($requester)
         ->toContain('fieldOptions')
+        ->toContain('<CatalogueRequestWizard')
+        ->toContain('fieldOptions={fieldOptions}')
+        ->and($requestWizard)
+        ->toContain('<CatalogFieldControl')
+        ->toMatch('/options=\{\s*fieldOptions\[/')
+        ->and($requestFields)
         ->toContain("['employee', 'user', 'asset'].includes")
+        ->toContain('<CatalogueEntityPicker')
         ->toContain("const numeric = ['integer', 'number']");
 });
 
@@ -843,9 +854,12 @@ it('keeps provisioning creation cancellation and HR handover centrally governed'
     $controller = file_get_contents($root.'/app/Http/Controllers/It/ItProvisioningController.php');
     $service = file_get_contents($root.'/app/Domain/It/Services/ItProvisioningRequestLifecycleService.php');
     $cancelRequest = file_get_contents($root.'/app/Http/Requests/It/CancelProvisioningRequestRequest.php');
-    $dialogPath = $root.'/resources/js/components/it/provisioning-cancel-dialog.tsx';
-    $dialog = is_file($dialogPath) ? file_get_contents($dialogPath) : '';
-    $workspace = file_get_contents($root.'/resources/js/pages/it/index.tsx');
+    $commandsPath = $root.'/app/Domain/It/Services/ItProvisioningCommandService.php';
+    $commands = is_file($commandsPath) ? file_get_contents($commandsPath) : '';
+    $commandFieldsPath = $root.'/resources/js/components/it/provisioning-command-fields.ts';
+    $commandFields = is_file($commandFieldsPath) ? file_get_contents($commandFieldsPath) : '';
+    $taskPage = file_get_contents($root.'/resources/js/pages/it/provisioning/task.tsx');
+    $register = file_get_contents($root.'/resources/js/pages/it/provisioning/index.tsx');
 
     expect($controller)
         ->not->toContain('ItProvisioningRequest::query()->create([')
@@ -859,13 +873,22 @@ it('keeps provisioning creation cancellation and HR handover centrally governed'
         ->toContain("'reason' => \$reason")
         ->and($cancelRequest)
         ->toContain("'reason' => ['required'")
-        ->and($dialog)
-        ->toContain('Reason for cancelling')
+        ->and($commands)
+        ->toContain("'cancel' => \$this->requests->cancel(\$target, \$actor, \$payload['reason'])")
+        ->toContain("in_array(\$operation, ['withdraw_approval', 'reject', 'fail', 'retry', 'cancel', 'reopen', 'reverse'], true)")
+        ->toContain("\$rules['reason'] = ['required'")
+        ->and($commandFields)
+        ->toContain("label: 'Reason and next action'")
+        ->toMatch("/provisioningReasonField: ProvisioningCommandField = \{[^}]*required: true,/")
+        ->toContain("case 'cancel':")
         ->toContain('linked onboarding task remains open')
-        ->toContain('min-h-11')
-        ->and($workspace)
-        ->toContain('ProvisioningCancelDialog')
-        ->toContain('setCancelRequest(r)');
+        ->and($taskPage)
+        ->toContain('<ProvisioningCommandDialog')
+        ->toContain('description={taskCommandDescription(operation)}')
+        ->toContain('fields={taskCommandFields(task, operation)}')
+        ->and($register)
+        ->toContain('<ProvisioningCommandDialog')
+        ->toContain('description={taskCommandDescription(rowCommand.operation)}');
 });
 
 it('detects an injected tenant authorization shortcut in a new file', function () {
@@ -949,6 +972,7 @@ it('pins the exact compatibility evidence files excluded from active source scan
     $expectedPaths = [
         'tests/Feature/It/ItProvisioningWorkflowTest.php',
         'tests/Feature/It/ItServiceManagementSchemaTest.php',
+        'tests/Feature/Monitoring/MetricRetentionTest.php',
         'tests/Feature/Monitoring/MonitoringFoundationMigrationTest.php',
         'tests/Feature/Monitoring/MonitoringObservationProvenanceReconciliationTest.php',
         'tests/Feature/Monitoring/MonitoringSchemaTest.php',
@@ -1423,8 +1447,9 @@ function itSecurityTenantDebtSnapshot(string $root): array
 function itSecurityCompatibilityEvidenceFingerprints(): array
 {
     return [
-        'tests/Feature/It/ItProvisioningWorkflowTest.php' => 'b03da30cdfb02dfb4c1dbb1524a5c0fcb3a3ee24987d2debce5a1e92af4d333b',
+        'tests/Feature/It/ItProvisioningWorkflowTest.php' => '2c3cf7f7160a51ac317a1dd2f1207a8ac27048e1cf1b6c16ad246c8f5162e909',
         'tests/Feature/It/ItServiceManagementSchemaTest.php' => 'e54dc9941b442fa4600dfc033bf203b1d9d0c7abef73f40b7755b2e40a5fd372',
+        'tests/Feature/Monitoring/MetricRetentionTest.php' => '183a09dc2c57e61ac825a7920fc1f2b1c8a66bd8208d5568b794116d4c1fdf74',
         'tests/Feature/Monitoring/MonitoringFoundationMigrationTest.php' => '887bf76dbd5ba516321b4e41dfeac6150b7ac9d66cf803a1da079a09b0bd3b28',
         'tests/Feature/Monitoring/MonitoringObservationProvenanceReconciliationTest.php' => 'ccf15093cf6293e76084781da1142d0621162d8b5fc78e8710f2855bad664e69',
         'tests/Feature/Monitoring/MonitoringSchemaTest.php' => 'f755c57573d32e70a1746f7558147b3741be022e092d9e3f31498c823185b16e',
@@ -2368,6 +2393,7 @@ function itSecurityHistoricalTenantMigrationFingerprints(): array
         'database/migrations/2026_08_02_000015_realign_site_profile_application_identity.php' => 'd59a7523eccb409e82d0e2930733654ea3a4d7e0a1743846c5c5dc2c3a2bb6be',
         'database/migrations/2026_08_02_000016_realign_hr_automation_webhooks_application_identity.php' => '4c40ee432de581f8be741f7a0bb52d3fc1b554a9b04f50620b589a61117e9ff1',
         'database/migrations/2026_08_02_000019_realign_hr_documents_signatures_application_identity.php' => 'a40891f91f8f2c616f35bb74b6ed6dbd7ac37633021b87d42a8eb22259b1c237',
+        'database/migrations/2026_08_23_000230_create_workforce_availability_coverage_actions.php' => 'ae578b7d3fdb082e96350984e180e626166dec43596bb3c12cc77b2d6b6d61d1',
     ];
 }
 

@@ -110,6 +110,8 @@ export function taskCommandDescription(operation: string): string {
             return 'The completed action stays recorded. A new corrective task is created that needs its own approval and evidence; nothing is changed in external accounts or equipment until that task is fulfilled.';
         case 'request_approval':
             return 'Choose two distinct eligible approvers. The requester and beneficiary cannot approve their own work. Approval expires at the end of the chosen NZ date.';
+        case 'cancel':
+            return 'Cancelling closes this task and records your reason. If it came from an onboarding checklist, the linked onboarding task remains open with your reason added for manual follow-up.';
         default:
             return 'Review the current task and the reason for this action. The requester and beneficiary cannot approve their own work.';
     }
