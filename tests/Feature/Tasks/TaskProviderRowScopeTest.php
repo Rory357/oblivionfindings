@@ -12,6 +12,7 @@ use App\Models\DataBreachLog;
 use App\Models\DataSubjectRequest;
 use App\Models\FirstAidFollowup;
 use App\Models\FirstAidRecord;
+use App\Models\FleetFinanceReviewRequest;
 use App\Models\FleetIncident;
 use App\Models\FleetServiceSchedule;
 use App\Models\FleetWorkOrder;
@@ -140,6 +141,8 @@ function taskRbacMatrix(): array
         'vendors.contracts.view',
         'fleet.viewAny',
         'assets.viewAny',
+        'finance.assets.view',
+        'finance.assets.manage',
         'medications.view',
         'medications.controlled.view',
         'hr.cases.view',
@@ -524,6 +527,36 @@ function taskRbacMatrix(): array
         'next_due_at' => now()->addDays(2),
         'is_active' => true,
     ]);
+    $financeReviewA = FleetFinanceReviewRequest::query()->create([
+        'reference_number' => 'FRQ-91001',
+        'asset_id' => $assetA->id,
+        'request_type' => 'supplier_invoice_review',
+        'source_type' => 'vehicle',
+        'source_id' => null,
+        'source_label' => 'TASK-RBAC visible vehicle',
+        'amount' => '120.00',
+        'note' => 'TASK-RBAC visible finance review',
+        'status' => 'submitted',
+        'lock_version' => 1,
+        'requested_by_user_id' => $actor->id,
+        'request_key' => 'task-rbac-visible-finance-review',
+        'request_fingerprint' => hash('sha256', 'task-rbac-visible-finance-review'),
+    ]);
+    $financeReviewB = FleetFinanceReviewRequest::query()->create([
+        'reference_number' => 'FRQ-92001',
+        'asset_id' => $assetB->id,
+        'request_type' => 'supplier_invoice_review',
+        'source_type' => 'vehicle',
+        'source_id' => null,
+        'source_label' => 'TASK-RBAC private vehicle',
+        'amount' => '120.00',
+        'note' => 'TASK-RBAC private finance review',
+        'status' => 'submitted',
+        'lock_version' => 1,
+        'requested_by_user_id' => $staffB->id,
+        'request_key' => 'task-rbac-private-finance-review',
+        'request_fingerprint' => hash('sha256', 'task-rbac-private-finance-review'),
+    ]);
 
     $medicationA = MedicationError::withoutEvents(fn () => MedicationError::query()->create([
         'reference_number' => 'MED-91001',
@@ -809,6 +842,7 @@ function taskRbacMatrix(): array
                 ['id' => 'fleet_service_schedule-'.$scheduleB->id, 'source' => 'fleet_service_schedule', 'numeric_id' => (int) $scheduleB->id, 'token' => 'TASK-RBAC private service schedule'],
             ],
         ],
+        'fleet_finance_review' => $pair('fleet_finance_review', $financeReviewA, $financeReviewB, 'FRQ-91001', 'FRQ-92001'),
         'med_error' => $pair('med_error', $medicationA, $medicationB, 'MED-91001', 'MED-92001'),
         'cd_loss' => $pair('cd_loss', $cdLossA, $cdLossB, 'CDL-91001', 'CDL-92001'),
         'breach' => ['visible' => [['id' => 'breach-'.$breach->id, 'source' => 'breach', 'numeric_id' => (int) $breach->id, 'token' => 'DBR-93001']], 'hidden' => []],
