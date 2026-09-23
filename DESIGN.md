@@ -575,6 +575,15 @@ before.
   page)", counted from the current page of a paginated list. Either the
   controller returns the real total for the current filter, or the block
   goes; a label that admits the number is wrong is not a fix.
+- **Approximating an approved mockup** (corrected 2026-09-23, PKG-02B
+  vehicle profile) — an approved design is built "in spirit": sections
+  re-laid-out, tables turned into tiles, extra cards added, or whole views
+  left as restyled legacy "interim" content (the vehicle Calendar shipped
+  as a bookings list instead of the approved five-view calendar). Every
+  approved view is built to the mockup, section for section. Before
+  calling a UI change done, open the mockup and the build side by side at
+  the same width and walk every view, then record the comparison. Views
+  not yet built stay unreleased; don't substitute interim content for them.
 
 ## Conformance sweep (run on request)
 
@@ -736,3 +745,8 @@ This file only works if it reflects reality. The loop:
 - `resources/css/app.css` — the tokens themselves (source of truth)
 - `resources/js/lib/status-colors.ts` — status → class map
 - `resources/js/lib/derive-palette.ts` — brand colour → derived palette
+# User-authorized additions · 22 September 2026
+
+- Maps and cross-profile geofencing follow [MAP_GEOFENCING_STYLE_GUIDE.md](design_styles/MAP_GEOFENCING_STYLE_GUIDE.md), based on the inspected Client Location implementation. Greyscale base tiles, coloured overlays, canonical shared boundaries, separate profile assignments and separate monitoring authority are required.
+- Structured form choices follow the searchable catalog and interval amendment in [POPUP_STYLE_GUIDE.md](design_styles/POPUP_STYLE_GUIDE.md). Service types and service interval presets use searchable choices with explicit **Add custom** where the field represents a configurable catalog. Service recurrence is expressed in calendar months by default, with distance as an independent trigger.
+- Vehicle checks require a reusable library owned with Maintenance checklists, editable questions and evidence requirements, profile/category assignment, controlled versions, and immutable submitted question/answer snapshots. A changed template must not rewrite previous checks. Workflow previews demonstrate configuration; approval of operational checklist content remains with its responsible owner.

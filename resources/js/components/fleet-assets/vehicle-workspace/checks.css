@@ -1,0 +1,74 @@
+/*
+ * Checks & inspections: product adjustments on top of the ported v13 design
+ * (mockup-port.css, loaded by studio.css, which is imported first). Scoped to
+ * .vehicle-studio — the check dialogs put that class on their own content
+ * because they render in portals. Tokens only.
+ */
+
+/* The question builder's answer type uses the design's field select look. */
+.vehicle-studio .question-fields select {
+    width: 100%;
+    min-height: 40px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 11px;
+    color: var(--foreground);
+    background: var(--card);
+    font-size: 12px;
+}
+
+.vehicle-studio .field select:focus-visible,
+.vehicle-studio .question-fields select:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+
+/* A required answer that still needs attention. */
+.vehicle-studio .field select[aria-invalid='true'],
+.vehicle-studio .field input[aria-invalid='true'] {
+    border-color: var(--status-critical);
+}
+
+/* Evidence rows in a check record (the design's studio.css attachment item). */
+.vehicle-studio .attachment-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 12px;
+}
+.vehicle-studio .attachment-item > svg {
+    flex-shrink: 0;
+    color: var(--primary);
+}
+.vehicle-studio .attachment-item > div {
+    min-width: 0;
+    flex: 1;
+}
+.vehicle-studio .attachment-item strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vehicle-studio .attachment-item small {
+    display: block;
+    font-size: 10px;
+    color: var(--muted-foreground);
+    margin-top: 5px;
+}
+.vehicle-studio a.attachment-item:hover {
+    border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
+}
+.vehicle-studio a.attachment-item:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+
+/* The record rail's outcome summary sits under the section list. */
+.vehicle-studio .detail-rail-summary p {
+    line-height: 1.5;
+}

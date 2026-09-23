@@ -1,0 +1,120 @@
+.op-record {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--border);
+}
+.op-record:last-child {
+    border-bottom: 0;
+}
+.op-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+.op-actions button {
+    min-height: 40px;
+}
+.op-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    color: var(--muted-foreground);
+    font-size: 13px;
+    margin-top: 8px;
+}
+.op-fields {
+    display: grid;
+    gap: 22px;
+}
+.op-fields.op-fields-paired {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+.op-fields.op-fields-paired > * {
+    min-width: 0;
+}
+.op-fields.op-fields-paired > .op-full,
+.op-fields.op-fields-paired > .date-time-field,
+.op-fields.op-fields-paired > .field:has(textarea) {
+    grid-column: 1 / -1;
+}
+.op-fields.op-fields-paired .evidence-field > [role='button'] {
+    padding: 16px;
+    min-height: 100px;
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.op-fields.op-fields-paired .evidence-field > [role='button'] > span {
+    width: 40px;
+    height: 40px;
+}
+.op-fields.op-fields-paired .field textarea {
+    min-height: 72px;
+}
+@media (max-width: 760px) {
+    .op-fields.op-fields-paired {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .op-fields.op-fields-paired button,
+    .op-fields.op-fields-paired [role='button'] {
+        min-height: 44px;
+    }
+}
+.op-check {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+.op-check input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+}
+.op-log {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    line-height: 1.6;
+}
+.op-toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 45;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 6px 30px #0002;
+    padding: 12px 16px;
+    border-radius: 12px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    max-width: 850px;
+    width: max-content;
+    font-size: 13px;
+}
+.op-fields .field textarea {
+    min-height: 100px;
+}
+.op-fields select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--background);
+}
+.content > .panel + .panel {
+    margin-top: 20px;
+}
+.observation-filters {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}

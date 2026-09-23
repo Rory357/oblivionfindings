@@ -1,0 +1,69 @@
+/*
+ * Vehicle Map › Driving insights and Alerts & Control Room: product
+ * adjustments on top of the ported PKG-02B v13 design (mockup-port.css).
+ * Tokens only. Rules for dialogs (rendered in portals, outside
+ * .vehicle-studio) are namespaced by their own dialog class.
+ */
+
+/* Keyboard focus on the design's full-width rows and inline links. */
+.vehicle-studio .insights-journey-list > button:focus-visible,
+.vehicle-studio .driving-event:focus-visible,
+.vehicle-studio .alert-record:focus-visible,
+.vehicle-studio .score-link:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 8px;
+}
+.vehicle-studio .insights-journey-list > button,
+.vehicle-studio .driving-event,
+.vehicle-studio .alert-record,
+.vehicle-studio .score-link {
+    cursor: pointer;
+}
+
+/* The recorded-episode evaluator: the episode choice spans the grid. */
+.vehicle-studio .speed-field-wide {
+    grid-column: 1 / -1;
+}
+.vehicle-studio .speed-field input[readonly] {
+    background: var(--muted);
+    color: var(--foreground);
+}
+.vehicle-studio .speed-evaluation > button {
+    margin-top: 6px;
+}
+.vehicle-studio .speed-evaluation .vehicle-notice {
+    margin-top: 12px;
+}
+
+/* Record rows inside the review and coaching lists keep their buttons on one line. */
+.vehicle-studio .review-event-list > div > button,
+.vehicle-studio .coaching-record > button {
+    flex-shrink: 0;
+}
+
+/* Record modals (portals): body stack, headings, text and the formula. */
+.vehicle-insight-dialog .vehicle-insight-body {
+    display: grid;
+    gap: 12px;
+    align-content: start;
+}
+.vehicle-insight-dialog .vehicle-insight-heading {
+    font-size: 14px;
+    font-weight: 650;
+    margin-top: 6px;
+}
+.vehicle-insight-dialog .vehicle-insight-text {
+    font-size: 12px;
+    line-height: 1.6;
+}
+.vehicle-insight-dialog .score-formula {
+    padding: 15px;
+    background: var(--muted);
+    border-radius: 6px;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+.vehicle-insight-dialog .vehicle-record-row > span {
+    max-width: 62%;
+}

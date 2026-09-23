@@ -4,6 +4,7 @@ namespace App\Services\Fleet;
 
 use App\Models\FleetWorkOrder;
 use App\Models\User;
+use App\Services\Fleet\Data\VehicleReadinessContext;
 use App\Services\UserSiteAccessService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,7 @@ class MaintenanceTransitionService
         private readonly MaintenanceAccessService $access,
         private readonly MaintenancePolicyService $policy,
         private readonly UserSiteAccessService $siteAccess,
+        private readonly VehicleReadinessService $readiness,
     ) {}
 
     /** @param array<string, mixed> $payload */
@@ -277,6 +279,27 @@ class MaintenanceTransitionService
                         $currentActor, $order, (int) $asset->site_id, (string) $asset->category,
                     );
                     $payload['restriction_sources'] = $restrictionSources;
+                    if (\App\Models\Asset::vehicles()->whereKey($asset->id)->exists()) {
+                        $releaseRestrictionIds = array_map(fn (array $source): int => $source['id'], $restrictionSources);
+                        $resolvedCheckRunIds = array_values(array_map(
+                            fn (array $source): int => (int) $source['source_run_id'],
+                            array_filter($restrictionSources, fn (array $source): bool => $source['source_run_id'] !== null),
+                        ));
+                        $assessment = $this->readiness->assess($asset, new VehicleReadinessContext(
+                            purpose: 'maintenance_release',
+                            releaseRestrictionIds: $releaseRestrictionIds,
+                            resolvedCheckRunIds: $resolvedCheckRunIds,
+                        ), true);
+                        $this->readiness->assertCanProceed($assessment, 'status');
+                        $payload['vehicle_readiness'] = [
+                            'input_fingerprint' => $assessment->inputFingerprint,
+                            'compliance_version_ids' => $assessment->complianceVersionIds,
+                            'odometer_observation_id' => $assessment->odometerObservationId,
+                            'restriction_ids' => $assessment->restrictionIds,
+                            'check_run_ids' => $assessment->checkRunIds,
+                            'reason_codes' => array_map(fn ($reason) => $reason->code, $assessment->reasons),
+                        ];
+                    }
                     break;
                 default:
                     throw ValidationException::withMessages(['operation' => 'Unsupported maintenance action.']);

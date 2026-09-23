@@ -25,11 +25,18 @@ class FleetTrip extends Model
         'reverse_geocoded_at',
         'distance_km',
         'duration_s',
+        'max_speed_kph',
         'status',
         'consent_blocked',
         'is_personal',
         'marked_personal_by',
         'marked_personal_at',
+        // PKG-02B confirmed driver. Unconfirmed attribution (a checked-out
+        // booking or a driver sign-in) is derived at read time, never stored.
+        'driver_user_id',
+        'driver_attribution_source',
+        'driver_confirmed_by',
+        'driver_confirmed_at',
     ];
 
     protected $casts = [
@@ -41,10 +48,12 @@ class FleetTrip extends Model
         'end_longitude' => 'decimal:7',
         'reverse_geocoded_at' => 'datetime',
         'distance_km' => 'decimal:3',
+        'max_speed_kph' => 'float',
         'consent_blocked' => 'boolean',
         'duration_s' => 'integer',
         'is_personal' => 'boolean',
         'marked_personal_at' => 'datetime',
+        'driver_confirmed_at' => 'datetime',
     ];
 
     public function asset(): BelongsTo
@@ -70,6 +79,22 @@ class FleetTrip extends Model
     public function markedPersonalBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'marked_personal_by');
+    }
+
+    /** The confirmed driver, when someone has confirmed one. */
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'driver_user_id');
+    }
+
+    public function driverConfirmedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'driver_confirmed_by');
+    }
+
+    public function driverConfirmations(): HasMany
+    {
+        return $this->hasMany(FleetTripDriverConfirmation::class, 'fleet_trip_id');
     }
 
     /**

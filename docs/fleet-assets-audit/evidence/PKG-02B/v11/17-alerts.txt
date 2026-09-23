@@ -1,0 +1,170 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button "Home":
+      - generic: Home
+    - button "My day":
+      - generic: My day
+    - button "Clients":
+      - generic: Clients
+    - button "Sites":
+      - generic: Sites
+    - generic: Fleet & assets
+    - button "Overview":
+      - generic: Overview
+    - button "Vehicles":
+      - generic: Vehicles
+    - button "Bookings":
+      - generic: Bookings
+    - button "Maintenance":
+      - generic: Maintenance
+    - button "Assets":
+      - generic: Assets
+    - button "Reports":
+      - generic: Reports
+    - button "Settings":
+      - generic: Settings
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Overview":
+      - generic: Overview
+    - tab "Service & compliance":
+      - generic: Service & compliance
+    - tab "Checks & inspections":
+      - generic: Checks & inspections
+    - tab "Maintenance":
+      - generic: Maintenance
+    - tab "Map" [selected]:
+      - generic: Map
+    - button "More views (2)":
+      - generic: More
+    - button "Find a section":
+      - generic: Find
+      - generic: /
+  - tablist "Vehicle sections":
+    - tab "Location & geofences":
+      - text: Location & geofences
+    - tab "Vehicle telemetry":
+      - text: Vehicle telemetry
+    - tab "Driving insights":
+      - text: Driving insights
+    - tab "Alerts & Control Room" [active] [selected]:
+      - text: Alerts & Control Room
+  - tabpanel:
+    - generic: SAFETY & RESPONSE
+    - heading "Vehicle alerts → Control Room" [level=2]
+    - paragraph: One source event, one response record, linked follow-up.
+    - button "Response plan"
+    - paragraph:
+      - strong: Response clock +0 min
+      - text: "· Potential collision: acknowledge within 2 min; other preview alerts: 10 min. Overdue items escalate to Operations Manager. Example deadlines."
+    - button "Advance preview clock 5 min"
+    - text: GV500CG event
+    - generic: →
+    - text: Correlate & route
+    - generic: →
+    - text: Control Room owner
+    - generic: →
+    - text: Assessment & follow-up
+    - heading "Response queue 0" [level=3]:
+      - text: Response queue
+      - generic: "0"
+    - combobox "Alert status filter":
+      - option "Open" [selected]
+      - option "All"
+      - option "Resolved"
+    - heading "No matching alerts" [level=3]
+    - paragraph: Use the synthetic event preview to walk through the response.
+    - generic: Preview controls
+    - heading "Try an event" [level=3]
+    - generic: Synthetic vehicle event
+    - combobox "Synthetic vehicle event":
+      - generic: Potential collision
+    - generic: Sensor indication · human confirmation needed
+    - checkbox "Simulate delivery failure"
+    - text: Simulate delivery failure
+    - button "Preview event"
+    - paragraph: Repeating the same sample tests duplicate handling. No notification, emergency call or device command is sent.
+    - generic: DRAFT RESPONSE PLAN
+    - heading "Shift lead → Operations Manager" [level=3]
+    - paragraph: "Overspeed: above 50 km/h plus 5 km/h tolerance for 15 seconds → Control Room. A new episode needs 60 seconds below the trigger. Potential collision: urgent human review. Low voltage: below 11.8 V for 5 minutes. Tracker overdue: 30 minutes after an expected report."
+    - generic: Activation pending
+    - paragraph: Geofence alerts require an active assignment and schedule. Towing, power loss and motion during a restriction need contextual review. Harsh driving normally creates a coaching task unless an approved escalation rule applies.
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged
+- status:
+  - generic: Evidence retained with its owning record.
+  - button "Undo"
+  - button "Dismiss"

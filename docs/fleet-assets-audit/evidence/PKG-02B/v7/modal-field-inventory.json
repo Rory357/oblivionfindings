@@ -1,0 +1,1433 @@
+{
+  "scope": "All preview TS/TSX source field definitions and modal entry points; source audit, not exhaustive browser acceptance",
+  "fieldCount": 174,
+  "modalEntryCount": 40,
+  "fields": [
+    {
+      "file": "driving-workflows.ts",
+      "line": 208,
+      "key": "driver",
+      "label": "Actual driver",
+      "kind": "select"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 211,
+      "key": "point",
+      "label": "Applies from recorded point",
+      "kind": "record"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 221,
+      "key": "reason",
+      "label": "Checkout or handover evidence",
+      "kind": "textarea"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 226,
+      "key": "files",
+      "label": "Supporting evidence",
+      "kind": "files"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 227,
+      "key": "confirmed",
+      "label": "I verified the actual driver and handover point",
+      "kind": "check"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 291,
+      "key": "outcome",
+      "label": "Review outcome",
+      "kind": "select"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 296,
+      "key": "reviewer",
+      "label": "Review owner",
+      "kind": "person"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 297,
+      "key": "reason",
+      "label": "Evidence and review reason",
+      "kind": "textarea"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 302,
+      "key": "files",
+      "label": "Supporting files",
+      "kind": "files"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 303,
+      "key": "confirmed",
+      "label": "I reviewed the event evidence and scoring impact",
+      "kind": "check"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 361,
+      "key": "owner",
+      "label": "Coach or review owner",
+      "kind": "person"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 362,
+      "key": "due",
+      "label": "Review date",
+      "kind": "date"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 363,
+      "key": "reason",
+      "label": "Expected outcome and actions",
+      "kind": "textarea"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 368,
+      "key": "files",
+      "label": "Supporting files",
+      "kind": "files"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 438,
+      "key": "files",
+      "label": "Evidence",
+      "kind": "files"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 522,
+      "key": "braking",
+      "label": "Braking points per event",
+      "kind": "number"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 523,
+      "key": "acceleration",
+      "label": "Acceleration points per event",
+      "kind": "number"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 528,
+      "key": "speed",
+      "label": "Overspeed points per episode",
+      "kind": "number"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 533,
+      "key": "idle",
+      "label": "Points per idle minute",
+      "kind": "number"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 541,
+      "key": "coverage",
+      "label": "Minimum trip coverage %",
+      "kind": "number"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 542,
+      "key": "trips",
+      "label": "Minimum confirmed trips",
+      "kind": "number"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 543,
+      "key": "distance",
+      "label": "Minimum confirmed distance · km",
+      "kind": "number"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 548,
+      "key": "reason",
+      "label": "Reason for the new version",
+      "kind": "textarea"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 553,
+      "key": "confirmed",
+      "label": "I reviewed the scoring impact in this synthetic preview",
+      "kind": "check"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 616,
+      "key": "segment",
+      "label": "Road segment",
+      "kind": "select"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 620,
+      "key": "direction",
+      "label": "Direction",
+      "kind": "select"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 626,
+      "key": "limit",
+      "label": "Posted or temporary limit · km/h",
+      "kind": "catalog-number"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 640,
+      "key": "from",
+      "label": "Effective from",
+      "kind": "datetime"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 641,
+      "key": "until",
+      "label": "Expires at",
+      "kind": "datetime"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 649,
+      "key": "reason",
+      "label": "Authority reference and reason",
+      "kind": "textarea"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 654,
+      "key": "files",
+      "label": "Sign photo or authority document",
+      "kind": "files"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 716,
+      "key": "reviewer",
+      "label": "Reviewer",
+      "kind": "person"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 717,
+      "key": "reason",
+      "label": "Review decision and reason",
+      "kind": "textarea"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "line": 722,
+      "key": "confirmed",
+      "label": "I verified the authority, segment, direction and dates",
+      "kind": "check"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 629,
+      "key": "name",
+      "label": "Service type",
+      "kind": "catalog"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 642,
+      "key": "months",
+      "label": "Interval in months",
+      "kind": "catalog-number"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 651,
+      "key": "distance",
+      "label": "Interval in kilometres",
+      "kind": "catalog-number"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 664,
+      "key": "due",
+      "label": "Next due date",
+      "kind": "date"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 665,
+      "key": "dueKm",
+      "label": "Next due odometer",
+      "kind": "number"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 666,
+      "key": "owner",
+      "label": "Responsible person or role",
+      "kind": "person"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 673,
+      "key": "lead",
+      "label": "Days before due",
+      "kind": "number → catalogue renderer"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 674,
+      "key": "leadKm",
+      "label": "Kilometres before due",
+      "kind": "number → catalogue renderer"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 675,
+      "key": "files",
+      "label": "Service documents",
+      "kind": "files"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 760,
+      "key": "provider",
+      "label": "Service provider",
+      "kind": "provider"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 761,
+      "key": "owner",
+      "label": "Responsible person or role",
+      "kind": "person"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 762,
+      "key": "target",
+      "label": "Target date",
+      "kind": "date"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 769,
+      "key": "operation",
+      "label": "Appointment action",
+      "kind": "select"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 774,
+      "key": "start",
+      "label": "Appointment start",
+      "kind": "datetime"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 775,
+      "key": "end",
+      "label": "Appointment end",
+      "kind": "datetime"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 776,
+      "key": "unavailable",
+      "label": "Vehicle unavailable during this appointment",
+      "kind": "check"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 782,
+      "key": "confirmed",
+      "label": "Provider confirmation reference",
+      "kind": "text"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 789,
+      "key": "changeReason",
+      "label": "Reason for change",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 801,
+      "key": "impact",
+      "label": "Booking impact reviewed",
+      "kind": "check"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 856,
+      "key": "owner",
+      "label": "Responsible person or role",
+      "kind": "person"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 857,
+      "key": "target",
+      "label": "Target date",
+      "kind": "date"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 858,
+      "key": "notes",
+      "label": "Assessment and next action",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 864,
+      "key": "quote",
+      "label": "Quote reference / estimate",
+      "kind": "text"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 867,
+      "key": "approval",
+      "label": "Finance approval record",
+      "kind": "record"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 891,
+      "key": "parts",
+      "label": "Parts and cost context",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 892,
+      "key": "labour",
+      "label": "Labour and cost context",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 958,
+      "key": "outcome",
+      "label": "Outcome",
+      "kind": "select"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 963,
+      "key": "completed",
+      "label": "Actual completion date",
+      "kind": "date"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 964,
+      "key": "odo",
+      "label": "Completion odometer",
+      "kind": "number"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 965,
+      "key": "evidence",
+      "label": "Completion / retest evidence reference",
+      "kind": "text"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 972,
+      "key": "notes",
+      "label": "Work performed and outcome",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 983,
+      "key": "due",
+      "label": "Following due date",
+      "kind": "date"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 984,
+      "key": "dueKm",
+      "label": "Following due odometer",
+      "kind": "number"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 992,
+      "key": "feedback",
+      "label": "Feedback for the reporter",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 993,
+      "key": "reviewed",
+      "label": "Evidence and next action reviewed",
+      "kind": "check"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1107,
+      "key": "reviewer",
+      "label": "Independent authorised reviewer",
+      "kind": "person"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1112,
+      "key": "evidence",
+      "label": "Release assessment evidence reference",
+      "kind": "text"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1113,
+      "key": "decision",
+      "label": "Decision",
+      "kind": "select"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1117,
+      "key": "reason",
+      "label": "Decision reason",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1124,
+      "key": "repairs",
+      "label": "Required repairs and retests reviewed",
+      "kind": "check"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1129,
+      "key": "compliance",
+      "label": "Applicable compliance evidence reviewed",
+      "kind": "check"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1134,
+      "key": "custody",
+      "label": "Custody and equipment readiness reviewed",
+      "kind": "check"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1211,
+      "key": "applies",
+      "label": "Applicability",
+      "kind": "select"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1216,
+      "key": "basis",
+      "label": "Applicability basis / source",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1223,
+      "key": "outcome",
+      "label": "Evidence outcome",
+      "kind": "select"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1229,
+      "key": "evidence",
+      "label": "Evidence reference",
+      "kind": "text"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1230,
+      "key": "files",
+      "label": "Certificate / licence documents",
+      "kind": "files"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1238,
+      "key": "low",
+      "label": "Licence start odometer",
+      "kind": "number"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1239,
+      "key": "high",
+      "label": "Licence end odometer",
+      "kind": "number"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1242,
+      "key": "due",
+      "label": "Next due / expiry date",
+      "kind": "date"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1329,
+      "key": "value",
+      "label": "Odometer in kilometres",
+      "kind": "number"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1330,
+      "key": "at",
+      "label": "Observed at",
+      "kind": "datetime"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1339,
+      "key": "source",
+      "label": "Reading source",
+      "kind": "record"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1379,
+      "key": "files",
+      "label": "Odometer photo or document",
+      "kind": "files"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1492,
+      "key": "title",
+      "label": "Reminder title",
+      "kind": "text → catalogue renderer"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1495,
+      "key": "source",
+      "label": "Linked source",
+      "kind": "record"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1497,
+      "key": "notes",
+      "label": "Action to take",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1504,
+      "key": "at",
+      "label": "Remind at",
+      "kind": "datetime"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1505,
+      "key": "owner",
+      "label": "Responsible person or role",
+      "kind": "person"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1506,
+      "key": "backup",
+      "label": "Backup owner",
+      "kind": "person"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1509,
+      "key": "repeat",
+      "label": "Repeat every (months)",
+      "kind": "catalog-number"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1519,
+      "key": "changeReason",
+      "label": "Reason for change",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1689,
+      "key": "note",
+      "label": "Follow-up action / owner note",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1786,
+      "key": "start",
+      "label": "Pickup / block start",
+      "kind": "datetime"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1787,
+      "key": "end",
+      "label": "Return / block end",
+      "kind": "datetime"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1797,
+      "key": "purpose",
+      "label": "Reason for unavailable period",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1804,
+      "key": "requester",
+      "label": "Requester",
+      "kind": "person"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1805,
+      "key": "driver",
+      "label": "Driver",
+      "kind": "person"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1806,
+      "key": "purpose",
+      "label": "Purpose",
+      "kind": "textarea → catalogue renderer"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1807,
+      "key": "pickup",
+      "label": "Pickup / return and keys",
+      "kind": "text → catalogue renderer"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1810,
+      "key": "reason",
+      "label": "Reason for change",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1825,
+      "key": "approvalRoute",
+      "label": "Booking approval",
+      "kind": "approval"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1830,
+      "key": "exemptionReason",
+      "label": "Reason / policy authority for approval not required",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1837,
+      "key": "readyReview",
+      "label": "Readiness and driver authority reviewed for approval not required",
+      "kind": "check"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 1843,
+      "key": "files",
+      "label": "Approval evidence",
+      "kind": "files"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 2045,
+      "key": "ready",
+      "label": "Readiness, driver authority and conflicts reviewed",
+      "kind": "check"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 2053,
+      "key": "odo",
+      "label": "Recorded odometer",
+      "kind": "number"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 2054,
+      "key": "condition",
+      "label": "Condition",
+      "kind": "select"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 2058,
+      "key": "evidence",
+      "label": "Condition check / evidence reference",
+      "kind": "text"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 2071,
+      "key": "reason",
+      "label": "Decision / custody notes",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 2186,
+      "key": "template",
+      "label": "Checklist template",
+      "kind": "checklist"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 2187,
+      "key": "due",
+      "label": "Next check date",
+      "kind": "date"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 2188,
+      "key": "owner",
+      "label": "Responsible role",
+      "kind": "person"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 2216,
+      "key": "note",
+      "label": "Amendment and reason",
+      "kind": "textarea"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 2447,
+      "key": "work",
+      "label": "Open work record",
+      "kind": "record"
+    },
+    {
+      "file": "operations.tsx",
+      "line": 2461,
+      "key": "reason",
+      "label": "Why this work covers the alert",
+      "kind": "textarea"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 78,
+      "key": "files",
+      "label": "Upload documents",
+      "kind": "files"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 84,
+      "key": "reason",
+      "label": "Reason / supporting details",
+      "kind": "textarea"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 135,
+      "key": "vin",
+      "label": "VIN / chassis reference",
+      "kind": "text"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 141,
+      "key": "category",
+      "label": "Vehicle category",
+      "kind": "catalog"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 154,
+      "key": "make",
+      "label": "Manufacturer",
+      "kind": "catalog"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 166,
+      "key": "model",
+      "label": "Vehicle model",
+      "kind": "catalog"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 173,
+      "key": "fuel",
+      "label": "Fuel / energy type",
+      "kind": "catalog"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 180,
+      "key": "seats",
+      "label": "Seats",
+      "kind": "catalog-number"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 194,
+      "key": "lease",
+      "label": "Ownership arrangement",
+      "kind": "catalog"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 207,
+      "key": "owner",
+      "label": "Responsible person or role",
+      "kind": "person"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 213,
+      "key": "life",
+      "label": "Lifecycle status",
+      "kind": "select"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 220,
+      "key": "ownershipFiles",
+      "label": "Purchase / lease documents",
+      "kind": "files"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 233,
+      "key": "insurer",
+      "label": "Insurance provider",
+      "kind": "record"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 247,
+      "key": "insurance",
+      "label": "Insurance policy reference",
+      "kind": "text"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 253,
+      "key": "insuranceDue",
+      "label": "Insurance expiry",
+      "kind": "date"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 259,
+      "key": "insuranceFiles",
+      "label": "Insurance documents",
+      "kind": "files"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 265,
+      "key": "warranty",
+      "label": "Warranty reference",
+      "kind": "text"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 271,
+      "key": "warrantyDue",
+      "label": "Warranty expiry",
+      "kind": "date"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 277,
+      "key": "warrantyFiles",
+      "label": "Warranty documents",
+      "kind": "files"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 391,
+      "key": "category",
+      "label": "Document type",
+      "kind": "catalog"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 398,
+      "key": "reference",
+      "label": "Document / policy reference",
+      "kind": "text"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 404,
+      "key": "issued",
+      "label": "Document date",
+      "kind": "date"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 410,
+      "key": "expiry",
+      "label": "Expiry / renewal date",
+      "kind": "date"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 416,
+      "key": "finance",
+      "label": "Linked Finance record",
+      "kind": "record"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 439,
+      "key": "remind",
+      "label": "Create expiry reminder for the vehicle owner",
+      "kind": "check"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 560,
+      "key": "asset",
+      "label": "Fixed asset record",
+      "kind": "record"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 578,
+      "key": "centre",
+      "label": "Cost centre",
+      "kind": "record"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 596,
+      "key": "record",
+      "label": "Purchase order or supplier invoice",
+      "kind": "record"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 665,
+      "key": "existing",
+      "label": "Use an existing document",
+      "kind": "record"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 692,
+      "key": "type",
+      "label": "Finance request type",
+      "kind": "select"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 704,
+      "key": "source",
+      "label": "Source record",
+      "kind": "record"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 722,
+      "key": "amount",
+      "label": "Amount including GST · NZD",
+      "kind": "number"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 728,
+      "key": "notes",
+      "label": "What Finance needs to review",
+      "kind": "textarea"
+    },
+    {
+      "file": "record-model.ts",
+      "line": 734,
+      "key": "files",
+      "label": "Quote / invoice / supporting files",
+      "kind": "files"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 106,
+      "key": "value",
+      "label": "Dashboard reading in kilometres",
+      "kind": "number"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 111,
+      "key": "reason",
+      "label": "Observation and discrepancy explanation",
+      "kind": "textarea"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 116,
+      "key": "files",
+      "label": "Dashboard photo or supporting document",
+      "kind": "files"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 129,
+      "key": "automatic",
+      "label": "Use calibrated tracker mileage for planning",
+      "kind": "check"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 135,
+      "key": "tolerance",
+      "label": "Review difference in kilometres",
+      "kind": "number"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 140,
+      "key": "confirmed",
+      "label": "I checked this dashboard reading against the selected tracker sample",
+      "kind": "check"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 227,
+      "key": "owner",
+      "label": "Responsible person or role",
+      "kind": "person"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 232,
+      "key": "decision",
+      "label": "Triage decision",
+      "kind": "record"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 253,
+      "key": "outcome",
+      "label": "Assessment outcome",
+      "kind": "record"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 441,
+      "key": "reason",
+      "label": "Reason for pausing",
+      "kind": "textarea"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 484,
+      "key": "owner",
+      "label": "Primary response owner",
+      "kind": "person"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 485,
+      "key": "backup",
+      "label": "Backup response owner",
+      "kind": "person"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 495,
+      "key": "speed",
+      "label": "Fleet speed threshold · km/h",
+      "kind": "catalog-number"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 503,
+      "key": "speedTolerance",
+      "label": "Tolerance · km/h",
+      "kind": "catalog-number"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 511,
+      "key": "speedDuration",
+      "label": "Minimum continuous duration · seconds",
+      "kind": "catalog-number"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 519,
+      "key": "speedCooldown",
+      "label": "Below-threshold time before a new episode · seconds",
+      "kind": "catalog-number"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 532,
+      "key": "offline",
+      "label": "Minutes overdue before review",
+      "kind": "number"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 537,
+      "key": "voltage",
+      "label": "Vehicle voltage below which to review",
+      "kind": "number"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 542,
+      "key": "duration",
+      "label": "Low voltage duration in minutes",
+      "kind": "number"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "line": 547,
+      "key": "notes",
+      "label": "Response, cooldown and escalation instructions",
+      "kind": "textarea"
+    }
+  ],
+  "modals": [
+    {
+      "file": "checklist-library.tsx",
+      "component": "WizardShell",
+      "line": 231,
+      "title": "title={\n                    original\n                        ? 'Customise vehicle checklist'\n                        : 'Create vehicle checklist'\n                }"
+    },
+    {
+      "file": "checklist-library.tsx",
+      "component": "Modal",
+      "line": 596,
+      "title": "title=\"Discard checklist changes?\""
+    },
+    {
+      "file": "driving-insights.tsx",
+      "component": "Modal",
+      "line": 477,
+      "title": "title=\"How the score is calculated\""
+    },
+    {
+      "file": "driving-workflows.ts",
+      "title": "Confirm driver & handover"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "title": "Review driving event"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "title": "Create coaching follow-up"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "title": "Review score policy"
+    },
+    {
+      "file": "driving-workflows.ts",
+      "title": "Add manual speed limit"
+    },
+    {
+      "file": "evidence-field.tsx",
+      "component": "Modal",
+      "line": 144,
+      "title": "title=\"Vehicle profile photo\""
+    },
+    {
+      "file": "evidence-field.tsx",
+      "component": "Modal",
+      "line": 198,
+      "title": "title=\"Discard selected photo?\""
+    },
+    {
+      "file": "flows.tsx",
+      "component": "Modal",
+      "line": 79,
+      "title": "title=\"Discard this draft?\""
+    },
+    {
+      "file": "flows.tsx",
+      "component": "WizardShell",
+      "line": 216,
+      "title": "title=\"Start vehicle check\""
+    },
+    {
+      "file": "flows.tsx",
+      "component": "WizardShell",
+      "line": 593,
+      "title": "title={`Check ${run.id}`}"
+    },
+    {
+      "file": "flows.tsx",
+      "component": "WizardShell",
+      "line": 946,
+      "title": "title=\"Create or link maintenance\""
+    },
+    {
+      "file": "flows.tsx",
+      "component": "Modal",
+      "line": 1414,
+      "title": "title=\"Add evidence\""
+    },
+    {
+      "file": "geofence-studio.tsx",
+      "component": "WizardShell",
+      "line": 211,
+      "title": "title={\n                    initial\n                        ? 'Manage geofence assignment'\n                        : 'Create or link geofence'\n                }"
+    },
+    {
+      "file": "geofence-studio.tsx",
+      "component": "Modal",
+      "line": 857,
+      "title": "title=\"Discard geofence changes?\""
+    },
+    {
+      "file": "main.tsx",
+      "component": "Modal",
+      "line": 1517,
+      "title": "title=\"Find in this vehicle\""
+    },
+    {
+      "file": "main.tsx",
+      "component": "Modal",
+      "line": 1611,
+      "title": "title={\n                        detail === 'booking'\n                            ? 'Busy'\n                            : (defaultEntries.find((e) => e.kind === detail)\n                                  ?.title ?? 'Upcoming event')\n                    }"
+    },
+    {
+      "file": "main.tsx",
+      "component": "Modal",
+      "line": 1706,
+      "title": "title={detail}"
+    },
+    {
+      "file": "map-studio.tsx",
+      "component": "Modal",
+      "line": 667,
+      "title": "title=\"Select shared geofences\""
+    },
+    {
+      "file": "operations.tsx",
+      "title": "Assess work & record costs"
+    },
+    {
+      "file": "operations.tsx",
+      "title": "Record work outcome"
+    },
+    {
+      "file": "operations.tsx",
+      "title": "Review authorised release"
+    },
+    {
+      "file": "operations.tsx",
+      "title": "Plan check requirement"
+    },
+    {
+      "file": "operations.tsx",
+      "title": "Link existing Maintenance work"
+    },
+    {
+      "file": "operations.tsx",
+      "component": "Modal",
+      "line": 3987,
+      "title": "title={m.record.title}"
+    },
+    {
+      "file": "operations.tsx",
+      "component": "WizardShell",
+      "line": 4082,
+      "title": "title={a.title}"
+    },
+    {
+      "file": "operations.tsx",
+      "component": "Modal",
+      "line": 4316,
+      "title": "title=\"Discard this draft?\""
+    },
+    {
+      "file": "record-model.ts",
+      "title": "Edit vehicle record"
+    },
+    {
+      "file": "record-model.ts",
+      "title": "Archive vehicle document"
+    },
+    {
+      "file": "record-model.ts",
+      "title": "Link Finance records"
+    },
+    {
+      "file": "record-model.ts",
+      "title": "Request Finance review"
+    },
+    {
+      "file": "record-workspaces.tsx",
+      "component": "Modal",
+      "line": 460,
+      "title": "title={\n                r\n                    ? r.kind + ' · ' + r.id\n                    : request\n                      ? 'Finance review · ' + id\n                      : 'Finance record unavailable'\n            }"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "title": "Reconcile tracker mileage"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "title": "Pause automatic mileage"
+    },
+    {
+      "file": "telemetry-state.ts",
+      "title": "Vehicle alert response plan"
+    },
+    {
+      "file": "telemetry-studio.tsx",
+      "component": "Modal",
+      "line": 399,
+      "title": "title={selected.kind}"
+    },
+    {
+      "file": "trip-export.tsx",
+      "component": "Modal",
+      "line": 64,
+      "title": "title=\"Export vehicle trips\""
+    },
+    {
+      "file": "vehicle-map.tsx",
+      "component": "Modal",
+      "line": 246,
+      "title": "title=\"Recorded vehicle observation\""
+    }
+  ]
+}

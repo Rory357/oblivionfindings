@@ -1,0 +1,186 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button:
+    - button:
+    - button:
+    - button:
+    - button
+    - button
+    - button
+    - button
+    - button
+    - button
+    - button:
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Overview" [selected]:
+      - generic: Overview
+    - button "More views (6)":
+      - generic: More
+    - button "Find a section":
+  - tablist "Vehicle sections":
+    - tab "Readiness":
+      - text: Readiness
+    - tab "Vehicle details":
+      - text: Vehicle details
+    - tab "Documents":
+      - text: Documents
+    - tab "Finance" [selected]:
+      - text: Finance
+  - tabpanel:
+    - generic: FINANCE CONNECTION · VH-014
+    - heading "Ownership, purchasing & costs" [level=2]
+    - paragraph: Linked records keep approvals and payment with Finance.
+    - button "Link records":
+      - text: Link records
+    - button "Request Finance review":
+      - text: Request Finance review
+    - strong: Fixed asset
+    - generic: FA-DEMO-14
+    - generic: Financial asset recognition
+    - strong: Cost centre
+    - generic: Kōwhai House
+    - generic: CC-KOWHAI
+    - strong: Review queue
+    - generic: 0 pending
+    - generic: Finance owns the next decision
+    - heading "Linked Finance records" [level=3]
+    - group "Finance records layout":
+      - button "List":
+        - text: List
+      - button "Cards" [pressed]:
+        - text: Cards
+    - generic: NZD · synthetic
+    - generic "Linked Finance records":
+      - generic: Linked Finance records
+      - generic: 3 records shown
+      - button "KWH014 · Toyota Hiace FA-DEMO-14 Actions for KWH014 · Toyota Hiace Type Fixed asset Status Active Amount (NZD) $42,000.00 Fixed asset Approval and payment owned by Finance Open":
+        - heading "KWH014 · Toyota Hiace" [level=3]
+        - generic: FA-DEMO-14
+        - button "Actions for KWH014 · Toyota Hiace":
+        - term: Type
+        - definition:
+          - generic: Fixed asset
+        - term: Status
+        - definition:
+          - generic: Active
+        - term: Amount (NZD)
+        - definition:
+          - strong: $42,000.00
+        - generic: Fixed asset
+        - generic: Approval and payment owned by Finance
+        - text: Open
+      - button "Harbour Workshop · routine service PO-DEMO-188 Actions for Harbour Workshop · routine service Type Purchase order Status Approved Amount (NZD) $408.25 Purchase order Approval and payment owned by Finance Open":
+        - heading "Harbour Workshop · routine service" [level=3]
+        - generic: PO-DEMO-188
+        - button "Actions for Harbour Workshop · routine service":
+        - term: Type
+        - definition:
+          - generic: Purchase order
+        - term: Status
+        - definition:
+          - generic: Approved
+        - term: Amount (NZD)
+        - definition:
+          - strong: $408.25
+        - generic: Purchase order
+        - generic: Approval and payment owned by Finance
+        - text: Open
+      - button "Harbour Workshop · service invoice BILL-DEMO-188 Actions for Harbour Workshop · service invoice Type Supplier invoice Status Awaiting payment Amount (NZD) $408.25 Supplier invoice Approval and payment owned by Finance Open":
+        - heading "Harbour Workshop · service invoice" [level=3]
+        - generic: BILL-DEMO-188
+        - button "Actions for Harbour Workshop · service invoice":
+        - term: Type
+        - definition:
+          - generic: Supplier invoice
+        - term: Status
+        - definition:
+          - generic: Awaiting payment
+        - term: Amount (NZD)
+        - definition:
+          - strong: $408.25
+        - generic: Supplier invoice
+        - generic: Approval and payment owned by Finance
+        - text: Open
+    - paragraph: Purchase orders and invoices represent different stages of the same spend. They are not added together as vehicle costs.
+    - heading "Finance review requests" [level=3]
+    - generic "Finance review requests":
+      - generic: Finance review requests
+      - generic: 0 records shown
+      - generic: No requests yet. Submit a quote, invoice or ownership correction with its supporting files.
+    - status:
+      - strong: Finance remains the owner
+      - paragraph: Vehicle edits and Maintenance completion do not approve spend, pay invoices, post depreciation or dispose of the fixed asset. This mockup shows the linked record and review queue; nothing is sent externally.
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged

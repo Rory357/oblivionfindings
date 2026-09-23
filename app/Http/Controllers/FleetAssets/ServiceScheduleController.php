@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
-use App\Models\Asset;
 use App\Models\FleetServiceSchedule;
-use App\Services\AuditLogger;
+use App\Services\Fleet\VehicleServiceScheduleService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class ServiceScheduleController extends Controller
@@ -16,6 +16,10 @@ class ServiceScheduleController extends Controller
     public function index(Request $request)
     {
         $canManage = $this->canManageMaintenance($request);
+        // Only schedules for vehicles this user can see (the list was unscoped).
+        $user = $request->user() ?? abort(403);
+        $scoped = fn () => FleetServiceSchedule::query()->whereIn('asset_id',
+            app(SecurityDevicesAccessService::class)->accessibleVehiclesForFleet($user)->select('assets.id'));
 
         // Sorting
         $allowedSorts = ['name', 'next_due_at', 'created_at'];
@@ -24,7 +28,7 @@ class ServiceScheduleController extends Controller
         if (!in_array($sort, $allowedSorts)) $sort = 'next_due_at';
         if (!in_array($direction, ['asc', 'desc'])) $direction = 'asc';
 
-        $schedules = FleetServiceSchedule::query()
+        $schedules = $scoped()
             ->with('asset:id,name,asset_tag,category')
             ->orderBy($sort, $direction)
             ->get()
@@ -63,7 +67,7 @@ class ServiceScheduleController extends Controller
         // Schedules per vehicle
         $schedulesPerVehicle = [];
         try {
-            $schedulesPerVehicle = FleetServiceSchedule::query()
+            $schedulesPerVehicle = $scoped()
                 ->with('asset:id,name')
                 ->get()
                 ->filter(fn ($s) => $s->asset !== null)
@@ -82,7 +86,7 @@ class ServiceScheduleController extends Controller
         $monthlyCompletions = [];
         try {
             $sixMonthsAgo = Carbon::now()->subMonths(6)->startOfMonth();
-            $completedSchedules = FleetServiceSchedule::query()
+            $completedSchedules = $scoped()
                 ->whereNotNull('last_completed_at')
                 ->where('last_completed_at', '>=', $sixMonthsAgo)
                 ->get();
@@ -107,7 +111,7 @@ class ServiceScheduleController extends Controller
         // Upcoming timeline (next 30 days)
         $upcomingTimeline = [];
         try {
-            $upcomingTimeline = FleetServiceSchedule::query()
+            $upcomingTimeline = $scoped()
                 ->with('asset:id,name')
                 ->whereNotNull('next_due_at')
                 ->where('next_due_at', '<=', Carbon::now()->addDays(30))
@@ -138,31 +142,21 @@ class ServiceScheduleController extends Controller
             $upcomingTimeline = [];
         }
 
-        // Assets list for create dialog
-        $assets = [];
-        try {
-            if (Schema::hasTable('assets')) {
-                $assets = Asset::query()
-                    ->select('id', 'name')
-                    ->orderBy('name')
-                    ->get()
-                    ->toArray();
-            }
-        } catch (\Throwable $e) {
-            $assets = [];
-        }
+        // Vehicles for the create dialog: only those this user can see.
+        $assets = app(SecurityDevicesAccessService::class)->accessibleVehiclesForFleet($user)
+            ->orderBy('name')->get(['assets.id', 'assets.name'])->toArray();
 
         // Hero band stats — efficient COUNTs (active schedules only)
         $stats = [
-            'due_7d' => FleetServiceSchedule::where('is_active', true)
+            'due_7d' => $scoped()->where('is_active', true)
                 ->whereNotNull('next_due_at')
                 ->whereBetween('next_due_at', [Carbon::now(), Carbon::now()->addDays(7)])
                 ->count(),
-            'overdue' => FleetServiceSchedule::where('is_active', true)
+            'overdue' => $scoped()->where('is_active', true)
                 ->whereNotNull('next_due_at')
                 ->where('next_due_at', '<', Carbon::now())
                 ->count(),
-            'active' => FleetServiceSchedule::where('is_active', true)->count(),
+            'active' => $scoped()->where('is_active', true)->count(),
         ];
 
         return Inertia::render('fleet-assets/maintenance/schedules/index', [
@@ -179,45 +173,40 @@ class ServiceScheduleController extends Controller
         ]);
     }
 
+    /**
+     * Legacy list action. Records a service today through the same scoped
+     * service as the vehicle workspace. The completion reading is the one
+     * supplied (never the old due milestone); without one, the next distance
+     * trigger is left for the vehicle's owner to record.
+     */
     public function markComplete(Request $request, FleetServiceSchedule $schedule)
     {
-        $schedule->update([
-            'last_completed_at' => Carbon::now(),
-            'last_completed_km' => $request->input('last_completed_km', $schedule->next_due_km),
-            'next_due_at' => $schedule->interval_days
-                ? Carbon::now()->addDays($schedule->interval_days)
-                : null,
-            'next_due_km' => $schedule->interval_km && $schedule->next_due_km
-                ? $schedule->next_due_km + $schedule->interval_km
-                : null,
-        ]);
+        $actor = $request->user() ?? abort(403);
+        $current = FleetServiceSchedule::query()->whereKey($schedule->getKey())->first() ?? abort(404);
+        app(VehicleServiceScheduleService::class)->recordCompletion($actor, (int) $current->asset_id, (int) $current->id, [
+            'completed_on' => Carbon::now((string) config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
+            'odometer_km' => $request->input('last_completed_km'),
+            'notes' => 'Marked complete from the service schedules list.',
+        ], (int) ($current->lock_version ?? 1), 'legacy-mark-complete-'.$current->id.'-'.Str::uuid());
 
-        AuditLogger::log('fleet.service_schedule.mark_complete', $schedule, [
-            'schedule_id' => $schedule->id,
-        ]);
-
-        return back()->with('success', 'Schedule marked as completed.');
+        return back()->with('success', 'Service recorded. The next due date moved on from today.');
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'asset_id' => ['required', 'integer', 'exists:assets,id'],
+            'asset_id' => ['required', 'integer'],
             'name' => ['required', 'string', 'max:255'],
             'interval_km' => ['nullable', 'integer', 'min:1'],
             'interval_days' => ['nullable', 'integer', 'min:1'],
-            'last_completed_at' => ['nullable', 'date'],
-            'last_completed_km' => ['nullable', 'numeric', 'min:0'],
             'next_due_at' => ['nullable', 'date'],
             'next_due_km' => ['nullable', 'numeric', 'min:0'],
         ]);
-
-        $schedule = FleetServiceSchedule::create($data);
-
-        AuditLogger::log('fleet.service_schedule.create', $schedule, [
-            'asset_id' => $data['asset_id'],
-            'name' => $data['name'],
-        ]);
+        $actor = $request->user() ?? abort(403);
+        app(VehicleServiceScheduleService::class)->save($actor, (int) $data['asset_id'], null, [
+            ...$data,
+            'next_due_at' => empty($data['next_due_at']) ? null : Carbon::parse($data['next_due_at'])->toDateString(),
+        ], null);
 
         return back()->with('success', 'Service schedule created.');
     }
@@ -228,18 +217,26 @@ class ServiceScheduleController extends Controller
             'name' => ['sometimes', 'string', 'max:255'],
             'interval_km' => ['nullable', 'integer', 'min:1'],
             'interval_days' => ['nullable', 'integer', 'min:1'],
-            'last_completed_at' => ['nullable', 'date'],
-            'last_completed_km' => ['nullable', 'numeric', 'min:0'],
             'next_due_at' => ['nullable', 'date'],
             'next_due_km' => ['nullable', 'numeric', 'min:0'],
             'is_active' => ['boolean'],
         ]);
-
-        $schedule->update($data);
-
-        AuditLogger::log('fleet.service_schedule.update', $schedule, [
-            'schedule_id' => $schedule->id,
-        ]);
+        $actor = $request->user() ?? abort(403);
+        $current = FleetServiceSchedule::query()->whereKey($schedule->getKey())->first() ?? abort(404);
+        app(VehicleServiceScheduleService::class)->save($actor, (int) $current->asset_id, (int) $current->id, [
+            'name' => $data['name'] ?? $current->name,
+            'interval_km' => array_key_exists('interval_km', $data) ? $data['interval_km'] : $current->interval_km,
+            'interval_days' => array_key_exists('interval_days', $data) ? $data['interval_days'] : $current->interval_days,
+            'interval_months' => $current->interval_months,
+            'next_due_at' => array_key_exists('next_due_at', $data)
+                ? ($data['next_due_at'] ? Carbon::parse($data['next_due_at'])->toDateString() : null)
+                : $current->next_due_at?->toDateString(),
+            'next_due_km' => array_key_exists('next_due_km', $data) ? $data['next_due_km'] : $current->next_due_km,
+            'owner_user_id' => $current->owner_user_id,
+            'reminder_days_before' => $current->reminder_days_before,
+            'reminder_km_before' => $current->reminder_km_before,
+            'is_active' => $data['is_active'] ?? $current->is_active,
+        ], (int) ($current->lock_version ?? 1));
 
         return back()->with('success', 'Service schedule updated.');
     }

@@ -434,11 +434,27 @@ export function BookVehicleWizard({
         step === 0 ? stepOneComplete : step === 1 ? stepTwoComplete : true;
 
     const submit = () => {
+        // The pickers hold Auckland wall time; send it as such so the server
+        // converts it (bookings are stored in UTC).
+        form.transform((data) => ({
+            ...data,
+            starts_local: data.starts_at,
+            ends_local: data.ends_at,
+            starts_at: undefined,
+            ends_at: undefined,
+        }));
         form.post('/fleet-assets/bookings', {
             // On success the server redirects to the new booking's detail page,
             // so no success pane is needed here.
             onError: (errors) => {
-                if (errors.asset_id || errors.starts_at || errors.ends_at)
+                const timeErrors = errors as Record<string, string | undefined>;
+                if (
+                    errors.asset_id ||
+                    errors.starts_at ||
+                    errors.ends_at ||
+                    timeErrors.starts_local ||
+                    timeErrors.ends_local
+                )
                     setStep(0);
                 else if (
                     errors.purpose ||

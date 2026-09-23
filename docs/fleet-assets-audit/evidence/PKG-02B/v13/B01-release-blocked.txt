@@ -1,0 +1,188 @@
+- strong: PKG-02B · v13
+- generic: Synthetic design · nothing is sent
+- text: Scenario
+- combobox
+- text: Recovery
+- combobox
+- button: Dark theme
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - generic: Tue, 22 September
+  - button: Report incident
+  - button:
+  - button:
+  - generic: AM
+- complementary:
+  - navigation:
+    - button:
+      - generic: Home
+    - button:
+      - generic: My day
+    - button:
+      - generic: Clients
+    - button:
+      - generic: Sites
+    - generic: Fleet & assets
+    - button:
+      - generic: Overview
+    - button:
+      - generic: Vehicles
+    - button:
+      - generic: Bookings
+    - button:
+      - generic: Maintenance
+    - button:
+      - generic: Assets
+    - button:
+      - generic: Reports
+    - button:
+      - generic: Settings
+  - button:
+- main:
+  - navigation:
+    - button: Home
+    - generic: ›
+    - button: Fleet & assets
+    - generic: ›
+    - button: Vehicles
+    - generic: ›
+    - generic: Kōwhai van › Maintenance
+  - button:
+  - button [disabled]:
+  - heading [level=1]: Routine service
+  - generic: Internal plan
+  - paragraph: WO-0268 · Kōwhai van · VH-014 Maintenance · Original record context
+  - button:
+    - generic: Find in this vehicle…
+    - generic: /
+  - button:
+    - text: Calendar
+  - button:
+    - text: Start check
+  - button: Report a problem
+  - button:
+    - generic: Vehicle
+    - generic: VH-014
+    - generic: Kōwhai van
+  - button:
+    - generic: Source
+    - generic: SCH-DEMO-07
+    - generic: Original service schedule
+  - button:
+    - generic: Restriction
+    - generic: Review
+    - generic: Separate release decision
+  - button:
+    - generic: Evidence
+    - generic: 0 linked files
+    - generic: Original records & notes
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button:
+    - text: Reminders & follow-up
+  - tablist:
+    - tab:
+      - generic: Overview
+    - tab:
+      - generic: Service & compliance
+    - tab:
+      - generic: Checks & inspections
+    - tab [selected]:
+      - generic: Maintenance
+    - tab:
+      - generic: Map
+    - tab:
+      - generic: Trip history
+    - button:
+      - generic: More
+    - button:
+      - generic: Find
+      - generic: /
+  - strong: Routine service · WO-0268
+  - generic: "Next: record work outcome · Kōwhai House Coordinator"
+  - generic: Internal plan
+  - button: Record outcome
+  - tablist:
+    - tab [selected]: Overview
+    - tab: Appointment
+    - tab: Evidence
+    - tab: Costs
+  - heading [level=2]: Work summary
+  - button: Update assessment
+  - term: Original source
+  - definition:
+    - button:
+      - text: SCH-DEMO-07
+  - term: Owner
+  - definition: Kōwhai House Coordinator
+  - term: Target date
+  - definition: 24 Sept 2026
+  - term: Outcome
+  - definition: Not recorded
+  - term: Completed
+  - definition: Not recorded
+  - term: Completion odometer
+  - definition: Not recorded
+  - generic: Assessment & completion notes
+  - paragraph: No assessment notes recorded yet.
+  - generic: Reporter feedback
+  - generic: Activity · 1 entries
+  - complementary:
+    - generic: VEHICLE CONTROL
+    - heading [level=2]: Release & custody
+    - paragraph: Check current readiness and record keys, checkout and return for each booking.
+    - button: Review vehicle release
+    - button:
+      - text: Back to vehicle
+  - generic: PKG-02B v13 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged
+- status:
+  - generic: WoF evidence updated; any repair/retest remains separate.
+  - button: Undo
+  - button: Dismiss
+- dialog "Review authorised release":
+  - heading "Review authorised release" [level=2]
+  - paragraph: Kōwhai van · VH-014 · Synthetic walkthrough
+  - complementary:
+    - generic: Review authorised release
+    - generic: KWH014 · Kōwhai House
+    - button "Independent review Original failed check, repairs and retest remain linked":
+      - generic: Independent review
+      - generic: Original failed check, repairs and retest remain linked
+    - button "Readiness review Review applicable evidence and custody":
+      - generic: Readiness review
+      - generic: Review applicable evidence and custody
+    - button "Review Confirm the resulting record":
+      - generic: Review
+      - generic: Confirm the resulting record
+    - generic: Completeness
+    - generic: 100%
+    - progressbar "Completeness"
+  - banner:
+    - generic: Step 1 of 3 · Independent review
+    - button "Close":
+  - strong: Kōwhai van
+  - generic: VH-014 · KWH014 · Kōwhai House
+  - alert:
+    - strong: Review before continuing
+    - paragraph: "WoF: assessment is unresolved."
+  - heading "Independent review" [level=2]
+  - paragraph: Original failed check, repairs and retest remain linked. Completion alone is insufficient.
+  - generic: Independent authorised reviewer
+  - combobox "Independent authorised reviewer":
+    - generic: Operations Manager
+  - generic: Approved-site synthetic record
+  - generic: Release assessment evidence reference
+  - textbox "Release assessment evidence reference": DEMO-B01-RELEASE
+  - generic: Decision
+  - combobox "Decision":
+    - option "Choose…"
+    - option "Keep restricted"
+    - option "Release for use" [selected]
+  - generic: Decision reason
+  - textbox "Decision reason": Synthetic B01 release gate regression.
+  - contentinfo:
+    - button "Cancel"
+    - button "Continue" [active]

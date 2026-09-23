@@ -1,0 +1,28 @@
+{
+  "at": "2026-09-22T00:06:36.122636+00:00",
+  "typescript": "pass: preview-scoped tsc --noEmit",
+  "vite": "pass: 2524 modules",
+  "warnings": [
+    "Main bundle >500kB",
+    "Leaflet static/dynamic import overlap"
+  ],
+  "identity": {
+    "version": "PKG-02B-v7",
+    "baseline": "5307692ec59be84f3503c06354419b7da95be805",
+    "worktree": "5b0a",
+    "model": "gpt-6-astra",
+    "effort": "xhigh",
+    "synthetic": true
+  },
+  "frozenFilesVerified": {
+    "v5": 72,
+    "v6": 65
+  },
+  "sourceAudit": {
+    "fieldDefinitions": 174,
+    "modalEntryPoints": 40
+  },
+  "recordWorkflowChecks": 8,
+  "productionApplicationChanged": false,
+  "mainNotified": false
+}

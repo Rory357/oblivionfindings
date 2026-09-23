@@ -57,20 +57,23 @@ class FleetHeroRolloutContractTest extends TestCase
 
     public function test_daily_check_and_vehicle_index_expose_live_compliance_badge_counts(): void
     {
-        // This contract verifies organisation-wide badge arithmetic. Cross-site
-        // totals are intentionally reserved for the explicit fleet manager bypass.
-        $user = $this->makeFleetUser(['fleet.manage']);
+        // This contract verifies organisation-wide badge arithmetic. Both pages
+        // count the vehicles the person may open (the vehicle profile's Site
+        // rule), so cross-site totals need the explicit all-sites permission.
+        $user = $this->makeFleetUser(['fleet.manage', 'securityDevices.devices.viewAllSites']);
         $site = Site::factory()->create();
 
         Asset::factory()->vehicle()->create([
             'wof_expires_at' => now()->addDays(10),
             'registration_expires_at' => now()->addDays(12),
             'cof_expires_at' => now()->addDays(14),
+            'insurance_expires_at' => now()->addDays(20),
         ]);
         Asset::factory()->vehicle()->create([
             'wof_expires_at' => now()->subDay(),
             'registration_expires_at' => now()->subDay(),
             'cof_expires_at' => now()->subDay(),
+            'insurance_expires_at' => now()->subDay(),
         ]);
 
         ControlRoomAlert::factory()->fromFleet()->open()->critical()->create(['site_id' => $site->id]);
@@ -89,8 +92,9 @@ class FleetHeroRolloutContractTest extends TestCase
                 ->where('compliance.rego_expired', 1)
                 ->where('compliance.cof_due', 1)
                 ->where('compliance.cof_expired', 1)
-                ->where('compliance.insurance_expiring', null)
-                ->where('compliance.insurance_expired', null)
+                // The vehicle profile's insurance expiry is counted like the other dates.
+                ->where('compliance.insurance_expiring', 1)
+                ->where('compliance.insurance_expired', 1)
                 ->where('compliance.open_alerts', 3)
                 ->where('compliance.critical_alerts', 1)
             );
@@ -106,8 +110,8 @@ class FleetHeroRolloutContractTest extends TestCase
                 ->where('compliance.rego_expired', 1)
                 ->where('compliance.cof_due', 1)
                 ->where('compliance.cof_expired', 1)
-                ->where('compliance.insurance_expiring', null)
-                ->where('compliance.insurance_expired', null)
+                ->where('compliance.insurance_expiring', 1)
+                ->where('compliance.insurance_expired', 1)
                 ->where('compliance.open_alerts', 3)
                 ->where('compliance.critical_alerts', 1)
             );

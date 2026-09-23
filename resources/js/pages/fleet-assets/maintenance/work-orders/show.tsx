@@ -88,6 +88,13 @@ function aucklandLocal(utc: string | null): string {
     return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
 }
 
+/** A vehicle profile view to go back to (?return=), when the work was opened from one. */
+function vehicleReturn(): string | null {
+    if (typeof window === 'undefined') return null;
+    const target = new URLSearchParams(window.location.search).get('return');
+    return target && /^\/fleet-assets\/vehicles\/\d+(\?[A-Za-z0-9_=&%.-]*)?$/.test(target) ? target : null;
+}
+
 export default function WorkOrderShow({ work_order: work, actions, checks, reports, restrictions, asset_active_restriction_ids, booking_impacts, attachments,
     finance, release_policy, repair_policy, release_readiness, retest_policy, retest_template, check_policy, check_template, hold_policy,
     task_link, task_scope_message, current_user_id, can }: Props) {
@@ -308,12 +315,12 @@ export default function WorkOrderShow({ work_order: work, actions, checks, repor
         });
     };
 
-    return <AppLayout breadcrumbs={[{ title: 'Fleet & Assets', href: '/fleet-assets' },
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Fleet & Assets', href: '/fleet-assets' },
         { title: 'Maintenance', href: '/fleet-assets/maintenance/work-orders' },
         { title: work.reference_number ?? `Work ${work.id}`, href: '#' }]}>
         <Head title={`${work.reference_number ?? 'Work order'} · ${work.title}`} />
         <PageShell>
-            <PageHeader variant="profile" icon={Wrench} backHref="/fleet-assets/maintenance/work-orders" wrapTitle className="overflow-clip!"
+            <PageHeader variant="profile" icon={Wrench} backHref={vehicleReturn() ?? '/fleet-assets/maintenance/work-orders'} wrapTitle className="overflow-clip!"
                 title={work.reference_number ?? `WO-${work.id}`}
                 titleChip={<PageHeaderStatusChip variant={assetHeld ? 'critical' : work.status === 'completed' ? 'success' : 'warning'}>
                     {assetHeld ? 'Restricted' : label(work.status)}</PageHeaderStatusChip>}

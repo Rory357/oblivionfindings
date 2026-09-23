@@ -160,6 +160,34 @@ function pkg01Site(): Site
     return Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
 }
 
+/**
+ * PKG-02B: release to service rechecks the vehicle's recorded compliance
+ * evidence. Record a valid set up front so each release refusal in these
+ * tests is caused by the maintenance rule it exercises.
+ */
+function pkg01ReadyVehicleEvidence(Asset $asset): void
+{
+    $evidence = [
+        'registration' => ['applicable', 'recorded', 'REG-PKG01', '2027-12-31', null],
+        'wof' => ['applicable', 'passed', 'WOF-PKG01', '2027-12-31', null],
+        'cof' => ['not_applicable', 'needs_assessment', null, null, 'Light vehicle; a WoF applies instead.'],
+        'ruc' => ['not_applicable', 'needs_assessment', null, null, 'Recorded by the fleet owner.'],
+    ];
+    foreach ($evidence as $kind => [$applicability, $outcome, $reference, $expires, $basis]) {
+        $recordId = DB::table('fleet_vehicle_compliance_records')->insertGetId([
+            'asset_id' => $asset->id, 'kind' => $kind, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $versionId = DB::table('fleet_vehicle_compliance_versions')->insertGetId([
+            'record_id' => $recordId, 'version' => 1, 'applicability' => $applicability,
+            'applicability_basis' => $basis, 'outcome' => $outcome, 'evidence_reference' => $reference,
+            'expires_on' => $expires, 'request_key' => "pkg01-evidence-{$kind}",
+            'request_fingerprint' => str_repeat('e', 64), 'content_sha256' => str_repeat('e', 64),
+            'created_at' => now(),
+        ]);
+        DB::table('fleet_vehicle_compliance_records')->where('id', $recordId)->update(['current_version_id' => $versionId]);
+    }
+}
+
 test('approved configuration versions route, rule and reviewer decisions without default grants', function () {
     $site = pkg01Site();
     $otherSite = pkg01Site();
@@ -760,6 +788,7 @@ test('release requires an independent category-granted reviewer, current passing
     $reviewer = pkg01StaffAt($site, ['fleet.maintenance.release']);
     $recipient = pkg01StaffAt($site);
     $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle']);
+    pkg01ReadyVehicleEvidence($asset);
     $order = FleetWorkOrder::create([
         'asset_id' => $asset->id, 'reported_by_user_id' => $manager->id,
         'assigned_to_user_id' => $manager->id, 'title' => 'Safety repair',
@@ -991,6 +1020,7 @@ test('a completed held repair can recover a new rule and enabled committed effec
     $reviewer = pkg01StaffAt($site, ['fleet.maintenance.release']);
     $recipient = pkg01StaffAt($site);
     $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle']);
+    pkg01ReadyVehicleEvidence($asset);
     $template = FleetChecklistTemplate::create([
         'name' => 'Synthetic automatic release retest', 'type' => 'custom',
         'items' => [['id' => 'brakes', 'label' => 'Brakes', 'required' => true]], 'is_active' => true,
@@ -1427,6 +1457,7 @@ test('Designer review: two completed jobs clear only their own holds while the a
     $manager = pkg01StaffAt($site, ['fleet.maintenance.manage']);
     $reviewer = pkg01StaffAt($site, ['fleet.maintenance.release']);
     $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle']);
+    pkg01ReadyVehicleEvidence($asset);
     $template = FleetChecklistTemplate::create(['name' => 'Synthetic two-job retest', 'type' => 'custom',
         'items' => [['id' => 'condition', 'label' => 'Condition', 'type' => 'select', 'options' => ['pass', 'fail']]], 'is_active' => true]);
     pkg01DesignerPolicy($site, $manager, 'hold', ['allowed_kinds' => ['safety']]);
@@ -1468,6 +1499,18 @@ test('Designer review: two completed jobs clear only their own holds while the a
     expect(fn () => $service->execute($reviewer, $orders[1]->id, 'release', 3, 'designer-two-stale-release'))
         ->toThrow(ValidationException::class);
     expect($retest($orders[1], 'designer-two-current-retest')->outcome)->toBe('passed');
+    // PKG-02B: an unresolved compliance assessment keeps release to service
+    // blocked, even when the repair, retest and reviewer are all in order.
+    $wof = DB::table('fleet_vehicle_compliance_records')->where('asset_id', $asset->id)->where('kind', 'wof')->first();
+    $unresolved = DB::table('fleet_vehicle_compliance_versions')->insertGetId([
+        'record_id' => $wof->id, 'version' => 2, 'supersedes_version_id' => $wof->current_version_id,
+        'applicability' => 'applicable', 'outcome' => 'needs_assessment', 'request_key' => 'pkg01-wof-unresolved',
+        'request_fingerprint' => str_repeat('f', 64), 'content_sha256' => str_repeat('f', 64), 'created_at' => now(),
+    ]);
+    DB::table('fleet_vehicle_compliance_records')->where('id', $wof->id)->update(['current_version_id' => $unresolved]);
+    expect(fn () => $service->execute($reviewer, $orders[1]->id, 'release', 3, 'designer-two-release-unresolved-wof'))
+        ->toThrow(ValidationException::class, 'WoF: assessment is unresolved.');
+    DB::table('fleet_vehicle_compliance_records')->where('id', $wof->id)->update(['current_version_id' => $wof->current_version_id]);
     $service->execute($reviewer, $orders[1]->id, 'release', 3, 'designer-two-release-2');
     expect(DB::table('fleet_maintenance_restrictions')->where('asset_id', $asset->id)->where('state', 'active')->count())->toBe(0);
     app(MaintenanceRestrictionService::class)->assertBookable($asset->id);

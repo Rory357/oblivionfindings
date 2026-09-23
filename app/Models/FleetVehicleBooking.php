@@ -22,6 +22,18 @@ class FleetVehicleBooking extends Model
         'reference_number',
         'asset_id',
         'user_id',
+        'driver_user_id',
+        'pickup_arrangement',
+        'lock_version',
+        'checkout_condition',
+        'checkout_evidence_reference',
+        'checkout_notes',
+        'return_evidence_reference',
+        'cancellation_reason',
+        'cancelled_by',
+        'cancelled_at',
+        'request_key',
+        'request_fingerprint',
         'approved_by_user_id',
         'purpose',
         'passengers',
@@ -40,6 +52,12 @@ class FleetVehicleBooking extends Model
         'odometer_out',
         'odometer_in',
         'status',
+        'approval_route',
+        'approval_not_required_reason',
+        'approval_not_required_evidence',
+        'approval_authority_recorded_by',
+        'approval_authority_recorded_at',
+        'approved_at',
         'review_required',
         'review_reason',
         'review_flagged_at',
@@ -54,11 +72,15 @@ class FleetVehicleBooking extends Model
         'ends_at' => 'datetime',
         'checked_out_at' => 'datetime',
         'returned_at' => 'datetime',
+        'approval_authority_recorded_at' => 'datetime',
+        'approved_at' => 'datetime',
         'review_required' => 'boolean',
         'review_flagged_at' => 'datetime',
         'odometer_out' => 'decimal:1',
         'odometer_in' => 'decimal:1',
         'passengers' => 'integer',
+        'lock_version' => 'integer',
+        'cancelled_at' => 'datetime',
     ];
 
     public function asset(): BelongsTo
@@ -69,6 +91,27 @@ class FleetVehicleBooking extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** The named driver; the requester drives when none is recorded. */
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'driver_user_id');
+    }
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    public function keyLogs(): HasMany
+    {
+        return $this->hasMany(FleetKeyLog::class, 'booking_id');
+    }
+
+    public function driverUserId(): int
+    {
+        return (int) ($this->driver_user_id ?: $this->user_id);
     }
 
     public function approvedBy(): BelongsTo
