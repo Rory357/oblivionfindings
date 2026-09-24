@@ -22,6 +22,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 function wfAvailabilityGrant(User $user, array $permissionKeys): void
 {
@@ -480,6 +481,7 @@ test('completed offboarding cannot be cancelled or resumed into contradictory em
 });
 
 test('availability activation and cancellation serialize on one shift across two MySQL workers', function () {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     expect(DB::connection()->getDriverName())->toBe('mysql');
 
     $shift = ($this->makeShift)();

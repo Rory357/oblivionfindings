@@ -559,6 +559,7 @@ class MaintenanceTransitionService
         $ruled = $run->rule_version_id !== null;
 
         return match (true) {
+            ($run->check_kind ?? null) === FleetChecklistRun::KIND_DAILY => 'Daily checks don’t stop the vehicle being used, so there’s nothing to release.',
             ($run->check_kind ?? 'check') !== 'check' => 'A retest is resolved when its Maintenance work is released.',
             ! $blocking => 'This check doesn’t stop the vehicle being used, so there’s nothing to release.',
             $ruled && $run->outcome === 'failed' => 'An approved check rule recorded a failure. Report it to Maintenance for repair, a retest and an independent release.',
@@ -705,13 +706,13 @@ class MaintenanceTransitionService
                 throw ValidationException::withMessages(['status' => 'A newer hold requires fresh retest and review.']);
             }
         }
-        // Submitted checks only, as readiness counts them: legacy daily checks
-        // without a submission time never hold a vehicle. A check Maintenance
-        // assessed as "no issue found" no longer counts either.
-        $newer = DB::table('fleet_checklist_runs')->where('asset_id', $order->asset_id)
-            ->where('id', '>', $retest->id)->whereNotNull('submitted_at')
+        // The same checks that block availability: daily checks and older
+        // unsubmitted rows are observations and never hold up a release. A
+        // check Maintenance assessed as "no issue found" no longer counts either.
+        $newer = MaintenanceRestrictionService::readinessChecks(DB::table('fleet_checklist_runs')->where('asset_id', $order->asset_id))
+            ->where('id', '>', $retest->id)
             ->where(fn ($query) => $query->whereNull('outcome')->orWhere('outcome', '!=', 'passed'))
-            ->orderBy('id')->lockForUpdate()->get(['id', 'outcome', 'rule_version_id', 'rule_snapshot_json'])
+            ->orderBy('id')->lockForUpdate()->get(['id', 'check_kind', 'outcome', 'rule_version_id', 'rule_snapshot_json'])
             ->filter(fn ($run) => MaintenanceRestrictionService::blocksAvailability($run))
             ->pluck('id')->map(fn ($id): int => (int) $id)->values()->all();
         if (array_diff($newer, $this->restrictions->assessedRunIds($newer, true)) !== []) {

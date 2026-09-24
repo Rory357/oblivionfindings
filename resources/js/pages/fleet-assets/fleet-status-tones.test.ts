@@ -16,8 +16,9 @@ describe('Fleet semantic status tones', () => {
         expect(dailyCheck).toMatch(
             /tone=\{\s*summary\.unchecked\s*>\s*0\s*\?\s*'warning'\s*:\s*'success'\s*}/,
         );
+        // Token tints only: no dark: pair on the good state (DESIGN.md).
         expect(dailyCheck).toMatch(
-            /vehicle\.checked_today\s*\?\s*vehicle\.check_result\s*===\s*'good'\s*\?\s*'border-primary\/30 bg-primary\/5 dark:bg-primary\/10'\s*:\s*'border-status-critical\/30 bg-status-critical-bg'\s*:\s*'border-status-warning\/30 bg-status-warning-bg'/,
+            /vehicle\.checked_today\s*\?\s*vehicle\.check_result\s*===\s*'good'\s*\?\s*'border-primary\/30 bg-primary\/5'\s*:\s*'border-status-critical\/30 bg-status-critical-bg'\s*:\s*'border-status-warning\/30 bg-status-warning-bg'/,
         );
         expect(dailyCheck).toMatch(
             /<Clock\b[^>]*className="(?=[^"]*\bshrink-0\b)(?=[^"]*\btext-status-warning\b)[^"]*"[^>]*\/>/,

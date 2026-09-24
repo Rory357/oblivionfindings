@@ -24,13 +24,14 @@ import {
     ShieldCheck,
     Wrench,
 } from 'lucide-react';
-import { ASSESSED_LABEL } from './checks-model';
+import { ASSESSED_LABEL, outcomeLabel } from './checks-model';
 import './studio.css';
 import type { VehicleWorkspace } from './types';
 import {
     checkOverdue,
     formatKm,
     headerStatus,
+    lastCheck,
     SOURCE_KIND_LABELS,
     type MainTab,
     type WorkspaceLocation,
@@ -53,9 +54,6 @@ export const MAIN_RAIL: PageHeaderRailItem<MainTab>[] = [
     { key: 'trips', label: 'Trip history', icon: Route },
     { key: 'calendar', label: 'Calendar', icon: CalendarDays },
 ];
-
-const sentence = (value: string) =>
-    value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
 
 export function VehicleHeader({
     workspace,
@@ -102,6 +100,7 @@ export function VehicleHeader({
     );
     const hold = work.active_restrictions > 0;
     const overdueCheck = checkOverdue(workspace, workspace.as_of.slice(0, 10));
+    const last = lastCheck(checks);
     const maintenanceValue = !work.can_view
         ? 'Not available'
         : hold
@@ -246,24 +245,22 @@ export function VehicleHeader({
                         onClick={() => onNavigate({ tab: 'checks' })}
                     >
                         <PageHeaderMeterBig>
-                            {!checks.latest
+                            {!last
                                 ? 'No record'
                                 : overdueCheck
                                   ? 'Overdue'
-                                  : checks.latest.assessed
+                                  : last.assessed
                                     ? ASSESSED_LABEL
-                                    : checks.latest.outcome
-                                      ? sentence(checks.latest.outcome)
+                                    : last.outcome
+                                      ? outcomeLabel(last.outcome)
                                       : 'Submitted'}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
-                            {checks.latest
+                            {last
                                 ? [
-                                      `CHK-${checks.latest.id}`,
-                                      checks.latest.template,
-                                      checks.latest.assessed
-                                          ? 'Released for use'
-                                          : null,
+                                      `CHK-${last.id}`,
+                                      last.template,
+                                      last.assessed ? 'Released for use' : null,
                                   ]
                                       .filter(Boolean)
                                       .join(' · ')

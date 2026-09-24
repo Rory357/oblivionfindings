@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class MedicationRoundCompletionConcurrencyTest extends TestCase
@@ -27,6 +28,7 @@ class MedicationRoundCompletionConcurrencyTest extends TestCase
 
     public function test_mysql_completion_waits_for_a_concurrent_verification_and_sees_the_new_canonical_item(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         Carbon::setTestNow(Carbon::parse('2026-08-28 10:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
         $workerToday = Carbon::today(config('app.worker_timezone', 'Pacific/Auckland'));
         $connection = DB::connection();

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetCategory;
 use App\Models\AssetAssignment;
+use App\Models\AssetDocument;
 use App\Models\Client;
 use App\Models\ClientEmergencyContact;
 use App\Models\Site;
@@ -41,6 +42,42 @@ class AssetController extends Controller
             'returned_at' => optional($assignment->released_at)->toISOString(),
             'purpose' => $assignment->purpose,
         ];
+    }
+
+    /**
+     * A register row for an asset file. Only files that may be opened get a
+     * link; the register route hands vehicle files to the vehicle profile's
+     * download, which rechecks access and the virus check.
+     */
+    private function mapAssetDocument(Asset $asset, AssetDocument $document): array
+    {
+        return [
+            'id' => $document->id,
+            'name' => $document->title ?: ($document->original_name ?: 'Document'),
+            'type' => $document->category ?: ($document->mime_type ?: 'document'),
+            'uploaded_at' => optional($document->created_at)->toISOString(),
+            'url' => $document->isOpenable() ? "/assets/{$asset->id}/documents/{$document->id}/download" : null,
+            'status' => $this->assetDocumentStatus($document),
+        ];
+    }
+
+    /** @return array{label: string, tone: string}|null */
+    private function assetDocumentStatus(AssetDocument $document): ?array
+    {
+        if ($document->isOpenable()) {
+            return $document->archived_at ? ['label' => 'Archived', 'tone' => 'neutral'] : null;
+        }
+
+        // The vehicle profile's wording for files still in (or stopped by) their virus check.
+        return match ($document->state) {
+            'reserved' => ['label' => 'Uploading', 'tone' => 'info'],
+            'stored' => ['label' => 'Checking', 'tone' => 'info'],
+            'scan_unavailable' => ['label' => 'Waiting for virus check', 'tone' => 'warning'],
+            'publication_failed' => ['label' => 'Needs retry', 'tone' => 'warning'],
+            'storage_failed' => ['label' => 'Upload failed', 'tone' => 'critical'],
+            'quarantined' => ['label' => 'Blocked: failed virus check', 'tone' => 'critical'],
+            default => ['label' => 'Not available', 'tone' => 'neutral'],
+        };
     }
 
     private function resolveAssignmentAssigneeName(AssetAssignment $assignment): string
@@ -423,15 +460,17 @@ class AssetController extends Controller
                 'last_seen_at' => optional($asset->fleetState->last_seen_at)->toISOString(),
                 'consent_blocked' => (bool) $asset->fleetState->consent_blocked,
             ] : null,
-            // PKG-02B vehicle finance: review evidence is listed only for Finance viewers.
-            'documents' => $asset->documents->reject(fn ($d) => $d->source_type === 'finance_review_request'
-                && ! $user->canDo('finance.assets.view'))->map(fn ($d) => [
-                'id' => $d->id,
-                'name' => $d->title ?: ($d->original_name ?: 'Document'),
-                'type' => $d->category ?: ($d->mime_type ?: 'document'),
-                'uploaded_at' => optional($d->created_at)->toISOString(),
-                'url' => "/assets/{$asset->id}/documents/{$d->id}/download",
-            ])->values(),
+            // Source-owned vehicle evidence (compliance, mileage, service,
+            // bookings, Finance review, the vehicle photo) stays with its record
+            // in the vehicle profile.
+            'documents' => $asset->documents->reject(fn (AssetDocument $d): bool => $d->isSourceOwned())
+                ->map(fn (AssetDocument $d): array => $this->mapAssetDocument($asset, $d))->values(),
+            // PKG-02B: a vehicle's documents are added and archived in the vehicle profile.
+            'vehicle_documents' => Asset::vehicles()->whereKey($asset->id)->exists() ? [
+                'url' => $user->canDo('fleet.viewAny')
+                    ? route('fleet-assets.vehicles.show', ['asset' => $asset->id, 'view' => 'documents'], false)
+                    : null,
+            ] : null,
             'inspections' => $asset->inspections->map(fn ($i) => [
                 'id' => $i->id,
                 'type' => 'Inspection',

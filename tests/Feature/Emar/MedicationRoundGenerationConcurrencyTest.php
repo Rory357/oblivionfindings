@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class MedicationRoundGenerationConcurrencyTest extends TestCase
@@ -22,6 +23,7 @@ class MedicationRoundGenerationConcurrencyTest extends TestCase
 
     public function test_two_mysql_workers_converge_on_one_template_date_round(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 

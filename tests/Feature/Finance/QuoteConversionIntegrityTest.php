@@ -17,6 +17,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 function quoteConversionActor(Site $site, array $permissions = ['finance.ar.manage']): User
 {
@@ -309,6 +310,7 @@ it('rolls back destination, lines, link, and number allocation as one command', 
 });
 
 it('backfills only matching legacy quote lineage and seeds the durable number floor', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
     $actor = quoteConversionActor($this->quoteSite);
@@ -418,6 +420,7 @@ it('backfills only matching legacy quote lineage and seeds the durable number fl
 });
 
 it('serializes same, cross-destination, lifecycle, and number races on MySQL', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
 

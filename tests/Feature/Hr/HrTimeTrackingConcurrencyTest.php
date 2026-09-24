@@ -22,6 +22,7 @@ use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 /** These shared-MySQL barrier tests must run without parallel workers. */
@@ -39,6 +40,7 @@ class HrTimeTrackingConcurrencyTest extends TestCase
 
     public function test_self_clock_in_and_clock_on_behalf_leave_exactly_one_active_entry(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         [$manager, $worker, $site, $client, $shift] = $this->commandFixture();
         $token = Str::uuid()->toString();
         $readyPaths = [
@@ -91,6 +93,7 @@ class HrTimeTrackingConcurrencyTest extends TestCase
 
     public function test_permission_revocation_while_waiting_on_mutex_conceals_target_and_writes_nothing(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         [$manager, $worker, $site, $client, $shift, $permission] = $this->commandFixture();
         $settingsAdmin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $settingsPermission = Permission::query()->where('key', 'settings.access.manage')->firstOrFail();
@@ -151,6 +154,7 @@ class HrTimeTrackingConcurrencyTest extends TestCase
 
     public function test_manager_profile_site_move_while_waiting_on_client_aggregate_writes_nothing(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         [$manager, $worker, $site, $client, $shift] = $this->commandFixture();
         $foreignSite = Site::factory()->create([
             'is_active' => true,
@@ -212,6 +216,7 @@ class HrTimeTrackingConcurrencyTest extends TestCase
 
     public function test_production_access_revocation_serializes_after_an_authorized_hr_command(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         [$manager, $worker, $site, $client, $shift, $permission] = $this->commandFixture();
         $settingsAdmin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $settingsPermission = Permission::query()->where('key', 'settings.access.manage')->firstOrFail();
@@ -266,6 +271,7 @@ class HrTimeTrackingConcurrencyTest extends TestCase
 
     public function test_production_role_revocations_win_before_a_waiting_hr_command_and_are_freshly_denied(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         DB::connection()->commit();
 
         foreach (['role_detach', 'role_permission_detach'] as $scenario) {
@@ -319,6 +325,7 @@ class HrTimeTrackingConcurrencyTest extends TestCase
 
     public function test_authorized_hr_command_serializes_before_production_role_revocations(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         DB::connection()->commit();
 
         foreach (['role_detach', 'role_permission_detach'] as $scenario) {
@@ -366,6 +373,7 @@ class HrTimeTrackingConcurrencyTest extends TestCase
 
     public function test_self_clock_in_rechecks_permission_and_profile_site_after_waiting_on_mutex(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         DB::connection()->commit();
 
         foreach (['permission_revoked', 'profile_site_moved', 'site_deactivated'] as $scenario) {
@@ -432,6 +440,7 @@ class HrTimeTrackingConcurrencyTest extends TestCase
 
     public function test_admin_end_permission_revocation_while_waiting_on_mutex_rolls_back_every_record(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         [$manager, $worker, $site, , $shift, $permission] = $this->commandFixture();
         $session = HrAttendanceSession::query()->create([
             'user_id' => $worker->id,
@@ -490,6 +499,7 @@ class HrTimeTrackingConcurrencyTest extends TestCase
 
     public function test_self_attendance_permission_revocation_blocks_clock_out_and_break_mutations_after_mutex_wait(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         DB::connection()->commit();
 
         foreach (['clockOut', 'startBreak', 'endBreak'] as $command) {
@@ -568,6 +578,7 @@ class HrTimeTrackingConcurrencyTest extends TestCase
 
     public function test_payroll_publication_wins_against_every_pay_affecting_timesheet_transition(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         [$manager, $worker, $site, $client] = $this->commandFixture();
         DB::connection()->commit();
 
@@ -656,6 +667,7 @@ class HrTimeTrackingConcurrencyTest extends TestCase
 
     public function test_timesheet_review_rechecks_permission_and_profile_site_after_waiting_on_payroll_mutex(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         DB::connection()->commit();
 
         foreach (['permission_revoked', 'profile_site_moved'] as $scenario) {
@@ -730,6 +742,7 @@ class HrTimeTrackingConcurrencyTest extends TestCase
 
     public function test_timesheet_draft_writes_recheck_exact_permission_ownership_and_site_after_waiting_on_payroll_mutex(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         DB::connection()->commit();
 
         $scenarios = [
