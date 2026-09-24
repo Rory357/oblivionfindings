@@ -70,9 +70,9 @@ class Pkg02bLegacyAssetDocumentRoutesTest extends TestCase
         $vehicle = $this->vehicle($this->site);
 
         $this->scanner->next = MalwareScanDisposition::Infected;
-        $infected = $this->upload($manager, $vehicle, 'infected', 'invoice.pdf');
+        $infected = $this->upload($manager, $vehicle, 'infected-upload', 'invoice.pdf');
         $this->scanner->next = MalwareScanDisposition::Unavailable;
-        $waiting = $this->upload($manager, $vehicle, 'waiting', 'warranty.pdf');
+        $waiting = $this->upload($manager, $vehicle, 'waiting-upload', 'warranty.pdf');
         $this->assertSame(['quarantined', 'scan_unavailable'], [$infected->state, $waiting->state]);
 
         $withheld = [$infected, $waiting];
@@ -100,7 +100,7 @@ class Pkg02bLegacyAssetDocumentRoutesTest extends TestCase
     {
         $manager = $this->manager();
         $vehicle = $this->vehicle($this->site);
-        $clean = $this->upload($manager, $vehicle, 'clean', 'policy.pdf');
+        $clean = $this->upload($manager, $vehicle, 'clean-upload', 'policy.pdf');
         $legacy = $this->legacyVehicleFile($vehicle);
         $photo = $this->uploadPhoto($manager, $vehicle);
 
@@ -302,7 +302,7 @@ class Pkg02bLegacyAssetDocumentRoutesTest extends TestCase
     private function uploadPhoto(User $actor, Asset $vehicle): AssetDocument
     {
         $this->actingAs($actor)->post("/fleet-assets/vehicles/{$vehicle->id}/photo", [
-            'photo' => UploadedFile::fake()->image('van.jpg'), 'request_key' => 'photo-'.$vehicle->id,
+            'photo' => UploadedFile::fake()->image('van.jpg'), 'request_key' => 'vehicle-photo-'.$vehicle->id,
         ], ['Accept' => 'application/json'])->assertOk();
 
         return AssetDocument::query()->findOrFail($vehicle->fresh()->profile_photo_document_id);
