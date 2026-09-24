@@ -7,8 +7,6 @@ use App\Models\FleetOuting;
 use App\Models\FleetOutingResident;
 use App\Models\FleetResidentTransport;
 use App\Models\Site;
-use App\Models\User;
-use App\Services\Fleet\FleetTripSiteScope;
 use App\Services\Fleet\ResidentTransportJourneyScope;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -45,13 +43,14 @@ class CommunityAccessController extends Controller
         $totalOutings = 0;
         $totalHours = 0;
 
-        // Gather outing data per resident — visible outings, visible residents only.
+        // Gather outing data per resident — visible outings, visible residents
+        // only, by the same outing rule as the Outings register.
         if ($hasOutings && $hasOutingResidents) {
             $user = $request->user();
-            $outingResidents = FleetOutingResident::query()
-                ->whereHas('outing', fn (Builder $outing) => $this->applyOutingScope($outing, $user)
+            $outingResidents = $this->journeyScope
+                ->applyOutingResidentScope(FleetOutingResident::query(), $user)
+                ->whereHas('outing', fn (Builder $outing) => $this->journeyScope->applyOutingScope($outing, $user)
                     ->where('created_at', '>=', $since))
-                ->whereHas('client', fn (Builder $client) => $this->journeyScope->applyClientScope($client, $user))
                 ->with([
                     'outing:id,planned_departure,planned_return,actual_departure,actual_return,status',
                     'client:id,first_name,last_name,site_id',
@@ -119,7 +118,7 @@ class CommunityAccessController extends Controller
                 $weekStart = $weekStart->copy()->addDays(7);
             }
 
-            $weeklyCounts = $this->applyOutingScope(FleetOuting::query(), $user)
+            $weeklyCounts = $this->journeyScope->applyOutingScope(FleetOuting::query(), $user)
                 ->where('created_at', '>=', $since)
                 ->selectRaw('FLOOR(DATEDIFF(created_at, ?) / 7) as week_index, COUNT(*) as cnt', [$since->toDateString()])
                 ->groupBy('week_index')
@@ -229,22 +228,5 @@ class CommunityAccessController extends Controller
                 'access_target_pct' => $accessTargetPct,
             ],
         ]);
-    }
-
-    /**
-     * The outing rule ResidentTrackingController::applyOutingScope applies:
-     * an outing is visible when its vehicle is, and it carries at least one
-     * resident the viewer may see. Here both sides use the Fleet report
-     * boundary (approved Sites, `fleet.manage` bypass).
-     */
-    private function applyOutingScope(Builder $query, ?User $user): Builder
-    {
-        $vehicles = FleetTripSiteScope::vehicles(
-            $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS),
-        );
-
-        return $query
-            ->whereIn($query->qualifyColumn('asset_id'), $vehicles->select('assets.id'))
-            ->whereHas('clients', fn (Builder $clients) => $this->journeyScope->applyClientScope($clients, $user));
     }
 }
