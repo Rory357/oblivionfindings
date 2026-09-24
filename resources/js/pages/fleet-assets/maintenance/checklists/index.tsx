@@ -1,3 +1,7 @@
+import {
+    outcomeLabel,
+    outcomeTone,
+} from '@/components/fleet-assets/vehicle-workspace/checks-model';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +14,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/fleet-utils';
@@ -55,7 +60,8 @@ type ChecklistRun = {
     asset: { id: number; name: string; asset_tag: string | null } | null;
     user: { id: number; name: string } | null;
     passed: boolean;
-    outcome: 'passed' | 'failed' | 'needs_assessment' | null;
+    /** passed | failed | needs_assessment, or a daily check's no_issue_recorded | issue_recorded. */
+    outcome: string | null;
     responses: Record<string, any> | null;
     completed_at: string | null;
     created_at: string | null;
@@ -522,9 +528,9 @@ export default function ChecklistsIndex({
                                         className="flex items-center justify-between rounded-md border p-3 text-sm"
                                     >
                                         <div className="flex items-center gap-3">
-                                            {run.outcome === 'passed' ? (
+                                            {outcomeTone(run.outcome) === 'success' ? (
                                                 <CheckCircle className="h-5 w-5 text-status-success" />
-                                            ) : run.outcome === 'failed' ? (
+                                            ) : outcomeTone(run.outcome) === 'critical' ? (
                                                 <XCircle className="h-5 w-5 text-status-critical" />
                                             ) : <CircleHelp className="h-5 w-5 text-status-warning" />}
                                             <div>
@@ -557,15 +563,9 @@ export default function ChecklistsIndex({
                                                 </div>
                                             </div>
                                         </div>
-                                        <Badge
-                                            variant={
-                                                run.outcome === 'passed'
-                                                    ? 'default'
-                                                    : run.outcome === 'failed' ? 'destructive' : 'outline'
-                                            }
-                                        >
-                                            {run.outcome === 'passed' ? 'Passed' : run.outcome === 'failed' ? 'Failed' : 'Needs assessment'}
-                                        </Badge>
+                                        <StatusBadge variant={outcomeTone(run.outcome)}>
+                                            {outcomeLabel(run.outcome)}
+                                        </StatusBadge>
                                     </div>
                                 ))}
                             </div>

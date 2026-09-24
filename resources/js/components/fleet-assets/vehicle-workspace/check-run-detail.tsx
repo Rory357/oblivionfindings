@@ -19,6 +19,7 @@ import {
 import { useState } from 'react';
 import { LockedVehicle } from './checks-kit';
 import {
+    DAILY_CHECK_KIND,
     outcomeLabel,
     outcomeTone,
     vehicleShort,
@@ -190,11 +191,20 @@ export function RunDetailDialog({
                                             'No additional notes recorded.'}
                                     </p>
                                 </ReviewCard>
-                                <StudioNotice title="The check is evidence, not a release">
-                                    The original outcome stays with this
-                                    submission. Maintenance assessment and any
-                                    authorised release remain separate.
-                                </StudioNotice>
+                                {run.check_kind === DAILY_CHECK_KIND ? (
+                                    <StudioNotice title="Daily checks don’t stop bookings">
+                                        This daily check is kept as recorded for
+                                        follow-up. It doesn’t change bookings or
+                                        a maintenance release. Create or link
+                                        maintenance if something needs repair.
+                                    </StudioNotice>
+                                ) : (
+                                    <StudioNotice title="The check is evidence, not a release">
+                                        The original outcome stays with this
+                                        submission. Maintenance assessment and
+                                        any authorised release remain separate.
+                                    </StudioNotice>
+                                )}
                             </>
                         )}
                         {section === 1 && (

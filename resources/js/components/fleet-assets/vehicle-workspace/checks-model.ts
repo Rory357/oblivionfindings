@@ -14,16 +14,25 @@ export function versionLabel(version: number | null | undefined): string {
     return version ? `Version ${version}` : 'Version not recorded';
 }
 
+/**
+ * Daily checks are recorded observations: no approved rule evaluates them, so
+ * they read "No issue recorded" or "Issue recorded", never Passed or Failed.
+ */
+export const DAILY_CHECK_KIND = 'daily';
+
 export function outcomeLabel(outcome: string | null | undefined): string {
     if (outcome === 'passed') return 'Passed';
     if (outcome === 'failed') return 'Failed';
+    if (outcome === 'no_issue_recorded') return 'No issue recorded';
+    if (outcome === 'issue_recorded') return 'Issue recorded';
     return 'Needs assessment';
 }
 
 export function outcomeTone(
     outcome: string | null | undefined,
 ): 'success' | 'critical' | 'warning' {
-    if (outcome === 'passed') return 'success';
+    if (outcome === 'passed' || outcome === 'no_issue_recorded')
+        return 'success';
     if (outcome === 'failed') return 'critical';
     return 'warning';
 }

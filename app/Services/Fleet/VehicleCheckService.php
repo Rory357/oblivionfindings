@@ -109,8 +109,8 @@ class VehicleCheckService
                 // A retry: the check service confirms it is the same submission.
                 return $this->checks->submit($actor, $data);
             }
-            $template = FleetChecklistTemplate::query()->whereKey($data['template_id'])->where('is_active', true)
-                ->lockForUpdate()->first() ?? abort(404);
+            $template = FleetChecklistTemplate::query()->maintenanceChecklists()->whereKey($data['template_id'])
+                ->where('is_active', true)->lockForUpdate()->first() ?? abort(404);
             $items = is_array($template->items) ? array_values($template->items) : [];
             abort_unless(hash_equals(MaintenanceFingerprint::of($items), (string) $input['items_sha256']), 409, self::CHANGED);
             $version = $this->library->ensureCurrentVersion($template);
@@ -243,7 +243,7 @@ class VehicleCheckService
             }
             abort_unless($version === $expected, 409,
                 'This vehicle’s check requirement changed while you were editing. Review the latest requirement before saving.');
-            $template = FleetChecklistTemplate::query()->whereKey($templateId)->where('is_active', true)->first();
+            $template = FleetChecklistTemplate::query()->maintenanceChecklists()->whereKey($templateId)->where('is_active', true)->first();
             $definition = $template !== null
                 ? $this->library->describe($template, $this->library->latestVersions([$templateId])[$templateId] ?? null)
                 : null;

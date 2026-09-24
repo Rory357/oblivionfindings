@@ -115,7 +115,9 @@ class ChecklistController extends Controller
         abort_unless($actor, 403);
         $siteIds = app(MaintenanceAccessService::class)->approvedSiteIds($actor);
 
+        // The daily checklist is recorded from the Daily checks page, never as a Maintenance check.
         $templates = FleetChecklistTemplate::query()
+            ->maintenanceChecklists()
             ->where('is_active', true)
             ->orderBy('name')
             ->get()

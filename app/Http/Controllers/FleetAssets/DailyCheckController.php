@@ -7,16 +7,24 @@ use App\Http\Controllers\Controller;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetChecklistRun;
 use App\Models\FleetChecklistTemplate;
+use App\Services\Fleet\VehicleDailyCheckService;
 use App\Services\UserSiteAccessService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
+/**
+ * The Daily checks page. Each check is recorded by VehicleDailyCheckService as
+ * its own submitted record: checking again adds a record, and daily checks
+ * never block bookings or a maintenance release.
+ */
 class DailyCheckController extends Controller
 {
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
         private readonly SecurityDevicesAccessService $vehicleAccess,
+        private readonly VehicleDailyCheckService $dailyChecks,
     ) {}
 
     public function index(Request $request)
@@ -38,29 +46,32 @@ class DailyCheckController extends Controller
 
         $vehicles = $query->orderBy('name')->get(['id', 'name', 'asset_tag', 'status']);
 
-        // Get today's checks
-        $today = now()->startOfDay();
+        // Today's checks on the Auckland calendar, newest first. Each check is
+        // its own record, so the card shows the latest and counts the rest.
+        $today = CarbonImmutable::now((string) config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay()->utc();
         $todayChecks = FleetChecklistRun::query()
             ->whereIn('asset_id', $vehicles->pluck('id'))
             ->where('completed_at', '>=', $today)
-            ->whereHas('template', function ($q) {
-                $q->where('type', 'daily_check');
-            })
+            ->whereHas('template', fn ($q) => $q->where('type', FleetChecklistTemplate::TYPE_DAILY_CHECK))
+            ->with('user:id,name')
+            ->orderByDesc('completed_at')->orderByDesc('id')
             ->get()
-            ->keyBy('asset_id');
+            ->groupBy('asset_id');
 
         $vehicleData = $vehicles->map(function ($v) use ($todayChecks) {
-            $check = $todayChecks->get($v->id);
+            $checks = $todayChecks->get($v->id) ?? collect();
+            $check = $checks->first();
             return [
                 'id' => $v->id,
                 'name' => $v->name,
                 'asset_tag' => $v->asset_tag,
                 'status' => $v->status,
                 'checked_today' => $check !== null,
+                'checks_today' => $checks->count(),
                 'check_result' => $check ? ($check->passed ? 'good' : 'issue') : null,
-                'check_notes' => $check?->notes,
+                'check_notes' => $check ? $this->dailyChecks->notes($check) : null,
                 'checked_at' => $check?->completed_at?->toISOString(),
-                'checked_by' => $check?->user?->name ?? null,
+                'checked_by' => $check?->user?->name,
             ];
         })->values();
 
@@ -128,68 +139,27 @@ class DailyCheckController extends Controller
                 'open_alerts' => $openAlerts,
                 'critical_alerts' => $criticalAlerts,
             ],
+            'can' => [
+                // Recorded checks are reviewed on the vehicle profile.
+                'view_vehicles' => (bool) $user?->canDo('fleet.viewAny'),
+            ],
         ]);
     }
 
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'asset_id' => ['required', 'integer'],
-            'condition' => ['required', 'string', 'in:good,issue'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-        ]);
-        // A vehicle outside the person's fleet site scope (or missing) is not found.
-        $asset = $this->vehicleAccess->accessibleVehiclesForFleet($request->user())
-            ->whereKey((int) $data['asset_id'])->first() ?? abort(404);
-        $data['asset_id'] = (int) $asset->id;
-
-        // Find or create the daily_check template
-        $template = FleetChecklistTemplate::firstOrCreate(
-            ['type' => 'daily_check'],
-            [
-                'name' => 'Daily Vehicle Check',
-                'type' => 'daily_check',
-                'items' => [
-                    ['label' => 'Visual Condition', 'type' => 'select', 'options' => ['good', 'issue']],
-                    ['label' => 'Notes', 'type' => 'text'],
-                ],
-                'is_active' => true,
-            ]
+        $data = $request->validate(['asset_id' => ['required', 'integer']]);
+        // A vehicle outside the person's fleet site scope (or missing) is not
+        // found; the service resolves it again under its lock.
+        $run = $this->dailyChecks->record(
+            $request->user(),
+            (int) $data['asset_id'],
+            $request->only(['condition', 'notes']),
+            (string) $request->input('request_key', ''),
         );
 
-        // Check if already checked today
-        $today = now()->startOfDay();
-        $existing = FleetChecklistRun::query()
-            ->where('asset_id', $data['asset_id'])
-            ->where('template_id', $template->id)
-            ->where('completed_at', '>=', $today)
-            ->first();
-
-        if ($existing) {
-            // Update existing check
-            $existing->update([
-                'responses' => [
-                    'condition' => $data['condition'],
-                ],
-                'passed' => $data['condition'] === 'good',
-                'notes' => $data['notes'] ?? null,
-                'user_id' => $request->user()->id,
-                'completed_at' => now(),
-            ]);
-        } else {
-            FleetChecklistRun::create([
-                'template_id' => $template->id,
-                'asset_id' => $data['asset_id'],
-                'user_id' => $request->user()->id,
-                'responses' => [
-                    'condition' => $data['condition'],
-                ],
-                'passed' => $data['condition'] === 'good',
-                'notes' => $data['notes'] ?? null,
-                'completed_at' => now(),
-            ]);
-        }
-
-        return back()->with('success', 'Daily check recorded.');
+        return back()->with('success', $run->outcome === FleetChecklistRun::OUTCOME_ISSUE
+            ? 'Daily check recorded with an issue. The vehicle can still be booked, so tell your coordinator or report it to Maintenance.'
+            : 'Daily check recorded.');
     }
 }

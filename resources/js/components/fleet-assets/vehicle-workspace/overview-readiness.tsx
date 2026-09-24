@@ -23,6 +23,7 @@ import {
     blockingReasons,
     checkOverdue,
     complianceIssue,
+    dailyIssue,
     formatKm,
     headerStatus,
     reasonDestination,
@@ -64,7 +65,7 @@ export function ReadinessPanel({
         ? reasonDestination(firstIssue)
         : workspace.schedules.some((schedule) => schedule.overdue)
           ? { tab: 'service', view: 'schedules' }
-          : checkOverdue(workspace, today)
+          : checkOverdue(workspace, today) || dailyIssue(workspace)
             ? { tab: 'checks', view: 'recent' }
             : { tab: 'service', view: 'evidence' };
     // 9 am on the due date when that's still ahead (Auckland wall time).

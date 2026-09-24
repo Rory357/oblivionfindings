@@ -486,10 +486,12 @@ class MaintenanceTransitionService
                 throw ValidationException::withMessages(['status' => 'A newer hold requires fresh retest and review.']);
             }
         }
-        if (DB::table('fleet_checklist_runs')->where('asset_id', $order->asset_id)
+        // The same checks that block availability: daily checks and older
+        // unsubmitted rows are observations and never hold up a release.
+        if (MaintenanceRestrictionService::readinessChecks(DB::table('fleet_checklist_runs')->where('asset_id', $order->asset_id))
             ->where('id', '>', $retest->id)
             ->where(fn ($query) => $query->whereNull('outcome')->orWhere('outcome', '!=', 'passed'))
-            ->lockForUpdate()->get(['outcome', 'rule_version_id', 'rule_snapshot_json'])
+            ->lockForUpdate()->get(['check_kind', 'outcome', 'rule_version_id', 'rule_snapshot_json'])
             ->contains(fn ($run) => MaintenanceRestrictionService::blocksAvailability($run))) {
             throw ValidationException::withMessages(['status' => 'A newer unresolved check prevents release.']);
         }

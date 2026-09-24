@@ -411,13 +411,13 @@ class Pkg02bVehicleChecksTest extends TestCase
         $vehicle = $this->vehicle($this->site);
         $foreign = $this->vehicle($this->foreignSite);
 
-        $this->actingAs($user)->post('/fleet-assets/daily-check', ['asset_id' => $foreign->id, 'condition' => 'issue'])
+        $this->actingAs($user)->post('/fleet-assets/daily-check', ['asset_id' => $foreign->id, 'condition' => 'issue', 'request_key' => 'daily-foreign'])
             ->assertNotFound();
-        $this->actingAs($user)->post('/fleet-assets/daily-check', ['asset_id' => 999999, 'condition' => 'good'])
+        $this->actingAs($user)->post('/fleet-assets/daily-check', ['asset_id' => 999999, 'condition' => 'good', 'request_key' => 'daily-missing'])
             ->assertNotFound();
         $this->assertSame(0, FleetChecklistRun::query()->count());
 
-        $this->actingAs($user)->post('/fleet-assets/daily-check', ['asset_id' => $vehicle->id, 'condition' => 'good'])
+        $this->actingAs($user)->post('/fleet-assets/daily-check', ['asset_id' => $vehicle->id, 'condition' => 'good', 'request_key' => 'daily-own-site'])
             ->assertRedirect();
         $this->assertSame([$vehicle->id], FleetChecklistRun::query()->pluck('asset_id')->map(fn ($id): int => (int) $id)->all());
 
