@@ -1320,11 +1320,16 @@ test('Designer review: actual default administrator seeding withholds safety con
 test('Designer review: authored template configures and records standalone check evidence without inventing work', function () {
     Storage::fake('private');
     $site = pkg01Site();
-    $actor = pkg01StaffAt($site, ['fleet.maintenance.manage', 'fleet.maintenance.configure', 'fleet.viewAny']);
+    $actor = pkg01StaffAt($site, ['fleet.maintenance.manage', 'fleet.maintenance.configure', 'fleet.viewAny', 'fleet.settings.manage']);
     $backup = pkg01StaffAt($site);
     $foreign = pkg01StaffAt(pkg01Site(), ['fleet.maintenance.manage', 'fleet.viewAny']);
     $reader = pkg01StaffAt($site, ['fleet.viewAny']);
     $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle']);
+    // A checklist created here is offered to every vehicle: a fleet-wide setting.
+    $this->actingAs($foreign)->post('/fleet-assets/maintenance/checklists', [
+        'name' => 'Site manager template', 'items' => [['label' => 'Condition', 'type' => 'select', 'options' => ['pass', 'fail']]],
+    ])->assertForbidden();
+    expect(FleetChecklistTemplate::query()->where('name', 'Site manager template')->exists())->toBeFalse();
     $this->actingAs($actor)->post('/fleet-assets/maintenance/checklists', [
         'name' => 'Designer authored template', 'items' => [
             ['label' => 'Condition observed', 'type' => 'select', 'options' => ['pass', 'fail'], 'required' => true],

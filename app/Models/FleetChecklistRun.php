@@ -7,6 +7,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FleetChecklistRun extends Model
 {
+    /**
+     * A daily check from the Daily checks page: a recorded observation that
+     * no approved rule evaluates, so it never affects availability or release.
+     */
+    public const KIND_DAILY = 'daily';
+
+    /** Daily check outcomes; Passed and Failed need an approved check rule. */
+    public const OUTCOME_NO_ISSUE = 'no_issue_recorded';
+
+    public const OUTCOME_ISSUE = 'issue_recorded';
+
     // Preserve the microsecond ordering between an attestation and its new
     // retest. MySQL stores submitted_at at DATETIME(6) precision.
     protected $dateFormat = 'Y-m-d H:i:s.u';

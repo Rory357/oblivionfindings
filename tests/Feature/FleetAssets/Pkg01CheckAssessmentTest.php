@@ -514,6 +514,9 @@ class Pkg01CheckAssessmentTest extends TestCase
                 ->where('workspace.checks.latest.id', $runId)
                 ->where('workspace.checks.latest.assessed', true)
                 ->where('workspace.readiness.check_run_ids', [])
+                // Its work no longer carries the check's warning.
+                ->where('workspace.work.open.0.id', $workId)
+                ->where('workspace.work.open.0.source.failed_check', false)
                 ->etc());
 
         $this->actingAs($assessor)->get("/fleet-assets/maintenance/work-orders/{$workId}")->assertOk()
