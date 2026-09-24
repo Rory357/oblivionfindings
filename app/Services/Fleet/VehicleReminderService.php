@@ -294,7 +294,7 @@ class VehicleReminderService
     {
         $current = User::query()->findOrFail($actor->id);
         abort_unless($this->canManage($current), 403);
-        $asset = $this->access->assignableVehicle($current, $assetId, true) ?? abort(404);
+        $asset = $this->access->fleetVehicle($current, $assetId, true) ?? abort(404);
 
         return [$current, $asset];
     }

@@ -302,7 +302,9 @@ class Pkg02bVehicleDrivingAlertsTest extends TestCase
 
     public function test_a_published_scoring_policy_versions_the_weights_and_gates_a_persons_score(): void
     {
-        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage']);
+        // The policy scores drivers at every Site: a fleet-wide setting.
+        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage', 'fleet.settings.manage']);
+        $siteManager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage']);
         $tripManager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.trips.manage']);
         $jamie = $this->siteUser([$this->site], [], 'Jamie Taylor');
         $vehicle = $this->vehicle($this->site);
@@ -347,6 +349,9 @@ class Pkg02bVehicleDrivingAlertsTest extends TestCase
             'confirmed' => true, 'expected_version' => 1,
         ];
         $this->actingAs($tripManager)->withHeader('Idempotency-Key', 'policy-trip-manager')
+            ->postJson($url, $policy)->assertForbidden();
+        $this->actingAs($siteManager)->getJson($mine)->assertOk()->assertJsonPath('can.manage_policy', false);
+        $this->actingAs($siteManager)->withHeader('Idempotency-Key', 'policy-site-manager')
             ->postJson($url, $policy)->assertForbidden();
         $this->actingAs($manager)->withHeader('Idempotency-Key', 'policy-bad-coverage')
             ->postJson($url, ['coverage' => 40] + $policy)->assertUnprocessable()->assertJsonValidationErrors('coverage');

@@ -137,14 +137,19 @@ import {
     addDays,
     AgendaView,
     Avatar,
+    CalendarContextMenu,
+    CalendarSourcePills,
     CalendarUIProvider,
     DayView,
     decorate,
     endOfMonth,
     fmtTime,
     fmtTimeRange,
-    MiniMonth,
+    JumpToDate,
     MO,
+    periodLabel,
+    viewRange,
+    type CalView,
     MonthView,
     sameDay,
     SourceDot,
@@ -227,7 +232,8 @@ export interface SiteCalendarProps {
     dataAdapter?: CalendarDataAdapter;
 }
 
-export type CalView = 'month' | 'week' | 'day' | 'agenda' | 'timeline';
+// The view type lives with the shared calendar parts; re-exported for adapters.
+export type { CalView };
 
 /** Seed for the create dialog when opened from the right-click QuickAdd menu. */
 export type CreateSeed = { date: Date; hour?: number; eventType?: string };
@@ -485,97 +491,6 @@ function TypeIcon({
 }) {
     const C = (icon && TYPE_ICONS[icon]) || CalendarDays;
     return <C className={className} />;
-}
-
-function viewRange(view: CalView, navDate: Date): { start: Date; end: Date } {
-    if (view === 'week') {
-        const s = startOfWeek(navDate);
-        return { start: s, end: addDays(s, 7) };
-    }
-    if (view === 'day') {
-        const s = new Date(navDate);
-        s.setHours(0, 0, 0, 0);
-        return { start: s, end: addDays(s, 1) };
-    }
-    const s = startOfWeek(startOfMonth(navDate));
-    return { start: s, end: addDays(s, 42) };
-}
-
-function periodLabel(view: CalView, navDate: Date): string {
-    if (view === 'day') {
-        return navDate.toLocaleDateString('en-NZ', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-        });
-    }
-    if (view === 'week') {
-        const s = startOfWeek(navDate);
-        const e = addDays(s, 6);
-        const startYear = s.getFullYear() !== e.getFullYear() ? ` ${s.getFullYear()}` : '';
-        return `${s.getDate()} ${MO[s.getMonth()].slice(0, 3)}${startYear} – ${e.getDate()} ${MO[e.getMonth()].slice(0, 3)} ${e.getFullYear()}`;
-    }
-    return `${MO[navDate.getMonth()]} ${navDate.getFullYear()}`;
-}
-
-/**
- * Clickable period label that opens a mini-month so the user can jump straight to any
- * date instead of stepping period-by-period. `pill` renders it as an Event Horizon
- * filter-row field; the light variant is used by the profile-embed toolbar.
- */
-function JumpToDate({
-    view,
-    navDate,
-    onPick,
-    pill = false,
-}: {
-    view: CalView;
-    navDate: Date;
-    onPick: (d: Date) => void;
-    pill?: boolean;
-}) {
-    const [open, setOpen] = useState(false);
-
-    return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                {pill ? (
-                    <PageHeaderFilterButton
-                        icon={CalendarDays}
-                        aria-label="Jump to date"
-                        className="tnum"
-                    >
-                        {periodLabel(view, navDate)}
-                        <ChevronDown className="size-3 opacity-70" />
-                    </PageHeaderFilterButton>
-                ) : (
-                    // eslint-disable-next-line no-restricted-syntax -- calendar jump trigger; not a shadcn Button.
-                    <button
-                        type="button"
-                        aria-label="Jump to date"
-                        className="tnum inline-flex min-w-[150px] items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold transition-colors hover:bg-muted"
-                    >
-                        <CalendarDays className="h-3.5 w-3.5" />
-                        {periodLabel(view, navDate)}
-                        <ChevronDown className="h-3 w-3 opacity-70" />
-                    </button>
-                )}
-            </PopoverTrigger>
-            <PopoverContent
-                align={pill ? 'end' : 'start'}
-                className="w-auto p-0"
-            >
-                <MiniMonth
-                    selected={navDate}
-                    onSelect={(d) => {
-                        onPick(d);
-                        setOpen(false);
-                    }}
-                />
-            </PopoverContent>
-        </Popover>
-    );
 }
 
 export default function SiteCalendar({
@@ -1321,32 +1236,11 @@ export default function SiteCalendar({
     );
 
     const legend = (
-        <div className="flex flex-wrap items-center gap-1.5">
-            {effectiveSources.map((s) => {
-                const on = enabledSources.has(s.key);
-                return (
-                    <Button
-                        unstyled
-                        key={s.key}
-                        onClick={() => toggleSource(s.key)}
-                        className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-opacity md:min-h-0 ${on ? '' : 'opacity-40'}`}
-                        style={{
-                            background: `var(--src-${s.key}-bg)`,
-                            borderColor: `var(--src-${s.key}-ln)`,
-                            color: `var(--src-${s.key})`,
-                        }}
-                        aria-pressed={on}
-                    >
-                        <span
-                            aria-hidden="true"
-                            className="h-2 w-2 rounded-full"
-                            style={{ background: `var(--src-${s.key})` }}
-                        />
-                        {s.short}
-                    </Button>
-                );
-            })}
-        </div>
+        <CalendarSourcePills
+            sources={effectiveSources}
+            enabled={enabledSources}
+            onToggle={toggleSource}
+        />
     );
 
     const content = (
@@ -3570,109 +3464,27 @@ function QuickAddMenu({
     onForm: () => void;
     onClose: () => void;
 }) {
-    const ref = useRef<HTMLDivElement | null>(null);
-    const openerRef = useRef<HTMLElement | null>(null);
-    const [pos, setPos] = useState({ top: ctx.y, left: ctx.x });
-
-    useEffect(() => {
-        const el = ref.current;
-        if (!el) return;
-        const r = el.getBoundingClientRect();
-        let left = ctx.x;
-        let top = ctx.y;
-        if (left + r.width + 8 > window.innerWidth)
-            left = window.innerWidth - r.width - 8;
-        if (top + r.height + 8 > window.innerHeight)
-            top = window.innerHeight - r.height - 8;
-        setPos({ top: Math.max(8, top), left: Math.max(8, left) });
-    }, [ctx]);
-
-    // Focus the first item on open (G-17); remember the opener so a keyboard dismiss
-    // (Esc / Tab) restores focus to where it came from.
-    useEffect(() => {
-        openerRef.current = (document.activeElement as HTMLElement) ?? null;
-        ref.current
-            ?.querySelector<HTMLButtonElement>('[data-menuitem]')
-            ?.focus();
-    }, []);
-
-    useEffect(() => {
-        const onDown = (e: MouseEvent) => {
-            if (!ref.current?.contains(e.target as Node)) onClose();
-        };
-        window.addEventListener('mousedown', onDown);
-        return () => window.removeEventListener('mousedown', onDown);
-    }, [onClose]);
-
-    const dismiss = () => {
-        openerRef.current?.focus?.();
-        onClose();
-    };
-
-    const onMenuKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
-        if (e.key === 'Escape' || e.key === 'Tab') {
-            e.preventDefault();
-            dismiss();
-            return;
-        }
-        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
-        e.preventDefault();
-        const items = ref.current
-            ? Array.from(
-                  ref.current.querySelectorAll<HTMLButtonElement>(
-                      '[data-menuitem]',
-                  ),
-              )
-            : [];
-        if (items.length === 0) return;
-        const idx = items.indexOf(document.activeElement as HTMLButtonElement);
-        const next =
-            e.key === 'ArrowDown'
-                ? idx < 0
-                    ? 0
-                    : (idx + 1) % items.length
-                : e.key === 'ArrowUp'
-                  ? idx <= 0
-                      ? items.length - 1
-                      : idx - 1
-                  : e.key === 'Home'
-                    ? 0
-                    : items.length - 1;
-        items[next]?.focus();
-    };
-
     const hourDate = ctx.hour != null ? new Date(ctx.date) : null;
     if (hourDate && ctx.hour != null) hourDate.setHours(Math.floor(ctx.hour), Math.round((ctx.hour % 1) * 60), 0, 0);
     const where = `${siteName ? `to ${siteName} · ` : ''}${WD[ctx.date.getDay()]} ${ctx.date.getDate()} ${MO[ctx.date.getMonth()].slice(0, 3)} ${ctx.date.getFullYear()}${hourDate ? ` · ${fmtTime(hourDate)}` : ''}`;
 
-    return createPortal(
-        <div
-            ref={ref}
-            role="menu"
-            aria-label="Add calendar entry"
-            onKeyDown={onMenuKey}
-            style={{ top: pos.top, left: pos.left }}
-            className="fixed z-[60] w-[286px] rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-2xl"
-        >
-            <div className="mb-1 flex items-center gap-2 border-b px-2 py-1.5">
-                <span className="flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-primary uppercase">
-                    <Plus aria-hidden="true" className="h-3 w-3" /> Add
-                </span>
-                <span className="truncate text-[11px] text-muted-foreground">
-                    {where}
-                </span>
-            </div>
-            <ul className="max-h-[260px] space-y-px overflow-y-auto">
-                {eventTypes.map((t) => (
-                    <li key={t.key}>
-                        <Button
-                            unstyled
-                            role="menuitem"
-                            data-menuitem
-                            tabIndex={-1}
-                            onClick={() => onPick(t.key)}
-                            className="grid w-full grid-cols-[26px_1fr_auto] items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12.5px] transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                        >
+    // The shared calendar right-click menu (CalendarContextMenu in _parts).
+    return (
+        <CalendarContextMenu
+            x={ctx.x}
+            y={ctx.y}
+            chip="Add"
+            heading={where}
+            ariaLabel="Add calendar entry"
+            onClose={onClose}
+            sections={[
+                {
+                    key: 'types',
+                    scroll: true,
+                    items: eventTypes.map((t) => ({
+                        key: t.key,
+                        label: t.label,
+                        leading: (
                             <span
                                 aria-hidden="true"
                                 className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-md"
@@ -3686,37 +3498,29 @@ function QuickAddMenu({
                                     className="h-3.5 w-3.5"
                                 />
                             </span>
-                            <span className="min-w-0 truncate font-medium text-foreground">
-                                {t.label}
+                        ),
+                        trailing: t.requires_approval ? (
+                            <span className="rounded border border-status-warning/30 bg-status-warning-bg px-1 py-0.5 text-[9px] font-semibold tracking-wide text-status-warning uppercase">
+                                Approval
                             </span>
-                            {t.requires_approval && (
-                                <span className="rounded border border-status-warning/30 bg-status-warning-bg px-1 py-0.5 text-[9px] font-semibold tracking-wide text-status-warning uppercase">
-                                    Approval
-                                </span>
-                            )}
-                        </Button>
-                    </li>
-                ))}
-            </ul>
-            <div className="my-1 h-px bg-border/60" />
-            <Button
-                unstyled
-                role="menuitem"
-                data-menuitem
-                tabIndex={-1}
-                onClick={onForm}
-                className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12.5px] text-muted-foreground transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            >
-                <span
-                    aria-hidden="true"
-                    className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-md bg-muted"
-                >
-                    <Pencil className="h-3.5 w-3.5" />
-                </span>
-                Open full form…
-            </Button>
-        </div>,
-        document.body,
+                        ) : undefined,
+                        onSelect: () => onPick(t.key),
+                    })),
+                },
+                {
+                    key: 'form',
+                    items: [
+                        {
+                            key: 'form',
+                            label: 'Open full form…',
+                            icon: Pencil,
+                            muted: true,
+                            onSelect: onForm,
+                        },
+                    ],
+                },
+            ]}
+        />
     );
 }
 

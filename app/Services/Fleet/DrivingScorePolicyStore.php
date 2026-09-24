@@ -113,9 +113,13 @@ final class DrivingScorePolicyStore
         ])->values()->all();
     }
 
+    /**
+     * The policy scores every driver at every Site, so publishing it is a
+     * fleet-wide setting rather than part of one vehicle's management.
+     */
     public function canPublish(User $user): bool
     {
-        return $user->canDo('fleet.manage');
+        return $user->canDo('fleet.manage') && $user->canDo('fleet.settings.manage');
     }
 
     /**

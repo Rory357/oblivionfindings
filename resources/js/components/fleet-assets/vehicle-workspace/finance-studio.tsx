@@ -96,6 +96,17 @@ export function FinanceStudio({
     if (finance === undefined) {
         return <FinanceLoading reference={reference} onReload={onChanged} />;
     }
+    if (finance.site_restricted) {
+        return (
+            <div className="vehicle-studio">
+                <FinanceNotice title="Finance records stay with the vehicle’s Site">
+                    You can see this vehicle across Sites, but its Finance
+                    records are shown only to Finance viewers at{' '}
+                    {vehicle.site?.name ?? 'its Site'}.
+                </FinanceNotice>
+            </div>
+        );
+    }
     if (!finance.can.view) {
         return (
             <div className="vehicle-studio">

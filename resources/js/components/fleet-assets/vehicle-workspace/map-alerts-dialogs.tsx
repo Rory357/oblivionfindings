@@ -47,6 +47,7 @@ import { ReviewEventWizard } from './map-driving-dialogs';
 import type { DrivingReviews } from './map-driving-types';
 import { useNow, useWorkspaceJson } from './map-insights-data';
 import { InsightModal, ModalRow, whenLabel } from './map-insights-kit';
+import { WITHHELD_LABEL } from './map-model';
 import { isJsonObject, useVehicleRecordCommand } from './record-command';
 import { VehicleSearchSelect } from './search-select';
 import type { VehicleWorkspace } from './types';
@@ -60,12 +61,6 @@ import {
 import { todayInAuckland } from './workspace-model';
 
 export type Lifecycle = 'acknowledge' | 'triage' | 'escalate' | 'resolve';
-
-const WITHHELD: Record<string, string> = {
-    access: 'Withheld · recorded positions follow the trip site rules',
-    consent: 'Withheld · tracking consent was not in place',
-    personal: 'Withheld · recorded during a personal trip',
-};
 
 function vehicleLine(workspace: VehicleWorkspace) {
     const vehicle = workspace.vehicle;
@@ -185,7 +180,7 @@ export function AlertDetailDialog({
                         data.location
                             ? `${data.location.lat.toFixed(5)}, ${data.location.lng.toFixed(5)} · ${data.location.basis === 'recorded_event' ? 'where the event was recorded' : 'vehicle position when received'}`
                             : data.location_withheld
-                              ? WITHHELD[data.location_withheld]
+                              ? WITHHELD_LABEL[data.location_withheld]
                               : 'No recorded position with this signal'
                     }
                 />

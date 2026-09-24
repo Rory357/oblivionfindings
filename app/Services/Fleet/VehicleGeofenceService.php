@@ -61,7 +61,7 @@ final class VehicleGeofenceService
             // Vehicle-owned boundaries without a Site follow their vehicle's access.
             $scope->orWhere(fn (Builder $owned) => $owned->whereNull('site_id')->where(fn (Builder $vehicles) => $vehicles
                 ->where('asset_id', $vehicle->getKey())
-                ->orWhereIn('asset_id', $this->access->accessibleVehiclesForFleet($user)->select('assets.id'))));
+                ->orWhereIn('asset_id', $this->access->siteScopedVehiclesForFleet($user)->select('assets.id'))));
         });
     }
 

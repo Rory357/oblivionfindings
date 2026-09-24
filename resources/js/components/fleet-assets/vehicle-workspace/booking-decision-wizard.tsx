@@ -80,6 +80,7 @@ export function BookingDecisionWizard({
     const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
     const [step, setStep] = useState(0);
     const [savedText, setSavedText] = useState<string | null>(null);
+    const [reportText, setReportText] = useState<string | null>(null);
     const command = useVehicleRecordCommand(isJsonObject);
     const errors: Record<string, string> = { ...command.errors, ...localErrors };
     const [title, verb] = TITLES[decision];
@@ -211,6 +212,18 @@ export function BookingDecisionWizard({
         setSavedText(
             typeof result.message === 'string' ? result.message : 'Saved.',
         );
+        // A return with a concern also reports it to Maintenance when the Site
+        // has an approved route; otherwise say how to report it.
+        const report = isJsonObject(result.maintenance_report)
+            ? result.maintenance_report
+            : null;
+        setReportText(
+            report?.status === 'created'
+                ? `The concern is with Maintenance as ${String(report.reference ?? `work #${String(report.work_order_id)}`)}.`
+                : report?.status === 'not_routed'
+                  ? `${typeof report.message === 'string' ? report.message : 'The concern could not be sent to Maintenance.'} Use Report a problem on the vehicle so it is followed up.`
+                  : null,
+        );
         onSaved();
     };
 
@@ -269,7 +282,7 @@ export function BookingDecisionWizard({
             success={
                 <WizardSuccess
                     title={savedText ?? 'Saved'}
-                    blurb="The booking record, calendar and custody history now show this decision."
+                    blurb={`The booking record, calendar and custody history now show this decision.${reportText ? ` ${reportText}` : ''}`}
                     onClose={onClose}
                 />
             }
@@ -506,9 +519,27 @@ export function BookingDecisionWizard({
                     {decision === 'cancel' && row.kind === 'unavailable' && (
                         <StudioNotice title="What this changes">
                             The vehicle becomes bookable again for this period.
-                            The cancelled period stays in the calendar history.
+                            The cancelled period stays in the calendar history,
+                            and you can undo the cancellation straight after.
                         </StudioNotice>
                     )}
+                    {(decision === 'decline' ||
+                        (decision === 'cancel' && row.kind === 'booking')) && (
+                        <StudioNotice title="This decision is final">
+                            {decision === 'decline'
+                                ? 'A declined request can’t be reopened; the person can make a new request.'
+                                : 'A cancelled booking can’t be reopened; make a new request if the vehicle is still needed.'}{' '}
+                            The reason stays in the booking history.
+                        </StudioNotice>
+                    )}
+                    {decision === 'return' &&
+                        form.condition === 'Concern recorded' && (
+                            <StudioNotice title="What this changes">
+                                The concern is also reported to Maintenance as
+                                linked work when the vehicle’s Site has an
+                                approved route.
+                            </StudioNotice>
+                        )}
                 </div>
             )}
         </WorkspaceWizard>

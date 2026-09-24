@@ -306,6 +306,7 @@ export function ReadinessPanel({
                                     onNavigate({
                                         tab: 'service',
                                         view: 'evidence',
+                                        focus: record.kind,
                                     })
                                 }
                             >

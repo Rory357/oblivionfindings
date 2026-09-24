@@ -6,12 +6,16 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\FleetDriverSession;
+use App\Models\FleetDrivingEventReview;
 use App\Models\FleetTelemetryEvent;
 use App\Models\FleetTrip;
+use App\Models\FleetTripDriverConfirmation;
 use App\Services\AuditLogger;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class FleetTripController extends Controller
@@ -131,10 +135,13 @@ class FleetTripController extends Controller
         ]);
     }
 
-    public function update(Request $request, FleetTrip $trip)
+    /** Trips are changed under the same Site rule as playback; any other trip is not found. */
+    public function update(Request $request, int $trip)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('fleet.trips.manage'), 403);
+        $trip = $this->visibleTripsQuery($this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS))
+            ->findOrFail($trip);
 
         $data = $request->validate([
             'driver_session_id' => ['nullable', 'integer', 'exists:fleet_driver_sessions,id'],
@@ -152,10 +159,12 @@ class FleetTripController extends Controller
         return back()->with('success', 'Trip updated.');
     }
 
-    public function close(Request $request, FleetTrip $trip)
+    public function close(Request $request, int $trip)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('fleet.trips.manage'), 403);
+        $trip = $this->visibleTripsQuery($this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS))
+            ->findOrFail($trip);
 
         if ($trip->status === 'closed') {
             return back()->withErrors(['trip' => 'Trip is already closed.']);
@@ -173,17 +182,39 @@ class FleetTripController extends Controller
         return back()->with('success', 'Trip closed.');
     }
 
-    public function destroy(Request $request, FleetTrip $trip)
+    /**
+     * Delete a trip the manager can see (the same Site rule as playback; any
+     * other trip is not found). A trip whose driver was confirmed or whose
+     * driving events were reviewed is kept: that evidence is never erased.
+     */
+    public function destroy(Request $request, int $trip)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('fleet.trips.manage'), 403);
 
-        AuditLogger::log('fleet.trip.delete', $trip, [
-            'trip_id' => $trip->id,
-            'asset_id' => $trip->asset_id,
-        ]);
+        $visibleSiteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);
+        $tripId = (int) $this->visibleTripsQuery($visibleSiteIds)->findOrFail($trip)->getKey();
 
-        $trip->delete();
+        DB::transaction(function () use ($tripId): void {
+            // Driver confirmations and event reviews lock the trip before they
+            // are added, so after this lock no new evidence can appear.
+            $locked = FleetTrip::query()->whereKey($tripId)->lockForUpdate()->firstOrFail();
+            $confirmed = FleetTripDriverConfirmation::query()->where('fleet_trip_id', $tripId)->lockForUpdate()->count() > 0;
+            $reviewed = FleetDrivingEventReview::query()->where('fleet_trip_id', $tripId)->lockForUpdate()->count() > 0;
+            if ($confirmed || $reviewed) {
+                throw ValidationException::withMessages(['trip' => match (true) {
+                    $confirmed && $reviewed => "This trip can't be deleted because its driver confirmation and driving event reviews are kept as a record.",
+                    $confirmed => "This trip can't be deleted because its driver confirmation is kept as a record.",
+                    default => "This trip can't be deleted because its driving event reviews are kept as a record.",
+                }]);
+            }
+
+            AuditLogger::log('fleet.trip.delete', $locked, [
+                'trip_id' => $locked->id,
+                'asset_id' => $locked->asset_id,
+            ]);
+            $locked->delete();
+        }, 3);
 
         return redirect()->route('fleet-assets.trips.index')->with('success', 'Trip deleted.');
     }

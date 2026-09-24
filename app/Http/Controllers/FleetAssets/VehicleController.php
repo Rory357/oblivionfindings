@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Services\Assets\AssetMutationIntegrityService;
 use App\Services\AuditLogger;
 use App\Services\Fleet\Data\VehicleReadinessContext;
+use App\Services\Fleet\FleetTripSiteScope;
 use App\Services\Fleet\MaintenanceAccessService;
 use App\Services\Fleet\VehicleFinancePresenter;
 use App\Services\Fleet\VehicleLegacyEvidenceGuard;
@@ -136,6 +137,16 @@ class VehicleController extends Controller
 
         $vehicles = $query->paginate(25)->withQueryString();
 
+        // Central fleet oversight lists every vehicle, but a vehicle outside
+        // the person's Sites shows no position unless the trip Site rule
+        // allows it, and isn't offered for bulk Site or tracker actions.
+        $pageIds = $vehicles->getCollection()->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        $siteVehicleIds = $pageIds === [] ? [] : $this->deviceAccess->siteScopedVehiclesForFleet($user)
+            ->whereKey($pageIds)->pluck('assets.id')->map(fn (mixed $id): int => (int) $id)->all();
+        $positionVehicleIds = $pageIds === [] ? [] : FleetTripSiteScope::vehicles(array_values(array_map('intval',
+            $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS))))
+            ->whereKey($pageIds)->pluck('assets.id')->map(fn (mixed $id): int => (int) $id)->all();
+
         $sites = $this->deviceAccess->accessibleSites($user)->orderBy('name')->get(['id', 'name']);
 
         // Hero stats — whole-fleet counts (independent of filters/pagination).
@@ -211,24 +222,30 @@ class VehicleController extends Controller
                 'critical_alerts' => $criticalAlerts,
             ],
             'vehicles' => [
-                'data' => $vehicles->getCollection()->map(fn ($v) => [
-                    'id' => $v->id,
-                    'name' => $v->name,
-                    'asset_tag' => $v->asset_tag,
-                    'status' => $v->status,
-                    'home_site' => $hasFleetFields && $v->homeSite ? [
-                        'id' => $v->homeSite->id,
-                        'name' => $v->homeSite->name,
-                    ] : null,
-                    'state' => $v->fleetState ? [
-                        'status' => $v->fleetState->status,
-                        'last_seen_at' => optional($v->fleetState->last_seen_at)->toISOString(),
-                        'lat' => $v->fleetState->latitude,
-                        'lng' => $v->fleetState->longitude,
-                        'speed_kph' => $v->fleetState->speed_kph,
-                        'battery_pct' => $v->fleetState->battery_pct,
-                    ] : null,
-                ])->values(),
+                'data' => $vehicles->getCollection()->map(function ($v) use ($hasFleetFields, $siteVehicleIds, $positionVehicleIds) {
+                    $atYourSites = in_array((int) $v->id, $siteVehicleIds, true);
+                    $position = $atYourSites || in_array((int) $v->id, $positionVehicleIds, true);
+
+                    return [
+                        'id' => $v->id,
+                        'name' => $v->name,
+                        'asset_tag' => $v->asset_tag,
+                        'status' => $v->status,
+                        'at_your_sites' => $atYourSites,
+                        'home_site' => $hasFleetFields && $v->homeSite ? [
+                            'id' => $v->homeSite->id,
+                            'name' => $v->homeSite->name,
+                        ] : null,
+                        'state' => $v->fleetState ? [
+                            'status' => $v->fleetState->status,
+                            'last_seen_at' => optional($v->fleetState->last_seen_at)->toISOString(),
+                            'lat' => $position ? $v->fleetState->latitude : null,
+                            'lng' => $position ? $v->fleetState->longitude : null,
+                            'speed_kph' => $position ? $v->fleetState->speed_kph : null,
+                            'battery_pct' => $v->fleetState->battery_pct,
+                        ] : null,
+                    ];
+                })->values(),
                 'links' => $vehicles->linkCollection()->toArray(),
                 'meta' => [
                     'current_page' => $vehicles->currentPage(),
@@ -248,16 +265,20 @@ class VehicleController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $asset = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey()) ?? abort(404);
+        // Central fleet oversight opens every vehicle's profile; the sections
+        // that follow the vehicle's Site are gated inside the workspace.
+        $asset = $this->deviceAccess->fleetVehicle($user, (int) $asset->getKey()) ?? abort(404);
+        $siteRecords = $this->deviceAccess->vehicleAtAccessibleSite($user, $asset);
 
         // Each view of the workspace loads its own records (trips, map, checks,
         // calendar, finance); the page itself only needs the workspace summary.
 
         // Only the sites and drivers this user could actually assign (update()
-        // refuses anything else), rather than every site and driver.
+        // refuses anything else), rather than every site and driver. Drivers
+        // follow the vehicle's Site, so none are offered from outside it.
         $sites = $this->deviceAccess->accessibleSites($user)->orderBy('name')->get(['id', 'name']);
 
-        $eligibleDrivers = $this->deviceAccess->assignableStaff($user)
+        $eligibleDrivers = ! $siteRecords ? collect() : $this->deviceAccess->assignableStaff($user)
             ->whereHas('hrDriverEligibility')
             ->with('hrDriverEligibility')
             ->orderBy('name')
@@ -295,7 +316,7 @@ class VehicleController extends Controller
     public function update(Request $request, Asset $asset)
     {
         $user = $request->user() ?? abort(403);
-        $asset = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey()) ?? abort(404);
+        $asset = $this->deviceAccess->fleetVehicle($user, (int) $asset->getKey()) ?? abort(404);
         $request->validate(VehicleLegacyEvidenceGuard::rules());
         VehicleLegacyEvidenceGuard::assertUnchanged($request, $asset);
         $data = $request->validate([
@@ -346,7 +367,20 @@ class VehicleController extends Controller
         $safeData['updated_by_user_id'] = $user->id;
 
         $asset = DB::transaction(function () use ($user, $asset, $safeData, $expectedProfileVersion, $reason): Asset {
-            $locked = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey(), true) ?? abort(404);
+            $locked = $this->deviceAccess->fleetVehicle($user, (int) $asset->getKey(), true) ?? abort(404);
+            // Placement and driver follow the vehicle's Site: central fleet
+            // oversight can edit the record but not move it or name its driver.
+            if (! $this->deviceAccess->vehicleAtAccessibleSite($user, $locked)) {
+                foreach ([
+                    'home_site_id' => 'Moving this vehicle needs access to its current Site.',
+                    'primary_driver_user_id' => 'The primary driver is managed at the vehicle\'s Site.',
+                ] as $field => $message) {
+                    if (array_key_exists($field, $safeData)
+                        && (string) ($safeData[$field] ?? '') !== (string) ($locked->getAttribute($field) ?? '')) {
+                        throw ValidationException::withMessages([$field => $message]);
+                    }
+                }
+            }
             if ($expectedProfileVersion !== null) {
                 abort_unless((int) $locked->vehicle_profile_version === $expectedProfileVersion, 409,
                     'This vehicle\'s details changed while you were editing. Reload before saving.');

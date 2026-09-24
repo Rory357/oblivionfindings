@@ -280,11 +280,14 @@ final class VehicleSpeedLimitService
                 if ((int) $limit->proposed_by_user_id === (int) $current->id) {
                     throw ValidationException::withMessages(['reason' => 'Someone other than the person who proposed this limit must approve it.']);
                 }
-                $evidence = AssetDocument::query()->where('asset_id', $vehicle->id)->where('source_type', 'speed_limit')
-                    ->where('source_id', $limit->id)->whereNull('archived_at')
-                    ->whereNotIn('state', ['quarantined', 'storage_failed'])->exists();
-                if (! $evidence) {
-                    throw ValidationException::withMessages(['reason' => 'Add the sign photo or authority document before approval.']);
+                // The approver must be able to open the evidence: files still
+                // being scanned, or that failed a scan, don't count.
+                $files = AssetDocument::query()->where('asset_id', $vehicle->id)->where('source_type', 'speed_limit')
+                    ->where('source_id', $limit->id)->whereNull('archived_at')->get(['id', 'state', 'document_set_id']);
+                if (! $files->contains(fn (AssetDocument $file): bool => $file->isOpenable())) {
+                    throw ValidationException::withMessages(['reason' => $files->isEmpty()
+                        ? 'Add the sign photo or authority document before approval.'
+                        : 'The evidence can’t be opened yet. Approve once its file check has finished.']);
                 }
                 $overlap = FleetSpeedLimit::query()->where('asset_id', $vehicle->id)->where('status', 'approved')
                     ->whereKeyNot($limit->id)

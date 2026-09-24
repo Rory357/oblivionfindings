@@ -37,6 +37,7 @@ class VehicleCheckService
         private readonly VehicleDocumentService $documents,
         private readonly SecurityDevicesAccessService $vehicles,
         private readonly VehicleStaffDirectory $staff,
+        private readonly MaintenanceTransitionService $transitions,
     ) {}
 
     /**
@@ -202,6 +203,33 @@ class VehicleCheckService
     }
 
     /**
+     * "No issue found — release for use" for a check that holds the vehicle.
+     * The decision is Maintenance's own (MaintenanceTransitionService), which
+     * rechecks authority, the approved Site and eligibility under the vehicle
+     * lock; this only checks the request's shape.
+     *
+     * @param  array<string,mixed>  $input
+     */
+    public function assess(User $actor, int $assetId, int $runId, array $input, string $requestKey): object
+    {
+        abort_unless($this->maintenance->canManage($actor), 403);
+        $this->assertKey($requestKey);
+        Validator::make($input, [
+            'decision' => ['required', 'string', 'in:'.MaintenanceRestrictionService::NO_ISSUE_RELEASE],
+            'reason' => ['required', 'string', 'max:2000'],
+            'confirmed' => ['accepted'],
+        ], [
+            'decision.required' => 'Choose the assessment decision.',
+            'decision.in' => 'Choose the assessment decision.',
+            'reason.required' => 'Record why the vehicle is safe to use.',
+            'reason.max' => 'Keep the reason under 2,000 characters.',
+            'confirmed.accepted' => 'Confirm that you assessed this check and found nothing that stops safe use.',
+        ])->validate();
+
+        return $this->transitions->assessCheck($actor, $assetId, $runId, (string) $input['reason'], true, $requestKey);
+    }
+
+    /**
      * Set the vehicle's check requirement: its checklist, owner and next due
      * date (the vehicle's inspection_due_at). Versioned; a retried save that
      * already landed reports success.
@@ -231,7 +259,7 @@ class VehicleCheckService
         $expected = (int) $input['expected_version'];
 
         return DB::transaction(function () use ($actor, $assetId, $due, $templateId, $ownerId, $expected): FleetVehicleCheckRequirement {
-            $asset = $this->vehicles->assignableVehicle($actor, $assetId, true) ?? abort(404);
+            $asset = $this->vehicles->fleetVehicle($actor, $assetId, true) ?? abort(404);
             $current = User::query()->findOrFail($actor->id);
             abort_unless($current->canDo('fleet.manage'), 403);
             $requirement = FleetVehicleCheckRequirement::query()->where('asset_id', $asset->id)->lockForUpdate()->first();

@@ -59,10 +59,16 @@ class VehicleFinancePresenter
      */
     public function present(User $viewer, Asset $asset): array
     {
-        $vehicle = $this->access->assignableVehicle($viewer, (int) $asset->getKey()) ?? abort(404);
-        $can = $this->permissions($viewer, $vehicle);
+        // Central fleet oversight opens the vehicle, not its Finance records:
+        // those keep the vehicle's Site rule and read as not available.
+        $vehicle = $this->access->fleetVehicle($viewer, (int) $asset->getKey()) ?? abort(404);
+        $siteRestricted = ! $this->access->vehicleAtAccessibleSite($viewer, $vehicle);
+        $can = $siteRestricted
+            ? array_map(fn (): bool => false, $this->permissions($viewer, $vehicle))
+            : $this->permissions($viewer, $vehicle);
         $view = [
             'can' => $can,
+            'site_restricted' => $siteRestricted,
             'fixed_asset' => null,
             'cost_centre' => null,
             'pending_requests' => 0,
@@ -100,7 +106,7 @@ class VehicleFinancePresenter
             'pending_requests' => FleetFinanceReviewRequest::query()->where('asset_id', $vehicle->id)->where('status', 'submitted')->count(),
             'records' => $records,
             'records_total' => $total,
-            'requests' => $requests->map(fn (FleetFinanceReviewRequest $request): array => $this->request($request, $can, $files))->values()->all(),
+            'requests' => $requests->map(fn (FleetFinanceReviewRequest $request): array => $this->request($request, $can, $files, (int) $viewer->id))->values()->all(),
             'request_types' => collect(FleetFinanceReviewRequest::TYPES)
                 ->map(fn (string $label, string $value): array => ['value' => $value, 'label' => $label])->values()->all(),
             'sources' => $can['request_review'] ? $this->sources($vehicle, $records) : [],
@@ -366,7 +372,7 @@ class VehicleFinancePresenter
      * @param  array<int, list<array<string,mixed>>>  $files
      * @return array<string,mixed>
      */
-    private function request(FleetFinanceReviewRequest $request, array $can, array $files): array
+    private function request(FleetFinanceReviewRequest $request, array $can, array $files, int $viewerId): array
     {
         [$label, $tone] = match ($request->status) {
             'resolved' => ['Resolved', 'success'],
@@ -412,7 +418,9 @@ class VehicleFinancePresenter
                 'occurred_at' => $event->occurred_at?->toIso8601String(),
             ])->values()->all(),
             'files' => $files[$request->id] ?? [],
-            'can_decide' => $can['decide'] && $request->isOpen(),
+            // Someone other than the person who asked decides (VehicleFinanceService::decide).
+            'can_decide' => $can['decide'] && $request->isOpen()
+                && (int) $request->requested_by_user_id !== $viewerId,
             'can_add_files' => $can['attach_files'] && $request->isOpen(),
         ];
     }

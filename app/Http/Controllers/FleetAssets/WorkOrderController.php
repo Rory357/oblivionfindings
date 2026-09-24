@@ -428,11 +428,21 @@ class WorkOrderController extends Controller
             ]);
         $linkedCheckIds = DB::table('fleet_maintenance_reports')->where('work_order_id', $workOrder->id)
             ->where('source_type', 'fleet_checklist_run')->whereNotNull('source_id')->pluck('source_id');
-        $checks = DB::table('fleet_checklist_runs')->where('asset_id', $asset->id)
+        $checkRows = DB::table('fleet_checklist_runs')->where('asset_id', $asset->id)
             ->where(fn ($query) => $query->where('work_order_id', $workOrder->id)->orWhereIn('id', $linkedCheckIds))
             ->orderBy('id')->get(['id', 'check_kind', 'outcome', 'submitted_at',
-                'corrects_run_id', 'presented_template_json', 'rule_version_id'])
-            ->map(fn ($row) => [
+                'corrects_run_id', 'presented_template_json', 'rule_version_id']);
+        // Maintenance's "no issue found — release for use" decision on a check,
+        // shown beside its original outcome (which never changes).
+        $checkAssessments = $checkRows->isEmpty() || ! \Illuminate\Support\Facades\Schema::hasTable('fleet_maintenance_check_assessments')
+            ? collect()
+            : DB::table('fleet_maintenance_check_assessments as assessment')
+                ->leftJoin('users as assessor', 'assessor.id', '=', 'assessment.assessed_by_user_id')
+                ->whereIn('assessment.check_run_id', $checkRows->pluck('id'))
+                ->get(['assessment.check_run_id', 'assessment.decision', 'assessment.reason',
+                    'assessment.assessed_at', 'assessor.name as assessed_by'])
+                ->keyBy('check_run_id');
+        $checks = $checkRows->map(fn ($row) => [
                 'id' => (int) $row->id, 'kind' => $row->check_kind,
                 'outcome' => $row->outcome ?? 'needs_assessment',
                 'submitted_at' => $row->submitted_at
@@ -440,6 +450,13 @@ class WorkOrderController extends Controller
                 'corrects_run_id' => $row->corrects_run_id,
                 'presented_template' => json_decode((string) $row->presented_template_json, true),
                 'rule_version_id' => $row->rule_version_id,
+                'assessment' => ($assessment = $checkAssessments->get($row->id)) ? [
+                    'decision' => (string) $assessment->decision,
+                    'label' => \App\Services\Fleet\VehicleChecksPresenter::NO_ISSUE_LABEL,
+                    'reason' => (string) $assessment->reason,
+                    'assessed_by' => $assessment->assessed_by,
+                    'assessed_at' => \Illuminate\Support\Carbon::parse($assessment->assessed_at, 'UTC')->toISOString(),
+                ] : null,
             ]);
         $reports = DB::table('fleet_maintenance_reports as report')
             ->join('users as reporter', 'reporter.id', '=', 'report.submitted_by_user_id')

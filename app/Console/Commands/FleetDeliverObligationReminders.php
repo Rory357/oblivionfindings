@@ -9,7 +9,7 @@ class FleetDeliverObligationReminders extends Command
 {
     protected $signature = 'fleet:deliver-obligation-reminders';
 
-    protected $description = 'Tell vehicle obligation owners about service and compliance due points within their lead time.';
+    protected $description = 'Tell vehicle obligation owners about service, compliance and vehicle check due points within their lead time.';
 
     public function handle(VehicleObligationReminderService $reminders): int
     {

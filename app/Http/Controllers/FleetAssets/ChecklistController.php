@@ -67,12 +67,15 @@ class ChecklistController extends Controller
             'stats' => $stats,
             'can' => [
                 'manage' => $canManage,
+                // A new checklist here is offered to every vehicle: a fleet-wide setting.
+                'create_templates' => $this->canCreateShared($request),
             ],
         ]);
     }
 
     public function store(Request $request)
     {
+        abort_unless($this->canCreateShared($request), 403);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
@@ -215,5 +218,14 @@ class ChecklistController extends Controller
         $user = $request->user();
 
         return (bool) ($user?->canDo('fleet.manage') || $user?->canDo('fleet.maintenance.manage'));
+    }
+
+    /**
+     * Checklists created here are available to every vehicle, so, as in the
+     * vehicle checklist library, they are fleet-wide settings.
+     */
+    private function canCreateShared(Request $request): bool
+    {
+        return $this->canManageMaintenance($request) && (bool) $request->user()?->canDo('fleet.settings.manage');
     }
 }

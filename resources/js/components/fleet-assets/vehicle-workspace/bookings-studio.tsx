@@ -4,19 +4,26 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { toDatetimeLocal } from '@/lib/datetime';
+import { CalendarContextMenu } from '@/pages/sites/calendar/_parts';
 import {
     ArrowRight,
     CalendarDays,
+    FileText,
     KeyRound,
     MoreHorizontal,
 } from 'lucide-react';
-import type { BookingDecision } from './booking-decision-wizard';
+import { Fragment, useState } from 'react';
 import type { CustodyRow, VehicleCalendarSummary } from './calendar-types';
 import './studio.css';
+import {
+    custodyActions,
+    type CalendarAction,
+} from './vehicle-calendar-actions';
 import { StudioNotice } from './wizard-kit';
 
 const JOURNEY = [
@@ -56,20 +63,37 @@ export function BookingsStudio({
     summary,
     onRequest,
     onBlock,
-    onDecision,
-    onChangeTimes,
-    onRecord,
-    onUpload,
+    onAction,
+    onResolveUseProblem,
 }: {
     summary: VehicleCalendarSummary | null;
     onRequest: () => void;
     onBlock: () => void;
-    onDecision: (row: CustodyRow, decision: BookingDecision) => void;
-    onChangeTimes: (row: CustodyRow) => void;
-    onRecord: (row: CustodyRow) => void;
-    onUpload: (row: CustodyRow) => void;
+    /** Runs one of the shared booking/period actions (the calendar menu's list). */
+    onAction: (action: CalendarAction) => void;
+    /** Opens where the vehicle-use problem is resolved (e.g. its evidence row). */
+    onResolveUseProblem?: () => void;
 }) {
     const rows = ordered(summary?.bookings ?? []);
+    const [menu, setMenu] = useState<{
+        x: number;
+        y: number;
+        row: CustodyRow;
+        opener: HTMLElement | null;
+    } | null>(null);
+    /** Every action for a row: its record first, then the calendar's own list. */
+    const actionsFor = (row: CustodyRow): CalendarAction[] =>
+        summary
+            ? [
+                  {
+                      key: 'record',
+                      label: 'View record & history',
+                      icon: FileText,
+                      intent: { type: 'custody-record', row },
+                  },
+                  ...custodyActions(row, summary),
+              ]
+            : [];
     return (
         <section
             className="studio-card"
@@ -112,36 +136,63 @@ export function BookingsStudio({
                     </span>
                 ))}
             </div>
+            {summary && !summary.can.view_bookings && (
+                <StudioNotice title="Bookings stay with the vehicle’s Site">
+                    You can see this vehicle across Sites. Its bookings and
+                    drivers are shown only to people at the vehicle’s Site; the
+                    calendar shows when it’s busy.
+                </StudioNotice>
+            )}
             {summary?.use_problem && (
                 <StudioNotice title="Vehicle use needs review">
                     {summary.use_problem} Requests can be recorded; confirmation
                     and checkout remain blocked.
+                    {onResolveUseProblem && (
+                        <Button
+                            variant="link"
+                            className="h-auto px-1 py-0 align-baseline"
+                            onClick={onResolveUseProblem}
+                        >
+                            Resolve this
+                        </Button>
+                    )}
                 </StudioNotice>
             )}
             {rows.map((row) => {
-                const active = LIVE.includes(row.status);
                 const booking = row.kind === 'booking' ? row : null;
-                const decision: BookingDecision | null = booking
-                    ? booking.status === 'pending'
-                        ? 'approve'
-                        : booking.status === 'approved'
-                          ? 'out'
-                          : booking.status === 'checked_out'
-                            ? 'return'
-                            : null
-                    : null;
-                const allowed =
-                    booking && decision
-                        ? decision === 'approve'
-                            ? booking.can.approve
-                            : decision === 'out'
-                              ? booking.can.checkout
-                              : booking.can.return
-                        : false;
+                const actions = actionsFor(row);
+                // The card's one button is the row's next step.
+                const next = LIVE.includes(row.status)
+                    ? actions.find((action) =>
+                          ['approve', 'checkout', 'return'].includes(
+                              action.key,
+                          ),
+                      )
+                    : undefined;
                 const label = row.reference ?? `#${row.id}`;
-                const checkedOut = row.status === 'checked_out';
                 return (
-                    <div className="booking-card" key={`${row.kind}-${row.id}`}>
+                    <div
+                        className="booking-card"
+                        key={`${row.kind}-${row.id}`}
+                        onContextMenu={(event) => {
+                            if (!actions.length) return;
+                            event.preventDefault();
+                            const rect =
+                                event.currentTarget.getBoundingClientRect();
+                            const keyboard =
+                                event.clientX === 0 && event.clientY === 0;
+                            setMenu({
+                                x: keyboard ? rect.left + 16 : event.clientX,
+                                y: keyboard ? rect.top + 16 : event.clientY,
+                                row,
+                                opener:
+                                    document.activeElement instanceof
+                                    HTMLElement
+                                        ? document.activeElement
+                                        : null,
+                            });
+                        }}
+                    >
                         <span className="feature-icon">
                             <KeyRound className="size-[22px]" aria-hidden />
                         </span>
@@ -158,7 +209,10 @@ export function BookingsStudio({
                             <p>
                                 {booking
                                     ? `${booking.driver?.name ?? 'Driver not recorded'} · ${booking.approval_route === 'not_required' ? 'Approval not required' : 'Approval required'}`
-                                    : 'Unavailable period'}
+                                    : row.kind === 'unavailable' &&
+                                        row.work_order_id
+                                      ? 'Held by a service appointment'
+                                      : 'Unavailable period'}
                                 {booking?.approval_not_required_reason
                                     ? ` · ${booking.approval_not_required_reason}`
                                     : ''}
@@ -180,77 +234,65 @@ export function BookingsStudio({
                             {row.status_label}
                         </StatusBadge>
                         <div className="booking-actions">
-                            {active && booking && decision && (
+                            {next && (
                                 <Button
                                     size="sm"
-                                    disabled={!allowed}
-                                    onClick={() => onDecision(row, decision)}
+                                    disabled={next.disabled}
+                                    title={next.reason}
+                                    onClick={() => onAction(next)}
                                 >
-                                    {decision === 'approve'
+                                    {next.key === 'approve'
                                         ? 'Review & approve'
-                                        : decision === 'out'
+                                        : next.key === 'checkout'
                                           ? 'Check out'
                                           : 'Record return'}
                                 </Button>
                             )}
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        aria-label={`Actions for ${row.kind === 'booking' ? label : row.purpose}`}
-                                    >
-                                        <MoreHorizontal className="size-[18px]" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem
-                                        onSelect={() => onRecord(row)}
-                                    >
-                                        View record & history
-                                    </DropdownMenuItem>
-                                    {active && (
-                                        <>
-                                            <DropdownMenuItem
-                                                disabled={
-                                                    !row.can.edit || checkedOut
-                                                }
-                                                onSelect={() =>
-                                                    onChangeTimes(row)
-                                                }
-                                            >
-                                                Change times
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem
-                                                disabled={
-                                                    !row.can.cancel ||
-                                                    checkedOut
-                                                }
-                                                onSelect={() =>
-                                                    onDecision(row, 'cancel')
-                                                }
-                                            >
-                                                Cancel booking / block
-                                            </DropdownMenuItem>
-                                        </>
-                                    )}
-                                    {booking?.can.decline && (
-                                        <DropdownMenuItem
-                                            onSelect={() =>
-                                                onDecision(row, 'decline')
-                                            }
+                            {actions.length > 0 && (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            aria-label={`Actions for ${row.kind === 'booking' ? label : row.purpose}`}
                                         >
-                                            Decline request
-                                        </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuItem
-                                        disabled={!row.can.upload}
-                                        onSelect={() => onUpload(row)}
-                                    >
-                                        Upload evidence
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                                            <MoreHorizontal className="size-[18px]" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        {actions.map((action, index) => (
+                                            <Fragment key={action.key}>
+                                                {action.destructive &&
+                                                    !actions[index - 1]
+                                                        ?.destructive && (
+                                                        <DropdownMenuSeparator />
+                                                    )}
+                                                <DropdownMenuItem
+                                                    disabled={action.disabled}
+                                                    variant={
+                                                        action.destructive
+                                                            ? 'destructive'
+                                                            : 'default'
+                                                    }
+                                                    onSelect={() =>
+                                                        onAction(action)
+                                                    }
+                                                >
+                                                    <action.icon className="size-4" />
+                                                    <span>
+                                                        {action.label}
+                                                        {action.reason && (
+                                                            <small className="block text-xs text-muted-foreground">
+                                                                {action.reason}
+                                                            </small>
+                                                        )}
+                                                    </span>
+                                                </DropdownMenuItem>
+                                            </Fragment>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            )}
                         </div>
                     </div>
                 );
@@ -268,6 +310,39 @@ export function BookingsStudio({
                 confirmation or checkout. Report-only staff still need
                 coordinator verification.
             </p>
+            {menu && summary && (
+                <CalendarContextMenu
+                    key={`${menu.row.kind}-${menu.row.id}-${menu.x}-${menu.y}`}
+                    x={menu.x}
+                    y={menu.y}
+                    chip={
+                        menu.row.kind === 'booking' ? 'Booking' : 'Unavailable'
+                    }
+                    chipIcon={KeyRound}
+                    heading={menu.row.purpose}
+                    subheading={`${wallTime(menu.row.starts_at)} → ${wallTime(menu.row.ends_at)} · ${menu.row.status_label}`}
+                    ariaLabel="Booking actions"
+                    returnFocus={menu.opener}
+                    onClose={() => setMenu(null)}
+                    sections={[false, true].map((destructive) => ({
+                        key: destructive ? 'destructive' : 'actions',
+                        items: actionsFor(menu.row)
+                            .filter(
+                                (action) =>
+                                    !!action.destructive === destructive,
+                            )
+                            .map((action) => ({
+                                key: action.key,
+                                label: action.label,
+                                icon: action.icon,
+                                disabled: action.disabled,
+                                destructive: action.destructive,
+                                detail: action.reason,
+                                onSelect: () => onAction(action),
+                            })),
+                    }))}
+                />
+            )}
         </section>
     );
 }

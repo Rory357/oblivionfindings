@@ -35,7 +35,7 @@ class VehicleOdometerService
         return DB::transaction(function () use ($actor, $assetId, $data, $requestKey, $manualEndpoint, $workflowAuthorized): FleetVehicleOdometerObservation {
             $currentActor = User::query()->findOrFail($actor->id);
             abort_unless($workflowAuthorized || $currentActor->canDo('fleet.manage'), 403);
-            $asset = $this->access->assignableVehicle($currentActor, $assetId, true) ?? abort(404);
+            $asset = $this->access->fleetVehicle($currentActor, $assetId, true) ?? abort(404);
             if (trim($requestKey) === '' || mb_strlen($requestKey) > 100) {
                 throw ValidationException::withMessages(['request_key' => 'Provide an idempotency key of at most 100 characters.']);
             }

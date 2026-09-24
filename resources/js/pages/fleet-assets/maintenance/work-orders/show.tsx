@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { MaintenanceDateRange } from '@/components/fleet-assets/maintenance/date-range';
 import { WorkOrderCreateWizard } from './create-wizard';
@@ -34,7 +35,9 @@ type WorkOrder = {
 type Action = { id: number; type: string; actor_id: number; actor_name: string; policy_version_id: number | null; target_id: number | null;
     target_name: string | null; payload: Record<string, unknown>; occurred_at: string; version: number };
 type Check = { id: number; kind: string; outcome: string; submitted_at: string; corrects_run_id: number | null;
-    presented_template: { name: string; items: Array<{ id: string; label: string }> } | null };
+    presented_template: { name: string; items: Array<{ id: string; label: string }> } | null;
+    /** Maintenance's "No issue found — released for use" decision; the outcome stays as submitted. */
+    assessment?: { decision: string; label: string; reason: string; assessed_by: string | null; assessed_at: string } | null };
 type Attachment = { id: number; action_id: number | null; original_name: string; byte_size: number };
 type Rule = { id: number; rules: { questions?: ConfiguredQuestion[]; requires_custody?: boolean } & Record<string, unknown> } | null;
 type Props = {
@@ -88,6 +91,16 @@ function aucklandLocal(utc: string | null): string {
     return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
 }
 
+/** A link can open one tab (?tab=release) and its review (&open=release), e.g. from the vehicle calendar. */
+function linkedTab(): WorkTab {
+    if (typeof window === 'undefined') return 'detail';
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    return WORK_TABS.find((item) => item.key === tab)?.key ?? 'detail';
+}
+function linkedRelease(): boolean {
+    return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('open') === 'release';
+}
+
 /** A vehicle profile view to go back to (?return=), when the work was opened from one. */
 function vehicleReturn(): string | null {
     if (typeof window === 'undefined') return null;
@@ -111,7 +124,7 @@ export default function WorkOrderShow({ work_order: work, actions, checks, repor
     const [triageStep, setTriageStep] = useState(0);
     const [holdKind, setHoldKind] = useState('');
     const [holdSourceRunId, setHoldSourceRunId] = useState('');
-    const [activeTab, setActiveTab] = useState<WorkTab>('detail');
+    const [activeTab, setActiveTab] = useState<WorkTab>(linkedTab);
     const [detailView, setDetailView] = useState<'overview' | 'activity'>('overview');
     const [workSearch, setWorkSearch] = useState('');
     const [targetSearch, setTargetSearch] = useState('');
@@ -119,8 +132,9 @@ export default function WorkOrderShow({ work_order: work, actions, checks, repor
     const [handoverOpen, setHandoverOpen] = useState(false);
     const [handoverStep, setHandoverStep] = useState(0);
     const [handoverTarget, setHandoverTarget] = useState<{ id: number; name: string } | null>(null);
-    const [releaseOpen, setReleaseOpen] = useState(false);
-    const [releaseStep, setReleaseStep] = useState(0);
+    // Opened for release review: the same wizard and first step as the release button.
+    const [releaseOpen, setReleaseOpen] = useState(() => linkedRelease() && (can.manage || can.review || can.custody));
+    const [releaseStep, setReleaseStep] = useState(() => (linkedRelease() && can.custody && !can.manage && !can.review ? 2 : 0));
     const [repairSummary, setRepairSummary] = useState('');
     const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
     const [evidenceKey, setEvidenceKey] = useState(crypto.randomUUID());
@@ -185,6 +199,9 @@ export default function WorkOrderShow({ work_order: work, actions, checks, repor
             detail: `${report.reporter_name} · ${report.title}` })),
         ...checks.map((check) => ({ key: `check-${check.id}`, at: check.submitted_at,
             title: `${label(check.kind)} · ${label(check.outcome)}`, detail: check.presented_template?.name ?? 'Original check source' })),
+        ...checks.flatMap((check) => check.assessment ? [{ key: `check-assessment-${check.id}`, at: check.assessment.assessed_at,
+            title: `CHK-${check.id} · ${check.assessment.label}`,
+            detail: `${check.assessment.assessed_by ?? 'Maintenance manager'} · ${check.assessment.reason}` }] : []),
         ...actions.map((action) => ({ key: `action-${action.id}`, at: action.occurred_at,
             title: label(action.type), detail: `${action.actor_name}${action.target_name ? ` → ${action.target_name}` : ''}` })),
     ].sort((left, right) => right.at.localeCompare(left.at));
@@ -469,6 +486,11 @@ export default function WorkOrderShow({ work_order: work, actions, checks, repor
                         {checks.filter((check) => `${check.kind} ${check.outcome} ${check.presented_template?.name ?? ''} ${check.presented_template?.items?.map((item) => item.label).join(' ') ?? ''}`.toLowerCase().includes(workSearch.toLowerCase())).map((check) => <Link key={check.id} href={`/fleet-assets/inspections/${check.id}`} className="block rounded-lg border p-3 hover:bg-accent">
                             <div className="flex items-center justify-between"><span>{check.presented_template?.name ?? 'Legacy check'} · {label(check.kind)}</span><Badge variant="outline">{label(check.outcome)}</Badge></div>
                             <p className="text-xs text-muted-foreground">{check.presented_template?.items?.map((item) => item.label).join(', ') ?? 'Original question wording unavailable'} · {formatDateTime(check.submitted_at)}</p>
+                            {check.assessment && <div className="mt-2 grid gap-1">
+                                <div className="flex flex-wrap items-center gap-2"><StatusBadge variant="success">No issue found</StatusBadge>
+                                    <span className="text-xs text-muted-foreground">Released for use by {check.assessment.assessed_by ?? 'a maintenance manager'} · {formatDateTime(check.assessment.assessed_at)}</span></div>
+                                <p className="text-sm">{check.assessment.reason}</p>
+                            </div>}
                         </Link>)}
                         <div className="border-t pt-3"><strong>Private evidence</strong>
                             {attachments.filter((file) => file.original_name.toLowerCase().includes(workSearch.toLowerCase())).map((file) =>

@@ -94,6 +94,8 @@ export type FinanceFixedAssetLink = {
 };
 
 export type VehicleFinanceWorkspace = {
+    /** The vehicle is outside the viewer's Sites: Finance keeps its own Site rule. */
+    site_restricted?: boolean;
     can: {
         view: boolean;
         view_spend: boolean;

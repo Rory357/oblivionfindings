@@ -16,9 +16,9 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    eventLabel,
     GV500CG_CAPABILITIES,
     observedLabel,
+    sampleLabel,
     telemetryTiles,
 } from './map-model';
 import type { VehicleTelemetry } from './map-types';
@@ -175,7 +175,7 @@ export function VehicleTelemetryPanel({
                     <span>
                         <Radio className="size-[15px]" aria-hidden />
                         {sample
-                            ? `Recorded sample · ${observedLabel(sample.occurred_at)} · ${eventLabel(sample.event_type)}`
+                            ? `Recorded sample · ${observedLabel(sample.occurred_at)} · ${sampleLabel(sample)}`
                             : 'No recorded samples yet'}
                     </span>
                     {samples.length > 0 && (
@@ -191,7 +191,7 @@ export function VehicleTelemetryPanel({
                                 {samples.map((entry, index) => (
                                     <option key={entry.id} value={entry.id}>
                                         {observedLabel(entry.occurred_at)} ·{' '}
-                                        {eventLabel(entry.event_type)}
+                                        {sampleLabel(entry)}
                                         {index === 0 ? ' · latest' : ''}
                                     </option>
                                 ))}

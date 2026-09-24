@@ -1,5 +1,28 @@
 # PKG-02B vehicle profile: mockup fidelity audit
 
+## Follow-up re-audit (24 September 2026)
+
+After Stephan's four decisions, the calendar work and the review fixes (branch `claude/pkg02b-v13-followups`), the changed views were compared with the v13 mockup again on the isolated `oblivion_findings_pkg02b_browser` database, as the synthetic Demo Admin and as a Fleet Manager placed at another Site. Views marked "side by side" were screenshotted at 1440 × 1600 beside the mockup; the Browser pane stopped drawing part-way through, so the calendar and checks were checked through the page structure (menus, dialogs, labels) instead, against the mockup's own `calendar-actions.ts`.
+
+| Area | View | Verdict | Checked |
+|---|---|---|---|
+| Overview | Readiness | Matches (side by side) | Compliance at a glance now follows the mockup's order: WoF, Registration, RUC, CoF. |
+| Overview | Vehicle details | Matches (side by side) | Unchanged layout; third row is deliberate difference 1. |
+| Overview | Documents | Matches (side by side) | |
+| Service & compliance | Evidence & due dates | Matches (side by side) | Rows were Registration, WoF, CoF, RUC; now WoF, Registration, RUC, CoF as in the mockup. Adds the "Not required for this vehicle" tick box (deliberate difference 6). |
+| Checks & inspections | Recent checks | Matches (structure) | Row actions add "No issue found — release for use" (deliberate difference 7); its dialog lists what to resolve first and keeps the button disabled until then. |
+| Calendar | Vehicle calendar | Matches (structure) | Shared Site Calendar parts: date anchor, Month/Week/Day/Agenda/Timeline, source pills, Today rail, New entry. All 21 right-click labels in the mockup's `calendar-actions.ts` are offered; an appointment's hold offers "Reschedule / manage appointment" and "Open work order" instead of edit or cancel; the restriction record opens its source check. |
+| Calendar | Seen from another Site | Deliberate difference 8 | Bookings and unavailable periods are "Busy" only, with no reference, provider or reason; the only action is "Open source record". |
+| Maintenance, Map, Trip history, Finance | Seen from another Site | Deliberate difference 8 | Each view says its records stay with the vehicle's Site. |
+
+### Deliberate differences added
+
+6. **"Not required for this vehicle" tick box** on each requirement (Stephan, 24 September 2026), with the recorded reason and who recorded it in the Next due column.
+7. **"No issue found — release for use"** on a check that holds the vehicle (Stephan, 24 September 2026). New dialog, built from the existing record-dialog pattern; the mockup has no equivalent.
+8. **Central fleet oversight**: the mockup has no viewer from another Site. Bookings are busy time only, and Maintenance, Map, Trips, Finance and service history show a notice instead of other Sites' records.
+
+---
+
 ## Re-audit after the rebuild (23 September 2026, evening)
 
 Every view was rebuilt to the approved v13 mockup and then walked side by side with it: the mockup (`docs/fleet-assets-audit/previews/PKG-02B/v13`, served locally) beside the build (branch `claude/vehicle-profile-designer-pkg02b-54af5e`, isolated `oblivion_findings_pkg02b_browser` database, synthetic Demo Admin), both at the same emulated desktop width. Where the synthetic vehicle had no data for a view (tracker samples, a trip, a checklist, a schedule), a record was created through the view's own wizard or, for tracker data, inserted into the isolated database, so each view was compared with content rather than as an empty state.

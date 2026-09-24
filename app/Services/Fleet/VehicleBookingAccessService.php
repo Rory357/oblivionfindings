@@ -35,7 +35,7 @@ class VehicleBookingAccessService
     /** @return list<int> */
     public function authorizedVehicleIds(User $actor): array
     {
-        return $this->access->accessibleVehiclesForFleet($actor)
+        return $this->access->siteScopedVehiclesForFleet($actor)
             ->orderBy('id')
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
@@ -76,7 +76,7 @@ class VehicleBookingAccessService
 
     public function vehicle(User $actor, int $id, bool $lockForUpdate = false): ?Asset
     {
-        $query = $this->access->accessibleVehiclesForFleet($actor)->whereKey($id);
+        $query = $this->access->siteScopedVehiclesForFleet($actor)->whereKey($id);
         if ($lockForUpdate) {
             $query->lockForUpdate();
         }

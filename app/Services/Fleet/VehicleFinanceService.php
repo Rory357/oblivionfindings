@@ -331,6 +331,10 @@ class VehicleFinanceService
             }
             abort_unless($request->lock_version === $expectedVersion, 409, 'This review request changed while you were deciding. Reload before saving.');
             abort_unless($request->isOpen(), 409, 'Finance has already decided this review request.');
+            // Separation of duties: the person who asked for the review can't decide it.
+            if ((int) $request->requested_by_user_id === (int) $current->id) {
+                throw ValidationException::withMessages(['decision' => 'Someone other than the person who asked for this review must decide it.']);
+            }
             $request->forceFill([
                 'status' => $decision,
                 'decided_by_user_id' => $current->id,

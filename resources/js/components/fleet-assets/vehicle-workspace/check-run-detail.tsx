@@ -14,11 +14,13 @@ import {
     FileText,
     History,
     MessageSquare,
+    ShieldCheck,
     Wrench,
 } from 'lucide-react';
 import { useState } from 'react';
 import { LockedVehicle } from './checks-kit';
 import {
+    ASSESSED_LABEL,
     DAILY_CHECK_KIND,
     outcomeLabel,
     outcomeTone,
@@ -60,6 +62,7 @@ export function RunDetailDialog({
     onClose,
     onReport,
     onOpenWork,
+    onAssess,
 }: {
     vehicle: VehicleProfile;
     run: CheckRun;
@@ -70,9 +73,13 @@ export function RunDetailDialog({
     onReport: (run: CheckRun) => void;
     /** Open the linked work order. */
     onOpenWork: (workOrderId: number) => void;
+    /** Record "No issue found — release for use" for this check. */
+    onAssess?: (run: CheckRun) => void;
 }) {
     const [section, setSection] = useState(0);
     const tone = outcomeTone(run.outcome);
+    const assessment = run.assessment;
+    const canAssess = !!onAssess && !!run.assess?.available;
     const observed = run.observed_at
         ? localDateTimeLabel(toDatetimeLocal(run.observed_at))
         : 'Not recorded';
@@ -103,6 +110,11 @@ export function RunDetailDialog({
                         <StatusBadge variant={tone}>
                             {outcomeLabel(run.outcome)}
                         </StatusBadge>
+                        {assessment && (
+                            <StatusBadge variant="success">
+                                {ASSESSED_LABEL}
+                            </StatusBadge>
+                        )}
                         <p>{versionLabel(run.version)} · original version</p>
                     </div>
                 </div>
@@ -113,28 +125,39 @@ export function RunDetailDialog({
                 </Button>
             }
             footerEnd={
-                run.linked ? (
-                    run.linked_work ? (
+                <>
+                    {canAssess && (
                         <Button
-                            onClick={() =>
-                                run.linked_work &&
-                                onOpenWork(run.linked_work.id)
-                            }
+                            variant="outline"
+                            onClick={() => onAssess?.(run)}
                         >
-                            Review linked maintenance
+                            <ShieldCheck className="size-4" />
+                            No issue found…
                         </Button>
-                    ) : (
-                        <span className="text-subtle">
-                            Linked to Maintenance work
-                        </span>
-                    )
-                ) : can.report ? (
-                    <Button onClick={() => onReport(run)}>
-                        Create or link maintenance
-                    </Button>
-                ) : (
-                    <span className="text-subtle">View-only access</span>
-                )
+                    )}
+                    {run.linked ? (
+                        run.linked_work ? (
+                            <Button
+                                onClick={() =>
+                                    run.linked_work &&
+                                    onOpenWork(run.linked_work.id)
+                                }
+                            >
+                                Review linked maintenance
+                            </Button>
+                        ) : (
+                            <span className="text-subtle">
+                                Linked to Maintenance work
+                            </span>
+                        )
+                    ) : can.report ? (
+                        <Button onClick={() => onReport(run)}>
+                            Create or link maintenance
+                        </Button>
+                    ) : canAssess ? null : (
+                        <span className="text-subtle">View-only access</span>
+                    )}
+                </>
             }
         >
             <WizardStepPane key={section}>
@@ -152,9 +175,16 @@ export function RunDetailDialog({
                                             {run.template}
                                         </h3>
                                     </div>
-                                    <StatusBadge variant={tone}>
-                                        {outcomeLabel(run.outcome)}
-                                    </StatusBadge>
+                                    <div className="inline-actions">
+                                        <StatusBadge variant={tone}>
+                                            {outcomeLabel(run.outcome)}
+                                        </StatusBadge>
+                                        {assessment && (
+                                            <StatusBadge variant="success">
+                                                {ASSESSED_LABEL}
+                                            </StatusBadge>
+                                        )}
+                                    </div>
                                 </div>
                                 <ReviewCard
                                     icon={ClipboardCheck}
@@ -191,6 +221,53 @@ export function RunDetailDialog({
                                             'No additional notes recorded.'}
                                     </p>
                                 </ReviewCard>
+                                {assessment ? (
+                                    <ReviewCard
+                                        icon={ShieldCheck}
+                                        title="Maintenance decision"
+                                    >
+                                        <ReviewRow
+                                            label="Decision"
+                                            value={assessment.label}
+                                        />
+                                        <ReviewRow
+                                            label="Released by"
+                                            value={[
+                                                assessment.assessed_by ??
+                                                    'Staff member',
+                                                assessment.assessed_at
+                                                    ? formatDateTime(
+                                                          assessment.assessed_at,
+                                                      )
+                                                    : null,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(' · ')}
+                                        />
+                                        <ReviewRow
+                                            label="Reason"
+                                            value={assessment.reason}
+                                        />
+                                        {assessment.issues.length > 0 && (
+                                            <ReviewRow
+                                                label="Recorded issues assessed"
+                                                value={assessment.issues.join(
+                                                    ', ',
+                                                )}
+                                            />
+                                        )}
+                                    </ReviewCard>
+                                ) : run.blocking ? (
+                                    <StudioNotice
+                                        title="This check stops the vehicle being used"
+                                        tone="warning"
+                                    >
+                                        {canAssess
+                                            ? 'If Maintenance found no issue, record “No issue found — release for use”. Otherwise create or link maintenance.'
+                                            : (run.assess?.reason ??
+                                              'Bookings and checkout stay blocked until Maintenance assesses this check.')}
+                                    </StudioNotice>
+                                ) : null}
                                 {run.check_kind === DAILY_CHECK_KIND ? (
                                     <StudioNotice title="Daily checks don’t stop bookings">
                                         This daily check is kept as recorded for
@@ -298,6 +375,21 @@ export function RunDetailDialog({
                                                 : run.linked
                                                   ? 'Linked to Maintenance work'
                                                   : 'No follow-up link recorded'
+                                        }
+                                    />
+                                    <ReviewRow
+                                        label="Maintenance decision"
+                                        value={
+                                            assessment
+                                                ? [
+                                                      assessment.label,
+                                                      assessment.assessed_by,
+                                                  ]
+                                                      .filter(Boolean)
+                                                      .join(' · ')
+                                                : run.blocking
+                                                  ? 'Stops the vehicle being used until assessed'
+                                                  : 'None recorded'
                                         }
                                     />
                                     <p className="body-copy mt-3">

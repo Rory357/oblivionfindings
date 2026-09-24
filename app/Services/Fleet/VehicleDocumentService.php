@@ -72,9 +72,55 @@ class VehicleDocumentService
         private readonly VehicleBookingAccessService $bookings,
     ) {}
 
+    /**
+     * Vehicle files follow the Asset register's rule, or central fleet
+     * oversight for the vehicle's own records. Files kept with bookings,
+     * speed limits or Finance keep those records' Site rules (sourceVisible).
+     */
+    public function canView(User $actor, Asset $asset): bool
+    {
+        return Gate::forUser($actor)->allows('view', $asset)
+            || ($actor->canDo('fleet.viewAny') && $this->reachedFleetWide($actor, $asset));
+    }
+
     public function canManage(User $actor, Asset $asset): bool
     {
-        return Gate::forUser($actor)->allows('manageDocuments', $asset);
+        return Gate::forUser($actor)->allows('manageDocuments', $asset)
+            || ($actor->canDo('assets.documents.manage') && $this->reachedFleetWide($actor, $asset));
+    }
+
+    /** Whether the record a file is kept with is open to this person. */
+    public function sourceVisible(User $actor, Asset $asset, ?string $sourceType, mixed $sourceId): bool
+    {
+        return match ($sourceType) {
+            // Finance review evidence (quotes, invoices) opens only for Finance
+            // viewers at the vehicle's Site.
+            'finance_review_request' => $actor->canDo('finance.assets.view')
+                && $this->access->vehicleAtAccessibleSite($actor, $asset),
+            // Booking evidence follows the booking's own Site rule, as the calendar does.
+            'booking' => $this->bookings->accessibleBookings($actor)->whereKey((int) $sourceId)->exists(),
+            // Speed-limit evidence belongs to driving insights, which follow the trip Site rule.
+            'speed_limit' => $this->access->vehicleAtAccessibleSite($actor, $asset),
+            default => true,
+        };
+    }
+
+    /**
+     * Central fleet oversight manages the vehicle's own records. Files kept
+     * with a booking, speed limit or Finance request need access to the
+     * vehicle's Site (a booking's own rule still applies on top).
+     */
+    private function assertSourceWritable(User $actor, Asset $asset, ?string $sourceType): void
+    {
+        if (in_array($sourceType, ['booking', 'finance_review_request', 'speed_limit'], true)) {
+            abort_unless($this->access->vehicleAtAccessibleSite($actor, $asset), 404);
+        }
+    }
+
+    private function reachedFleetWide(User $actor, Asset $asset): bool
+    {
+        return $this->access->canViewAllFleetVehicles($actor)
+            && $this->access->fleetVehicle($actor, (int) $asset->getKey()) !== null;
     }
 
     /**
@@ -105,6 +151,7 @@ class VehicleDocumentService
                 return [$prior, $prior->files()->where('request_key', 'like', $requestKey.':%')->orderBy('id')->get()->all()];
             }
             $this->assertSource($asset, $meta['source_type'], $meta['source_id']);
+            $this->assertSourceWritable($current, $asset, $meta['source_type']);
             $set = AssetDocumentSet::query()->create([
                 'asset_id' => $asset->id, 'category' => $meta['category'], 'reference' => $meta['reference'],
                 'document_date' => $meta['document_date'], 'expires_on' => $meta['expires_on'],
@@ -144,6 +191,7 @@ class VehicleDocumentService
         [$set, $reserved] = DB::transaction(function () use ($actor, $assetId, $setId, $checked, $reason, $expectedVersion, $requestKey, $fingerprint): array {
             [$current, $asset] = $this->resolve($actor, $assetId);
             $set = $this->lockSet($asset, $setId);
+            $this->assertSourceWritable($current, $asset, $set->source_type);
             if ($this->replayed($set, $requestKey, $fingerprint)) {
                 return [$set, $set->files()->where('request_key', 'like', $requestKey.':%')->orderBy('id')->get()->all()];
             }
@@ -171,6 +219,7 @@ class VehicleDocumentService
         return DB::transaction(function () use ($actor, $assetId, $setId, $meta, $expectedVersion, $requestKey, $fingerprint): AssetDocumentSet {
             [$current, $asset] = $this->resolve($actor, $assetId);
             $set = $this->lockSet($asset, $setId);
+            $this->assertSourceWritable($current, $asset, $set->source_type);
             if ($this->replayed($set, $requestKey, $fingerprint)) {
                 return $set;
             }
@@ -201,6 +250,7 @@ class VehicleDocumentService
             [$current, $asset] = $this->resolve($actor, $assetId);
             $document = AssetDocument::query()->whereKey($documentId)->where('asset_id', $asset->id)->whereNotNull('document_set_id')->first() ?? abort(404);
             $set = $this->lockSet($asset, (int) $document->document_set_id);
+            $this->assertSourceWritable($current, $asset, $set->source_type);
             $document = AssetDocument::query()->whereKey($documentId)->lockForUpdate()->firstOrFail();
             $fingerprint = MaintenanceFingerprint::of(['actor' => (int) $current->id, 'document' => $documentId, 'reason' => trim($reason), 'pause' => $pauseRenewal]);
             if ($this->replayed($set, $requestKey, $fingerprint)) {
@@ -224,8 +274,9 @@ class VehicleDocumentService
     /** Retry storage, scanning or publication of a file that did not finish. */
     public function retryFile(User $actor, int $assetId, int $documentId): AssetDocument
     {
-        [, $asset] = DB::transaction(fn (): array => $this->resolve($actor, $assetId));
+        [$current, $asset] = DB::transaction(fn (): array => $this->resolve($actor, $assetId));
         $document = AssetDocument::query()->whereKey($documentId)->where('asset_id', $asset->id)->whereNotNull('document_set_id')->first() ?? abort(404);
+        $this->assertSourceWritable($current, $asset, $document->source_type);
         abort_unless(in_array($document->state, ['scan_unavailable', 'publication_failed', 'reserved', 'stored'], true), 409,
             'Only files still waiting for their check can be retried.');
         abort_unless($document->storage_path && Storage::disk(self::DISK)->exists($document->storage_path), 409,
@@ -237,9 +288,10 @@ class VehicleDocumentService
     /** Scan a pre-existing (legacy) file now that checking is available. */
     public function verifyLegacyFile(User $actor, int $assetId, int $documentId): AssetDocument
     {
-        [, $asset] = DB::transaction(fn (): array => $this->resolve($actor, $assetId));
+        [$current, $asset] = DB::transaction(fn (): array => $this->resolve($actor, $assetId));
         $document = AssetDocument::query()->whereKey($documentId)->where('asset_id', $asset->id)
             ->where('state', AssetDocument::STATE_LEGACY)->first() ?? abort(404);
+        $this->assertSourceWritable($current, $asset, $document->source_type);
         $disk = Storage::disk($document->storage_disk ?: 'local');
         abort_unless($disk->exists($document->storage_path), 409, 'The original file is no longer in storage.');
         $scan = $this->scan($disk->path($document->storage_path));
@@ -261,14 +313,10 @@ class VehicleDocumentService
     /** Stream a file after rechecking current access. Images may be shown inline. */
     public function download(User $actor, int $assetId, int $documentId, bool $inline = false): StreamedResponse
     {
-        $asset = $this->access->assignableVehicle($actor, $assetId) ?? abort(404);
-        abort_unless(Gate::forUser($actor)->allows('view', $asset), 404);
+        $asset = $this->access->fleetVehicle($actor, $assetId) ?? abort(404);
+        abort_unless($this->canView($actor, $asset), 404);
         $document = AssetDocument::query()->whereKey($documentId)->where('asset_id', $asset->id)->first() ?? abort(404);
-        // Finance review evidence (quotes, invoices) opens only for Finance viewers.
-        abort_if($document->source_type === 'finance_review_request' && ! $actor->canDo('finance.assets.view'), 404);
-        // Booking evidence follows the booking's own Site rule, as the calendar does.
-        abort_if($document->source_type === 'booking' && ! $this->bookings->accessibleBookings($actor)
-            ->whereKey((int) $document->source_id)->exists(), 404);
+        abort_unless($this->sourceVisible($actor, $asset, $document->source_type, $document->source_id), 404);
         abort_unless($document->isOpenable(), 409, 'This file is not available to open. It has not passed its virus check.');
         $disk = Storage::disk($document->storage_disk ?: 'local');
         abort_unless($disk->exists($document->storage_path), 404);
@@ -572,7 +620,7 @@ class VehicleDocumentService
     private function resolve(User $actor, int $assetId, ?int $bookingEvidenceFor = null): array
     {
         $current = User::query()->findOrFail($actor->id);
-        $asset = $this->access->assignableVehicle($current, $assetId, true) ?? abort(404);
+        $asset = $this->access->fleetVehicle($current, $assetId, true) ?? abort(404);
         abort_unless($this->canManage($current, $asset)
             || ($bookingEvidenceFor !== null && $this->mayAddBookingEvidence($current, $asset, $bookingEvidenceFor)), 403);
 

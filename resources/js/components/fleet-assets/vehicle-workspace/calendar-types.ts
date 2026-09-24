@@ -1,4 +1,5 @@
 import type { CalendarItem } from '@/lib/calendar/recur';
+import type { ComplianceKind } from './types';
 
 /** Server DTOs for the vehicle calendar (VehicleCalendarService). */
 
@@ -20,12 +21,36 @@ export type VehicleCalendarItem = CalendarItem & {
     recordId: number | null;
     workOrderId: number | null;
     desc: string | null;
-    /** Service appointments: the planned provider, whether it holds the vehicle, and whether it can still change. */
+    /**
+     * Service appointments: the planned provider, whether it holds the vehicle
+     * and whether it can still change. Estimates: the appointment already
+     * planned on that work. Restrictions: the record shown in place.
+     * Unavailable periods: whether an appointment holds them.
+     */
     meta?: {
         provider?: string | null;
         unavailable?: boolean;
         open?: boolean;
+        appointment?: PlannedAppointmentMeta | null;
+        held_by_appointment?: boolean;
+        owner?: string | null;
+        work_status?: string | null;
+        work_reference?: string | null;
+        source_check?: RestrictionSourceCheck | null;
     } | null;
+};
+
+export type PlannedAppointmentMeta = {
+    start: string;
+    end: string | null;
+    provider: string | null;
+    unavailable: boolean;
+};
+
+export type RestrictionSourceCheck = {
+    id: number;
+    label: string;
+    outcome: string | null;
 };
 
 export type CalendarPerson = { id: number; name: string };
@@ -124,6 +149,8 @@ export type CalendarOpenWork = {
     title: string | null;
     status: string;
     version: number;
+    /** What the work was reported from (e.g. a service schedule), for linked planning. */
+    source?: { type: string; id: number } | null;
 };
 
 export type VehicleCalendarSummary = {
@@ -140,8 +167,15 @@ export type VehicleCalendarSummary = {
         work_order_id: number;
         work_reference: string | null;
         work_title: string | null;
+        work_status?: string | null;
+        owner?: string | null;
+        source_check?: RestrictionSourceCheck | null;
     } | null;
     use_problem: string | null;
+    use_problem_code: string | null;
+    use_problem_kind: ComplianceKind | null;
+    /** The readiness reason's source record (e.g. the check run holding the vehicle). */
+    use_problem_source_id?: number | null;
     readiness_label: string;
     next_appointment: { start: string; title: string; id: string } | null;
     next_due: { start: string; title: string; id: string } | null;
@@ -149,6 +183,8 @@ export type VehicleCalendarSummary = {
     drivers: CalendarDriver[];
     open_work: CalendarOpenWork[];
     can: {
+        /** False when the vehicle is outside the viewer's Sites: bookings keep their own rule. */
+        view_bookings: boolean;
         request: boolean;
         manage: boolean;
         approve: boolean;
@@ -158,5 +194,7 @@ export type VehicleCalendarSummary = {
         add_reminder: boolean;
         mark_unavailable: boolean;
         view_maintenance: boolean;
+        /** An authorised release reviewer for this vehicle's Site and category. */
+        review_release?: boolean;
     };
 };

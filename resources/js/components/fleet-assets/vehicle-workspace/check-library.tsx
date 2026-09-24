@@ -67,6 +67,10 @@ export function ChecklistLibrary({
 }) {
     const { can, templates } = checks;
     const canManage = can.manage_templates;
+    // A checklist other vehicles use is a fleet-wide setting.
+    const canCustomise = (template: CheckTemplate) =>
+        canManage &&
+        (can.manage_shared_templates || template.assignment === 'vehicle');
     const canRun = can.start;
     const [edit, setEdit] = useState<CheckTemplate | null | undefined>();
     const [preview, setPreview] = useState<CheckTemplate | null>(null);
@@ -167,7 +171,7 @@ export function ChecklistLibrary({
                             </Button>
                             <Button
                                 variant="outline"
-                                disabled={!canManage}
+                                disabled={!canCustomise(template)}
                                 onClick={() => setEdit(template)}
                             >
                                 <Settings2 className="size-[14px]" />
@@ -192,7 +196,7 @@ export function ChecklistLibrary({
                             icon: ListChecks,
                             onClick: () => setPreview(template),
                         },
-                        ...(canManage
+                        ...(canCustomise(template)
                             ? [
                                   {
                                       label: 'Customise checklist',
@@ -302,7 +306,13 @@ function TemplateEditor({
     onClose: () => void;
     onSaved: () => void;
 }) {
-    const [initial] = useState(() => draftFromTemplate(original));
+    // Checklists used beyond this vehicle are fleet-wide settings; without
+    // that authority a new checklist is for this vehicle only.
+    const shared = checks.can.manage_shared_templates;
+    const [initial] = useState(() => {
+        const base = draftFromTemplate(original);
+        return shared ? base : { ...base, assignment: 'vehicle' as const };
+    });
     const [draft, setDraft] = useState<TemplateDraft>(initial);
     const [step, setStep] = useState(0);
     const [error, setError] = useState('');
@@ -340,7 +350,9 @@ function TemplateEditor({
             })
             .map((option) => ({ value: option, label: option }));
     }, [checks.templates, draft.use]);
-    const assignment = assignmentOptions(vehicle);
+    const assignment = assignmentOptions(vehicle).filter(
+        (option) => shared || option.value === 'vehicle',
+    );
     const serverError =
         Object.entries(command.errors).find(([key]) =>
             ['name', 'use', 'assignment', 'questions', 'confirmed'].some(
@@ -600,6 +612,8 @@ function TemplateEditor({
                                             Checks pass or fail only against a
                                             version the site’s approved check
                                             rules cover.
+                                            {!shared &&
+                                                ' Checklists used by other vehicles are fleet-wide settings, changed by a Fleet Manager.'}
                                         </StudioNotice>
                                     </>
                                 )}

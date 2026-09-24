@@ -68,6 +68,7 @@ export function AppointmentWizard({
     workOrderId,
     appointment,
     presetType,
+    source,
     onClose,
     onSaved,
 }: {
@@ -80,6 +81,8 @@ export function AppointmentWizard({
     appointment?: PlannedAppointment;
     /** "Plan linked appointment": the service or due item it is for. */
     presetType?: string;
+    /** "Plan linked appointment": the schedule or compliance record new work is reported from. */
+    source?: { type: 'service_schedule' | 'compliance_record'; id: number };
     onClose: () => void;
     onSaved: () => void;
 }) {
@@ -204,7 +207,15 @@ export function AppointmentWizard({
         if (form.changeReason.trim())
             body.append('change_reason', form.changeReason.trim());
         if (form.work !== NEW_WORK) body.append('work_order_id', form.work);
-        else body.append('title', form.type.trim());
+        else {
+            body.append('title', form.type.trim());
+            // New work is reported from the due date it plans for, so later
+            // plans for the same due date reuse it instead of duplicating it.
+            if (source) {
+                body.append('source_type', source.type);
+                body.append('source_id', String(source.id));
+            }
+        }
         if (!cancelling) {
             body.append('provider_name', form.provider.trim());
             body.append('starts_local', form.start);

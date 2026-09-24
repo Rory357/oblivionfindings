@@ -2,6 +2,7 @@
 
 namespace App\Services\Fleet;
 
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
 use App\Models\AssetDocument;
 use App\Models\AssetDocumentSet;
@@ -19,7 +20,6 @@ use App\Services\Fleet\Data\VehicleReadinessAssessment;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -32,6 +32,9 @@ class VehicleWorkspacePresenter
 
     private const HISTORY = 50;
 
+    /** The approved design lists compliance requirements in this order. */
+    private const COMPLIANCE_ORDER = ['wof', 'registration', 'ruc', 'cof'];
+
     public function __construct(
         private readonly VehicleReadinessService $readiness,
         private readonly VehicleOdometerService $odometer,
@@ -40,6 +43,9 @@ class VehicleWorkspacePresenter
         private readonly MaintenanceAccessService $maintenance,
         private readonly VehicleObligationReminderService $obligationReminders,
         private readonly VehicleMileageFeedService $mileageFeed,
+        private readonly SecurityDevicesAccessService $vehicles,
+        private readonly VehicleDocumentService $files,
+        private readonly MaintenanceRestrictionService $restrictions,
     ) {}
 
     /** @return array<string,mixed> */
@@ -48,7 +54,8 @@ class VehicleWorkspacePresenter
         $asset->loadMissing(['site:id,name', 'homeSite:id,name', 'primaryDriver:id,name', 'fleetResponsible:id,name', 'profilePhoto']);
         $assessment = $this->readiness->assess($asset);
         $can = $this->permissions($viewer, $asset, $canViewTechnology);
-        // Files follow the asset register's own access rule (AssetPolicy::view).
+        // Files follow the asset register's rule, or central fleet oversight
+        // for the vehicle's own records (VehicleDocumentService::canView).
         $documents = $can['view_documents'] ? $this->documents($asset) : [];
         // Service and RUC planning may use the calibrated tracker distance; readiness never does.
         // Tracker figures are separately permissioned, so other viewers plan from recorded readings.
@@ -58,13 +65,13 @@ class VehicleWorkspacePresenter
         $schedules = $this->schedules($asset, $assessment, $documents, $planning['planning_km']);
 
         return [
-            'vehicle' => $this->vehicle($asset),
+            'vehicle' => $this->vehicle($asset, $can['view_site_records']),
             'readiness' => $assessment->toArray($canViewTechnology),
             'compliance' => $this->compliance($asset, $documents),
             'odometer' => $this->odometerData($asset, $assessment, $canViewTechnology, $documents),
             'schedules' => $schedules,
-            'service_history' => $this->serviceHistory($asset),
-            'reminders' => $this->reminders($asset),
+            'service_history' => $this->serviceHistory($asset, $can['view_maintenance']),
+            'reminders' => $this->reminders($asset, $can['view_maintenance']),
             'obligation_reminders' => $this->obligationReminders->forVehicle($viewer, $asset, $planning['planning_km']),
             'mileage_feed' => $this->mileageFeed->present($viewer, $asset, $currentReading, $assessment->trackerEstimate, $canViewTechnology),
             'documents' => array_values(array_filter($documents, fn (array $set): bool => $set['source'] === null)),
@@ -84,27 +91,42 @@ class VehicleWorkspacePresenter
     private function permissions(User $viewer, Asset $asset, bool $canViewTechnology): array
     {
         $manage = $viewer->canDo('fleet.manage');
+        // Central fleet oversight shows every vehicle's own records; bookings,
+        // trips, locations, drivers and Finance need the vehicle's Site.
+        $siteRecords = $this->vehicles->vehicleAtAccessibleSite($viewer, $asset);
 
         return [
             'manage' => $manage,
-            'view_documents' => Gate::forUser($viewer)->allows('view', $asset),
-            'manage_documents' => Gate::forUser($viewer)->allows('manageDocuments', $asset),
+            'view_site_records' => $siteRecords,
+            'view_documents' => $this->files->canView($viewer, $asset),
+            'manage_documents' => $this->files->canManage($viewer, $asset),
             'manage_schedules' => $manage || $viewer->canDo('fleet.maintenance.manage'),
             'add_catalogue' => $this->catalogue->canAdd($viewer),
-            'view_finance' => $viewer->canDo('finance.assets.view'),
-            'inspect' => $manage || $viewer->canDo('fleet.maintenance.manage'),
+            'view_finance' => $siteRecords && $viewer->canDo('finance.assets.view'),
+            // Checks are recorded through Maintenance, at the viewer's own Sites.
+            'inspect' => ($manage || $viewer->canDo('fleet.maintenance.manage'))
+                && $this->maintenanceSite($viewer, $asset),
             'report_maintenance' => $this->maintenance->canReport($viewer)
                 && in_array((int) $asset->site_id, $this->maintenance->approvedSiteIds($viewer), true),
-            'view_maintenance' => $this->maintenance->canRead($viewer),
+            // PKG-01's read rule (MaintenanceAccessService::scopedWorkOrders):
+            // Maintenance access at the vehicle's Site, not fleet oversight.
+            'view_maintenance' => $this->maintenance->canRead($viewer) && $this->maintenanceSite($viewer, $asset),
             'schedule_service' => $this->maintenance->canManage($viewer)
                 && in_array((int) $asset->site_id, $this->maintenance->approvedSiteIds($viewer), true),
-            'book' => $viewer->canDo('fleet.viewAny') || $viewer->canDo('assets.viewAny'),
+            'book' => $siteRecords && ($viewer->canDo('fleet.viewAny') || $viewer->canDo('assets.viewAny')),
             'view_vehicle_technology' => $canViewTechnology,
         ];
     }
 
+    /** Whether the vehicle's Site is one where this person may act for Maintenance. */
+    private function maintenanceSite(User $viewer, Asset $asset): bool
+    {
+        return $asset->site_id !== null
+            && in_array((int) $asset->site_id, $this->maintenance->approvedSiteIds($viewer), true);
+    }
+
     /** @return array<string,mixed> */
-    private function vehicle(Asset $asset): array
+    private function vehicle(Asset $asset, bool $siteRecords): array
     {
         $photo = $asset->profilePhoto;
 
@@ -125,7 +147,9 @@ class VehicleWorkspacePresenter
             'use_purpose' => $asset->use_purpose,
             'ownership_arrangement' => $asset->ownership_arrangement,
             'responsible' => $asset->fleetResponsible ? ['id' => $asset->fleetResponsible->id, 'name' => $asset->fleetResponsible->name] : null,
-            'primary_driver' => $asset->primaryDriver ? ['id' => $asset->primaryDriver->id, 'name' => $asset->primaryDriver->name] : null,
+            // Driver details follow the vehicle's Site, not central fleet oversight.
+            'primary_driver' => $siteRecords && $asset->primaryDriver ? ['id' => $asset->primaryDriver->id, 'name' => $asset->primaryDriver->name] : null,
+            'primary_driver_withheld' => ! $siteRecords && $asset->primary_driver_user_id !== null,
             'insurance_provider' => $asset->insurance_provider,
             'insurance_policy_reference' => $asset->insurance_policy_reference,
             'insurance_expires_at' => $asset->insurance_expires_at?->toDateString(),
@@ -175,6 +199,8 @@ class VehicleWorkspacePresenter
     }
 
     /**
+     * Requirements in the approved design's order: WoF, Registration, RUC, CoF.
+     *
      * @param  list<array<string,mixed>>  $documents
      * @return list<array<string,mixed>>
      */
@@ -186,7 +212,7 @@ class VehicleWorkspacePresenter
         $filesByVersion = collect($documents)->filter(fn (array $set): bool => ($set['source']['type'] ?? null) === 'compliance_version')
             ->groupBy(fn (array $set): int => (int) $set['source']['id']);
 
-        return collect(VehicleComplianceService::KINDS)->map(function (string $kind) use ($records, $versions, $filesByVersion): array {
+        return collect(self::COMPLIANCE_ORDER)->map(function (string $kind) use ($records, $versions, $filesByVersion): array {
             $record = $records->get($kind);
             $history = $record ? ($versions->get($record->id) ?? collect()) : collect();
             $current = $history->firstWhere('id', $record?->current_version_id);
@@ -308,8 +334,14 @@ class VehicleWorkspacePresenter
             })->values()->all();
     }
 
-    /** Recorded services plus completed or cancelled Maintenance work, newest first. @return list<array<string,mixed>> */
-    private function serviceHistory(Asset $asset): array
+    /**
+     * Recorded services plus completed or cancelled Maintenance work, newest
+     * first. Work records, and the work a service was recorded against, are
+     * listed only for people who may read that Site's Maintenance.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function serviceHistory(Asset $asset, bool $readsMaintenance): array
     {
         $completions = FleetServiceCompletion::query()->where('asset_id', $asset->id)
             ->with(['schedule:id,name', 'workOrder:id,reference_number,title', 'recordedBy:id,name'])
@@ -325,11 +357,12 @@ class VehicleWorkspacePresenter
                 'provider' => $completion->provider,
                 'evidence_reference' => $completion->evidence_reference,
                 'notes' => $completion->notes,
-                'reference' => $completion->workOrder?->reference_number,
-                'work_order_id' => $completion->work_order_id,
+                'reference' => $readsMaintenance ? $completion->workOrder?->reference_number : null,
+                'work_order_id' => $readsMaintenance ? $completion->work_order_id : null,
                 'recorded_by' => $completion->recordedBy?->name,
             ]);
-        $work = FleetWorkOrder::query()->where('asset_id', $asset->id)->whereIn('status', ['completed', 'cancelled'])
+        $work = ! $readsMaintenance ? collect() : FleetWorkOrder::query()->where('asset_id', $asset->id)
+            ->whereIn('status', ['completed', 'cancelled'])
             ->orderByDesc(DB::raw('COALESCE(completed_at, updated_at)'))->limit(self::HISTORY)->get();
         $workIds = $work->pluck('id')->all();
         $providers = [];
@@ -381,12 +414,12 @@ class VehicleWorkspacePresenter
     }
 
     /** @return list<array<string,mixed>> */
-    private function reminders(Asset $asset): array
+    private function reminders(Asset $asset, bool $readsMaintenance): array
     {
         $reminders = FleetVehicleReminder::query()->where('asset_id', $asset->id)
             ->with(['owner:id,name', 'backup:id,name', 'events' => fn ($events) => $events->with('actor:id,name')->orderByDesc('id')->limit(10)])
             ->orderByRaw("FIELD(state, 'scheduled', 'acknowledged', 'paused', 'completed')")->orderBy('due_at')->limit(100)->get();
-        $labels = $this->sourceLabels($asset, $reminders);
+        $labels = $this->sourceLabels($asset, $reminders, $readsMaintenance);
 
         return $reminders->map(fn (FleetVehicleReminder $reminder): array => [
             'id' => $reminder->id,
@@ -407,8 +440,13 @@ class VehicleWorkspacePresenter
         ])->values()->all();
     }
 
-    /** @return array<string,string> */
-    private function sourceLabels(Asset $asset, Collection $reminders): array
+    /**
+     * Readable names for reminder sources. Work records are named only for
+     * people who may read that Site's Maintenance.
+     *
+     * @return array<string,string>
+     */
+    private function sourceLabels(Asset $asset, Collection $reminders, bool $readsMaintenance): array
     {
         $labels = [];
         foreach ($reminders->groupBy('source_type') as $type => $group) {
@@ -418,8 +456,10 @@ class VehicleWorkspacePresenter
                 'service_schedule' => FleetServiceSchedule::query()->whereIn('id', $ids)->where('asset_id', $asset->id)->pluck('name', 'id'),
                 'compliance_record' => FleetVehicleComplianceRecord::query()->whereIn('id', $ids)->where('asset_id', $asset->id)
                     ->pluck('kind', 'id')->map(fn (string $kind): string => VehicleComplianceService::LABELS[$kind] ?? $kind),
-                'work_order' => FleetWorkOrder::query()->whereIn('id', $ids)->where('asset_id', $asset->id)
-                    ->get(['id', 'reference_number', 'title'])->mapWithKeys(fn ($order): array => [$order->id => trim(($order->reference_number ?? '').' · '.$order->title, ' ·')]),
+                'work_order' => $readsMaintenance
+                    ? FleetWorkOrder::query()->whereIn('id', $ids)->where('asset_id', $asset->id)
+                        ->get(['id', 'reference_number', 'title'])->mapWithKeys(fn ($order): array => [$order->id => trim(($order->reference_number ?? '').' · '.$order->title, ' ·')])
+                    : $ids->mapWithKeys(fn (mixed $id): array => [(int) $id => 'Maintenance work']),
                 default => collect(),
             };
             foreach ($rows as $id => $label) {
@@ -525,6 +565,12 @@ class VehicleWorkspacePresenter
         if (! $this->maintenance->canRead($viewer)) {
             return ['can_view' => false, 'open_count' => null, 'open' => [], 'active_restrictions' => 0];
         }
+        // Maintenance keeps PKG-01's Site rule (MaintenanceAccessService::
+        // scopedWorkOrders): central fleet oversight sees the vehicle, not the
+        // work of a Site the person can't act at for Maintenance.
+        if (! $this->maintenanceSite($viewer, $asset)) {
+            return ['can_view' => false, 'site_restricted' => true, 'open_count' => null, 'open' => [], 'active_restrictions' => 0];
+        }
         $open = FleetWorkOrder::query()->where('asset_id', $asset->id)->whereNotIn('status', ['completed', 'cancelled'])
             ->with('assignedTo:id,name')
             ->orderByRaw('due_at IS NULL')->orderBy('due_at')->orderByDesc('id')->limit(50)
@@ -585,6 +631,11 @@ class VehicleWorkspacePresenter
         $responses = DB::table('control_room_alerts')
             ->whereIn('id', $reports->where('source_type', 'control_room_alert')->pluck('source_id')->filter()->unique()->values()->all())
             ->pluck('reference_number', 'id');
+        // A check Maintenance released as "no issue found" no longer warns.
+        $released = array_flip($this->restrictions->assessedRunIds(
+            $reports->where('source_type', 'fleet_checklist_run')->pluck('source_id')->filter()
+                ->map(fn (mixed $id): int => (int) $id)->unique()->values()->all(),
+        ));
         $sources = [];
         foreach ($reports as $report) {
             $id = (int) $report->work_order_id;
@@ -593,7 +644,8 @@ class VehicleWorkspacePresenter
             }
             $sources[$id] = match ($report->source_type) {
                 'fleet_checklist_run' => ['label' => 'CHK-'.$report->source_id, 'failed_check' => $report->outcome !== null
-                    && ! in_array($report->outcome, ['passed', FleetChecklistRun::OUTCOME_NO_ISSUE], true)],
+                    && ! in_array($report->outcome, ['passed', FleetChecklistRun::OUTCOME_NO_ISSUE], true)
+                    && ! isset($released[(int) $report->source_id])],
                 'control_room_alert' => ['label' => (string) ($responses[$report->source_id] ?? 'Control Room response'), 'failed_check' => false],
                 default => ['label' => 'Manual report', 'failed_check' => false],
             };
@@ -621,7 +673,7 @@ class VehicleWorkspacePresenter
         ];
     }
 
-    /** @return array{id:int, outcome:?string, template:?string, submitted_at:string}|null */
+    /** @return array{id:int, outcome:?string, template:?string, submitted_at:string, assessed:bool}|null */
     private function latestCheck(Asset $asset, bool $daily): ?array
     {
         $run = DB::table('fleet_checklist_runs as run')->leftJoin('fleet_checklist_templates as template', 'template.id', '=', 'run.template_id')
@@ -631,10 +683,16 @@ class VehicleWorkspacePresenter
                 fn ($query) => $query->where(fn ($kind) => $kind->whereNull('run.check_kind')->orWhere('run.check_kind', '!=', FleetChecklistRun::KIND_DAILY)))
             ->orderByDesc('run.submitted_at')->orderByDesc('run.id')
             ->first(['run.id', 'run.outcome', 'run.submitted_at', 'template.name as template_name']);
+        // Maintenance's "no issue found — release for use" on that check; its
+        // original outcome is kept as submitted. Daily checks are never assessed.
+        $assessed = $run !== null && ! $daily && Schema::hasTable('fleet_maintenance_check_assessments')
+            && DB::table('fleet_maintenance_check_assessments')->where('check_run_id', $run->id)
+                ->where('decision', MaintenanceRestrictionService::NO_ISSUE_RELEASE)->exists();
 
         return $run ? [
             'id' => (int) $run->id, 'outcome' => $run->outcome, 'template' => $run->template_name,
             'submitted_at' => CarbonImmutable::parse($run->submitted_at, 'UTC')->toIso8601String(),
+            'assessed' => $assessed,
         ] : null;
     }
 }

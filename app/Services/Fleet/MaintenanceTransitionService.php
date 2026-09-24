@@ -2,21 +2,29 @@
 
 namespace App\Services\Fleet;
 
+use App\Models\Asset;
+use App\Models\FleetChecklistRun;
 use App\Models\FleetWorkOrder;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\Fleet\Data\VehicleReadinessContext;
 use App\Services\UserSiteAccessService;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class MaintenanceTransitionService
 {
+    /** Answer values that record an issue, or that the item couldn't be assessed. */
+    private const ISSUE_ANSWERS = ['fail', 'unable', 'issue', 'poor'];
+
     public function __construct(
         private readonly MaintenanceAccessService $access,
         private readonly MaintenancePolicyService $policy,
         private readonly UserSiteAccessService $siteAccess,
         private readonly VehicleReadinessService $readiness,
+        private readonly MaintenanceRestrictionService $restrictions,
     ) {}
 
     /** @param array<string, mixed> $payload */
@@ -390,6 +398,218 @@ class MaintenanceTransitionService
         }, 3);
     }
 
+    /**
+     * Maintenance assessment of one submitted check: "No issue found —
+     * release for use". It resolves only that check's hold on the vehicle,
+     * under the same vehicle lock and readiness gate as a per-work release,
+     * and keeps the readiness evidence beside the decision. Maintenance holds
+     * are untouched (repair, retest and independent release still apply) and
+     * the check's own answers and outcome never change.
+     *
+     * The person who recorded a check may release it only when no approved
+     * rule applied and it recorded no issue; otherwise another maintenance
+     * manager assesses it. An identical retry returns the same decision.
+     */
+    public function assessCheck(User $actor, int $assetId, int $runId, string $reason, bool $confirmed, string $key): object
+    {
+        abort_unless($this->access->canManage($actor), 403);
+        $reason = trim($reason);
+        if ($reason === '') {
+            throw ValidationException::withMessages(['reason' => 'Record why the vehicle is safe to use.']);
+        }
+        if (mb_strlen($reason) > 2000) {
+            throw ValidationException::withMessages(['reason' => 'Keep the reason under 2,000 characters.']);
+        }
+        if (! $confirmed) {
+            throw ValidationException::withMessages(['confirmed' => 'Confirm that you assessed this check and found nothing that stops safe use.']);
+        }
+        if (mb_strlen(trim($key)) < 8 || mb_strlen($key) > 100) {
+            throw ValidationException::withMessages(['request_key' => 'A request key is required.']);
+        }
+        $decision = MaintenanceRestrictionService::NO_ISSUE_RELEASE;
+        $fingerprint = MaintenanceFingerprint::of([
+            'actor_id' => (int) $actor->id,
+            'operation' => 'maintenance.check.assess',
+            'asset_id' => $assetId,
+            'run_id' => $runId,
+            'decision' => $decision,
+            'reason' => $reason,
+            'confirmed' => true,
+        ]);
+
+        try {
+            return DB::transaction(function () use ($actor, $assetId, $runId, $reason, $key, $decision, $fingerprint): object {
+                $currentActor = User::query()->findOrFail($actor->id);
+                abort_unless($this->access->canManage($currentActor), 403);
+                // The vehicle first: the same lock bookings, checks, reports and
+                // release take. Maintenance's approved Sites decide the scope.
+                $asset = $this->access->asset($currentActor, $assetId, true);
+
+                $prior = DB::table('fleet_maintenance_check_assessments')
+                    ->where('assessed_by_user_id', $currentActor->id)->where('request_key', $key)
+                    ->lockForUpdate()->first();
+                if ($prior) {
+                    abort_unless((int) $prior->asset_id === (int) $asset->id
+                        && hash_equals((string) $prior->request_fingerprint, $fingerprint), 409,
+                        'This request was already used for a different assessment. Reload and try again.');
+
+                    return $prior;
+                }
+
+                $run = DB::table('fleet_checklist_runs')->where('id', $runId)->where('asset_id', $asset->id)
+                    ->whereNotNull('submitted_at')->lockForUpdate()
+                    ->first(['id', 'user_id', 'outcome', 'check_kind', 'rule_version_id', 'rule_snapshot_json', 'responses', 'work_order_id']);
+                abort_unless($run !== null, 404);
+                abort_if(DB::table('fleet_maintenance_check_assessments')->where('check_run_id', $run->id)
+                    ->lockForUpdate()->exists(), 409, 'This check has already been assessed. Reload to see the decision.');
+
+                $workIds = self::checkWorkIds($run, true);
+                $held = DB::table('fleet_maintenance_restrictions')->where('asset_id', $asset->id)->where('state', 'active')
+                    ->where(fn ($query) => $query->where('source_run_id', $run->id)
+                        ->when($workIds !== [], fn ($linked) => $linked->orWhereIn('work_order_id', $workIds)))
+                    ->lockForUpdate()->exists();
+                $blocking = in_array((int) $run->id, $this->restrictions->blockers((int) $asset->id, true)['check_run_ids'], true);
+                $responses = json_decode((string) $run->responses, true);
+                $issues = self::recordedIssues(is_array($responses) ? $responses : []);
+                $refusal = self::checkAssessmentRefusal($run, (int) $currentActor->id, $blocking, $held, $issues);
+                if ($refusal !== null) {
+                    throw ValidationException::withMessages(['run' => $refusal]);
+                }
+
+                $readiness = null;
+                if (Asset::vehicles()->whereKey($asset->id)->exists()) {
+                    // The same gate as a per-work release: this check stops
+                    // counting, every other hold and check still does, and the
+                    // vehicle's compliance evidence must be current.
+                    $assessment = $this->readiness->assess($asset, new VehicleReadinessContext(
+                        purpose: 'maintenance_release',
+                        resolvedCheckRunIds: [(int) $run->id],
+                    ), true);
+                    $this->readiness->assertCanProceed($assessment, 'run');
+                    $readiness = [
+                        'input_fingerprint' => $assessment->inputFingerprint,
+                        'compliance_version_ids' => $assessment->complianceVersionIds,
+                        'odometer_observation_id' => $assessment->odometerObservationId,
+                        'restriction_ids' => $assessment->restrictionIds,
+                        'check_run_ids' => $assessment->checkRunIds,
+                        'reason_codes' => array_map(fn ($item) => $item->code, $assessment->reasons),
+                    ];
+                }
+
+                $workOrderId = $workIds[0] ?? null;
+                $id = DB::table('fleet_maintenance_check_assessments')->insertGetId([
+                    'asset_id' => $asset->id,
+                    'check_run_id' => $run->id,
+                    'work_order_id' => $workOrderId,
+                    'decision' => $decision,
+                    'reason' => $reason,
+                    'run_outcome' => (string) ($run->outcome ?? 'needs_assessment'),
+                    'run_rule_version_id' => $run->rule_version_id,
+                    'acknowledged_issues_json' => json_encode($issues, JSON_THROW_ON_ERROR),
+                    'readiness_json' => $readiness === null ? null : json_encode($readiness, JSON_THROW_ON_ERROR),
+                    'assessed_by_user_id' => $currentActor->id,
+                    'assessed_at' => now()->format('Y-m-d H:i:s.u'),
+                    'request_key' => $key,
+                    'request_fingerprint' => $fingerprint,
+                    'created_at' => now(),
+                ]);
+                AuditLogger::logOrFail('fleet.maintenance.check.assess', FleetChecklistRun::query()->findOrFail($run->id), [
+                    'actor_id' => (int) $currentActor->id,
+                    'asset_id' => (int) $asset->id,
+                    'assessment_id' => (int) $id,
+                    'decision' => $decision,
+                    'reason' => $reason,
+                    'run_outcome' => $run->outcome,
+                    'rule_version_id' => $run->rule_version_id !== null ? (int) $run->rule_version_id : null,
+                    'recorded_by_user_id' => (int) $run->user_id,
+                    'work_order_id' => $workOrderId,
+                    'acknowledged_issues' => $issues,
+                    'vehicle_readiness' => $readiness,
+                ]);
+
+                return DB::table('fleet_maintenance_check_assessments')->where('id', $id)->first();
+            }, 3);
+        } catch (QueryException $exception) {
+            // A same-key retry racing on another vehicle: return the identical
+            // decision, or refuse a changed one.
+            if ((int) ($exception->errorInfo[1] ?? 0) !== 1062) {
+                throw $exception;
+            }
+            $currentActor = User::query()->findOrFail($actor->id);
+            abort_unless($this->access->canManage($currentActor), 403);
+            $asset = $this->access->asset($currentActor, $assetId);
+            $prior = DB::table('fleet_maintenance_check_assessments')
+                ->where('assessed_by_user_id', $currentActor->id)->where('request_key', $key)->first();
+            abort_unless($prior !== null && (int) $prior->asset_id === (int) $asset->id
+                && hash_equals((string) $prior->request_fingerprint, $fingerprint), 409,
+                'This check has already been assessed. Reload to see the decision.');
+
+            return $prior;
+        }
+    }
+
+    /**
+     * Why a check can't take a "no issue found" assessment, or null when it
+     * can. Shared by assessCheck() and the checks read model.
+     *
+     * @param  list<array{question_id:string, answer:string}>  $issues
+     */
+    public static function checkAssessmentRefusal(object $run, int $actorId, bool $blocking, bool $held, array $issues): ?string
+    {
+        $ruled = $run->rule_version_id !== null;
+
+        return match (true) {
+            ($run->check_kind ?? null) === FleetChecklistRun::KIND_DAILY => 'Daily checks don’t stop the vehicle being used, so there’s nothing to release.',
+            ($run->check_kind ?? 'check') !== 'check' => 'A retest is resolved when its Maintenance work is released.',
+            ! $blocking => 'This check doesn’t stop the vehicle being used, so there’s nothing to release.',
+            $ruled && $run->outcome === 'failed' => 'An approved check rule recorded a failure. Report it to Maintenance for repair, a retest and an independent release.',
+            $held => 'Maintenance has placed a hold for this check. The hold is released through repair, a retest and an independent release.',
+            (int) $run->user_id === $actorId && ($ruled || $issues !== []) => 'This check recorded an issue or couldn’t be fully assessed, so another maintenance manager must assess it.',
+            default => null,
+        };
+    }
+
+    /**
+     * Answers that recorded an issue, or that an item couldn't be assessed.
+     *
+     * @param  array<string|int, mixed>  $responses
+     * @return list<array{question_id:string, answer:string}>
+     */
+    public static function recordedIssues(array $responses): array
+    {
+        $issues = [];
+        foreach ($responses as $question => $answer) {
+            if ((string) $question === '_metadata') {
+                continue;
+            }
+            $value = is_array($answer) ? ($answer['result'] ?? null) : $answer;
+            $value = is_string($value) ? strtolower(trim($value)) : null;
+            if ($value !== null && in_array($value, self::ISSUE_ANSWERS, true)) {
+                $issues[] = ['question_id' => (string) $question, 'answer' => $value];
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * The Maintenance work a check belongs to: the work it was recorded on,
+     * then work its reports opened or joined.
+     *
+     * @return list<int>
+     */
+    public static function checkWorkIds(object $run, bool $lock = false): array
+    {
+        $reports = DB::table('fleet_maintenance_reports')->where('source_type', 'fleet_checklist_run')
+            ->where('source_id', $run->id)->whereNull('duplicate_of_report_id')->orderBy('id');
+        $reported = ($lock ? $reports->lockForUpdate() : $reports)->pluck('work_order_id')
+            ->map(fn ($id): int => (int) $id)->all();
+
+        return array_values(array_unique(array_filter([
+            $run->work_order_id !== null ? (int) $run->work_order_id : null, ...$reported,
+        ])));
+    }
+
     private function requireStatus(FleetWorkOrder $order, array $allowed): void
     {
         if (! in_array($order->status, $allowed, true)) {
@@ -487,12 +707,15 @@ class MaintenanceTransitionService
             }
         }
         // The same checks that block availability: daily checks and older
-        // unsubmitted rows are observations and never hold up a release.
-        if (MaintenanceRestrictionService::readinessChecks(DB::table('fleet_checklist_runs')->where('asset_id', $order->asset_id))
+        // unsubmitted rows are observations and never hold up a release. A
+        // check Maintenance assessed as "no issue found" no longer counts either.
+        $newer = MaintenanceRestrictionService::readinessChecks(DB::table('fleet_checklist_runs')->where('asset_id', $order->asset_id))
             ->where('id', '>', $retest->id)
             ->where(fn ($query) => $query->whereNull('outcome')->orWhere('outcome', '!=', 'passed'))
-            ->lockForUpdate()->get(['check_kind', 'outcome', 'rule_version_id', 'rule_snapshot_json'])
-            ->contains(fn ($run) => MaintenanceRestrictionService::blocksAvailability($run))) {
+            ->orderBy('id')->lockForUpdate()->get(['id', 'check_kind', 'outcome', 'rule_version_id', 'rule_snapshot_json'])
+            ->filter(fn ($run) => MaintenanceRestrictionService::blocksAvailability($run))
+            ->pluck('id')->map(fn ($id): int => (int) $id)->values()->all();
+        if (array_diff($newer, $this->restrictions->assessedRunIds($newer, true)) !== []) {
             throw ValidationException::withMessages(['status' => 'A newer unresolved check prevents release.']);
         }
         if ($releasePolicy['rules']['requires_custody'] === true) {

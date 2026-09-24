@@ -18,6 +18,7 @@ use App\Services\Fleet\MaintenanceLocalTime;
 use App\Services\Fleet\VehicleBookingAccessService;
 use App\Services\Fleet\VehicleOdometerService;
 use App\Services\Fleet\VehicleReadinessService;
+use App\Services\Fleet\VehicleReturnConcernService;
 use App\Services\Fleet\VehicleStaffDirectory;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
@@ -35,6 +36,7 @@ class VehicleBookingController extends Controller
         private readonly VehicleReadinessService $readiness,
         private readonly VehicleOdometerService $odometer,
         private readonly VehicleStaffDirectory $staff,
+        private readonly VehicleReturnConcernService $returnConcerns,
     ) {}
 
     public function index(Request $request)
@@ -616,10 +618,17 @@ class VehicleBookingController extends Controller
             ], ['reason.required' => 'Record the reason for this change.']);
             [$startsAt, $endsAt] = $this->window($data, true);
             $asset = $this->bookingAccess->vehicle($current, (int) $canonical->asset_id) ?? abort(404);
-            // A retried save that already landed reports success.
-            if ((int) $canonical->lock_version === (int) $data['expected_version'] + 1
-                && $canonical->starts_at->equalTo($startsAt) && $canonical->ends_at->equalTo($endsAt)
-                && $canonical->purpose === trim($data['purpose'])) {
+            // Only this request sent again with the same body is a retry of a
+            // saved change; anything else on an older version is a conflict,
+            // never a silent success that drops the edit.
+            $requestKey = $this->requestKey($request);
+            $fingerprint = MaintenanceFingerprint::of([
+                'actor' => (int) $current->id, 'booking' => (int) $canonical->id, 'data' => $data,
+            ]);
+            if ($requestKey !== '' && ($prior = $this->priorChange($canonical, $requestKey)) !== null) {
+                abort_unless(hash_equals((string) ($prior['request_fingerprint'] ?? ''), $fingerprint), 409,
+                    'This request was already used for a different change. Reload and try again.');
+
                 return [$canonical, null];
             }
             abort_unless((int) $canonical->lock_version === (int) $data['expected_version'], 409,
@@ -675,6 +684,9 @@ class VehicleBookingController extends Controller
                 'reason' => trim($data['reason']),
                 'status' => $canonical->status,
                 'readiness' => $assessment ? $this->decisionEvidence($assessment) : null,
+                // Kept so a retry of exactly this request is recognised.
+                'request_key' => $requestKey !== '' ? $requestKey : null,
+                'request_fingerprint' => $fingerprint,
             ], $request);
 
             return [$canonical, $assessment];
@@ -933,9 +945,19 @@ class VehicleBookingController extends Controller
             return $canonical;
         });
 
+        // A concern recorded at return goes to Maintenance as linked work
+        // (once per booking). The return is already recorded either way.
+        $concern = $this->returnConcerns->report($actor, $booking);
+        $message = match ($concern['status'] ?? null) {
+            'created' => 'Vehicle returned. Linked Maintenance work '.($concern['reference'] ?? '#'.$concern['work_order_id'])
+                .' was created for the concern.',
+            'not_routed' => $concern['message'],
+            default => 'Vehicle returned.',
+        };
+
         return $this->wantsJson($request)
-            ? response()->json(['booking' => $this->bookingResult($booking), 'message' => 'Vehicle returned.'])
-            : back()->with('success', 'Vehicle returned.');
+            ? response()->json(['booking' => $this->bookingResult($booking), 'message' => $message, 'maintenance_report' => $concern])
+            : back()->with(($concern['status'] ?? null) === 'not_routed' ? 'warning' : 'success', $message);
     }
 
     public function cancel(Request $request, FleetVehicleBooking $booking)
@@ -1036,6 +1058,22 @@ class VehicleBookingController extends Controller
     private function requestKey(Request $request): string
     {
         return mb_substr((string) ($request->input('request_key') ?: $request->header('Idempotency-Key') ?: ''), 0, 100);
+    }
+
+    /**
+     * The change already saved on this booking with the request key, if any
+     * (kept with its audit record, written in the same transaction).
+     *
+     * @return array<string,mixed>|null
+     */
+    private function priorChange(FleetVehicleBooking $booking, string $requestKey): ?array
+    {
+        $meta = DB::table('audit_logs')->where('auditable_type', $booking->getMorphClass())
+            ->where('auditable_id', $booking->id)->where('action', 'fleet.booking.update')
+            ->where('meta->request_key', $requestKey)->orderByDesc('id')->value('meta');
+        $decoded = is_string($meta) ? json_decode($meta, true) : null;
+
+        return is_array($decoded) ? $decoded : null;
     }
 
     /**

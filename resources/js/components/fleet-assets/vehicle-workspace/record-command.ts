@@ -177,3 +177,52 @@ export const isJsonObject = (
     value: unknown,
 ): value is Record<string, unknown> =>
     !!value && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * A one-shot JSON write outside a dialog (e.g. Undo from a toast), with the
+ * session's CSRF token and its own idempotency key. Throws the server's
+ * message when the change is refused.
+ */
+export async function sendVehicleRecord(
+    url: string,
+    body: Record<string, unknown>,
+    method: 'POST' | 'PUT' = 'POST',
+): Promise<Record<string, unknown>> {
+    const response = await fetch(url, {
+        method,
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Idempotency-Key': crypto.randomUUID(),
+            ...csrfHeaders(),
+        },
+        body: JSON.stringify(body),
+    });
+    const result: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+        throw new Error(
+            isJsonObject(result) && typeof result.message === 'string'
+                ? result.message
+                : 'That change could not be undone. Reload to see the latest version.',
+        );
+    }
+    return isJsonObject(result) ? result : {};
+}
+
+/** A JSON read; resolves null when the record isn't available to the viewer. */
+export async function fetchVehicleRecord(
+    url: string,
+    signal?: AbortSignal,
+): Promise<Record<string, unknown> | null> {
+    const response = await fetch(url, {
+        signal,
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) return null;
+    const result: unknown = await response.json().catch(() => null);
+    return isJsonObject(result) ? result : null;
+}

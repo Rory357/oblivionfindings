@@ -355,7 +355,7 @@ export function DetailsPanel({
 
             <section className="studio-card">
                 <SectionHeading title="Placement & driver">
-                    {can.manage && (
+                    {can.manage && can.view_site_records && (
                         <Button
                             variant="outline"
                             size="sm"
@@ -371,7 +371,12 @@ export function DetailsPanel({
                             'Home site',
                             vehicle.home_site?.name ?? vehicle.site?.name,
                         ],
-                        ['Primary driver', vehicle.primary_driver?.name],
+                        [
+                            'Primary driver',
+                            vehicle.primary_driver_withheld
+                                ? 'Recorded · shown at the vehicle’s Site'
+                                : vehicle.primary_driver?.name,
+                        ],
                         [
                             'Driver licence',
                             driver

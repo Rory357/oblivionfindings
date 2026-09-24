@@ -104,13 +104,22 @@ class Pkg02bVehicleMapTest extends TestCase
         $vehicle = $this->vehicle($this->site);
         $personal = $this->trip($vehicle, '2026-09-22 09:00', 0, ['is_personal' => true, 'ended_at' => null]);
         $event = $this->sample($vehicle, $this->local('2026-09-22 09:25'));
-        $this->state($vehicle, $event, ['last_trip_id' => $personal->id]);
+        $this->state($vehicle, $event, [
+            'last_trip_id' => $personal->id, 'ignition' => true, 'motion_status' => 'moving', 'speed_kph' => 48,
+            'battery_pct' => 81,
+        ]);
         $url = "/fleet-assets/vehicles/{$vehicle->id}/location";
 
         $this->actingAs($reader)->getJson($url)->assertOk()
             ->assertJsonPath('state.withheld', 'personal')
             ->assertJsonPath('state.lat', null)
             ->assertJsonPath('state.speed_kph', null)
+            ->assertJsonPath('state.heading_deg', null)
+            // The journey stays private; the tracker's own health does not.
+            ->assertJsonPath('state.ignition', null)
+            ->assertJsonPath('state.motion', null)
+            ->assertJsonPath('state.battery_pct', 81)
+            ->assertJsonPath('state.status', 'online')
             ->assertJsonPath('observations.0.lat', null);
         $this->actingAs($reader)->getJson("{$url}/trail?trip={$personal->id}")->assertOk()
             ->assertJsonPath('withheld', 'personal')
@@ -119,7 +128,11 @@ class Pkg02bVehicleMapTest extends TestCase
         FleetVehicleStateSnapshot::query()->whereKey($vehicle->id)->update([
             'consent_blocked' => true, 'latitude' => null, 'longitude' => null, 'last_trip_id' => null,
         ]);
-        $this->actingAs($reader)->getJson($url)->assertOk()->assertJsonPath('state.withheld', 'consent');
+        $this->actingAs($reader)->getJson($url)->assertOk()
+            ->assertJsonPath('state.withheld', 'consent')
+            ->assertJsonPath('state.ignition', null)
+            ->assertJsonPath('state.motion', null)
+            ->assertJsonPath('state.battery_pct', 81);
 
         // A business trip's route leaves out consent-blocked reports.
         $business = $this->trip($vehicle, '2026-09-21 10:00', 10);
@@ -378,6 +391,78 @@ class Pkg02bVehicleMapTest extends TestCase
         // Twenty minutes on, the latest sample is no longer current.
         $this->travel(20)->minutes();
         $this->actingAs($admin)->getJson($url)->assertOk()->assertJsonPath('telemetry.current_sample_id', null);
+    }
+
+    public function test_withheld_telemetry_keeps_the_row_and_device_health_but_no_driving_events(): void
+    {
+        $admin = User::factory()->create(['approved_at' => now()]);
+        $admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+        $vehicle = $this->vehicle($this->site);
+        $device = Device::factory()->tracking()->create(['name' => 'Van 14 tracker', 'category' => 'vehicle_tracker', 'model' => 'GV500CG']);
+        DeviceAssetLink::query()->create([
+            'device_id' => $device->id, 'asset_id' => $vehicle->id, 'link_type' => LinkType::InstalledIn, 'linked_at' => now(),
+        ]);
+        $journey = ['device_id' => $device->id, 'ignition' => true, 'motion_status' => 'moving', 'speed_kph' => 50, 'odometer_km' => 82400];
+        // A personal trip from 3 am to 5 am, with driving events, place events and tracker health reports.
+        $this->trip($vehicle, '2026-09-22 03:00', 120, ['is_personal' => true]);
+        foreach (['03:10' => 'speed_alarm', '03:20' => 'harsh_behaviour', '03:30' => 'geofence_enter', '03:40' => 'ignition_on'] as $time => $type) {
+            $this->sample($vehicle, $this->local("2026-09-22 {$time}"), ['event_type' => $type] + $journey);
+        }
+        $heartbeat = $this->sample($vehicle, $this->local('2026-09-22 03:50'), [
+            'event_type' => 'heartbeat', 'battery_pct' => 77, 'external_power' => true,
+        ] + $journey);
+        $powerOff = $this->sample($vehicle, $this->local('2026-09-22 04:00'), [
+            'event_type' => 'power_off', 'battery_pct' => 76, 'external_power' => false,
+        ] + $journey);
+        $consent = $this->sample($vehicle, $this->local('2026-09-22 06:00'), [
+            'event_type' => 'geofence_exit', 'consent_blocked' => true, 'latitude' => null, 'longitude' => null,
+        ] + $journey);
+        $business = $this->sample($vehicle, $this->local('2026-09-22 07:00'), [
+            'device_id' => $device->id, 'event_type' => 'ignition_off', 'ignition' => false, 'motion_status' => 'stationary',
+        ]);
+
+        $response = $this->actingAs($admin)->getJson("/fleet-assets/vehicles/{$vehicle->id}/telemetry")->assertOk()
+            ->assertJsonCount(8, 'telemetry.samples')
+            // A business sample keeps everything it recorded.
+            ->assertJsonPath('telemetry.samples.0.id', $business->id)
+            ->assertJsonPath('telemetry.samples.0.withheld', null)
+            ->assertJsonPath('telemetry.samples.0.event_type', 'ignition_off')
+            ->assertJsonPath('telemetry.samples.0.ignition', false)
+            ->assertJsonPath('telemetry.samples.0.motion', 'stationary')
+            // Without consent: the row stays, the journey doesn't.
+            ->assertJsonPath('telemetry.samples.1.id', $consent->id)
+            ->assertJsonPath('telemetry.samples.1.withheld', 'consent')
+            ->assertJsonPath('telemetry.samples.1.event_type', null)
+            ->assertJsonPath('telemetry.samples.1.ignition', null)
+            ->assertJsonPath('telemetry.samples.1.motion', null)
+            // Tracker health reports during a personal trip keep their type, power and battery.
+            ->assertJsonPath('telemetry.samples.2.id', $powerOff->id)
+            ->assertJsonPath('telemetry.samples.2.withheld', 'personal')
+            ->assertJsonPath('telemetry.samples.2.event_type', 'power_off')
+            ->assertJsonPath('telemetry.samples.2.external_power', false)
+            ->assertJsonPath('telemetry.samples.2.battery_pct', 76)
+            ->assertJsonPath('telemetry.samples.2.ignition', null)
+            ->assertJsonPath('telemetry.samples.2.motion', null)
+            ->assertJsonPath('telemetry.samples.3.id', $heartbeat->id)
+            ->assertJsonPath('telemetry.samples.3.event_type', 'heartbeat')
+            ->assertJsonPath('telemetry.samples.3.battery_pct', 77)
+            ->assertJsonPath('telemetry.samples.3.ignition', null);
+
+        foreach (range(1, 7) as $index) {
+            $sample = $response->json("telemetry.samples.{$index}");
+            $this->assertNotNull($sample['withheld']);
+            $this->assertNull($sample['ignition']);
+            $this->assertNull($sample['motion']);
+            $this->assertNull($sample['speed_kph']);
+            $this->assertNull($sample['odometer_km']);
+            if ($index >= 4) {
+                $this->assertSame('personal', $sample['withheld']);
+                $this->assertNull($sample['event_type']);
+            }
+        }
+        foreach (['speed_alarm', 'harsh_behaviour', 'geofence_enter', 'geofence_exit', 'ignition_on'] as $type) {
+            $this->assertStringNotContainsString($type, (string) $response->getContent());
+        }
     }
 
     /** @return array<string,mixed> */

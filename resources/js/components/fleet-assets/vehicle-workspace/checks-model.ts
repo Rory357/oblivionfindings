@@ -37,6 +37,14 @@ export function outcomeTone(
     return 'warning';
 }
 
+/** The second badge on a check Maintenance released: no issue found. */
+export const ASSESSED_LABEL = 'No issue found';
+
+/** A check Maintenance released no longer needs attention; its outcome stays as recorded. */
+export function runTone(run: Pick<CheckRun, 'outcome' | 'assessment'>) {
+    return run.assessment ? 'success' : outcomeTone(run.outcome);
+}
+
 const KIND_LABELS: Record<CheckQuestionKind, string> = {
     condition: 'Condition',
     text: 'Written observation',

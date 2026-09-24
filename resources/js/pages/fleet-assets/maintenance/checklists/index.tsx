@@ -77,6 +77,8 @@ type Props = {
     };
     can: {
         manage: boolean;
+        /** A new checklist is offered to every vehicle: a fleet-wide setting. */
+        create_templates?: boolean;
     };
 };
 
@@ -205,20 +207,22 @@ export default function ChecklistsIndex({
                             >
                                 Run checklist
                             </FleetHeroAction>
-                            <HeroActionButton
-                                onClick={() => {
-                                    setTemplateStepIndex(0);
-                                    setDialogOpen(true);
-                                }}
-                                icon={Plus}
-                            >
-                                Create template
-                            </HeroActionButton>
+                            {can.create_templates ? (
+                                <HeroActionButton
+                                    onClick={() => {
+                                        setTemplateStepIndex(0);
+                                        setDialogOpen(true);
+                                    }}
+                                    icon={Plus}
+                                >
+                                    Create template
+                                </HeroActionButton>
+                            ) : null}
                         </div>
                     ) : null}
                 </HeroShell>
 
-                {can.manage ? (
+                {can.create_templates ? (
                     <WizardShell
                         open={dialogOpen}
                         onClose={closeTemplateDialog}

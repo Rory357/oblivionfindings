@@ -24,7 +24,7 @@ import {
     ShieldCheck,
     Wrench,
 } from 'lucide-react';
-import { outcomeLabel } from './checks-model';
+import { ASSESSED_LABEL, outcomeLabel } from './checks-model';
 import './studio.css';
 import type { VehicleWorkspace } from './types';
 import {
@@ -249,13 +249,19 @@ export function VehicleHeader({
                                 ? 'No record'
                                 : overdueCheck
                                   ? 'Overdue'
-                                  : last.outcome
-                                    ? outcomeLabel(last.outcome)
-                                    : 'Submitted'}
+                                  : last.assessed
+                                    ? ASSESSED_LABEL
+                                    : last.outcome
+                                      ? outcomeLabel(last.outcome)
+                                      : 'Submitted'}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
                             {last
-                                ? [`CHK-${last.id}`, last.template]
+                                ? [
+                                      `CHK-${last.id}`,
+                                      last.template,
+                                      last.assessed ? 'Released for use' : null,
+                                  ]
                                       .filter(Boolean)
                                       .join(' · ')
                                 : 'No submitted checks'}
@@ -272,7 +278,9 @@ export function VehicleHeader({
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
                             {!work.can_view
-                                ? 'Maintenance access required'
+                                ? work.site_restricted
+                                    ? 'Shown at the vehicle’s Site'
+                                    : 'Maintenance access required'
                                 : !work.total
                                   ? 'No maintenance recorded'
                                   : work.awaiting_release

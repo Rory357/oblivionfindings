@@ -50,6 +50,8 @@ class VehicleCheckLibraryService
 
     private const STALE = 'This checklist changed while you were editing. Review the latest version before publishing.';
 
+    private const SHARED = 'Checklists used beyond this vehicle are fleet-wide settings. Ask a Fleet Manager to change them, or publish a checklist for this vehicle only.';
+
     private const LIBRARY_LIMIT = 200;
 
     public function __construct(
@@ -60,6 +62,16 @@ class VehicleCheckLibraryService
     public function canManage(User $actor): bool
     {
         return $this->maintenance->canManage($actor);
+    }
+
+    /**
+     * A checklist used beyond one vehicle changes every Site's checks, and
+     * the approved check rules that name it, so publishing one needs
+     * fleet-wide authority. Site managers publish for their own vehicle.
+     */
+    public function canManageShared(User $actor): bool
+    {
+        return $this->canManage($actor) && $actor->canDo('fleet.settings.manage');
     }
 
     /**
@@ -152,7 +164,7 @@ class VehicleCheckLibraryService
         if (trim($requestKey) === '' || mb_strlen($requestKey) > 100) {
             throw ValidationException::withMessages(['request_key' => 'A request key is required.']);
         }
-        $vehicle = $this->vehicles->assignableVehicle($actor, $assetId) ?? abort(404);
+        $vehicle = $this->vehicles->fleetVehicle($actor, $assetId) ?? abort(404);
         $definition = $this->validatedDefinition($input, $templateId !== null, (int) $vehicle->id);
         $expectedVersionId = isset($input['expected_version_id']) ? (int) $input['expected_version_id'] : null;
         $expectedSha = (string) ($input['expected_items_sha256'] ?? '');
@@ -174,8 +186,10 @@ class VehicleCheckLibraryService
             $current = User::query()->findOrFail($actor->id);
             abort_unless($this->canManage($current), 403);
             $this->assertUniqueName($definition['name'], $templateId);
+            $shared = $this->canManageShared($current);
 
             if ($templateId === null) {
+                abort_unless($shared || $definition['assignment'] === 'vehicle', 403, self::SHARED);
                 $template = FleetChecklistTemplate::query()->create([
                     'name' => $definition['name'], 'type' => 'custom', 'items' => $definition['items'], 'is_active' => true,
                 ]);
@@ -192,6 +206,9 @@ class VehicleCheckLibraryService
                 $base = $matching ?? $this->capture($template, $latest);
                 // A checklist assigned to another vehicle can't be changed from this one.
                 abort_if($base->assignment === 'vehicle' && (int) $base->assignment_asset_id !== (int) $vehicle->id, 404);
+                // Changing a checklist other vehicles use, or sharing this
+                // vehicle's checklist with others, is a fleet-wide change.
+                abort_unless($shared || ($base->assignment === 'vehicle' && $definition['assignment'] === 'vehicle'), 403, self::SHARED);
                 // Unchanged questions keep their stored form, so a change to the
                 // name, use or assignment alone leaves the approved content intact.
                 $definition['items'] = $this->preserveUnchanged(is_array($base->items) ? $base->items : [], $definition['items']);

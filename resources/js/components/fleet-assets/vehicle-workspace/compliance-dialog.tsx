@@ -1,4 +1,5 @@
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -67,19 +68,28 @@ export function ComplianceDialog({
     vehicle,
     record,
     initialStep = 0,
+    presetApplicability,
     onClose,
     onSaved,
 }: {
     vehicle: VehicleProfile;
     record: ComplianceRecord;
     initialStep?: number;
+    /** Starts from this applicability instead of the current version's. */
+    presetApplicability?: Applicability;
     onClose: () => void;
     onSaved: () => void;
 }) {
     const current = record.current;
     const [initial] = useState<Form>(() => ({
-        applicability: current?.applicability ?? 'unknown',
-        applicability_basis: current?.applicability_basis ?? '',
+        applicability:
+            presetApplicability ?? current?.applicability ?? 'unknown',
+        // A changed applicability needs its own basis, not the previous one.
+        applicability_basis:
+            presetApplicability &&
+            presetApplicability !== current?.applicability
+                ? ''
+                : (current?.applicability_basis ?? ''),
         outcome: current?.outcome ?? 'needs_assessment',
         evidence_reference: current?.evidence_reference ?? '',
         effective_on: current?.effective_on ?? '',
@@ -89,6 +99,14 @@ export function ComplianceDialog({
         reason: '',
     }));
     const [form, setForm] = useState(initial);
+    // Unticking "Not required" returns to the last other applicability.
+    const [lastApplicability, setLastApplicability] = useState<
+        Exclude<Applicability, 'not_applicable'>
+    >(() =>
+        initial.applicability === 'not_applicable'
+            ? 'applicable'
+            : initial.applicability,
+    );
     const [files, setFiles] = useState<File[]>([]);
     const [step, setStep] = useState(initialStep);
     const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
@@ -267,46 +285,85 @@ export function ComplianceDialog({
                         Record what applies to this vehicle from its own source.
                         This does not decide legal applicability for you.
                     </p>
-                    <WizardField
-                        id="applicability"
-                        label="Applicability"
-                        error={errors.applicability}
+                    <label
+                        htmlFor="compliance-not-required"
+                        className="flex cursor-pointer items-start gap-3 rounded-lg border p-3"
                     >
-                        <Select
-                            value={form.applicability}
-                            onValueChange={(value) =>
-                                update('applicability', value as Applicability)
-                            }
+                        <Checkbox
+                            id="compliance-not-required"
+                            className="mt-0.5"
+                            checked={notApplicable}
+                            onCheckedChange={(checked) => {
+                                if (checked === true) {
+                                    if (!notApplicable)
+                                        setLastApplicability(
+                                            form.applicability as Exclude<
+                                                Applicability,
+                                                'not_applicable'
+                                            >,
+                                        );
+                                    update('applicability', 'not_applicable');
+                                } else {
+                                    update('applicability', lastApplicability);
+                                }
+                            }}
+                        />
+                        <span>
+                            <span className="block font-medium">
+                                {label} is not required for this vehicle
+                            </span>
+                            <span className="text-caption block">
+                                Readiness stops asking for {label} evidence.
+                                Record the reason below.
+                            </span>
+                        </span>
+                    </label>
+                    {!notApplicable && (
+                        <WizardField
+                            id="applicability"
+                            label="Applicability"
+                            error={errors.applicability}
                         >
-                            <SelectTrigger
-                                {...fieldProps(
-                                    'applicability',
-                                    errors.applicability,
-                                )}
+                            <Select
+                                value={form.applicability}
+                                onValueChange={(value) =>
+                                    update(
+                                        'applicability',
+                                        value as Applicability,
+                                    )
+                                }
                             >
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {(
-                                    Object.keys(
-                                        applicabilityNames,
-                                    ) as Applicability[]
-                                ).map((value) => (
-                                    <SelectItem key={value} value={value}>
-                                        {applicabilityNames[value]}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </WizardField>
+                                <SelectTrigger
+                                    {...fieldProps(
+                                        'applicability',
+                                        errors.applicability,
+                                    )}
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {(['unknown', 'applicable'] as const).map(
+                                        (value) => (
+                                            <SelectItem
+                                                key={value}
+                                                value={value}
+                                            >
+                                                {applicabilityNames[value]}
+                                            </SelectItem>
+                                        ),
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </WizardField>
+                    )}
                     <WizardField
                         id="applicability_basis"
-                        label="Basis / source"
+                        label={notApplicable ? 'Reason' : 'Basis / source'}
                         optional={!notApplicable}
                         error={errors.applicability_basis}
                         hint={
                             notApplicable
-                                ? 'Required: record why this does not apply, for example the vehicle class or the source you checked.'
+                                ? `Required: record why ${label} doesn’t apply, for example the vehicle class or the source you checked.`
                                 : undefined
                         }
                     >
@@ -530,10 +587,14 @@ export function ComplianceDialog({
                     >
                         <ReviewRow
                             label="Applicability"
-                            value={applicabilityNames[form.applicability]}
+                            value={
+                                notApplicable
+                                    ? 'Not required for this vehicle'
+                                    : applicabilityNames[form.applicability]
+                            }
                         />
                         <ReviewRow
-                            label="Basis / source"
+                            label={notApplicable ? 'Reason' : 'Basis / source'}
                             value={form.applicability_basis || undefined}
                         />
                     </ReviewCard>

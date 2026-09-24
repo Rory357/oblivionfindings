@@ -159,6 +159,11 @@ class DailyCheckRecordsTest extends TestCase
         $this->assertSame([], $restrictions->blockers($vehicle->id)['check_run_ids']);
         $this->assertSame([], $restrictions->blockersMany([$vehicle->id])[$vehicle->id]['check_run_ids']);
         $restrictions->assertBookable($vehicle->id);
+        // So there is nothing for Maintenance to release as "no issue found".
+        $daily = FleetChecklistRun::query()->sole();
+        $this->actingAs($manager)->postJson("/fleet-assets/vehicles/{$vehicle->id}/checks/{$daily->id}/assessments", [
+            'decision' => 'no_issue_release', 'reason' => 'Looked at it; all fine.', 'confirmed' => true, 'request_key' => 'assess-daily',
+        ])->assertUnprocessable()->assertJsonPath('errors.run.0', 'Daily checks don’t stop the vehicle being used, so there’s nothing to release.');
 
         // A vehicle check without an approved rule still needs assessment and blocks.
         $template = FleetChecklistTemplate::query()->create([

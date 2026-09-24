@@ -84,6 +84,29 @@ describe('vehicle workspace location', () => {
         });
     });
 
+    it('deep links to one compliance requirement on Evidence & due dates only', () => {
+        const url = locationUrl(7, {
+            tab: 'service',
+            view: 'evidence',
+            focus: 'wof',
+        });
+        expect(url).toBe(
+            '/fleet-assets/vehicles/7?tab=service&view=evidence&focus=wof',
+        );
+        expect(readLocation(url.split('?')[1])).toEqual({
+            tab: 'service',
+            view: 'evidence',
+            focus: 'wof',
+        });
+        expect(
+            readLocation('?tab=service&view=evidence&focus=insurance'),
+        ).toEqual({ tab: 'service', view: 'evidence' });
+        expect(readLocation('?tab=service&view=mileage&focus=ruc')).toEqual({
+            tab: 'service',
+            view: 'mileage',
+        });
+    });
+
     it('sends each readiness reason to where it is resolved', () => {
         expect(
             reasonDestination(reason('compliance.ruc.coverage_exceeded')),
@@ -92,6 +115,10 @@ describe('vehicle workspace location', () => {
             tab: 'service',
             view: 'evidence',
         });
+        // A reason about one requirement opens its row (where "Not required" lives).
+        expect(
+            reasonDestination({ code: 'compliance.ruc.missing', kind: 'ruc' }),
+        ).toEqual({ tab: 'service', view: 'evidence', focus: 'ruc' });
         expect(
             reasonDestination(reason('maintenance.unresolved_check')),
         ).toEqual({ tab: 'checks', view: 'recent' });
@@ -103,13 +130,89 @@ describe('vehicle workspace location', () => {
             view: 'mileage',
         });
     });
+
+    it('opens the check that holds the vehicle, and only on Recent checks', () => {
+        expect(
+            reasonDestination({
+                ...reason('maintenance.unresolved_check'),
+                source_id: 190,
+            }),
+        ).toEqual({ tab: 'checks', view: 'recent', run: 190 });
+        const url = locationUrl(7, { tab: 'checks', view: 'recent', run: 190 });
+        expect(url).toBe(
+            '/fleet-assets/vehicles/7?tab=checks&view=recent&run=190',
+        );
+        expect(readLocation(url.split('?')[1])).toEqual({
+            tab: 'checks',
+            view: 'recent',
+            run: 190,
+        });
+        expect(readLocation('?tab=checks&view=recent&run=abc')).toEqual({
+            tab: 'checks',
+            view: 'recent',
+        });
+        expect(readLocation('?tab=checks&view=recent&run=0')).toEqual({
+            tab: 'checks',
+            view: 'recent',
+        });
+        expect(readLocation('?tab=checks&view=templates&run=190')).toEqual({
+            tab: 'checks',
+            view: 'templates',
+        });
+        expect(readLocation('?tab=service&view=evidence&run=190')).toEqual({
+            tab: 'service',
+            view: 'evidence',
+        });
+    });
+});
+
+describe('vehicle header status', () => {
+    const workspace = (latest: {
+        outcome: string;
+        assessed: boolean;
+    }): VehicleWorkspace =>
+        ({
+            vehicle: { status: 'active' },
+            readiness: { restriction_ids: [], can_proceed: true },
+            schedules: [],
+            checks: {
+                latest: {
+                    id: 190,
+                    template: 'Vehicle condition record',
+                    submitted_at: '2026-09-22T01:00:00+00:00',
+                    ...latest,
+                },
+                next_due_at: null,
+            },
+        }) as unknown as VehicleWorkspace;
+
+    it('no longer asks for review once Maintenance released the latest check', () => {
+        expect(
+            headerStatus(
+                workspace({ outcome: 'needs_assessment', assessed: false }),
+                '2026-09-22',
+            ).label,
+        ).toBe('Needs assessment');
+        expect(
+            headerStatus(
+                workspace({ outcome: 'needs_assessment', assessed: true }),
+                '2026-09-22',
+            ),
+        ).toEqual({ label: 'Ready', variant: 'success', state: 'ready' });
+    });
 });
 
 const check = (
     id: number,
     outcome: string | null,
     submitted_at: string,
-): CheckSummary => ({ id, outcome, template: 'Checklist', submitted_at });
+): CheckSummary => ({
+    id,
+    outcome,
+    template: 'Checklist',
+    submitted_at,
+    assessed: false,
+});
 
 /** Only what the readiness picture reads; everything else is irrelevant here. */
 const workspaceWith = (

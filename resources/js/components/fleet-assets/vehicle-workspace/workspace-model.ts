@@ -2,6 +2,7 @@ import type { StatusVariant } from '@/components/ui/status-badge';
 import { WORKER_TIMEZONE } from '@/lib/datetime';
 import type {
     CheckSummary,
+    ComplianceKind,
     ComplianceRecord,
     ReadinessReason,
     ServiceSchedule,
@@ -39,7 +40,22 @@ export type WorkspaceLocation = {
     view?: WorkspaceView;
     /** Calendar or trip history deep link: the day to open (YYYY-MM-DD). */
     date?: string;
+    /** Evidence & due dates deep link: the requirement a readiness reason is about. */
+    focus?: ComplianceKind;
+    /** Recent checks deep link: the check (run id) to open, e.g. one holding the vehicle. */
+    run?: number;
 };
+
+const COMPLIANCE_KINDS: ComplianceKind[] = [
+    'registration',
+    'wof',
+    'cof',
+    'ruc',
+];
+
+export function isComplianceKind(value: unknown): value is ComplianceKind {
+    return COMPLIANCE_KINDS.includes(value as ComplianceKind);
+}
 
 export const MAIN_TABS: MainTab[] = [
     'overview',
@@ -153,7 +169,8 @@ export function headerStatus(
         !readiness.can_proceed ||
         overdueSchedules(workspace.schedules).length > 0 ||
         checkOverdue(workspace, today) ||
-        (latest && latest.outcome !== 'passed') ||
+        // A check Maintenance released (no issue found) no longer needs review.
+        (latest && latest.outcome !== 'passed' && !latest.assessed) ||
         dailyIssue(workspace)
     ) {
         return {
@@ -165,17 +182,32 @@ export function headerStatus(
     return { label: 'Ready', variant: 'success', state: 'ready' };
 }
 
-/** Where the person should go to resolve a reason. */
-export function reasonDestination(reason: ReadinessReason): WorkspaceLocation {
+/**
+ * Where the person should go to resolve a reason. A check that holds the
+ * vehicle opens that check (its `source_id`), where it can be assessed.
+ */
+export function reasonDestination(
+    reason: Pick<ReadinessReason, 'code' | 'kind'> & {
+        source_id?: number | null;
+    },
+): WorkspaceLocation {
     if (
         reason.code.startsWith('compliance.ruc.odometer') ||
         reason.code.startsWith('compliance.ruc.coverage')
     )
         return { tab: 'service', view: 'mileage' };
     if (reason.code.startsWith('compliance.'))
-        return { tab: 'service', view: 'evidence' };
+        return {
+            tab: 'service',
+            view: 'evidence',
+            ...(reason.kind ? { focus: reason.kind } : {}),
+        };
     if (reason.code === 'maintenance.unresolved_check')
-        return { tab: 'checks', view: 'recent' };
+        return {
+            tab: 'checks',
+            view: 'recent',
+            ...(reason.source_id ? { run: reason.source_id } : {}),
+        };
     if (reason.code.startsWith('maintenance.'))
         return { tab: 'maintenance', view: 'open' };
     if (reason.code.startsWith('odometer.'))
@@ -225,6 +257,8 @@ export function locationUrl(
     if (location.tab !== 'overview') params.set('tab', location.tab);
     if (location.view) params.set('view', location.view);
     if (location.date) params.set('date', location.date);
+    if (location.focus) params.set('focus', location.focus);
+    if (location.run) params.set('run', String(location.run));
     const query = params.toString();
     return `/fleet-assets/vehicles/${vehicleId}${query ? `?${query}` : ''}`;
 }
@@ -247,7 +281,20 @@ export function readLocation(search: string): WorkspaceLocation {
             : { tab };
     }
     if (!views) return { tab };
-    return { tab, view: view && views.includes(view) ? view : views[0] };
+    const resolved = view && views.includes(view) ? view : views[0];
+    const focus = params.get('focus');
+    if (tab === 'service' && resolved === 'evidence' && isComplianceKind(focus))
+        return { tab, view: resolved, focus };
+    // Recent checks can open one check, e.g. from a readiness link.
+    const run = params.get('run');
+    if (
+        tab === 'checks' &&
+        resolved === 'recent' &&
+        run &&
+        /^[1-9]\d{0,9}$/.test(run)
+    )
+        return { tab, view: resolved, run: Number(run) };
+    return { tab, view: resolved };
 }
 
 export const SOURCE_KIND_LABELS: Record<string, string> = {

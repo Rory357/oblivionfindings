@@ -16,8 +16,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 
 /**
- * The vehicle calendar: a JSON feed for the visible period, unavailable
- * periods, and service appointments scheduled from a calendar slot.
+ * The vehicle calendar: a JSON feed for the visible period, one custody
+ * record, unavailable periods (with undo of a cancellation), and service
+ * appointments scheduled from a calendar slot or a due item.
  */
 class VehicleCalendarController extends Controller
 {
@@ -34,7 +35,7 @@ class VehicleCalendarController extends Controller
     public function events(Request $request, Asset $asset): JsonResponse
     {
         $viewer = $this->actor($request);
-        $vehicle = $this->vehicles->assignableVehicle($viewer, (int) $asset->getKey()) ?? abort(404);
+        $vehicle = $this->vehicles->fleetVehicle($viewer, (int) $asset->getKey()) ?? abort(404);
         $data = $request->validate([
             'start' => ['required', 'date'],
             'end' => ['required', 'date', 'after:start'],
@@ -49,9 +50,22 @@ class VehicleCalendarController extends Controller
     public function summary(Request $request, Asset $asset): JsonResponse
     {
         $viewer = $this->actor($request);
-        $vehicle = $this->vehicles->assignableVehicle($viewer, (int) $asset->getKey()) ?? abort(404);
+        $vehicle = $this->vehicles->fleetVehicle($viewer, (int) $asset->getKey()) ?? abort(404);
 
         return response()->json($this->calendar->summary($viewer, $vehicle));
+    }
+
+    /**
+     * One booking or unavailable period as the summary lists it, for records
+     * outside the summary's capped lists. Bookings keep their own Site rule;
+     * anything else, foreign or missing answers 404.
+     */
+    public function record(Request $request, Asset $asset, string $kind, int $id): JsonResponse
+    {
+        $viewer = $this->actor($request);
+        $vehicle = $this->vehicles->fleetVehicle($viewer, (int) $asset->getKey()) ?? abort(404);
+
+        return response()->json(['row' => $this->calendar->record($viewer, $vehicle, $kind, $id) ?? abort(404)]);
     }
 
     public function storeUnavailable(Request $request, Asset $asset): JsonResponse
@@ -79,16 +93,27 @@ class VehicleCalendarController extends Controller
         return response()->json(['period' => $this->periodResult($cancelled), 'message' => 'Unavailable period cancelled.']);
     }
 
+    /** Undo a cancellation (a period recorded on the calendar, not an appointment's hold). */
+    public function restoreUnavailable(Request $request, Asset $asset, FleetVehicleUnavailablePeriod $period): JsonResponse
+    {
+        $restored = $this->unavailable->restore($this->actor($request), (int) $asset->getKey(), (int) $period->getKey(),
+            (int) $request->input('expected_version'), $this->key($request));
+
+        return response()->json(['period' => $this->periodResult($restored), 'message' => 'Unavailable period restored.']);
+    }
+
     public function scheduleAppointment(Request $request, Asset $asset): JsonResponse
     {
         $files = array_values(array_filter((array) $request->file('files', []), fn (mixed $file): bool => $file instanceof UploadedFile));
         $result = $this->appointments->schedule($this->actor($request), (int) $asset->getKey(),
             $request->only(['operation', 'change_reason', 'work_order_id', 'title', 'provider_name', 'starts_local',
-                'ends_local', 'starts_offset', 'ends_offset', 'unavailable', 'provider_reference', 'notes']),
+                'ends_local', 'starts_offset', 'ends_offset', 'unavailable', 'provider_reference', 'notes',
+                'source_type', 'source_id']),
             $this->key($request), $files);
         $order = $result['work_order'];
 
         return response()->json([
+            'work_order_id' => (int) $order->id,
             'work_order' => ['id' => $order->id, 'reference' => $order->reference_number, 'version' => (int) $order->version],
             'unavailable_period' => $result['unavailable_period'] ? $this->periodResult($result['unavailable_period']) : null,
             'message' => match ($request->input('operation')) {

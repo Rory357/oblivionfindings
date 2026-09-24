@@ -7,6 +7,7 @@ use App\Models\AssetDocument;
 use App\Models\FleetVehicleComplianceRecord;
 use App\Models\FleetVehicleComplianceVersion;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -36,7 +37,7 @@ class VehicleComplianceService
         return DB::transaction(function () use ($actor, $assetId, $kind, $data, $requestKey, $expectedCurrentVersionId): FleetVehicleComplianceVersion {
             $currentActor = User::query()->findOrFail($actor->id);
             abort_unless($currentActor->canDo('fleet.manage'), 403);
-            $asset = $this->access->assignableVehicle($currentActor, $assetId, true) ?? abort(404);
+            $asset = $this->access->fleetVehicle($currentActor, $assetId, true) ?? abort(404);
             if (trim($requestKey) === '' || mb_strlen($requestKey) > 100) {
                 throw ValidationException::withMessages(['request_key' => 'Provide an idempotency key of at most 100 characters.']);
             }
@@ -87,11 +88,37 @@ class VehicleComplianceService
             ]);
             $record->update(['current_version_id' => $version->id]);
 
+            // "Not required" and "required again" are decisions in their own
+            // right, so the audit names them; every other save is a recording.
+            $wasNotRequired = $current?->applicability === 'not_applicable';
+            $isNotRequired = $version->applicability === 'not_applicable';
+            AuditLogger::logOrFail(match (true) {
+                $isNotRequired && ! $wasNotRequired => 'fleet.vehicle.compliance.not_required',
+                $wasNotRequired && ! $isNotRequired => 'fleet.vehicle.compliance.required_again',
+                default => 'fleet.vehicle.compliance.recorded',
+            }, $version, [
+                'actor_id' => (int) $currentActor->id,
+                'asset_id' => (int) $asset->id,
+                'kind' => $kind,
+                'record_id' => (int) $record->id,
+                'version' => (int) $version->version,
+                'supersedes_version_id' => $current?->id,
+                'previous_applicability' => $current?->applicability,
+                'applicability' => $version->applicability,
+                'basis' => $version->applicability_basis,
+                'outcome' => $version->outcome,
+            ]);
+
             // The legacy Asset date remains a compatibility projection of the
-            // last recorded expiry; it never makes an assessment acceptable.
+            // current version's expiry; it never makes an assessment
+            // acceptable. A failed, unassessed or not-required version clears
+            // it, so register badges, due alerts and Site calendar
+            // obligations stop showing an expiry that no longer stands.
             $legacyField = ['registration' => 'registration_expires_at', 'wof' => 'wof_expires_at', 'cof' => 'cof_expires_at'][$kind] ?? null;
-            if ($legacyField && in_array($version->outcome, ['recorded', 'passed'], true) && $version->expires_on) {
-                $asset->forceFill([$legacyField => $version->expires_on])->save();
+            if ($legacyField) {
+                $standing = $version->applicability !== 'not_applicable'
+                    && in_array($version->outcome, ['recorded', 'passed'], true) && $version->expires_on;
+                $asset->forceFill([$legacyField => $standing ? $version->expires_on : null])->save();
             }
 
             return $version;

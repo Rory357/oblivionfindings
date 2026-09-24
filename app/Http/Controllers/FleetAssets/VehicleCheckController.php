@@ -13,16 +13,19 @@ use App\Models\User;
 use App\Services\Fleet\VehicleCheckLibraryService;
 use App\Services\Fleet\VehicleCheckService;
 use App\Services\Fleet\VehicleChecksPresenter;
+use App\Services\Fleet\VehicleReadinessService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 
 /**
  * The vehicle profile's Checks & inspections: a JSON read model, recording a
- * check, amendments, the vehicle's check requirement, publishing checklist
- * versions and reporting a problem. Every call resolves the vehicle in the
- * actor's scope first, so a foreign or missing vehicle answers 404; the
- * services recheck their own authority under their locks.
+ * check, amendments, Maintenance's "no issue found" release of a check, the
+ * vehicle's check requirement, publishing checklist versions and reporting a
+ * problem. Every call resolves the vehicle in the actor's scope first, so a
+ * foreign or missing vehicle answers 404; the services recheck their own
+ * authority under their locks.
  */
 class VehicleCheckController extends Controller
 {
@@ -31,6 +34,7 @@ class VehicleCheckController extends Controller
         private readonly VehicleChecksPresenter $presenter,
         private readonly VehicleCheckService $checks,
         private readonly VehicleCheckLibraryService $library,
+        private readonly VehicleReadinessService $readiness,
     ) {}
 
     public function index(Request $request, Asset $asset): JsonResponse
@@ -86,6 +90,35 @@ class VehicleCheckController extends Controller
                 'recorded_at' => $amendment->recorded_at?->copy()->utc()->toIso8601String(),
             ],
             'message' => 'Amendment recorded. The original check is unchanged.',
+        ]);
+    }
+
+    /**
+     * Maintenance's "No issue found — release for use" for one check. The
+     * Maintenance service resolves the vehicle again in its own approved
+     * Sites, so central fleet oversight alone never opens this decision.
+     */
+    public function assess(Request $request, Asset $asset, FleetChecklistRun $run): JsonResponse
+    {
+        $actor = $this->actor($request);
+        $vehicle = $this->vehicle($actor, $asset);
+        abort_unless((int) $run->asset_id === (int) $vehicle->id, 404);
+        $decision = $this->checks->assess($actor, (int) $vehicle->id, (int) $run->id,
+            $request->only(['decision', 'reason', 'confirmed']), $this->key($request));
+        $ready = $this->readiness->assess($vehicle->fresh() ?? $vehicle)->canProceed;
+
+        return response()->json([
+            'assessment' => [
+                'id' => (int) $decision->id,
+                'run_id' => (int) $decision->check_run_id,
+                'decision' => (string) $decision->decision,
+                'reason' => (string) $decision->reason,
+                'assessed_at' => CarbonImmutable::parse((string) $decision->assessed_at, 'UTC')->toIso8601String(),
+            ],
+            'vehicle_ready' => $ready,
+            'message' => 'CHK-'.$run->id.' released for use: no issue found. '.($ready
+                ? 'The vehicle can be booked.'
+                : 'Other readiness items still stop the vehicle being used.'),
         ]);
     }
 
@@ -152,7 +185,7 @@ class VehicleCheckController extends Controller
 
     private function vehicle(User $actor, Asset $asset): Asset
     {
-        return $this->vehicles->assignableVehicle($actor, (int) $asset->getKey()) ?? abort(404);
+        return $this->vehicles->fleetVehicle($actor, (int) $asset->getKey()) ?? abort(404);
     }
 
     private function key(Request $request): string

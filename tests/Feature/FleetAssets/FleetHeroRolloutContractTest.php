@@ -58,9 +58,10 @@ class FleetHeroRolloutContractTest extends TestCase
     public function test_daily_check_and_vehicle_index_expose_live_compliance_badge_counts(): void
     {
         // This contract verifies organisation-wide badge arithmetic. Both pages
-        // count the vehicles the person may open (the vehicle profile's Site
-        // rule), so cross-site totals need the explicit all-sites permission.
-        $user = $this->makeFleetUser(['fleet.manage', 'securityDevices.devices.viewAllSites']);
+        // count the vehicles the person may open, so cross-site totals come
+        // from central fleet oversight (fleet.vehicles.viewAllSites), which
+        // opens every vehicle without other Site access.
+        $user = $this->makeFleetUser(['fleet.manage', 'fleet.vehicles.viewAllSites']);
         $site = Site::factory()->create();
 
         Asset::factory()->vehicle()->create([

@@ -53,10 +53,10 @@ class FleetFinanceReviewProvider implements SiteScopedTaskProvider, TaskProvider
             $user,
             $this->canView($user),
             $query,
-            // The same vehicle scope as the vehicle profile itself.
+            // Finance keeps its own Site rule: central fleet oversight doesn't open it.
             fn ($scoped, User $actor) => $scoped->whereIn(
                 'asset_id',
-                app(SecurityDevicesAccessService::class)->accessibleVehiclesForFleet($actor)->select('assets.id'),
+                app(SecurityDevicesAccessService::class)->siteScopedVehiclesForFleet($actor)->select('assets.id'),
             ),
             function (FleetFinanceReviewRequest $request) {
                 $vehicle = $request->asset;

@@ -9,6 +9,19 @@ use Illuminate\Database\Seeder;
 
 class RbacSeeder extends Seeder
 {
+    /**
+     * The Fleet Manager role's grants. The deploy-time grant migrations
+     * (2026_09_24_000200, 2026_09_24_000400) give a newly created role the
+     * same set.
+     */
+    public const FLEET_MANAGER_PERMISSIONS = [
+        'fleet.viewAny', 'fleet.manage', 'fleet.vehicles.viewAllSites', 'fleet.settings.manage',
+        'fleet.driverSessions.manage', 'fleet.signals.view', 'fleet.trips.manage',
+        'fleet.fuel.manage', 'fleet.reports.view', 'fleet.bookings.approve',
+        'fleet.incidents.manage', 'fleet.maintenance.manage', 'fleet.maintenance.report',
+        'fleet.mileage.approve', 'fleet.outings.manage', 'assets.documents.manage',
+    ];
+
     public function run(): void
     {
         /*
@@ -38,6 +51,7 @@ class RbacSeeder extends Seeder
             ['name' => 'risk_lead', 'label' => 'Risk Lead', 'level' => 66, 'type' => 'system', 'description' => 'Manages organizational risk'],
             ['name' => 'it_manager', 'label' => 'IT Manager', 'level' => 65, 'type' => 'system', 'description' => 'Manages IT systems and integrations'],
             ['name' => 'facilities_manager', 'label' => 'Facilities Manager', 'level' => 64, 'type' => 'system', 'description' => 'Manages facilities and maintenance'],
+            ['name' => 'fleet_manager', 'label' => 'Fleet Manager', 'level' => 63, 'type' => 'system', 'description' => 'Manages the vehicle fleet across all Sites'],
             ['name' => 'roadmap_manager', 'label' => 'Roadmap Manager', 'level' => 62, 'type' => 'system', 'description' => 'Manages organizational roadmap'],
 
             // Department leads
@@ -91,6 +105,7 @@ class RbacSeeder extends Seeder
         $roadmapManager = Role::where('name', 'roadmap_manager')->first();
         $itManager = Role::where('name', 'it_manager')->first();
         $facilitiesManager = Role::where('name', 'facilities_manager')->first();
+        $fleetManager = Role::where('name', 'fleet_manager')->first();
         $clientRole = Role::where('name', 'client')->first();
         $nextOfKinRole = Role::where('name', 'next_of_kin')->first();
         $boardChair = Role::where('name', 'board_chair')->first();
@@ -175,6 +190,8 @@ class RbacSeeder extends Seeder
             // Fleet
             ['key' => 'fleet.viewAny', 'description' => 'View fleet management', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.manage', 'description' => 'Full fleet management access', 'group' => 'fleet', 'module' => 'Resources'],
+            ['key' => 'fleet.vehicles.viewAllSites', 'description' => 'See every vehicle and its profile across all Sites; bookings, trips, drivers and Finance keep their own Site rules', 'group' => 'fleet', 'module' => 'Resources'],
+            ['key' => 'fleet.settings.manage', 'description' => 'Change fleet-wide settings every Site shares: vehicle checklists used beyond one vehicle and the driving score policy', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.driverSessions.manage', 'description' => 'Start/end driver sessions', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.signals.view', 'description' => 'View fleet signals', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.trips.manage', 'description' => 'Manage fleet trips (edit/delete)', 'group' => 'fleet', 'module' => 'Resources'],
@@ -933,6 +950,12 @@ class RbacSeeder extends Seeder
             'sites.ledger.view', 'sites.ledger.create', 'sites.ledger.manage',
         ]);
 
+        // Fleet Manager: central oversight of every vehicle and its profile
+        // (fleet.vehicles.viewAllSites) without other Site access. Bookings,
+        // trips, drivers and Finance keep their own Site rules. Mirrors
+        // 2026_09_24_000200_grant_fleet_vehicles_view_all_sites.
+        $syncPermissions($fleetManager, self::FLEET_MANAGER_PERMISSIONS);
+
         // Board Trustee
         $syncPermissions($boardTrustee, [
             'reports.viewAny', 'audit.viewAny', 'reports.sites.view', 'reports.sites.export',
@@ -1006,7 +1029,7 @@ class RbacSeeder extends Seeder
             ->chunk(200, function ($users) use (
                 $admin, $providerManager, $coordinator, $supportWorker,
                 $finance, $hr, $auditor, $roadmapManager, $itManager,
-                $facilitiesManager, $ceo, $cfo, $coo, $complianceLead, $riskLead
+                $facilitiesManager, $fleetManager, $ceo, $cfo, $coo, $complianceLead, $riskLead
             ) {
                 foreach ($users as $user) {
                     $roleName = $user->role ?? 'support_worker';
@@ -1021,6 +1044,7 @@ class RbacSeeder extends Seeder
                         'roadmap_manager' => $roadmapManager,
                         'it_manager' => $itManager,
                         'facilities_manager' => $facilitiesManager,
+                        'fleet_manager' => $fleetManager,
                         'ceo' => $ceo,
                         'cfo' => $cfo,
                         'coo' => $coo,

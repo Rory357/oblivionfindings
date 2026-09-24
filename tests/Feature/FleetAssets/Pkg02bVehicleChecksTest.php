@@ -164,7 +164,7 @@ class Pkg02bVehicleChecksTest extends TestCase
 
     public function test_required_evidence_is_kept_with_the_check_as_private_vehicle_documents(): void
     {
-        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.maintenance.manage', 'assets.viewAny', 'assets.documents.manage']);
+        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.maintenance.manage', 'fleet.settings.manage', 'assets.viewAny', 'assets.documents.manage']);
         $vehicle = $this->vehicle($this->site);
         $otherVehicle = $this->vehicle($this->site);
         $published = $this->actingAs($manager)->postJson("/fleet-assets/vehicles/{$vehicle->id}/check-templates", [
@@ -213,7 +213,9 @@ class Pkg02bVehicleChecksTest extends TestCase
 
     public function test_changing_a_checklist_publishes_a_new_version_and_keeps_earlier_checks(): void
     {
-        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.maintenance.manage']);
+        // Checklists used beyond one vehicle are fleet-wide settings.
+        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.maintenance.manage', 'fleet.settings.manage']);
+        $siteManager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.maintenance.manage']);
         $reader = $this->siteUser([$this->site], ['fleet.viewAny']);
         $vehicle = $this->vehicle($this->site);
         $otherVehicle = $this->vehicle($this->site);
@@ -236,6 +238,11 @@ class Pkg02bVehicleChecksTest extends TestCase
             'expected_version_id' => $one->id, 'expected_items_sha256' => $one->items_sha256, 'request_key' => 'customise-1',
         ];
         $this->actingAs($reader)->postJson($url, $change)->assertForbidden();
+        $this->actingAs($siteManager)->getJson($checks)->assertOk()
+            ->assertJsonPath('can.manage_templates', true)->assertJsonPath('can.manage_shared_templates', false);
+        $this->actingAs($siteManager)->postJson($url, ['request_key' => 'customise-site'] + $change)->assertForbidden()
+            ->assertJsonPath('message', 'Checklists used beyond this vehicle are fleet-wide settings. Ask a Fleet Manager to change them, or publish a checklist for this vehicle only.');
+        $this->actingAs($manager)->getJson($checks)->assertOk()->assertJsonPath('can.manage_shared_templates', true);
         $this->actingAs($manager)->postJson($url, ['confirmed' => false] + $change)
             ->assertUnprocessable()->assertJsonValidationErrors('confirmed');
         $published = $this->actingAs($manager)->postJson($url, $change)->assertOk()
@@ -270,7 +277,10 @@ class Pkg02bVehicleChecksTest extends TestCase
             'questions' => [['id' => 'return', 'label' => 'Return condition', 'kind' => 'condition', 'required' => true]]];
         $this->actingAs($manager)->postJson($create, ['name' => 'vehicle condition record (before use)', 'assignment' => 'all_vehicles',
             'request_key' => 'create-duplicate'] + $own)->assertUnprocessable()->assertJsonValidationErrors('name');
-        $this->actingAs($manager)->postJson($create, ['name' => 'Return condition record', 'assignment' => 'vehicle',
+        // A Site manager publishes checklists for their own vehicle, not for the fleet.
+        $this->actingAs($siteManager)->postJson($create, ['name' => 'Fleet return record', 'assignment' => 'all_vehicles',
+            'request_key' => 'create-shared-site'] + $own)->assertForbidden();
+        $this->actingAs($siteManager)->postJson($create, ['name' => 'Return condition record', 'assignment' => 'vehicle',
             'request_key' => 'create-own'] + $own)->assertOk();
         $this->assertContains('Return condition record', collect($this->actingAs($manager)->getJson($checks)->json('templates'))->pluck('name')->all());
         $this->assertNotContains('Return condition record', collect($this->actingAs($manager)

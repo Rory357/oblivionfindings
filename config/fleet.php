@@ -65,6 +65,8 @@ return [
     'obligation_reminders' => [
         'schedule_lead_days' => env('FLEET_SCHEDULE_REMINDER_LEAD_DAYS', 14),
         'compliance_lead_days' => env('FLEET_COMPLIANCE_REMINDER_LEAD_DAYS', 7),
+        // The vehicle check due date (assets.inspection_due_at).
+        'check_lead_days' => env('FLEET_CHECK_REMINDER_LEAD_DAYS', 7),
         'ruc_lead_km' => env('FLEET_RUC_REMINDER_LEAD_KM', 1000),
     ],
 

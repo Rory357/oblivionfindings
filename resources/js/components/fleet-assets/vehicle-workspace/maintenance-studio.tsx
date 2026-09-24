@@ -49,10 +49,21 @@ export function OpenWorkPanel({
         return (
             <section className="studio-card">
                 <SectionHeading eyebrow="MAINTENANCE" title="Open work" />
-                <StudioNotice title="Maintenance access required">
-                    Maintenance records for this vehicle are available to people
-                    with Maintenance access at its site.
-                </StudioNotice>
+                {work.site_restricted ? (
+                    <StudioNotice title="Maintenance stays with the vehicle’s Site">
+                        You can see this vehicle across Sites. Its Maintenance
+                        work is shown to people with Maintenance access at{' '}
+                        {vehicle.home_site?.name ??
+                            vehicle.site?.name ??
+                            'its Site'}
+                        .
+                    </StudioNotice>
+                ) : (
+                    <StudioNotice title="Maintenance access required">
+                        Maintenance records for this vehicle are available to
+                        people with Maintenance access at its site.
+                    </StudioNotice>
+                )}
             </section>
         );
     }

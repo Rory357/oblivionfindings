@@ -584,6 +584,26 @@ before.
   calling a UI change done, open the mockup and the build side by side at
   the same width and walk every view, then record the comparison. Views
   not yet built stay unreleased; don't substitute interim content for them.
+- **Module calendars that fork the shared calendar chrome** (corrected
+  2026-09-24, PKG-02B vehicle calendar) — a module calendar that rebuilds
+  its own header, date anchor, filter row, source legend, view switcher,
+  Today rail or entry menus instead of using
+  `pages/sites/calendar/_parts.tsx` (`CalendarContextMenu`,
+  `CalendarSourcePills`, `JumpToDate`, `TodayRail`, the shared views) inside
+  `PageLayout`. A module calendar supplies its data through an adapter and
+  adds its own actions to the shared menus; it never ships a second menu or
+  legend style. `design_styles/CALENDAR_STYLE_GUIDE.md` is the checklist.
+  ESLint refuses new `@fullcalendar/*` imports outside the listed legacy
+  migration targets.
+- **Dropping approved context actions** (corrected 2026-09-24, PKG-02B
+  vehicle calendar) — shipping a calendar or list with only some of the
+  approved right-click and kebab actions. Every context action in the
+  approved design is built with a real backend and offered the same way
+  everywhere: right-click, the entry's actions button, the keyboard
+  (context-menu key or Shift+F10) and a long press on touch. Destructive
+  items use the destructive tone and offer Undo where a compensating action
+  exists. Actions with no backend are hidden, never stubbed, and are listed
+  in the handoff.
 
 ## Conformance sweep (run on request)
 

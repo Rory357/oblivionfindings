@@ -826,6 +826,31 @@ export function DocumentUploadDialog({
     );
 }
 
+/**
+ * Edit a document's details and renewal plan from elsewhere (the calendar's
+ * renewal reminders): the document owns its renewal reminder.
+ */
+export function DocumentEditDialog({
+    workspace,
+    set,
+    onClose,
+    onSaved,
+}: {
+    workspace: VehicleWorkspace;
+    set: DocumentSet;
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    return (
+        <DocumentDialog
+            workspace={workspace}
+            mode={{ kind: 'edit', set, step: 1 }}
+            onClose={onClose}
+            onSaved={onSaved}
+        />
+    );
+}
+
 function DocumentDialog({
     workspace,
     mode,
