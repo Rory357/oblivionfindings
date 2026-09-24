@@ -122,6 +122,36 @@ export default [
         },
     },
     {
+        // Calendars use the shared Site Calendar parts (DESIGN.md
+        // "Calendars — always the Site Calendar style" and the anti-pattern
+        // "Module calendars that fork the shared calendar chrome"). The files
+        // below predate the rule and are migration targets. Keep this block
+        // before the finance block: a later block's no-restricted-imports
+        // replaces this one, so finance repeats the pattern.
+        files: ['resources/js/**/*.{ts,tsx}'],
+        ignores: [
+            'resources/js/pages/hr/calendar/index.tsx',
+            'resources/js/pages/operations/clients/calendar.tsx',
+            'resources/js/pages/operations/clients/tabs/legacy-profile-sections.tsx',
+            'resources/js/pages/portal/calendar.tsx',
+            'resources/js/test/client-profile-appointment-access.test.tsx',
+        ],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    patterns: [
+                        {
+                            group: ['@fullcalendar/*'],
+                            message:
+                                'Calendars reuse pages/sites/calendar (SiteCalendar + _parts) with a data adapter, not a new FullCalendar skin. See DESIGN.md "Calendars".',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
         // Finance is migrated to the Event Horizon header (audit
         // 2026-09-16). PageHero is the superseded page top — DESIGN.md
         // "Page headers" — so a new finance page can't quietly go back to it.
@@ -159,6 +189,11 @@ export default [
                             importNames: ['PageHero'],
                             message:
                                 'Finance pages use <PageHeader> (@/components/page), not the superseded PageHero. See DESIGN.md "Page headers".',
+                        },
+                        {
+                            group: ['@fullcalendar/*'],
+                            message:
+                                'Calendars reuse pages/sites/calendar (SiteCalendar + _parts) with a data adapter, not a new FullCalendar skin. See DESIGN.md "Calendars".',
                         },
                     ],
                 },
