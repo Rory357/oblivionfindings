@@ -1,7 +1,12 @@
+import {
+    DAILY_CHECK_KIND,
+    outcomeLabel,
+    outcomeTone,
+} from '@/components/fleet-assets/vehicle-workspace/checks-model';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatDistance } from '@/lib/fleet-utils';
 import { cn } from '@/lib/utils';
@@ -35,7 +40,9 @@ type Inspection = {
     } | null;
     user: { id: number; name: string } | null;
     passed: boolean;
-    outcome: 'passed' | 'failed' | 'needs_assessment';
+    /** passed | failed | needs_assessment, or a daily check's no_issue_recorded | issue_recorded. */
+    outcome: string;
+    check_kind: string | null;
     notes: string | null;
     odometer: number | null;
     overall_condition: string | null;
@@ -49,6 +56,18 @@ type Inspection = {
 type Props = {
     inspection: Inspection;
     can_report: boolean;
+};
+
+/** Each answer's assessment under the submitted rule; daily check answers are only recorded. */
+const ANSWER_BADGES: Record<
+    'pass' | 'fail' | 'na' | 'unknown' | 'recorded',
+    { label: string; tone: StatusVariant }
+> = {
+    pass: { label: 'Passed', tone: 'success' },
+    fail: { label: 'Failed', tone: 'critical' },
+    na: { label: 'N/A', tone: 'neutral' },
+    unknown: { label: 'Needs assessment', tone: 'warning' },
+    recorded: { label: 'Recorded', tone: 'neutral' },
 };
 
 const SECTION_COLORS: Record<string, string> = {
@@ -69,9 +88,12 @@ function ResultIcon({ result }: { result: string }) {
 export default function InspectionShow({ inspection, can_report }: Props) {
     const insp = inspection ?? ({} as Inspection);
     const responses = insp.responses ?? {};
-    const passed = insp.outcome === 'passed';
-    const failed = insp.outcome === 'failed';
-    const outcomeLabel = passed ? 'Passed' : failed ? 'Failed' : 'Needs assessment';
+    const tone = outcomeTone(insp.outcome);
+    const passed = tone === 'success';
+    const failed = tone === 'critical';
+    const resultLabel = outcomeLabel(insp.outcome);
+    // Daily checks are recorded observations: no approved rule assesses them.
+    const daily = insp.check_kind === DAILY_CHECK_KIND;
 
     // Group responses by section
     const sections: Record<
@@ -79,8 +101,9 @@ export default function InspectionShow({ inspection, can_report }: Props) {
         { key: string; label: string; item: ChecklistItem; options: unknown }[]
     > = {};
     const snapshot = insp.presented_template;
-    const presented: Array<{ key: string; label: string; section: string; item: ChecklistItem; options: unknown }> = snapshot?.items?.map((question) => {
-        const key = String(question.id ?? question.key ?? '');
+    const presented: Array<{ key: string; label: string; section: string; item: ChecklistItem; options: unknown }> = snapshot?.items?.map((question, index) => {
+        // Items without an id are answered by position, as the checklist runner and vehicle checks record them.
+        const key = String(question.id ?? question.key ?? index);
         return { key, label: question.label ?? `Question ${key}`, section: question.section ?? 'Checklist',
             item: { ...(responses[key] ?? { result: 'unknown' }), assessment: insp.answer_outcomes[key] ?? 'needs_assessment' }, options: question.options ?? null };
     }) ?? Object.entries(responses).map(([key, item]) => ({
@@ -97,7 +120,7 @@ export default function InspectionShow({ inspection, can_report }: Props) {
     }
 
     // Count pass/fail/na
-    const assessment = (item: ChecklistItem) => item.assessment === 'passed' ? 'pass' : item.assessment === 'failed' ? 'fail' : item.assessment === 'not_applicable' ? 'na' : 'unknown';
+    const assessment = (item: ChecklistItem) => daily ? 'recorded' : item.assessment === 'passed' ? 'pass' : item.assessment === 'failed' ? 'fail' : item.assessment === 'not_applicable' ? 'na' : 'unknown';
     const counts = presented.reduce(
         (acc, { item }) => {
             if (assessment(item) === 'pass') acc.pass++;
@@ -120,7 +143,7 @@ export default function InspectionShow({ inspection, can_report }: Props) {
             <Head title={`Inspection #${insp.id ?? ''}`} />
             <PageShell>
                 <FleetCompactHero
-                    pill={`Asset check · ${outcomeLabel.toLowerCase()}`}
+                    pill={`${daily ? 'Daily check' : 'Asset check'} · ${resultLabel.toLowerCase()}`}
                     title={`Inspection #${insp.id ?? ''}`}
                     backHref="/fleet-assets/inspections"
                     backLabel="Inspections"
@@ -148,7 +171,7 @@ export default function InspectionShow({ inspection, can_report }: Props) {
                             )}
                             <div>
                                 <span className="text-lg font-bold">
-                                    {`Check · ${outcomeLabel}`}
+                                    {`${daily ? 'Daily check' : 'Check'} · ${resultLabel}`}
                                 </span>
                                 <span className="mx-2 opacity-50">|</span>
                                 <span className="capitalize">
@@ -156,12 +179,7 @@ export default function InspectionShow({ inspection, can_report }: Props) {
                                 </span>
                             </div>
                         </div>
-                        <Badge
-                            variant={passed ? 'default' : failed ? 'destructive' : 'secondary'}
-                            className="text-sm"
-                        >
-                            {outcomeLabel}
-                        </Badge>
+                        <StatusBadge variant={tone}>{resultLabel}</StatusBadge>
                     </div>
                 </div>
 
@@ -246,6 +264,14 @@ export default function InspectionShow({ inspection, can_report }: Props) {
                             <CardTitle className="text-base">Summary</CardTitle>
                         </CardHeader>
                         <CardContent>
+                            {daily ? (
+                                <p className="text-sm text-muted-foreground">
+                                    Daily checks are recorded as answered. No
+                                    approved rule assesses them, and they don’t
+                                    stop bookings. Report a problem so
+                                    Maintenance can assess an issue.
+                                </p>
+                            ) : (
                             <div className="grid grid-cols-4 gap-3">
                                 <div className="rounded-lg bg-status-success-bg p-3 text-center">
                                     <div className="text-2xl font-bold text-status-success">
@@ -276,6 +302,7 @@ export default function InspectionShow({ inspection, can_report }: Props) {
                                     <div className="mt-1 text-xs text-muted-foreground">Unknown</div>
                                 </div>
                             </div>
+                            )}
                             <div className="mt-4 rounded-md bg-muted/40 p-3">
                                 <div className="text-xs text-muted-foreground">
                                     Overall Condition
@@ -325,18 +352,9 @@ export default function InspectionShow({ inspection, can_report }: Props) {
                                                     : option && typeof option === 'object' && 'label' in option ? String(option.label) : '').filter(Boolean).join(', ')}
                                             </small>}
                                         </span>
-                                        <Badge
-                                            variant={
-                                                assessment(item) === 'pass'
-                                                    ? 'default'
-                                                    : assessment(item) === 'fail'
-                                                      ? 'destructive'
-                                                      : 'secondary'
-                                            }
-                                            className="text-xs"
-                                        >
-                                            {assessment(item) === 'na' ? 'N/A' : assessment(item) === 'unknown' ? 'Needs assessment' : assessment(item) === 'pass' ? 'Passed' : 'Failed'}
-                                        </Badge>
+                                        <StatusBadge variant={ANSWER_BADGES[assessment(item)].tone}>
+                                            {ANSWER_BADGES[assessment(item)].label}
+                                        </StatusBadge>
                                         {item.evidence && <a className="text-xs font-medium text-primary underline" href={item.evidence.url}>{item.evidence.name}</a>}
                                         {item.notes && (
                                             <span className="max-w-[200px] truncate text-xs text-muted-foreground italic">

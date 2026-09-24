@@ -44,8 +44,8 @@ class TrackingWorkspaceTest extends TestCase
     {
         $site = $this->site('Kauri House');
         $client = Client::factory()->create([
-
             'site_id' => $site->id,
+            'status' => 'active',
             'preferred_name' => 'Mere',
         ]);
         $consent = $this->trackingConsent($client);
@@ -142,8 +142,8 @@ class TrackingWorkspaceTest extends TestCase
     {
         $site = $this->site('Miro House');
         $client = Client::factory()->create([
-
             'site_id' => $site->id,
+            'status' => 'active',
             'preferred_name' => 'Ani',
             'first_name' => 'Anahera',
             'last_name' => 'Private-Surname-Sentinel',
@@ -248,10 +248,12 @@ class TrackingWorkspaceTest extends TestCase
         $site = $this->site('Rimu House');
         $withdrawnClient = Client::factory()->create([
             'site_id' => $site->id,
+            'status' => 'active',
             'preferred_name' => 'Hana',
         ]);
         $inactiveClient = Client::factory()->create([
             'site_id' => $site->id,
+            'status' => 'active',
             'preferred_name' => 'Matiu',
         ]);
         $withdrawnConsent = $this->trackingConsent($withdrawnClient, [
@@ -314,10 +316,12 @@ class TrackingWorkspaceTest extends TestCase
     {
         $site = $this->site('Totara House');
         $worker = User::factory()->create([
-
             'approved_at' => now(),
             'name' => 'Aroha Worker',
         ]);
+        // Custody is captured when the tracker is assigned, so the worker must
+        // already be current staff at the Site.
+        $this->assignViewerToSite($worker, $site);
         $device = $this->trackingDevice('Aroha lone-worker tracker', [
             'category' => 'personal_tracker',
             'subcategory' => 'lone_worker',
@@ -346,7 +350,6 @@ class TrackingWorkspaceTest extends TestCase
             'hr.employees.viewAny',
             'assets.telemetry.view',
         ]);
-        $this->assignViewerToSite($worker, $site);
         $this->assignViewerToSite($viewer, $site);
 
         $technicalViewer = $this->viewerWithPermissions([
@@ -512,8 +515,8 @@ class TrackingWorkspaceTest extends TestCase
         $site = $this->site('Pohutukawa Base');
         $vehicle = Asset::factory()->vehicle()->forSite($site)->create(['name' => 'Pohutukawa van']);
         $client = Client::factory()->create([
-
             'site_id' => $site->id,
+            'status' => 'active',
             'preferred_name' => 'Ria',
         ]);
         $clientAsset = Asset::factory()->forSite($site)->forClient($client->id)->create([

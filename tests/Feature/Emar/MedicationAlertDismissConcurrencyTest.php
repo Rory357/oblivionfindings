@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class MedicationAlertDismissConcurrencyTest extends TestCase
@@ -22,6 +23,7 @@ class MedicationAlertDismissConcurrencyTest extends TestCase
 
     public function test_two_separate_acknowledgement_workers_serialize_and_replay_the_terminal_result(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 
@@ -93,6 +95,7 @@ class MedicationAlertDismissConcurrencyTest extends TestCase
 
     public function test_permission_revoked_while_alert_transition_waits_denies_without_writing(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $fixture = $this->alertFixture('Revoked acknowledgement fixture');

@@ -20,6 +20,7 @@ use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 #[Group('mysql-serial')]
@@ -29,6 +30,7 @@ class HandoverAuthorizationEvidenceConcurrencyTest extends TestCase
 
     public function test_assigned_worker_capability_revoked_while_edit_waits_cannot_mutate_handover_audit_or_timeline(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $this->seed(RbacSeeder::class);
@@ -108,6 +110,7 @@ class HandoverAuthorizationEvidenceConcurrencyTest extends TestCase
 
     public function test_profile_site_move_while_save_waits_cannot_clear_controlled_medication_due_evidence(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $this->seed(RbacSeeder::class);

@@ -25,7 +25,9 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tests\TestCase;
 
@@ -455,6 +457,80 @@ class Pkg02bVehicleFinanceTest extends TestCase
             ->assertOk()->assertJsonPath('request.status', 'resolved');
     }
 
+    public function test_finance_decides_review_requests_in_finance_without_fleet_access(): void
+    {
+        $vehicle = $this->vehicle($this->site);
+        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage', 'assets.viewAny', 'assets.documents.manage', 'finance.assets.view']);
+        $finance = $this->siteUser([$this->site], ['finance.assets.view', 'finance.ap.view', 'finance.ap.manage']);
+        $viewOnly = $this->siteUser([$this->site], ['finance.assets.view']);
+        $fleetOnly = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage']);
+        $remote = $this->siteUser([$this->foreignSite], ['finance.assets.view', 'finance.ap.manage']);
+        $central = $this->siteUser([$this->foreignSite], ['finance.assets.view', 'finance.ap.manage', 'finance.insights.viewAllSites']);
+        $request = $this->reviewRequest($manager, $vehicle);
+        $upload = $this->actingAs($manager)->post("/fleet-assets/vehicles/{$vehicle->id}/documents", [
+            'category' => 'Supplier invoice review', 'document_date' => '2026-09-23', 'reason' => 'Invoice for '.$request['reference'],
+            'source_type' => 'finance_review_request', 'source_id' => $request['id'], 'request_key' => 'finance-page-file',
+            'files' => [$this->pdf('service-invoice.pdf')],
+        ], ['Accept' => 'application/json'])->assertOk()->json('files.0');
+
+        // Finance is told where to decide it; the requester and other Sites aren't.
+        $notified = fn (User $user): bool => DB::table('notifications')->where('notifiable_id', $user->id)->pluck('data')
+            ->contains(fn (string $data): bool => (json_decode($data, true)['url'] ?? null) === '/finance/vehicle-reviews?request='.$request['id']);
+        $this->assertTrue($notified($finance));
+        $this->assertTrue($notified($central));
+        $this->assertFalse($notified($remote));
+        $this->assertFalse($notified($manager));
+
+        // Finance › Vehicle reviews lists it for Finance at the vehicle's Site, or with all-Sites Finance access.
+        $this->actingAs($finance)->get('/finance/vehicle-reviews')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('finance/vehicle-reviews/index')
+                ->where('summary.open', 1)
+                ->where('requests.0.id', $request['id'])
+                ->where('requests.0.can_decide', true)
+                ->where('requests.0.vehicle.url', null)
+                ->where('requests.0.files.0.name', 'service-invoice.pdf')
+                ->where('can.decide', true)
+                ->etc());
+        $this->actingAs($central)->get('/finance/vehicle-reviews')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('requests.0.id', $request['id'])->etc());
+        $this->actingAs($remote)->get('/finance/vehicle-reviews')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('requests', [])->where('summary.open', 0)->etc());
+        $this->actingAs($viewOnly)->get('/finance/vehicle-reviews')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('requests.0.can_decide', false)->where('can.decide', false)->etc());
+        $this->actingAs($fleetOnly)->get('/finance/vehicle-reviews')->assertForbidden();
+
+        // Its evidence opens from Finance, sandboxed; other documents don't.
+        $this->actingAs($finance)->get("/finance/vehicle-reviews/{$request['id']}/files/{$upload['id']}")->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
+        $other = $this->actingAs($manager)->post("/fleet-assets/vehicles/{$vehicle->id}/documents", [
+            'category' => 'Invoice', 'document_date' => '2026-09-20', 'reason' => 'Unrelated invoice',
+            'request_key' => 'finance-page-other', 'files' => [$this->pdf('unrelated.pdf')],
+        ], ['Accept' => 'application/json'])->assertOk()->json('files.0');
+        $this->actingAs($finance)->get("/finance/vehicle-reviews/{$request['id']}/files/{$other['id']}")->assertNotFound();
+        $this->actingAs($remote)->get("/finance/vehicle-reviews/{$request['id']}/files/{$upload['id']}")->assertNotFound();
+
+        // A request opened from All Tasks shows whatever the filter.
+        $this->actingAs($finance)->get("/finance/vehicle-reviews?status=decided&request={$request['id']}")->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('requests', [])->where('focus.id', $request['id'])->etc());
+
+        // Deciding: a note is required, only Finance with authority at the Site decides, once.
+        $url = "/finance/vehicle-reviews/{$request['id']}/decision";
+        $decision = ['decision' => 'resolved', 'note' => 'Credit note requested from the supplier.', 'expected_version' => 1];
+        $this->actingAs($viewOnly)->post($url, $decision + ['request_key' => 'finance-page-view'])->assertForbidden();
+        $this->actingAs($remote)->from('/finance/vehicle-reviews')->post($url, $decision + ['request_key' => 'finance-page-remote'])->assertNotFound();
+        $this->actingAs($finance)->from('/finance/vehicle-reviews')->post($url, ['note' => ''] + $decision + ['request_key' => 'finance-page-empty'])
+            ->assertRedirect('/finance/vehicle-reviews')->assertSessionHasErrors('note');
+        $this->actingAs($finance)->from('/finance/vehicle-reviews')->post($url, $decision + ['request_key' => 'finance-page-decide'])
+            ->assertRedirect('/finance/vehicle-reviews')->assertSessionHasNoErrors();
+        $stored = FleetFinanceReviewRequest::query()->findOrFail($request['id']);
+        $this->assertSame(['resolved', $finance->id], [$stored->status, (int) $stored->decided_by_user_id]);
+        $this->actingAs($finance)->from('/finance/vehicle-reviews')
+            ->post($url, ['decision' => 'declined', 'expected_version' => 2] + $decision + ['request_key' => 'finance-page-again'])
+            ->assertRedirect('/finance/vehicle-reviews')->assertSessionHasErrors('decision');
+        // The requester sees Finance's decision on the vehicle.
+        $this->assertSame('Resolved', $this->present($manager, $vehicle)['requests'][0]['status_label']);
+    }
+
     public function test_open_review_requests_reach_finance_in_all_tasks(): void
     {
         $vehicle = $this->vehicle($this->site);
@@ -466,11 +542,15 @@ class Pkg02bVehicleFinanceTest extends TestCase
 
         $item = collect((new TaskAggregator)->itemsFor($this->fresh($finance), []))->firstWhere('id', $id);
         $this->assertNotNull($item);
-        $this->assertSame("/fleet-assets/vehicles/{$vehicle->id}?view=finance", $item->link);
+        // The row opens the request in Finance › Vehicle reviews.
+        $this->assertSame("/finance/vehicle-reviews?request={$request['id']}", $item->link);
         $this->assertSame($request['reference'], $item->ref);
         $this->assertSame($this->site->id, $item->site['id']);
         $this->assertNull(collect((new TaskAggregator)->itemsFor($this->fresh($manager), []))->firstWhere('id', $id));
         $this->assertNull(collect((new TaskAggregator)->itemsFor($this->fresh($remoteFinance), []))->firstWhere('id', $id));
+        // Finance needs no Fleet access to see it.
+        $financeOnly = $this->siteUser([$this->site], ['finance.ap.view', 'finance.ap.manage']);
+        $this->assertNotNull(collect((new TaskAggregator)->itemsFor($this->fresh($financeOnly), []))->firstWhere('id', $id));
         $this->actingAs($finance)->getJson('/tasks/detail?source=fleet_finance_review&id='.$request['id'])
             ->assertOk()->assertJsonPath('item.id', $id);
 

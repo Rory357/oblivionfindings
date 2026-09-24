@@ -11,9 +11,13 @@ it('cannot report a normal production release before the configured Inertia SSR 
     $deploy = (string) file_get_contents($root.'/scripts/deploy-server.sh');
     $installer = (string) file_get_contents($root.'/scripts/inertia/install-supervisor.sh');
 
+    // SSR stays on by default at the Supervisor runtime's address. The env
+    // overrides exist for local development without an SSR runtime; a server
+    // that disabled SSR still fails the release below, because
+    // inertia:start-ssr refuses to run while SSR is disabled.
     expect($inertiaConfig)->toContain(
-        "'enabled' => true",
-        "'url' => 'http://127.0.0.1:13714'",
+        "'enabled' => env('INERTIA_SSR_ENABLED', true)",
+        "'url' => env('INERTIA_SSR_URL', 'http://127.0.0.1:13714')",
     )->and($package['scripts']['build:ssr'] ?? null)->toBe('vite build && vite build --ssr')
         ->and($deploy)->toContain(
             'npm run build:ssr',

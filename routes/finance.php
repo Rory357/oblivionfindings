@@ -52,6 +52,7 @@ use App\Domain\Finance\Http\Controllers\SettingsController;
 use App\Domain\Finance\Http\Controllers\SiteFinancialDashboardController;
 use App\Domain\Finance\Http\Controllers\SitesFinancialOverviewController;
 use App\Domain\Finance\Http\Controllers\TaxController;
+use App\Domain\Finance\Http\Controllers\VehicleReviewRequestController;
 use App\Domain\Finance\Http\Controllers\VendorController;
 use App\Domain\Finance\Http\Middleware\RejectUnsupportedConsolidation;
 use Illuminate\Support\Facades\Route;
@@ -549,6 +550,21 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::post('/gst-returns/{gstReturn}/amend', [GstReturnController::class, 'amend'])
         ->name('gst-returns.amend')
         ->middleware('permission:finance.tax.manage');
+
+    // ── Vehicle reviews ─────────────────────────────────────────────────
+    // Review requests raised from a vehicle's Finance view. Finance reads and
+    // decides them here under its own Site rule, without Fleet access.
+    Route::get('/vehicle-reviews', [VehicleReviewRequestController::class, 'index'])
+        ->name('vehicle-reviews.index')
+        ->middleware('permission:finance.assets.view|finance.ap.view');
+    Route::post('/vehicle-reviews/{reviewRequest}/decision', [VehicleReviewRequestController::class, 'decide'])
+        ->whereNumber('reviewRequest')
+        ->name('vehicle-reviews.decision')
+        ->middleware('permission:finance.assets.manage|finance.ap.manage');
+    Route::get('/vehicle-reviews/{reviewRequest}/files/{document}', [VehicleReviewRequestController::class, 'file'])
+        ->whereNumber(['reviewRequest', 'document'])
+        ->name('vehicle-reviews.file')
+        ->middleware('permission:finance.assets.view|finance.ap.view');
 
     // ── Fixed Assets ────────────────────────────────────────────────────
     // Create/edit are WizardShell modals on the index/show pages; the retired

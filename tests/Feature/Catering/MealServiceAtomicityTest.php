@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 uses(RefreshDatabase::class);
 
@@ -416,6 +417,7 @@ test('unserve refuses unlinked legacy stock and later dependent stocktakes witho
 });
 
 test('parallel serve unserve and opposing actions serialize without duplicate effects', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     Notification::fake();
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
