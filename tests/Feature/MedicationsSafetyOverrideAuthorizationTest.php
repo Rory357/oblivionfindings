@@ -352,9 +352,6 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
                 DB::table('audit_logs')->where('client_id', $this->client->id)->delete();
                 DB::table('client_controlled_drug_entries')->where('client_id', $this->client->id)->delete();
                 DB::table('client_medication_administrations')->where('client_id', $this->client->id)->delete();
-                DB::table('medication_idempotency_results')->where('request_uuid', $payload['client_request_uuid'])->delete();
-                DB::table('shifts')->whereIn('id', $this->fixtureShiftIds)->delete();
-                DB::table('medication_competency_assessments')->whereIn('user_id', $userIds)->delete();
                 DB::table('medication_allergies')->where('client_id', $this->client->id)->delete();
                 DB::table('client_medication_stocks')->where('client_medication_id', $this->medication->id)->delete();
                 DB::table('client_medications')->where('client_id', $this->client->id)->delete();
