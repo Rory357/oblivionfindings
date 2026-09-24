@@ -266,7 +266,8 @@ class FleetHeroRolloutContractTest extends TestCase
 
     public function test_one_year_trip_export_includes_only_trips_within_the_selected_period(): void
     {
-        $user = $this->makeFleetUser();
+        // Reports are Site-scoped; fleet.manage is the all-Sites view this contract needs.
+        $user = $this->makeFleetUser(['fleet.manage']);
         $withinYearVehicleName = 'Fleet Report Within Year Vehicle';
         $olderVehicleName = 'Fleet Report Older Than Year Vehicle';
         $recentVehicleName = 'Fleet Report Invalid Period Fallback Vehicle';
@@ -323,10 +324,19 @@ class FleetHeroRolloutContractTest extends TestCase
 
     public function test_trip_export_queries_rows_only_when_the_download_stream_runs(): void
     {
-        $user = $this->makeFleetUser();
+        $user = $this->makeFleetUser(['fleet.manage']);
         $vehicleName = 'Fleet Report Lazy Stream Vehicle';
         $vehicle = Asset::factory()->vehicle()->create(['name' => $vehicleName]);
         $driver = User::factory()->create(['name' => 'Fleet Report Lazy Stream Driver']);
+        // The export names drivers who are current staff the viewer can see.
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $driver->id,
+            'primary_site_id' => $vehicle->site_id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
         $startedAt = now()->subDay()->startOfHour();
         $endedAt = $startedAt->copy()->addMinutes(90);
         $driverSession = FleetDriverSession::query()->create([
@@ -383,7 +393,7 @@ class FleetHeroRolloutContractTest extends TestCase
 
     public function test_fuel_export_queries_rows_only_when_the_download_stream_runs(): void
     {
-        $user = $this->makeFleetUser();
+        $user = $this->makeFleetUser(['fleet.manage']);
         $vehicleName = 'Fleet Fuel Lazy Stream Vehicle';
         $vehicle = Asset::factory()->vehicle()->create(['name' => $vehicleName]);
         $fuelUser = User::factory()->create(['name' => 'Fleet Fuel Lazy Stream User']);
