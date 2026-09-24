@@ -75,12 +75,17 @@ class MedicationCompetencyPolicyTest extends TestCase
 
     public function test_explicit_exemption_is_independently_approved_scoped_expiring_and_audited(): void
     {
+        // Only an independently declared and acknowledged assessment is
+        // competency evidence; an undeclared row would read as "unassessed".
         MedicationCompetencyAssessment::query()->create([
             'user_id' => $this->worker->id,
+            'assessor_id' => $this->approver->id,
             'assessment_type' => 'remedial',
             'status' => 'failed',
             'assessment_date' => now()->toDateString(),
             'expiry_date' => now()->addYear()->toDateString(),
+            'assessor_declared_at' => now()->subMinutes(5),
+            'staff_acknowledged_at' => now()->subMinutes(4),
         ]);
 
         $this->actingAs($this->approver);
@@ -209,7 +214,7 @@ class MedicationCompetencyPolicyTest extends TestCase
         Carbon::setTestNow(now()->startOfMinute());
         try {
             $this->actingAs($this->approver);
-            app(MedicationCompetencyExemptionService::class)->approve(
+            $exemption = app(MedicationCompetencyExemptionService::class)->approve(
                 $this->worker,
                 $this->site,
                 $this->approver,
@@ -218,11 +223,16 @@ class MedicationCompetencyPolicyTest extends TestCase
                 now()->addMinute(),
             );
 
-            $this->partialMock(MedicationSafetyService::class, function (MockInterface $mock): void {
+            // Competency is judged at the captured dose time, so request time
+            // elapsing past the expiry does not by itself void an in-window
+            // dose. The persistence-point recheck must instead re-read the
+            // evidence: an expiry that moves before the dose after the initial
+            // locked check has to fail closed before anything is written.
+            $this->partialMock(MedicationSafetyService::class, function (MockInterface $mock) use ($exemption): void {
                 $mock->shouldReceive('performSafetyCheck')
                     ->once()
-                    ->andReturnUsing(function (): array {
-                        Carbon::setTestNow(now()->addMinutes(2));
+                    ->andReturnUsing(function () use ($exemption): array {
+                        $exemption->forceFill(['expires_at' => now()->subSecond()])->save();
 
                         return [
                             'blocked' => false,
