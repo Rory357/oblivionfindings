@@ -91,12 +91,12 @@ class FleetCostCommunityReportSiteAccessTest extends TestCase
                 ->where('by_site.0.id', $this->localSite->id)
                 ->where('by_site.0.name', 'Harbour House')
                 ->where('by_site.0.vehicles', 2)
-                ->where('by_site.0.fuel_cost', 100.0)
-                ->where('by_site.0.maintenance_cost', 80.0)
-                ->where('by_site.0.total', 180.0)
-                ->where('stats.total_fleet_cost', 180.0)
-                ->where('stats.total_fuel', 100.0)
-                ->where('stats.total_maintenance', 80.0)
+                ->where('by_site.0.fuel_cost', 100)
+                ->where('by_site.0.maintenance_cost', 80)
+                ->where('by_site.0.total', 180)
+                ->where('stats.total_fleet_cost', 180)
+                ->where('stats.total_fuel', 100)
+                ->where('stats.total_maintenance', 80)
                 ->has('by_resident', 1)
                 ->where('by_resident.0.id', $this->localResident->id)
                 ->where('by_resident.0.name', 'Harbour Resident')
@@ -149,9 +149,9 @@ class FleetCostCommunityReportSiteAccessTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->has('by_site', 0)
                 ->has('by_resident', 0)
-                ->where('stats.total_fleet_cost', 0.0)
-                ->where('stats.total_fuel', 0.0)
-                ->where('stats.total_maintenance', 0.0));
+                ->where('stats.total_fleet_cost', 0)
+                ->where('stats.total_fuel', 0)
+                ->where('stats.total_maintenance', 0));
 
         $this->actingAs($unplaced)
             ->get('/fleet-assets/reports/community-access')
@@ -177,7 +177,7 @@ class FleetCostCommunityReportSiteAccessTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('by_site', fn ($rows): bool => collect($rows)->pluck('id')->sort()->values()->all()
                     === collect([$this->localSite->id, $this->otherSite->id])->sort()->values()->all())
-                ->where('stats.total_fleet_cost', 730.0)
+                ->where('stats.total_fleet_cost', 730)
                 ->where('by_resident', fn ($rows): bool => collect($rows)->pluck('id')->sort()->values()->all()
                     === collect([$this->localResident->id, $this->otherResident->id])->sort()->values()->all()));
 
