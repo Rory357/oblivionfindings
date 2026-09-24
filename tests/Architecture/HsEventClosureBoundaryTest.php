@@ -1,5 +1,7 @@
 <?php
 
+use Database\Seeders\RbacSeeder;
+
 test('H&S terminal mutation has one canonical aggregate owner', function (): void {
     $root = dirname(__DIR__, 2);
     $app = $root.DIRECTORY_SEPARATOR.'app';
@@ -57,9 +59,27 @@ test('H&S close routes and schema enforce explicit authority and immutable prove
         $root.DIRECTORY_SEPARATOR.'database'.DIRECTORY_SEPARATOR.'migrations'
         .DIRECTORY_SEPARATOR.'2026_08_14_000061_create_hs_closure_exception_authority.php',
     );
-    $seeder = (string) file_get_contents(
-        $root.DIRECTORY_SEPARATOR.'database'.DIRECTORY_SEPARATOR.'seeders'.DIRECTORY_SEPARATOR.'RbacSeeder.php',
+    $seeders = $root.DIRECTORY_SEPARATOR.'database'.DIRECTORY_SEPARATOR.'seeders'.DIRECTORY_SEPARATOR;
+    $seeder = (string) file_get_contents($seeders.'RbacSeeder.php');
+    preg_match(
+        '/\/\/ Explicit product policy: Compliance Lead holds independent decision.*?->pluck\(\'id\'\)/s',
+        $seeder,
+        $complianceLeadGrant,
     );
+
+    // Every seeder that backfills admin with "all permissions" must withhold
+    // the independent decisions, or a routine re-seed hands them to admin.
+    $adminBackfills = [];
+    foreach (['OperationsPermissionsSeeder.php', 'SeedAllPermissionsToAdminSeeder.php'] as $file) {
+        $adminBackfills[$file] = (string) file_get_contents($seeders.$file);
+    }
+    $unfilteredAllPermissionGrants = [];
+    foreach (glob($seeders.'*.php') ?: [] as $path) {
+        $source = (string) file_get_contents($path);
+        if (preg_match('/Permission::(?:query\(\)->)?pluck\(\s*[\'"]id[\'"]\s*\)|Permission::all\(\)/', $source)) {
+            $unfilteredAllPermissionGrants[] = basename($path);
+        }
+    }
 
     expect($routes)
         ->toContain("Route::middleware('permission:healthSafety.events.close')")
@@ -72,10 +92,23 @@ test('H&S close routes and schema enforce explicit authority and immutable prove
         ->toContain('H&S closure exception provenance is append-only')
         ->toContain("where('worksafe_site_preserved', true)")
         ->not->toContain("where('worksafe_site_preserved', false)")
+        ->and(RbacSeeder::RESTRICTED_INDEPENDENT_AUTHORITY)
+        ->toContain(
+            'healthSafety.events.close',
+            'healthSafety.events.closeAny',
+            'healthSafety.closureExceptions.request',
+            'healthSafety.closureExceptions.approve',
+        )
         ->and($seeder)
-        ->toContain('$restrictedHsClosureAuthority')
-        ->toContain("'healthSafety.closureExceptions.approve',")
-        ->toContain('// Explicit product policy: Compliance Lead is the independent,');
+        ->toContain("->whereNotIn('key', self::RESTRICTED_INDEPENDENT_AUTHORITY)")
+        ->and($adminBackfills['OperationsPermissionsSeeder.php'])
+        ->toContain("->whereNotIn('key', RbacSeeder::RESTRICTED_INDEPENDENT_AUTHORITY)")
+        ->and($adminBackfills['SeedAllPermissionsToAdminSeeder.php'])
+        ->toContain("->whereNotIn('key', RbacSeeder::RESTRICTED_INDEPENDENT_AUTHORITY)")
+        ->and($unfilteredAllPermissionGrants)
+        ->toBe([])
+        ->and($complianceLeadGrant[0] ?? '')
+        ->toContain("'healthSafety.closureExceptions.approve',");
 });
 
 test('historical cross-module lifecycle integrations cannot close H&S events', function (): void {

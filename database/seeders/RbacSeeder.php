@@ -22,6 +22,21 @@ class RbacSeeder extends Seeder
         'fleet.mileage.approve', 'fleet.outings.manage', 'assets.documents.manage',
     ];
 
+    /**
+     * Independent safety/privacy decisions. Only the explicit product policy
+     * in run() assigns them; broad administrator access does not imply them.
+     * Every seeder that backfills the admin role must exclude these keys.
+     */
+    public const RESTRICTED_INDEPENDENT_AUTHORITY = [
+        'healthSafety.events.close',
+        'healthSafety.events.closeAny',
+        'healthSafety.closureExceptions.request',
+        'healthSafety.closureExceptions.approve',
+        'safeguarding.declassification.approve',
+        'fleet.maintenance.release',
+        'fleet.maintenance.configure',
+    ];
+
     public function run(): void
     {
         /*
@@ -606,18 +621,9 @@ class RbacSeeder extends Seeder
 
         // Independent safety/privacy decisions are assigned by the explicit
         // product policy below. Broad administrator access does not imply them.
-        $restrictedIndependentAuthority = [
-            'healthSafety.events.close',
-            'healthSafety.events.closeAny',
-            'healthSafety.closureExceptions.request',
-            'healthSafety.closureExceptions.approve',
-            'safeguarding.declassification.approve',
-            'fleet.maintenance.release',
-            'fleet.maintenance.configure',
-        ];
         $admin?->permissions()->sync(
             Permission::query()
-                ->whereNotIn('key', $restrictedIndependentAuthority)
+                ->whereNotIn('key', self::RESTRICTED_INDEPENDENT_AUTHORITY)
                 ->pluck('id'),
         );
 
@@ -1029,7 +1035,8 @@ class RbacSeeder extends Seeder
             ->chunk(200, function ($users) use (
                 $admin, $providerManager, $coordinator, $supportWorker,
                 $finance, $hr, $auditor, $roadmapManager, $itManager,
-                $facilitiesManager, $fleetManager, $ceo, $cfo, $coo, $complianceLead, $riskLead
+                $facilitiesManager, $fleetManager, $ceo, $cfo, $coo, $complianceLead, $riskLead,
+                $healthSafetyOfficer
             ) {
                 foreach ($users as $user) {
                     $roleName = $user->role ?? 'support_worker';
@@ -1050,6 +1057,7 @@ class RbacSeeder extends Seeder
                         'coo' => $coo,
                         'compliance_lead' => $complianceLead,
                         'risk_lead' => $riskLead,
+                        'health_safety_officer' => $healthSafetyOfficer,
                         default => $supportWorker,
                     };
 

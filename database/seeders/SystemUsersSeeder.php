@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\Staff;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -54,6 +55,23 @@ class SystemUsersSeeder extends Seeder
                 'role' => 'auditor',
                 'staff_data' => ['job_title' => 'Internal Auditor', 'department' => 'Compliance'],
             ],
+            // Independent decisions (RbacSeeder::RESTRICTED_INDEPENDENT_AUTHORITY)
+            // are withheld from admin, so these roles demo them instead.
+            [
+                'email' => 'safety@demo.test',
+                'name' => 'Demo H&S Officer',
+                'role' => 'health_safety_officer',
+                'staff_data' => ['job_title' => 'Health & Safety Officer', 'department' => 'Health & Safety'],
+            ],
+            [
+                'email' => 'compliance@demo.test',
+                'name' => 'Demo Compliance Lead',
+                'role' => 'compliance_lead',
+                'staff_data' => ['job_title' => 'Compliance Lead', 'department' => 'Compliance'],
+                // Safeguarding declassification still checks canonical Site
+                // access, so the demo Compliance Lead covers every Site.
+                'all_sites' => true,
+            ],
         ];
 
         foreach ($users as $u) {
@@ -88,6 +106,10 @@ class SystemUsersSeeder extends Seeder
                 );
 
                 $this->upsertHrEmployeeProfile($user, $staff);
+            }
+
+            if (! empty($u['all_sites'])) {
+                $this->assignEveryActiveSite($user);
             }
         }
 
@@ -180,6 +202,19 @@ class SystemUsersSeeder extends Seeder
         );
     }
 
+    private function assignEveryActiveSite(User $user): void
+    {
+        $siteIds = Site::query()->active()->notArchived()->orderBy('id')->pluck('id')->all();
+        if ($siteIds === []) {
+            return;
+        }
+
+        HrEmployeeProfile::query()->where('user_id', $user->id)->first()?->update([
+            'primary_site_id' => $siteIds[0],
+            'secondary_site_ids' => array_slice($siteIds, 1),
+        ]);
+    }
+
     private function employeeNumberFor(User $user, ?Staff $staff): string
     {
         if ($staff?->employee_id) {
@@ -207,6 +242,8 @@ class SystemUsersSeeder extends Seeder
             'finance' => 'Finance Officer',
             'hr' => 'HR Manager',
             'auditor' => 'Internal Auditor',
+            'health_safety_officer' => 'Health & Safety Officer',
+            'compliance_lead' => 'Compliance Lead',
             default => 'Support Worker',
         };
     }
