@@ -121,6 +121,8 @@ it('keeps the intentionally global providers tied to their explicit product perm
         ->all();
 
     expect($globalProviders)->toBe([
+        'it_automation_review' => ['it.manage'],
+        'it_recurrence_failure' => ['it.manage'],
         'breach' => ['privacy.reportBreaches'],
         'dsr' => ['privacy.viewRequests'],
         'action_item' => ['governance.actions.view'],
