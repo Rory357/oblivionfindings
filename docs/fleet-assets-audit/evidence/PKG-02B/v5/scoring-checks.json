@@ -1,0 +1,29 @@
+{
+  "at": "2026-09-21T22:17:34.791Z",
+  "checks": [
+    {
+      "name": "Partial coverage never returns a perfect score",
+      "result": "pass"
+    },
+    {
+      "name": "Overspeed episode deducts eight points once",
+      "result": "pass"
+    },
+    {
+      "name": "Score clamps at zero",
+      "result": "pass"
+    },
+    {
+      "name": "Coverage gate boundary is explicit",
+      "result": "pass"
+    },
+    {
+      "name": "Overspeed evidence preserves original rule and source coordinates",
+      "result": "pass"
+    },
+    {
+      "name": "Period vehicle score weights distance and excludes partial",
+      "result": "pass"
+    }
+  ]
+}

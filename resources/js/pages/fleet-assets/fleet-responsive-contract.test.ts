@@ -85,11 +85,15 @@ describe('Fleet responsive and hero contracts', () => {
     });
 
     it('keeps every titled Fleet page in the shared hero family', () => {
+        // The Event Horizon page top (PageHeader / PageLayout from
+        // @/components/page; DESIGN.md "Page headers", approved 2026-09-05)
+        // is the current shared hero: PKG-01 work orders and the PKG-02B
+        // vehicle profile use it.
         const outliers = pageFiles(root)
             .filter((file) => readFileSync(file, 'utf8').includes('<Head'))
             .filter((file) => {
                 const page = readFileSync(file, 'utf8');
-                return !/HeroShell|FleetCompactHero|data-fleet-mobile-hero/.test(
+                return !/HeroShell|FleetCompactHero|data-fleet-mobile-hero|<PageHeader[\s>]|<PageLayout[\s>]/.test(
                     page,
                 );
             });

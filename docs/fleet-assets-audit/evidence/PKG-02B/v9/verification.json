@@ -1,0 +1,40 @@
+{
+  "version": "PKG-02B-v9",
+  "typescript": "pass",
+  "viteBuild": "pass; existing Leaflet and large-chunk warnings",
+  "browser": {
+    "default": "List",
+    "desktopListRowHeights": [
+      57,
+      57,
+      57,
+      57,
+      57
+    ],
+    "views": [
+      "List",
+      "Card",
+      "Table"
+    ],
+    "listMapSelection": "Harsh braking -> Thorndon point 2",
+    "cardMapSelection": "Overspeed -> Pipitea point 3",
+    "tableMapSelection": "Harsh acceleration -> Pipitea point 3, separate event from overspeed",
+    "sharedDrivingFilter": "3 events; selection retained on switching Card to Table",
+    "emptyFilter": "Vehicle faults empty state; Show all events restores 5",
+    "reload": "Table view retained",
+    "partialTrip": "4 list events; missing report time unavailable",
+    "responsive760": {
+      "clientWidth": 745,
+      "scrollWidth": 745,
+      "tableViewport": 595,
+      "tableScrollWidth": 595
+    },
+    "responsive540": {
+      "clientWidth": 525,
+      "scrollWidth": 525,
+      "listRowHeight": 82
+    },
+    "newConsoleErrors": []
+  },
+  "scope": "Targeted timeline checks only; inherited workflows not exhaustively rerun"
+}

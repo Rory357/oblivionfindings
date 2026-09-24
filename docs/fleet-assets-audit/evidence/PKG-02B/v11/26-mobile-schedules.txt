@@ -1,0 +1,167 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button:
+    - button:
+    - button:
+    - button:
+    - button
+    - button
+    - button
+    - button
+    - button
+    - button
+    - button:
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Service & compliance" [selected]:
+      - generic: Service & compliance
+    - button "More views (6)":
+      - generic: More
+    - button "Find a section":
+  - tablist "Vehicle sections":
+    - tab "Evidence & due dates":
+      - text: Evidence & due dates
+    - tab "Service schedules" [selected]:
+      - text: Service schedules
+    - tab "Reminders":
+      - text: Reminders
+    - tab "Service history":
+      - text: Service history
+    - tab "Mileage":
+      - text: Mileage
+  - tabpanel:
+    - generic: PLANNED MAINTENANCE
+    - heading "Service schedules" [level=2]
+    - group "Service schedules layout":
+      - button "List":
+        - text: List
+      - button "Cards" [pressed]:
+        - text: Cards
+    - button "Add schedule"
+    - generic "Service schedules":
+      - generic: Service schedules
+      - generic: 2 records shown
+      - button "Routine service SCH-DEMO-07 Actions for Routine service Next due / remaining 24 Sept 2026 Scheduled 2,540 km remaining 75.09803921568627 Due at 85,000 km · recorded odometer Interval & responsibility 6 months or 10,000 km Kōwhai House Coordinator Last service 24 Mar 2026 Evidence & actions Plan service Upload evidence 0 supporting files KC Kōwhai House Coordinator Schedule owner Open":
+        - heading "Routine service" [level=3]
+        - generic: SCH-DEMO-07
+        - button "Actions for Routine service":
+        - term: Next due / remaining
+        - definition:
+          - strong: 24 Sept 2026
+          - generic: Scheduled
+          - generic: 2,540 km remaining
+          - progressbar "Routine service distance interval used"
+          - generic: Due at 85,000 km · recorded odometer
+        - term: Interval & responsibility
+        - definition:
+          - strong: 6 months or 10,000 km
+          - generic: Kōwhai House Coordinator
+          - generic: Last service 24 Mar 2026
+        - term: Evidence & actions
+        - definition:
+          - button "Plan service"
+          - button "Upload evidence":
+            - text: Upload evidence
+          - generic: 0 supporting files
+        - generic: KC
+        - generic: Kōwhai House Coordinator
+        - generic: Schedule owner
+        - text: Open
+      - button "Passenger lift service SCH-DEMO-08 Actions for Passenger lift service Next due / remaining 13 Nov 2026 Scheduled 52 days remaining Interval & responsibility 6 months Equipment Coordinator Last service 13 May 2026 Evidence & actions Plan service Upload evidence 0 supporting files EC Equipment Coordinator Schedule owner Open":
+        - heading "Passenger lift service" [level=3]
+        - generic: SCH-DEMO-08
+        - button "Actions for Passenger lift service":
+        - term: Next due / remaining
+        - definition:
+          - strong: 13 Nov 2026
+          - generic: Scheduled
+          - generic: 52 days remaining
+        - term: Interval & responsibility
+        - definition:
+          - strong: 6 months
+          - generic: Equipment Coordinator
+          - generic: Last service 13 May 2026
+        - term: Evidence & actions
+        - definition:
+          - button "Plan service"
+          - button "Upload evidence":
+            - text: Upload evidence
+          - generic: 0 supporting files
+        - generic: EC
+        - generic: Equipment Coordinator
+        - generic: Schedule owner
+        - text: Open
+    - paragraph: The first reached date or distance trigger needs action. Intervals and reminder lead times are synthetic examples.
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged

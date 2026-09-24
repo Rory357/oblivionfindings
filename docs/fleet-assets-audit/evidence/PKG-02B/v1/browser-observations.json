@@ -1,0 +1,215 @@
+{
+  "session": "post-crash IAB",
+  "finalBundle": "index--V2KTTov.js",
+  "note": "Chronological observations include interim bundles. Final candidate observations explicitly identify the final bundle or follow its reload. Retained history entry immediately after earlier close was an overview, not proof of full check history. No 200% zoom claim.",
+  "observations": [
+    {
+      "test": "1440x1000 overview",
+      "metrics": {
+        "header": {
+          "bottom": 414,
+          "height": 270,
+          "left": 238,
+          "right": 1405,
+          "top": 144,
+          "width": 1167,
+          "x": 238,
+          "y": 144
+        },
+        "headerScroll": 0,
+        "heading": {
+          "bottom": 189.5,
+          "height": 27.5,
+          "left": 361,
+          "right": 474.703125,
+          "top": 162,
+          "width": 113.703125,
+          "x": 361,
+          "y": 162
+        },
+        "height": 1000,
+        "scripts": [
+          "http://127.0.0.1:4336/assets/index-DJkPruyA.js"
+        ],
+        "scrollWidth": 1425,
+        "width": 1440
+      }
+    },
+    {
+      "test": "Check review",
+      "result": "Start vehicle check\n\nSynthetic checklist walkthrough\n\nVehicle check\nKōwhai van · VH-014\nCheck details\nTemplate and observation\nRecord answers\nOriginal observations\nReview\nCheck before submitting\nCompleteness\n100%\nStep 3 of 3 · Review\nKōwhai van\nVH-014 · KWH014 · Kōwhai House\nSynthetic checklist\n\nThese two example observations demonstrate the interaction. They are not an approved safety procedure.\n\nOriginal check\nEdit\nTemplate\nVehicle condition record · DEMO-3\nObserved\n21 Sep 2026 · 09:20 AM · Pacific/Auckland\nRecord\nKōwhai van · VH-014\nAnswers\nEdit\nExample observation A\nIssue recorded\nExample observation B\nNo issue recorded\nNotes\nSynthetic example: record the concern for assessment.\nSubmission records the check\n\nAssessment and any restriction or release remain separate. The submission never clears a restriction.\n\nCancel\nBack\nSubmit check"
+    },
+    {
+      "test": "Check submit",
+      "result": "Start vehicle check\n\nSynthetic checklist walkthrough\n\nCheck recorded in this preview\n\nCHK-DEMO-0183 · Failed\nOriginal answers and template DEMO-3 are retained. This does not release the vehicle.\n\nBack to checks\nCreate or link maintenance"
+    },
+    {
+      "test": "Retained history",
+      "result": "VEHICLE READINESS\nNot ready for use\n\nA restriction remains active for this vehicle.\n\nCondition concern requires assessment\nRST-DEMO-12 · Active since 21 Sep, 8:20 am · No end recorded\nActive restriction\nCompliance evidence needs review\nRUC evidence and CoF applicability have not been verified\nNeeds assessment\nReadiness is assessed again for each booking and checkout.\nReview maintenance\nEvidence & next due dates\n\nOriginal sources and observation dates stay visible\n\nView all\nOdometer\nObserved 21 Sep 2026 · 8:10 am · Inspection CHK-0182 · Manual reading\n82,460 km\nRecorded\nNext service\nDate and distance are separate schedule fields · SCH-DEMO-07 · Routine service\n24 Sep 2026 / 85,000 km\nDue soon\nWoF\nEvidence recorded 9 Apr 2026 · WOF-DEMO-14 · Certificate record\n09 Apr 2027\nCurrent evidence\nRegistration\nEvidence recorded 8 Jul 2026 · REG-DEMO-14 · Licence record\n08 Oct 2026\nDue soon\nRUC\nVehicle-specific applicability · No claim of applicability or exemption\nEvidence not recorded\nNeeds assessment\nCoF\nVehicle-specific applicability · Confirm the applicable compliance evidence\nApplicability not verified\nUnknown\nLatest inspection\n\nSubmitted answers stay with the version used\n\nAll checks\nVehicle condition record\nCHK-DEMO-0183 · DEMO-3 · 21 Sep 2026 · 9:24 am · Alex Morgan\nFailed\nUpcoming\n\nPacific/Auckland · Source-owned dates\n\nNow\nVehicle use restricted\nActive from 21 Sep · 8:20 am · No end recorded\nRST-DEMO-12\n24 Sep\nRoutine service appointment\n9:00–11:00 am · Internal appointment\nAPT-DEMO-28\n24–25 Sep\nEstimated maintenance window\nAdvisory dates · No provider confirmation\nWO-0264\n25 Sep\nBusy\n10:00 am–12:00 pm · Booking details restricted\nBusy-only\n08 Oct\nRegistration reminder\nDue date reminder · Does not reserve a day\nREG-DEMO-14\n\nA reminder or estimate does not reserve the vehicle.\n\nVehicle context\nToyota Hiace\nKWH014 · VH-014\nHome site\nKōwhai House\nSeating\n8 recorded seats\nEquipment\nPassenger lift\nTracking\nLast seen 8:12 am\nReport a problem"
+    },
+    {
+      "test": "Final return-copy bundle at 1280x900",
+      "metrics": {
+        "headerScroll": 0,
+        "headerTop": 144,
+        "height": 900,
+        "scripts": [
+          "http://127.0.0.1:4336/assets/index-BQUSiSrW.js"
+        ],
+        "scrollWidth": 1265,
+        "titleTop": 162,
+        "width": 1280
+      }
+    },
+    {
+      "test": "Final 1440x1000 overview",
+      "metrics": {
+        "headerScroll": 0,
+        "headerTop": 144,
+        "height": 1000,
+        "scrollWidth": 1425,
+        "titleTop": 162,
+        "width": 1440
+      }
+    },
+    {
+      "test": "Final 1920x1080 calendar",
+      "metrics": {
+        "headerScroll": 0,
+        "headerTop": 144,
+        "height": 1080,
+        "scrollWidth": 1905,
+        "titleTop": 162,
+        "width": 1920
+      }
+    },
+    {
+      "test": "Final-build scenario coverage",
+      "results": [
+        {
+          "scenario": "Ready · current example evidence",
+          "visible": "Home\n›\nFleet & assets\n›\nVehicles\n›\nKōwhai van\nKōwhai van\nReady\n\nKWH014 · VH-014 · Kōwhai House\nToyota Hiace · Diesel · Community transport\n\nFind in this vehicle…\n/\nCalendar\nStart check\nODOMETER\n82,460 km\nManual reading · 21 Sep\nNEXT SERVICE\n24 Sep\nDate and distance schedule\nLAST CHECK\nPassed\nCHK-0182 · DEMO-3\nMAINTENANCE\nView work\nOriginal issues and work\nAs at 21 Sep 2026 · 9:30 am · Pacific/Auckland\nAll evidence\nOverview\nService & compliance\nChecks & inspections\nMaintenance\nCalendar\nFind\n/\nReadiness\nVehicle details\nTracking\nVEHICLE READINESS\nReady on current evidence\n\nThe example assessment records no active restriction.\n\nApplicable evidence reviewed\nAssessment ASMT-DEMO-14 · 21 Sep, 9:20 am · Fictional rules\nReviewed\nReadiness is assessed again for each booking and checkout.\nReview evidence\nEvidence & next due dates\n\nOriginal sources and observation dates stay visible\n\nView all\nOdometer\nObserved 21 Sep 2026 · 8:10 am · Inspection CHK-0182 · Manual reading\n82,460 km\nRecorded\nNext service\nDate and distance are separate schedule fields · SCH-DEMO-07 · Routine service\n24 Sep 2026 / 85,000 km\nDue soon\nWoF\nEvidence recorded 9 Apr 2026 · WOF-DEMO-14 · Certificate record\n09 Apr 2027\nCurrent evidence\nRegistration\nEvidence recorded 8 Jul 2026 · REG-DEMO-14 · Licence record\n08 Oct 2026\nDue soon\nRUC\nEvidence recorded 15 Sep 2026 · RUC-DEMO-14 · Illustrative applicable licence\n80,000–90,000 km\nCurrent evidence\nCoF\nExample applicability record · 15 Sep 2026 · APP-DEMO-14 · Synthetic decision, not legal guidance\nNot applicable\nApplicability recorded\nLatest inspection\n\nSubmitted answers stay with the version used\n\nAll checks\nVehicle condition record\nCHK-0182 · DEMO-3 · 21 Sep 2026 · 8:14 am · Alex Morgan\nPassed\nUpcoming\n\nPacific/Auckland · Source-owned dates\n\n24 Sep\nRoutine service appointment\n9:00–11:00 am · Internal appointment\nAPT-DEMO-28\n24–25 Sep\nEstimated maintenance window\nAdvisory dates · No provider confirmation\nWO-0264\n25 Sep\nBusy\n10:00 am–12:00 pm · Booking details restricted\nBusy-only\n08 Oct\nRegistration reminder\nDue date reminder · Does not reserve a day\nREG-DEMO-14\n\nA reminder or estimate does not reserve the vehicle.\n\nVehicle context\nToyota Hiace\nKWH014 · VH-014\nHome site\nKōwhai House\nSeating\n8 recorded seats\nEquipment\nPassenger lift\nTracking\nLast seen 8:12 am\nReport a problem\nPKG-02B v1 · All people, records, dates and outcomes are synthetic.\nDesign review · Application unchanged"
+        },
+        {
+          "scenario": "Unknown applicability & missing evidence",
+          "visible": "Home\n›\nFleet & assets\n›\nVehicles\n›\nKōwhai van\nKōwhai van\nNeeds assessment\n\nKWH014 · VH-014 · Kōwhai House\nToyota Hiace · Diesel · Community transport\n\nFind in this vehicle…\n/\nCalendar\nStart check\nODOMETER\n82,460 km\nManual reading · 21 Sep\nNEXT SERVICE\n24 Sep\nDate and distance schedule\nLAST CHECK\nFailed\nCHK-0182 · DEMO-3\nMAINTENANCE\nView work\nOriginal issues and work\nAs at 21 Sep 2026 · 9:30 am · Pacific/Auckland\nAll evidence\nOverview\nService & compliance\nChecks & inspections\nMaintenance\nCalendar\nFind\n/\nReadiness\nVehicle details\nTracking\nVEHICLE READINESS\nMore evidence is needed\n\nMissing or old evidence cannot confirm readiness.\n\nCompliance evidence needs review\nRUC evidence and CoF applicability have not been verified\nNeeds assessment\nReadiness is assessed again for each booking and checkout.\nReview evidence\nEvidence & next due dates\n\nOriginal sources and observation dates stay visible\n\nView all\nOdometer\nObserved 21 Sep 2026 · 8:10 am · Inspection CHK-0182 · Manual reading\n82,460 km\nRecorded\nNext service\nDate and distance are separate schedule fields · SCH-DEMO-07 · Routine service\n24 Sep 2026 / 85,000 km\nDue soon\nWoF\nEvidence date not recorded · Applicability and evidence need review\nNot recorded\nUnknown\nRegistration\nNo source document recorded · Expiry has not been verified\nNot recorded\nUnknown\nRUC\nVehicle-specific applicability · No claim of applicability or exemption\nApplicability unknown\nNeeds assessment\nCoF\nVehicle-specific applicability · Confirm the applicable compliance evidence\nApplicability not verified\nUnknown\nLatest inspection\n\nSubmitted answers stay with the version used\n\nAll checks\nVehicle condition record\nCHK-0182 · DEMO-3 · 21 Sep 2026 · 8:14 am · Alex Morgan\nFailed\nUpcoming\n\nPacific/Auckland · Source-owned dates\n\n24 Sep\nRoutine service appointment\n9:00–11:00 am · Internal appointment\nAPT-DEMO-28\n24–25 Sep\nEstimated maintenance window\nAdvisory dates · No provider confirmation\nWO-0264\n25 Sep\nBusy\n10:00 am–12:00 pm · Booking details restricted\nBusy-only\n08 Oct\nRegistration reminder\nDue date reminder · Does not reserve a day\nREG-DEMO-14\n\nA reminder or estimate does not reserve the vehicle.\n\nVehicle context\nToyota Hiace\nKWH014 · VH-014\nHome site\nKōwhai House\nSeating\n8 recorded seats\nEquipment\nPassenger lift\nTracking\nLast seen 8:12 am\nReport a problem\nPKG-02B v1 · All people, records, dates and outcomes are synthetic.\nDesign review · Application unchanged"
+        },
+        {
+          "scenario": "Overdue service & check",
+          "visible": "Home\n›\nFleet & assets\n›\nVehicles\n›\nKōwhai van\nKōwhai van\nNeeds assessment\n\nKWH014 · VH-014 · Kōwhai House\nToyota Hiace · Diesel · Community transport\n\nFind in this vehicle…\n/\nCalendar\nStart check\nODOMETER\n82,460 km\nManual reading · 21 Sep\nNEXT SERVICE\nOverdue\nDate and distance schedule\nLAST CHECK\nOverdue\nCHK-0182 · DEMO-3\nMAINTENANCE\nView work\nOriginal issues and work\nAs at 21 Sep 2026 · 9:30 am · Pacific/Auckland\nAll evidence\nOverview\nService & compliance\nChecks & inspections\nMaintenance\nCalendar\nFind\n/\nReadiness\nVehicle details\nTracking\nVEHICLE READINESS\nMore evidence is needed\n\nMissing or old evidence cannot confirm readiness.\n\nService and check are overdue\nService due 18 Sep / 82,000 km · Expected check has no current record\nNeeds assessment\nReadiness is assessed again for each booking and checkout.\nReview evidence\nEvidence & next due dates\n\nOriginal sources and observation dates stay visible\n\nView all\nOdometer\nObserved 21 Sep 2026 · 8:10 am · Inspection CHK-0182 · Manual reading\n82,460 km\nRecorded\nNext service\nDate and distance are separate schedule fields · SCH-DEMO-07 · Routine service\n18 Sep 2026 / 82,000 km\nOverdue\nWoF\nEvidence recorded 9 Apr 2026 · WOF-DEMO-14 · Certificate record\n09 Apr 2027\nCurrent evidence\nRegistration\nEvidence recorded 8 Jul 2026 · REG-DEMO-14 · Licence record\n08 Oct 2026\nDue soon\nRUC\nVehicle-specific applicability · No claim of applicability or exemption\nEvidence not recorded\nNeeds assessment\nCoF\nVehicle-specific applicability · Confirm the applicable compliance evidence\nApplicability not verified\nUnknown\nLatest inspection\n\nSubmitted answers stay with the version used\n\nAll checks\nVehicle condition record\nCHK-0182 · DEMO-3 · 21 Sep 2026 · 8:14 am · Alex Morgan\nFailed\nUpcoming\n\nPacific/Auckland · Source-owned dates\n\n24 Sep\nRoutine service appointment\n9:00–11:00 am · Internal appointment\nAPT-DEMO-28\n24–25 Sep\nEstimated maintenance window\nAdvisory dates · No provider confirmation\nWO-0264\n25 Sep\nBusy\n10:00 am–12:00 pm · Booking details restricted\nBusy-only\n08 Oct\nRegistration reminder\nDue date reminder · Does not reserve a day\nREG-DEMO-14\n\nA reminder or estimate does not reserve the vehicle.\n\nVehicle context\nToyota Hiace\nKWH014 · VH-014\nHome site\nKōwhai House\nSeating\n8 recorded seats\nEquipment\nPassenger lift\nTracking\nLast seen 8:12 am\nReport a problem\nPKG-02B v1 · All people, records, dates and outcomes are synthetic.\nDesign review · Application unchanged"
+        },
+        {
+          "scenario": "Work completed · awaiting release",
+          "visible": "Home\n›\nFleet & assets\n›\nVehicles\n›\nKōwhai van\nKōwhai van\nNot ready\n\nKWH014 · VH-014 · Kōwhai House\nToyota Hiace · Diesel · Community transport\n\nFind in this vehicle…\n/\nCalendar\nStart check\nODOMETER\n82,460 km\nManual reading · 21 Sep\nNEXT SERVICE\n24 Sep\nDate and distance schedule\nLAST CHECK\nFailed\nCHK-0182 · DEMO-3\nMAINTENANCE\nHold active\nRepair complete · release pending\nAs at 21 Sep 2026 · 9:30 am · Pacific/Auckland\nAll evidence\nOverview\nService & compliance\nChecks & inspections\nMaintenance\nCalendar\nFind\n/\nReadiness\nVehicle details\nTracking\nVEHICLE READINESS\nRepair complete. Release still pending.\n\nA restriction remains active for this vehicle.\n\nAwaiting authorised release\nRST-DEMO-12 · Active since 21 Sep, 8:20 am · No end recorded\nActive restriction\nCompliance evidence needs review\nRUC evidence and CoF applicability have not been verified\nNeeds assessment\nReadiness is assessed again for each booking and checkout.\nReview maintenance\nEvidence & next due dates\n\nOriginal sources and observation dates stay visible\n\nView all\nOdometer\nObserved 21 Sep 2026 · 8:10 am · Inspection CHK-0182 · Manual reading\n82,460 km\nRecorded\nNext service\nDate and distance are separate schedule fields · SCH-DEMO-07 · Routine service\n24 Sep 2026 / 85,000 km\nDue soon\nWoF\nEvidence recorded 9 Apr 2026 · WOF-DEMO-14 · Certificate record\n09 Apr 2027\nCurrent evidence\nRegistration\nEvidence recorded 8 Jul 2026 · REG-DEMO-14 · Licence record\n08 Oct 2026\nDue soon\nRUC\nVehicle-specific applicability · No claim of applicability or exemption\nEvidence not recorded\nNeeds assessment\nCoF\nVehicle-specific applicability · Confirm the applicable compliance evidence\nApplicability not verified\nUnknown\nLatest inspection\n\nSubmitted answers stay with the version used\n\nAll checks\nVehicle condition record\nCHK-0182 · DEMO-3 · 21 Sep 2026 · 8:14 am · Alex Morgan\nFailed\nUpcoming\n\nPacific/Auckland · Source-owned dates\n\nNow\nVehicle use restricted\nActive from 21 Sep · 8:20 am · No end recorded\nRST-DEMO-12\n24 Sep\nRoutine service appointment\n9:00–11:00 am · Internal appointment\nAPT-DEMO-28\n24–25 Sep\nEstimated maintenance window\nAdvisory dates · No provider confirmation\nWO-0264\n25 Sep\nBusy\n10:00 am–12:00 pm · Booking details restricted\nBusy-only\n08 Oct\nRegistration reminder\nDue date reminder · Does not reserve a day\nREG-DEMO-14\n\nA reminder or estimate does not reserve the vehicle.\n\nVehicle context\nToyota Hiace\nKWH014 · VH-014\nHome site\nKōwhai House\nSeating\n8 recorded seats\nEquipment\nPassenger lift\nTracking\nLast seen 8:12 am\nReport a problem\nPKG-02B v1 · All people, records, dates and outcomes are synthetic.\nDesign review · Application unchanged"
+        },
+        {
+          "scenario": "Stale evidence · no tracker",
+          "visible": "Home\n›\nFleet & assets\n›\nVehicles\n›\nKōwhai van\nKōwhai van\nNeeds assessment\n\nKWH014 · VH-014 · Kōwhai House\nToyota Hiace · Diesel · Community transport\n\nFind in this vehicle…\n/\nCalendar\nStart check\nODOMETER\n82,460 km\nLast observed 2 Sep\nNEXT SERVICE\n24 Sep\nDate and distance schedule\nLAST CHECK\nFailed\nCHK-0182 · DEMO-3\nMAINTENANCE\nView work\nOriginal issues and work\nAs at 21 Sep 2026 · 9:30 am · Pacific/Auckland\nAll evidence\nOverview\nService & compliance\nChecks & inspections\nMaintenance\nCalendar\nFind\n/\nReadiness\nVehicle details\nTracking\nVEHICLE READINESS\nMore evidence is needed\n\nMissing or old evidence cannot confirm readiness.\n\nOdometer observation is old\nLast reading 2 Sep · No tracker is assigned\nNeeds assessment\nReadiness is assessed again for each booking and checkout.\nReview evidence\nEvidence & next due dates\n\nOriginal sources and observation dates stay visible\n\nView all\nOdometer\nLast observed 2 Sep 2026 · 4:15 pm · Inspection CHK-0182 · Manual reading\n82,460 km\nStale evidence\nNext service\nDate and distance are separate schedule fields · SCH-DEMO-07 · Routine service\n24 Sep 2026 / 85,000 km\nDue soon\nWoF\nEvidence recorded 9 Apr 2026 · WOF-DEMO-14 · Certificate record\n09 Apr 2027\nCurrent evidence\nRegistration\nEvidence recorded 8 Jul 2026 · REG-DEMO-14 · Licence record\n08 Oct 2026\nDue soon\nRUC\nVehicle-specific applicability · No claim of applicability or exemption\nEvidence not recorded\nNeeds assessment\nCoF\nVehicle-specific applicability · Confirm the applicable compliance evidence\nApplicability not verified\nUnknown\nLatest inspection\n\nSubmitted answers stay with the version used\n\nAll checks\nVehicle condition record\nCHK-0182 · DEMO-3 · 21 Sep 2026 · 8:14 am · Alex Morgan\nFailed\nUpcoming\n\nPacific/Auckland · Source-owned dates\n\n24 Sep\nRoutine service appointment\n9:00–11:00 am · Internal appointment\nAPT-DEMO-28\n24–25 Sep\nEstimated maintenance window\nAdvisory dates · No provider confirmation\nWO-0264\n25 Sep\nBusy\n10:00 am–12:00 pm · Booking details restricted\nBusy-only\n08 Oct\nRegistration reminder\nDue date reminder · Does not reserve a day\nREG-DEMO-14\n\nA reminder or estimate does not reserve the vehicle.\n\nVehicle context\nToyota Hiace\nKWH014 · VH-014\nHome site\nKōwhai House\nSeating\n8 recorded seats\nEquipment\nPassenger lift\nTracking\nNo tracker\nReport a problem\nPKG-02B v1 · All people, records, dates and outcomes are synthetic.\nDesign review · Application unchanged"
+        },
+        {
+          "scenario": "First use · empty history",
+          "visible": "Home\n›\nFleet & assets\n›\nVehicles\n›\nKōwhai van\nKōwhai van\nNeeds assessment\n\nKWH014 · VH-014 · Kōwhai House\nToyota Hiace · Diesel · Community transport\n\nFind in this vehicle…\n/\nCalendar\nStart check\nODOMETER\nUnknown\nManual reading · 21 Sep\nNEXT SERVICE\nUnknown\nDate and distance schedule\nLAST CHECK\nNo record\nNo submitted checks\nMAINTENANCE\nNo history\nFirst-use example\nAs at 21 Sep 2026 · 9:30 am · Pacific/Auckland\nAll evidence\nOverview\nService & compliance\nChecks & inspections\nMaintenance\nCalendar\nFind\n/\nReadiness\nVehicle details\nTracking\nVEHICLE READINESS\nMore evidence is needed\n\nMissing or old evidence cannot confirm readiness.\n\nNo readiness evidence yet\nAdd approved source records before any readiness decision\nNeeds assessment\nReadiness is assessed again for each booking and checkout.\nReview evidence\nEvidence & next due dates\n\nOriginal sources and observation dates stay visible\n\nView all\nOdometer\nObserved 21 Sep 2026 · 8:10 am · No observation available\nNot recorded\nUnknown\nNext service\nDate and distance are separate schedule fields · SCH-DEMO-07 · Routine service\nNot scheduled\nUnknown\nWoF\nEvidence date not recorded · Applicability and evidence need review\nNot recorded\nUnknown\nRegistration\nNo source document recorded · Expiry has not been verified\nNot recorded\nUnknown\nRUC\nVehicle-specific applicability · No claim of applicability or exemption\nApplicability unknown\nNeeds assessment\nCoF\nVehicle-specific applicability · Confirm the applicable compliance evidence\nApplicability not verified\nUnknown\nLatest inspection\n\nSubmitted answers stay with the version used\n\nAll checks\nNo checks recorded\n\nStart with the applicable approved template.\n\nUpcoming\n\nPacific/Auckland · Source-owned dates\n\nNo upcoming records\n\nSource-owned bookings, appointments and reminders will appear here.\n\nA reminder or estimate does not reserve the vehicle.\n\nVehicle context\nToyota Hiace\nKWH014 · VH-014\nHome site\nKōwhai House\nSeating\n8 recorded seats\nEquipment\nPassenger lift\nTracking\nNo tracker\nReport a problem\nPKG-02B v1 · All people, records, dates and outcomes are synthetic.\nDesign review · Application unchanged"
+        },
+        {
+          "scenario": "View-only role",
+          "visible": "Home\n›\nFleet & assets\n›\nVehicles\n›\nKōwhai van\nKōwhai van\nNot ready\n\nKWH014 · VH-014 · Kōwhai House\nToyota Hiace · Diesel · Community transport\n\nFind in this vehicle…\n/\nCalendar\nStart check\nODOMETER\n82,460 km\nManual reading · 21 Sep\nNEXT SERVICE\n24 Sep\nDate and distance schedule\nLAST CHECK\nFailed\nCHK-0182 · DEMO-3\nMAINTENANCE\nHold active\nOriginal issues and work\nAs at 21 Sep 2026 · 9:30 am · Pacific/Auckland\nAll evidence\nOverview\nService & compliance\nChecks & inspections\nMaintenance\nCalendar\nFind\n/\nView-only access\n\nYou can review permitted evidence. Reporting, checks and updates need additional authority.\n\nReadiness\nVehicle details\nTracking\nVEHICLE READINESS\nNot ready for use\n\nA restriction remains active for this vehicle.\n\nCondition concern requires assessment\nRST-DEMO-12 · Active since 21 Sep, 8:20 am · No end recorded\nActive restriction\nCompliance evidence needs review\nRUC evidence and CoF applicability have not been verified\nNeeds assessment\nReadiness is assessed again for each booking and checkout.\nReview maintenance\nEvidence & next due dates\n\nOriginal sources and observation dates stay visible\n\nView all\nOdometer\nObserved 21 Sep 2026 · 8:10 am · Inspection CHK-0182 · Manual reading\n82,460 km\nRecorded\nNext service\nDate and distance are separate schedule fields · SCH-DEMO-07 · Routine service\n24 Sep 2026 / 85,000 km\nDue soon\nWoF\nEvidence recorded 9 Apr 2026 · WOF-DEMO-14 · Certificate record\n09 Apr 2027\nCurrent evidence\nRegistration\nEvidence recorded 8 Jul 2026 · REG-DEMO-14 · Licence record\n08 Oct 2026\nDue soon\nRUC\nVehicle-specific applicability · No claim of applicability or exemption\nEvidence not recorded\nNeeds assessment\nCoF\nVehicle-specific applicability · Confirm the applicable compliance evidence\nApplicability not verified\nUnknown\nLatest inspection\n\nSubmitted answers stay with the version used\n\nAll checks\nVehicle condition record\nCHK-0182 · DEMO-3 · 21 Sep 2026 · 8:14 am · Alex Morgan\nFailed\nUpcoming\n\nPacific/Auckland · Source-owned dates\n\nNow\nVehicle use restricted\nActive from 21 Sep · 8:20 am · No end recorded\nRST-DEMO-12\n24 Sep\nRoutine service appointment\n9:00–11:00 am · Internal appointment\nAPT-DEMO-28\n24–25 Sep\nEstimated maintenance window\nAdvisory dates · No provider confirmation\nWO-0264\n25 Sep\nBusy\n10:00 am–12:00 pm · Booking details restricted\nBusy-only\n08 Oct\nRegistration reminder\nDue date reminder · Does not reserve a day\nREG-DEMO-14\n\nA reminder or estimate does not reserve the vehicle.\n\nVehicle context\nToyota Hiace\nKWH014 · VH-014\nHome site\nKōwhai House\nSeating\n8 recorded seats\nEquipment\nPassenger lift\nTracking\nLast seen 8:12 am\nReport a problem\nPKG-02B v1 · All people, records, dates and outcomes are synthetic.\nDesign review · Application unchanged"
+        },
+        {
+          "scenario": "Report-only staff",
+          "visible": "Home\n›\nFleet & assets\n›\nVehicles\n›\nKōwhai van\nKōwhai van\nNot ready\n\nKWH014 · VH-014 · Kōwhai House\nToyota Hiace · Diesel · Community transport\n\nFind in this vehicle…\n/\nCalendar\nStart check\nODOMETER\n82,460 km\nManual reading · 21 Sep\nNEXT SERVICE\n24 Sep\nDate and distance schedule\nLAST CHECK\nFailed\nCHK-0182 · DEMO-3\nMAINTENANCE\nHold active\nOriginal issues and work\nAs at 21 Sep 2026 · 9:30 am · Pacific/Auckland\nAll evidence\nOverview\nService & compliance\nChecks & inspections\nMaintenance\nCalendar\nFind\n/\nReadiness\nVehicle details\nTracking\nVEHICLE READINESS\nNot ready for use\n\nA restriction remains active for this vehicle.\n\nCondition concern requires assessment\nRST-DEMO-12 · Active since 21 Sep, 8:20 am · No end recorded\nActive restriction\nCompliance evidence needs review\nRUC evidence and CoF applicability have not been verified\nNeeds assessment\nReadiness is assessed again for each booking and checkout.\nReview maintenance\nEvidence & next due dates\n\nOriginal sources and observation dates stay visible\n\nView all\nOdometer\nObserved 21 Sep 2026 · 8:10 am · Inspection CHK-0182 · Manual reading\n82,460 km\nRecorded\nNext service\nDate and distance are separate schedule fields · SCH-DEMO-07 · Routine service\n24 Sep 2026 / 85,000 km\nDue soon\nWoF\nEvidence recorded 9 Apr 2026 · WOF-DEMO-14 · Certificate record\n09 Apr 2027\nCurrent evidence\nRegistration\nEvidence recorded 8 Jul 2026 · REG-DEMO-14 · Licence record\n08 Oct 2026\nDue soon\nRUC\nVehicle-specific applicability · No claim of applicability or exemption\nEvidence not recorded\nNeeds assessment\nCoF\nVehicle-specific applicability · Confirm the applicable compliance evidence\nApplicability not verified\nUnknown\nLatest inspection\n\nSubmitted answers stay with the version used\n\nAll checks\nVehicle condition record\nCHK-0182 · DEMO-3 · 21 Sep 2026 · 8:14 am · Alex Morgan\nFailed\nUpcoming\n\nPacific/Auckland · Source-owned dates\n\nNow\nVehicle use restricted\nActive from 21 Sep · 8:20 am · No end recorded\nRST-DEMO-12\n24 Sep\nRoutine service appointment\n9:00–11:00 am · Internal appointment\nAPT-DEMO-28\n24–25 Sep\nEstimated maintenance window\nAdvisory dates · No provider confirmation\nWO-0264\n25 Sep\nBusy\n10:00 am–12:00 pm · Booking details restricted\nBusy-only\n08 Oct\nRegistration reminder\nDue date reminder · Does not reserve a day\nREG-DEMO-14\n\nA reminder or estimate does not reserve the vehicle.\n\nVehicle context\nToyota Hiace\nKWH014 · VH-014\nHome site\nKōwhai House\nSeating\n8 recorded seats\nEquipment\nPassenger lift\nTracking\nLast seen 8:12 am\nReport a problem\nPKG-02B v1 · All people, records, dates and outcomes are synthetic.\nDesign review · Application unchanged"
+        },
+        {
+          "scenario": "Role/site access denied",
+          "visible": "Home\n›\nFleet & assets\n›\nVehicles\n›\nRestricted record\nThis vehicle is not available to you\n\nYour role or approved site access does not allow this record. Vehicle details and actions are hidden.\n\nBack to permitted vehicles\nPKG-02B v1 · All people, records, dates and outcomes are synthetic.\nDesign review · Application unchanged"
+        },
+        {
+          "scenario": "Active restriction",
+          "visible": "Home\n›\nFleet & assets\n›\nVehicles\n›\nKōwhai van\nKōwhai van\nNot ready\n\nKWH014 · VH-014 · Kōwhai House\nToyota Hiace · Diesel · Community transport\n\nFind in this vehicle…\n/\nCalendar\nStart check\nODOMETER\n82,460 km\nManual reading · 21 Sep\nNEXT SERVICE\n24 Sep\nDate and distance schedule\nLAST CHECK\nFailed\nCHK-0182 · DEMO-3\nMAINTENANCE\nHold active\nOriginal issues and work\nAs at 21 Sep 2026 · 9:30 am · Pacific/Auckland\nAll evidence\nOverview\nService & compliance\nChecks & inspections\nMaintenance\nCalendar\nFind\n/\nReadiness\nVehicle details\nTracking\nVEHICLE READINESS\nNot ready for use\n\nA restriction remains active for this vehicle.\n\nCondition concern requires assessment\nRST-DEMO-12 · Active since 21 Sep, 8:20 am · No end recorded\nActive restriction\nCompliance evidence needs review\nRUC evidence and CoF applicability have not been verified\nNeeds assessment\nReadiness is assessed again for each booking and checkout.\nReview maintenance\nEvidence & next due dates\n\nOriginal sources and observation dates stay visible\n\nView all\nOdometer\nObserved 21 Sep 2026 · 8:10 am · Inspection CHK-0182 · Manual reading\n82,460 km\nRecorded\nNext service\nDate and distance are separate schedule fields · SCH-DEMO-07 · Routine service\n24 Sep 2026 / 85,000 km\nDue soon\nWoF\nEvidence recorded 9 Apr 2026 · WOF-DEMO-14 · Certificate record\n09 Apr 2027\nCurrent evidence\nRegistration\nEvidence recorded 8 Jul 2026 · REG-DEMO-14 · Licence record\n08 Oct 2026\nDue soon\nRUC\nVehicle-specific applicability · No claim of applicability or exemption\nEvidence not recorded\nNeeds assessment\nCoF\nVehicle-specific applicability · Confirm the applicable compliance evidence\nApplicability not verified\nUnknown\nLatest inspection\n\nSubmitted answers stay with the version used\n\nAll checks\nVehicle condition record\nCHK-0182 · DEMO-3 · 21 Sep 2026 · 8:14 am · Alex Morgan\nFailed\nUpcoming\n\nPacific/Auckland · Source-owned dates\n\nNow\nVehicle use restricted\nActive from 21 Sep · 8:20 am · No end recorded\nRST-DEMO-12\n24 Sep\nRoutine service appointment\n9:00–11:00 am · Internal appointment\nAPT-DEMO-28\n24–25 Sep\nEstimated maintenance window\nAdvisory dates · No provider confirmation\nWO-0264\n25 Sep\nBusy\n10:00 am–12:00 pm · Booking details restricted\nBusy-only\n08 Oct\nRegistration reminder\nDue date reminder · Does not reserve a day\nREG-DEMO-14\n\nA reminder or estimate does not reserve the vehicle.\n\nVehicle context\nToyota Hiace\nKWH014 · VH-014\nHome site\nKōwhai House\nSeating\n8 recorded seats\nEquipment\nPassenger lift\nTracking\nLast seen 8:12 am\nReport a problem\nPKG-02B v1 · All people, records, dates and outcomes are synthetic.\nDesign review · Application unchanged"
+        }
+      ]
+    },
+    {
+      "test": "Frozen candidate bundle identity",
+      "scripts": [
+        "http://127.0.0.1:4336/assets/index--V2KTTov.js"
+      ]
+    },
+    {
+      "test": "Corrected empty evidence provenance",
+      "result": "Home\n›\nFleet & assets\n›\nVehicles\n›\nKōwhai van\nKōwhai van\nNeeds assessment\n\nKWH014 · VH-014 · Kōwhai House\nToyota Hiace · Diesel · Community transport\n\nFind in this vehicle…\n/\nCalendar\nStart check\nODOMETER\nUnknown\nNo observation available\nNEXT SERVICE\nUnknown\nDate and distance schedule\nLAST CHECK\nNo record\nNo submitted checks\nMAINTENANCE\nNo history\nFirst-use example\nAs at 21 Sep 2026 · 9:30 am · Pacific/Auckland\nAll evidence\nOverview\nService & compliance\nChecks & inspections\nMaintenance\nCalendar\nFind\n/\nReadiness\nVehicle details\nTracking\nVEHICLE READINESS\nMore evidence is needed\n\nMissing or old evidence cannot confirm readiness.\n\nNo readiness evidence yet\nAdd approved source records before any readiness decision\nNeeds assessment\nReadiness is assessed again for each booking and checkout.\nReview evidence\nEvidence & next due dates\n\nOriginal sources and observation dates stay visible\n\nView all\nOdometer\nObservation date not recorded · No observation available\nNot recorded\nUnknown\nNext service\nDate and distance are separate schedule fields · No schedule available\nNot scheduled\nUnknown\nWoF\nEvidence date not recorded · Applicability and evidence need review\nNot recorded\nUnknown\nRegistration\nNo source document recorded · Expiry has not been verified\nNot recorded\nUnknown\nRUC\nVehicle-specific applicability · No claim of applicability or exemption\nApplicability unknown\nNeeds assessment\nCoF\nVehicle-specific applicability · Confirm the applicable compliance evidence\nApplicability not verified\nUnknown\nLatest inspection\n\nSubmitted answers stay with the version used\n\nAll checks\nNo checks recorded\n\nStart with the applicable approved template.\n\nUpcoming\n\nPacific/Auckland · Source-owned dates\n\nNo upcoming records\n\nSource-owned bookings, appointments and reminders will appear here.\n\nA reminder or estimate does not reserve the vehicle.\n\nVehicle context\nToyota Hiace\nKWH014 · VH-014\nHome site\nKōwhai House\nSeating\n8 recorded seats\nEquipment\nPassenger lift\nTracking\nNo tracker\nReport a problem\nPKG-02B v1 · All people, records, dates and outcomes are synthetic.\nDesign review · Application unchanged"
+    },
+    {
+      "test": "Empty first check with unconfigured rules",
+      "result": "Start vehicle check\n\nSynthetic checklist walkthrough\n\nCheck recorded in this preview\n\nCHK-DEMO-0182 · Needs assessment\nOriginal answers and template DEMO-3 are retained. This does not release the vehicle.\n\nBack to vehicle"
+    },
+    {
+      "test": "First check retained; needs-assessment header",
+      "result": "Home\n›\nFleet & assets\n›\nVehicles\n›\nKōwhai van\nKōwhai van\nNeeds assessment\n\nKWH014 · VH-014 · Kōwhai House\nToyota Hiace · Diesel · Community transport\n\nFind in this vehicle…\n/\nCalendar\nStart check\nODOMETER\nUnknown\nNo observation available\nNEXT SERVICE\nUnknown\nDate and distance schedule\nLAST CHECK\nNeeds assessment\nCHK-DEMO-0182 · DEMO-3\nMAINTENANCE\nNo history\nFirst-use example\nAs at 21 Sep 2026 · 9:30 am · Pacific/Auckland\nAll evidence\nOverview\nService & compliance\nChecks & inspections\nMaintenance\nCalendar\nFind\n/\nReadiness\nVehicle details\nTracking\nVEHICLE READINESS\nMore evidence is needed\n\nMissing or old evidence cannot confirm readiness.\n\nNo readiness evidence yet\nAdd approved source records before any readiness decision\nNeeds assessment\nReadiness is assessed again for each booking and checkout.\nReview evidence\nEvidence & next due dates\n\nOriginal sources and observation dates stay visible\n\nView all\nOdometer\nObservation date not recorded · No observation available\nNot recorded\nUnknown\nNext service\nDate and distance are separate schedule fields · No schedule available\nNot scheduled\nUnknown\nWoF\nEvidence date not recorded · Applicability and evidence need review\nNot recorded\nUnknown\nRegistration\nNo source document recorded · Expiry has not been verified\nNot recorded\nUnknown\nRUC\nVehicle-specific applicability · No claim of applicability or exemption\nApplicability unknown\nNeeds assessment\nCoF\nVehicle-specific applicability · Confirm the applicable compliance evidence\nApplicability not verified\nUnknown\nLatest inspection\n\nSubmitted answers stay with the version used\n\nAll checks\nVehicle condition record\nCHK-DEMO-0182 · DEMO-3 · 21 Sep 2026 · 9:24 am · Alex Morgan\nNeeds assessment\nUpcoming\n\nPacific/Auckland · Source-owned dates\n\nNo upcoming records\n\nSource-owned bookings, appointments and reminders will appear here.\n\nA reminder or estimate does not reserve the vehicle.\n\nVehicle context\nToyota Hiace\nKWH014 · VH-014\nHome site\nKōwhai House\nSeating\n8 recorded seats\nEquipment\nPassenger lift\nTracking\nNo tracker\nReport a problem\nPKG-02B v1 · All people, records, dates and outcomes are synthetic.\nDesign review · Application unchanged"
+    },
+    {
+      "test": "Service work route and canonical source",
+      "result": {
+        "url": "http://127.0.0.1:4336/PKG-02B/v1/#/fleet-assets/maintenance/work-orders/268?return=vehicle-14",
+        "text": "Home\n›\nFleet & assets\n›\nVehicles\n›\nKōwhai van › Maintenance\nRoutine service\nAwaiting scheduling\n\nWO-0268 · Kōwhai van · VH-014\nMaintenance · Original record context\n\nFind in this vehicle…\n/\nCalendar\nStart check\nVEHICLE\nVH-014\nKōwhai van\nSOURCE\nSCH-DEMO-07\nOriginal service schedule\nRESTRICTION\nActive\nSeparate release decision\nEVIDENCE\n2 files\nOriginal records & notes\nAs at 21 Sep 2026 · 9:30 am · Pacific/Auckland\nAll evidence\nOverview\nService & compliance\nChecks & inspections\nMaintenance\nCalendar\nFind\n/\nBack to vehicle profile\nBounded Maintenance destination preview\nPlanned service\n\nOriginal work and check remain linked\n\nRoutine service is due on the recorded schedule. The appointment is an internal plan; provider confirmation is still outstanding.\n\nService schedule · SCH-DEMO-07\nKōwhai van · VH-014\nSame vehicle record\nNotes & updates\n\nAttributed notes keep their original author and time\n\nExpand\n\nLatest: Assessment requested by the site Coordinator. 21 Sep · 8:25 am\n\nAdd note\nSave note\nEvidence\n\nOriginal files remain attached to their owning records\n\nAdd evidence\nCondition evidence\nEV-DEMO-0182 · Original check · 21 Sep · Alex Morgan\nPDF\nService record\nEV-DEMO-0188 · WO-0188 · 24 Mar · Demo provider record\nPDF\nWork details\nNext action\nConfirm the service provider and appointment\nProgress\nAwaiting scheduling\nOwner\nKōwhai House Coordinator\nTarget\nNot yet assigned\nComplete work\nRestriction remains active\n\nThis profile does not provide a shortcut around Maintenance release or Finance approval.\n\nPKG-02B v1 · All people, records, dates and outcomes are synthetic.\nDesign review · Application unchanged"
+      }
+    },
+    {
+      "test": "Historical work lifecycle retained",
+      "url": "http://127.0.0.1:4336/PKG-02B/v1/#/fleet-assets/maintenance/work-orders/188?return=vehicle-14",
+      "text": "Home\n›\nFleet & assets\n›\nVehicles\n›\nKōwhai van › Maintenance\nPrevious routine service\nCompleted\n\nWO-0188 · Kōwhai van · VH-014\nMaintenance · Original record context\n\nFind in this vehicle…\n/\nCalendar\nStart check\nVEHICLE\nVH-014\nKōwhai van\nSOURCE\nSCH-DEMO-07\nOriginal service schedule\nRESTRICTION\nActive\nSeparate release decision\nEVIDENCE\n2 files\nOriginal records & notes\nAs at 21 Sep 2026 · 9:30 am · Pacific/Auckland\nAll evidence\nOverview\nService & compliance\nChecks & inspections\nMaintenance\nCalendar\nFind\n/\nBack to vehicle profile\nBounded Maintenance destination preview\nPrevious service record\n\nOriginal work and check remain linked\n\nRoutine service completed on 24 March 2026 at 74,800 km. The service record retains its original job reference and evidence.\n\nService schedule · SCH-DEMO-07\nKōwhai van · VH-014\nSame vehicle record\nNotes & updates\n\nAttributed notes keep their original author and time\n\nExpand\n\nLatest: Assessment requested by the site Coordinator. 21 Sep · 8:25 am\n\nAdd note\nSave note\nEvidence\n\nOriginal files remain attached to their owning records\n\nAdd evidence\nCondition evidence\nEV-DEMO-0182 · Original check · 21 Sep · Alex Morgan\nPDF\nService record\nEV-DEMO-0188 · WO-0188 · 24 Mar · Demo provider record\nPDF\nWork details\nNext action\nReview original completed service evidence\nProgress\nCompleted\nOwner\nKōwhai House Coordinator\nTarget\nNot yet assigned\nWork completed\nRestriction remains active\n\nThis profile does not provide a shortcut around Maintenance release or Finance approval.\n\nPKG-02B v1 · All people, records, dates and outcomes are synthetic.\nDesign review · Application unchanged",
+      "completionDisabled": true
+    },
+    {
+      "test": "Candidate final 1280x900",
+      "metrics": {
+        "headerScroll": 0,
+        "headerTop": 144,
+        "height": 900,
+        "scrollWidth": 1265,
+        "titleTop": 162,
+        "width": 1280
+      }
+    },
+    {
+      "test": "Candidate final 1440x1000",
+      "metrics": {
+        "headerScroll": 0,
+        "headerTop": 144,
+        "height": 1000,
+        "scrollWidth": 1425,
+        "titleTop": 162,
+        "width": 1440
+      }
+    },
+    {
+      "test": "Candidate final 1920x1080",
+      "metrics": {
+        "headerScroll": 0,
+        "headerTop": 144,
+        "height": 1080,
+        "scrollWidth": 1905,
+        "titleTop": 162,
+        "width": 1920
+      }
+    },
+    {
+      "test": "Browser console through final verification",
+      "logs": []
+    },
+    {
+      "test": "Final ready fixture excludes condition work context",
+      "result": {
+        "ready": true,
+        "noActiveRestriction": true,
+        "noConditionEstimate": true
+      }
+    },
+    {
+      "test": "Final Escape closes source detail and restores focus",
+      "result": {
+        "focusedLabel": "View RUC",
+        "openDialogs": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "version": "PKG-02B-v8",
+  "typescript": "pass",
+  "viteBuild": "pass; existing Leaflet import and large-chunk warnings",
+  "browser": {
+    "customRange21to22September2026": "2 trips",
+    "preset20September2026": "1 trip; custom range hidden and bounds cleared",
+    "searchJamie": "1 trip",
+    "reset": "3 trips",
+    "viewport1060": {
+      "clientWidth": 1045,
+      "scrollWidth": 1045,
+      "filtersHeight": 57.5
+    },
+    "newConsoleErrors": []
+  },
+  "scope": "Targeted filter/layout checks. Inherited workflows not exhaustively retested."
+}

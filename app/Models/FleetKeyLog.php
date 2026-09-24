@@ -13,6 +13,7 @@ class FleetKeyLog extends Model
 
     protected $fillable = [
         'asset_id',
+        'booking_id',
         'site_id',
         'user_id',
         'action',

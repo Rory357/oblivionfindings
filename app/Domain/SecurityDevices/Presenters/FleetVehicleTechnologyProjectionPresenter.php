@@ -172,6 +172,9 @@ final class FleetVehicleTechnologyProjectionPresenter
             'domain' => $device->domain,
             'category' => $device->category,
             'subcategory' => $device->subcategory,
+            // The exact model gates which capabilities the vehicle telemetry view describes.
+            'manufacturer' => $device->manufacturer,
+            'model' => $device->model,
             'provider' => $device->provider,
             'status' => $device->status?->value,
             'health' => $device->health_status?->value,

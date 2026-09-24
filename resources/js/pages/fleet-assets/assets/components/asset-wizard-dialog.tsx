@@ -314,6 +314,7 @@ const STEP_FOR_FIELD: Record<string, StepKey> = {
     registration_expires_at: 'compliance',
     wof_expires_at: 'compliance',
     cof_expires_at: 'compliance',
+    vehicle_evidence: 'compliance',
     requires_inspection: 'compliance',
     inspection_due_at: 'compliance',
     requires_maintenance: 'compliance',
@@ -414,7 +415,6 @@ export function AssetWizardDialog({
             !!data.location.trim(),
             !!data.purchase_date,
             data.category !== 'vehicle' || !!data.registration_number.trim(),
-            data.category !== 'vehicle' || !!data.wof_expires_at,
         ];
         return Math.round(
             (checks.filter(Boolean).length / checks.length) * 100,
@@ -466,11 +466,10 @@ export function AssetWizardDialog({
             serial_number: nn(data.serial_number),
             description: nn(data.description),
             registration_number: nn(data.registration_number),
-            registration_expires_at: nn(data.registration_expires_at),
-            wof_expires_at: nn(data.wof_expires_at),
-            cof_expires_at: nn(data.cof_expires_at),
+            // Registration, WoF and CoF evidence and odometer readings are
+            // versioned records on the vehicle's Service & compliance tab;
+            // this register form no longer writes their legacy columns.
             fuel_type: nn(data.fuel_type),
-            odometer_km: nn(data.odometer_km),
             purchase_date: nn(data.purchase_date),
             warranty_expires_at: nn(data.warranty_expires_at),
             requires_inspection: data.requires_inspection,
@@ -529,8 +528,10 @@ export function AssetWizardDialog({
                 ) : (
                     <>
                         <span className="font-semibold">{data.name}</span> is
-                        now on the asset register. Add documents, trackers,
-                        inspections and assignments from its detail page.
+                        now on the asset register.{' '}
+                        {data.category === 'vehicle'
+                            ? 'Record its registration, WoF, CoF, RUC and odometer on its Service & compliance tab before it is booked.'
+                            : 'Add documents, trackers, inspections and assignments from its detail page.'}
                     </>
                 )
             }
@@ -545,9 +546,15 @@ export function AssetWizardDialog({
                         {createdId != null ? (
                             <Button asChild>
                                 <Link
-                                    href={`/fleet-assets/assets/${createdId}`}
+                                    href={
+                                        data.category === 'vehicle'
+                                            ? `/fleet-assets/vehicles/${createdId}?tab=service`
+                                            : `/fleet-assets/assets/${createdId}`
+                                    }
                                 >
-                                    View asset
+                                    {data.category === 'vehicle'
+                                        ? 'Open vehicle'
+                                        : 'View asset'}
                                 </Link>
                             </Button>
                         ) : (
@@ -799,18 +806,14 @@ function StepDetails({ data, set, errors }: StepProps) {
                         </Field>
                         <Field
                             label="Odometer"
-                            hint="km"
-                            error={errors.odometer_km}
+                            hint="recorded on the vehicle"
+                            error={errors.odometer_km ?? errors.vehicle_evidence}
                         >
-                            <Input
-                                type="number"
-                                min={0}
-                                value={data.odometer_km}
-                                onChange={(e) =>
-                                    set('odometer_km', e.target.value)
-                                }
-                                placeholder="e.g. 84500"
-                            />
+                            <p className="text-subtle py-2">
+                                {data.odometer_km
+                                    ? `${Number(data.odometer_km).toLocaleString('en-NZ')} km · update it from the vehicle's Mileage tab`
+                                    : "Record the first reading from the vehicle's Mileage tab after saving."}
+                            </p>
                         </Field>
                     </div>
                 ) : null}
@@ -946,46 +949,27 @@ function StepCompliance({ data, set, errors }: StepProps) {
             <div className="grid gap-4">
                 {data.category === 'vehicle' ? (
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <SubHead icon={Car}>Compliance dates</SubHead>
-                        <Field
-                            label="Registration expires"
-                            error={errors.registration_expires_at}
-                        >
-                            <Input
-                                type="date"
-                                value={data.registration_expires_at}
-                                onChange={(e) =>
-                                    set(
-                                        'registration_expires_at',
-                                        e.target.value,
-                                    )
-                                }
-                            />
-                        </Field>
-                        <Field
-                            label="WOF expires"
-                            error={errors.wof_expires_at}
-                        >
-                            <Input
-                                type="date"
-                                value={data.wof_expires_at}
-                                onChange={(e) =>
-                                    set('wof_expires_at', e.target.value)
-                                }
-                            />
-                        </Field>
-                        <Field
-                            label="COF expires"
-                            error={errors.cof_expires_at}
-                        >
-                            <Input
-                                type="date"
-                                value={data.cof_expires_at}
-                                onChange={(e) =>
-                                    set('cof_expires_at', e.target.value)
-                                }
-                            />
-                        </Field>
+                        <SubHead icon={Car}>Registration, WoF, CoF and RUC</SubHead>
+                        <InfoCard icon={Info}>
+                            {data.registration_expires_at ||
+                            data.wof_expires_at ||
+                            data.cof_expires_at ? (
+                                <>
+                                    Last recorded: registration{' '}
+                                    {data.registration_expires_at || 'not recorded'}
+                                    , WoF {data.wof_expires_at || 'not recorded'},
+                                    CoF {data.cof_expires_at || 'not recorded'}.{' '}
+                                </>
+                            ) : null}
+                            These are recorded with their evidence on the
+                            vehicle&apos;s Service &amp; compliance tab, so every
+                            change keeps its source and history.
+                            {errors.vehicle_evidence ? (
+                                <span className="mt-1 block font-medium text-destructive">
+                                    {errors.vehicle_evidence}
+                                </span>
+                            ) : null}
+                        </InfoCard>
                     </div>
                 ) : null}
 

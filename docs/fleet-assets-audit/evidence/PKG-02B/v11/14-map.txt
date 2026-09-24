@@ -1,0 +1,197 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button "Home":
+      - generic: Home
+    - button "My day":
+      - generic: My day
+    - button "Clients":
+      - generic: Clients
+    - button "Sites":
+      - generic: Sites
+    - generic: Fleet & assets
+    - button "Overview":
+      - generic: Overview
+    - button "Vehicles":
+      - generic: Vehicles
+    - button "Bookings":
+      - generic: Bookings
+    - button "Maintenance":
+      - generic: Maintenance
+    - button "Assets":
+      - generic: Assets
+    - button "Reports":
+      - generic: Reports
+    - button "Settings":
+      - generic: Settings
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Overview":
+      - generic: Overview
+    - tab "Service & compliance":
+      - generic: Service & compliance
+    - tab "Checks & inspections":
+      - generic: Checks & inspections
+    - tab "Maintenance":
+      - generic: Maintenance
+    - tab "Map" [active] [selected]:
+      - generic: Map
+    - button "More views (2)":
+      - generic: More
+    - button "Find a section":
+      - generic: Find
+      - generic: /
+  - tablist "Vehicle sections":
+    - tab "Location & geofences" [selected]:
+      - text: Location & geofences
+    - tab "Vehicle telemetry":
+      - text: Vehicle telemetry
+    - tab "Driving insights":
+      - text: Driving insights
+    - tab "Alerts & Control Room":
+      - text: Alerts & Control Room
+  - tabpanel:
+    - generic: LOCATION · VH-014
+    - heading "Vehicle location" [level=2]
+    - generic: Current sample · DEMO
+    - button "Recenter":
+      - text: Recenter
+    - button "Historical trail":
+      - text: Historical trail
+    - button "Geofences" [pressed]:
+      - text: Geofences
+    - button "Location actions"
+    - button "Expand map"
+    - button:
+    - button "KWH014":
+      - generic: KWH014
+    - button "Zoom in": +
+    - button "Zoom out": −
+    - link "Leaflet":
+      - /url: https://leafletjs.com
+      - text: Leaflet
+    - text: "| ©"
+    - link "OpenStreetMap":
+      - /url: https://www.openstreetmap.org/copyright
+    - text: contributors
+    - text: 22 Sep 2026 · 9:28 am · GV500CG-DEMO-14 · SAMPLE-0
+    - button "Trip history":
+      - text: Trip history
+    - complementary:
+      - generic: REPORTED STATE
+      - heading "KWH014" [level=2]
+      - 'button "Motion: Stationary. Show report details"':
+        - generic: Motion
+        - strong: Stationary
+      - generic: Tracker
+      - strong: Current sample · DEMO
+      - generic: DEMO
+      - generic: Ignition
+      - strong: "Off"
+      - generic: Speed
+      - strong: 0 km/h
+      - generic: Vehicle
+      - strong: 12.6 V
+      - generic: Signal
+      - strong: LTE
+      - text: Use restricted
+      - button "0 open alerts":
+        - text: 0 open alerts
+      - paragraph: Virtual ignition · sample-based state
+      - text: Observation
+      - combobox "Select recorded observation":
+        - option "22 Sep 2026 · 9:28 am" [selected]
+        - option "21 Sep 2026 · 8:12 am"
+        - option "20 Sep 2026 · 5:08 pm"
+      - strong: "-41.28650, 174.77620"
+      - generic: Recorded coordinates · NZST
+      - heading "Linked geofences" [level=3]
+      - generic: "1"
+      - strong: Kōwhai House grounds
+      - generic: Site · Kōwhai House · Inactive
+      - button "Manage"
+      - button "Select existing"
+      - button "Create":
+        - text: Create
+      - paragraph: One shared geofence record can be selected from vehicle, client, site or house maps. This preview shows the proposed interaction.
+      - button "Location & readiness":
+        - text: Location & readiness
+    - button "Map context anchor"
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged
+- status:
+  - generic: Evidence retained with its owning record.
+  - button "Undo"
+  - button "Dismiss"

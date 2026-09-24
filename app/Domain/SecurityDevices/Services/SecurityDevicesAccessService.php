@@ -292,28 +292,98 @@ class SecurityDevicesAccessService
     }
 
     /**
-     * Canonical unbounded vehicle scope for Fleet booking reads and actions.
-     *
-     * The controller still owns the exact read/approval/management decision;
-     * this query only intersects an authorised Fleet action with operational
-     * Site and Asset provenance. `assets.viewAny` is included solely because
-     * the existing booking read/store routes and readActor explicitly accept
-     * it; it cannot grant approval or management. The scope must not be
-     * derived from Device links or a bounded picker, because ordinary Fleet
-     * vehicles need neither.
+     * Central fleet oversight (`fleet.vehicles.viewAllSites`): every vehicle
+     * at an operational Site, for the vehicle register, the daily check and
+     * the vehicle profile's own records. It grants no other Site access:
+     * bookings, trips, locations, drivers, Finance and devices keep their
+     * own Site rules (siteScopedVehiclesForFleet / assignableVehicle).
+     */
+    public function canViewAllFleetVehicles(User $user): bool
+    {
+        return $user->canDo('fleet.vehicles.viewAllSites');
+    }
+
+    /**
+     * Fleet vehicle scope for the vehicle register, daily check and vehicle
+     * records. The controller still owns the exact read/approval/management
+     * decision; this query only intersects an authorised Fleet action with
+     * operational Site and Asset provenance. `assets.viewAny` is included
+     * solely because the existing booking read/store routes accept it; it
+     * cannot grant approval or management. Central fleet oversight widens the
+     * Sites, never the action.
      */
     public function accessibleVehiclesForFleet(User $user): Builder
     {
-        $query = $this->assetCandidateQuery($user, true);
+        return $this->withFleetReadGate($user, $this->fleetVehicleCandidateQuery($user));
+    }
 
-        if ($user->canDo('fleet.viewAny')
+    /**
+     * The same vehicles limited to the person's own Sites. Bookings, trips,
+     * drivers and Finance use this: central fleet oversight does not open
+     * them. The scope must not be derived from Device links or a bounded
+     * picker, because ordinary Fleet vehicles need neither.
+     */
+    public function siteScopedVehiclesForFleet(User $user): Builder
+    {
+        return $this->withFleetReadGate($user, $this->assetCandidateQuery($user, true));
+    }
+
+    /**
+     * One vehicle for the vehicle profile and its own records (evidence,
+     * readings, schedules, reminders, checks, documents). Site-scoped callers
+     * (bookings, trips, locations, drivers, Finance, devices) keep using
+     * assignableVehicle().
+     */
+    public function fleetVehicle(User $user, int $id, bool $lockForUpdate = false): ?Asset
+    {
+        if (! $this->canViewAllFleetVehicles($user)) {
+            return $this->assignableVehicle($user, $id, $lockForUpdate);
+        }
+        $query = $this->fleetVehicleCandidateQuery($user)->whereKey($id);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+        $asset = $query->first();
+
+        return $asset instanceof Asset
+            && ($user->canDo('fleet.viewAny') || $this->assetIsVisible($user, $asset))
+                ? $asset
+                : null;
+    }
+
+    /**
+     * Whether the vehicle is at one of the person's own Sites, so its
+     * bookings, trips, drivers and Finance records may be shown.
+     */
+    public function vehicleAtAccessibleSite(User $user, Asset|int $vehicle): bool
+    {
+        $id = $vehicle instanceof Asset ? (int) $vehicle->getKey() : $vehicle;
+
+        return $this->assignableVehicle($user, $id) !== null;
+    }
+
+    private function fleetVehicleCandidateQuery(User $user): Builder
+    {
+        if (! $this->canViewAllFleetVehicles($user) || $this->canViewAllSites($user)) {
+            return $this->assetCandidateQuery($user, true);
+        }
+        $siteIds = $this->operationalSites()->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+
+        return $this->applyAssetSiteScope($this->current(Asset::query()), $siteIds)->vehicles();
+    }
+
+    /** Whether the person holds a Fleet action that reads the vehicle scope. */
+    public function canReadFleetVehicles(User $user): bool
+    {
+        return $user->canDo('fleet.viewAny')
             || $user->canDo('fleet.manage')
             || $user->canDo('fleet.bookings.approve')
-            || $user->canDo('assets.viewAny')) {
-            return $query;
-        }
+            || $user->canDo('assets.viewAny');
+    }
 
-        return $query->whereRaw('1 = 0');
+    private function withFleetReadGate(User $user, Builder $query): Builder
+    {
+        return $this->canReadFleetVehicles($user) ? $query : $query->whereRaw('1 = 0');
     }
 
     public function assignableVehicle(User $user, int $id, bool $lockForUpdate = false): ?Asset

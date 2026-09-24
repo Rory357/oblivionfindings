@@ -1,0 +1,49 @@
+/*
+ * Vehicle Map › Alerts & Control Room: the design's rules that the
+ * mockup-port.css generator did not carry, and the response modal's rules
+ * (rendered in a portal, so namespaced by .vehicle-alert-dialog rather than
+ * .vehicle-studio). Tokens only.
+ */
+
+.vehicle-studio .telemetry-empty {
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    color: var(--muted-foreground);
+    text-align: center;
+}
+.vehicle-studio .telemetry-empty h3 {
+    color: var(--foreground);
+}
+.vehicle-studio .alert-preview .field {
+    display: grid;
+    gap: 6px;
+}
+.vehicle-studio .alert-preview .field > small {
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+/* The response modal. */
+.vehicle-alert-dialog .control-room-summary {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    font-size: 13px;
+}
+.vehicle-alert-dialog .alert-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.vehicle-alert-dialog .alert-history {
+    padding: 0 0 0 18px;
+    display: grid;
+    gap: 10px;
+    font-size: 12px;
+    border-left: 2px solid var(--border);
+    list-style: none;
+}

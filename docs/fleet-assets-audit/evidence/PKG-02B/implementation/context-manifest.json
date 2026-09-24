@@ -1,0 +1,96 @@
+{
+  "capturedAt": "2026-09-22T06:01:24.516383+00:00",
+  "note": "Read-only scoped Main context snapshot, not a competing master or permission to alter Main source records. Latest build release supersedes historical design-only text.",
+  "master": {
+    "path": "C:/Users/steph/Downloads/oblivion-findings-fleet-assets-complete-astra-prompt-v10.md",
+    "sha256": "c4837ab675f9dffdb6a8597636f49d5761da114e6c155dc08e6bb8a209d63fd0"
+  },
+  "modelProof": {
+    "turn": "01a0c7b1-dfe4-7f23-b9da-ead60b63e045",
+    "timestamp": "2026-09-22T05:58:38.374Z",
+    "model": "gpt-6-astra",
+    "effort": "xhigh",
+    "collaborationModel": "gpt-6-astra",
+    "collaborationEffort": "xhigh"
+  },
+  "files": [
+    {
+      "source": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/handoffs/PKG-02B-BUILD.md",
+      "snapshot": "docs/fleet-assets-audit/evidence/PKG-02B/implementation/main-context-20260922/handoffs/PKG-02B-BUILD.md",
+      "sha256": "456f6b94b28a2a20d70534f63d4101cf173ef3e0742e7279c51987bd019eb06c",
+      "bytes": 14573
+    },
+    {
+      "source": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/handoffs/PKG-02B-DESIGNER.md",
+      "snapshot": "docs/fleet-assets-audit/evidence/PKG-02B/implementation/main-context-20260922/handoffs/PKG-02B-DESIGNER.md",
+      "sha256": "6ab0b054bbd2faa20202330743c07db04836d4bc2ff7ea59dc11a953fda48d21",
+      "bytes": 10145
+    },
+    {
+      "source": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/00-project-rules.md",
+      "snapshot": "docs/fleet-assets-audit/evidence/PKG-02B/implementation/main-context-20260922/00-project-rules.md",
+      "sha256": "7e10456bcc1210a5269b14381973adb67fca5104c52f3ba9078346e7aeb928ae",
+      "bytes": 17513
+    },
+    {
+      "source": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/01-domain-ownership.md",
+      "snapshot": "docs/fleet-assets-audit/evidence/PKG-02B/implementation/main-context-20260922/01-domain-ownership.md",
+      "sha256": "315123740bae45d61b173a9a6c53953d7077765ecb9778aaddc8b11426c34e0b",
+      "bytes": 4651
+    },
+    {
+      "source": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/02-approved-workflows.md",
+      "snapshot": "docs/fleet-assets-audit/evidence/PKG-02B/implementation/main-context-20260922/02-approved-workflows.md",
+      "sha256": "184e88246c45bdd02474148572f641176fc8de503b6eb31cbc190ab438a7c68c",
+      "bytes": 33283
+    },
+    {
+      "source": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/03-dependency-map.md",
+      "snapshot": "docs/fleet-assets-audit/evidence/PKG-02B/implementation/main-context-20260922/03-dependency-map.md",
+      "sha256": "b09583645beae94e3281a4b49ce6ce471d4bbdeed52369c713aa5be467c6c133",
+      "bytes": 17642
+    },
+    {
+      "source": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/05-page-register.md",
+      "snapshot": "docs/fleet-assets-audit/evidence/PKG-02B/implementation/main-context-20260922/05-page-register.md",
+      "sha256": "c60cf45b9c01d4143ef55e8328be2554fa2cb7568cb2a0c97d3181cec2688542",
+      "bytes": 117009
+    },
+    {
+      "source": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/06-model-selection.md",
+      "snapshot": "docs/fleet-assets-audit/evidence/PKG-02B/implementation/main-context-20260922/06-model-selection.md",
+      "sha256": "db330020d73ec8706d6c40b1a9a760e1174f46fde0915df3cc2657d451e83490",
+      "bytes": 11797
+    },
+    {
+      "source": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/09-amendments.md",
+      "snapshot": "docs/fleet-assets-audit/evidence/PKG-02B/implementation/main-context-20260922/09-amendments.md",
+      "sha256": "2c8c418ccb7215bed469c1738d7cefcaf8d28014123df62557e951a59033934e",
+      "bytes": 27456
+    },
+    {
+      "source": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/evidence/PKG-02B-main-v12-review.md",
+      "snapshot": "docs/fleet-assets-audit/evidence/PKG-02B/implementation/main-context-20260922/evidence/PKG-02B-main-v12-review.md",
+      "sha256": "15f3a2036272f995276f69a7a7d31919134384d68465061c25a92f073cdc4504",
+      "bytes": 15534
+    },
+    {
+      "source": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/evidence/PKG-02B-main-v13-review.md",
+      "snapshot": "docs/fleet-assets-audit/evidence/PKG-02B/implementation/main-context-20260922/evidence/PKG-02B-main-v13-review.md",
+      "sha256": "90c5f8701305b68fd312aca9e397467e3f5f3660f4666b39a9e12fc63dffd8fb",
+      "bytes": 9049
+    },
+    {
+      "source": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/evidence/PKG-02B-build-start.md",
+      "snapshot": "docs/fleet-assets-audit/evidence/PKG-02B/implementation/main-context-20260922/evidence/PKG-02B-build-start.md",
+      "sha256": "55faf04a7658e72b0b98af51cb0198b5703b9d2fbc807bc7d643a02ee149800d",
+      "bytes": 1465
+    },
+    {
+      "source": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/evidence/PKG-02A-main-publication-verification.md",
+      "snapshot": "docs/fleet-assets-audit/evidence/PKG-02B/implementation/main-context-20260922/evidence/PKG-02A-main-publication-verification.md",
+      "sha256": "5c5fdf9664627a1cf0e36ffa37c025504d49ee7abec35869c880f3620b9f6720",
+      "bytes": 16107
+    }
+  ]
+}

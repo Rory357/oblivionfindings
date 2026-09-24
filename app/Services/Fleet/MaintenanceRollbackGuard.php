@@ -14,6 +14,7 @@ final class MaintenanceRollbackGuard
         foreach (['fleet_maintenance_reports', 'fleet_maintenance_actions', 'fleet_maintenance_restrictions',
             'fleet_maintenance_attachments', 'fleet_maintenance_effects', 'fleet_maintenance_fin_bill_links',
             'fleet_maintenance_reviewer_grants', 'fleet_maintenance_booking_impacts',
+            'fleet_maintenance_check_assessments',
             'fleet_maintenance_configuration_events', 'fleet_maintenance_site_route_history',
             'fleet_maintenance_site_routes', 'fleet_maintenance_policy_assignments',
             'fleet_maintenance_policy_versions'] as $table) {

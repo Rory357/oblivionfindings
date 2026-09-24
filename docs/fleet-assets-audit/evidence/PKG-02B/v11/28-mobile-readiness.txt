@@ -1,0 +1,155 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button:
+    - button:
+    - button:
+    - button:
+    - button
+    - button
+    - button
+    - button
+    - button
+    - button
+    - button:
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Overview" [selected]:
+      - generic: Overview
+    - button "More views (6)":
+      - generic: More
+    - button "Find a section":
+  - tablist "Vehicle sections":
+    - tab "Readiness" [selected]:
+      - text: Readiness
+    - tab "Vehicle details":
+      - text: Vehicle details
+    - tab "Documents":
+      - text: Documents
+    - tab "Finance":
+      - text: Finance
+  - tabpanel:
+    - generic: VEHICLE READINESS
+    - heading "Restricted for use" [level=2]
+    - paragraph: Condition concern · independent release required
+    - generic: Action required
+    - generic: Next action
+    - strong: Review repair & release
+    - generic: Operations Manager · RST-DEMO-12
+    - button "Review release":
+      - text: Review release
+    - button "Open work 2":
+      - generic: Open work
+      - strong: "2"
+    - button "Next check 23 Sept 2026":
+      - generic: Next check
+      - strong: 23 Sept 2026
+    - button "Latest mileage 82,460 km":
+      - generic: Latest mileage
+      - strong: 82,460 km
+    - generic: LOOKING AHEAD
+    - heading "Next service" [level=2]
+    - button "All":
+      - text: All
+    - strong: 24 Sept 2026
+    - generic: Routine service · SCH-DEMO-07
+    - generic: 85,000 km
+    - generic: Upcoming
+    - paragraph: Kōwhai House Coordinator
+    - button "Plan service"
+    - heading "Compliance at a glance" [level=2]
+    - button "View evidence":
+      - text: View evidence
+    - button "WoF 9 Apr 2027":
+      - strong: WoF
+      - generic: 9 Apr 2027
+    - button "Registration 8 Oct 2026":
+      - strong: Registration
+      - generic: 8 Oct 2026
+    - button "RUC Needs evidence":
+      - strong: RUC
+      - generic: Needs evidence
+    - button "CoF Needs evidence":
+      - strong: CoF
+      - generic: Needs evidence
+    - heading "What happens next" [level=2]
+    - button "Calendar":
+      - text: Calendar
+    - strong: Vehicle condition check
+    - generic: 23 Sept 2026 · Shift lead
+    - button "Start check"
+    - strong: Reminder follow-up
+    - generic: Service and compliance owners
+    - button "Review"
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged

@@ -1,0 +1,22 @@
+{
+  "version": "PKG-02B-v10",
+  "typescript": "pass",
+  "vite": "pass; existing large-chunk and Leaflet import warnings",
+  "browser": {
+    "Month": "empty-date and entry menus",
+    "Week": "23 September 11:00 preserved in empty-time menu",
+    "Day": "22 September 11:00 preserved in empty-time menu",
+    "Agenda": "service entry actions",
+    "Timeline": "service entry actions",
+    "reminder": "created 26 September 09:00, snoozed to 11:00 with reason, completed; calendar entry removed and restriction retained",
+    "service": "created WO-269 for 27 September 09:00–11:00; source Vehicle calendar; sample evidence upload retained on WO-269; Open work order showed one linked file",
+    "booking": "created pending request; approval disabled under active restriction; declined with reason; history retained and reservation removed",
+    "unavailable": "created block in formerly declined slot; menu has change/cancel only",
+    "pastDate": "creation disabled; 20 September shortcut displayed one matching trip and selected date",
+    "viewOnly": "only View this day / availability on future date",
+    "reportOnly": "Request vehicle booking and View this day / availability only",
+    "newConsoleErrors": [],
+    "finalRebuild": "reloaded; final empty-date menu and copy verified"
+  },
+  "coverage": "Targeted changed-workflow checks; not exhaustive verification of all inherited profile functions."
+}

@@ -1,0 +1,84 @@
+.op-record {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--border);
+}
+.op-record:last-child {
+    border-bottom: 0;
+}
+.op-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+.op-actions button {
+    min-height: 40px;
+}
+.op-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    color: var(--muted-foreground);
+    font-size: 13px;
+    margin-top: 8px;
+}
+.op-fields {
+    display: grid;
+    gap: 22px;
+}
+.op-check {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+.op-check input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+}
+.op-log {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    line-height: 1.6;
+}
+.op-toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 45;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 6px 30px #0002;
+    padding: 12px 16px;
+    border-radius: 12px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    max-width: 850px;
+    width: max-content;
+    font-size: 13px;
+}
+.op-fields .field textarea {
+    min-height: 100px;
+}
+.op-fields select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--background);
+}
+.content > .panel + .panel {
+    margin-top: 20px;
+}
+.observation-filters {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
