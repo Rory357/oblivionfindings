@@ -751,6 +751,14 @@ it('migrates settlement constraints down and back up with foreign keys removed b
     expect($connection->getDriverName())->toBe('mysql');
     $connection->commit();
     $path = database_path('migrations/2026_08_14_000064_add_finance_payment_global_site_permission.php');
+    // down() deletes the committed permissions this migration owns and up()
+    // re-creates them under new ids, so keep the originals to put back.
+    $ownedKeys = ['finance.payments.viewAllSites', 'finance.payments.manageAllSites'];
+    $ownedPermissions = DB::table('permissions')->whereIn('key', $ownedKeys)->get()
+        ->map(fn (object $row): array => (array) $row)->all();
+    $ownedGrants = DB::table('role_permission')
+        ->whereIn('permission_id', array_column($ownedPermissions, 'id'))->get()
+        ->map(fn (object $row): array => (array) $row)->all();
 
     try {
         /** @var Migration $migration */
@@ -802,6 +810,10 @@ it('migrates settlement constraints down and back up with foreign keys removed b
             $restore = require $path;
             $restore->up();
         }
+        // Deleting a permission cascades to its role grants.
+        DB::table('permissions')->whereIn('key', $ownedKeys)->delete();
+        DB::table('permissions')->insert($ownedPermissions);
+        DB::table('role_permission')->insert($ownedGrants);
         DB::table('audit_logs')->delete();
         DB::table('fin_fiscal_periods')->delete();
         DB::table('fin_accounts')->delete();
