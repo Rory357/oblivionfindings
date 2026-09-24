@@ -1,3 +1,4 @@
+import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -120,6 +121,33 @@ const outingSteps = [
         icon: Save,
     },
 ] as const satisfies readonly WizardStep[];
+
+const DETAIL_FIELDS = [
+    'title',
+    'destination',
+    'purpose',
+    'planned_departure',
+    'planned_return',
+];
+
+/** The 1-based wizard step that holds the first field with a server error. */
+function stepForErrors(errors: Record<string, string>): number {
+    const keys = Object.keys(errors);
+    const has = (...fields: string[]) =>
+        keys.some((key) =>
+            fields.some(
+                (field) => key === field || key.startsWith(`${field}.`),
+            ),
+        );
+
+    if (has(...DETAIL_FIELDS)) return 1;
+    if (has('resident_ids')) return 2;
+    if (has('stops')) return 3;
+    if (has('asset_id', 'driver_user_id')) return 4;
+    if (has('risk_assessment', 'notes')) return 5;
+
+    return outingSteps.length;
+}
 
 const PURPOSE_TYPES = [
     {
@@ -377,10 +405,22 @@ export function OutingWizard({
     const handleSubmit = useCallback(
         (e: React.FormEvent) => {
             e.preventDefault();
-            form.post('/fleet-assets/outings', { onSuccess: onClose });
+            form.post('/fleet-assets/outings', {
+                onSuccess: onClose,
+                // Errors render beside their fields, so return to that step.
+                onError: (errors) => setStep(stepForErrors(errors)),
+            });
         },
         [form, onClose],
     );
+
+    const residentError =
+        form.errors.resident_ids ??
+        Object.entries(form.errors as Record<string, string>).find(([key]) =>
+            key.startsWith('resident_ids.'),
+        )?.[1];
+    const readyToCreate =
+        selectedResidents.length > 0 && Boolean(form.data.asset_id);
 
     if (!can.manage) {
         return null;
@@ -684,6 +724,10 @@ export function OutingWizard({
                                             No active clients found.
                                         </p>
                                     )}
+                                    <InputError
+                                        message={residentError}
+                                        className="mt-3"
+                                    />
                                 </CardContent>
                             </Card>
 
@@ -1348,6 +1392,12 @@ export function OutingWizard({
                                     Back
                                 </Button>
                                 <div className="flex items-center gap-2">
+                                    {!readyToCreate && (
+                                        <span className="text-caption">
+                                            Choose at least one resident and a
+                                            vehicle to create the outing.
+                                        </span>
+                                    )}
                                     <Button
                                         type="button"
                                         variant="outline"
@@ -1357,7 +1407,9 @@ export function OutingWizard({
                                     </Button>
                                     <Button
                                         type="submit"
-                                        disabled={form.processing}
+                                        disabled={
+                                            form.processing || !readyToCreate
+                                        }
                                     >
                                         {form.processing ? (
                                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

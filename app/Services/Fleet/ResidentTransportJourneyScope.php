@@ -5,6 +5,7 @@ namespace App\Services\Fleet;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\FleetMedicationTransitLog;
+use App\Models\FleetOuting;
 use App\Models\FleetResidentTransport;
 use App\Models\Shift;
 use App\Models\User;
@@ -52,6 +53,44 @@ class ResidentTransportJourneyScope
                     $homeSite->whereNull('site_id')->whereIn('home_site_id', $siteIds);
                 });
         });
+    }
+
+    /**
+     * FA-T01: the vehicles an outing may use and be seen through — the Fleet
+     * trip boundary (direct, home or client Site, operational only).
+     */
+    public function outingVehicles(?User $user): Builder
+    {
+        return FleetTripSiteScope::vehicles($this->accessibleSiteIds($user));
+    }
+
+    /**
+     * FA-T01: an outing is visible when its vehicle is inside the viewer's
+     * Fleet boundary AND it carries at least one resident the viewer may see.
+     * Outings with no vehicle or no residents therefore fail closed. This is
+     * the one outing rule for Fleet pages (Outings register, Community Access).
+     */
+    public function applyOutingScope(Builder $query, ?User $user): Builder
+    {
+        return $query
+            ->whereIn($query->qualifyColumn('asset_id'), $this->outingVehicles($user)->select('assets.id'))
+            ->whereHas('clients', fn (Builder $clients): Builder => $this->applyClientScope($clients, $user));
+    }
+
+    /** A foreign outing answers exactly like a missing one (404). */
+    public function outingFor(User $user, int $outingId, bool $lockForUpdate = false): FleetOuting
+    {
+        $query = FleetOuting::query()->whereKey($outingId);
+        $this->applyOutingScope($query, $user);
+
+        return $query->when($lockForUpdate, fn (Builder $builder): Builder => $builder->lockForUpdate())
+            ->firstOrFail();
+    }
+
+    /** The outing's resident rows whose Client the viewer may see. */
+    public function applyOutingResidentScope(Builder $query, ?User $user): Builder
+    {
+        return $query->whereHas('client', fn (Builder $client): Builder => $this->applyClientScope($client, $user));
     }
 
     public function applyTransportScope(Builder $query, ?User $user): Builder
