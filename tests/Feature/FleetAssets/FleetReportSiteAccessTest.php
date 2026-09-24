@@ -85,7 +85,8 @@ class FleetReportSiteAccessTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('fleet-assets/reports/index')
                 ->where('trip_stats.total_trips', 2)
-                ->where('trip_stats.total_distance_km', 20.0)
+                // Whole-number floats come back as ints from the Inertia JSON round-trip.
+                ->where('trip_stats.total_distance_km', 20)
                 ->where('utilization', fn ($rows): bool => collect($rows)->pluck('vehicle')->all() === ['Harbour Van'])
                 ->where('fuel_stats.total_fill_ups', 1)
                 ->where('fuel_by_vehicle', fn ($rows): bool => collect($rows)->pluck('vehicle')->all() === ['Harbour Van'])
