@@ -19,6 +19,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 beforeEach(function (): void {
     $this->actor = User::factory()->create(['organization_id' => 1]);
@@ -367,6 +368,7 @@ it('keeps completion terminal and permits correction only through a linked evide
 });
 
 it('serializes concurrent match and complete commands without duplicate or partial effects on MySQL', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
 

@@ -29,6 +29,7 @@ use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\Process\Process;
 use Tests\Support\AuthoritativeConsentFixture;
+use Tests\Support\CommittedFixtureCleanup;
 
 function grantConsentIntegrityPermissions(User $user, array $permissionKeys): void
 {
@@ -1097,6 +1098,7 @@ it('makes two stale identical approvals one committed decision and one consent',
 });
 
 it('serializes concurrent substituted approvals to one accepted evidence transition', function () {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
     $context = makeConsentIntegrityContext();

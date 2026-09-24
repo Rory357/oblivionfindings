@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class SafeguardingTerminalTransitionTest extends TestCase
@@ -209,6 +210,7 @@ class SafeguardingTerminalTransitionTest extends TestCase
 
     public function test_two_independent_mysql_workers_apply_one_terminal_transition(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $site = Site::factory()->create();

@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class SignalAlertAtomicityTest extends TestCase
@@ -304,6 +305,7 @@ class SignalAlertAtomicityTest extends TestCase
 
     public function test_two_independent_mysql_workers_serialize_to_one_alert_and_link(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $signal = $this->pendingSignal('parallel-worker-origin');

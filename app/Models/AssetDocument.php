@@ -81,4 +81,22 @@ class AssetDocument extends Model
         return in_array($this->state, [self::STATE_AVAILABLE, self::STATE_LEGACY], true)
             || ($this->state === null && $this->document_set_id === null);
     }
+
+    /**
+     * True when the vehicle profile keeps this file: a document-set file
+     * (including legacy files wrapped by the backfill), a private upload with
+     * a virus check (such as the vehicle photo) or evidence owned by a record.
+     * Such files open only through VehicleDocumentService and are archived
+     * with a reason, never deleted.
+     */
+    public function isVehicleManaged(): bool
+    {
+        return $this->document_set_id !== null || $this->state !== null || $this->source_type !== null;
+    }
+
+    /** True when the file is evidence kept with another record, e.g. a compliance version or the vehicle photo. */
+    public function isSourceOwned(): bool
+    {
+        return $this->source_type !== null;
+    }
 }
