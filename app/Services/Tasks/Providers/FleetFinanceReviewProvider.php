@@ -2,19 +2,19 @@
 
 namespace App\Services\Tasks\Providers;
 
-use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\FleetFinanceReviewRequest;
 use App\Models\User;
+use App\Services\Fleet\VehicleFinanceService;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 use App\Services\Tasks\TaskProviderAuthorization;
 
 /**
- * Vehicle Finance review requests waiting for a Finance decision. Only
- * Finance users who can decide them see this source, and only for vehicles
- * whose profile they can open (fleet.viewAny within their sites) — the row
- * links to the vehicle's Overview › Finance view.
+ * Vehicle Finance review requests waiting for a Finance decision. Finance
+ * users who can decide them see this source for vehicles at the Sites they
+ * handle for Finance (VehicleFinanceService::financeSiteIds); no Fleet access
+ * is needed. The row opens the request in Finance › Vehicle reviews.
  */
 class FleetFinanceReviewProvider implements SiteScopedTaskProvider, TaskProvider
 {
@@ -30,9 +30,8 @@ class FleetFinanceReviewProvider implements SiteScopedTaskProvider, TaskProvider
 
     public function canView(User $user): bool
     {
-        return $user->canDo('fleet.viewAny')
-            && $user->canDo('finance.assets.view')
-            && ($user->canDo('finance.assets.manage') || $user->canDo('finance.ap.manage'));
+        return ($user->canDo('finance.assets.view') || $user->canDo('finance.ap.view'))
+            && app(VehicleFinanceService::class)->canDecide($user);
     }
 
     public function authorizedTasks(User $user, array $filters = []): array
@@ -53,11 +52,9 @@ class FleetFinanceReviewProvider implements SiteScopedTaskProvider, TaskProvider
             $user,
             $this->canView($user),
             $query,
-            // Finance keeps its own Site rule: central fleet oversight doesn't open it.
-            fn ($scoped, User $actor) => $scoped->whereIn(
-                'asset_id',
-                app(SecurityDevicesAccessService::class)->siteScopedVehiclesForFleet($actor)->select('assets.id'),
-            ),
+            // Finance's own Site rule, not the Fleet one.
+            fn ($scoped, User $actor) => $scoped->whereHas('asset', fn ($asset) => $asset->whereNotNull('site_id')
+                ->whereIn('site_id', app(VehicleFinanceService::class)->financeSiteIds($actor))),
             function (FleetFinanceReviewRequest $request) {
                 $vehicle = $request->asset;
                 $open = $request->isOpen();
@@ -75,10 +72,10 @@ class FleetFinanceReviewProvider implements SiteScopedTaskProvider, TaskProvider
                     site: $vehicle?->site ? ['id' => $vehicle->site->id, 'name' => (string) $vehicle->site->name] : null,
                     dueAt: null,
                     createdAt: optional($request->created_at)->toIso8601String(),
-                    link: "/fleet-assets/vehicles/{$request->asset_id}?view=finance",
+                    link: "/finance/vehicle-reviews?request={$request->id}",
                     type: 'Finance review request',
                     description: str($request->note)->limit(140)->toString(),
-                    actionLabel: $open ? 'Review in vehicle Finance' : 'Open vehicle Finance',
+                    actionLabel: $open ? 'Review in Finance' : 'Open in Finance',
                     displayState: match ($request->status) {
                         'resolved' => 'Resolved',
                         'declined' => 'Declined',

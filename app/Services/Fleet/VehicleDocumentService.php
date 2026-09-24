@@ -7,6 +7,7 @@ use App\Models\Asset;
 use App\Models\AssetDocument;
 use App\Models\AssetDocumentSet;
 use App\Models\AssetDocumentSetEvent;
+use App\Models\FleetFinanceReviewRequest;
 use App\Models\FleetServiceCompletion;
 use App\Models\FleetVehicleComplianceVersion;
 use App\Models\FleetVehicleOdometerObservation;
@@ -15,6 +16,7 @@ use App\Services\AuditLogger;
 use App\Services\Files\MalwareScanDisposition;
 use App\Services\Files\MalwareScanner;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -317,10 +319,34 @@ class VehicleDocumentService
         abort_unless($this->canView($actor, $asset), 404);
         $document = AssetDocument::query()->whereKey($documentId)->where('asset_id', $asset->id)->first() ?? abort(404);
         abort_unless($this->sourceVisible($actor, $asset, $document->source_type, $document->source_id), 404);
+
+        return $this->respond($document, (int) $asset->id, $inline);
+    }
+
+    /**
+     * A file kept with a Finance review request, or the vehicle document the
+     * request pointed to, opened from Finance › Vehicle reviews. The caller
+     * has already resolved the request under Finance's Site rule.
+     */
+    public function financeReviewFile(FleetFinanceReviewRequest $request, int $documentId, bool $inline = false): StreamedResponse
+    {
+        $document = AssetDocument::query()->whereKey($documentId)->where('asset_id', $request->asset_id)
+            ->where(fn (Builder $kept): Builder => $kept
+                ->where(fn (Builder $own): Builder => $own->where('source_type', 'finance_review_request')->where('source_id', $request->id))
+                ->when($request->existing_document_id !== null,
+                    fn (Builder $pointed): Builder => $pointed->orWhere('id', $request->existing_document_id)))
+            ->first() ?? abort(404);
+
+        return $this->respond($document, (int) $request->asset_id, $inline);
+    }
+
+    /** Stream a file that has passed its virus check, sandboxed. */
+    private function respond(AssetDocument $document, int $assetId, bool $inline): StreamedResponse
+    {
         abort_unless($document->isOpenable(), 409, 'This file is not available to open. It has not passed its virus check.');
         $disk = Storage::disk($document->storage_disk ?: 'local');
         abort_unless($disk->exists($document->storage_path), 404);
-        AuditLogger::log('fleet.vehicle.document.download', $document, ['asset_id' => $asset->id]);
+        AuditLogger::log('fleet.vehicle.document.download', $document, ['asset_id' => $assetId]);
         $mime = $document->detected_mime ?: ($document->mime_type ?: 'application/octet-stream');
         $name = self::safeName((string) ($document->original_name ?: 'vehicle-document'));
         $inline = $inline && str_starts_with($mime, 'image/');
