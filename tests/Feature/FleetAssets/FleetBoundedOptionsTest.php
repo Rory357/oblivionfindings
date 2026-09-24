@@ -17,11 +17,20 @@ class FleetBoundedOptionsTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function makeUser(array $permissions): User
+    private function makeUser(array $permissions, ?Site $site = null): User
     {
         $this->seed(RbacSeeder::class);
 
         $user = User::factory()->create(['approved_at' => now()]);
+        if ($site) {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $user->id,
+                'primary_site_id' => $site->id,
+                'secondary_site_ids' => [],
+                'is_active' => true,
+                'start_date' => today()->subMonth(),
+            ]);
+        }
         foreach ($permissions as $key) {
             $permission = Permission::query()->firstOrCreate(
                 ['key' => $key],
@@ -37,9 +46,13 @@ class FleetBoundedOptionsTest extends TestCase
 
     public function test_work_order_option_search_is_bounded_and_manage_only(): void
     {
-        $viewer = $this->makeUser(['fleet.viewAny']);
-        $manager = $this->makeUser(['fleet.viewAny', 'fleet.maintenance.manage']);
-        Asset::factory()->count(25)->create(['name' => 'Searchable work asset']);
+        // Maintenance pickers only offer assets at the actor's approved Sites.
+        $site = Site::factory()->create();
+        $foreignSite = Site::factory()->create();
+        $viewer = $this->makeUser(['fleet.viewAny'], $site);
+        $manager = $this->makeUser(['fleet.viewAny', 'fleet.maintenance.manage'], $site);
+        Asset::factory()->count(25)->create(['name' => 'Searchable work asset', 'site_id' => $site->id]);
+        Asset::factory()->create(['name' => 'Searchable foreign asset', 'site_id' => $foreignSite->id]);
 
         $this->actingAs($viewer)
             ->getJson('/fleet-assets/maintenance/work-orders/options/search?type=assets&q=Searchable')
@@ -49,10 +62,12 @@ class FleetBoundedOptionsTest extends TestCase
             ->getJson('/fleet-assets/maintenance/work-orders/options/search?type=assets&q=a')
             ->assertUnprocessable();
 
-        $this->actingAs($manager)
+        $results = $this->actingAs($manager)
             ->getJson('/fleet-assets/maintenance/work-orders/options/search?type=assets&q=Searchable')
             ->assertOk()
-            ->assertJsonCount(20, 'results');
+            ->assertJsonCount(20, 'results')
+            ->json('results');
+        $this->assertSame([$site->id], collect($results)->pluck('site_id')->unique()->values()->all());
     }
 
     public function test_incident_option_search_preserves_view_permission_and_caps_results(): void
@@ -113,13 +128,14 @@ class FleetBoundedOptionsTest extends TestCase
 
     public function test_initial_option_payloads_are_small_and_keep_selected_values(): void
     {
+        $site = Site::factory()->create();
         $manager = $this->makeUser([
             'fleet.viewAny',
             'fleet.manage',
             'fleet.maintenance.manage',
-        ]);
-        Asset::factory()->count(25)->create(['name' => 'AAA Initial asset']);
-        $selected = Asset::factory()->create(['name' => 'ZZZ Selected asset']);
+        ], $site);
+        Asset::factory()->count(25)->create(['name' => 'AAA Initial asset', 'site_id' => $site->id]);
+        $selected = Asset::factory()->create(['name' => 'ZZZ Selected asset', 'site_id' => $site->id]);
 
         $workOrderResponse = $this->actingAs($manager)
             ->get("/fleet-assets/maintenance/work-orders?new=1&asset_id={$selected->id}")

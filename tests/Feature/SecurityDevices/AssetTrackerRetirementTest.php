@@ -213,7 +213,7 @@ class AssetTrackerRetirementTest extends TestCase
             'site_id' => $this->site->id,
             'status' => 'active',
         ]);
-        $consent = $this->createFleetTrackingConsent($client);
+        $consent = $this->createResidentTrackingConsent($client);
         $device = Device::factory()->tracking()->create([
             'name' => 'Resident Pendant',
         ]);
@@ -313,14 +313,18 @@ class AssetTrackerRetirementTest extends TestCase
         $this->assertStringContainsString('@deprecated', $docComment);
     }
 
-    private function createFleetTrackingConsent(Client $client): ClientConsent
+    /**
+     * Resident location needs the personal wandering-risk consent; vehicle
+     * Fleet Tracking consent cannot authorise a tracker assigned to a Client.
+     */
+    private function createResidentTrackingConsent(Client $client): ClientConsent
     {
         $type = ConsentType::firstOrCreate(
-            ['name' => 'Fleet Tracking'],
+            ['name' => 'Personal Tracker (Wandering Risk)'],
             [
                 'category' => 'operational',
-                'description' => 'Vehicle / tracker GPS consent',
-                'purpose' => 'Tracker location collection',
+                'description' => 'Resident personal location tracking',
+                'purpose' => 'Resident tracker safety',
                 'legal_basis' => 'consent',
                 'active' => true,
             ],

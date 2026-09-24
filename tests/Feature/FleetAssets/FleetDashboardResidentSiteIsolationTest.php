@@ -229,14 +229,27 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
 
     public function test_cross_site_resident_tracking_requires_fleet_and_security_devices_permissions(): void
     {
-        $manager = $this->makeSiteUser($this->localSite, [
+        $permissions = [
             'fleet.viewAny',
             'fleet.manage',
             'assets.telemetry.view',
             'clients.viewAny',
             'securityDevices.devices.viewAllSites',
-        ], 'manager');
-        $this->seedResidentTrackingSurfaces();
+        ];
+        // Residents are client records: seeing another Site's also needs the
+        // explicit all-Sites client grant, not device or Fleet reach alone.
+        $siteScopedManager = $this->makeSiteUser($this->localSite, $permissions, 'manager');
+        $manager = $this->makeSiteUser($this->localSite, [...$permissions, 'sites.viewAll'], 'manager');
+        $ids = $this->seedResidentTrackingSurfaces();
+
+        $this->actingAs($siteScopedManager)
+            ->get('/fleet-assets/resident-tracking?new=1')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('fleet-assets/resident-tracking/index')
+                ->has('residents', 1)
+                ->where('residents.0.client_id', $ids['local_client'])
+            );
 
         $this->actingAs($manager)
             ->get('/fleet-assets/resident-tracking?new=1')
@@ -266,6 +279,7 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             'assets.telemetry.view',
             'clients.viewAny',
             'securityDevices.devices.viewAllSites',
+            'sites.viewAll',
         ], 'manager');
         $foreignClient = Client::factory()->create([
             'site_id' => $this->foreignSite->id,
@@ -953,7 +967,7 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             ],
         );
 
-        return AuthoritativeConsentFixture::manualSelf($client, $type, $this->admin, array_merge([
+        return AuthoritativeConsentFixture::manualSelf($client, $type, User::factory()->create(), array_merge([
             'status' => 'given',
             'given_at' => now(),
         ], $overrides));
