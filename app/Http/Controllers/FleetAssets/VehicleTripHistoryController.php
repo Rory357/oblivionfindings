@@ -83,7 +83,7 @@ class VehicleTripHistoryController extends Controller
         ]);
         $from = CarbonImmutable::createFromFormat('!Y-m-d', $data['from']);
         $to = CarbonImmutable::createFromFormat('!Y-m-d', $data['to']);
-        if ($from->diffInDays($to) > 366) {
+        if ($from->diffInDays($to) > VehicleTripHistoryService::MAX_RANGE_DAYS) {
             throw ValidationException::withMessages(['to' => 'Export at most one year of trips at a time.']);
         }
 

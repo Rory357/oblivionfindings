@@ -58,6 +58,33 @@ export type CheckRunFile = {
     url: string | null;
 };
 
+/** An answer that recorded an issue, or that an item couldn't be assessed. */
+export type CheckIssue = { id: string; label: string; value: string };
+
+/** Maintenance's "No issue found — released for use" decision on a check. */
+export type CheckAssessment = {
+    id: number;
+    decision: 'no_issue_release';
+    label: string;
+    reason: string;
+    assessed_by: string | null;
+    assessed_at: string | null;
+    /** The person who recorded the check released it (allowed only for a clean check). */
+    self_assessed: boolean;
+    /** Labels of the recorded issues the assessor confirmed. */
+    issues: string[];
+};
+
+/** Whether this viewer can record "no issue found" for the check, and why not. */
+export type CheckAssessOption = {
+    available: boolean;
+    /** Why it isn't available, in words to show; null when it is. */
+    reason: string | null;
+    issues: CheckIssue[];
+    /** Someone other than the recorder must assess it. */
+    needs_independent: boolean;
+};
+
 export type CheckRun = {
     id: number;
     reference: string;
@@ -87,6 +114,11 @@ export type CheckRun = {
         title: string | null;
         status: string;
     } | null;
+    /** The check holds the vehicle now (readiness maintenance.unresolved_check). */
+    blocking: boolean;
+    assessment: CheckAssessment | null;
+    /** Null when the viewer can't assess checks here, or it's already assessed. */
+    assess: CheckAssessOption | null;
 };
 
 export type CheckRequirement = {
@@ -108,10 +140,14 @@ export type ChecksCan = {
     start: boolean;
     amend: boolean;
     manage_templates: boolean;
+    /** Publish checklists used beyond this vehicle (fleet.settings.manage). */
+    manage_shared_templates: boolean;
     manage_requirement: boolean;
     upload: boolean;
     report: boolean;
     link_work: boolean;
+    /** Record "No issue found — release for use" (maintenance managers at the vehicle's Site). */
+    assess: boolean;
     view_maintenance: boolean;
     view_files: boolean;
     view_answer_files: boolean;

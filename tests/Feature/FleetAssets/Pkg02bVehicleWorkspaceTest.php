@@ -79,7 +79,8 @@ class Pkg02bVehicleWorkspaceTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->component('fleet-assets/vehicles/show')
                 ->where('workspace.vehicle.id', $vehicle->id)
                 ->has('workspace.compliance', 4)
-                ->where('workspace.compliance.1.label', 'WoF')
+                // The approved design's order: WoF, Registration, RUC, CoF.
+                ->where('workspace.compliance', fn ($rows) => collect($rows)->pluck('label')->all() === ['WoF', 'Registration', 'RUC', 'CoF'])
                 ->where('workspace.readiness.status', 'blocked')
                 ->where('workspace.can.manage', true)
                 ->where('workspace.can.manage_documents', true)
@@ -365,13 +366,23 @@ class Pkg02bVehicleWorkspaceTest extends TestCase
         $url = "/fleet-assets/vehicles/{$vehicle->id}/service-schedules";
 
         $this->actingAs($manager)->postJson($url, ['name' => 'Routine service', 'owner_user_id' => $owner->id, 'next_due_at' => '2026-10-01'])
-            ->assertUnprocessable()->assertJsonValidationErrors('interval_months');
-        $this->actingAs($manager)->postJson($url, ['name' => 'Routine service', 'owner_user_id' => $owner->id, 'interval_months' => 6])
-            ->assertUnprocessable()->assertJsonValidationErrors('next_due_at');
-        $schedule = $this->actingAs($manager)->postJson($url, [
+            ->assertUnprocessable()->assertJsonValidationErrors('request_key');
+        $this->actingAs($manager)->postJson($url, ['name' => 'Routine service', 'owner_user_id' => $owner->id, 'next_due_at' => '2026-10-01',
+            'request_key' => 'schedule-no-interval'])->assertUnprocessable()->assertJsonValidationErrors('interval_months');
+        $this->actingAs($manager)->postJson($url, ['name' => 'Routine service', 'owner_user_id' => $owner->id, 'interval_months' => 6,
+            'request_key' => 'schedule-no-trigger'])->assertUnprocessable()->assertJsonValidationErrors('next_due_at');
+        $create = [
             'name' => 'Routine service', 'interval_months' => 6, 'interval_km' => 10000,
             'next_due_at' => '2026-09-01', 'next_due_km' => 60000, 'owner_user_id' => $owner->id,
-        ])->assertOk()->json('schedule');
+        ];
+        $schedule = $this->actingAs($manager)->postJson($url, $create, ['Idempotency-Key' => 'schedule-create-01'])
+            ->assertOk()->json('schedule');
+        // A retried create returns the same schedule; the key can't be reused for other details.
+        $this->actingAs($manager)->postJson($url, $create, ['Idempotency-Key' => 'schedule-create-01'])
+            ->assertOk()->assertJsonPath('schedule.id', $schedule['id']);
+        $this->actingAs($manager)->postJson($url, ['interval_km' => 12000] + $create, ['Idempotency-Key' => 'schedule-create-01'])
+            ->assertStatus(409);
+        $this->assertSame(1, FleetServiceSchedule::query()->where('asset_id', $vehicle->id)->count());
 
         $complete = "{$url}/{$schedule['id']}/completions";
         $this->actingAs($manager)->postJson($complete, ['completed_on' => '2026-09-23', 'notes' => 'x', 'expected_version' => 1, 'request_key' => 'f'])

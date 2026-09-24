@@ -42,7 +42,8 @@ type Vehicle = {
     cof_expires_at: string | null;
     insurance_expires_at: string | null;
     home_site: { id: number; name: string } | null;
-    status: 'ok' | 'warning' | 'critical' | 'expired';
+    /** `not_ready`: vehicle readiness blocks use (evidence, a hold or an unresolved check). */
+    status: 'ok' | 'warning' | 'critical' | 'expired' | 'not_ready';
     worst_days: number | null;
 };
 
@@ -60,6 +61,8 @@ type Props = {
         expired_rego: number;
         expiring_30: number;
         expiring_60: number;
+        /** Vehicles readiness blocks from use. */
+        not_ready?: number;
         /** `null` when the schema has no insurance column — hides the metric. */
         insurance_expiring: number | null;
     };
@@ -112,6 +115,12 @@ function statusBadge(status: string): {
                 label: 'Expiring Soon',
                 icon: AlertTriangle,
             };
+        case 'not_ready':
+            return {
+                variant: 'destructive',
+                label: 'Not ready',
+                icon: AlertTriangle,
+            };
         case 'warning':
             return { variant: 'default', label: 'Warning', icon: Clock };
         default:
@@ -153,7 +162,8 @@ export default function ComplianceIndex({
     const problemVehicles =
         (summary.expired_wof ?? 0) +
         (summary.expired_rego ?? 0) +
-        (summary.expiring_30 ?? 0);
+        (summary.expiring_30 ?? 0) +
+        (summary.not_ready ?? 0);
     const compliancePct =
         totalVehicles > 0
             ? Math.round(
@@ -308,6 +318,7 @@ export default function ComplianceIndex({
                                 Critical (30d)
                             </SelectItem>
                             <SelectItem value="expired">Expired</SelectItem>
+                            <SelectItem value="not_ready">Not ready</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>

@@ -18,8 +18,10 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
+    daysBetween,
     dispositionFilename,
     formatDistance,
+    MAX_RANGE_DAYS,
     plural,
     tripHistoryUrl,
     tripQuery,
@@ -84,7 +86,10 @@ export function TripExportDialog({
         count: number;
     } | null>(null);
     const [scope, setScope] = useState<Scope>({ state: 'loading' });
-    const invalid = !from || !to || to < from;
+    // The export reads at most a year, as the trip list does.
+    const tooLong =
+        !!from && !!to && to >= from && daysBetween(from, to) > MAX_RANGE_DAYS;
+    const invalid = !from || !to || to < from || tooLong;
     const exportFilters: TripFilterState = {
         ...filters,
         day: 'range',
@@ -304,7 +309,9 @@ export function TripExportDialog({
                             title="Choose a valid date range"
                             tone="critical"
                         >
-                            The end date must be on or after the start date.
+                            {tooLong
+                                ? 'Export at most one year of trips at a time.'
+                                : 'The end date must be on or after the start date.'}
                         </StudioNotice>
                     )}
                     {!invalid && scope.state === 'ready' && !scope.trips && (

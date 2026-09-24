@@ -166,151 +166,38 @@
 
 /* ── Vehicle calendar ────────────────────────────────────────────── */
 
+/*
+ * The calendar composes the shared Site Calendar parts (date anchor, filter
+ * row, source pills, context menu); the ported mockup rules supply the rest.
+ * PageLayout owns the 20px rhythm between sections, so the ported margins go.
+ */
 .vehicle-studio .vehicle-calendar .eh-header,
 .vehicle-studio .vehicle-calendar .eh-meter-block {
     min-width: 0;
 }
-.vehicle-studio .calendar-date-anchor {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-.vehicle-studio .calendar-date-anchor > div {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    line-height: 1.2;
-}
-.vehicle-studio .calendar-date-anchor strong {
-    font-size: 17px;
-}
-.vehicle-studio .calendar-date-anchor span {
-    font-size: 13px;
-    font-weight: 600;
-}
-.vehicle-studio .calendar-date-anchor .eh-meter-big {
-    font-size: 36px;
-    line-height: 1;
-}
-.vehicle-studio .calendar-controls {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-    width: 100%;
-}
-.vehicle-studio .calendar-period {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    flex-wrap: wrap;
-}
-.vehicle-studio .calendar-period button {
-    min-height: 30px;
-}
-.vehicle-studio .calendar-density {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 11px;
-}
-.vehicle-studio .calendar-density select {
-    padding: 5px 9px;
-    color: var(--primary-foreground);
-    background: color-mix(in oklch, var(--primary-foreground) 10%, transparent);
-    border: 1px solid
-        color-mix(in oklch, var(--primary-foreground) 25%, transparent);
-    border-radius: 7px;
-}
-.vehicle-studio .calendar-density option {
-    color: var(--foreground);
-    background: var(--card);
-}
 .vehicle-studio .calendar-source-bar {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-    margin: 18px 0 14px;
-}
-.vehicle-studio .calendar-source-pill {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 8px 11px;
-    min-height: 38px;
-    font-size: 11px;
-    background: var(--card);
-    color: var(--muted-foreground);
-}
-.vehicle-studio .calendar-source-pill[aria-pressed='true'] {
-    color: var(--foreground);
-    box-shadow: 0 1px 2px color-mix(in oklch, var(--foreground) 5%, transparent);
-}
-.vehicle-studio .calendar-source-pill[aria-pressed='false'] {
-    opacity: 0.58;
-}
-.vehicle-studio .calendar-source-pill > span {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-}
-.vehicle-studio .calendar-source-pill small {
-    padding-left: 4px;
-    font-weight: 600;
+    justify-content: space-between;
+    margin: 0;
 }
 .vehicle-studio .calendar-restriction {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 13px 16px;
-    border: 1px solid
-        color-mix(in oklch, var(--status-critical) 24%, var(--border));
-    background: var(--status-critical-bg);
-    border-radius: 10px;
-    margin-bottom: 16px;
-    color: var(--status-critical);
-}
-.vehicle-studio .calendar-restriction > div {
-    display: grid;
-    gap: 3px;
-    flex: 1;
-}
-.vehicle-studio .calendar-restriction strong {
-    font-size: 12px;
-}
-.vehicle-studio .calendar-restriction span {
-    font-size: 11px;
-    line-height: 1.5;
-}
-.vehicle-studio .calendar-restriction > svg {
-    flex-shrink: 0;
+    margin-bottom: 0;
 }
 .vehicle-studio .calendar-layout {
-    display: flex;
-    gap: 18px;
-    align-items: flex-start;
-}
-.vehicle-studio .calendar-view {
-    height: 620px;
-    min-width: 0;
-    flex: 1;
+    gap: 20px;
 }
 .vehicle-studio .calendar-footnote {
-    display: flex;
-    gap: 8px;
-    align-items: flex-start;
-    margin: 14px 0;
-    color: var(--muted-foreground);
-    font-size: 11px;
-    line-height: 1.6;
+    margin: 0;
 }
-.vehicle-studio .calendar-footnote svg {
-    flex-shrink: 0;
-    margin-top: 2px;
+/* The glass back chip: a visible focus ring, and a 44px target on small screens. */
+.vehicle-studio .hero-back:focus-visible {
+    outline: 2px solid var(--primary-foreground);
+    outline-offset: 2px;
+}
+@media (max-width: 767px) {
+    .vehicle-studio .hero-back {
+        width: 44px;
+        height: 44px;
+    }
 }
 
 /* ── Bookings & custody ──────────────────────────────────────────── */
@@ -502,4 +389,27 @@
     border-top: 1px solid var(--border);
     background: var(--muted);
     flex-shrink: 0;
+}
+
+/* Evidence & due dates: "Not required for this vehicle" tick box (Stephan, 24 Sept 2026). */
+.vehicle-studio .compliance-not-required {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--foreground);
+}
+.vehicle-studio .compliance-not-required label {
+    cursor: pointer;
+}
+.vehicle-studio .compliance-not-required-reason {
+    max-width: 38ch;
+}
+/* A readiness link lands on its requirement: the row is outlined briefly. */
+.vehicle-studio .compliance-focus {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+    border-radius: 10px;
 }

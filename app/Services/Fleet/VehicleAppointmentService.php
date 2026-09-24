@@ -16,9 +16,19 @@ use Illuminate\Validation\ValidationException;
  * lives on a Maintenance work order (new or existing): an internal provider
  * plan, an optional recorded confirmation, the purpose as a note, evidence as
  * work attachments, and — when asked — an unavailable period for the window.
+ *
+ * "Plan linked appointment" passes the due item it came from (a service
+ * schedule or compliance record of the vehicle). New work keeps it as its
+ * report's source; open work already reported from that item is planned on
+ * instead, so planning the same due item again never opens a second record.
  */
 class VehicleAppointmentService
 {
+    /** Due items an appointment can be planned from. */
+    public const LINKED_SOURCES = ['service_schedule', 'compliance_record'];
+
+    private const OPEN_STATUSES = ['open', 'in_progress', 'on_hold'];
+
     public function __construct(
         private readonly MaintenanceAccessService $access,
         private readonly MaintenanceReportService $reports,
@@ -40,7 +50,18 @@ class VehicleAppointmentService
         Validator::make($data, [
             'operation' => ['nullable', 'in:plan,cancel,overrun'],
             'change_reason' => ['nullable', 'string', 'max:2000'],
+            'source_type' => ['nullable', 'required_with:source_id', 'in:'.implode(',', self::LINKED_SOURCES)],
+            'source_id' => ['nullable', 'required_with:source_type', 'integer', 'min:1'],
+        ], [
+            'source_type.required_with' => 'Choose the due item this appointment is planned from.',
+            'source_type.in' => 'Plan a linked appointment from a service schedule or compliance record.',
+            'source_id.required_with' => 'Choose the due item this appointment is planned from.',
         ])->validate();
+        $source = empty($data['source_type']) ? null
+            : ['type' => (string) $data['source_type'], 'id' => (int) $data['source_id']];
+        if ($source !== null && $operation !== 'plan') {
+            throw ValidationException::withMessages(['source_type' => 'A due item can only be linked when planning an appointment.']);
+        }
         if ($operation !== 'plan') {
             if (empty($data['work_order_id'])) {
                 throw ValidationException::withMessages(['work_order_id' => 'Choose the work order that holds the appointment.']);
@@ -110,12 +131,48 @@ class VehicleAppointmentService
         }
         $asset = $this->access->asset($actor, $assetId);
 
-        return DB::transaction(function () use ($actor, $asset, $data, $requestKey, $files, $operation): array {
+        return DB::transaction(function () use ($actor, $asset, $data, $requestKey, $files, $operation, $source): array {
+            $planPayload = [
+                'provider_name' => trim((string) $data['provider_name']),
+                'starts_local' => (string) $data['starts_local'],
+                'ends_local' => (string) $data['ends_local'],
+                'starts_offset' => $data['starts_offset'] ?? null,
+                'ends_offset' => $data['ends_offset'] ?? null,
+            ];
+            // What PKG-01 stores for this request's plan step, so a retry is
+            // recognised only when it asks for the same plan.
+            $planFingerprint = MaintenanceFingerprint::of([
+                'actor_id' => (int) $actor->id, 'operation' => 'plan_provider', 'payload' => $planPayload,
+            ]);
+            $linked = [];
+            if ($source !== null) {
+                // The vehicle first (Asset → work): two plans from one due item
+                // can't both open new work.
+                $this->access->asset($actor, (int) $asset->id, true);
+                // A retry reports the plan this request already made, wherever it landed.
+                $planned = $this->plannedWith($actor, (int) $asset->id, $requestKey.':plan', $planFingerprint);
+                if ($planned !== null) {
+                    return $this->current((int) $asset->id, $planned);
+                }
+                $this->reports->assertSourceBelongsToAsset($source['type'], $source['id'], (int) $asset->id);
+                $linked = $this->linkedWorkIds($actor, (int) $asset->id, $source);
+            }
+            // Existing work keeps its own description; the purpose is added as a note.
+            $existingWork = true;
             if (! empty($data['work_order_id'])) {
                 $order = $this->access->scopedWorkOrders($actor)->whereKey((int) $data['work_order_id'])
                     ->where('asset_id', $asset->id)->first() ?? abort(404);
-                if (! in_array($order->status, ['open', 'in_progress', 'on_hold'], true)) {
+                if (! in_array($order->status, self::OPEN_STATUSES, true)) {
                     throw ValidationException::withMessages(['work_order_id' => 'Choose an open Maintenance record.']);
+                }
+                if ($source !== null && ! in_array((int) $order->id, $linked, true)) {
+                    throw ValidationException::withMessages(['work_order_id' => 'This Maintenance record isn\'t linked to the due item. Choose its linked work, or create new work from the due item.']);
+                }
+            } elseif ($linked !== []) {
+                // Open work already reported from this due item takes the appointment.
+                $order = FleetWorkOrder::query()->findOrFail($linked[0]);
+                if ($this->replayed($actor, (int) $order->id, $requestKey.':plan', $planFingerprint)) {
+                    return $this->current((int) $asset->id, $order);
                 }
             } else {
                 abort_unless($this->access->canReport($actor), 403);
@@ -124,23 +181,20 @@ class VehicleAppointmentService
                     'title' => trim((string) $data['title']),
                     'description' => trim((string) $data['notes']),
                     'priority' => 'medium',
+                    'source_type' => $source['type'] ?? null,
+                    'source_id' => $source['id'] ?? null,
                     'request_key' => $requestKey.':report',
                 ]);
                 // The report is replay-safe on its own; a retry after the plan
                 // landed must not re-run the notes, files or unavailable period.
-                if ($this->replayed($actor, (int) $order->id, $requestKey.':plan')) {
+                if ($this->replayed($actor, (int) $order->id, $requestKey.':plan', $planFingerprint)) {
                     return $this->current((int) $asset->id, $order);
                 }
+                $existingWork = false;
             }
 
             $order = $this->transitions->execute($actor, (int) $order->id, 'plan_provider', (int) $order->version,
-                $requestKey.':plan', [
-                    'provider_name' => trim((string) $data['provider_name']),
-                    'starts_local' => (string) $data['starts_local'],
-                    'ends_local' => (string) $data['ends_local'],
-                    'starts_offset' => $data['starts_offset'] ?? null,
-                    'ends_offset' => $data['ends_offset'] ?? null,
-                ]);
+                $requestKey.':plan', $planPayload);
             $reference = trim((string) ($data['provider_reference'] ?? ''));
             if ($reference !== '') {
                 $order = $this->transitions->execute($actor, (int) $order->id, 'record_provider_confirmation',
@@ -149,7 +203,7 @@ class VehicleAppointmentService
                         'provider_reference' => $reference,
                     ]);
             }
-            if (! empty($data['work_order_id'])) {
+            if ($existingWork) {
                 // New work carries the purpose as its description already.
                 $change = trim((string) ($data['change_reason'] ?? ''));
                 $note = $operation === 'overrun'
@@ -178,7 +232,7 @@ class VehicleAppointmentService
             ];
             if (filter_var($data['unavailable'] ?? false, FILTER_VALIDATE_BOOL)) {
                 $period = $existing
-                    ? $this->unavailable->update($actor, (int) $asset->id, (int) $existing->id,
+                    ? $this->unavailable->moveAppointmentHold($actor, (int) $asset->id, (int) $existing->id, (int) $order->id,
                         $window + ['change_reason' => $operation === 'overrun'
                             ? 'Appointment overrun recorded on the vehicle calendar.'
                             : 'Appointment rescheduled on the vehicle calendar.'],
@@ -186,7 +240,7 @@ class VehicleAppointmentService
                     : $this->unavailable->create($actor, (int) $asset->id, $window,
                         $requestKey.':unavailable', (int) $order->id);
             } elseif ($existing) {
-                $this->unavailable->cancel($actor, (int) $asset->id, (int) $existing->id,
+                $this->unavailable->releaseAppointmentHold($actor, (int) $asset->id, (int) $existing->id, (int) $order->id,
                     'The appointment no longer makes the vehicle unavailable.', (int) $existing->lock_version);
             }
 
@@ -216,7 +270,7 @@ class VehicleAppointmentService
                 ->where('work_order_id', $order->id)->where('state', FleetVehicleUnavailablePeriod::STATE_ACTIVE)
                 ->orderByDesc('id')->first();
             if ($existing) {
-                $this->unavailable->cancel($actor, (int) $asset->id, (int) $existing->id,
+                $this->unavailable->releaseAppointmentHold($actor, (int) $asset->id, (int) $existing->id, (int) $order->id,
                     'Appointment cancelled: '.$reason, (int) $existing->lock_version);
             }
 
@@ -224,17 +278,62 @@ class VehicleAppointmentService
         });
     }
 
-    /** Whether this request's appointment step already ran (by this person). */
-    private function replayed(User $actor, int $workOrderId, string $key): bool
+    /**
+     * Whether this request's appointment step already ran (by this person).
+     * With a fingerprint, the step must also have asked for the same thing.
+     */
+    private function replayed(User $actor, int $workOrderId, string $key, ?string $fingerprint = null): bool
     {
         $prior = DB::table('fleet_maintenance_actions')->where('work_order_id', $workOrderId)
-            ->where('idempotency_key', $key)->lockForUpdate()->first(['actor_user_id']);
+            ->where('idempotency_key', $key)->lockForUpdate()->first(['actor_user_id', 'payload_sha256']);
         if (! $prior) {
             return false;
         }
-        abort_unless((int) $prior->actor_user_id === (int) $actor->id, 409, 'This request was already used for a different change.');
+        abort_unless((int) $prior->actor_user_id === (int) $actor->id
+            && ($fingerprint === null || hash_equals((string) $prior->payload_sha256, $fingerprint)),
+            409, 'This request was already used for a different change.');
 
         return true;
+    }
+
+    /** The work order this person already planned on with the key, on this vehicle. */
+    private function plannedWith(User $actor, int $assetId, string $key, string $fingerprint): ?FleetWorkOrder
+    {
+        $prior = DB::table('fleet_maintenance_actions as action')
+            ->join('fleet_work_orders as work', 'work.id', '=', 'action.work_order_id')
+            ->where('work.asset_id', $assetId)->where('action.idempotency_key', $key)
+            ->where('action.actor_user_id', $actor->id)->lockForUpdate()
+            ->first(['action.work_order_id', 'action.payload_sha256']);
+        if (! $prior) {
+            return null;
+        }
+        abort_unless(hash_equals((string) $prior->payload_sha256, $fingerprint), 409,
+            'This request was already used for a different change.');
+
+        return FleetWorkOrder::query()->find((int) $prior->work_order_id);
+    }
+
+    /**
+     * Open work of this vehicle reported from the due item (not as a
+     * duplicate), newest first. Current reads under the vehicle lock, so work
+     * a concurrent plan just opened is seen.
+     *
+     * @param  array{type:string,id:int}  $source
+     * @return list<int>
+     */
+    private function linkedWorkIds(User $actor, int $assetId, array $source): array
+    {
+        $reported = DB::table('fleet_maintenance_reports')->where('asset_id', $assetId)
+            ->where('source_type', $source['type'])->where('source_id', $source['id'])
+            ->whereNull('duplicate_of_report_id')->orderBy('id')->lockForUpdate()
+            ->pluck('work_order_id')->map(fn (mixed $id): int => (int) $id)->unique()->values()->all();
+        if ($reported === []) {
+            return [];
+        }
+
+        return $this->access->scopedWorkOrders($actor)->whereKey($reported)->where('asset_id', $assetId)
+            ->whereIn('status', self::OPEN_STATUSES)->orderByDesc('id')->lockForUpdate()
+            ->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
     }
 
     /** @return array{work_order: FleetWorkOrder, unavailable_period: ?FleetVehicleUnavailablePeriod} */

@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
     dayOptions,
+    daysBetween,
     DEFAULT_TRIP_FILTERS,
     dispositionFilename,
     driverCaption,
     driverName,
     endpointCaption,
     filterRange,
+    MAX_RANGE_DAYS,
     playbackDelay,
     rangeInvalid,
     scoreCaption,
@@ -15,12 +17,14 @@ import {
     timelineMatches,
     tripBadge,
     tripQuery,
+    tripWindowNotice,
 } from './trip-model';
 import type {
     TripBehaviour,
     TripDriver,
     TripEvent,
     TripListItem,
+    TripListResponse,
     TripPoint,
     TripPolicy,
 } from './trip-types';
@@ -143,6 +147,93 @@ describe('trip filters', () => {
             '2026-08-01',
         ]);
         expect(dayOptions(['2026-09-21'], 'range')).toEqual(['2026-09-21']);
+    });
+
+    it('measures a range in whole days, across daylight saving', () => {
+        expect(daysBetween('2026-09-21', '2026-09-21')).toBe(0);
+        // New Zealand daylight time starts on 27 September 2026.
+        expect(daysBetween('2026-09-20', '2026-10-04')).toBe(14);
+        // An export may cover a year: one more day is too long.
+        expect(daysBetween('2025-09-20', '2026-09-21')).toBe(MAX_RANGE_DAYS);
+        expect(daysBetween('2025-09-19', '2026-09-21')).toBeGreaterThan(
+            MAX_RANGE_DAYS,
+        );
+    });
+});
+
+describe('trip list limits', () => {
+    const list = (
+        patch: Partial<Pick<TripListResponse, 'window' | 'truncated'>> = {},
+    ): Pick<TripListResponse, 'window' | 'truncated' | 'limits'> => ({
+        window: {
+            from: '2026-06-24',
+            to: null,
+            limited: 'recent',
+            earlier_trips: false,
+        },
+        truncated: false,
+        limits: { default_days: 90, max_range_days: 366, max_trips: 500 },
+        ...patch,
+    });
+
+    it('says nothing when every matching trip is listed', () => {
+        expect(tripWindowNotice(list())).toBeNull();
+        expect(
+            tripWindowNotice(
+                list({
+                    window: {
+                        from: '2026-09-01',
+                        to: '2026-09-21',
+                        limited: null,
+                        earlier_trips: false,
+                    },
+                }),
+            ),
+        ).toBeNull();
+    });
+
+    it('explains that all recorded dates covers the latest 90 days', () => {
+        expect(
+            tripWindowNotice(
+                list({
+                    window: {
+                        from: '2026-06-24',
+                        to: null,
+                        limited: 'recent',
+                        earlier_trips: true,
+                    },
+                }),
+            ),
+        ).toEqual({
+            title: 'Showing the latest 90 days of trips',
+            body: 'All recorded dates covers the 90 days up to the latest trip, from 24 Jun 2026. To see earlier trips, choose a custom date range.',
+        });
+    });
+
+    it('explains a range kept to one year', () => {
+        expect(
+            tripWindowNotice(
+                list({
+                    window: {
+                        from: '2025-09-20',
+                        to: '2026-09-21',
+                        limited: 'range',
+                        earlier_trips: true,
+                    },
+                }),
+            ),
+        ).toEqual({
+            title: 'Showing one year of trips',
+            body: 'Trip history shows up to a year at a time, so this list starts on 20 Sep 2025. To see earlier trips, choose a date range of a year or less.',
+        });
+    });
+
+    it('says plainly when the oldest trips were left out', () => {
+        const notice = tripWindowNotice(list({ truncated: true }));
+        expect(notice?.title).toBe('Showing the latest 500 trips');
+        expect(notice?.body).toBe(
+            'These dates have more than 500 trips, so the list and its totals include only the 500 most recent. To see earlier trips, choose a shorter date range.',
+        );
     });
 });
 

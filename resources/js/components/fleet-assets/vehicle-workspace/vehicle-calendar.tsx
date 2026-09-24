@@ -1,77 +1,64 @@
+import { PageLayout } from '@/components/page';
 import {
     PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderSearch,
     PageHeaderStatusChip,
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
 import { formatDateTime, toDatetimeLocal } from '@/lib/datetime';
 import {
     AgendaView,
+    CalendarContextMenu,
+    CalendarSourcePills,
     CalendarUIProvider,
     DayView,
+    JumpToDate,
     MO,
-    MiniMonth,
     MonthView,
     TimelineView,
     TodayRail,
     WeekView,
     addDays,
     decorate,
+    fmtTimeRange,
+    periodLabel,
     sameDay,
     startOfWeek,
+    useNow,
+    type CalView,
+    type CalendarMenuItem,
+    type CalendarMenuSection,
     type Decorated,
     type Density,
     type SourceDef,
 } from '@/pages/sites/calendar/_parts';
 import {
+    AlertTriangle,
     ArrowLeft,
-    ArrowUpRight,
-    BellPlus,
-    CalendarClock,
     CalendarDays,
-    CalendarPlus,
-    Check,
-    CheckCheck,
     ChevronLeft,
     ChevronRight,
-    ClipboardCheck,
     Clock,
-    Clock3,
     Columns3,
     FileText,
-    History,
-    KeyRound,
     LayoutGrid,
     List,
     Lock,
-    Route,
+    Plus,
+    RefreshCw,
     Rows3,
     ShieldAlert,
-    ShieldCheck,
-    Upload,
-    Wrench,
-    X,
-    type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { AddEvidenceDialog } from './add-evidence-dialog';
 import {
     AppointmentWizard,
@@ -89,6 +76,7 @@ import {
 import { BookingsStudio } from './bookings-studio';
 import type {
     CustodyRow,
+    UnavailableRow,
     VehicleCalendarItem,
     VehicleCalendarSummary,
 } from './calendar-types';
@@ -96,6 +84,8 @@ import {
     ObligationActionDialog,
     ObligationHistoryDialog,
 } from './obligation-reminders';
+import { DocumentEditDialog } from './overview-documents';
+import { fetchVehicleRecord, sendVehicleRecord } from './record-command';
 import {
     ReminderActionDialog,
     ReminderActivityDialog,
@@ -106,23 +96,26 @@ import {
 import { SourceRecordDialog, openWorkOrder } from './studio-kit';
 import './studio.css';
 import type {
+    DocumentSet,
     ObligationReminder,
     VehicleReminder,
     VehicleWorkspace,
 } from './types';
+import {
+    creationActions,
+    dayNavigationActions,
+    entryActions,
+    openEntryLabel,
+    type CalendarAction,
+    type CalendarIntent,
+    type LinkedSource,
+} from './vehicle-calendar-actions';
 import { WorkEvidenceDialog } from './work-evidence-dialog';
-import type { WorkspaceLocation } from './workspace-model';
-
-type View = 'month' | 'week' | 'day' | 'agenda' | 'timeline';
-
-type CalendarAction = {
-    label: string;
-    icon: LucideIcon;
-    run: () => void;
-    disabled?: boolean;
-    destructive?: boolean;
-    reason?: string;
-};
+import {
+    isComplianceKind,
+    reasonDestination,
+    type WorkspaceLocation,
+} from './workspace-model';
 
 type Entry = Decorated & VehicleCalendarItem;
 
@@ -135,6 +128,7 @@ type DialogState =
           workOrderId?: number;
           appointment?: PlannedAppointment;
           presetType?: string;
+          source?: LinkedSource;
       }
     | {
           kind: 'reminder';
@@ -149,7 +143,12 @@ type DialogState =
       }
     | { kind: 'snooze'; reminder: VehicleReminder }
     | { kind: 'reminder-activity'; reminder: VehicleReminder }
-    | { kind: 'record'; title: string; rows: Array<[string, string]> }
+    | {
+          kind: 'record';
+          title: string;
+          rows: Array<[string, string]>;
+          action?: { label: string; onClick: () => void };
+      }
     | { kind: 'work-evidence'; workOrderId: number; label: string }
     | { kind: 'obligation-history'; reminder: ObligationReminder }
     | {
@@ -162,7 +161,33 @@ type DialogState =
           source: 'booking' | 'unavailable_period';
           id: number;
           label: string;
+      }
+    | { kind: 'document'; set: DocumentSet };
+
+/** A right-click (or tap, or New entry) menu, placed at a point with focus returning to its opener. */
+type MenuState =
+    | {
+          kind: 'create';
+          x: number;
+          y: number;
+          date: Date;
+          hour?: number;
+          opener: HTMLElement | null;
+      }
+    | {
+          kind: 'entry';
+          x: number;
+          y: number;
+          entry: Entry;
+          row: CustodyRow | null;
+          rowState: 'ready' | 'loading' | 'missing';
+          opener: HTMLElement | null;
       };
+
+/** What Undo puts back after a reversible calendar change. */
+type UndoPlan =
+    | { kind: 'restore-period'; row: UnavailableRow }
+    | { kind: 'revert-period'; row: UnavailableRow };
 
 const SOURCES: SourceDef[] = [
     {
@@ -221,6 +246,19 @@ const VIEW_ITEMS = [
     { key: 'timeline' as const, label: 'Timeline', icon: Rows3 },
 ];
 
+const ENTRY_CHIPS: Record<VehicleCalendarItem['kind'], string> = {
+    restriction: 'Restriction',
+    appointment: 'Appointment',
+    estimate: 'Estimate',
+    booking: 'Booking',
+    busy: 'Busy',
+    unavailable: 'Unavailable',
+    schedule: 'Service due',
+    compliance: 'Compliance due',
+    check: 'Check due',
+    reminder: 'Reminder',
+};
+
 const fullDate = (date: Date) =>
     date.toLocaleDateString('en-NZ', {
         weekday: 'long',
@@ -240,6 +278,8 @@ const dateKey = (date: Date) =>
         String(date.getMonth() + 1).padStart(2, '0'),
         String(date.getDate()).padStart(2, '0'),
     ].join('-');
+const startOfDay = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
 /** 9 am on a day, or the next whole hour when that has already passed. */
 function futureStart(day: Date): string {
@@ -253,6 +293,31 @@ function decorateAll(items: VehicleCalendarItem[]): Entry[] {
         ...(decorate(item) as Decorated & VehicleCalendarItem),
         typeLabel: SOURCES.find((source) => source.key === item.source)?.short,
     }));
+}
+
+/**
+ * Where a menu opens: the pointer, or (for Shift+F10 / the Menu key, which
+ * report no pointer position, and for taps) just under the element.
+ */
+function menuPoint(event?: {
+    clientX: number;
+    clientY: number;
+    currentTarget: EventTarget | null;
+}): { x: number; y: number; opener: HTMLElement | null } {
+    const element =
+        event?.currentTarget instanceof HTMLElement
+            ? event.currentTarget
+            : document.activeElement instanceof HTMLElement
+              ? document.activeElement
+              : null;
+    if (event && (event.clientX !== 0 || event.clientY !== 0))
+        return { x: event.clientX, y: event.clientY, opener: element };
+    const rect = element?.getBoundingClientRect();
+    return {
+        x: rect ? rect.left + 8 : window.innerWidth / 2,
+        y: rect ? rect.bottom - 4 : window.innerHeight / 3,
+        opener: element,
+    };
 }
 
 /** Load calendar items for a window, dropping stale responses. */
@@ -308,31 +373,28 @@ export function VehicleCalendar({
     onChanged: () => void;
 }) {
     const vehicle = workspace.vehicle;
-    const rightClick = useRef<{ x: number; y: number } | null>(null);
-    const [eventMenu, setEventMenu] = useState<{
-        x: number;
-        y: number;
-        entry: Entry;
-    } | null>(null);
-    const [creation, setCreation] = useState<{
-        x: number;
-        y: number;
-        date: Date;
-        hour?: number;
-    } | null>(null);
-    const [view, setView] = useState<View>('month');
+    const now = useNow();
+    const today = now;
+    const nowLocal = toDatetimeLocal(now.toISOString());
+    const [menu, setMenu] = useState<MenuState | null>(null);
+    const [view, setView] = useState<CalView>('month');
     const [navDate, setNavDate] = useState(() =>
         focusDate ? new Date(`${focusDate}T12:00`) : new Date(),
     );
     const [query, setQuery] = useState('');
     const [density, setDensity] = useState<Density>('comfortable');
-    const [enabled, setEnabled] = useState<string[]>(SOURCE_KEYS);
-    const [jumpOpen, setJumpOpen] = useState(false);
+    const [enabled, setEnabled] = useState<Set<string>>(
+        () => new Set(SOURCE_KEYS),
+    );
     const [dialog, setDialog] = useState<DialogState | null>(null);
     const [version, setVersion] = useState(0);
     const [summary, setSummary] = useState<VehicleCalendarSummary | null>(null);
-    const [summaryFailed, setSummaryFailed] = useState(false);
-    const today = new Date();
+    const [summaryState, setSummaryState] = useState<
+        'loading' | 'ready' | 'failed'
+    >('loading');
+    // Taps open an entry's actions (touch has no right-click).
+    const lastPointer = useRef<string | null>(null);
+    const undoPlan = useRef<UndoPlan | null>(null);
 
     // The browsed window: the month grid with a week either side.
     const monthKey = `${navDate.getFullYear()}-${navDate.getMonth()}`;
@@ -349,15 +411,18 @@ export function VehicleCalendar({
     );
     const windowEnd = useMemo(() => addDays(windowStart, 56), [windowStart]);
     const feed = useCalendarFeed(vehicle.id, windowStart, windowEnd, version);
-    // Today's schedule stays anchored to today, whatever period is browsed.
+    // Today's rail keeps the Site Calendar's window (45 days back, 30 ahead),
+    // anchored to today whatever period is browsed.
+    const todayKey = dateKey(today);
     const railStart = useMemo(
-        () => addDays(new Date(new Date().toDateString()), -1),
-        [],
+        () => addDays(startOfDay(new Date(`${todayKey}T12:00`)), -45),
+        [todayKey],
     );
-    const railEnd = useMemo(() => addDays(railStart, 60), [railStart]);
+    const railEnd = useMemo(() => addDays(railStart, 76), [railStart]);
     const rail = useCalendarFeed(vehicle.id, railStart, railEnd, version);
 
     const loadSummary = useCallback(() => {
+        setSummaryState('loading');
         fetch(`/fleet-assets/vehicles/${vehicle.id}/calendar/summary`, {
             headers: { Accept: 'application/json' },
             credentials: 'same-origin',
@@ -365,50 +430,42 @@ export function VehicleCalendar({
             .then(async (response) => {
                 if (!response.ok) throw new Error(String(response.status));
                 setSummary((await response.json()) as VehicleCalendarSummary);
-                setSummaryFailed(false);
+                setSummaryState('ready');
             })
-            .catch(() => setSummaryFailed(true));
+            .catch(() => setSummaryState('failed'));
     }, [vehicle.id]);
     useEffect(() => {
         loadSummary();
     }, [loadSummary, version]);
 
+    const reload = () => setVersion((value) => value + 1);
     const changed = () => {
-        setVersion((value) => value + 1);
+        reload();
         onChanged();
     };
 
+    const searched = (entry: Entry) =>
+        `${entry.title} ${entry.ref ?? ''}`
+            .toLowerCase()
+            .includes(query.toLowerCase());
     const visible = feed.items.filter(
-        (entry) =>
-            enabled.includes(entry.source) &&
-            `${entry.title} ${entry.ref ?? ''}`
-                .toLowerCase()
-                .includes(query.toLowerCase()),
+        (entry) => enabled.has(entry.source) && searched(entry),
     );
     const railVisible = rail.items.filter(
         (entry) =>
-            enabled.includes(entry.source) &&
+            enabled.has(entry.source) &&
+            searched(entry) &&
             !['Returned', 'Completed', 'Released'].includes(
                 entry.statusLabel ?? '',
             ),
     );
     const weekStart = startOfWeek(navDate);
     const weekEnd = addDays(weekStart, 6);
-    const period =
-        view === 'week'
-            ? `${fullDate(weekStart)} – ${fullDate(weekEnd)}`
-            : view === 'day'
-              ? fullDate(navDate)
-              : `${MO[navDate.getMonth()]} ${navDate.getFullYear()}`;
     const periodStart =
         view === 'week'
             ? weekStart
             : view === 'day'
-              ? new Date(
-                    navDate.getFullYear(),
-                    navDate.getMonth(),
-                    navDate.getDate(),
-                )
+              ? startOfDay(navDate)
               : new Date(navDate.getFullYear(), navDate.getMonth(), 1);
     const periodEnd =
         view === 'week'
@@ -416,13 +473,19 @@ export function VehicleCalendar({
             : view === 'day'
               ? addDays(periodStart, 1)
               : new Date(navDate.getFullYear(), navDate.getMonth() + 1, 1);
-    const periodCount = visible.filter(
-        (entry) =>
-            entry._start < periodEnd &&
-            (entry._end
-                ? entry._end > periodStart
-                : entry._start >= periodStart),
-    ).length;
+    const inPeriod = (entry: Entry) =>
+        entry._start < periodEnd &&
+        (entry._end ? entry._end > periodStart : entry._start >= periodStart);
+    const periodCount = visible.filter(inPeriod).length;
+    // Source pill counts describe the period being viewed.
+    const sourceCounts = Object.fromEntries(
+        SOURCES.map((source) => [
+            source.key,
+            feed.items.filter(
+                (entry) => entry.source === source.key && inPeriod(entry),
+            ).length,
+        ]),
+    );
     const shift = (steps: number) =>
         setNavDate((date) =>
             view === 'week'
@@ -443,7 +506,6 @@ export function VehicleCalendar({
                     ),
         );
 
-    const nowLocal = toDatetimeLocal(new Date().toISOString());
     const reminderFor = (entry: Entry) =>
         workspace.reminders.find((reminder) => reminder.id === entry.recordId);
     const rowFor = (entry: Entry): CustodyRow | undefined =>
@@ -453,9 +515,27 @@ export function VehicleCalendar({
                 row.kind ===
                     (entry.kind === 'unavailable' ? 'unavailable' : 'booking'),
         );
-    const openWork = (workOrderId: number | null) => {
+    /** A booking or period outside the summary's recent list is loaded on demand. */
+    const loadRow = useCallback(
+        async (entry: Entry): Promise<CustodyRow | null> => {
+            if (!entry.recordId) return null;
+            const kind =
+                entry.kind === 'unavailable' ? 'unavailable' : 'booking';
+            const result = await fetchVehicleRecord(
+                `/fleet-assets/vehicles/${vehicle.id}/calendar/records/${kind}/${entry.recordId}`,
+            ).catch(() => null);
+            return result && result.row ? (result.row as CustodyRow) : null;
+        },
+        [vehicle.id],
+    );
+    const openWork = (workOrderId: number | null, release = false) => {
         if (workOrderId)
-            openWorkOrder(workOrderId, vehicle.id, { tab: 'calendar' });
+            openWorkOrder(
+                workOrderId,
+                vehicle.id,
+                { tab: 'calendar' },
+                release,
+            );
     };
     const releaseRequirements = () =>
         setDialog({
@@ -480,6 +560,72 @@ export function VehicleCalendar({
                 ],
             ],
         });
+    /** The restriction record, shown in place (the mockup's "Restriction record"). */
+    const restrictionRecord = (entry?: Entry) => {
+        const restriction = summary?.restriction ?? null;
+        const meta = entry?.meta ?? null;
+        const active = entry ? entry.status === 'overdue' : !!restriction;
+        const check = meta?.source_check ?? restriction?.source_check ?? null;
+        setDialog({
+            kind: 'record',
+            title: 'Restriction record',
+            rows: [
+                [
+                    'Reference',
+                    meta?.work_reference ??
+                        entry?.ref ??
+                        restriction?.work_reference ??
+                        'Not recorded',
+                ],
+                [
+                    'Started',
+                    entry?.start
+                        ? formatDateTime(entry.start)
+                        : restriction
+                          ? formatDateTime(restriction.started_at)
+                          : 'Not recorded',
+                ],
+                [
+                    'End',
+                    active
+                        ? 'No release recorded'
+                        : entry?.end
+                          ? formatDateTime(entry.end)
+                          : 'Released',
+                ],
+                ['Owner', meta?.owner ?? restriction?.owner ?? 'Not assigned'],
+                [
+                    'Source check',
+                    check
+                        ? `${check.label}${check.outcome ? ` · ${check.outcome}` : ''}`
+                        : 'Not linked to a check',
+                ],
+                [
+                    'Maintenance status',
+                    meta?.work_status ??
+                        restriction?.work_status ??
+                        'Not recorded',
+                ],
+                ...(entry?.desc
+                    ? ([['Reason', entry.desc]] as Array<[string, string]>)
+                    : []),
+            ],
+            // The check that raised the hold opens in Checks & inspections.
+            action: check
+                ? {
+                      label: 'Open check',
+                      onClick: () => {
+                          setDialog(null);
+                          onNavigate({
+                              tab: 'checks',
+                              view: 'recent',
+                              run: check.id,
+                          });
+                      },
+                  }
+                : undefined,
+        });
+    };
     const custodyRecord = (row: CustodyRow) =>
         setDialog({
             kind: 'record',
@@ -490,17 +636,38 @@ export function VehicleCalendar({
             rows: custodyRows(row),
         });
 
-    const openEntry = (entry: Entry) => {
+    const openEntry = async (entry: Entry) => {
         switch (entry.kind) {
             case 'restriction':
+                restrictionRecord(entry);
+                return;
             case 'appointment':
             case 'estimate':
                 openWork(entry.workOrderId);
                 return;
             case 'booking':
             case 'unavailable': {
-                const row = rowFor(entry);
+                const row = rowFor(entry) ?? (await loadRow(entry));
                 if (row) custodyRecord(row);
+                else
+                    setDialog({
+                        kind: 'record',
+                        title:
+                            entry.kind === 'booking'
+                                ? 'Booking'
+                                : 'Unavailable period',
+                        rows: [
+                            [
+                                'Period',
+                                `${formatDateTime(entry.start ?? '')} – ${formatDateTime(entry.end ?? '')}`,
+                            ],
+                            ['Status', entry.statusLabel],
+                            [
+                                'Record',
+                                'The full record isn’t available to you.',
+                            ],
+                        ],
+                    });
                 return;
             }
             case 'busy':
@@ -512,16 +679,27 @@ export function VehicleCalendar({
                             'Busy interval',
                             `${formatDateTime(entry.start ?? '')} – ${formatDateTime(entry.end ?? '')}`,
                         ],
-                        ['Access', 'Booking details restricted'],
+                        // A booking or unavailable period at another Site.
+                        [
+                            'Details',
+                            'Shown to people who can book this vehicle at its Site',
+                        ],
                     ],
                 });
                 return;
             case 'schedule':
                 onNavigate({ tab: 'service', view: 'schedules' });
                 return;
-            case 'compliance':
-                onNavigate({ tab: 'service', view: 'evidence' });
+            case 'compliance': {
+                // Entries are "compliance:<kind>": open that requirement's row.
+                const kind = String(entry.id).split(':')[1];
+                onNavigate({
+                    tab: 'service',
+                    view: 'evidence',
+                    ...(isComplianceKind(kind) ? { focus: kind } : {}),
+                });
                 return;
+            }
             case 'check':
                 onNavigate({ tab: 'checks', view: 'recent' });
                 return;
@@ -534,411 +712,53 @@ export function VehicleCalendar({
         }
     };
 
-    const actionsFor = (entry: Entry): CalendarAction[] => {
-        const can = summary?.can;
-        if (!can) return [];
-        if (entry.kind === 'reminder') {
-            const reminder = reminderFor(entry);
-            if (!reminder) return [];
-            const open = ['scheduled', 'acknowledged'].includes(reminder.state);
-            return [
-                ...(can.add_reminder && open
-                    ? [
-                          {
-                              label: 'Edit / reschedule reminder',
-                              icon: CalendarClock,
-                              run: () =>
-                                  setDialog({ kind: 'reminder', reminder }),
-                          },
-                          {
-                              label: 'Snooze reminder',
-                              icon: Clock3,
-                              run: () =>
-                                  setDialog({ kind: 'snooze', reminder }),
-                          },
-                          {
-                              label: 'Complete follow-up',
-                              icon: CheckCheck,
-                              run: () =>
-                                  setDialog({
-                                      kind: 'reminder-action',
-                                      reminder,
-                                      action: 'complete',
-                                  }),
-                          },
-                      ]
-                    : []),
-                ...(reminder.source.type === 'document_set'
-                    ? [
-                          {
-                              label: 'Open linked document',
-                              icon: FileText,
-                              run: () =>
-                                  onNavigate({
-                                      tab: 'overview',
-                                      view: 'documents',
-                                  }),
-                          },
-                      ]
-                    : []),
-                ...(reminder.source.type === 'work_order' && reminder.source.id
-                    ? [
-                          {
-                              label: 'Open linked Maintenance',
-                              icon: Wrench,
-                              run: () => openWork(reminder.source.id),
-                          },
-                      ]
-                    : []),
-                {
-                    label: 'View reminder activity',
-                    icon: History,
-                    run: () =>
-                        setDialog({ kind: 'reminder-activity', reminder }),
-                },
-            ];
-        }
-        if (entry.kind === 'booking' || entry.kind === 'unavailable') {
-            const row = rowFor(entry);
-            if (!row) return [];
-            if (row.kind === 'unavailable') {
-                return [
-                    ...(row.can.edit
-                        ? [
-                              {
-                                  label: 'Change unavailable period',
-                                  icon: CalendarClock,
-                                  run: () =>
-                                      setDialog({
-                                          kind: 'booking',
-                                          mode: { kind: 'change-block', row },
-                                      }),
-                              },
-                          ]
-                        : []),
-                    ...(row.can.cancel
-                        ? [
-                              {
-                                  label: 'Cancel unavailable period',
-                                  icon: X,
-                                  destructive: true,
-                                  run: () =>
-                                      setDialog({
-                                          kind: 'decision',
-                                          row,
-                                          decision: 'cancel',
-                                      }),
-                              },
-                          ]
-                        : []),
-                ];
-            }
-            const decide = (decision: BookingDecision) => () =>
-                setDialog({ kind: 'decision', row, decision });
-            const blocked = summary?.use_problem ?? '';
-            return [
-                ...(row.can.edit
-                    ? [
-                          {
-                              label: 'Edit booking',
-                              icon: CalendarClock,
-                              run: () =>
-                                  setDialog({
-                                      kind: 'booking',
-                                      mode: { kind: 'change', row },
-                                  }),
-                          },
-                      ]
-                    : []),
-                ...(row.can.approve
-                    ? [
-                          {
-                              label: 'Review & approve',
-                              icon: Check,
-                              run: decide('approve'),
-                              disabled: !!blocked,
-                              reason: blocked || undefined,
-                          },
-                      ]
-                    : []),
-                ...(row.can.checkout
-                    ? [
-                          {
-                              label: 'Check out vehicle',
-                              icon: KeyRound,
-                              run: decide('out'),
-                              disabled: !!blocked,
-                              reason: blocked || undefined,
-                          },
-                      ]
-                    : []),
-                ...(row.can.return
-                    ? [
-                          {
-                              label: 'Record vehicle return',
-                              icon: KeyRound,
-                              run: decide('return'),
-                          },
-                      ]
-                    : []),
-                ...(row.can.decline
-                    ? [
-                          {
-                              label: 'Decline request',
-                              icon: X,
-                              destructive: true,
-                              run: decide('decline'),
-                          },
-                      ]
-                    : []),
-                ...(row.can.cancel && row.status !== 'checked_out'
-                    ? [
-                          {
-                              label: 'Cancel booking',
-                              icon: X,
-                              destructive: true,
-                              run: decide('cancel'),
-                          },
-                      ]
-                    : []),
-            ];
-        }
-        if (
-            (entry.kind === 'appointment' || entry.kind === 'estimate') &&
-            entry.workOrderId
-        ) {
-            const workOrderId = entry.workOrderId;
-            const openOrder = summary?.open_work.some(
-                (work) => work.id === workOrderId,
+    const openEntryMenu = (
+        entry: Entry,
+        event?: {
+            clientX: number;
+            clientY: number;
+            currentTarget: EventTarget | null;
+        },
+    ) => {
+        const point = menuPoint(event);
+        const known = rowFor(entry) ?? null;
+        const needsRow =
+            (entry.kind === 'booking' || entry.kind === 'unavailable') &&
+            !known &&
+            !!summary;
+        setMenu({
+            kind: 'entry',
+            ...point,
+            entry,
+            row: known,
+            rowState: needsRow ? 'loading' : known ? 'ready' : 'missing',
+        });
+        if (needsRow) {
+            void loadRow(entry).then((row) =>
+                setMenu((current) =>
+                    current?.kind === 'entry' && current.entry.id === entry.id
+                        ? {
+                              ...current,
+                              row,
+                              rowState: row ? 'ready' : 'missing',
+                          }
+                        : current,
+                ),
             );
-            // A planned appointment is managed; an estimate gets its first one.
-            const planned =
-                entry.kind === 'appointment' && entry.start && entry.meta?.open
-                    ? {
-                          start: entry.start,
-                          end: entry.end,
-                          provider: entry.meta.provider,
-                          unavailable: entry.meta.unavailable,
-                      }
-                    : undefined;
-            return can.schedule_service
-                ? [
-                      ...(openOrder && (planned || entry.kind === 'estimate')
-                          ? [
-                                {
-                                    label: 'Reschedule / manage appointment',
-                                    icon: CalendarClock,
-                                    run: () =>
-                                        setDialog({
-                                            kind: 'appointment',
-                                            workOrderId,
-                                            appointment: planned,
-                                            startLocal: planned
-                                                ? undefined
-                                                : futureStart(entry._start),
-                                        }),
-                                },
-                            ]
-                          : []),
-                      {
-                          label: 'Upload work evidence',
-                          icon: Upload,
-                          run: () =>
-                              setDialog({
-                                  kind: 'work-evidence',
-                                  workOrderId,
-                                  label: entry.ref ?? `Work #${workOrderId}`,
-                              }),
-                      },
-                  ]
-                : [];
         }
-        if (entry.kind === 'restriction') {
-            return [
-                {
-                    label: 'Open linked Maintenance',
-                    icon: Wrench,
-                    run: () => openWork(entry.workOrderId),
-                },
-                {
-                    label: 'View release requirements',
-                    icon: ClipboardCheck,
-                    run: releaseRequirements,
-                },
-                ...(can.schedule_service
-                    ? [
-                          {
-                              label: 'Review authorised release',
-                              icon: ShieldCheck,
-                              run: () => openWork(entry.workOrderId),
-                          },
-                      ]
-                    : []),
-            ];
-        }
-        if (
-            entry.kind === 'schedule' ||
-            entry.kind === 'compliance' ||
-            entry.kind === 'check'
-        ) {
-            const source =
-                entry.kind === 'schedule'
-                    ? `service_schedule:${entry.recordId}`
-                    : entry.kind === 'compliance'
-                      ? `compliance_record:${entry.recordId}`
-                      : 'vehicle';
-            return [
-                ...(can.schedule_service && entry.kind !== 'check'
-                    ? [
-                          {
-                              label: 'Plan linked appointment',
-                              icon: Wrench,
-                              run: () =>
-                                  setDialog({
-                                      kind: 'appointment',
-                                      startLocal: futureStart(entry._start),
-                                      presetType: entry.title.replace(
-                                          / due · reminder$/,
-                                          '',
-                                      ),
-                                  }),
-                          },
-                      ]
-                    : []),
-                ...(can.add_reminder
-                    ? [
-                          {
-                              label: 'Add follow-up reminder',
-                              icon: BellPlus,
-                              run: () =>
-                                  setDialog({
-                                      kind: 'reminder',
-                                      reminder: null,
-                                      presetSource: source,
-                                  }),
-                          },
-                      ]
-                    : []),
-                ...obligationActions(source),
-            ];
-        }
-        return [];
+    };
+    const openCreateMenu = (
+        date: Date,
+        hour: number | undefined,
+        event?: {
+            clientX: number;
+            clientY: number;
+            currentTarget: EventTarget | null;
+        },
+    ) => {
+        setMenu({ kind: 'create', ...menuPoint(event), date, hour });
     };
 
-    /** The obligation reminder behind a due date: acknowledge, retry and its history. */
-    const obligationActions = (source: string): CalendarAction[] => {
-        const reminder = workspace.obligation_reminders.find(
-            (item) => item.key === source,
-        );
-        if (!reminder) return [];
-        return [
-            ...(reminder.can.acknowledge
-                ? [
-                      {
-                          label: 'Acknowledge reminder',
-                          icon: Check,
-                          run: () =>
-                              setDialog({
-                                  kind: 'obligation-action',
-                                  reminder,
-                                  action: 'acknowledge',
-                              }),
-                      },
-                  ]
-                : []),
-            ...(reminder.can.retry
-                ? [
-                      {
-                          label: 'Retry delivery',
-                          icon: BellPlus,
-                          run: () =>
-                              setDialog({
-                                  kind: 'obligation-action',
-                                  reminder,
-                                  action: 'retry',
-                              }),
-                      },
-                  ]
-                : []),
-            {
-                label: 'View reminder activity',
-                icon: History,
-                run: () => setDialog({ kind: 'obligation-history', reminder }),
-            },
-        ];
-    };
-
-    const createActions = (start: string): CalendarAction[] => {
-        const can = summary?.can;
-        if (!can) return [];
-        const past = start < nowLocal;
-        return [
-            ...(can.request
-                ? [
-                      {
-                          label: 'Request vehicle booking',
-                          icon: CalendarPlus,
-                          run: () =>
-                              setDialog({
-                                  kind: 'booking',
-                                  mode: { kind: 'request', startLocal: start },
-                              }),
-                          disabled: past,
-                      },
-                  ]
-                : []),
-            ...(can.schedule_service
-                ? [
-                      {
-                          label: 'Schedule service or inspection',
-                          icon: Wrench,
-                          run: () =>
-                              setDialog({
-                                  kind: 'appointment',
-                                  startLocal: start,
-                              }),
-                          disabled: past,
-                      },
-                  ]
-                : []),
-            ...(can.add_reminder
-                ? [
-                      {
-                          label: 'Add reminder',
-                          icon: BellPlus,
-                          run: () =>
-                              setDialog({
-                                  kind: 'reminder',
-                                  reminder: null,
-                                  presetDueLocal: start,
-                              }),
-                          disabled: past,
-                      },
-                  ]
-                : []),
-            ...(can.mark_unavailable
-                ? [
-                      {
-                          label: 'Mark vehicle unavailable',
-                          icon: Lock,
-                          run: () =>
-                              setDialog({
-                                  kind: 'booking',
-                                  mode: { kind: 'block', startLocal: start },
-                              }),
-                          disabled: past,
-                      },
-                  ]
-                : []),
-        ];
-    };
-
-    const onSelect = (entry: Decorated) => {
-        if (rightClick.current) {
-            setEventMenu({ ...rightClick.current, entry: entry as Entry });
-            rightClick.current = null;
-        } else openEntry(entry as Entry);
-    };
     const startFor = (date: Date, hour?: number) => {
         if (hour === undefined) {
             if (sameDay(date, today)) return defaultBookingStart();
@@ -946,566 +766,839 @@ export function VehicleCalendar({
         }
         return `${dateKey(date)}T${String(Math.floor(hour)).padStart(2, '0')}:${String(Math.round((hour % 1) * 60)).padStart(2, '0')}`;
     };
-    const creationStart = creation
-        ? startFor(creation.date, creation.hour)
-        : '';
-    const creationActions = creation ? createActions(creationStart) : [];
-    const entryActions = eventMenu ? actionsFor(eventMenu.entry) : [];
+
+    /** The appointment already planned on a work order, from the loaded entries. */
+    const plannedFor = (
+        workOrderId: number,
+    ): PlannedAppointment | undefined => {
+        const planned = [...feed.items, ...rail.items].find(
+            (item) =>
+                item.kind === 'appointment' &&
+                item.workOrderId === workOrderId &&
+                item.meta?.open,
+        );
+        return planned?.start
+            ? {
+                  start: planned.start,
+                  end: planned.end ?? null,
+                  provider: planned.meta?.provider ?? null,
+                  unavailable: planned.meta?.unavailable,
+              }
+            : undefined;
+    };
+
+    const tripsVisible = workspace.can.view_site_records;
+    const perform = (intent: CalendarIntent, entry?: Entry, day?: Date) => {
+        switch (intent.type) {
+            case 'open-entry':
+                if (entry) void openEntry(entry);
+                return;
+            case 'retry-summary':
+                loadSummary();
+                return;
+            case 'request-booking':
+                setDialog({
+                    kind: 'booking',
+                    mode: { kind: 'request', startLocal: intent.startLocal },
+                });
+                return;
+            case 'schedule-service':
+                setDialog({
+                    kind: 'appointment',
+                    startLocal: intent.startLocal,
+                });
+                return;
+            case 'add-reminder':
+                setDialog({
+                    kind: 'reminder',
+                    reminder: null,
+                    presetDueLocal: intent.dueLocal,
+                });
+                return;
+            case 'mark-unavailable':
+                setDialog({
+                    kind: 'booking',
+                    mode: { kind: 'block', startLocal: intent.startLocal },
+                });
+                return;
+            case 'view-day':
+                if (day) setNavDate(day);
+                setView('day');
+                return;
+            case 'view-trips':
+                if (day) onNavigate({ tab: 'trips', date: dateKey(day) });
+                return;
+            case 'edit-reminder':
+                setDialog({ kind: 'reminder', reminder: intent.reminder });
+                return;
+            case 'edit-document': {
+                const set = workspace.documents.find(
+                    (item) => item.id === intent.setId,
+                );
+                if (set) setDialog({ kind: 'document', set });
+                else onNavigate({ tab: 'overview', view: 'documents' });
+                return;
+            }
+            case 'snooze-reminder':
+                setDialog({ kind: 'snooze', reminder: intent.reminder });
+                return;
+            case 'complete-reminder':
+                setDialog({
+                    kind: 'reminder-action',
+                    reminder: intent.reminder,
+                    action: 'complete',
+                });
+                return;
+            case 'open-documents':
+                onNavigate({ tab: 'overview', view: 'documents' });
+                return;
+            case 'open-work':
+                openWork(intent.workOrderId, intent.release);
+                return;
+            case 'reminder-activity':
+                setDialog({
+                    kind: 'reminder-activity',
+                    reminder: intent.reminder,
+                });
+                return;
+            case 'custody-record':
+                custodyRecord(intent.row);
+                return;
+            case 'edit-booking':
+                setDialog({
+                    kind: 'booking',
+                    mode: { kind: 'change', row: intent.row },
+                });
+                return;
+            case 'change-block':
+                undoPlan.current = { kind: 'revert-period', row: intent.row };
+                setDialog({
+                    kind: 'booking',
+                    mode: { kind: 'change-block', row: intent.row },
+                });
+                return;
+            case 'decide':
+                undoPlan.current =
+                    intent.decision === 'cancel' &&
+                    intent.row.kind === 'unavailable'
+                        ? { kind: 'restore-period', row: intent.row }
+                        : null;
+                setDialog({
+                    kind: 'decision',
+                    row: intent.row,
+                    decision: intent.decision,
+                });
+                return;
+            case 'custody-evidence':
+                setDialog({
+                    kind: 'custody-evidence',
+                    source:
+                        intent.row.kind === 'booking'
+                            ? 'booking'
+                            : 'unavailable_period',
+                    id: intent.row.id,
+                    label:
+                        intent.row.kind === 'booking'
+                            ? (intent.row.reference ??
+                              `Booking #${intent.row.id}`)
+                            : 'Unavailable period',
+                });
+                return;
+            case 'manage-appointment':
+                setDialog({
+                    kind: 'appointment',
+                    workOrderId: intent.workOrderId,
+                    appointment:
+                        intent.appointment ?? plannedFor(intent.workOrderId),
+                    startLocal: intent.startLocal,
+                });
+                return;
+            case 'upload-work-evidence':
+                setDialog({
+                    kind: 'work-evidence',
+                    workOrderId: intent.workOrderId,
+                    label: intent.label,
+                });
+                return;
+            case 'release-requirements':
+                releaseRequirements();
+                return;
+            case 'plan-linked':
+                setDialog({
+                    kind: 'appointment',
+                    startLocal: intent.startLocal,
+                    presetType: intent.presetType,
+                    source: intent.source,
+                });
+                return;
+            case 'add-follow-up':
+                setDialog({
+                    kind: 'reminder',
+                    reminder: null,
+                    presetSource: intent.source,
+                });
+                return;
+            case 'obligation':
+                setDialog({
+                    kind: 'obligation-action',
+                    reminder: intent.reminder,
+                    action: intent.action,
+                });
+                return;
+            case 'obligation-history':
+                setDialog({
+                    kind: 'obligation-history',
+                    reminder: intent.reminder,
+                });
+                return;
+        }
+    };
+
+    /** After a reversible change is saved, offer Undo for a short while. */
+    const offerUndo = () => {
+        const plan = undoPlan.current;
+        undoPlan.current = null;
+        if (!plan) return;
+        const current = async (): Promise<UnavailableRow> => {
+            const result = await fetchVehicleRecord(
+                `/fleet-assets/vehicles/${vehicle.id}/calendar/records/unavailable/${plan.row.id}`,
+            );
+            if (!result?.row)
+                throw new Error(
+                    'This period is no longer available to change.',
+                );
+            return result.row as UnavailableRow;
+        };
+        const undo = async () => {
+            const row = await current();
+            if (plan.kind === 'restore-period') {
+                await sendVehicleRecord(
+                    `/fleet-assets/vehicles/${vehicle.id}/unavailable-periods/${row.id}/restore`,
+                    { expected_version: row.lock_version },
+                );
+            } else {
+                await sendVehicleRecord(
+                    `/fleet-assets/vehicles/${vehicle.id}/unavailable-periods/${row.id}`,
+                    {
+                        starts_local: toDatetimeLocal(plan.row.starts_at),
+                        ends_local: toDatetimeLocal(plan.row.ends_at),
+                        reason: plan.row.purpose,
+                        change_reason: 'Undo: previous times put back',
+                        expected_version: row.lock_version,
+                    },
+                    'PUT',
+                );
+            }
+        };
+        toast.success(
+            plan.kind === 'restore-period'
+                ? 'Unavailable period cancelled'
+                : 'Unavailable period changed',
+            {
+                duration: 10000,
+                action: {
+                    label: 'Undo',
+                    onClick: () => {
+                        undo()
+                            .then(() => {
+                                changed();
+                                toast.success(
+                                    plan.kind === 'restore-period'
+                                        ? 'Unavailable period restored'
+                                        : 'Previous times put back',
+                                );
+                            })
+                            .catch((error: Error) =>
+                                toast.error(error.message),
+                            );
+                    },
+                },
+            },
+        );
+    };
+
+    const toMenuItems = (
+        actions: CalendarAction[],
+        onPick: (action: CalendarAction) => void,
+        showReasons = true,
+    ): CalendarMenuItem[] =>
+        actions.map((action) => ({
+            key: action.key,
+            label: action.label,
+            icon: action.icon,
+            disabled: action.disabled,
+            destructive: action.destructive,
+            detail: showReasons ? action.reason : undefined,
+            onSelect: () => onPick(action),
+        }));
+
+    const menuSections = (current: MenuState): CalendarMenuSection[] => {
+        if (current.kind === 'create') {
+            const start = startFor(current.date, current.hour);
+            const past = start < nowLocal;
+            const create = creationActions(start, nowLocal, summary);
+            return [
+                {
+                    key: 'create',
+                    note:
+                        past && create.some((action) => action.disabled)
+                            ? 'Past time · choose a future slot to schedule'
+                            : undefined,
+                    items: toMenuItems(
+                        create,
+                        (action) =>
+                            perform(action.intent, undefined, current.date),
+                        !past,
+                    ),
+                },
+                {
+                    key: 'navigate',
+                    items: toMenuItems(
+                        dayNavigationActions(
+                            dateKey(current.date),
+                            dateKey(today),
+                            tripsVisible,
+                        ),
+                        (action) =>
+                            perform(action.intent, undefined, current.date),
+                    ),
+                },
+            ];
+        }
+        const { entry } = current;
+        const actions = entryActions(entry, {
+            summary,
+            reminders: workspace.reminders,
+            obligations: workspace.obligation_reminders,
+            row: current.row,
+            vehicleId: vehicle.id,
+            planStart: futureStart,
+        });
+        const pick = (action: CalendarAction) => perform(action.intent, entry);
+        return [
+            {
+                key: 'open',
+                items: [
+                    {
+                        key: 'open',
+                        label: openEntryLabel(entry.kind),
+                        icon: FileText,
+                        onSelect: () => void openEntry(entry),
+                    },
+                ],
+            },
+            {
+                key: 'actions',
+                note:
+                    current.rowState === 'loading'
+                        ? 'Loading this record’s actions…'
+                        : entry.kind === 'busy'
+                          ? 'Booking details are restricted.'
+                          : undefined,
+                items: toMenuItems(
+                    actions.filter((action) => !action.destructive),
+                    pick,
+                ),
+            },
+            {
+                key: 'destructive',
+                items: toMenuItems(
+                    actions.filter((action) => action.destructive),
+                    pick,
+                ),
+            },
+        ];
+    };
+
     const context = {
         colorBy: 'source' as const,
         density,
         srcByKey: Object.fromEntries(
             SOURCES.map((source) => [source.key, source]),
         ),
-        onSelect,
+        onSelect: (entry: Decorated) => {
+            // A tap opens the entry's actions; a click opens its record.
+            if (lastPointer.current === 'touch') {
+                lastPointer.current = null;
+                openEntryMenu(entry as Entry);
+                return;
+            }
+            void openEntry(entry as Entry);
+        },
+        onEntryContext: (entry: Decorated, event: React.MouseEvent) =>
+            openEntryMenu(entry as Entry, event),
         onContext: (event: React.MouseEvent, date: Date, hour?: number) => {
             event.preventDefault();
-            rightClick.current = null;
-            setCreation({ x: event.clientX, y: event.clientY, date, hour });
+            openCreateMenu(date, hour, event);
         },
-        onCreateAt: summary?.can.request
-            ? (date: Date, hour = 9) => {
-                  const start = startFor(date, hour);
-                  if (start < nowLocal) return;
-                  setDialog({
-                      kind: 'booking',
-                      mode: { kind: 'request', startLocal: start },
-                  });
-              }
-            : undefined,
+        // A blank slot requests a booking; when that isn't possible (a past
+        // time, or no booking permission) it opens the creation menu instead.
+        onCreateAt: (date: Date, hour = 9) => {
+            const start = startFor(date, hour);
+            if (summary?.can.request && start >= nowLocal) {
+                setDialog({
+                    kind: 'booking',
+                    mode: { kind: 'request', startLocal: start },
+                });
+                return;
+            }
+            openCreateMenu(date, hour);
+        },
         onMore: (date: Date) => {
             setNavDate(date);
             setView('day');
         },
     };
     const restriction = summary?.restriction ?? null;
+    const feedFailed = feed.state === 'failed' || rail.state === 'failed';
     const readinessLabel = restriction
         ? 'Restricted'
-        : (summary?.readiness_label ?? '…');
+        : summaryState === 'ready'
+          ? (summary?.readiness_label ?? '—')
+          : '—';
+    const viewingToday = sameDay(today, navDate);
+
+    const header = (
+        <PageHeader
+            className="max-md:[&_button]:min-h-[44px] max-md:[&_button]:min-w-[44px]"
+            variant="profile"
+            wrapTitle
+            mark={
+                <div className="identity-mark">
+                    {/* eslint-disable-next-line no-restricted-syntax -- The design's glass back chip beside the calendar ring. */}
+                    <button
+                        type="button"
+                        className="hero-back"
+                        aria-label="Back to vehicle"
+                        onClick={onBack}
+                    >
+                        <ArrowLeft className="size-4" />
+                    </button>
+                    <div className="eh-mark-ring">
+                        <CalendarDays className="size-[25px]" />
+                    </div>
+                </div>
+            }
+            title="Vehicle calendar"
+            titleChip={
+                <PageHeaderStatusChip variant="info">
+                    {vehicle.name}
+                </PageHeaderStatusChip>
+            }
+            subline={[
+                vehicle.registration_number,
+                vehicle.asset_tag,
+                'Pacific/Auckland',
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            actions={
+                <>
+                    <PageHeaderPrimaryButton
+                        icon={Plus}
+                        aria-haspopup="menu"
+                        onClick={(event) =>
+                            openCreateMenu(
+                                sameDay(navDate, today) ? today : navDate,
+                                undefined,
+                                {
+                                    clientX: 0,
+                                    clientY: 0,
+                                    currentTarget: event.currentTarget,
+                                },
+                            )
+                        }
+                    >
+                        New entry
+                    </PageHeaderPrimaryButton>
+                    {summary?.can.request && (
+                        <PageHeaderGlassButton
+                            onClick={() =>
+                                setDialog({
+                                    kind: 'booking',
+                                    mode: {
+                                        kind: 'request',
+                                        startLocal: defaultBookingStart(
+                                            dateKey(navDate),
+                                        ),
+                                    },
+                                })
+                            }
+                        >
+                            Request booking
+                        </PageHeaderGlassButton>
+                    )}
+                    <PageHeaderSearch
+                        value={query}
+                        onChange={setQuery}
+                        placeholder="Find an entry or reference…"
+                    />
+                    <PageHeaderGlassButton onClick={onBack}>
+                        <ArrowLeft className="size-4" />
+                        Vehicle profile
+                    </PageHeaderGlassButton>
+                </>
+            }
+            meters={
+                <div className="meter-grid">
+                    <PageHeaderMeterBlock
+                        label="Viewing"
+                        className="min-w-[220px]!"
+                        value={
+                            feedFailed
+                                ? 'Incomplete schedule'
+                                : `${periodCount} ${periodCount === 1 ? 'entry' : 'entries'}`
+                        }
+                        ariaLabel="View this period in the agenda"
+                        onClick={() => setView('agenda')}
+                    >
+                        <div
+                            className="flex items-center gap-3 [&_.eh-meter-big]:text-3xl"
+                            aria-live="polite"
+                            aria-atomic="true"
+                            data-testid="calendar-date-anchor"
+                        >
+                            <PageHeaderMeterBig>
+                                {navDate.getDate()}
+                            </PageHeaderMeterBig>
+                            <div className="flex min-w-0 flex-col leading-tight">
+                                <span className="text-section-title text-primary-foreground!">
+                                    {MO[navDate.getMonth()]}
+                                </span>
+                                <span className="text-sm font-semibold tabular-nums">
+                                    {navDate.getFullYear()}
+                                </span>
+                            </div>
+                        </div>
+                        <PageHeaderMeterCaption>
+                            {view === 'week'
+                                ? periodLabel(view, navDate)
+                                : fullDate(navDate)}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Vehicle use"
+                        ariaLabel="Review vehicle readiness"
+                        onClick={onBack}
+                        tone={restriction ? 'critical' : 'brand'}
+                    >
+                        <PageHeaderMeterBig>
+                            {readinessLabel}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {summaryState !== 'ready'
+                                ? summaryState === 'failed'
+                                    ? 'Readiness couldn’t load'
+                                    : 'Checking readiness…'
+                                : restriction
+                                  ? 'Active · no release recorded'
+                                  : readinessLabel === 'Ready'
+                                    ? 'Booking and checkout checks pass'
+                                    : 'Booking and checkout still need assessment'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Next appointment"
+                        ariaLabel="View the next service appointment"
+                        onClick={() => {
+                            if (summary?.next_appointment)
+                                setNavDate(
+                                    new Date(summary.next_appointment.start),
+                                );
+                            setView('day');
+                        }}
+                    >
+                        <PageHeaderMeterBig>
+                            {summaryState !== 'ready'
+                                ? '—'
+                                : summary?.next_appointment
+                                  ? shortDate(summary.next_appointment.start)
+                                  : 'None'}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {summaryState !== 'ready'
+                                ? 'Schedule incomplete'
+                                : (summary?.next_appointment?.title ??
+                                  'No appointment planned')}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Due reminder"
+                        ariaLabel="View the next due reminder"
+                        onClick={() => {
+                            if (summary?.next_due)
+                                setNavDate(new Date(summary.next_due.start));
+                            setView('day');
+                        }}
+                    >
+                        <PageHeaderMeterBig>
+                            {summaryState !== 'ready'
+                                ? '—'
+                                : summary?.next_due
+                                  ? shortDate(summary.next_due.start)
+                                  : 'None'}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {summaryState !== 'ready'
+                                ? 'Schedule incomplete'
+                                : summary?.next_due
+                                  ? `${summary.next_due.title.replace(/ · reminder$/, '')} · does not reserve a day`
+                                  : 'No due reminders'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </div>
+            }
+            filters={
+                <>
+                    <PageHeaderFilterButton
+                        icon={ChevronLeft}
+                        aria-label="Previous period"
+                        onClick={() => shift(-1)}
+                    />
+                    <JumpToDate
+                        view={view}
+                        navDate={navDate}
+                        onPick={setNavDate}
+                        pill
+                    />
+                    <PageHeaderFilterButton
+                        icon={ChevronRight}
+                        aria-label="Next period"
+                        onClick={() => shift(1)}
+                    />
+                    <PageHeaderFilterButton
+                        active={viewingToday}
+                        onClick={() => setNavDate(new Date())}
+                    >
+                        Today
+                    </PageHeaderFilterButton>
+                    <PageHeaderFilterSelect
+                        icon={Rows3}
+                        label="Display"
+                        value={density}
+                        allValue="comfortable"
+                        options={[
+                            { value: 'comfortable', label: 'Comfortable' },
+                            { value: 'compact', label: 'Compact' },
+                        ]}
+                        onChange={(value) => setDensity(value as Density)}
+                    />
+                </>
+            }
+            rail={
+                <PageHeaderRail
+                    items={VIEW_ITEMS}
+                    value={view}
+                    onSelect={(key) => setView(key)}
+                    ariaLabel="Calendar views"
+                />
+            }
+        />
+    );
 
     return (
         <div
             className="vehicle-calendar"
-            onContextMenuCapture={(event) => {
-                rightClick.current = { x: event.clientX, y: event.clientY };
-            }}
-            onKeyDownCapture={() => {
-                rightClick.current = null;
-            }}
             onPointerDownCapture={(event) => {
-                rightClick.current =
-                    event.button === 2
-                        ? { x: event.clientX, y: event.clientY }
-                        : null;
+                lastPointer.current = event.pointerType;
                 // Focus the entry first so closing its dialog restores focus.
                 const target = (
                     event.target as HTMLElement
                 ).closest<HTMLElement>('[role="button"][tabindex="0"]');
                 target?.focus({ preventScroll: true });
             }}
+            onKeyDownCapture={() => {
+                lastPointer.current = null;
+            }}
         >
-            {eventMenu && (
-                <DropdownMenu
-                    open
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setEventMenu(null);
-                            rightClick.current = null;
-                        }
-                    }}
-                >
-                    <DropdownMenuTrigger
-                        style={{
-                            position: 'fixed',
-                            left: eventMenu.x,
-                            top: eventMenu.y,
-                            width: 1,
-                            height: 1,
-                        }}
-                        aria-label="Calendar entry actions"
-                    />
-                    <DropdownMenuContent align="start">
-                        <DropdownMenuLabel>
-                            {eventMenu.entry.title}
-                        </DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {eventMenu.entry.kind !== 'busy' && (
-                            <DropdownMenuItem
-                                onSelect={() => {
-                                    openEntry(eventMenu.entry);
-                                    setEventMenu(null);
-                                }}
-                            >
-                                <FileText className="size-[15px]" />
-                                {eventMenu.entry.kind === 'restriction'
-                                    ? 'View restriction reason'
-                                    : ['appointment', 'estimate'].includes(
-                                            eventMenu.entry.kind,
-                                        )
-                                      ? 'Open work order'
-                                      : 'Open source record'}
-                            </DropdownMenuItem>
-                        )}
-                        {entryActions
-                            .filter((action) => !action.destructive)
-                            .map((action) => (
-                                <DropdownMenuItem
-                                    key={action.label}
-                                    disabled={action.disabled}
-                                    onSelect={() => {
-                                        action.run();
-                                        setEventMenu(null);
-                                    }}
-                                >
-                                    <action.icon className="size-[15px]" />
-                                    <span>
-                                        {action.label}
-                                        {action.reason && (
-                                            <small className="block text-xs text-muted-foreground">
-                                                {action.reason}
-                                            </small>
-                                        )}
-                                    </span>
-                                </DropdownMenuItem>
-                            ))}
-                        {entryActions.some((action) => action.destructive) && (
-                            <DropdownMenuSeparator />
-                        )}
-                        {entryActions
-                            .filter((action) => action.destructive)
-                            .map((action) => (
-                                <DropdownMenuItem
-                                    key={action.label}
-                                    disabled={action.disabled}
-                                    onSelect={() => {
-                                        setEventMenu(null);
-                                        action.run();
-                                    }}
-                                >
-                                    <action.icon className="size-[15px]" />
-                                    {action.label}
-                                </DropdownMenuItem>
-                            ))}
-                        {eventMenu.entry.kind === 'busy' && (
-                            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                                Booking details are restricted.
-                            </DropdownMenuLabel>
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            )}
-            {creation && (
-                <DropdownMenu
-                    open
-                    onOpenChange={(open) => !open && setCreation(null)}
-                >
-                    <DropdownMenuTrigger
-                        style={{
-                            position: 'fixed',
-                            left: creation.x,
-                            top: creation.y,
-                            width: 1,
-                            height: 1,
-                        }}
-                        aria-label="Calendar creation menu"
-                    />
-                    <DropdownMenuContent align="start">
-                        <DropdownMenuLabel>
-                            {fullDate(creation.date)} · {vehicle.name}
-                            <span className="block text-xs font-normal text-muted-foreground">
-                                {creationStart.slice(11)} · Pacific/Auckland
-                            </span>
-                        </DropdownMenuLabel>
-                        {creationActions.length > 0 && (
-                            <>
-                                <DropdownMenuSeparator />
-                                {creationStart < nowLocal && (
-                                    <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                                        Past time · choose a future slot to
-                                        schedule
-                                    </DropdownMenuLabel>
-                                )}
-                                {creationActions.map((action) => (
-                                    <DropdownMenuItem
-                                        key={action.label}
-                                        disabled={action.disabled}
-                                        onSelect={() => {
-                                            setCreation(null);
-                                            action.run();
-                                        }}
-                                    >
-                                        <action.icon className="size-[15px]" />
-                                        {action.label}
-                                    </DropdownMenuItem>
-                                ))}
-                            </>
-                        )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                            onSelect={() => {
-                                setNavDate(creation.date);
-                                setView('day');
-                                setCreation(null);
-                            }}
-                        >
-                            <CalendarDays className="size-[15px]" />
-                            View this day / availability
-                            <ArrowUpRight className="size-[13px]" />
-                        </DropdownMenuItem>
-                        {dateKey(creation.date) <= dateKey(today) && (
-                            <DropdownMenuItem
-                                onSelect={() => {
-                                    onNavigate({
-                                        tab: 'trips',
-                                        date: dateKey(creation.date),
-                                    });
-                                    setCreation(null);
-                                }}
-                            >
-                                <Route className="size-[15px]" />
-                                View trips on this date
-                            </DropdownMenuItem>
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            )}
-            <PageHeader
-                variant="profile"
-                wrapTitle
-                mark={
-                    <div className="identity-mark">
-                        {/* eslint-disable-next-line no-restricted-syntax -- The design's glass back chip beside the calendar ring. */}
-                        <button
-                            type="button"
-                            className="hero-back"
-                            aria-label="Back to vehicle"
-                            onClick={onBack}
-                        >
-                            <ArrowLeft className="size-4" />
-                        </button>
-                        <div className="eh-mark-ring">
-                            <CalendarDays className="size-[25px]" />
-                        </div>
-                    </div>
-                }
-                title="Vehicle calendar"
-                titleChip={
-                    <PageHeaderStatusChip variant="info">
-                        {vehicle.name}
-                    </PageHeaderStatusChip>
-                }
-                subline={[
-                    vehicle.registration_number,
-                    vehicle.asset_tag,
-                    'Pacific/Auckland',
-                ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                actions={
-                    <>
-                        {summary?.can.request && (
-                            <PageHeaderGlassButton
-                                onClick={() =>
-                                    setDialog({
-                                        kind: 'booking',
-                                        mode: {
-                                            kind: 'request',
-                                            startLocal: defaultBookingStart(
-                                                dateKey(navDate),
-                                            ),
-                                        },
-                                    })
-                                }
-                            >
-                                Request booking
-                            </PageHeaderGlassButton>
-                        )}
-                        <PageHeaderSearch
-                            value={query}
-                            onChange={setQuery}
-                            placeholder="Find an entry or reference…"
-                        />
-                        <PageHeaderGlassButton onClick={onBack}>
-                            <ArrowLeft className="size-4" />
-                            Vehicle profile
-                        </PageHeaderGlassButton>
-                    </>
-                }
-                meters={
-                    <div className="meter-grid">
-                        <PageHeaderMeterBlock
-                            label="Viewing"
-                            value={`${periodCount} ${periodCount === 1 ? 'entry' : 'entries'}`}
-                            ariaLabel="View this period in the agenda"
-                            onClick={() => setView('agenda')}
-                        >
-                            <div
-                                className="calendar-date-anchor"
-                                aria-live="polite"
-                                aria-atomic="true"
-                            >
-                                <PageHeaderMeterBig>
-                                    {navDate.getDate()}
-                                </PageHeaderMeterBig>
-                                <div>
-                                    <strong>{MO[navDate.getMonth()]}</strong>
-                                    <span>{navDate.getFullYear()}</span>
-                                </div>
-                            </div>
-                            <PageHeaderMeterCaption>
-                                {view === 'week'
-                                    ? `${fullDate(weekStart)} – ${fullDate(weekEnd)}`
-                                    : fullDate(navDate)}
-                            </PageHeaderMeterCaption>
-                        </PageHeaderMeterBlock>
-                        <PageHeaderMeterBlock
-                            label="Vehicle use"
-                            ariaLabel="Review vehicle readiness"
-                            onClick={onBack}
-                            tone={restriction ? 'critical' : 'brand'}
-                        >
-                            <PageHeaderMeterBig>
-                                {readinessLabel}
-                            </PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>
-                                {restriction
-                                    ? 'Active · no release recorded'
-                                    : readinessLabel === 'Ready'
-                                      ? 'Booking and checkout checks pass'
-                                      : 'Booking and checkout still need assessment'}
-                            </PageHeaderMeterCaption>
-                        </PageHeaderMeterBlock>
-                        <PageHeaderMeterBlock
-                            label="Next appointment"
-                            ariaLabel="View the next service appointment"
-                            onClick={() => {
-                                if (summary?.next_appointment)
-                                    setNavDate(
-                                        new Date(
-                                            summary.next_appointment.start,
+            {menu && (
+                <CalendarContextMenu
+                    key={`${menu.kind}-${menu.x}-${menu.y}`}
+                    x={menu.x}
+                    y={menu.y}
+                    chip={
+                        menu.kind === 'create'
+                            ? 'Add'
+                            : ENTRY_CHIPS[menu.entry.kind]
+                    }
+                    chipIcon={menu.kind === 'create' ? Plus : CalendarDays}
+                    heading={
+                        menu.kind === 'create'
+                            ? `${fullDate(menu.date)} · ${vehicle.name}`
+                            : menu.entry.title
+                    }
+                    subheading={
+                        menu.kind === 'create'
+                            ? `${startFor(menu.date, menu.hour).slice(11)} · Pacific/Auckland`
+                            : [
+                                  menu.entry.allDay
+                                      ? 'All day'
+                                      : fmtTimeRange(
+                                            menu.entry._start,
+                                            menu.entry._end,
                                         ),
-                                    );
-                                setView('day');
-                            }}
-                        >
-                            <PageHeaderMeterBig>
-                                {summary?.next_appointment
-                                    ? shortDate(summary.next_appointment.start)
-                                    : 'None'}
-                            </PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>
-                                {summary?.next_appointment?.title ??
-                                    'No appointment planned'}
-                            </PageHeaderMeterCaption>
-                        </PageHeaderMeterBlock>
-                        <PageHeaderMeterBlock
-                            label="Due reminder"
-                            ariaLabel="View the next due reminder"
-                            onClick={() => {
-                                if (summary?.next_due)
-                                    setNavDate(
-                                        new Date(summary.next_due.start),
-                                    );
-                                setView('day');
-                            }}
-                        >
-                            <PageHeaderMeterBig>
-                                {summary?.next_due
-                                    ? shortDate(summary.next_due.start)
-                                    : 'None'}
-                            </PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>
-                                {summary?.next_due
-                                    ? `${summary.next_due.title.replace(/ · reminder$/, '')} · does not reserve a day`
-                                    : 'No due reminders'}
-                            </PageHeaderMeterCaption>
-                        </PageHeaderMeterBlock>
-                    </div>
-                }
-                filters={
-                    <div className="calendar-controls">
-                        <div className="calendar-period">
-                            <PageHeaderGlassButton
-                                aria-label="Previous period"
-                                onClick={() => shift(-1)}
-                            >
-                                <ChevronLeft className="size-[17px]" />
-                            </PageHeaderGlassButton>
-                            <PageHeaderGlassButton
-                                onClick={() => setNavDate(new Date())}
-                            >
-                                Today
-                            </PageHeaderGlassButton>
-                            <PageHeaderGlassButton
-                                aria-label="Next period"
-                                onClick={() => shift(1)}
-                            >
-                                <ChevronRight className="size-[17px]" />
-                            </PageHeaderGlassButton>
-                            <Popover open={jumpOpen} onOpenChange={setJumpOpen}>
-                                <PopoverTrigger asChild>
-                                    <PageHeaderGlassButton aria-label="Jump to date">
-                                        <CalendarDays className="size-4" />
-                                        {period}
-                                    </PageHeaderGlassButton>
-                                </PopoverTrigger>
-                                <PopoverContent
-                                    className="w-auto p-2"
-                                    align="start"
-                                >
-                                    <MiniMonth
-                                        selected={navDate}
-                                        onSelect={(date) => {
-                                            setNavDate(date);
-                                            setJumpOpen(false);
-                                        }}
-                                    />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                        <label className="calendar-density">
-                            Display
-                            <select
-                                aria-label="Calendar display density"
-                                value={density}
-                                onChange={(event) =>
-                                    setDensity(event.target.value as Density)
-                                }
-                            >
-                                <option value="comfortable">Comfortable</option>
-                                <option value="compact">Compact</option>
-                            </select>
-                        </label>
-                    </div>
-                }
-                rail={
-                    <PageHeaderRail
-                        items={VIEW_ITEMS}
-                        value={view}
-                        onSelect={(key) => setView(key)}
-                        ariaLabel="Calendar views"
-                    />
-                }
-            />
-            <div className="calendar-source-bar" aria-label="Calendar sources">
-                {SOURCES.map((source) => (
-                    // eslint-disable-next-line no-restricted-syntax -- Source filter pill from the approved calendar design.
-                    <button
-                        key={source.key}
-                        type="button"
-                        aria-pressed={enabled.includes(source.key)}
-                        className="calendar-source-pill"
-                        onClick={() =>
-                            setEnabled((list) =>
-                                list.includes(source.key)
-                                    ? list.filter((key) => key !== source.key)
-                                    : [...list, source.key],
-                            )
-                        }
-                    >
-                        <span
-                            style={{ background: `var(--src-${source.key})` }}
-                        />
-                        {source.label}
-                        <small>
-                            {
-                                feed.items.filter(
-                                    (entry) => entry.source === source.key,
-                                ).length
-                            }
-                        </small>
-                    </button>
-                ))}
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                        setEnabled(SOURCE_KEYS);
-                        setQuery('');
-                    }}
+                                  menu.entry.statusLabel,
+                              ]
+                                  .filter(Boolean)
+                                  .join(' · ')
+                    }
+                    ariaLabel={
+                        menu.kind === 'create'
+                            ? 'Add to the vehicle calendar'
+                            : 'Calendar entry actions'
+                    }
+                    sections={menuSections(menu)}
+                    returnFocus={menu.opener}
+                    onClose={() => setMenu(null)}
+                />
+            )}
+            <PageLayout hero={header}>
+                <div
+                    className="calendar-source-bar"
+                    aria-label="Calendar sources"
                 >
-                    Reset filters
-                </Button>
-            </div>
-            {restriction && (
-                <div className="calendar-restriction" role="status">
-                    <ShieldAlert className="size-[19px]" aria-hidden />
-                    <div>
-                        <strong>Vehicle use remains restricted</strong>
-                        <span>
-                            Since {formatDateTime(restriction.started_at)} · No
-                            end or authorised release recorded. Calendar gaps do
-                            not mean available.
-                        </span>
-                    </div>
+                    <CalendarSourcePills
+                        sources={SOURCES}
+                        enabled={enabled}
+                        counts={sourceCounts}
+                        onToggle={(key) =>
+                            setEnabled((current) => {
+                                const next = new Set(current);
+                                if (next.has(key)) next.delete(key);
+                                else next.add(key);
+                                return next;
+                            })
+                        }
+                    />
                     <Button
-                        variant="outline"
-                        onClick={() => openWork(restriction.work_order_id)}
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                            setEnabled(new Set(SOURCE_KEYS));
+                            setQuery('');
+                        }}
                     >
-                        View restriction
+                        Reset filters
                     </Button>
                 </div>
-            )}
-            {(feed.state === 'failed' || summaryFailed) && (
-                <p role="alert" className="mb-3 text-sm text-status-warning">
-                    Some calendar entries could not be loaded. Reload the page
-                    to try again.
-                </p>
-            )}
-            <CalendarUIProvider value={context}>
-                <div className="calendar-layout">
-                    <div
-                        className="calendar-view"
-                        aria-busy={feed.state === 'loading'}
-                    >
-                        {view === 'month' && (
-                            <MonthView events={visible} navDate={navDate} />
-                        )}
-                        {view === 'week' && (
-                            <WeekView events={visible} navDate={navDate} />
-                        )}
-                        {view === 'day' && (
-                            <DayView events={visible} navDate={navDate} />
-                        )}
-                        {view === 'agenda' && (
-                            <AgendaView
-                                events={visible}
-                                navDate={navDate}
-                                sourcesOff={!enabled.length}
-                                filtersActive={
-                                    enabled.length !== SOURCES.length || !!query
-                                }
-                            />
-                        )}
-                        {view === 'timeline' && (
-                            <TimelineView
-                                events={visible}
-                                navDate={navDate}
-                                sources={SOURCES}
-                            />
-                        )}
+                {restriction && (
+                    <div className="calendar-restriction" role="status">
+                        <ShieldAlert className="size-[19px]" aria-hidden />
+                        <div>
+                            <strong>Vehicle use remains restricted</strong>
+                            <span>
+                                Since {formatDateTime(restriction.started_at)} ·
+                                No end or authorised release recorded. Calendar
+                                gaps do not mean available.
+                            </span>
+                        </div>
+                        <Button
+                            variant="outline"
+                            onClick={() => restrictionRecord()}
+                        >
+                            View restriction
+                        </Button>
                     </div>
-                    <TodayRail
-                        events={railVisible}
-                        today={today}
-                        onSelect={onSelect}
-                        onApprovals={() => setView('agenda')}
-                        onJumpToday={() => setNavDate(new Date())}
-                        viewingToday={sameDay(today, navDate)}
-                    />
+                )}
+                {(feedFailed || summaryState === 'failed') && (
+                    <div
+                        role="alert"
+                        className="flex flex-wrap items-center gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg px-4 py-3 text-sm text-status-critical"
+                    >
+                        <AlertTriangle
+                            className="size-4 shrink-0"
+                            aria-hidden
+                        />
+                        <span className="min-w-0 flex-1">
+                            {feedFailed
+                                ? 'Some calendar entries couldn’t load, so this schedule may be incomplete.'
+                                : 'This vehicle’s scheduling actions couldn’t load.'}
+                        </span>
+                        <Button variant="outline" size="sm" onClick={reload}>
+                            <RefreshCw className="size-4" /> Retry
+                        </Button>
+                    </div>
+                )}
+                <CalendarUIProvider value={context}>
+                    <div className="calendar-layout">
+                        <div
+                            className="calendar-view relative"
+                            aria-busy={feed.state === 'loading'}
+                        >
+                            {view === 'month' && (
+                                <MonthView events={visible} navDate={navDate} />
+                            )}
+                            {view === 'week' && (
+                                <WeekView events={visible} navDate={navDate} />
+                            )}
+                            {view === 'day' && (
+                                <DayView events={visible} navDate={navDate} />
+                            )}
+                            {view === 'agenda' && (
+                                <AgendaView
+                                    events={visible}
+                                    navDate={navDate}
+                                    sourcesOff={enabled.size === 0}
+                                    filtersActive={
+                                        enabled.size !== SOURCES.length ||
+                                        !!query
+                                    }
+                                />
+                            )}
+                            {view === 'timeline' && (
+                                <TimelineView
+                                    events={visible}
+                                    navDate={navDate}
+                                    sources={SOURCES}
+                                />
+                            )}
+                            {feed.state === 'loading' && (
+                                <div className="pointer-events-none absolute inset-0 flex items-start justify-center pt-24">
+                                    <span className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-[12.5px] font-medium text-muted-foreground shadow-sm">
+                                        <RefreshCw
+                                            className="size-3.5 animate-spin"
+                                            aria-hidden
+                                        />{' '}
+                                        Loading…
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        <TodayRail
+                            events={railVisible}
+                            today={today}
+                            onSelect={context.onSelect}
+                            onApprovals={() => setView('agenda')}
+                            onJumpToday={() => setNavDate(new Date())}
+                            viewingToday={viewingToday}
+                        />
+                    </div>
+                </CalendarUIProvider>
+                <div className="calendar-footnote">
+                    <Lock className="size-[14px]" aria-hidden />
+                    <span>
+                        Right-click (or Shift+F10) a date or time for scheduling
+                        and reminders, or an entry for its actions; on touch,
+                        use New entry or tap an entry. Reminders and advisory
+                        estimates do not reserve the vehicle.
+                    </span>
                 </div>
-            </CalendarUIProvider>
-            <div className="calendar-footnote">
-                <Lock className="size-[14px]" aria-hidden />
-                <span>
-                    Right-click a date/time for scheduling and reminders, or an
-                    entry for its actions. Select an entry to open its source.
-                    Reminders and advisory estimates do not reserve the vehicle.
-                </span>
-            </div>
-            <div className="mt-5">
                 <BookingsStudio
                     summary={summary}
+                    onResolveUseProblem={
+                        summary?.use_problem_code
+                            ? () =>
+                                  onNavigate(
+                                      reasonDestination({
+                                          code: summary.use_problem_code ?? '',
+                                          kind: summary.use_problem_kind,
+                                          source_id:
+                                              summary.use_problem_source_id ??
+                                              null,
+                                      }),
+                                  )
+                            : undefined
+                    }
                     onRequest={() =>
                         setDialog({
                             kind: 'booking',
@@ -1515,43 +1608,23 @@ export function VehicleCalendar({
                     onBlock={() =>
                         setDialog({ kind: 'booking', mode: { kind: 'block' } })
                     }
-                    onDecision={(row, decision) =>
-                        setDialog({ kind: 'decision', row, decision })
-                    }
-                    onChangeTimes={(row) =>
-                        setDialog({
-                            kind: 'booking',
-                            mode:
-                                row.kind === 'booking'
-                                    ? { kind: 'change', row }
-                                    : { kind: 'change-block', row },
-                        })
-                    }
-                    onRecord={custodyRecord}
-                    onUpload={(row) =>
-                        setDialog({
-                            kind: 'custody-evidence',
-                            source:
-                                row.kind === 'booking'
-                                    ? 'booking'
-                                    : 'unavailable_period',
-                            id: row.id,
-                            label:
-                                row.kind === 'booking'
-                                    ? (row.reference ?? `Booking #${row.id}`)
-                                    : 'Unavailable period',
-                        })
-                    }
+                    onAction={(action) => perform(action.intent)}
                 />
-            </div>
+            </PageLayout>
 
             {dialog?.kind === 'booking' && summary && (
                 <BookingWizard
                     vehicle={vehicle}
                     summary={summary}
                     mode={dialog.mode}
-                    onClose={() => setDialog(null)}
-                    onSaved={changed}
+                    onClose={() => {
+                        undoPlan.current = null;
+                        setDialog(null);
+                    }}
+                    onSaved={() => {
+                        changed();
+                        offerUndo();
+                    }}
                 />
             )}
             {dialog?.kind === 'decision' && summary && (
@@ -1560,8 +1633,14 @@ export function VehicleCalendar({
                     summary={summary}
                     row={dialog.row}
                     decision={dialog.decision}
-                    onClose={() => setDialog(null)}
-                    onSaved={changed}
+                    onClose={() => {
+                        undoPlan.current = null;
+                        setDialog(null);
+                    }}
+                    onSaved={() => {
+                        changed();
+                        offerUndo();
+                    }}
                 />
             )}
             {dialog?.kind === 'appointment' && summary && (
@@ -1572,6 +1651,7 @@ export function VehicleCalendar({
                     workOrderId={dialog.workOrderId}
                     appointment={dialog.appointment}
                     presetType={dialog.presetType}
+                    source={dialog.source}
                     onClose={() => setDialog(null)}
                     onSaved={changed}
                 />
@@ -1616,6 +1696,7 @@ export function VehicleCalendar({
                     title={dialog.title}
                     description={`${[vehicle.asset_tag, vehicle.name].filter(Boolean).join(' · ')} · Source record`}
                     rows={dialog.rows}
+                    action={dialog.action}
                     onClose={() => setDialog(null)}
                 />
             )}
@@ -1654,6 +1735,14 @@ export function VehicleCalendar({
                     }
                     sourceType={dialog.source}
                     sourceId={dialog.id}
+                    onClose={() => setDialog(null)}
+                    onSaved={changed}
+                />
+            )}
+            {dialog?.kind === 'document' && (
+                <DocumentEditDialog
+                    workspace={workspace}
+                    set={dialog.set}
                     onClose={() => setDialog(null)}
                     onSaved={changed}
                 />

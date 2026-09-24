@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Schema;
  * - A confirmed driver on each trip, with the confirmations kept as history.
  *   A checked-out booking is shown as the booked driver until someone
  *   confirms who actually drove; it is never written here on its own.
+ *   Confirmations are evidence, so a trip or vehicle that has them can't be
+ *   deleted (restrict, not cascade).
  * - `fleet_driving_metrics.harsh_other_count`: Queclink harsh reports that
  *   are cornering or carry no type, which were previously not counted.
  *
@@ -39,9 +41,9 @@ return new class extends Migration
         Schema::create('fleet_trip_driver_confirmations', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('fleet_trip_id')
-                ->constrained('fleet_trips', 'id', 'fleet_trip_driver_conf_trip_fk')->cascadeOnDelete();
+                ->constrained('fleet_trips', 'id', 'fleet_trip_driver_conf_trip_fk')->restrictOnDelete();
             $table->foreignId('asset_id')
-                ->constrained('assets', 'id', 'fleet_trip_driver_conf_asset_fk')->cascadeOnDelete();
+                ->constrained('assets', 'id', 'fleet_trip_driver_conf_asset_fk')->restrictOnDelete();
             $table->foreignId('driver_user_id')->nullable()
                 ->constrained('users', 'id', 'fleet_trip_driver_conf_driver_fk')->nullOnDelete();
             $table->foreignId('previous_driver_user_id')->nullable()

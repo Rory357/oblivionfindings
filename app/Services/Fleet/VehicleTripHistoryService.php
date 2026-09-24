@@ -31,6 +31,11 @@ use Illuminate\Validation\ValidationException;
  * Sites. Consent-blocked telemetry is never read; personal trips are listed
  * as the trips index lists them but never scored, totalled as driving
  * events or exported.
+ *
+ * One list request reads a limited stretch of history: with no dates, the
+ * latest DEFAULT_WINDOW_DAYS days of the vehicle's trips; a date range is
+ * kept to MAX_RANGE_DAYS; and at most MAX_LIST_TRIPS trips, newest first.
+ * The response says when a limit left trips out.
  */
 final class VehicleTripHistoryService
 {
@@ -39,6 +44,15 @@ final class VehicleTripHistoryService
     public const DEFAULT_PAGE_SIZE = 2;
 
     public const MAX_PAGE_SIZE = 25;
+
+    /** "All recorded dates": the days up to and including the latest trip's day. */
+    public const DEFAULT_WINDOW_DAYS = 90;
+
+    /** The most days between a range's first and last date (a year, as exports allow). */
+    public const MAX_RANGE_DAYS = 366;
+
+    /** The most trips one list request reads and analyses, newest first. */
+    public const MAX_LIST_TRIPS = 500;
 
     public const DETAIL_POINT_CAP = 2000;
 
@@ -111,13 +125,27 @@ final class VehicleTripHistoryService
      */
     public function list(User $user, Asset $asset, array $filters, int $page = 1, int $perPage = self::DEFAULT_PAGE_SIZE, bool $summaryOnly = false): array
     {
-        $result = $this->pipeline($user, $asset, $filters, $this->siteIds($user));
+        $window = $this->window($asset, $filters);
+        $result = $this->pipeline($user, $asset, ['from' => $window['from'], 'to' => $window['to']] + $filters,
+            $this->siteIds($user), self::MAX_LIST_TRIPS);
         $trips = $result['trips'];
-        $summary = $this->summary($trips, $result['analysis']);
+        $analysis = $result['analysis'];
+        $summary = $this->summary($trips, $analysis);
         $response = [
             'vehicle' => $this->vehicleIdentity($asset),
             'summary' => $summary,
             'filters' => $filters,
+            // The dates actually read, and why they differ from the request.
+            'window' => $window + [
+                'earlier_trips' => $window['limited'] !== null && $this->baseTrips($asset)
+                    ->where('started_at', '<', self::localDayStart($window['from']))->exists(),
+            ],
+            'truncated' => $result['truncated'],
+            'limits' => [
+                'default_days' => self::DEFAULT_WINDOW_DAYS,
+                'max_range_days' => self::MAX_RANGE_DAYS,
+                'max_trips' => self::MAX_LIST_TRIPS,
+            ],
             'timezone' => self::zone(),
         ];
         if ($summaryOnly) {
@@ -129,12 +157,15 @@ final class VehicleTripHistoryService
         $lastPage = max(1, (int) ceil($total / $perPage));
         $page = max(1, min($lastPage, $page));
         $slice = array_slice($trips, ($page - 1) * $perPage, $perPage);
+        // Personal and consent-restricted trips are only analysed when shown.
+        $unread = array_values(array_filter($slice, fn (FleetTrip $trip): bool => ! isset($analysis[$trip->id])));
+        $analysis += $this->analyse($asset, $unread, false, 0);
 
         return $response + [
             'data' => array_map(fn (FleetTrip $trip): array => $this->listItem(
                 $trip,
                 $result['attribution'][$trip->id],
-                $result['analysis'][$trip->id],
+                $analysis[$trip->id],
             ), $slice),
             'trip_ids' => array_map(fn (FleetTrip $trip): int => (int) $trip->id, $trips),
             'meta' => ['page' => $page, 'per_page' => $perPage, 'total' => $total, 'last_page' => $lastPage],
@@ -486,11 +517,60 @@ final class VehicleTripHistoryService
     }
 
     /**
+     * The local dates one list request reads. With no dates, the latest
+     * DEFAULT_WINDOW_DAYS days up to the vehicle's most recent trip
+     * ('recent'); a range longer than MAX_RANGE_DAYS, or one without a first
+     * date, keeps its most recent MAX_RANGE_DAYS ('range').
+     *
+     * @param  array{q:string,from:?string,to:?string,driver:string,event:string}  $filters
+     * @return array{from:string,to:?string,limited:?string}
+     */
+    private function window(Asset $asset, array $filters): array
+    {
+        $zone = self::zone();
+        if ($filters['from'] === null && $filters['to'] === null) {
+            // Never after today, so a trip with a wrong future time can't hide the rest.
+            $latest = $this->baseTrips($asset)->max('started_at');
+            $anchor = $latest !== null
+                ? CarbonImmutable::parse((string) $latest, 'UTC')->setTimezone($zone)->min(CarbonImmutable::now($zone))
+                : CarbonImmutable::now($zone);
+
+            return [
+                'from' => $anchor->startOfDay()->subDays(self::DEFAULT_WINDOW_DAYS - 1)->toDateString(),
+                'to' => null,
+                'limited' => 'recent',
+            ];
+        }
+
+        $last = $filters['to'] !== null
+            ? CarbonImmutable::createFromFormat('!Y-m-d', $filters['to'], $zone)
+            : CarbonImmutable::now($zone)->startOfDay();
+        $earliest = $last->subDays(self::MAX_RANGE_DAYS)->toDateString();
+        if ($filters['from'] === null || $filters['from'] < $earliest) {
+            return ['from' => $earliest, 'to' => $filters['to'], 'limited' => 'range'];
+        }
+
+        return ['from' => $filters['from'], 'to' => $filters['to'], 'limited' => null];
+    }
+
+    /** The UTC moment a Pacific/Auckland day begins. */
+    private static function localDayStart(string $day): CarbonImmutable
+    {
+        return CarbonImmutable::createFromFormat('!Y-m-d', $day, self::zone())->utc();
+    }
+
+    /**
+     * The trips matching the filters, with their attribution and analysis.
+     * With a cap, only the newest $cap trips in the dates are read and
+     * `truncated` says whether more exist. Business trips are always
+     * analysed (the totals count their driving events); personal and
+     * consent-restricted trips only when an event filter reads them.
+     *
      * @param  array{q:string,from:?string,to:?string,driver:string,event:string}  $filters
      * @param  list<int>  $siteIds
-     * @return array{trips:list<FleetTrip>,attribution:array<int,array<string,mixed>>,analysis:array<int,array<string,mixed>>,drivers:list<array<string,mixed>>,unassigned:int}
+     * @return array{trips:list<FleetTrip>,attribution:array<int,array<string,mixed>>,analysis:array<int,array<string,mixed>>,drivers:list<array<string,mixed>>,unassigned:int,truncated:bool}
      */
-    private function pipeline(User $viewer, Asset $asset, array $filters, array $siteIds): array
+    private function pipeline(User $viewer, Asset $asset, array $filters, array $siteIds, ?int $cap = null): array
     {
         $zone = self::zone();
         $query = $this->baseTrips($asset)
@@ -501,13 +581,22 @@ final class VehicleTripHistoryService
         if ($filters['to']) {
             $query->where('started_at', '<', CarbonImmutable::createFromFormat('!Y-m-d', $filters['to'], $zone)->addDay()->utc());
         }
+        if ($cap !== null) {
+            $query->limit($cap + 1);
+        }
         $inRange = $query->get();
+        $truncated = $cap !== null && $inRange->count() > $cap;
+        if ($truncated) {
+            $inRange = $inRange->take($cap)->values();
+        }
         $attribution = $this->attribute($viewer, $asset, $inRange, $siteIds);
         [$drivers, $unassigned] = $this->driverOptions($inRange, $attribution);
 
         $matching = $inRange->filter(fn (FleetTrip $trip): bool => $this->matches($trip, $attribution[$trip->id], $filters))
             ->values()->all();
-        $analysis = $this->analyse($asset, $matching, false, 0);
+        $analysis = $this->analyse($asset, in_array($filters['event'], ['faults', 'partial'], true)
+            ? $matching
+            : array_values(array_filter($matching, fn (FleetTrip $trip): bool => ! self::withheld($trip))), false, 0);
         $trips = array_values(array_filter($matching, fn (FleetTrip $trip): bool => match ($filters['event']) {
             'overspeed' => ! self::withheld($trip) && $analysis[$trip->id]['overspeed_episodes'] > 0,
             'faults' => $analysis[$trip->id]['faults'] > 0,
@@ -521,6 +610,7 @@ final class VehicleTripHistoryService
             'analysis' => $analysis,
             'drivers' => $drivers,
             'unassigned' => $unassigned,
+            'truncated' => $truncated,
         ];
     }
 

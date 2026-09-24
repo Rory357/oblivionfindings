@@ -30,6 +30,7 @@ import {
     SourceRecordDialog,
 } from './studio-kit';
 import type { ServiceHistoryRow, VehicleWorkspace } from './types';
+import { StudioNotice } from './wizard-kit';
 import { WorkEvidenceDialog } from './work-evidence-dialog';
 import { formatKm, type WorkspaceLocation } from './workspace-model';
 
@@ -118,6 +119,17 @@ export function HistoryPanel({
                     />
                 </div>
             </SectionHeading>
+            {!can.view_maintenance && (
+                <StudioNotice title="Maintenance work stays with the vehicle’s Site">
+                    Recorded services are listed here. Completed and cancelled
+                    Maintenance work is shown to people with Maintenance access
+                    at{' '}
+                    {vehicle.home_site?.name ??
+                        vehicle.site?.name ??
+                        'its Site'}
+                    .
+                </StudioNotice>
+            )}
             <div className="history-summary">
                 <div>
                     <Wrench className="size-[18px]" aria-hidden />

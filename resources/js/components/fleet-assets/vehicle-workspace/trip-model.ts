@@ -1,4 +1,5 @@
 import type { StatusVariant } from '@/components/ui/status-badge';
+import { formatDateOnly } from '@/lib/datetime';
 import type {
     TripBehaviour,
     TripDriver,
@@ -6,12 +7,19 @@ import type {
     TripEvent,
     TripEventFilter,
     TripListItem,
+    TripListResponse,
     TripPoint,
     TripPolicy,
 } from './trip-types';
 
 /** The approved trip selector shows two trips per page. */
 export const TRIPS_PER_PAGE = 2;
+
+/**
+ * The most days between the first and last date of an export
+ * (VehicleTripHistoryService::MAX_RANGE_DAYS, a year).
+ */
+export const MAX_RANGE_DAYS = 366;
 
 export const EVENT_FILTERS: Array<{ value: TripEventFilter; label: string }> = [
     { value: 'all', label: 'All types' },
@@ -74,6 +82,45 @@ export function rangeInvalid(filters: TripFilterState): boolean {
         !!filters.to &&
         filters.to < filters.from
     );
+}
+
+/** Whole days from one YYYY-MM-DD date to another. */
+export function daysBetween(from: string, to: string): number {
+    return Math.round(
+        (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
+            86_400_000,
+    );
+}
+
+/**
+ * What to say under the totals when the list holds fewer trips than the
+ * filters ask for: "All recorded dates" covers the latest days of trips, a
+ * range covers at most a year, and one list reads a limited number of trips.
+ */
+export function tripWindowNotice(
+    list: Pick<TripListResponse, 'window' | 'truncated' | 'limits'>,
+): { title: string; body: string } | null {
+    const { truncated, limits } = list;
+    const read = list.window;
+    const from = formatDateOnly(read.from);
+    if (truncated) {
+        const trips = limits.max_trips.toLocaleString('en-NZ');
+        return {
+            title: `Showing the latest ${trips} trips`,
+            body: `These dates have more than ${trips} trips, so the list and its totals include only the ${trips} most recent. To see earlier trips, choose a shorter date range.`,
+        };
+    }
+    if (read.limited === 'range')
+        return {
+            title: 'Showing one year of trips',
+            body: `Trip history shows up to a year at a time, so this list starts on ${from}. To see earlier trips, choose a date range of a year or less.`,
+        };
+    if (read.limited === 'recent' && read.earlier_trips)
+        return {
+            title: `Showing the latest ${limits.default_days} days of trips`,
+            body: `All recorded dates covers the ${limits.default_days} days up to the latest trip, from ${from}. To see earlier trips, choose a custom date range.`,
+        };
+    return null;
 }
 
 export function tripQuery(

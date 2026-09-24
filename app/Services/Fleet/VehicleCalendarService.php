@@ -17,6 +17,8 @@ use App\Models\User;
 use App\Services\Fleet\Data\VehicleReadinessContext;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -30,6 +32,11 @@ use Illuminate\Support\Facades\Gate;
 class VehicleCalendarService
 {
     private const ZONE = 'Pacific/Auckland';
+
+    private const OPEN_WORK = ['open', 'in_progress', 'on_hold'];
+
+    /** Provider actions that leave an appointment planned. */
+    private const LIVE_PROVIDER_STATES = ['plan_provider', 'record_provider_confirmation'];
 
     public const BOOKING_STATUS_LABELS = [
         'pending' => 'Pending approval',
@@ -50,15 +57,22 @@ class VehicleCalendarService
     /** @return list<array<string,mixed>> */
     public function events(User $viewer, Asset $asset, CarbonImmutable $start, CarbonImmutable $end): array
     {
+        return $this->feed($viewer, $asset, $start, $end, $this->bookable($viewer, $asset), $this->readsMaintenance($viewer, $asset));
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function feed(User $viewer, Asset $asset, CarbonImmutable $start, CarbonImmutable $end, bool $bookable, bool $readsMaintenance): array
+    {
         $items = [];
-        $readsMaintenance = $this->readsMaintenance($viewer, $asset);
         if ($readsMaintenance) {
+            $plans = $this->providerPlans($asset);
+            $held = $this->heldWorkIds($asset);
             array_push($items, ...$this->restrictionItems($asset, $start, $end));
-            array_push($items, ...$this->appointmentItems($asset, $start, $end));
-            array_push($items, ...$this->estimateItems($asset, $start, $end));
+            array_push($items, ...$this->appointmentItems($plans, $held, $start, $end));
+            array_push($items, ...$this->estimateItems($asset, $plans, $held, $start, $end));
         }
         array_push($items, ...$this->bookingItems($viewer, $asset, $start, $end));
-        array_push($items, ...$this->unavailableItems($asset, $start, $end));
+        array_push($items, ...$this->unavailableItems($asset, $start, $end, $bookable, $readsMaintenance));
         array_push($items, ...$this->reminderItems($asset, $start, $end));
 
         usort($items, fn (array $a, array $b): int => strcmp((string) $a['start'], (string) $b['start']));
@@ -72,6 +86,7 @@ class VehicleCalendarService
         $now = CarbonImmutable::now();
         $readsMaintenance = $this->readsMaintenance($viewer, $asset);
         $restriction = $readsMaintenance ? $this->activeRestriction($asset) : null;
+        $bookable = $this->bookable($viewer, $asset);
         $assessment = $this->readiness->assess($asset, new VehicleReadinessContext(
             purpose: 'booking_request', startsAt: $now, endsAt: $now->addHour(),
         ));
@@ -79,7 +94,7 @@ class VehicleCalendarService
             ->first(fn ($reason): bool => $reason->blocksDecision && ! str_starts_with($reason->code, 'driver.')
                 && ! str_starts_with($reason->code, 'booking.'));
 
-        $upcoming = $this->events($viewer, $asset, $now->startOfDay(), $now->addYear());
+        $upcoming = $this->feed($viewer, $asset, $now->startOfDay(), $now->addYear(), $bookable, $readsMaintenance);
         $nextAppointment = collect($upcoming)->first(fn (array $item): bool => $item['kind'] === 'appointment'
             && $item['status'] !== 'completed');
         $nextDue = collect($upcoming)->first(fn (array $item): bool => $item['source'] === 'compliance');
@@ -91,25 +106,59 @@ class VehicleCalendarService
             ],
             'restriction' => $restriction,
             'use_problem' => $useProblem?->message,
+            // Lets the calendar link the problem to where it's resolved.
+            'use_problem_code' => $useProblem?->code,
+            'use_problem_kind' => $useProblem?->kind,
+            // The reason's source record, e.g. the check run holding the vehicle.
+            'use_problem_source_id' => $useProblem?->sourceId,
             'readiness_label' => $restriction ? 'Restricted' : ($assessment->canProceed ? 'Ready' : 'Needs assessment'),
             'next_appointment' => $nextAppointment ? ['start' => $nextAppointment['start'], 'title' => $nextAppointment['title'], 'id' => $nextAppointment['id']] : null,
             'next_due' => $nextDue ? ['start' => $nextDue['start'], 'title' => $nextDue['title'], 'id' => $nextDue['id']] : null,
-            'bookings' => $this->bookingRows($viewer, $asset),
-            'drivers' => $this->drivers($asset),
+            'bookings' => $this->bookingRows($viewer, $asset, $bookable, $readsMaintenance),
+            // Drivers follow the booking rule (the vehicle's Site).
+            'drivers' => $bookable ? $this->drivers($asset) : [],
             'open_work' => $readsMaintenance ? $this->openWork($asset) : [],
             'can' => [
-                'request' => $viewer->canDo('fleet.viewAny') || $viewer->canDo('assets.viewAny'),
+                'view_bookings' => $bookable,
+                'request' => $bookable && ($viewer->canDo('fleet.viewAny') || $viewer->canDo('assets.viewAny')),
                 'manage' => $viewer->canDo('fleet.manage'),
-                'approve' => $viewer->canDo('fleet.bookings.approve') || $viewer->canDo('fleet.manage'),
-                'authority' => $viewer->canDo('fleet.bookings.approve') || $viewer->canDo('fleet.manage'),
+                'approve' => $bookable && ($viewer->canDo('fleet.bookings.approve') || $viewer->canDo('fleet.manage')),
+                'authority' => $bookable && ($viewer->canDo('fleet.bookings.approve') || $viewer->canDo('fleet.manage')),
                 'schedule_service' => $this->maintenance->canManage($viewer)
                     && in_array((int) $asset->site_id, $this->maintenance->approvedSiteIds($viewer), true),
                 'report_work' => $this->maintenance->canReport($viewer),
                 'add_reminder' => $viewer->canDo('fleet.manage'),
-                'mark_unavailable' => $viewer->canDo('fleet.manage'),
+                'mark_unavailable' => $bookable && $viewer->canDo('fleet.manage'),
                 'view_maintenance' => $readsMaintenance,
+                // An authorised release reviewer for this vehicle's Site and category.
+                'review_release' => $this->maintenance->canReview($viewer, $asset),
             ],
         ];
+    }
+
+    /**
+     * One booking or unavailable period, exactly as the summary lists it, for
+     * a record outside the summary's capped lists. Both keep the booking rule
+     * (the viewer's own Sites); periods must belong to the vehicle. Null when
+     * not found or not open to the viewer.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function record(User $viewer, Asset $asset, string $kind, int $id): ?array
+    {
+        if ($kind === 'booking') {
+            $booking = $this->custodyBookings($viewer, $asset)->whereKey($id)->first();
+
+            return $booking ? $this->bookingCustodyRows($viewer, $asset, collect([$booking]))[0] : null;
+        }
+        if ($kind === 'unavailable' && $this->bookable($viewer, $asset)) {
+            $period = $this->custodyPeriods($asset)->whereKey($id)->first();
+
+            return $period ? $this->periodCustodyRows($viewer, $asset, collect([$period]),
+                $this->readsMaintenance($viewer, $asset))[0] : null;
+        }
+
+        return null;
     }
 
     private function readsMaintenance(User $viewer, Asset $asset): bool
@@ -118,39 +167,55 @@ class VehicleCalendarService
             && in_array((int) $asset->site_id, $this->maintenance->approvedSiteIds($viewer), true);
     }
 
+    /**
+     * Whether the vehicle is at one of the viewer's own Sites. Central fleet
+     * oversight opens the vehicle's records; its bookings, drivers and
+     * unavailable periods keep this booking rule.
+     */
+    private function bookable(User $viewer, Asset $asset): bool
+    {
+        return $this->bookings->vehicle($viewer, (int) $asset->id) !== null;
+    }
+
     /** @return array<string,mixed>|null */
     private function activeRestriction(Asset $asset): ?array
     {
-        $row = DB::table('fleet_maintenance_restrictions as restriction')
-            ->join('fleet_work_orders as work', 'work.id', '=', 'restriction.work_order_id')
-            ->where('restriction.asset_id', $asset->id)->where('restriction.state', 'active')
-            ->orderBy('restriction.created_at')
-            ->first(['restriction.id', 'restriction.created_at', 'restriction.restriction_kind',
-                'work.id as work_order_id', 'work.reference_number', 'work.title']);
+        $row = $this->restrictionRows($asset)->where('restriction.state', 'active')
+            ->orderBy('restriction.created_at')->orderBy('restriction.id')->first();
+        if (! $row) {
+            return null;
+        }
+        $record = $this->restrictionRecord($row);
 
-        return $row ? [
+        return [
             'id' => (int) $row->id,
             'started_at' => CarbonImmutable::parse($row->created_at, 'UTC')->setTimezone(self::ZONE)->toIso8601String(),
             'kind' => $row->restriction_kind,
             'work_order_id' => (int) $row->work_order_id,
             'work_reference' => $row->reference_number,
             'work_title' => $row->title,
-        ] : null;
+            'work_status' => $record['work_status'],
+            'owner' => $record['owner'],
+            'source_check' => $record['source_check'],
+        ];
     }
 
-    /** @return list<array<string,mixed>> */
+    /**
+     * Restriction records. An active one has no end yet, so it spans the whole
+     * browsed window; a released one ends on its release day.
+     *
+     * @return list<array<string,mixed>>
+     */
     private function restrictionItems(Asset $asset, CarbonImmutable $start, CarbonImmutable $end): array
     {
-        return DB::table('fleet_maintenance_restrictions as restriction')
-            ->join('fleet_work_orders as work', 'work.id', '=', 'restriction.work_order_id')
-            ->where('restriction.asset_id', $asset->id)
+        $windowEnd = $end->setTimezone(self::ZONE);
+
+        return $this->restrictionRows($asset)
             ->where('restriction.created_at', '<', $end->utc())
             ->where(fn ($open) => $open->where('restriction.state', 'active')
                 ->orWhere('restriction.released_at', '>=', $start->utc()))
-            ->orderBy('restriction.id')
-            ->get(['restriction.id', 'restriction.state', 'restriction.created_at', 'restriction.released_at',
-                'work.id as work_order_id', 'work.reference_number'])
-            ->map(function (object $row): array {
+            ->orderBy('restriction.id')->get()
+            ->map(function (object $row) use ($windowEnd): array {
                 $active = $row->state === 'active';
                 $started = CarbonImmutable::parse($row->created_at, 'UTC')->setTimezone(self::ZONE)->startOfDay();
                 $released = $row->released_at
@@ -160,18 +225,67 @@ class VehicleCalendarService
                 return $this->item(
                     id: 'restriction:'.$row->id, kind: 'restriction', source: 'damage',
                     title: $active ? 'Restriction started · still active' : 'Restriction · released',
-                    start: $started, end: $active ? null : $released, allDay: true,
+                    start: $started, end: $active ? $windowEnd : $released, allDay: true,
                     status: $active ? 'overdue' : 'completed', statusLabel: $active ? 'Active restriction' : 'Released',
                     ref: $row->reference_number, recordId: (int) $row->id,
                     link: '/fleet-assets/maintenance/work-orders/'.$row->work_order_id,
                     desc: $active ? 'No end or authorised release recorded. Calendar gaps do not mean available.' : null,
                     workOrderId: (int) $row->work_order_id,
+                    meta: $this->restrictionRecord($row),
                 );
             })->all();
     }
 
-    /** Latest provider action per work order wins; one stable identity per work order. @return list<array<string,mixed>> */
-    private function appointmentItems(Asset $asset, CarbonImmutable $start, CarbonImmutable $end): array
+    /** A vehicle's restrictions with their work, its owner and the check that raised each. */
+    private function restrictionRows(Asset $asset): QueryBuilder
+    {
+        return DB::table('fleet_maintenance_restrictions as restriction')
+            ->join('fleet_work_orders as work', 'work.id', '=', 'restriction.work_order_id')
+            ->leftJoin('users as owner', 'owner.id', '=', 'work.assigned_to_user_id')
+            ->leftJoin('fleet_checklist_runs as run', 'run.id', '=', 'restriction.source_run_id')
+            ->leftJoin('fleet_checklist_templates as template', 'template.id', '=', 'run.template_id')
+            ->where('restriction.asset_id', $asset->id)
+            ->select(['restriction.id', 'restriction.state', 'restriction.created_at', 'restriction.released_at',
+                'restriction.restriction_kind', 'work.id as work_order_id', 'work.reference_number', 'work.title',
+                'work.status as work_status', 'owner.name as owner_name', 'run.id as run_id', 'run.outcome as run_outcome',
+                'run.presented_template_json as run_template', 'template.name as template_name']);
+    }
+
+    /**
+     * The restriction record shown in place: the work's owner and status and
+     * the check that raised it.
+     *
+     * @return array{owner:?string,source_check:?array{id:int,label:string,outcome:string},work_status:?string,work_reference:?string}
+     */
+    private function restrictionRecord(object $row): array
+    {
+        $check = null;
+        if ($row->run_id !== null) {
+            $presented = json_decode((string) $row->run_template, true);
+            $name = is_array($presented) && is_string($presented['name'] ?? null) && trim($presented['name']) !== ''
+                ? trim($presented['name']) : ($row->template_name ?: 'Vehicle check');
+            $check = [
+                'id' => (int) $row->run_id,
+                'label' => $name.' · CHK-'.$row->run_id,
+                'outcome' => (string) ($row->run_outcome ?? 'needs_assessment'),
+            ];
+        }
+
+        return [
+            'owner' => $row->owner_name,
+            'source_check' => $check,
+            'work_status' => $row->work_status,
+            'work_reference' => $row->reference_number,
+        ];
+    }
+
+    /**
+     * The latest provider action and plan of each work order of this vehicle
+     * that was ever planned with a provider.
+     *
+     * @return array<int, array{state:string, plan:?array<string,mixed>}>
+     */
+    private function providerPlans(Asset $asset): array
     {
         $workIds = DB::table('fleet_maintenance_actions as action')
             ->join('fleet_work_orders as work', 'work.id', '=', 'action.work_order_id')
@@ -192,13 +306,37 @@ class VehicleCalendarService
                     $latest[$id]['plan'] = json_decode((string) $action->payload_json, true);
                 }
             });
-        $work = FleetWorkOrder::query()->whereKey($workIds)->get(['id', 'reference_number', 'title', 'status', 'version']);
-        $held = FleetVehicleUnavailablePeriod::query()->where('asset_id', $asset->id)
-            ->whereIn('work_order_id', $workIds)->where('state', FleetVehicleUnavailablePeriod::STATE_ACTIVE)
-            ->pluck('work_order_id')->map(fn (mixed $id): int => (int) $id)->all();
+
+        return array_map(fn (array $row): array => [
+            'state' => (string) $row['state'],
+            'plan' => is_array($row['plan'] ?? null) ? $row['plan'] : null,
+        ], $latest);
+    }
+
+    /** Work orders whose appointment holds the vehicle now. @return list<int> */
+    private function heldWorkIds(Asset $asset): array
+    {
+        return FleetVehicleUnavailablePeriod::query()->where('asset_id', $asset->id)->whereNotNull('work_order_id')
+            ->where('state', FleetVehicleUnavailablePeriod::STATE_ACTIVE)
+            ->pluck('work_order_id')->map(fn (mixed $id): int => (int) $id)->unique()->values()->all();
+    }
+
+    /**
+     * Latest provider action per work order wins; one stable identity per work order.
+     *
+     * @param  array<int, array{state:string, plan:?array<string,mixed>}>  $plans
+     * @param  list<int>  $held
+     * @return list<array<string,mixed>>
+     */
+    private function appointmentItems(array $plans, array $held, CarbonImmutable $start, CarbonImmutable $end): array
+    {
+        if ($plans === []) {
+            return [];
+        }
+        $work = FleetWorkOrder::query()->whereKey(array_keys($plans))->get(['id', 'reference_number', 'title', 'status', 'version']);
         $items = [];
         foreach ($work as $order) {
-            $source = $latest[$order->id] ?? null;
+            $source = $plans[(int) $order->id] ?? null;
             $plan = $source['plan'] ?? null;
             if (! is_array($plan) || empty($plan['starts_at']) || empty($plan['ends_at'])
                 || $source['state'] === 'record_provider_cancellation' || $order->status === 'cancelled') {
@@ -225,7 +363,7 @@ class VehicleCalendarService
                 meta: [
                     'provider' => $plan['provider_name'] ?? null,
                     'unavailable' => in_array((int) $order->id, $held, true),
-                    'open' => in_array($order->status, ['open', 'in_progress', 'on_hold'], true)
+                    'open' => in_array($order->status, self::OPEN_WORK, true)
                         && $source['state'] !== 'record_provider_completion',
                 ],
             );
@@ -234,8 +372,15 @@ class VehicleCalendarService
         return $items;
     }
 
-    /** @return list<array<string,mixed>> */
-    private function estimateItems(Asset $asset, CarbonImmutable $start, CarbonImmutable $end): array
+    /**
+     * Advisory estimates; one whose work already has a planned appointment
+     * carries it, so the calendar can show both together.
+     *
+     * @param  array<int, array{state:string, plan:?array<string,mixed>}>  $plans
+     * @param  list<int>  $held
+     * @return list<array<string,mixed>>
+     */
+    private function estimateItems(Asset $asset, array $plans, array $held, CarbonImmutable $start, CarbonImmutable $end): array
     {
         return DB::table('fleet_maintenance_reports as report')
             ->join('fleet_work_orders as work', 'work.id', '=', 'report.work_order_id')
@@ -247,17 +392,46 @@ class VehicleCalendarService
             ->orderBy('report.id')
             ->get(['report.id', 'report.work_order_id', 'report.estimated_start_date', 'report.estimated_end_date',
                 'work.reference_number'])
-            ->map(fn (object $row): array => $this->item(
-                id: 'estimate:'.$row->id, kind: 'estimate', source: 'asset',
-                title: 'Estimated work · advisory',
-                start: CarbonImmutable::parse($row->estimated_start_date, self::ZONE)->startOfDay(),
-                end: CarbonImmutable::parse($row->estimated_end_date, self::ZONE)->addDay()->startOfDay(),
-                allDay: true, status: 'scheduled', statusLabel: 'Advisory dates',
-                ref: $row->reference_number, recordId: (int) $row->work_order_id,
-                link: '/fleet-assets/maintenance/work-orders/'.$row->work_order_id,
-                desc: 'Planning estimate from a maintenance report. It does not reserve the vehicle.',
-                workOrderId: (int) $row->work_order_id,
-            ))->all();
+            ->map(function (object $row) use ($plans, $held): array {
+                $appointment = $this->liveAppointment($plans[(int) $row->work_order_id] ?? null, (int) $row->work_order_id, $held);
+
+                return $this->item(
+                    id: 'estimate:'.$row->id, kind: 'estimate', source: 'asset',
+                    title: 'Estimated work · advisory',
+                    start: CarbonImmutable::parse($row->estimated_start_date, self::ZONE)->startOfDay(),
+                    end: CarbonImmutable::parse($row->estimated_end_date, self::ZONE)->addDay()->startOfDay(),
+                    allDay: true, status: 'scheduled', statusLabel: 'Advisory dates',
+                    ref: $row->reference_number, recordId: (int) $row->work_order_id,
+                    link: '/fleet-assets/maintenance/work-orders/'.$row->work_order_id,
+                    desc: 'Planning estimate from a maintenance report. It does not reserve the vehicle.',
+                    workOrderId: (int) $row->work_order_id,
+                    meta: $appointment ? ['appointment' => $appointment] : null,
+                );
+            })->all();
+    }
+
+    /**
+     * The appointment still planned on a work order (planned or confirmed,
+     * not cancelled or completed), wherever it falls.
+     *
+     * @param  array{state:string, plan:?array<string,mixed>}|null  $source
+     * @param  list<int>  $held
+     * @return array{start:string,end:string,provider:?string,unavailable:bool}|null
+     */
+    private function liveAppointment(?array $source, int $workOrderId, array $held): ?array
+    {
+        $plan = $source['plan'] ?? null;
+        if ($source === null || ! in_array($source['state'], self::LIVE_PROVIDER_STATES, true)
+            || ! is_array($plan) || empty($plan['starts_at']) || empty($plan['ends_at'])) {
+            return null;
+        }
+
+        return [
+            'start' => CarbonImmutable::parse($plan['starts_at'], 'UTC')->setTimezone(self::ZONE)->toIso8601String(),
+            'end' => CarbonImmutable::parse($plan['ends_at'], 'UTC')->setTimezone(self::ZONE)->toIso8601String(),
+            'provider' => isset($plan['provider_name']) ? (string) $plan['provider_name'] : null,
+            'unavailable' => in_array($workOrderId, $held, true),
+        ];
     }
 
     /** @return list<array<string,mixed>> */
@@ -296,21 +470,41 @@ class VehicleCalendarService
         })->all();
     }
 
-    /** @return list<array<string,mixed>> */
-    private function unavailableItems(Asset $asset, CarbonImmutable $start, CarbonImmutable $end): array
+    /**
+     * Unavailable periods. Outside the viewer's own Sites they are busy time
+     * only, like another Site's bookings. A period an appointment holds shows
+     * its work and provider only to those who can read Maintenance.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function unavailableItems(Asset $asset, CarbonImmutable $start, CarbonImmutable $end, bool $bookable, bool $readsMaintenance): array
     {
         return FleetVehicleUnavailablePeriod::query()->where('asset_id', $asset->id)
             ->overlapping($start->utc(), $end->utc())->orderBy('starts_at')->limit(200)->get()
-            ->map(fn (FleetVehicleUnavailablePeriod $period): array => $this->item(
-                id: 'unavailable:'.$period->id, kind: 'unavailable', source: 'respite',
-                title: 'Unavailable · '.$period->reason,
-                start: CarbonImmutable::parse($period->starts_at)->setTimezone(self::ZONE),
-                end: CarbonImmutable::parse($period->ends_at)->setTimezone(self::ZONE),
-                allDay: false, status: 'scheduled', statusLabel: 'Unavailable',
-                ref: null, recordId: (int) $period->id, link: null,
-                desc: 'Marked unavailable on the calendar. It does not create or clear a safety restriction.',
-                workOrderId: $period->work_order_id ? (int) $period->work_order_id : null,
-            ))->all();
+            ->map(function (FleetVehicleUnavailablePeriod $period) use ($bookable, $readsMaintenance): array {
+                $starts = CarbonImmutable::parse($period->starts_at)->setTimezone(self::ZONE);
+                $ends = CarbonImmutable::parse($period->ends_at)->setTimezone(self::ZONE);
+                if (! $bookable) {
+                    return $this->item(
+                        id: 'busy:unavailable-'.$period->id, kind: 'busy', source: 'respite', title: 'Busy',
+                        start: $starts, end: $ends, allDay: false, status: 'scheduled', statusLabel: 'Busy only',
+                        ref: null, recordId: null, link: null, desc: 'Details are restricted.',
+                    );
+                }
+                $held = $period->work_order_id !== null;
+                $withheld = $held && ! $readsMaintenance;
+
+                return $this->item(
+                    id: 'unavailable:'.$period->id, kind: 'unavailable', source: 'respite',
+                    title: 'Unavailable · '.($withheld ? 'Maintenance' : $period->reason),
+                    start: $starts, end: $ends, allDay: false, status: 'scheduled', statusLabel: 'Unavailable',
+                    ref: null, recordId: (int) $period->id, link: null,
+                    desc: 'Marked unavailable on the calendar. It does not create or clear a safety restriction.',
+                    workOrderId: $held && ! $withheld ? (int) $period->work_order_id : null,
+                    // Held by a service appointment: it moves and ends with the appointment.
+                    meta: $held ? ['held_by_appointment' => true] : null,
+                );
+            })->all();
     }
 
     /** Due dates and follow-ups; none of them reserve the vehicle. @return list<array<string,mixed>> */
@@ -378,17 +572,56 @@ class VehicleCalendarService
         return $items;
     }
 
-    /** Bookings and unavailable periods for the custody list. @return list<array<string,mixed>> */
-    private function bookingRows(User $viewer, Asset $asset): array
+    /**
+     * Bookings and unavailable periods for the custody list. Both keep the
+     * booking rule: outside the viewer's own Sites there are none.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function bookingRows(User $viewer, Asset $asset, bool $bookable, bool $readsMaintenance): array
     {
         $live = ['pending', 'approved', 'checked_out'];
-        $active = $this->bookings->accessibleBookings($viewer)->where('asset_id', $asset->id)
-            ->whereIn('status', $live)->with(['user:id,name', 'driver:id,name'])
+        $active = $this->custodyBookings($viewer, $asset)->whereIn('status', $live)
             ->orderBy('starts_at')->limit(50)->get();
-        $recent = $this->bookings->accessibleBookings($viewer)->where('asset_id', $asset->id)
-            ->whereNotIn('status', $live)->with(['user:id,name', 'driver:id,name'])
+        $recent = $this->custodyBookings($viewer, $asset)->whereNotIn('status', $live)
             ->orderByDesc('ends_at')->limit(10)->get();
-        $shown = $active->concat($recent)->values();
+        $periods = $bookable
+            ? $this->custodyPeriods($asset)
+                ->where(fn ($query) => $query->where('state', 'active')->where('ends_at', '>=', now()->subDays(30))
+                    ->orWhere(fn ($cancelled) => $cancelled->where('state', 'cancelled')->where('cancelled_at', '>=', now()->subDays(30))))
+                ->orderBy('starts_at')->limit(40)->get()
+            : collect();
+
+        return [
+            ...$this->bookingCustodyRows($viewer, $asset, $active->concat($recent)->values()),
+            ...$this->periodCustodyRows($viewer, $asset, $periods, $readsMaintenance),
+        ];
+    }
+
+    /** The viewer's bookings of this vehicle (the booking Site rule). */
+    private function custodyBookings(User $viewer, Asset $asset): Builder
+    {
+        return $this->bookings->accessibleBookings($viewer)->where('asset_id', $asset->id)
+            ->with(['user:id,name', 'driver:id,name']);
+    }
+
+    private function custodyPeriods(Asset $asset): Builder
+    {
+        return FleetVehicleUnavailablePeriod::query()->where('asset_id', $asset->id)->with('workOrder:id,reference_number');
+    }
+
+    /**
+     * Custody rows for bookings: details, history, keys, files and what the
+     * viewer can do. The summary and the single-record lookup both use it.
+     *
+     * @param  Collection<int,FleetVehicleBooking>  $shown
+     * @return list<array<string,mixed>>
+     */
+    private function bookingCustodyRows(User $viewer, Asset $asset, Collection $shown): array
+    {
+        if ($shown->isEmpty()) {
+            return [];
+        }
         $history = $this->history(FleetVehicleBooking::class, $shown->pluck('id')->all(), 'fleet.booking.');
         $keys = FleetKeyLog::query()->whereIn('booking_id', $shown->pluck('id'))->orderBy('id')
             ->with('user:id,name')->get(['id', 'booking_id', 'action', 'user_id', 'created_at'])->groupBy('booking_id');
@@ -401,7 +634,7 @@ class VehicleCalendarService
         $manage = $viewer->canDo('fleet.manage');
         $approve = $viewer->canDo('fleet.bookings.approve') || $manage;
 
-        $rows = $shown->map(function (FleetVehicleBooking $booking) use ($viewer, $history, $keys, $files, $asset, $manage, $approve, $uploads): array {
+        return $shown->map(function (FleetVehicleBooking $booking) use ($viewer, $history, $keys, $files, $asset, $manage, $approve, $uploads): array {
             $status = $booking->status;
             $selfIndependent = $booking->approval_route !== 'not_required' && (int) $booking->user_id === (int) $viewer->id;
 
@@ -456,41 +689,64 @@ class VehicleCalendarService
                     'upload' => $uploads || $approve || (int) $booking->user_id === (int) $viewer->id,
                 ],
             ];
-        })->all();
+        })->values()->all();
+    }
 
-        $periods = FleetVehicleUnavailablePeriod::query()->where('asset_id', $asset->id)
-            ->where(fn ($query) => $query->where('state', 'active')->where('ends_at', '>=', now()->subDays(30))
-                ->orWhere(fn ($cancelled) => $cancelled->where('state', 'cancelled')->where('cancelled_at', '>=', now()->subDays(30))))
-            ->with('workOrder:id,reference_number')->orderBy('starts_at')->limit(40)->get();
-        $periodHistory = $this->history(FleetVehicleUnavailablePeriod::class, $periods->pluck('id')->all(), 'fleet.vehicle.unavailable.');
-        $periodFiles = $seesFiles
+    /**
+     * Custody rows for unavailable periods, for viewers the booking rule
+     * admits (the vehicle is at one of their Sites). A period an appointment
+     * holds changes only with its appointment, and shows its work and
+     * provider only to those who can read Maintenance; only a cancelled
+     * calendar period can be restored.
+     *
+     * @param  Collection<int,FleetVehicleUnavailablePeriod>  $periods
+     * @return list<array<string,mixed>>
+     */
+    private function periodCustodyRows(User $viewer, Asset $asset, Collection $periods, bool $readsMaintenance): array
+    {
+        if ($periods->isEmpty()) {
+            return [];
+        }
+        $history = $this->history(FleetVehicleUnavailablePeriod::class, $periods->pluck('id')->all(), 'fleet.vehicle.unavailable.');
+        $uploads = Gate::forUser($viewer)->allows('manageDocuments', $asset);
+        $files = Gate::forUser($viewer)->allows('view', $asset)
             ? AssetDocumentSet::query()->where('asset_id', $asset->id)->where('source_type', 'unavailable_period')
                 ->whereIn('source_id', $periods->pluck('id'))->with('files')->get()->groupBy('source_id')
             : collect();
-        foreach ($periods as $period) {
-            $rows[] = [
+        $manage = $viewer->canDo('fleet.manage');
+
+        return $periods->map(function (FleetVehicleUnavailablePeriod $period) use ($history, $files, $asset, $manage, $uploads, $readsMaintenance): array {
+            $active = $period->state === FleetVehicleUnavailablePeriod::STATE_ACTIVE;
+            $calendarPeriod = $period->work_order_id === null;
+            // The appointment's reason, cancellation and history name its work and provider.
+            $withheld = ! $calendarPeriod && ! $readsMaintenance;
+            $entries = $history[(int) $period->id] ?? [];
+
+            return [
                 'kind' => 'unavailable',
                 'id' => (int) $period->id,
-                'reference' => $period->workOrder?->reference_number,
-                'work_order_id' => $period->work_order_id ? (int) $period->work_order_id : null,
-                'purpose' => $period->reason,
+                'reference' => $withheld ? null : $period->workOrder?->reference_number,
+                'work_order_id' => $calendarPeriod || $withheld ? null : (int) $period->work_order_id,
+                'purpose' => $withheld ? 'Maintenance' : $period->reason,
                 'starts_at' => $period->starts_at?->toIso8601String(),
                 'ends_at' => $period->ends_at?->toIso8601String(),
                 'status' => $period->state,
-                'status_label' => $period->state === 'active' ? 'Unavailable' : 'Cancelled',
-                'cancellation_reason' => $period->cancellation_reason,
+                'status_label' => $active ? 'Unavailable' : 'Cancelled',
+                'cancellation_reason' => $withheld ? null : $period->cancellation_reason,
                 'lock_version' => (int) $period->lock_version,
-                'history' => $periodHistory[(int) $period->id] ?? [],
-                'files' => $this->fileRows($asset, $periodFiles->get($period->id)),
+                'history' => $withheld
+                    ? array_map(fn (array $entry): array => array_replace($entry, ['reason' => null]), $entries)
+                    : $entries,
+                'files' => $this->fileRows($asset, $files->get($period->id)),
                 'can' => [
-                    'edit' => $period->state === 'active' && $manage,
-                    'cancel' => $period->state === 'active' && $manage,
+                    'edit' => $active && $calendarPeriod && $manage,
+                    'cancel' => $active && $calendarPeriod && $manage,
+                    // Undo of a cancellation; the window is rechecked when restoring.
+                    'restore' => ! $active && $calendarPeriod && $manage && (bool) $period->ends_at?->isFuture(),
                     'upload' => $uploads,
                 ],
             ];
-        }
-
-        return $rows;
+        })->values()->all();
     }
 
     /** @return list<array{id:int,name:string,licence_status:?string,licence_expires_at:?string}> */
@@ -515,13 +771,44 @@ class VehicleCalendarService
     /** @return list<array<string,mixed>> */
     private function openWork(Asset $asset): array
     {
-        return FleetWorkOrder::query()->where('asset_id', $asset->id)
-            ->whereIn('status', ['open', 'in_progress', 'on_hold'])->orderByDesc('id')->limit(30)
-            ->get(['id', 'reference_number', 'title', 'status', 'version'])
-            ->map(fn (FleetWorkOrder $order): array => [
-                'id' => (int) $order->id, 'reference' => $order->reference_number,
-                'title' => $order->title, 'status' => $order->status, 'version' => (int) $order->version,
-            ])->all();
+        $orders = FleetWorkOrder::query()->where('asset_id', $asset->id)
+            ->whereIn('status', self::OPEN_WORK)->orderByDesc('id')->limit(30)
+            ->get(['id', 'reference_number', 'title', 'status', 'version']);
+        $sources = $this->workSources($orders->pluck('id')->map(fn (mixed $id): int => (int) $id)->all());
+
+        return $orders->map(fn (FleetWorkOrder $order): array => [
+            'id' => (int) $order->id, 'reference' => $order->reference_number,
+            'title' => $order->title, 'status' => $order->status, 'version' => (int) $order->version,
+            'source' => $sources[(int) $order->id] ?? null,
+        ])->all();
+    }
+
+    /**
+     * What each work order was reported from: its first report's source (a
+     * service schedule, compliance record, check, booking…), or null.
+     *
+     * @param  list<int>  $workIds
+     * @return array<int, array{type:string,id:int}|null>
+     */
+    private function workSources(array $workIds): array
+    {
+        if ($workIds === []) {
+            return [];
+        }
+        $sources = [];
+        DB::table('fleet_maintenance_reports')->whereIn('work_order_id', $workIds)->whereNull('duplicate_of_report_id')
+            ->orderBy('id')->get(['work_order_id', 'source_type', 'source_id'])
+            ->each(function (object $report) use (&$sources): void {
+                $id = (int) $report->work_order_id;
+                if (array_key_exists($id, $sources)) {
+                    return;
+                }
+                $sources[$id] = $report->source_type !== null && $report->source_id !== null
+                    ? ['type' => (string) $report->source_type, 'id' => (int) $report->source_id]
+                    : null;
+            });
+
+        return $sources;
     }
 
     /**
@@ -538,8 +825,11 @@ class VehicleCalendarService
             'fleet.booking.approve' => 'Approved', 'fleet.booking.reject' => 'Declined',
             'fleet.booking.checkout' => 'Checked out', 'fleet.booking.return' => 'Returned',
             'fleet.booking.cancel' => 'Cancelled',
+            VehicleReturnConcernService::REPORTED_ACTION => 'Concern sent to Maintenance',
+            VehicleReturnConcernService::NOT_ROUTED_ACTION => 'Concern not sent to Maintenance',
             'fleet.vehicle.unavailable.create' => 'Recorded', 'fleet.vehicle.unavailable.update' => 'Changed',
             'fleet.vehicle.unavailable.cancel' => 'Cancelled',
+            VehicleUnavailablePeriodService::RESTORED_ACTION => 'Restored',
         ];
         $morph = (new $modelClass)->getMorphClass();
 

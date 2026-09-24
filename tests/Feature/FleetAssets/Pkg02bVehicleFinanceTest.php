@@ -133,8 +133,9 @@ class Pkg02bVehicleFinanceTest extends TestCase
         $this->assertSame('vehicle', $rows['purchase_order-'.$order->id]['basis']);
         // Each stage keeps its own amount and nothing adds them together.
         $this->assertSame([408.25, 408.25], [$rows['purchase_order-'.$order->id]['amount'], $rows['bill-'.$bill->id]['amount']]);
-        $this->assertSame(['can', 'fixed_asset', 'cost_centre', 'pending_requests', 'records', 'records_total', 'requests',
+        $this->assertSame(['can', 'site_restricted', 'fixed_asset', 'cost_centre', 'pending_requests', 'records', 'records_total', 'requests',
             'request_types', 'sources', 'documents', 'link_state', 'as_of'], array_keys($view));
+        $this->assertFalse($view['site_restricted']);
         $this->assertSame(['id' => $centre->id, 'code' => 'CC-KOWHAI', 'name' => 'Kōwhai House', 'active' => true], $view['cost_centre']);
         $this->assertSame($fixed->id, $view['link_state']['finance_fixed_asset']['id']);
         $this->assertNull($view['link_state']['vehicle_fixed_asset']);
@@ -432,6 +433,26 @@ class Pkg02bVehicleFinanceTest extends TestCase
         $this->assertSame('Resolved', $view['requests'][0]['status_label']);
         $this->assertFalse($view['requests'][0]['can_decide']);
         $this->assertSame(['Submitted to Finance', 'Resolved by Finance'], array_column($view['requests'][0]['history'], 'label'));
+    }
+
+    public function test_the_person_who_asked_for_a_review_cannot_decide_it(): void
+    {
+        $vehicle = $this->vehicle($this->site);
+        $requester = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage', 'finance.assets.view', 'finance.ap.view', 'finance.ap.manage']);
+        $finance = $this->siteUser([$this->site], ['fleet.viewAny', 'finance.assets.view', 'finance.ap.view', 'finance.ap.manage']);
+        $request = $this->reviewRequest($requester, $vehicle);
+        $url = "/fleet-assets/vehicles/{$vehicle->id}/finance/review-requests/{$request['id']}/decision";
+        $decision = ['decision' => 'resolved', 'note' => 'Quote and invoice match.', 'expected_version' => 1];
+
+        $this->assertFalse($this->present($requester, $vehicle)['requests'][0]['can_decide']);
+        $this->actingAs($requester)->postJson($url, $decision, ['Idempotency-Key' => 'own-review-decision'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['decision' => 'Someone other than the person who asked for this review must decide it.']);
+        $this->assertSame('submitted', FleetFinanceReviewRequest::query()->findOrFail($request['id'])->status);
+
+        $this->assertTrue($this->present($finance, $vehicle)['requests'][0]['can_decide']);
+        $this->actingAs($finance)->postJson($url, $decision, ['Idempotency-Key' => 'other-review-decision'])
+            ->assertOk()->assertJsonPath('request.status', 'resolved');
     }
 
     public function test_open_review_requests_reach_finance_in_all_tasks(): void

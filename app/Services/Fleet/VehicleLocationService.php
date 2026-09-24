@@ -24,9 +24,10 @@ use Illuminate\Support\Facades\DB;
  *
  * Positions follow the trip rules (FleetTripSiteScope, the same Site boundary
  * the trip history uses). Consent-blocked telemetry never carries a position,
- * and positions recorded during a personal trip are withheld. A recorded
- * position is never presented as live, and it never establishes custody or
- * readiness.
+ * and positions recorded during a personal trip are withheld; a withheld
+ * report also leaves out its ignition, movement, speed and heading. A
+ * recorded position is never presented as live, and it never establishes
+ * custody or readiness.
  */
 final class VehicleLocationService
 {
@@ -218,8 +219,10 @@ final class VehicleLocationService
             'withheld' => $withheld,
             'speed_kph' => $withheld === null && $snapshot->speed_kph !== null ? round((float) $snapshot->speed_kph, 1) : null,
             'heading_deg' => $withheld === null ? $snapshot->heading_deg : null,
-            'ignition' => $snapshot->ignition,
-            'motion' => self::motion($snapshot->motion_status, $withheld === null ? $snapshot->speed_kph : null),
+            // Ignition and movement describe the journey: a withheld report keeps
+            // only the tracker's own health (power, battery, connection).
+            'ignition' => $withheld === null ? $snapshot->ignition : null,
+            'motion' => $withheld === null ? self::motion($snapshot->motion_status, $snapshot->speed_kph) : null,
             'battery_pct' => $snapshot->battery_pct,
             'external_power' => $event?->external_power,
             'status' => (string) $snapshot->status,

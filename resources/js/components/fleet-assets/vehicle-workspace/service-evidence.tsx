@@ -16,11 +16,18 @@ import {
     History,
     Paperclip,
     ShieldCheck,
+    ShieldOff,
     Upload,
     Wrench,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ComplianceDialog } from './compliance-dialog';
+import {
+    isNotRequired,
+    notRequiredByline,
+    NotRequiredDialog,
+    NotRequiredToggle,
+} from './compliance-not-required';
 import {
     useVehicleCollectionView,
     VehicleCollectionToggle,
@@ -35,6 +42,8 @@ import {
 import {
     applicabilityNames,
     outcomeNames,
+    type Applicability,
+    type ComplianceKind,
     type ComplianceRecord,
     type ComplianceVersion,
     type VehicleWorkspace,
@@ -76,10 +85,13 @@ export function statusFor(version: ComplianceVersion | null): {
 
 export function EvidencePanel({
     workspace,
+    focusKind,
     onNavigate,
     onChanged,
 }: {
     workspace: VehicleWorkspace;
+    /** A readiness link names the requirement it's about; its row is brought into view. */
+    focusKind?: ComplianceKind;
     onNavigate: (location: WorkspaceLocation) => void;
     onChanged: () => void;
 }) {
@@ -87,16 +99,53 @@ export function EvidencePanel({
     const [editing, setEditing] = useState<{
         record: ComplianceRecord;
         step: number;
+        applicability?: Applicability;
     } | null>(null);
     const [history, setHistory] = useState<ComplianceRecord | null>(null);
     const [source, setSource] = useState<ComplianceRecord | null>(null);
     const [planning, setPlanning] = useState<ComplianceRecord | null>(null);
+    const [notRequired, setNotRequired] = useState<ComplianceRecord | null>(
+        null,
+    );
+    const panel = useRef<HTMLElement>(null);
     const { can, vehicle } = workspace;
     const owner = vehicle.responsible?.name ?? 'No responsible person';
     const odometerKm = workspace.odometer.current_km;
 
+    // Land on the linked requirement: scroll to its row, outline it briefly
+    // and put focus on its tick box (or the row) so the next step is visible.
+    useEffect(() => {
+        if (!focusKind || !panel.current) return;
+        const marker = panel.current.querySelector<HTMLElement>(
+            `[data-compliance-kind="${focusKind}"]`,
+        );
+        const row = marker?.closest<HTMLElement>(
+            '[role="row"], .collection-card',
+        );
+        if (!row) return;
+        const reduced = window.matchMedia(
+            '(prefers-reduced-motion: reduce)',
+        ).matches;
+        row.scrollIntoView({
+            block: 'center',
+            behavior: reduced ? 'auto' : 'smooth',
+        });
+        row.classList.add('compliance-focus');
+        (
+            row.querySelector<HTMLElement>('[data-compliance-toggle]') ?? row
+        ).focus({ preventScroll: true });
+        const timer = window.setTimeout(
+            () => row.classList.remove('compliance-focus'),
+            2600,
+        );
+        return () => {
+            window.clearTimeout(timer);
+            row.classList.remove('compliance-focus');
+        };
+    }, [focusKind, view]);
+
     return (
-        <section className="studio-card">
+        <section className="studio-card" ref={panel}>
             <SectionHeading
                 eyebrow="EVIDENCE & OBLIGATIONS"
                 title="Service & compliance"
@@ -136,8 +185,8 @@ export function EvidencePanel({
                         workspace.readiness.reasons,
                     );
                     const fileCount = current?.files.length ?? 0;
-                    const notRequired =
-                        current?.applicability === 'not_applicable';
+                    const notRequired = isNotRequired(record);
+                    const byline = notRequiredByline(record);
                     const ruc =
                         record.kind === 'ruc' &&
                         current?.ruc_start_km !== null &&
@@ -177,16 +226,29 @@ export function EvidencePanel({
                                 <StatusBadge variant={status.variant}>
                                     {status.label}
                                 </StatusBadge>
-                                <small>
+                                <small data-compliance-kind={record.kind}>
                                     {current
                                         ? applicabilityNames[
                                               current.applicability
                                           ]
                                         : 'Not assessed'}
                                 </small>
+                                {can.manage && (
+                                    <NotRequiredToggle
+                                        record={record}
+                                        onToggle={() => setNotRequired(record)}
+                                    />
+                                )}
                             </>,
                             <>
                                 <strong>{due}</strong>
+                                {notRequired &&
+                                    current?.applicability_basis && (
+                                        <small className="compliance-not-required-reason">
+                                            {current.applicability_basis}
+                                            {byline ? ` · ${byline}` : ''}
+                                        </small>
+                                    )}
                                 {remaining !== null && (
                                     <small>
                                         {remaining < 0
@@ -259,6 +321,15 @@ export function EvidencePanel({
                                           onClick: () =>
                                               setEditing({ record, step: 1 }),
                                       },
+                                      {
+                                          label: notRequired
+                                              ? 'Mark as required'
+                                              : 'Mark not required',
+                                          icon: notRequired
+                                              ? ShieldCheck
+                                              : ShieldOff,
+                                          onClick: () => setNotRequired(record),
+                                      },
                                   ]
                                 : []),
                             ...(can.schedule_service
@@ -299,8 +370,25 @@ export function EvidencePanel({
                     vehicle={vehicle}
                     record={editing.record}
                     initialStep={editing.step}
+                    presetApplicability={editing.applicability}
                     onClose={() => setEditing(null)}
                     onSaved={onChanged}
+                />
+            )}
+            {notRequired && (
+                <NotRequiredDialog
+                    vehicle={vehicle}
+                    record={notRequired}
+                    onClose={() => setNotRequired(null)}
+                    onSaved={onChanged}
+                    onRecordEvidence={() => {
+                        setEditing({
+                            record: notRequired,
+                            step: 1,
+                            applicability: 'applicable',
+                        });
+                        setNotRequired(null);
+                    }}
                 />
             )}
             {source && (

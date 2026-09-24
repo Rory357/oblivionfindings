@@ -227,7 +227,7 @@ export type MileageFeedState = {
 /** A reminder for the current due point of a service schedule or compliance record. */
 export type ObligationReminder = {
     key: string;
-    source_type: 'service_schedule' | 'compliance_record';
+    source_type: 'service_schedule' | 'compliance_record' | 'vehicle_check';
     source_id: number;
     name: string;
     due_on: string | null;
@@ -300,6 +300,8 @@ export type VehicleProfile = {
     ownership_arrangement: string | null;
     responsible: Person | null;
     primary_driver: Person | null;
+    /** A driver is recorded but, outside the viewer's Sites, not shown. */
+    primary_driver_withheld?: boolean;
     insurance_provider: string | null;
     insurance_policy_reference: string | null;
     insurance_expires_at: string | null;
@@ -343,6 +345,13 @@ export type CatalogueKind =
 
 export type WorkspaceCan = {
     manage: boolean;
+    /**
+     * The vehicle is at one of the viewer's Sites. Central fleet oversight
+     * (fleet.vehicles.viewAllSites) opens other vehicles' own records, but
+     * bookings, trips, locations, driving, alerts, drivers and Finance keep
+     * the vehicle's Site rule.
+     */
+    view_site_records: boolean;
     view_documents: boolean;
     manage_documents: boolean;
     manage_schedules: boolean;
@@ -376,6 +385,8 @@ export type VehicleWorkspace = {
     linked_documents: LinkedDocumentSet[];
     work: {
         can_view: boolean;
+        /** Hidden because the vehicle is outside the viewer's Sites (Maintenance keeps its Site rule). */
+        site_restricted?: boolean;
         open_count: number | null;
         open: Array<{
             id: number;
@@ -405,6 +416,8 @@ export type VehicleWorkspace = {
             outcome: string | null;
             template: string | null;
             submitted_at: string;
+            /** Maintenance released it: no issue found (the outcome stays as submitted). */
+            assessed: boolean;
         } | null;
         next_due_at: string | null;
     };

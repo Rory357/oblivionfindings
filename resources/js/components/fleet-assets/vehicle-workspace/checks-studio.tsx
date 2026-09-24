@@ -4,22 +4,31 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SkeletonTable } from '@/components/ui/skeleton-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDateOnly } from '@/lib/datetime';
-import { CalendarDays, ClipboardCheck, FileText, Upload } from 'lucide-react';
-import { useState } from 'react';
+import {
+    CalendarDays,
+    ClipboardCheck,
+    FileText,
+    ShieldCheck,
+    Upload,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import {
     AmendmentWizard,
     CheckEvidenceDialog,
     ManageRequirementWizard,
 } from './check-actions';
+import { AssessCheckDialog } from './check-assessment';
 import { CheckFlowDialog } from './check-flow';
 import { ChecklistLibrary } from './check-library';
 import { RunDetailDialog } from './check-run-detail';
 import { useVehicleChecks } from './checks-data';
 import {
+    ASSESSED_LABEL,
     checkDueStatus,
     outcomeLabel,
     outcomeTone,
     runObservedDay,
+    runTone,
     versionLabel,
 } from './checks-model';
 import type { CheckRun } from './checks-types';
@@ -41,7 +50,8 @@ type ChecksDialog =
     | { kind: 'report'; source: ReportSource | null }
     | { kind: 'plan' }
     | { kind: 'amend'; run: CheckRun }
-    | { kind: 'upload'; run: CheckRun };
+    | { kind: 'upload'; run: CheckRun }
+    | { kind: 'assess'; run: CheckRun };
 
 const sourceOf = (run: CheckRun): ReportSource => ({
     id: run.id,
@@ -59,10 +69,16 @@ const sourceOf = (run: CheckRun): ReportSource => ({
 export function ChecksStudio({
     workspace,
     view,
+    focusRunId,
+    onFocusHandled,
     onChanged,
 }: {
     workspace: VehicleWorkspace;
     view: ChecksView;
+    /** Open this check once the checks load (a readiness link's `run`). */
+    focusRunId?: number;
+    /** The linked check was opened (or isn't listed); the link can be dropped. */
+    onFocusHandled?: () => void;
     /** Something changed here: reload the workspace (header, readiness). */
     onChanged: () => void;
 }) {
@@ -78,6 +94,15 @@ export function ChecksStudio({
         reload();
         onChanged();
     };
+    // A readiness link names the check holding the vehicle: open it once.
+    const handledFocus = useRef<number | null>(null);
+    useEffect(() => {
+        if (!data || !focusRunId || handledFocus.current === focusRunId) return;
+        handledFocus.current = focusRunId;
+        const run = data.runs.data.find((item) => item.id === focusRunId);
+        if (run) setDialog({ kind: 'run', run });
+        onFocusHandled?.();
+    }, [data, focusRunId, onFocusHandled]);
 
     if (!data) {
         return load === 'loading' ? (
@@ -228,7 +253,7 @@ export function ChecksStudio({
                             name: run.template,
                             subline: run.reference,
                             icon: ClipboardCheck,
-                            tone: outcomeTone(run.outcome),
+                            tone: runTone(run),
                             fields: [
                                 <>
                                     <strong>{runObservedDay(run)}</strong>
@@ -239,12 +264,18 @@ export function ChecksStudio({
                                         ).toLowerCase()}
                                     </small>
                                 </>,
-                                <StatusBadge
-                                    key="result"
-                                    variant={outcomeTone(run.outcome)}
-                                >
-                                    {outcomeLabel(run.outcome)}
-                                </StatusBadge>,
+                                <span key="result" className="inline-actions">
+                                    <StatusBadge
+                                        variant={outcomeTone(run.outcome)}
+                                    >
+                                        {outcomeLabel(run.outcome)}
+                                    </StatusBadge>
+                                    {run.assessment && (
+                                        <StatusBadge variant="success">
+                                            {ASSESSED_LABEL}
+                                        </StatusBadge>
+                                    )}
+                                </span>,
                                 <>
                                     <small>
                                         {run.evidence_count}{' '}
@@ -321,6 +352,19 @@ export function ChecksStudio({
                                           },
                                       ]
                                     : []),
+                                ...(can.assess && run.assess?.available
+                                    ? [
+                                          {
+                                              label: 'No issue found — release for use',
+                                              icon: ShieldCheck,
+                                              onClick: () =>
+                                                  setDialog({
+                                                      kind: 'assess',
+                                                      run,
+                                                  }),
+                                          },
+                                      ]
+                                    : []),
                             ],
                         }))}
                     />
@@ -350,6 +394,19 @@ export function ChecksStudio({
                             view,
                         })
                     }
+                    onAssess={
+                        can.assess
+                            ? (run) => setDialog({ kind: 'assess', run })
+                            : undefined
+                    }
+                />
+            )}
+            {dialog?.kind === 'assess' && (
+                <AssessCheckDialog
+                    workspace={workspace}
+                    run={dialog.run}
+                    onClose={() => setDialog(null)}
+                    onSaved={refresh}
                 />
             )}
             {dialog?.kind === 'report' && (

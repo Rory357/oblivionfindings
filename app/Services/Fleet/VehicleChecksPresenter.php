@@ -9,17 +9,19 @@ use App\Models\FleetChecklistRunAmendment;
 use App\Models\FleetChecklistTemplateVersion;
 use App\Models\FleetVehicleCheckRequirement;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Read model for the vehicle's Checks & inspections: the check requirement,
  * the checklist library this vehicle can use (with the approved check rule
  * that covers each version, if any), and recent submitted checks with their
- * original answers, files, amendments and follow-up. Bounded; nothing here
- * writes. Callers resolve the vehicle in the viewer's scope first.
+ * original answers, files, amendments, follow-up and any Maintenance "no
+ * issue found" decision. Bounded; nothing here writes. Callers resolve the
+ * vehicle in the viewer's scope first.
  */
 class VehicleChecksPresenter
 {
@@ -28,10 +30,14 @@ class VehicleChecksPresenter
     /** Files that failed storage or scanning are not counted as kept evidence. */
     private const NOT_KEPT = ['quarantined', 'storage_failed'];
 
+    public const NO_ISSUE_LABEL = 'No issue found — released for use';
+
     public function __construct(
         private readonly VehicleCheckLibraryService $library,
         private readonly MaintenanceAccessService $maintenance,
         private readonly MaintenancePolicyService $policy,
+        private readonly VehicleDocumentService $documents,
+        private readonly MaintenanceRestrictionService $restrictions,
     ) {}
 
     /** @return array<string,mixed> */
@@ -46,7 +52,7 @@ class VehicleChecksPresenter
         return [
             'requirement' => $this->requirement($asset, $definitions, $rule),
             'templates' => array_map(fn (array $definition): array => $this->template($definition, $rule, $asset), $definitions),
-            'runs' => $this->runs($asset, $can),
+            'runs' => $this->runs($viewer, $asset, $can),
             'route' => $can['report'] ? $this->route($asset) : null,
             'can' => $can,
         ];
@@ -64,12 +70,17 @@ class VehicleChecksPresenter
             'start' => $manage && $atSite,
             'amend' => $manage && $atSite,
             'manage_templates' => $manage,
+            // Checklists used beyond this vehicle are fleet-wide settings.
+            'manage_shared_templates' => $this->library->canManageShared($viewer),
             'manage_requirement' => $viewer->canDo('fleet.manage'),
-            'upload' => Gate::forUser($viewer)->allows('manageDocuments', $asset),
+            'upload' => $this->documents->canManage($viewer, $asset),
             'report' => $this->maintenance->canReport($viewer) && $atSite,
             'link_work' => $manage && $atSite,
-            'view_maintenance' => $this->maintenance->canRead($viewer),
-            'view_files' => Gate::forUser($viewer)->allows('view', $asset),
+            // "No issue found — release for use" (MaintenanceTransitionService::assessCheck).
+            'assess' => $manage && $atSite,
+            // Linked work follows PKG-01's read rule: Maintenance access at the vehicle's Site.
+            'view_maintenance' => $this->maintenance->canRead($viewer) && $atSite,
+            'view_files' => $this->documents->canView($viewer, $asset),
             // Answer files download through ChecklistController::evidence, which
             // needs the approved site and maintenance or reviewer authority.
             'view_answer_files' => $atSite && ($manage || $this->maintenance->canReview($viewer, $asset)),
@@ -143,14 +154,22 @@ class VehicleChecksPresenter
      * @param  array<string,bool>  $can
      * @return array{data: list<array<string,mixed>>, total: int}
      */
-    private function runs(Asset $asset, array $can): array
+    private function runs(User $viewer, Asset $asset, array $can): array
     {
         $query = FleetChecklistRun::query()->where('asset_id', $asset->id)->whereNotNull('submitted_at');
         $total = (clone $query)->count();
-        $runs = $query->with(['user:id,name', 'template:id,name'])
+        $runs = (clone $query)->with(['user:id,name', 'template:id,name'])
             ->orderByDesc('submitted_at')->orderByDesc('id')->limit(self::RUNS)->get();
         if ($runs->isEmpty()) {
             return ['data' => [], 'total' => $total];
+        }
+        // A check that holds the vehicle is always listed, however old, so a
+        // readiness link can open it.
+        $blocking = $this->restrictions->blockers((int) $asset->id)['check_run_ids'];
+        $missing = array_values(array_diff($blocking, $runs->pluck('id')->map(fn (mixed $id): int => (int) $id)->all()));
+        if ($missing !== []) {
+            $runs = $runs->concat((clone $query)->with(['user:id,name', 'template:id,name'])->whereIn('id', $missing)
+                ->orderByDesc('submitted_at')->orderByDesc('id')->get())->values();
         }
         $ids = $runs->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
         $versions = FleetChecklistTemplateVersion::query()
@@ -161,12 +180,20 @@ class VehicleChecksPresenter
         $amendments = FleetChecklistRunAmendment::query()->whereIn('run_id', $ids)->with('recordedBy:id,name')
             ->orderBy('recorded_at')->orderBy('id')->get()->groupBy('run_id');
         $links = $this->links($runs);
+        $assessments = $this->assessments($ids);
+        $held = $this->heldRunIds($asset, $runs);
 
         return [
-            'data' => $runs->map(function (FleetChecklistRun $run) use ($asset, $can, $versions, $files, $amendments, $links): array {
+            'data' => $runs->map(function (FleetChecklistRun $run) use ($viewer, $asset, $can, $versions, $files, $amendments, $links, $blocking, $assessments, $held): array {
                 $presented = is_array($run->presented_template_json) ? $run->presented_template_json : [];
                 $questions = $this->library->questions(is_array($presented['items'] ?? null) ? $presented['items'] : []);
                 $responses = is_array($run->responses) ? $run->responses : [];
+                $isBlocking = in_array((int) $run->id, $blocking, true);
+                $decision = $assessments->get($run->id);
+                $issues = MaintenanceTransitionService::recordedIssues($responses);
+                $refusal = $can['assess'] && $decision === null
+                    ? MaintenanceTransitionService::checkAssessmentRefusal($run, (int) $viewer->id, $isBlocking, in_array((int) $run->id, $held, true), $issues)
+                    : null;
                 $answers = array_map(function (array $question) use ($responses, $run, $can): array {
                     $answer = $responses[$question['id']] ?? null;
                     $file = is_array($answer) && is_array($answer['evidence_file'] ?? null) ? $answer['evidence_file'] : null;
@@ -222,10 +249,116 @@ class VehicleChecksPresenter
                     'linked' => $link !== null,
                     // Work details follow Maintenance read access.
                     'linked_work' => $link !== null && $can['view_maintenance'] ? $link : null,
+                    // Holds the vehicle now (readiness "maintenance.unresolved_check").
+                    'blocking' => $isBlocking,
+                    // Maintenance's decision, kept beside the original outcome.
+                    'assessment' => $decision === null ? null : [
+                        'id' => (int) $decision->id,
+                        'decision' => (string) $decision->decision,
+                        'label' => self::NO_ISSUE_LABEL,
+                        'reason' => (string) $decision->reason,
+                        'assessed_by' => $decision->assessed_by,
+                        'assessed_at' => $this->iso(CarbonImmutable::parse((string) $decision->assessed_at, 'UTC')),
+                        'self_assessed' => (int) $decision->assessed_by_user_id === (int) $run->user_id,
+                        'issues' => array_map(
+                            fn (array $issue): string => $this->issueRow($questions, $issue)['label'],
+                            $this->acknowledged($decision->acknowledged_issues_json),
+                        ),
+                    ],
+                    // Whether this viewer can record "no issue found", and why not.
+                    'assess' => $can['assess'] && $decision === null ? [
+                        'available' => $refusal === null,
+                        'reason' => $refusal,
+                        'issues' => array_map(fn (array $issue): array => $this->issueRow($questions, $issue), $issues),
+                        'needs_independent' => $run->rule_version_id !== null || $issues !== [],
+                    ] : null,
                 ];
             })->values()->all(),
             'total' => $total,
         ];
+    }
+
+    /**
+     * Maintenance "no issue found" decisions for these checks, keyed by check.
+     *
+     * @param  list<int>  $runIds
+     * @return Collection<int|string, object>
+     */
+    private function assessments(array $runIds): Collection
+    {
+        if ($runIds === [] || ! Schema::hasTable('fleet_maintenance_check_assessments')) {
+            return collect();
+        }
+
+        return DB::table('fleet_maintenance_check_assessments as assessment')
+            ->leftJoin('users as assessor', 'assessor.id', '=', 'assessment.assessed_by_user_id')
+            ->whereIn('assessment.check_run_id', $runIds)
+            ->get(['assessment.id', 'assessment.check_run_id', 'assessment.decision', 'assessment.reason',
+                'assessment.assessed_at', 'assessment.assessed_by_user_id', 'assessment.acknowledged_issues_json',
+                'assessor.name as assessed_by'])
+            ->keyBy('check_run_id');
+    }
+
+    /**
+     * Checks Maintenance has placed a hold for: the hold's source check, or a
+     * hold on the work the check was recorded on or reported to. Their hold
+     * is released only through repair, retest and independent release.
+     *
+     * @param  Collection<int, FleetChecklistRun>  $runs
+     * @return list<int>
+     */
+    private function heldRunIds(Asset $asset, Collection $runs): array
+    {
+        $holds = DB::table('fleet_maintenance_restrictions')->where('asset_id', $asset->id)
+            ->where('state', 'active')->get(['source_run_id', 'work_order_id']);
+        if ($holds->isEmpty()) {
+            return [];
+        }
+        $heldRuns = $holds->pluck('source_run_id')->filter()->map(fn (mixed $id): int => (int) $id)->all();
+        $heldWork = $holds->pluck('work_order_id')->map(fn (mixed $id): int => (int) $id)->all();
+        $reported = DB::table('fleet_maintenance_reports')->where('source_type', 'fleet_checklist_run')
+            ->whereIn('source_id', $runs->pluck('id'))->whereNull('duplicate_of_report_id')
+            ->get(['source_id', 'work_order_id']);
+        $held = [];
+        foreach ($runs as $run) {
+            $work = $reported->where('source_id', $run->id)->pluck('work_order_id')->map(fn (mixed $id): int => (int) $id)->all();
+            if ($run->work_order_id !== null) {
+                $work[] = (int) $run->work_order_id;
+            }
+            if (in_array((int) $run->id, $heldRuns, true) || array_intersect($work, $heldWork) !== []) {
+                $held[] = (int) $run->id;
+            }
+        }
+
+        return $held;
+    }
+
+    /**
+     * A recorded issue answer with its question's label, as submitted.
+     *
+     * @param  list<array{id:string,label:string,kind:string,required:bool,options:list<array{value:string,label:string}>}>  $questions
+     * @param  array{question_id:string, answer:string}  $issue
+     * @return array{id:string, label:string, value:string}
+     */
+    private function issueRow(array $questions, array $issue): array
+    {
+        $question = collect($questions)->firstWhere('id', $issue['question_id']);
+
+        return [
+            'id' => $issue['question_id'],
+            'label' => is_array($question) ? $question['label'] : $issue['question_id'],
+            'value' => (is_array($question) ? $this->library->answerLabel($question, $issue['answer']) : null)
+                ?? $this->library->optionLabel($issue['answer']),
+        ];
+    }
+
+    /** @return list<array{question_id:string, answer:string}> */
+    private function acknowledged(mixed $json): array
+    {
+        $issues = is_string($json) ? json_decode($json, true) : $json;
+
+        return is_array($issues) ? array_values(array_filter($issues, fn (mixed $issue): bool => is_array($issue)
+            && is_string($issue['question_id'] ?? null) && is_string($issue['answer'] ?? null))) : [];
     }
 
     /**

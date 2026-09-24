@@ -20,7 +20,9 @@ class VehicleServiceScheduleController extends Controller
 
     public function store(Request $request, Asset $asset): JsonResponse
     {
-        $schedule = $this->schedules->save($this->actor($request), (int) $asset->getKey(), null, $request->only(self::FIELDS), null);
+        // Every create carries a request key, so a retried save can't add a second schedule.
+        $schedule = $this->schedules->save($this->actor($request), (int) $asset->getKey(), null, $request->only(self::FIELDS), null,
+            (string) ($request->input('request_key') ?: $request->header('Idempotency-Key') ?: ''));
 
         return response()->json(['schedule' => ['id' => $schedule->id, 'lock_version' => (int) $schedule->lock_version]]);
     }

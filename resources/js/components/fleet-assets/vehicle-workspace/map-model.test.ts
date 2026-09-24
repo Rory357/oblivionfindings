@@ -8,6 +8,7 @@ import {
     mapCentre,
     observedLabel,
     reportedFacts,
+    sampleLabel,
     scheduleError,
     telemetryTiles,
     weekdayNames,
@@ -158,6 +159,12 @@ describe('reported state', () => {
         const facts = reportedFacts(withheld, withheld.observations[0]);
         expect(facts.position).toBeNull();
         expect(facts.withheld).toBe('personal');
+        // Even if a report carried them, a withheld report shows no journey.
+        expect(facts.ignition).toBe('Unknown');
+        expect(facts.motion).toBe('Unknown');
+        expect(facts.speed).toBe('—');
+        // The tracker itself is still reported.
+        expect(facts.signal).toBe('Reporting');
     });
 
     it('formats observation times in Auckland with the right zone', () => {
@@ -350,22 +357,33 @@ describe('telemetry tiles', () => {
         expect(value(tiles, 'connection').value).toBe('Historic');
     });
 
-    it('keeps withheld distance out and names an unassigned tracker', () => {
+    it('keeps a withheld sample to the tracker’s own health', () => {
+        // Even if a withheld sample carried journey values, none is shown.
         const withheld = telemetryTiles(
-            sample({
-                withheld: 'personal',
-                speed_kph: null,
-                odometer_km: null,
-            }),
+            sample({ withheld: 'personal', external_power: false }),
             9,
             9,
-            { ...tracker, family: null, model: 'GL300' },
+            tracker,
         );
-        expect(value(withheld, 'distance').value).toBe('—');
-        expect(value(withheld, 'motion').caption).toBe(
-            'Speed withheld for this sample',
+        for (const key of ['ignition', 'motion', 'distance'])
+            expect(value(withheld, key)).toMatchObject({
+                value: '—',
+                caption: 'Withheld for this sample',
+            });
+        expect(value(withheld, 'backup').value).toBe('92%');
+        expect(value(withheld, 'connection').value).toBe('On backup');
+        expect(value(withheld, 'voltage').caption).toBe(
+            'External supply not detected · voltage not in reports',
         );
-        expect(value(withheld, 'ignition').caption).toBe(
+    });
+
+    it('names the source for an unreviewed tracker and an unassigned one', () => {
+        const other = telemetryTiles(sample(), 9, 9, {
+            ...tracker,
+            family: null,
+            model: 'GL300',
+        });
+        expect(value(other, 'ignition').caption).toBe(
             'Reported ignition · inferred by the tracker',
         );
         const none = telemetryTiles(null, null, null, null);
@@ -373,6 +391,53 @@ describe('telemetry tiles', () => {
             value: 'Not assigned',
             caption: 'Assign and validate a device',
         });
+    });
+});
+
+describe('telemetry sample labels', () => {
+    it('names the recorded event of a sample that is not withheld', () => {
+        expect(sampleLabel(sample({ event_type: 'speed_alarm' }))).toBe(
+            'Speed alarm',
+        );
+        expect(sampleLabel(sample({ event_type: null }))).toBe(
+            'Tracker report',
+        );
+    });
+
+    it('never names a driving event on a withheld sample', () => {
+        for (const type of [
+            'speed_alarm',
+            'harsh_behaviour',
+            'geofence_enter',
+            'geofence_exit',
+            'ignition_on',
+            'motion_start',
+            'location_report',
+            null,
+        ])
+            expect(
+                sampleLabel(sample({ event_type: type, withheld: 'personal' })),
+            ).toBe('Withheld · recorded during a personal trip');
+        expect(
+            sampleLabel(
+                sample({ event_type: 'harsh_behaviour', withheld: 'consent' }),
+            ),
+        ).toBe('Withheld · tracking consent was not in place');
+    });
+
+    it('keeps the tracker health report on a withheld sample', () => {
+        expect(
+            sampleLabel(
+                sample({ event_type: 'heartbeat', withheld: 'personal' }),
+            ),
+        ).toBe('Heartbeat · withheld · recorded during a personal trip');
+        expect(
+            sampleLabel(
+                sample({ event_type: 'power_off', withheld: 'consent' }),
+            ),
+        ).toBe(
+            'Power disconnected · withheld · tracking consent was not in place',
+        );
     });
 });
 

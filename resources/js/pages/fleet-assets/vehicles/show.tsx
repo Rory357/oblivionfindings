@@ -21,6 +21,7 @@ import { HistoryPanel } from '@/components/fleet-assets/vehicle-workspace/servic
 import { MileagePanel } from '@/components/fleet-assets/vehicle-workspace/service-mileage';
 import { RemindersPanel } from '@/components/fleet-assets/vehicle-workspace/service-reminders';
 import { SchedulesPanel } from '@/components/fleet-assets/vehicle-workspace/service-schedules';
+import { SiteRecordsNotice } from '@/components/fleet-assets/vehicle-workspace/studio-kit';
 import { TripHistory } from '@/components/fleet-assets/vehicle-workspace/trip-history';
 import type { VehicleWorkspace } from '@/components/fleet-assets/vehicle-workspace/types';
 import { VehicleCalendar } from '@/components/fleet-assets/vehicle-workspace/vehicle-calendar';
@@ -166,7 +167,9 @@ export default function VehicleShow({
                 '',
                 locationUrl(vehicle.id, resolved),
             );
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            // A focused requirement scrolls its own row into view.
+            if (!resolved.focus)
+                window.scrollTo({ top: 0, behavior: 'smooth' });
         },
         [vehicle.id, permitted],
     );
@@ -174,6 +177,17 @@ export default function VehicleShow({
         () => router.reload({ only: ['workspace'] }),
         [],
     );
+    // Once the linked check is open, drop it from the address so a reload or
+    // a shared link doesn't reopen it.
+    const clearRunFocus = useCallback(() => {
+        const next: WorkspaceLocation = { tab: 'checks', view: 'recent' };
+        setLocation(next);
+        window.history.replaceState(
+            window.history.state,
+            '',
+            locationUrl(vehicle.id, next),
+        );
+    }, [vehicle.id]);
     // Finance links and requests load when the Finance section opens.
     const financeOpen =
         location.tab === 'overview' && location.view === 'finance';
@@ -211,6 +225,9 @@ export default function VehicleShow({
         MAIN_RAIL.find((item) => item.key === location.tab)?.label;
     const at = (tab: MainTab, view?: WorkspaceView) =>
         location.tab === tab && (view === undefined || location.view === view);
+    // Seen through central fleet oversight only (outside the viewer's Sites).
+    const siteOnly = !can.view_site_records;
+    const siteName = vehicle.home_site?.name ?? vehicle.site?.name;
 
     return (
         <AppLayout
@@ -376,6 +393,7 @@ export default function VehicleShow({
                                 {at('service', 'evidence') && (
                                     <EvidencePanel
                                         workspace={workspace}
+                                        focusKind={location.focus}
                                         onNavigate={navigate}
                                         onChanged={refresh}
                                     />
@@ -423,6 +441,8 @@ export default function VehicleShow({
                                                 ? 'templates'
                                                 : 'recent'
                                         }
+                                        focusRunId={location.run}
+                                        onFocusHandled={clearRunFocus}
                                         onChanged={refresh}
                                     />
                                 )}
@@ -443,35 +463,56 @@ export default function VehicleShow({
                                         onChanged={refresh}
                                     />
                                 )}
-                                {at('map', 'location') && (
+                                {/* Central fleet oversight opens the vehicle's own
+                                    records; locations, trips, driving and alerts
+                                    keep the vehicle's Site rule. */}
+                                {siteOnly && location.tab === 'map' && (
+                                    <SiteRecordsNotice
+                                        what={
+                                            location.view === 'driving'
+                                                ? 'Driving insights'
+                                                : location.view === 'alerts'
+                                                  ? 'Alerts and Control Room responses'
+                                                  : 'Location and geofences'
+                                        }
+                                        site={siteName}
+                                    />
+                                )}
+                                {siteOnly && location.tab === 'trips' && (
+                                    <SiteRecordsNotice
+                                        what="Trips"
+                                        site={siteName}
+                                    />
+                                )}
+                                {!siteOnly && at('map', 'location') && (
                                     <VehicleLocationPanel
                                         workspace={workspace}
                                         onNavigate={navigate}
                                         onChanged={refresh}
                                     />
                                 )}
-                                {at('map', 'telemetry') && (
+                                {!siteOnly && at('map', 'telemetry') && (
                                     <VehicleTelemetryPanel
                                         workspace={workspace}
                                         onNavigate={navigate}
                                         onChanged={refresh}
                                     />
                                 )}
-                                {at('map', 'driving') && (
+                                {!siteOnly && at('map', 'driving') && (
                                     <VehicleDrivingPanel
                                         workspace={workspace}
                                         onNavigate={navigate}
                                         onChanged={refresh}
                                     />
                                 )}
-                                {at('map', 'alerts') && (
+                                {!siteOnly && at('map', 'alerts') && (
                                     <VehicleAlertsPanel
                                         workspace={workspace}
                                         onNavigate={navigate}
                                         onChanged={refresh}
                                     />
                                 )}
-                                {at('trips') && (
+                                {!siteOnly && at('trips') && (
                                     <TripHistory
                                         workspace={workspace}
                                         focusDate={location.date}

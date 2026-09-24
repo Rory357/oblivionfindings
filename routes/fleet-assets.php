@@ -95,14 +95,20 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
             ->whereNumber('asset')->name('fleet-assets.vehicles.calendar.events');
         Route::get('/vehicles/{asset}/calendar/summary', [VehicleCalendarController::class, 'summary'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.calendar.summary');
+        // One booking or unavailable period as the summary lists it (records
+        // outside its capped lists). Bookings keep their own Site rule.
+        Route::get('/vehicles/{asset}/calendar/records/{kind}/{id}', [VehicleCalendarController::class, 'record'])
+            ->whereNumber(['asset', 'id'])->whereIn('kind', ['booking', 'unavailable'])
+            ->name('fleet-assets.vehicles.calendar.records.show');
 
         // PKG-02B obligation reminders: the owner or a fleet manager acknowledges;
-        // fleet managers retry a failed delivery. The service checks both.
+        // fleet managers retry a failed delivery. The service checks both. A
+        // vehicle check's source id is the vehicle's own id.
         Route::post('/vehicles/{asset}/obligation-reminders/{sourceType}/{sourceId}/acknowledge', [VehicleObligationReminderController::class, 'acknowledge'])
-            ->whereNumber(['asset', 'sourceId'])->whereIn('sourceType', ['service_schedule', 'compliance_record'])
+            ->whereNumber(['asset', 'sourceId'])->whereIn('sourceType', ['service_schedule', 'compliance_record', 'vehicle_check'])
             ->name('fleet-assets.vehicles.obligation-reminders.acknowledge');
         Route::post('/vehicles/{asset}/obligation-reminders/{sourceType}/{sourceId}/retry', [VehicleObligationReminderController::class, 'retry'])
-            ->whereNumber(['asset', 'sourceId'])->whereIn('sourceType', ['service_schedule', 'compliance_record'])
+            ->whereNumber(['asset', 'sourceId'])->whereIn('sourceType', ['service_schedule', 'compliance_record', 'vehicle_check'])
             ->name('fleet-assets.vehicles.obligation-reminders.retry');
     });
 
@@ -120,6 +126,9 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
             ->whereNumber(['asset', 'period'])->name('fleet-assets.vehicles.unavailable.update');
         Route::post('/vehicles/{asset}/unavailable-periods/{period}/cancel', [VehicleCalendarController::class, 'cancelUnavailable'])
             ->whereNumber(['asset', 'period'])->name('fleet-assets.vehicles.unavailable.cancel');
+        // Undo a cancellation (calendar periods only; an appointment's hold moves with it).
+        Route::post('/vehicles/{asset}/unavailable-periods/{period}/restore', [VehicleCalendarController::class, 'restoreUnavailable'])
+            ->whereNumber(['asset', 'period'])->name('fleet-assets.vehicles.unavailable.restore');
 
         // PKG-02B tracker distance feed: reconcile with the dashboard, or pause automatic planning.
         Route::post('/vehicles/{asset}/mileage-feed/reconcile', [VehicleMileageFeedController::class, 'reconcile'])
@@ -160,6 +169,10 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
             ->whereNumber('asset')->name('fleet-assets.vehicles.checks.store');
         Route::post('/vehicles/{asset}/checks/{run}/amendments', [\App\Http\Controllers\FleetAssets\VehicleCheckController::class, 'amend'])
             ->whereNumber(['asset', 'run'])->name('fleet-assets.vehicles.checks.amendments.store');
+        // Maintenance's "no issue found — release for use" for one check
+        // (MaintenanceTransitionService::assessCheck; holds are untouched).
+        Route::post('/vehicles/{asset}/checks/{run}/assessments', [\App\Http\Controllers\FleetAssets\VehicleCheckController::class, 'assess'])
+            ->whereNumber(['asset', 'run'])->name('fleet-assets.vehicles.checks.assessments.store');
         Route::post('/vehicles/{asset}/check-templates', [\App\Http\Controllers\FleetAssets\VehicleCheckController::class, 'storeTemplate'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.check-templates.store');
         Route::post('/vehicles/{asset}/check-templates/{template}/versions', [\App\Http\Controllers\FleetAssets\VehicleCheckController::class, 'publishVersion'])

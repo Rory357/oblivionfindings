@@ -178,9 +178,14 @@ export function RemindersPanel({
                 .some((text) => String(text).toLowerCase().includes(needle));
         });
     }, [workspace.reminders, filter, query]);
-    const openSource = (type: ReminderSourceType | null, id: number | null) => {
+    const openSource = (
+        type: ReminderSourceType | 'vehicle_check' | null,
+        id: number | null,
+    ) => {
         if (type === 'document_set')
             onNavigate({ tab: 'overview', view: 'documents' });
+        else if (type === 'vehicle_check')
+            onNavigate({ tab: 'checks', view: 'recent' });
         else if (type === 'work_order' && id && workspace.work.can_view)
             openWorkOrder(id, vehicle.id, {
                 tab: 'service',
@@ -590,7 +595,12 @@ export function RemindersPanel({
                                               onClick: () =>
                                                   setEditing({
                                                       reminder: null,
-                                                      source: reminder.key,
+                                                      // Checks have no reminder source of their own.
+                                                      source:
+                                                          reminder.source_type ===
+                                                          'vehicle_check'
+                                                              ? 'vehicle'
+                                                              : reminder.key,
                                                   }),
                                           },
                                       ]

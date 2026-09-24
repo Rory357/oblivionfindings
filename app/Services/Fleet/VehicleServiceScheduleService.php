@@ -10,6 +10,7 @@ use App\Models\FleetWorkOrder;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -34,10 +35,34 @@ class VehicleServiceScheduleService
         return $actor->canDo('fleet.manage') || $actor->canDo('fleet.maintenance.manage');
     }
 
-    /** Create (no schedule id) or update a schedule. @param array<string,mixed> $data */
-    public function save(User $actor, int $assetId, ?int $scheduleId, array $data, ?int $expectedVersion): FleetServiceSchedule
+    /**
+     * Create (no schedule id) or update a schedule. A create with a request
+     * key returns the schedule that key already made; the same key for other
+     * details is refused.
+     *
+     * @param  array<string,mixed>  $data
+     */
+    public function save(User $actor, int $assetId, ?int $scheduleId, array $data, ?int $expectedVersion, ?string $requestKey = null): FleetServiceSchedule
     {
-        return DB::transaction(function () use ($actor, $assetId, $scheduleId, $data, $expectedVersion): FleetServiceSchedule {
+        if ($requestKey !== null && (trim($requestKey) === '' || mb_strlen($requestKey) > 100)) {
+            throw ValidationException::withMessages(['request_key' => 'A request key is required.']);
+        }
+
+        try {
+            return $this->saveSchedule($actor, $assetId, $scheduleId, $data, $expectedVersion, $requestKey);
+        } catch (QueryException $error) {
+            // Two concurrent retries of one create: the unique key keeps a single schedule.
+            if ($requestKey !== null && (int) ($error->errorInfo[1] ?? 0) === 1062) {
+                abort(409, 'This schedule was saved while you were working. Reload to check it.');
+            }
+            throw $error;
+        }
+    }
+
+    /** @param array<string,mixed> $data */
+    private function saveSchedule(User $actor, int $assetId, ?int $scheduleId, array $data, ?int $expectedVersion, ?string $requestKey): FleetServiceSchedule
+    {
+        return DB::transaction(function () use ($actor, $assetId, $scheduleId, $data, $expectedVersion, $requestKey): FleetServiceSchedule {
             [$current, $asset] = $this->resolve($actor, $assetId);
             $schedule = $scheduleId === null ? null : $this->lockSchedule($asset, $scheduleId);
             if ($schedule) {
@@ -92,8 +117,21 @@ class VehicleServiceScheduleService
                 $schedule->forceFill([...$values, 'lock_version' => $schedule->lock_version + 1])->save();
                 AuditLogger::logOrFail('fleet.service_schedule.update', $schedule, ['asset_id' => $asset->id, 'before' => $before]);
             } else {
+                $fingerprint = $requestKey === null ? null : MaintenanceFingerprint::of([
+                    'actor' => (int) $current->id, 'asset' => (int) $asset->id, 'schedule' => $values,
+                ]);
+                if ($requestKey !== null) {
+                    $prior = FleetServiceSchedule::query()->where('asset_id', $asset->id)
+                        ->where('request_key', $requestKey)->lockForUpdate()->first();
+                    if ($prior) {
+                        abort_unless(hash_equals((string) $prior->request_fingerprint, (string) $fingerprint), 409,
+                            'This request was already used for a different schedule. Reload and try again.');
+
+                        return $prior->fresh();
+                    }
+                }
                 $schedule = FleetServiceSchedule::query()->create([...$values, 'asset_id' => $asset->id]);
-                $schedule->forceFill(['lock_version' => 1])->save();
+                $schedule->forceFill(['lock_version' => 1, 'request_key' => $requestKey, 'request_fingerprint' => $fingerprint])->save();
                 AuditLogger::logOrFail('fleet.service_schedule.create', $schedule, ['asset_id' => $asset->id]);
             }
 
@@ -207,7 +245,7 @@ class VehicleServiceScheduleService
     {
         $current = User::query()->findOrFail($actor->id);
         abort_unless($this->canManage($current), 403);
-        $asset = $this->access->assignableVehicle($current, $assetId, true) ?? abort(404);
+        $asset = $this->access->fleetVehicle($current, $assetId, true) ?? abort(404);
 
         return [$current, $asset];
     }

@@ -18,14 +18,26 @@ use Illuminate\Support\Collection;
  *
  * Only people who may see the vehicle's technology see telemetry. A sample
  * older than FRESH_MINUTES is last known, never current. Consent-blocked
- * samples and samples recorded during a personal trip keep their device
- * state (ignition, power, battery) but never their speed or distance.
+ * samples and samples recorded during a personal trip stay in the list, so
+ * the record is complete, but keep only the tracker's own health (power,
+ * battery and a DEVICE_HEALTH_EVENT_TYPES report): never a driving event,
+ * ignition, movement, speed or distance.
  */
 final class VehicleTelemetryPresenter
 {
     public const FRESH_MINUTES = 15;
 
     public const SAMPLE_LIMIT = 20;
+
+    /**
+     * Tracker reports about the device itself (heartbeat, power and its
+     * backup battery). A withheld sample may still name one of these; every
+     * other event type describes the journey and is left out.
+     */
+    public const DEVICE_HEALTH_EVENT_TYPES = [
+        'heartbeat', 'hbd', 'power_on', 'power_off', 'external_power',
+        'battery_low', 'charging_started', 'charging_stopped',
+    ];
 
     public function __construct(private readonly FleetVehicleTechnologyProjectionPresenter $technology) {}
 
@@ -114,6 +126,12 @@ final class VehicleTelemetryPresenter
         ];
     }
 
+    /** Whether a tracker event type is about the device's own health. */
+    public static function isDeviceHealth(?string $eventType): bool
+    {
+        return in_array(strtolower(trim((string) $eventType)), self::DEVICE_HEALTH_EVENT_TYPES, true);
+    }
+
     /** Capabilities are only described for an exact, reviewed model. */
     public static function family(?string $model): ?string
     {
@@ -140,9 +158,10 @@ final class VehicleTelemetryPresenter
             'id' => (int) $event->id,
             'occurred_at' => $event->occurred_at?->toIso8601String(),
             'received_at' => $event->received_at?->toIso8601String(),
-            'event_type' => $event->event_type,
-            'ignition' => $event->ignition,
-            'motion' => VehicleLocationService::motion($event->motion_status, $withheld === null ? $event->speed_kph : null),
+            'event_type' => $withheld === null || self::isDeviceHealth($event->event_type) ? $event->event_type : null,
+            // Ignition and movement describe the journey, so a withheld sample keeps neither.
+            'ignition' => $withheld === null ? $event->ignition : null,
+            'motion' => $withheld === null ? VehicleLocationService::motion($event->motion_status, $event->speed_kph) : null,
             'speed_kph' => $withheld === null && $event->speed_kph !== null ? round((float) $event->speed_kph, 1) : null,
             'battery_pct' => $event->battery_pct,
             'external_power' => $event->external_power,

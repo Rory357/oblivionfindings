@@ -44,6 +44,13 @@ export const WITHHELD_TEXT: Record<Exclude<Withheld, null>, string> = {
     access: 'Recorded positions need trip access for this vehicle’s site.',
 };
 
+/** The short form, for a recorded item listed in a row or a select. */
+export const WITHHELD_LABEL: Record<Exclude<Withheld, null>, string> = {
+    access: 'Withheld · recorded positions follow the trip site rules',
+    consent: 'Withheld · tracking consent was not in place',
+    personal: 'Withheld · recorded during a personal trip',
+};
+
 export type ReportedFacts = {
     /** The selected observation is the latest tracker report. */
     current: boolean;
@@ -66,7 +73,8 @@ export type ReportedFacts = {
 /**
  * What the design's reported-state inspector shows for one observation.
  * Unknown stays unknown: a stale report can't prove ignition or motion, and
- * a historical position says nothing about the vehicle now.
+ * a historical position says nothing about the vehicle now. A withheld
+ * report never shows its ignition, motion or speed.
  */
 export function reportedFacts(
     location: VehicleLocation,
@@ -76,12 +84,12 @@ export function reportedFacts(
     const noTracker = !location.tracker.linked && state === null;
     const current = observation === null || observation.kind === 'latest';
     const fresh = !!state?.fresh;
-    const live = !noTracker && current && fresh;
+    const live = !noTracker && current && fresh && !state?.withheld;
     const motion: ReportedFacts['motion'] = noTracker
         ? 'Unknown'
         : !current
           ? 'Stationary'
-          : !fresh || !state?.motion
+          : !live || !state?.motion
             ? 'Unknown'
             : state.motion === 'moving'
               ? 'Moving'
@@ -297,6 +305,37 @@ export function eventLabel(type: string | null): string {
     );
 }
 
+/**
+ * Reports about the tracker itself (VehicleTelemetryPresenter::
+ * DEVICE_HEALTH_EVENT_TYPES), the only events a withheld sample may name.
+ */
+const DEVICE_HEALTH_EVENTS = new Set([
+    'heartbeat',
+    'hbd',
+    'power_on',
+    'power_off',
+    'external_power',
+    'battery_low',
+    'charging_started',
+    'charging_stopped',
+]);
+
+/**
+ * How a recorded sample is listed. A withheld sample (a personal trip or no
+ * tracking consent) never names a driving event: at most the tracker health
+ * report it carried, then why the rest is withheld.
+ */
+export function sampleLabel(
+    sample: Pick<TelemetrySample, 'event_type' | 'withheld'>,
+): string {
+    if (!sample.withheld) return eventLabel(sample.event_type);
+    const reason = WITHHELD_LABEL[sample.withheld];
+    const type = sample.event_type?.toLowerCase() ?? '';
+    return DEVICE_HEALTH_EVENTS.has(type)
+        ? `${eventLabel(type)} · ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`
+        : reason;
+}
+
 export type TelemetryTile = {
     key: string;
     label: string;
@@ -311,7 +350,8 @@ const km = (value: number) =>
 /**
  * The design's six telemetry tiles for one recorded sample. A stale latest
  * report leaves ignition and motion unknown; an older sample is shown as
- * what it recorded, marked as not current.
+ * what it recorded, marked as not current. A withheld sample shows only the
+ * tracker's own health: its ignition, motion and distance stay withheld.
  */
 export function telemetryTiles(
     sample: TelemetrySample | null,
@@ -323,21 +363,26 @@ export function telemetryTiles(
     const current = !!sample && sample.id === currentSampleId;
     const latestStale = !!sample && sample.id === latestId && !current;
     const known = !!sample && !latestStale;
+    const withheld = !!sample?.withheld;
     const gv500 = tracker?.family === 'gv500cg';
-    const ignition = !known
-        ? 'Unknown'
-        : sample!.ignition === null
+    const ignition = withheld
+        ? '—'
+        : !known
           ? 'Unknown'
-          : sample!.ignition
-            ? 'On'
-            : 'Off';
-    const motion = !known
-        ? 'Unknown'
-        : sample!.motion === 'moving'
-          ? 'Moving'
-          : sample!.motion === 'stationary'
-            ? 'Stationary'
-            : 'Unknown';
+          : sample!.ignition === null
+            ? 'Unknown'
+            : sample!.ignition
+              ? 'On'
+              : 'Off';
+    const motion = withheld
+        ? '—'
+        : !known
+          ? 'Unknown'
+          : sample!.motion === 'moving'
+            ? 'Moving'
+            : sample!.motion === 'stationary'
+              ? 'Stationary'
+              : 'Unknown';
     const connection = unavailable
         ? 'Not assigned'
         : !sample
@@ -354,21 +399,22 @@ export function telemetryTiles(
             key: 'ignition',
             label: 'Ignition',
             value: ignition,
-            caption: gv500
-                ? 'Virtual ignition · inferred'
-                : 'Reported ignition · inferred by the tracker',
+            caption: withheld
+                ? 'Withheld for this sample'
+                : gv500
+                  ? 'Virtual ignition · inferred'
+                  : 'Reported ignition · inferred by the tracker',
             current,
         },
         {
             key: 'motion',
             label: 'Motion',
             value: motion,
-            caption:
-                known && sample!.speed_kph !== null
-                    ? `${Math.round(sample!.speed_kph)} km/h · GNSS`
-                    : sample?.withheld
-                      ? 'Speed withheld for this sample'
-                      : 'Current movement not known',
+            caption: withheld
+                ? 'Withheld for this sample'
+                : known && sample!.speed_kph !== null
+                  ? `${Math.round(sample!.speed_kph)} km/h · GNSS`
+                  : 'Current movement not known',
             current,
         },
         {
@@ -409,14 +455,14 @@ export function telemetryTiles(
             key: 'distance',
             label: 'Distance counter',
             value:
+                !withheld &&
                 sample?.odometer_km !== null &&
                 sample?.odometer_km !== undefined
                     ? km(sample.odometer_km)
                     : '—',
-            caption:
-                sample?.withheld && sample.odometer_km === null
-                    ? 'Withheld for this sample'
-                    : 'Tracker cumulative distance · not dashboard OBD',
+            caption: withheld
+                ? 'Withheld for this sample'
+                : 'Tracker cumulative distance · not dashboard OBD',
             current,
         },
     ];

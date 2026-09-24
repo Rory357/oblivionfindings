@@ -391,6 +391,7 @@ export function RecordDialog({
     onClose,
     children,
     destructive,
+    submitDisabled = false,
 }: {
     title: string;
     description: string;
@@ -400,6 +401,8 @@ export function RecordDialog({
     onClose: () => void;
     children: ReactNode;
     destructive?: ReactNode;
+    /** Something shown in the dialog must be resolved before saving. */
+    submitDisabled?: boolean;
 }) {
     return (
         <Dialog
@@ -437,7 +440,9 @@ export function RecordDialog({
                         </Button>
                         <Button
                             disabled={
-                                command.processing || command.requiresReload
+                                command.processing ||
+                                command.requiresReload ||
+                                submitDisabled
                             }
                             onClick={onSubmit}
                         >

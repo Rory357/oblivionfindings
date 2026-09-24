@@ -14,6 +14,7 @@ import { AppointmentWizard } from './appointment-wizard';
 import type { VehicleCalendarSummary } from './calendar-types';
 import './studio.css';
 import type { VehicleProfile } from './types';
+import { StudioNotice } from './wizard-kit';
 import { locationUrl, type WorkspaceLocation } from './workspace-model';
 
 /** The design's section heading: an optional eyebrow, a title and actions on the right. */
@@ -55,6 +56,28 @@ export function StudioFooterAction({
             </span>
             {action}
         </div>
+    );
+}
+
+/**
+ * Shown in place of a section that follows the vehicle's Site when the
+ * person sees this vehicle through central fleet oversight only.
+ */
+export function SiteRecordsNotice({
+    what,
+    site,
+}: {
+    /** e.g. "Location and geofences" */
+    what: string;
+    site: string | null | undefined;
+}) {
+    return (
+        <section className="studio-card">
+            <StudioNotice title={`${what} stay with the vehicle’s Site`}>
+                You can see this vehicle across Sites. {what} are shown only to
+                people at {site ?? 'the vehicle’s Site'}.
+            </StudioNotice>
+        </section>
     );
 }
 
@@ -148,9 +171,11 @@ export function openWorkOrder(
     workOrderId: number,
     vehicleId: number,
     back: WorkspaceLocation,
+    /** Open the work order on its release review (tab and dialog). */
+    release = false,
 ) {
     router.visit(
-        `/fleet-assets/maintenance/work-orders/${workOrderId}?return=${encodeURIComponent(locationUrl(vehicleId, back))}`,
+        `/fleet-assets/maintenance/work-orders/${workOrderId}?return=${encodeURIComponent(locationUrl(vehicleId, back))}${release ? '&tab=release&open=release' : ''}`,
     );
 }
 
@@ -159,11 +184,14 @@ export function SourceRecordDialog({
     title,
     description = 'Source record',
     rows,
+    action,
     onClose,
 }: {
     title: string;
     description?: string;
     rows: Array<[string, string]>;
+    /** Opens the record this one points at (for example the source check). */
+    action?: { label: string; onClick: () => void };
     onClose: () => void;
 }) {
     return (
@@ -197,6 +225,9 @@ export function SourceRecordDialog({
                     <Button variant="outline" onClick={onClose}>
                         Close
                     </Button>
+                    {action && (
+                        <Button onClick={action.onClick}>{action.label}</Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

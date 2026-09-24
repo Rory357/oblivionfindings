@@ -39,6 +39,7 @@ import {
     tripMinutes,
     tripQuery,
     TRIPS_PER_PAGE,
+    tripWindowNotice,
     writeStored,
     type TimelineFilter,
     type TripFilterState,
@@ -52,6 +53,7 @@ import type {
 } from './trip-types';
 import './trips.css';
 import type { VehicleWorkspace } from './types';
+import { StudioNotice } from './wizard-kit';
 import type { WorkspaceLocation } from './workspace-model';
 
 type Load = 'loading' | 'ready' | 'error' | 'forbidden';
@@ -293,6 +295,8 @@ export function TripHistory({
     };
 
     const summary = list?.summary;
+    // The list reads a limited stretch of history; say so when trips are left out.
+    const windowNotice = list ? tripWindowNotice(list) : null;
     const detailReady =
         detail !== null &&
         detail.trip.id === selectedId &&
@@ -526,6 +530,11 @@ export function TripHistory({
                     {summary?.driving_events ?? 0} driving events
                 </span>
             </div>
+            {windowNotice && (
+                <StudioNotice title={windowNotice.title}>
+                    {windowNotice.body}
+                </StudioNotice>
+            )}
 
             {!list && listLoad === 'loading' ? (
                 <LoadingState message="Loading trip history…" />

@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\AuditLog;
 use App\Models\Client;
+use App\Models\FleetDrivingEventReview;
 use App\Models\FleetDrivingMetric;
 use App\Models\FleetTelemetryEvent;
 use App\Models\FleetTrip;
@@ -21,9 +22,12 @@ use App\Services\Fleet\VehicleTripHistoryService;
 use App\Services\Fleet\VehicleTripReportExporter;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -181,6 +185,99 @@ class Pkg02bVehicleTripHistoryTest extends TestCase
         $this->actingAs($viewer)->getJson($url.'?summary_only=1&from=2026-09-19&to=2026-09-21')->assertOk()
             ->assertJsonPath('summary.business_trips', 3)
             ->assertJsonMissingPath('data');
+    }
+
+    public function test_the_list_reads_the_latest_days_and_at_most_a_year_and_says_so(): void
+    {
+        $viewer = $this->siteUser([$this->site], ['fleet.viewAny']);
+        $vehicle = $this->vehicle($this->site);
+        $latest = $this->trip($vehicle, '2026-09-21 08:00', 12);
+        $spring = $this->trip($vehicle, '2026-05-01 08:00', 12);
+        $this->trip($vehicle, '2024-01-10 08:00', 12);
+        $url = "/fleet-assets/vehicles/{$vehicle->id}/trip-history";
+
+        // All recorded dates: the 90 days up to the latest trip, and whether there are earlier ones.
+        $this->actingAs($viewer)->getJson($url)->assertOk()
+            ->assertJsonPath('trip_ids', [$latest->id])
+            ->assertJsonPath('summary.trips', 1)
+            ->assertJsonPath('window.from', '2026-06-24')
+            ->assertJsonPath('window.to', null)
+            ->assertJsonPath('window.limited', 'recent')
+            ->assertJsonPath('window.earlier_trips', true)
+            ->assertJsonPath('truncated', false)
+            ->assertJsonPath('limits.default_days', VehicleTripHistoryService::DEFAULT_WINDOW_DAYS)
+            ->assertJsonPath('limits.max_range_days', VehicleTripHistoryService::MAX_RANGE_DAYS)
+            ->assertJsonPath('limits.max_trips', VehicleTripHistoryService::MAX_LIST_TRIPS)
+            ->assertJsonPath('has_trips', true);
+
+        // A range within a year is read as asked.
+        $this->actingAs($viewer)->getJson($url.'?from=2026-04-01&to=2026-09-21')->assertOk()
+            ->assertJsonPath('trip_ids', [$latest->id, $spring->id])
+            ->assertJsonPath('window.from', '2026-04-01')
+            ->assertJsonPath('window.limited', null)
+            ->assertJsonPath('window.earlier_trips', false);
+        $this->actingAs($viewer)->getJson($url.'?from=2026-01-01')->assertOk()
+            ->assertJsonPath('trip_ids', [$latest->id, $spring->id])
+            ->assertJsonPath('window.limited', null);
+
+        // A longer range, or one with no first date, keeps its most recent year.
+        foreach (['?from=2023-01-01&to=2026-09-21', '?to=2026-09-21'] as $query) {
+            $this->actingAs($viewer)->getJson($url.$query)->assertOk()
+                ->assertJsonPath('trip_ids', [$latest->id, $spring->id])
+                ->assertJsonPath('window.from', '2025-09-20')
+                ->assertJsonPath('window.to', '2026-09-21')
+                ->assertJsonPath('window.limited', 'range')
+                ->assertJsonPath('window.earlier_trips', true);
+        }
+        $this->actingAs($viewer)->getJson($url.'?summary_only=1&from=2023-01-01&to=2026-09-21')->assertOk()
+            ->assertJsonPath('summary.trips', 2)
+            ->assertJsonPath('window.limited', 'range');
+    }
+
+    public function test_the_list_reads_at_most_the_latest_trips_while_exports_keep_their_own_limits(): void
+    {
+        $viewer = $this->siteUser([$this->site], ['fleet.viewAny']);
+        $vehicle = $this->vehicle($this->site);
+        $start = $this->local('2026-09-21 06:00');
+        $rows = [];
+        // One more trip than a list reads: every 20 minutes back from 21 September.
+        foreach (range(0, VehicleTripHistoryService::MAX_LIST_TRIPS) as $index) {
+            $at = $start->subMinutes($index * 20);
+            $rows[] = [
+                'asset_id' => $vehicle->id, 'started_at' => $at->format('Y-m-d H:i:s'),
+                'ended_at' => $at->addMinutes(10)->format('Y-m-d H:i:s'), 'distance_km' => 1, 'duration_s' => 600,
+                'status' => 'closed', 'consent_blocked' => false, 'is_personal' => false,
+                'created_at' => now(), 'updated_at' => now(),
+            ];
+        }
+        DB::table('fleet_trips')->insert($rows);
+        $oldest = (int) DB::table('fleet_trips')->where('asset_id', $vehicle->id)->orderBy('started_at')->value('id');
+        $url = "/fleet-assets/vehicles/{$vehicle->id}/trip-history";
+
+        $list = $this->actingAs($viewer)->getJson($url.'?per_page=25')->assertOk()
+            ->assertJsonPath('truncated', true)
+            ->assertJsonPath('meta.total', VehicleTripHistoryService::MAX_LIST_TRIPS)
+            ->assertJsonPath('summary.trips', VehicleTripHistoryService::MAX_LIST_TRIPS)
+            ->assertJsonPath('window.limited', 'recent')
+            ->assertJsonCount(25, 'data');
+        $this->assertCount(VehicleTripHistoryService::MAX_LIST_TRIPS, $list->json('trip_ids'));
+        $this->assertNotContains($oldest, $list->json('trip_ids'));
+        // The last page is still there to read.
+        $this->actingAs($viewer)->getJson($url.'?per_page=25&page=20')->assertOk()
+            ->assertJsonPath('meta.page', 20)->assertJsonCount(25, 'data');
+
+        // An export uses the dates it is given and its own limits.
+        $service = app(VehicleTripHistoryService::class);
+        $asset = $service->vehicle($viewer, $vehicle->id);
+        $filters = $service->filters(['from' => '2026-09-13', 'to' => '2026-09-21']);
+        $report = $service->exportReport($viewer, $asset, $filters, VehicleTripHistoryService::SPREADSHEET_TRIP_LIMIT, false, false);
+        $this->assertSame(VehicleTripHistoryService::MAX_LIST_TRIPS + 1, $report['totals']['trips']);
+        try {
+            $service->exportReport($viewer, $asset, $filters, VehicleTripHistoryService::PDF_TRIP_LIMIT, false, false);
+            $this->fail('A PDF of more trips than its limit was generated.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('choose a shorter date range', $exception->errors()['range'][0]);
+        }
     }
 
     public function test_trip_detail_reads_behaviour_from_the_recorded_telemetry(): void
@@ -357,6 +454,80 @@ class Pkg02bVehicleTripHistoryTest extends TestCase
             ->assertOk()->assertJsonPath('trip_ids', [$trip->id])->assertJsonPath('data.0.driver.state', 'confirmed');
         $this->actingAs($viewer)->getJson("/fleet-assets/vehicles/{$vehicle->id}/trip-history/{$trip->id}")
             ->assertOk()->assertJsonPath('driver_history', []);
+    }
+
+    public function test_deleting_a_trip_never_erases_its_driver_confirmation_or_event_reviews(): void
+    {
+        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.trips.manage']);
+        $viewer = $this->siteUser([$this->site], ['fleet.viewAny']);
+        $driver = $this->siteUser([$this->site], [], 'Jamie Taylor');
+        $vehicle = $this->vehicle($this->site);
+        $confirmed = $this->trip($vehicle, '2026-09-21 08:00', 12);
+        $reviewed = $this->trip($vehicle, '2026-09-21 10:00', 12);
+        $both = $this->trip($vehicle, '2026-09-21 12:00', 12);
+        $plain = $this->trip($vehicle, '2026-09-21 14:00', 12);
+        $foreign = $this->trip($this->vehicle($this->foreignSite), '2026-09-21 08:00', 12);
+        foreach ([$confirmed, $both] as $index => $trip) {
+            FleetTripDriverConfirmation::query()->create([
+                'fleet_trip_id' => $trip->id, 'asset_id' => $vehicle->id, 'driver_user_id' => $driver->id,
+                'source' => 'manual', 'reason' => 'Key log shows Jamie drove.', 'confirmed_by_user_id' => $manager->id,
+                'confirmed_at' => now(), 'request_key' => 'confirm-before-delete-'.$index,
+                'request_fingerprint' => str_repeat('a', 64),
+            ]);
+        }
+        foreach ([$reviewed, $both] as $index => $trip) {
+            FleetDrivingEventReview::query()->create([
+                'asset_id' => $vehicle->id, 'fleet_trip_id' => $trip->id, 'event_key' => 'harsh-braking-'.$trip->id,
+                'event_type' => 'harsh-braking', 'event_title' => 'Harsh braking', 'event_at' => $trip->started_at,
+                'outcome' => 'dismissed', 'reason' => 'Braked for a pedestrian crossing.', 'recorded_by_user_id' => $manager->id,
+                'policy_version' => 1, 'sequence' => 1, 'request_key' => 'review-before-delete-'.$index,
+                'request_fingerprint' => str_repeat('b', 64),
+            ]);
+        }
+
+        $this->actingAs($viewer)->deleteJson("/fleet/trips/{$plain->id}")->assertForbidden();
+        $this->actingAs($manager)->deleteJson("/fleet/trips/{$confirmed->id}")->assertUnprocessable()
+            ->assertJsonValidationErrors(['trip' => "This trip can't be deleted because its driver confirmation is kept as a record."]);
+        $this->actingAs($manager)->deleteJson("/fleet/trips/{$reviewed->id}")->assertUnprocessable()
+            ->assertJsonValidationErrors(['trip' => "This trip can't be deleted because its driving event reviews are kept as a record."]);
+        $this->actingAs($manager)->deleteJson("/fleet/trips/{$both->id}")->assertUnprocessable()
+            ->assertJsonValidationErrors(['trip' => 'its driver confirmation and driving event reviews are kept as a record']);
+        // The trip playback page gets the reason back to show.
+        $playback = "/fleet-assets/trips/{$confirmed->id}/playback";
+        $this->actingAs($manager)->from($playback)->delete("/fleet/trips/{$confirmed->id}")
+            ->assertRedirect($playback)->assertSessionHasErrors('trip');
+
+        foreach ([$confirmed, $reviewed, $both] as $trip) {
+            $this->assertDatabaseHas('fleet_trips', ['id' => $trip->id]);
+        }
+        $this->assertSame(2, FleetTripDriverConfirmation::query()->count());
+        $this->assertSame(2, FleetDrivingEventReview::query()->count());
+        $this->assertFalse(AuditLog::query()->where('action', 'fleet.trip.delete')->exists());
+        // The database refuses as well, however a delete arrives.
+        foreach ([$confirmed, $reviewed] as $trip) {
+            try {
+                DB::table('fleet_trips')->where('id', $trip->id)->delete();
+                $this->fail('A trip with kept evidence was deleted.');
+            } catch (QueryException $exception) {
+                $this->assertStringContainsString('foreign key constraint fails', $exception->getMessage());
+            }
+        }
+
+        // A trip at another Site is not found, and stays: it can't be deleted,
+        // changed or closed from here.
+        $this->actingAs($manager)->deleteJson("/fleet/trips/{$foreign->id}")->assertNotFound();
+        $this->assertDatabaseHas('fleet_trips', ['id' => $foreign->id]);
+        $this->actingAs($manager)->putJson("/fleet/trips/{$foreign->id}", ['notes' => 'Moved elsewhere.'])->assertNotFound();
+        $this->actingAs($manager)->postJson("/fleet/trips/{$foreign->id}/close")->assertNotFound();
+        $this->assertNotSame('Moved elsewhere.', $foreign->fresh()->notes);
+        $this->actingAs($manager)->deleteJson('/fleet/trips/987654321')->assertNotFound();
+
+        // A trip at the manager's Site with nothing kept against it is deleted and audited.
+        $this->actingAs($manager)->deleteJson("/fleet/trips/{$plain->id}")
+            ->assertRedirect(route('fleet-assets.trips.index'));
+        $this->assertDatabaseMissing('fleet_trips', ['id' => $plain->id]);
+        $this->assertTrue(AuditLog::query()->where('action', 'fleet.trip.delete')
+            ->where('auditable_id', $plain->id)->exists());
     }
 
     public function test_exports_are_scoped_branded_sanitised_and_audited(): void

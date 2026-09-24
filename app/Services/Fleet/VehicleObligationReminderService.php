@@ -7,6 +7,7 @@ use App\Models\Asset;
 use App\Models\FleetObligationReminder;
 use App\Models\FleetObligationReminderEvent;
 use App\Models\FleetServiceSchedule;
+use App\Models\FleetVehicleCheckRequirement;
 use App\Models\FleetVehicleComplianceRecord;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
@@ -19,13 +20,15 @@ use Throwable;
 
 /**
  * Reminders for vehicle obligations: each due point of an active service
- * schedule or an applicable compliance record. The owner is told in the app
- * when the due point comes within its lead time; every attempt is kept.
- * Acknowledging a reminder never completes the service or the evidence.
+ * schedule, an applicable compliance record, or the vehicle's check
+ * (assets.inspection_due_at; source id is the vehicle's own id). The owner is
+ * told in the app when the due point comes within its lead time; every
+ * attempt is kept. Acknowledging a reminder never completes the service, the
+ * evidence or the check.
  */
 class VehicleObligationReminderService
 {
-    public const SOURCES = ['service_schedule', 'compliance_record'];
+    public const SOURCES = ['service_schedule', 'compliance_record', 'vehicle_check'];
 
     private const ZONE = 'Pacific/Auckland';
 
@@ -152,7 +155,7 @@ class VehicleObligationReminderService
             $isOwner = $obligation['owner_user_id'] !== null && (int) $obligation['owner_user_id'] === (int) $current->id;
             abort_unless($current->canDo('fleet.manage') || $isOwner, 403);
             $reminder = $this->cycleRow((int) $asset->id, $obligation, true);
-            if ($this->replayed($reminder, $requestKey)) {
+            if ($this->replayed($reminder, $requestKey, (int) $current->id, ['acknowledged'], $note)) {
                 return $reminder;
             }
             if ($reminder->state === FleetObligationReminder::STATE_ACKNOWLEDGED) {
@@ -185,7 +188,7 @@ class VehicleObligationReminderService
             [$current, $asset, $obligation] = $this->resolve($actor, $assetId, $sourceType, $sourceId);
             abort_unless($current->canDo('fleet.manage'), 403);
             $reminder = $this->cycleRow((int) $asset->id, $obligation, true);
-            if ($this->replayed($reminder, $requestKey)) {
+            if ($this->replayed($reminder, $requestKey, (int) $current->id, ['sent', 'failed'])) {
                 return $reminder;
             }
             abort_unless($reminder->state === FleetObligationReminder::STATE_FAILED, 409,
@@ -277,6 +280,29 @@ class VehicleObligationReminderService
                     'due_now' => $byDate || $byKm,
                 ];
             });
+
+        // The vehicle's check: owned by the check requirement's owner, or the
+        // vehicle's fleet responsible person when none is recorded.
+        $checkLead = (int) config('fleet.obligation_reminders.check_lead_days', 7);
+        $checkOwners = FleetVehicleCheckRequirement::query()->whereIn('asset_id', $ids)->whereNotNull('owner_user_id')
+            ->pluck('owner_user_id', 'asset_id');
+        foreach ($byId as $assetId => $asset) {
+            if ($asset->inspection_due_at === null) {
+                continue;
+            }
+            $dueOn = $asset->inspection_due_at->toDateString();
+            $result[(int) $assetId][] = [
+                'source_type' => 'vehicle_check',
+                'source_id' => (int) $assetId,
+                'name' => 'Vehicle check',
+                'cycle_key' => self::cycleKey($dueOn, null),
+                'due_on' => $dueOn,
+                'due_km' => null,
+                'owner_user_id' => (int) ($checkOwners[$assetId] ?? 0) ?: ($asset->fleet_responsible_user_id ?: null),
+                'lead' => $checkLead.' days',
+                'due_now' => $today->greaterThanOrEqualTo(CarbonImmutable::parse($dueOn, self::ZONE)->subDays($checkLead)),
+            ];
+        }
 
         return $result;
     }
@@ -386,9 +412,24 @@ class VehicleObligationReminderService
         }
     }
 
-    private function replayed(FleetObligationReminder $reminder, string $requestKey): bool
+    /**
+     * Whether this request already ran on the reminder. Only the same person
+     * sending the same action (and, for an acknowledgement, the same note)
+     * again is a retry; any other use of the key is refused.
+     *
+     * @param  list<string>  $actions  the event actions the request records
+     */
+    private function replayed(FleetObligationReminder $reminder, string $requestKey, int $actorId, array $actions, ?string $note = null): bool
     {
-        return $reminder->events()->where('request_key', $requestKey)->exists();
+        $prior = $reminder->events()->where('request_key', $requestKey)->first(['action', 'actor_user_id', 'note']);
+        if (! $prior) {
+            return false;
+        }
+        abort_unless(in_array($prior->action, $actions, true) && (int) $prior->actor_user_id === $actorId
+            && ($note === null || $prior->note === $note), 409,
+            'This request was already used for a different change. Reload and try again.');
+
+        return true;
     }
 
     /** @return array{0:User,1:Asset,2:array<string,mixed>} */
@@ -396,7 +437,7 @@ class VehicleObligationReminderService
     {
         abort_unless(in_array($sourceType, self::SOURCES, true), 404);
         $current = User::query()->findOrFail($actor->id);
-        $asset = $this->access->assignableVehicle($current, $assetId, true) ?? abort(404);
+        $asset = $this->access->fleetVehicle($current, $assetId, true) ?? abort(404);
         $odometer = $this->odometer->currentObserved((int) $asset->id);
         $obligation = collect($this->obligations([$asset], [(int) $asset->id => $odometer ? (float) $odometer->value_km : null])[(int) $asset->id] ?? [])
             ->first(fn (array $item): bool => $item['source_type'] === $sourceType && $item['source_id'] === $sourceId);

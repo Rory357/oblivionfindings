@@ -2,6 +2,9 @@
 
 namespace App\Services\Fleet;
 
+use App\Models\FleetServiceSchedule;
+use App\Models\FleetVehicleBooking;
+use App\Models\FleetVehicleComplianceRecord;
 use App\Models\FleetWorkOrder;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
@@ -167,25 +170,36 @@ class MaintenanceReportService
         }
     }
 
-    private function assertSourceBelongsToAsset(?string $type, ?int $id, int $assetId): void
+    /**
+     * The record a report came from must belong to the same asset. Callers
+     * check their own access to the source; this only proves ownership.
+     */
+    public function assertSourceBelongsToAsset(?string $type, ?int $id, int $assetId): void
     {
         if ($type === null && $id === null) {
             return;
         }
 
-        // PKG-02B: a vehicle's Control Room response can be the source of the
-        // Maintenance assessment it decided on (the caller checks the response).
-        if ($type === 'control_room_alert') {
-            if (! $id || ! DB::table('control_room_alerts')->where('id', $id)->where('asset_id', $assetId)->exists()) {
-                throw ValidationException::withMessages(['source_id' => 'Choose a Control Room response for this asset.']);
-            }
-
-            return;
-        }
-
-        if ($type !== 'fleet_checklist_run' || ! $id || ! DB::table('fleet_checklist_runs')
-            ->where('id', $id)->where('asset_id', $assetId)->exists()) {
-            throw ValidationException::withMessages(['source_id' => 'Choose a permitted check for this asset.']);
+        $belongs = $id !== null && $id > 0 && match ($type) {
+            'fleet_checklist_run' => DB::table('fleet_checklist_runs')->where('id', $id)->where('asset_id', $assetId)->exists(),
+            // PKG-02B: a vehicle's Control Room response can be the source of the
+            // Maintenance assessment it decided on (the caller checks the response).
+            'control_room_alert' => DB::table('control_room_alerts')->where('id', $id)->where('asset_id', $assetId)->exists(),
+            // PKG-02B vehicle calendar: an appointment planned from a due service
+            // or compliance item, and a concern recorded when a booking returned.
+            'service_schedule' => FleetServiceSchedule::query()->whereKey($id)->where('asset_id', $assetId)->exists(),
+            'compliance_record' => FleetVehicleComplianceRecord::query()->whereKey($id)->where('asset_id', $assetId)->exists(),
+            'fleet_vehicle_booking' => FleetVehicleBooking::query()->whereKey($id)->where('asset_id', $assetId)->exists(),
+            default => false,
+        };
+        if (! $belongs) {
+            throw ValidationException::withMessages(['source_id' => match ($type) {
+                'control_room_alert' => 'Choose a Control Room response for this asset.',
+                'service_schedule' => 'Choose a service schedule for this vehicle.',
+                'compliance_record' => 'Choose a compliance record for this vehicle.',
+                'fleet_vehicle_booking' => 'Choose a booking for this vehicle.',
+                default => 'Choose a permitted check for this asset.',
+            }]);
         }
     }
 }

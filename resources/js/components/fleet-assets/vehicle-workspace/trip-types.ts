@@ -102,10 +102,39 @@ export type TripDriverOption = {
     confirmed: number;
 };
 
+/** The dates one list request read (VehicleTripHistoryService::window). */
+export type TripWindow = {
+    /** First Pacific/Auckland day read (YYYY-MM-DD). */
+    from: string;
+    /** Last day read; null reads up to now. */
+    to: string | null;
+    /**
+     * Why fewer days were read than asked for: `recent` when no dates were
+     * chosen (the latest days up to the most recent trip), `range` when the
+     * range was longer than one list reads.
+     */
+    limited: 'recent' | 'range' | null;
+    /** Trips were recorded before `from` (checked only when limited). */
+    earlier_trips: boolean;
+};
+
+export type TripListLimits = {
+    /** Days "All recorded dates" covers, up to the latest trip. */
+    default_days: number;
+    /** The most days between a range's first and last date. */
+    max_range_days: number;
+    /** The most trips one list request reads, newest first. */
+    max_trips: number;
+};
+
 export type TripListResponse = {
     vehicle: TripVehicle;
     summary: TripSummary;
     filters: TripFilters;
+    window: TripWindow;
+    /** More trips matched the dates than one list reads; the oldest are left out. */
+    truncated: boolean;
+    limits: TripListLimits;
     timezone: string;
     data: TripListItem[];
     trip_ids: number[];
@@ -125,7 +154,13 @@ export type TripListResponse = {
 
 export type TripSummaryResponse = Pick<
     TripListResponse,
-    'vehicle' | 'summary' | 'filters' | 'timezone'
+    | 'vehicle'
+    | 'summary'
+    | 'filters'
+    | 'window'
+    | 'truncated'
+    | 'limits'
+    | 'timezone'
 >;
 
 export type TripPoint = {

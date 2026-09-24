@@ -19,6 +19,10 @@ use Illuminate\Support\Facades\Schema;
  *   limits for a vehicle's evaluations, pending until someone other than the
  *   proposer approves them with evidence.
  *
+ * Reviews, speed limits and their approval events are evidence: deleting the
+ * trip, vehicle or speed limit they belong to is refused (restrict), never
+ * cascaded. Speed limits are retired, not deleted.
+ *
  * Additive only.
  */
 return new class extends Migration
@@ -50,9 +54,9 @@ return new class extends Migration
         Schema::create('fleet_driving_event_reviews', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('asset_id')
-                ->constrained('assets', 'id', 'fleet_drv_review_asset_fk')->cascadeOnDelete();
+                ->constrained('assets', 'id', 'fleet_drv_review_asset_fk')->restrictOnDelete();
             $table->foreignId('fleet_trip_id')
-                ->constrained('fleet_trips', 'id', 'fleet_drv_review_trip_fk')->cascadeOnDelete();
+                ->constrained('fleet_trips', 'id', 'fleet_drv_review_trip_fk')->restrictOnDelete();
             // The recorded event: its type and source report, never a copy of the telemetry.
             $table->string('event_key', 120);
             $table->string('event_type', 40);
@@ -80,7 +84,7 @@ return new class extends Migration
         Schema::create('fleet_speed_limits', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('asset_id')
-                ->constrained('assets', 'id', 'fleet_speed_limit_asset_fk')->cascadeOnDelete();
+                ->constrained('assets', 'id', 'fleet_speed_limit_asset_fk')->restrictOnDelete();
             $table->string('road_segment', 160);
             $table->string('direction', 40);
             $table->unsignedSmallInteger('limit_kph');
@@ -108,7 +112,7 @@ return new class extends Migration
         Schema::create('fleet_speed_limit_events', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('speed_limit_id')
-                ->constrained('fleet_speed_limits', 'id', 'fleet_speed_limit_event_fk')->cascadeOnDelete();
+                ->constrained('fleet_speed_limits', 'id', 'fleet_speed_limit_event_fk')->restrictOnDelete();
             // proposed | approved | retired
             $table->string('action', 16);
             $table->foreignId('actor_user_id')->nullable()

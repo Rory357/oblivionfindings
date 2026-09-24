@@ -24,6 +24,7 @@ import {
     ShieldCheck,
     Wrench,
 } from 'lucide-react';
+import { ASSESSED_LABEL } from './checks-model';
 import './studio.css';
 import type { VehicleWorkspace } from './types';
 import {
@@ -249,15 +250,20 @@ export function VehicleHeader({
                                 ? 'No record'
                                 : overdueCheck
                                   ? 'Overdue'
-                                  : checks.latest.outcome
-                                    ? sentence(checks.latest.outcome)
-                                    : 'Submitted'}
+                                  : checks.latest.assessed
+                                    ? ASSESSED_LABEL
+                                    : checks.latest.outcome
+                                      ? sentence(checks.latest.outcome)
+                                      : 'Submitted'}
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
                             {checks.latest
                                 ? [
                                       `CHK-${checks.latest.id}`,
                                       checks.latest.template,
+                                      checks.latest.assessed
+                                          ? 'Released for use'
+                                          : null,
                                   ]
                                       .filter(Boolean)
                                       .join(' · ')
@@ -275,7 +281,9 @@ export function VehicleHeader({
                         </PageHeaderMeterBig>
                         <PageHeaderMeterCaption>
                             {!work.can_view
-                                ? 'Maintenance access required'
+                                ? work.site_restricted
+                                    ? 'Shown at the vehicle’s Site'
+                                    : 'Maintenance access required'
                                 : !work.total
                                   ? 'No maintenance recorded'
                                   : work.awaiting_release
