@@ -4,15 +4,24 @@ namespace App\Http\Controllers;
 
 use App\Models\Asset;
 use App\Models\AssetDocument;
+use App\Models\FleetVehicleComplianceVersion;
 use App\Services\AuditLogger;
+use App\Services\Fleet\VehicleDocumentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class AssetDocumentController extends Controller
 {
     public function store(Request $request, Asset $asset)
     {
         $this->authorize('manageDocuments', $asset);
+        // PKG-02B: vehicle files are virus-checked and versioned in the vehicle profile.
+        if (Asset::vehicles()->whereKey($asset->id)->exists()) {
+            throw ValidationException::withMessages([
+                'file' => 'Add vehicle documents in the vehicle profile. Files are virus-checked there before anyone can open them.',
+            ]);
+        }
 
         $data = $request->validate([
             'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,csv,jpg,jpeg,png,gif,txt,rtf'], // 20MB
@@ -58,12 +67,18 @@ class AssetDocumentController extends Controller
         return back();
     }
 
-    public function download(Request $request, Asset $asset, AssetDocument $document)
+    public function download(Request $request, Asset $asset, AssetDocument $document, VehicleDocumentService $vehicleDocuments)
     {
         $this->authorize('view', $asset);
         abort_unless($document->asset_id === $asset->id, 404);
         // PKG-02B vehicle finance: review evidence (quotes, invoices) opens only for Finance viewers.
         abort_if($document->source_type === 'finance_review_request' && ! $request->user()?->canDo('finance.assets.view'), 404);
+        abort_unless($document->isOpenable(), 409, 'This file is not available to open. It has not passed its virus check.');
+        // Vehicle files stream through the vehicle profile's download, which
+        // rechecks vehicle access and sends the private-file headers.
+        if ($document->isVehicleManaged()) {
+            return $vehicleDocuments->download($request->user(), $asset->id, $document->id);
+        }
 
         AuditLogger::log('assets.documents.download', $document, [
             'asset_id' => $asset->id,
@@ -81,9 +96,16 @@ class AssetDocumentController extends Controller
     {
         $this->authorize('manageDocuments', $asset);
         abort_unless($document->asset_id === $asset->id, 404);
+        // PKG-02B keeps vehicle files: they are archived with a reason, never deleted.
+        abort_if($document->isVehicleManaged(), 409,
+            'This file is kept in the vehicle profile. Archive it there and record why, instead of deleting it.');
+        abort_if(FleetVehicleComplianceVersion::query()->where('asset_document_id', $document->id)->exists(), 409,
+            'This file is evidence in the vehicle\'s compliance history, so it can\'t be deleted.');
 
-        Storage::disk($document->storage_disk)->delete($document->storage_path);
+        // Remove the record before the bytes: anything else that still points
+        // at the file blocks the delete while the file is intact.
         $document->delete();
+        Storage::disk($document->storage_disk)->delete($document->storage_path);
 
         AuditLogger::log('assets.documents.delete', $document, [
             'asset_id' => $asset->id,

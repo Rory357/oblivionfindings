@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class DataSubjectRequestLifecycleTest extends TestCase
@@ -799,6 +800,7 @@ class DataSubjectRequestLifecycleTest extends TestCase
 
     public function test_two_process_complete_versus_refuse_serializes_one_terminal_outcome(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $actor = $this->processor();
         $assignee = User::factory()->create();
         $request = $this->verifiedRequest($actor, [
@@ -833,6 +835,7 @@ class DataSubjectRequestLifecycleTest extends TestCase
 
     public function test_two_process_verify_versus_complete_revalidates_prerequisites_under_lock(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $actor = $this->processor();
         $request = $this->request();
 
@@ -865,6 +868,7 @@ class DataSubjectRequestLifecycleTest extends TestCase
 
     public function test_two_process_assignment_versus_terminal_command_serializes_without_terminal_reopen(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $actor = $this->processor();
         $assignee = User::factory()->create();
         $this->grant($assignee, 'privacy.processRequests');

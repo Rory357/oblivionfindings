@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 beforeEach(function (): void {
     $this->seed(RbacSeeder::class);
@@ -520,6 +521,7 @@ test('payroll replay migration removes self-reference before its supporting corr
 });
 
 test('two independent MySQL creators serialize to one period run', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
     $actor = payrollReplayGlobalActor($this->siteA);
