@@ -1,15 +1,18 @@
 <?php
 
+use App\Models\ItKbArticle;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 test('legacy installed revision storage receives relationships without changing existing publications or links', function () {
-    $id = DB::table('it_kb_articles')->insertGetId([
-        'tenant_id' => 1, 'title' => 'Synthetic preserved publication', 'slug' => 'migration-'.str()->uuid(),
+    $article = (new ItKbArticle)->forceFill([
+        'title' => 'Synthetic preserved publication', 'slug' => 'migration-'.str()->uuid(),
         'category' => 'network', 'body' => 'Synthetic preserved content.', 'status' => 'published',
-        'audience' => 'it_agents', 'lock_version' => 7, 'published_at' => now(), 'updated_at' => now(),
+        'audience' => 'it_agents', 'lock_version' => 7, 'published_at' => now(),
     ]);
+    $article->save();
+    $id = $article->id;
     $columns = ['id', 'title', 'body', 'status', 'audience', 'published_at', 'updated_at', 'lock_version'];
     $before = (array) DB::table('it_kb_articles')->find($id, $columns);
     Schema::table('it_kb_articles', fn (Blueprint $table) => $table->dropColumn('related_records'));

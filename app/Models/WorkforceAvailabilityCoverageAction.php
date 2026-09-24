@@ -3,13 +3,12 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
-use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WorkforceAvailabilityCoverageAction extends Model
 {
-    use AuditableChanges, WritesLegacyOrganizationStorageContext;
+    use AuditableChanges;
 
     public const SOURCE_LEAVE = 'hr_leave_request';
 
