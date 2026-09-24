@@ -568,6 +568,10 @@ class WorkOrderController extends Controller
     {
         $actor = $request->user();
         abort_unless($actor, 403);
+        // Apply the Site boundary before reading the payload, so a foreign id is
+        // 404 rather than disclosed by validation errors. The transition service
+        // still decides who may act on an order inside the boundary.
+        $this->access()->asset($actor, (int) $workOrder->asset_id);
         $data = $request->validate([
             'operation' => ['required', 'string', 'in:start,hold,resume,complete,cancel,update_next_action,note,propose_handover,accept_handover,place_restriction,review_booking_impact,attest_repair,plan_provider,record_provider_confirmation,record_provider_cancellation,record_provider_completion,propose_custody,acknowledge_custody,release'],
             'version' => ['required', 'integer', 'min:0'],
@@ -646,6 +650,7 @@ class WorkOrderController extends Controller
     {
         $actor = $request->user();
         abort_unless($actor, 403);
+        $this->access()->asset($actor, (int) $workOrder->asset_id);
         $data = $request->validate(['fin_bill_id' => ['required', 'integer']]);
         app(MaintenanceFinanceService::class)->linkBill($actor, (int) $workOrder->id,
             (int) $data['fin_bill_id']);
@@ -669,8 +674,9 @@ class WorkOrderController extends Controller
         ]);
 
         // Acquire locks in the same asset-then-work order as single commands.
-        // One outer transaction keeps the batch all-or-nothing.
-        $ordered = FleetWorkOrder::query()->whereIn('id', $data['ids'])
+        // One outer transaction keeps the batch all-or-nothing. Foreign ids
+        // fail the count check, so they 404 like a missing order.
+        $ordered = $this->access()->scopedWorkOrders($actor)->whereIn('id', $data['ids'])
             ->get(['id', 'asset_id'])->sortBy([['asset_id', 'asc'], ['id', 'asc']]);
         abort_unless($ordered->count() === count($data['ids']), 404);
         DB::transaction(function () use ($actor, $ordered, $data): void {
