@@ -21,7 +21,9 @@ class ClientFactory extends Factory
             'address_line_1' => fake()->streetAddress(),
             'city' => fake()->city(),
             'postcode' => fake()->postcode(),
-            'status'     => fake()->randomElement(['active', 'active', 'active', 'inactive']),
+            // Deterministic: custody, assignment and ownership paths only accept
+            // active clients. Use ->inactive() when a test needs one.
+            'status'     => 'active',
         ];
     }
 
