@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
-use App\Models\Asset;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetChecklistRun;
 use App\Models\FleetChecklistTemplate;
@@ -14,15 +14,20 @@ use Inertia\Inertia;
 
 class DailyCheckController extends Controller
 {
-    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly SecurityDevicesAccessService $vehicleAccess,
+    ) {}
 
     public function index(Request $request)
     {
         $user = $request->user();
         $hasFleetFields = Schema::hasColumn('assets', 'home_site_id');
 
-        // Get vehicles, optionally filtered to user's site
-        $query = Asset::vehicles();
+        // Only vehicles at the person's permitted sites, optionally narrowed to
+        // their own site. The store refuses anything outside this scope.
+        $permitted = $this->vehicleAccess->accessibleVehiclesForFleet($user);
+        $query = clone $permitted;
 
         if ($hasFleetFields && $request->user()?->site_id) {
             $query->where(function ($q) use ($request) {
@@ -36,6 +41,7 @@ class DailyCheckController extends Controller
         // Get today's checks
         $today = now()->startOfDay();
         $todayChecks = FleetChecklistRun::query()
+            ->whereIn('asset_id', $vehicles->pluck('id'))
             ->where('completed_at', '>=', $today)
             ->whereHas('template', function ($q) {
                 $q->where('type', 'daily_check');
@@ -60,44 +66,38 @@ class DailyCheckController extends Controller
 
         $checkedCount = $vehicleData->where('checked_today', true)->count();
 
-        // Roadworthiness badges (org-wide) — same COUNT patterns as
-        // VehicleController::index; the pre-drive check is exactly where an
-        // expired WOF must be visible.
-        $wofDue = Asset::query()->where(fn ($q) => $q->vehicles())->wofExpiring(30)->count();
-        $wofExpired = Asset::query()
-            ->where(fn ($q) => $q->vehicles())
+        // Roadworthiness badges over the person's permitted vehicles — the same
+        // scope and COUNT patterns as VehicleController::index; the pre-drive
+        // check is exactly where an expired WOF must be visible.
+        $wofDue = (clone $permitted)->wofExpiring(30)->count();
+        $wofExpired = (clone $permitted)
             ->whereNotNull('wof_expires_at')
             ->where('wof_expires_at', '<', now())
             ->count();
-        $regoDue = Asset::query()->where(fn ($q) => $q->vehicles())->registrationExpiring(30)->count();
-        $regoExpired = Asset::query()
-            ->where(fn ($q) => $q->vehicles())
+        $regoDue = (clone $permitted)->registrationExpiring(30)->count();
+        $regoExpired = (clone $permitted)
             ->whereNotNull('registration_expires_at')
             ->where('registration_expires_at', '<', now())
             ->count();
-        $cofDue = Asset::query()
-            ->where(fn ($q) => $q->vehicles())
+        $cofDue = (clone $permitted)
             ->whereNotNull('cof_expires_at')
             ->where('cof_expires_at', '<=', now()->addDays(30))
             ->where('cof_expires_at', '>=', now())
             ->count();
-        $cofExpired = Asset::query()
-            ->where(fn ($q) => $q->vehicles())
+        $cofExpired = (clone $permitted)
             ->whereNotNull('cof_expires_at')
             ->where('cof_expires_at', '<', now())
             ->count();
         $hasInsuranceExpiry = Schema::hasColumn('assets', 'insurance_expires_at');
         $insuranceExpiring = $hasInsuranceExpiry
-            ? Asset::query()
-                ->where(fn ($q) => $q->vehicles())
+            ? (clone $permitted)
                 ->whereNotNull('insurance_expires_at')
                 ->where('insurance_expires_at', '<=', now()->addDays(30))
                 ->where('insurance_expires_at', '>=', now())
                 ->count()
             : null;
         $insuranceExpired = $hasInsuranceExpiry
-            ? Asset::query()
-                ->where(fn ($q) => $q->vehicles())
+            ? (clone $permitted)
                 ->whereNotNull('insurance_expires_at')
                 ->where('insurance_expires_at', '<', now())
                 ->count()
@@ -134,10 +134,14 @@ class DailyCheckController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'asset_id' => ['required', 'integer', 'exists:assets,id'],
+            'asset_id' => ['required', 'integer'],
             'condition' => ['required', 'string', 'in:good,issue'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
+        // A vehicle outside the person's fleet site scope (or missing) is not found.
+        $asset = $this->vehicleAccess->accessibleVehiclesForFleet($request->user())
+            ->whereKey((int) $data['asset_id'])->first() ?? abort(404);
+        $data['asset_id'] = (int) $asset->id;
 
         // Find or create the daily_check template
         $template = FleetChecklistTemplate::firstOrCreate(

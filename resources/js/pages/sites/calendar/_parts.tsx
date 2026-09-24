@@ -3,8 +3,14 @@
  * Ported from the prototype's cal-views.jsx; icons swapped for lucide-react and
  * shared UI state threaded via context to keep view signatures small.
  */
+import { PageHeaderFilterButton } from '@/components/page/page-header';
 import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import {
     colorVars,
     parseDT,
@@ -18,6 +24,7 @@ import {
     CalendarDays,
     CheckCircle2,
     CheckSquare,
+    ChevronDown,
     ChevronLeft,
     ChevronRight,
     ClipboardCheck,
@@ -51,6 +58,7 @@ import {
     type CSSProperties,
     type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { CalendarDayHeading } from './work-schedule';
 export { CalendarWorkRows, WorkSchedule } from './work-schedule';
 export type { CalendarWorkEntry } from './work-schedule';
@@ -256,6 +264,394 @@ export function MiniMonth({
     );
 }
 
+/* ---- period label + jump to date (Site Calendar filter row) ------------- */
+
+export type CalView = 'month' | 'week' | 'day' | 'agenda' | 'timeline';
+
+export function viewRange(
+    view: CalView,
+    navDate: Date,
+): { start: Date; end: Date } {
+    if (view === 'week') {
+        const s = startOfWeek(navDate);
+        return { start: s, end: addDays(s, 7) };
+    }
+    if (view === 'day') {
+        const s = new Date(navDate);
+        s.setHours(0, 0, 0, 0);
+        return { start: s, end: addDays(s, 1) };
+    }
+    const s = startOfWeek(startOfMonth(navDate));
+    return { start: s, end: addDays(s, 42) };
+}
+
+/** The browsed period; a week across December/January names both years. */
+export function periodLabel(view: CalView, navDate: Date): string {
+    if (view === 'day') {
+        return navDate.toLocaleDateString('en-NZ', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+        });
+    }
+    if (view === 'week') {
+        const s = startOfWeek(navDate);
+        const e = addDays(s, 6);
+        const startYear =
+            s.getFullYear() !== e.getFullYear() ? ` ${s.getFullYear()}` : '';
+        return `${s.getDate()} ${MO[s.getMonth()].slice(0, 3)}${startYear} – ${e.getDate()} ${MO[e.getMonth()].slice(0, 3)} ${e.getFullYear()}`;
+    }
+    return `${MO[navDate.getMonth()]} ${navDate.getFullYear()}`;
+}
+
+/**
+ * Clickable period label that opens a mini-month so the user can jump straight to any
+ * date instead of stepping period-by-period. `pill` renders it as an Event Horizon
+ * filter-row field; the light variant is used by the profile-embed toolbar.
+ */
+export function JumpToDate({
+    view,
+    navDate,
+    onPick,
+    pill = false,
+}: {
+    view: CalView;
+    navDate: Date;
+    onPick: (d: Date) => void;
+    pill?: boolean;
+}) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                {pill ? (
+                    <PageHeaderFilterButton
+                        icon={CalendarDays}
+                        aria-label="Jump to date"
+                        className="tnum"
+                    >
+                        {periodLabel(view, navDate)}
+                        <ChevronDown className="size-3 opacity-70" />
+                    </PageHeaderFilterButton>
+                ) : (
+                    // eslint-disable-next-line no-restricted-syntax -- calendar jump trigger; not a shadcn Button.
+                    <button
+                        type="button"
+                        aria-label="Jump to date"
+                        className="tnum inline-flex min-w-[150px] items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold transition-colors hover:bg-muted"
+                    >
+                        <CalendarDays className="h-3.5 w-3.5" />
+                        {periodLabel(view, navDate)}
+                        <ChevronDown className="h-3 w-3 opacity-70" />
+                    </button>
+                )}
+            </PopoverTrigger>
+            <PopoverContent
+                align={pill ? 'end' : 'start'}
+                className="w-auto p-0"
+            >
+                <MiniMonth
+                    selected={navDate}
+                    onSelect={(d) => {
+                        onPick(d);
+                        setOpen(false);
+                    }}
+                />
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+/* ---- source pills ------------------------------------------------------- */
+
+/** The calendar's source filter pills; `counts` (optional) shows how many entries each source has. */
+export function CalendarSourcePills({
+    sources,
+    enabled,
+    onToggle,
+    counts,
+}: {
+    sources: SourceDef[];
+    enabled: ReadonlySet<string>;
+    onToggle: (key: string) => void;
+    counts?: Record<string, number>;
+}) {
+    return (
+        <div className="flex flex-wrap items-center gap-1.5">
+            {sources.map((s) => {
+                const on = enabled.has(s.key);
+                return (
+                    <GuardrailButton
+                        unstyled
+                        key={s.key}
+                        onClick={() => onToggle(s.key)}
+                        className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-opacity focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:min-h-0 ${on ? '' : 'opacity-40'}`}
+                        style={{
+                            background: `var(--src-${s.key}-bg)`,
+                            borderColor: `var(--src-${s.key}-ln)`,
+                            color: `var(--src-${s.key})`,
+                        }}
+                        aria-pressed={on}
+                    >
+                        <span
+                            aria-hidden="true"
+                            className="h-2 w-2 rounded-full"
+                            style={{ background: `var(--src-${s.key})` }}
+                        />
+                        {s.short}
+                        {counts && (
+                            <span className="tnum opacity-80">
+                                {counts[s.key] ?? 0}
+                            </span>
+                        )}
+                    </GuardrailButton>
+                );
+            })}
+        </div>
+    );
+}
+
+/* ---- right-click menu --------------------------------------------------- */
+
+export type CalendarMenuItem = {
+    key: string;
+    label: string;
+    icon?: LucideIcon;
+    /** A custom leading tile (e.g. a coloured event-type icon) instead of `icon`. */
+    leading?: ReactNode;
+    trailing?: ReactNode;
+    /** A second line, e.g. why the item is unavailable. */
+    detail?: string;
+    disabled?: boolean;
+    destructive?: boolean;
+    /** A quieter secondary item, such as "Open full form…". */
+    muted?: boolean;
+    onSelect: () => void;
+};
+
+export type CalendarMenuSection = {
+    key: string;
+    /** An optional caption above the section's items. */
+    note?: string;
+    items: CalendarMenuItem[];
+    /** Keep a long list scrollable within the menu. */
+    scroll?: boolean;
+};
+
+/**
+ * The shared calendar right-click menu: a small "Add"-style chip and where/when
+ * heading, then sections of items. It stays on screen, takes arrow keys,
+ * Home/End, Esc and Tab, and returns focus to where it was opened from.
+ */
+export function CalendarContextMenu({
+    x,
+    y,
+    chip,
+    chipIcon: ChipIcon = Plus,
+    heading,
+    subheading,
+    sections,
+    ariaLabel,
+    onClose,
+    returnFocus,
+}: {
+    x: number;
+    y: number;
+    chip: string;
+    chipIcon?: LucideIcon;
+    heading: string;
+    subheading?: string;
+    sections: CalendarMenuSection[];
+    ariaLabel: string;
+    onClose: () => void;
+    /** Where focus goes back to on close (defaults to the element focused at open). */
+    returnFocus?: HTMLElement | null;
+}) {
+    const ref = useRef<HTMLDivElement | null>(null);
+    const openerRef = useRef<HTMLElement | null>(null);
+    const [pos, setPos] = useState({ top: y, left: x });
+
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        let left = x;
+        let top = y;
+        if (left + r.width + 8 > window.innerWidth)
+            left = window.innerWidth - r.width - 8;
+        if (top + r.height + 8 > window.innerHeight)
+            top = window.innerHeight - r.height - 8;
+        setPos({ top: Math.max(8, top), left: Math.max(8, left) });
+    }, [x, y]);
+
+    // Focus the first item on open; remember the opener so a keyboard
+    // dismiss (Esc / Tab) restores focus to where it came from.
+    useEffect(() => {
+        openerRef.current =
+            returnFocus ?? (document.activeElement as HTMLElement) ?? null;
+        ref.current
+            ?.querySelector<HTMLButtonElement>('[data-menuitem]:not(:disabled)')
+            ?.focus();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- the opener is captured once, at open
+    }, []);
+
+    useEffect(() => {
+        const onDown = (e: MouseEvent) => {
+            if (!ref.current?.contains(e.target as Node)) onClose();
+        };
+        window.addEventListener('mousedown', onDown);
+        return () => window.removeEventListener('mousedown', onDown);
+    }, [onClose]);
+
+    const dismiss = () => {
+        const opener = openerRef.current;
+        onClose();
+        if (opener?.isConnected) opener.focus?.();
+    };
+
+    const onMenuKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'Escape' || e.key === 'Tab') {
+            e.preventDefault();
+            dismiss();
+            return;
+        }
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+        e.preventDefault();
+        const items = ref.current
+            ? Array.from(
+                  ref.current.querySelectorAll<HTMLButtonElement>(
+                      '[data-menuitem]:not(:disabled)',
+                  ),
+              )
+            : [];
+        if (items.length === 0) return;
+        const idx = items.indexOf(document.activeElement as HTMLButtonElement);
+        const next =
+            e.key === 'ArrowDown'
+                ? idx < 0
+                    ? 0
+                    : (idx + 1) % items.length
+                : e.key === 'ArrowUp'
+                  ? idx <= 0
+                      ? items.length - 1
+                      : idx - 1
+                  : e.key === 'Home'
+                    ? 0
+                    : items.length - 1;
+        items[next]?.focus();
+    };
+
+    const choose = (item: CalendarMenuItem) => {
+        const opener = openerRef.current;
+        onClose();
+        item.onSelect();
+        // Dialogs opened by the item take focus themselves; otherwise go back.
+        requestAnimationFrame(() => {
+            if (document.activeElement === document.body && opener?.isConnected)
+                opener.focus?.();
+        });
+    };
+
+    return createPortal(
+        <div
+            ref={ref}
+            role="menu"
+            aria-label={ariaLabel}
+            onKeyDown={onMenuKey}
+            style={{ top: pos.top, left: pos.left }}
+            className="fixed z-[60] w-[286px] rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-2xl"
+        >
+            <div className="mb-1 flex items-start gap-2 border-b px-2 py-1.5">
+                <span className="mt-px flex shrink-0 items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-primary uppercase">
+                    <ChipIcon aria-hidden="true" className="h-3 w-3" /> {chip}
+                </span>
+                <span className="min-w-0 text-[11px] text-muted-foreground">
+                    <span className="block truncate">{heading}</span>
+                    {subheading && (
+                        <span className="block truncate">{subheading}</span>
+                    )}
+                </span>
+            </div>
+            {sections
+                .filter((section) => section.items.length > 0 || section.note)
+                .map((section, index) => (
+                    <Fragment key={section.key}>
+                        {index > 0 && <div className="my-1 h-px bg-border/60" />}
+                        {section.note && (
+                            <p className="px-2 py-1 text-[11px] text-muted-foreground">
+                                {section.note}
+                            </p>
+                        )}
+                        <ul
+                            className={`space-y-px ${section.scroll ? 'scrollbar-pretty max-h-[260px] overflow-y-auto' : ''}`}
+                        >
+                            {section.items.map((item) => (
+                                <li key={item.key}>
+                                    <CalendarMenuButton
+                                        item={item}
+                                        onChoose={() => choose(item)}
+                                    />
+                                </li>
+                            ))}
+                        </ul>
+                    </Fragment>
+                ))}
+        </div>,
+        document.body,
+    );
+}
+
+function CalendarMenuButton({
+    item,
+    onChoose,
+}: {
+    item: CalendarMenuItem;
+    onChoose: () => void;
+}) {
+    const ItemIcon = item.icon;
+    const tone = item.destructive
+        ? 'text-destructive'
+        : item.muted
+          ? 'text-muted-foreground'
+          : 'text-foreground';
+    return (
+        <GuardrailButton
+            unstyled
+            role="menuitem"
+            data-menuitem
+            tabIndex={-1}
+            disabled={item.disabled}
+            aria-disabled={item.disabled || undefined}
+            onClick={onChoose}
+            className={`grid w-full grid-cols-[26px_1fr_auto] items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12.5px] transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent max-md:min-h-[44px] ${tone}`}
+        >
+            {item.leading ?? (
+                <span
+                    aria-hidden="true"
+                    className={`inline-flex h-[26px] w-[26px] items-center justify-center rounded-md ${item.destructive ? 'bg-destructive/10' : 'bg-muted'}`}
+                >
+                    {ItemIcon ? <ItemIcon className="h-3.5 w-3.5" /> : null}
+                </span>
+            )}
+            <span className="min-w-0">
+                <span
+                    className={`block truncate ${item.muted ? '' : 'font-medium'}`}
+                >
+                    {item.label}
+                </span>
+                {item.detail && (
+                    <span className="block text-[11px] leading-snug font-normal text-muted-foreground">
+                        {item.detail}
+                    </span>
+                )}
+            </span>
+            {item.trailing ?? <span />}
+        </GuardrailButton>
+    );
+}
+
 export function decorate(item: CalendarItem): Decorated {
     const start = parseDT(item.start) ?? new Date();
     return {
@@ -276,6 +672,11 @@ interface CalendarUI {
     onPreviewEnd?: () => void;
     onCreateAt?: (d: Date, hour?: number) => void;
     onContext?: (e: React.MouseEvent, d: Date, hour?: number) => void;
+    /**
+     * Right-click (or Shift+F10) on an entry, including the Today rail. When
+     * omitted, a right-click opens the entry like a click does.
+     */
+    onEntryContext?: (ev: Decorated, e: React.MouseEvent) => void;
     onMove?: (ev: Decorated, start: Date, end?: Date) => void;
     /** Drill into a single day (Month "+N more" → Day view for that date). */
     onMore?: (d: Date) => void;
@@ -302,6 +703,15 @@ export function CalendarUIProvider({
     );
 }
 const useCalUI = () => useContext(CalendarUICtx);
+
+/** Right-click on an entry: its actions where the calendar offers them, never a new entry underneath. */
+function contextEntry(event: React.MouseEvent, ev: Decorated, ui: CalendarUI) {
+    event.preventDefault();
+    event.stopPropagation();
+    ui.onPreviewEnd?.();
+    if (ui.onEntryContext) ui.onEntryContext(ev, event);
+    else ui.onSelect(ev);
+}
 
 const cv = (ev: Decorated, colorBy: ColorBy): CSSProperties =>
     colorVars(ev, colorBy);
@@ -426,7 +836,8 @@ function MiniChip({
     ev: Decorated;
     onDragStart?: (e: React.DragEvent, ev: Decorated) => void;
 }) {
-    const { colorBy, onSelect, onPreview, onPreviewEnd } = useCalUI();
+    const ui = useCalUI();
+    const { colorBy, onSelect, onPreview, onPreviewEnd } = ui;
     const overdue = ev.status === 'overdue';
     const draggable =
         !!onDragStart && ev.editable && !ev.recurrence && !ev.isOccurrence;
@@ -438,12 +849,7 @@ function MiniChip({
                 onPreviewEnd?.();
                 onSelect(ev);
             }}
-            onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onPreviewEnd?.();
-                onSelect(ev);
-            }}
+            onContextMenu={(e) => contextEntry(e, ev, ui)}
             draggable={draggable}
             onDragStart={
                 draggable && onDragStart
@@ -501,7 +907,7 @@ const topFor = (min: number): number => ((min - GRID_START * 60) / 60) * HOUR_H;
 
 /** One tab stop per day; arrow keys reach the other hours without 168 tab stops. */
 export function CalendarTimeSlot({ day, hour }: { day: Date; hour: number }) {
-    const { onCreateAt } = useCalUI();
+    const { onCreateAt, onContext } = useCalUI();
     if (!onCreateAt)
         return (
             <div
@@ -520,6 +926,17 @@ export function CalendarTimeSlot({ day, hour }: { day: Date; hour: number }) {
             className="block w-full border-b border-border/60 text-left hover:bg-primary/5 focus-visible:relative focus-visible:z-10 focus-visible:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             style={{ height: HOUR_H }}
             onClick={() => onCreateAt(day, hour)}
+            // The slot knows its own hour, so Shift+F10 on a focused slot
+            // (which reports no pointer position) still opens that hour.
+            onContextMenu={
+                onContext
+                    ? (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onContext(e, day, hour);
+                      }
+                    : undefined
+            }
             onKeyDown={(e) => {
                 if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key))
                     return;
@@ -636,8 +1053,9 @@ export function packDay(list: Decorated[], day: Date): Packed[] {
 }
 
 function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
+    const ui = useCalUI();
     const { colorBy, srcByKey, onSelect, onMove, onPreview, onPreviewEnd } =
-        useCalUI();
+        ui;
     const top = topFor(ev._s);
     const canDrag =
         !!onMove &&
@@ -737,12 +1155,7 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
             onClick={() => {
                 if (touch.current) onSelect(ev);
             }}
-            onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onPreviewEnd?.();
-                onSelect(ev);
-            }}
+            onContextMenu={(e) => contextEntry(e, ev, ui)}
             onMouseEnter={(e) => {
                 if (!drag) onPreview?.(ev, e.currentTarget);
             }}
@@ -811,7 +1224,8 @@ function AllDayRow({
     events: Decorated[];
     padRight?: number;
 }) {
-    const { colorBy, onSelect, onPreview, onPreviewEnd } = useCalUI();
+    const ui = useCalUI();
+    const { colorBy, onSelect, onPreview, onPreviewEnd } = ui;
     if (!events.some((e) => e.allDay)) return null;
     return (
         <div
@@ -842,7 +1256,7 @@ function AllDayRow({
                                         onPreviewEnd?.();
                                         onSelect(e);
                                     }}
-                                    onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); onPreviewEnd?.(); onSelect(e); }}
+                                    onContextMenu={(event) => contextEntry(event, e, ui)}
                                     style={cv(e, colorBy)}
                                     aria-label={`${e.title}, all day, ${d.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}`}
                                     className="flex w-full items-center gap-1 rounded border px-1.5 py-1 text-left text-[11px] font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
@@ -1362,7 +1776,8 @@ export function AgendaView({
     /** Some — but not all — sources/houses are filtered out. */
     filtersActive?: boolean;
 }) {
-    const { colorBy, srcByKey, onSelect, onContext } = useCalUI();
+    const ui = useCalUI();
+    const { colorBy, srcByKey, onSelect, onContext } = ui;
     const TODAY = new Date();
     const monthStart = new Date(navDate.getFullYear(), navDate.getMonth(), 1);
     const monthEnd = new Date(navDate.getFullYear(), navDate.getMonth() + 1, 1);
@@ -1437,7 +1852,7 @@ export function AgendaView({
                                     unstyled
                                     key={e.id}
                                     onClick={() => onSelect(e)}
-                                    onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); onSelect(e); }}
+                                    onContextMenu={(event) => contextEntry(event, e, ui)}
                                     className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40"
                                 >
                                     <span className="tnum w-20 shrink-0 text-[12px] font-medium text-muted-foreground">
@@ -1519,8 +1934,8 @@ export function TimelineView({
     navDate: Date;
     sources: SourceDef[];
 }) {
-    const { colorBy, onSelect, onContext, onPreview, onPreviewEnd } =
-        useCalUI();
+    const ui = useCalUI();
+    const { colorBy, onSelect, onContext, onPreview, onPreviewEnd } = ui;
     const TODAY = new Date();
     const first = startOfMonth(navDate);
     const last = endOfMonth(navDate);
@@ -1624,7 +2039,7 @@ export function TimelineView({
                                                                     onPreviewEnd?.();
                                                                     onSelect(e);
                                                                 }}
-                                                                onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); onSelect(e); }}
+                                                                onContextMenu={(event) => contextEntry(event, e, ui)}
                                                                 onMouseEnter={(
                                                                     me,
                                                                 ) =>
@@ -1679,6 +2094,15 @@ function srcLabel(key: string): string {
     return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+/** Right-click on a Today rail entry opens its actions when the calendar offers them. */
+function useRailContext() {
+    const ui = useCalUI();
+    return (ev: Decorated) =>
+        ui.onEntryContext
+            ? (e: React.MouseEvent) => contextEntry(e, ev, ui)
+            : undefined;
+}
+
 function RailRow({
     ev,
     onSelect,
@@ -1688,10 +2112,12 @@ function RailRow({
     onSelect: (ev: Decorated) => void;
     showDay?: boolean;
 }) {
+    const railContext = useRailContext();
     return (
         <GuardrailButton
             unstyled
             onClick={() => onSelect(ev)}
+            onContextMenu={railContext(ev)}
             className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent/40"
         >
             <span className="tnum w-16 shrink-0 text-[11.5px] font-medium text-muted-foreground">
@@ -1742,6 +2168,7 @@ export function TodayRail({
     onJumpToday: () => void;
     viewingToday: boolean;
 }) {
+    const railContext = useRailContext();
     const now = today;
     const dayStart = (d: Date) => {
         const r = new Date(d);
@@ -1833,6 +2260,7 @@ export function TodayRail({
                         <GuardrailButton
                             unstyled
                             onClick={() => onSelect(focus)}
+                            onContextMenu={railContext(focus)}
                             className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-md"
                             style={{
                                 borderColor: `var(--src-${focus.source}-ln)`,
@@ -1907,6 +2335,7 @@ export function TodayRail({
                                 unstyled
                                 key={`${e.id}-${e.start}`}
                                 onClick={() => onSelect(e)}
+                                onContextMenu={railContext(e)}
                                 className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-accent/40"
                             >
                                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-status-critical-bg text-status-critical">
@@ -1920,7 +2349,9 @@ export function TodayRail({
                                         {e.title}
                                     </span>
                                     <span className="block text-[11px] font-medium text-status-critical">
-                                        Overdue · {Math.abs(dayDiff(e._start))}d
+                                        {/* An entry's own wording (e.g. "Restricted") reads better than a generic "Overdue". */}
+                                        {e.statusLabel || 'Overdue'} ·{' '}
+                                        {Math.abs(dayDiff(e._start))}d
                                     </span>
                                 </span>
                                 <ChevronRight className="h-4 w-4 text-muted-foreground" />

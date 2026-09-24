@@ -35,7 +35,7 @@ class VehicleOdometerService
         return DB::transaction(function () use ($actor, $assetId, $data, $requestKey, $manualEndpoint, $workflowAuthorized): FleetVehicleOdometerObservation {
             $currentActor = User::query()->findOrFail($actor->id);
             abort_unless($workflowAuthorized || $currentActor->canDo('fleet.manage'), 403);
-            $asset = $this->access->assignableVehicle($currentActor, $assetId, true) ?? abort(404);
+            $asset = $this->access->fleetVehicle($currentActor, $assetId, true) ?? abort(404);
             if (trim($requestKey) === '' || mb_strlen($requestKey) > 100) {
                 throw ValidationException::withMessages(['request_key' => 'Provide an idempotency key of at most 100 characters.']);
             }
@@ -177,9 +177,9 @@ class VehicleOdometerService
                 ->where(fn ($end) => $end->whereNull('private_trip.ended_at')
                     ->orWhereColumn('private_trip.ended_at', '>=', 'fleet_telemetry_events.occurred_at')))
             ->orderByDesc('occurred_at')->orderByDesc('id')
-            ->first(['id', 'odometer_km', 'occurred_at', 'received_at']);
+            ->first(['id', 'device_id', 'odometer_km', 'occurred_at', 'received_at']);
 
-        return $event ? ['event_id' => $event->id, 'value_km' => (float) $event->odometer_km,
+        return $event ? ['event_id' => $event->id, 'device_id' => $event->device_id, 'value_km' => (float) $event->odometer_km,
             'observed_at' => $event->occurred_at?->toISOString(), 'received_at' => $event->received_at?->toISOString()] : null;
     }
 

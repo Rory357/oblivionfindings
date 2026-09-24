@@ -115,6 +115,76 @@ class Pkg02bVehicleReadinessTest extends TestCase
         $post('cof', ['applicability' => 'not_applicable', 'applicability_basis' => 'Light van; a WoF applies instead.', 'outcome' => 'needs_assessment'], 'v8')->assertOk();
     }
 
+    public function test_a_requirement_is_marked_not_required_with_a_reason_as_an_audited_version_and_can_be_required_again(): void
+    {
+        $viewer = $this->siteUser([$this->site], ['fleet.viewAny']);
+        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage']);
+        // Nothing is decided from the fuel type: a petrol vehicle is still asked about RUC.
+        $vehicle = $this->vehicle($this->site, ['fuel_type' => 'petrol']);
+        $this->recordReadyEvidence($vehicle, $manager, withRuc: false);
+        $this->assertSame(['compliance.ruc.missing'], array_map(fn ($reason) => $reason->code, $this->assess($vehicle)->blockingReasons()));
+
+        $url = "/fleet-assets/vehicles/{$vehicle->id}/compliance/ruc";
+        $tick = ['applicability' => 'not_applicable', 'applicability_basis' => 'Petrol car: road user charges are paid at the pump.', 'outcome' => 'recorded'];
+        $this->actingAs($viewer)->postJson($url, $tick, ['Idempotency-Key' => 'ruc-not-required-01'])->assertForbidden();
+        $this->actingAs($manager)->postJson($url, ['applicability_basis' => '  '] + $tick, ['Idempotency-Key' => 'ruc-not-required-02'])
+            ->assertUnprocessable()->assertJsonValidationErrors('applicability_basis');
+        $this->assertNull($this->currentVersionId($vehicle, 'ruc'));
+
+        // The tick box sends its key as a header; a retried tick returns the same version.
+        $marked = $this->actingAs($manager)->postJson($url, $tick, ['Idempotency-Key' => 'ruc-not-required-03'])
+            ->assertOk()->assertJsonPath('readiness.can_proceed', true)->json('version');
+        $this->actingAs($manager)->postJson($url, $tick, ['Idempotency-Key' => 'ruc-not-required-03'])
+            ->assertOk()->assertJsonPath('version.id', $marked['id']);
+        $this->assertSame([], $this->assess($vehicle)->blockingReasons());
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'fleet.vehicle.compliance.not_required', 'user_id' => $manager->id,
+            'auditable_type' => (new FleetVehicleComplianceVersion)->getMorphClass(), 'auditable_id' => $marked['id'],
+        ]);
+        // (The CoF recorded as not applicable while getting ready has its own entry.)
+        $audit = DB::table('audit_logs')->where('action', 'fleet.vehicle.compliance.not_required')
+            ->where('auditable_id', $marked['id'])->sole();
+        $meta = json_decode((string) $audit->meta, true);
+        $this->assertSame(['ruc', 'not_applicable', null, 'Petrol car: road user charges are paid at the pump.'],
+            [$meta['kind'], $meta['applicability'], $meta['previous_applicability'], $meta['basis']]);
+
+        // Unticking records that it applies again; evidence is then needed before use.
+        $required = $this->actingAs($manager)->postJson($url, [
+            'applicability' => 'applicable', 'applicability_basis' => 'Converted to diesel.', 'outcome' => 'needs_assessment',
+            'expected_current_version_id' => $marked['id'],
+        ], ['Idempotency-Key' => 'ruc-required-again-01'])->assertOk()->json('version');
+        $this->assertSame(2, $required['version']);
+        $this->assertSame(['compliance.ruc.unresolved'], array_map(fn ($reason) => $reason->code, $this->assess($vehicle)->blockingReasons()));
+        $this->assertDatabaseHas('audit_logs', ['action' => 'fleet.vehicle.compliance.required_again', 'auditable_id' => $required['id']]);
+        $this->assertSame('not_applicable', FleetVehicleComplianceVersion::query()->findOrFail($marked['id'])->applicability);
+        $this->assertSame(2, DB::table('audit_logs')->whereIn('action', [
+            'fleet.vehicle.compliance.not_required', 'fleet.vehicle.compliance.required_again',
+        ])->whereIn('auditable_id', [$marked['id'], $required['id']])->count());
+    }
+
+    public function test_the_register_expiry_date_follows_the_current_version_only(): void
+    {
+        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage']);
+        // The old register still says the CoF runs to next year.
+        $vehicle = $this->vehicle($this->site, ['cof_expires_at' => '2027-02-28']);
+        $service = app(VehicleComplianceService::class);
+        $service->record($manager, $vehicle->id, 'wof', $this->wofPassed(), 'legacy-wof-passed', null);
+        $this->assertSame('2027-04-09', $vehicle->fresh()->wof_expires_at->toDateString());
+
+        // Not required: the old date no longer stands, so register badges,
+        // due alerts and Site calendar obligations drop it.
+        $service->record($manager, $vehicle->id, 'cof', [
+            'applicability' => 'not_applicable', 'applicability_basis' => 'Light van; a WoF applies instead.', 'outcome' => 'recorded',
+        ], 'legacy-cof-not-required', null);
+        $this->assertNull($vehicle->fresh()->cof_expires_at);
+
+        // A failed WoF clears the date the passed one set.
+        $service->record($manager, $vehicle->id, 'wof', [
+            'applicability' => 'applicable', 'outcome' => 'failed', 'evidence_reference' => 'WOF-FAIL-14',
+        ], 'legacy-wof-failed', $this->currentVersionId($vehicle, 'wof'));
+        $this->assertNull($vehicle->fresh()->wof_expires_at);
+    }
+
     public function test_readiness_names_every_unassessed_requirement_and_becomes_ready_with_valid_evidence(): void
     {
         $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage']);
@@ -415,7 +485,7 @@ class Pkg02bVehicleReadinessTest extends TestCase
         $this->assertSame('2027-01-31', $vehicle->fresh()->wof_expires_at->toDateString());
     }
 
-    private function recordReadyEvidence(Asset $vehicle, User $actor): void
+    private function recordReadyEvidence(Asset $vehicle, User $actor, bool $withRuc = true): void
     {
         $service = app(VehicleComplianceService::class);
         $service->record($actor, $vehicle->id, 'registration', [
@@ -427,10 +497,12 @@ class Pkg02bVehicleReadinessTest extends TestCase
             'applicability' => 'not_applicable', 'applicability_basis' => 'Light van; a WoF applies instead.',
             'outcome' => 'needs_assessment',
         ], "ready-cof-{$vehicle->id}", $this->currentVersionId($vehicle, 'cof'));
-        $service->record($actor, $vehicle->id, 'ruc', [
-            'applicability' => 'not_applicable', 'applicability_basis' => 'Recorded by the fleet owner.',
-            'outcome' => 'needs_assessment',
-        ], "ready-ruc-{$vehicle->id}", $this->currentVersionId($vehicle, 'ruc'));
+        if ($withRuc) {
+            $service->record($actor, $vehicle->id, 'ruc', [
+                'applicability' => 'not_applicable', 'applicability_basis' => 'Recorded by the fleet owner.',
+                'outcome' => 'needs_assessment',
+            ], "ready-ruc-{$vehicle->id}", $this->currentVersionId($vehicle, 'ruc'));
+        }
         $this->recordReading($vehicle, $actor, 50000, 'ready');
     }
 

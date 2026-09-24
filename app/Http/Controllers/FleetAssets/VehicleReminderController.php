@@ -36,7 +36,8 @@ class VehicleReminderController extends Controller
     public function act(Request $request, Asset $asset, FleetVehicleReminder $reminder, string $action): JsonResponse
     {
         $updated = $this->reminders->act($this->actor($request), (int) $asset->getKey(), (int) $reminder->getKey(), $action,
-            (string) $request->input('note', ''), (int) $request->input('expected_version'), $this->key($request));
+            (string) $request->input('note', ''), (int) $request->input('expected_version'), $this->key($request),
+            $request->input('remind_local'), $request->input('remind_offset'));
 
         return response()->json($this->result($updated));
     }

@@ -7,6 +7,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleOdometerObservation;
+use App\Models\FleetVehicleUnavailablePeriod;
 use App\Models\User;
 use App\Services\Fleet\Data\VehicleReadinessAssessment;
 use App\Services\Fleet\Data\VehicleReadinessContext;
@@ -317,7 +318,13 @@ class VehicleReadinessService
             ->when($context->bookingId, fn ($query) => $query->whereKeyNot($context->bookingId))
             ->where('starts_at', '<', $context->endsAt)->where('ends_at', '>', $context->startsAt)->orderBy('id');
         if (($lock ? $conflicts->lockForUpdate() : $conflicts)->pluck('id')->isNotEmpty()) {
-            $reasons[] = new VehicleReadinessReason('booking.conflict', 'The vehicle has another booking or unavailable period at this time.', 'booking');
+            $reasons[] = new VehicleReadinessReason('booking.conflict', 'The vehicle has another booking at this time.', 'booking');
+        }
+        // A calendar block stops every request and decision in its window.
+        $blocked = FleetVehicleUnavailablePeriod::query()->where('asset_id', $asset->id)
+            ->overlapping($context->startsAt, $context->endsAt)->orderBy('id');
+        if (($lock ? $blocked->lockForUpdate() : $blocked)->pluck('id')->isNotEmpty()) {
+            $reasons[] = new VehicleReadinessReason('booking.unavailable_period', 'The vehicle is marked unavailable during this time.', 'booking');
         }
 
         return $reasons;

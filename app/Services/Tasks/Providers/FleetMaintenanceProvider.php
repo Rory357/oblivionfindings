@@ -208,7 +208,8 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, SiteScopedT
         $query = FleetServiceSchedule::query()
             ->where('is_active', true)
             ->whereNotNull('next_due_at')
-            ->where('next_due_at', '<=', now()->addDays(self::HORIZON_DAYS))
+            // A schedule's own reminder plan decides how early it shows as due.
+            ->whereRaw('next_due_at <= DATE_ADD(?, INTERVAL COALESCE(reminder_days_before, ?) DAY)', [now(), self::HORIZON_DAYS])
             ->with('asset:id,name')
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderBy('next_due_at')
