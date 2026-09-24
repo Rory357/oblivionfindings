@@ -42,6 +42,18 @@ it('keeps the new monitoring delivery boundary single tenant', function () {
             ], 'allowed_single_tenant_schema_absence_assertion', $contents);
         }
 
+        if ($file === $root.'/database/migrations/2026_08_30_000100_govern_monitoring_metric_projection_replays.php') {
+            // monitor_observations still carries the inert legacy storage
+            // column (App\Support\LegacyStorageContext). The evidence
+            // immutability trigger freezes it with every other column; that
+            // is not tenant scoping, and nothing else here may name it.
+            $contents = str_replace(
+                'AND NEW.tenant_id <=> OLD.tenant_id',
+                'allowed_legacy_storage_column_immutability_guard',
+                $contents,
+            );
+        }
+
         expect($contents)
             ->not->toContain('tenant_id')
             ->not->toContain('tenantId')

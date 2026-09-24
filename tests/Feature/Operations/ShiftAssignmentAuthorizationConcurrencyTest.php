@@ -22,6 +22,7 @@ use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 /** These shared-MySQL barrier tests must run without parallel workers. */
@@ -42,6 +43,7 @@ class ShiftAssignmentAuthorizationConcurrencyTest extends TestCase
 
     public function test_native_assignment_rechecks_manage_permission_after_waiting_on_the_application_mutex(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $site = Site::factory()->create([
             'is_active' => true,
             'archived' => false,
@@ -111,6 +113,7 @@ class ShiftAssignmentAuthorizationConcurrencyTest extends TestCase
 
     public function test_roster_suggestion_recomputes_eligibility_after_wait_and_leaves_everything_unchanged_on_drift(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $site = Site::factory()->create([
             'is_active' => true,
             'archived' => false,

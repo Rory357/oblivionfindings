@@ -1,6 +1,7 @@
 import type { StatusVariant } from '@/components/ui/status-badge';
 import { WORKER_TIMEZONE } from '@/lib/datetime';
 import type {
+    CheckSummary,
     ComplianceKind,
     ComplianceRecord,
     ReadinessReason,
@@ -131,10 +132,29 @@ export function checkOverdue(
     return !!due && due < today;
 }
 
+/** The most recent submitted check of any kind, daily checks included. */
+export function lastCheck(
+    checks: VehicleWorkspace['checks'],
+): CheckSummary | null {
+    const latest = checks.latest ?? null;
+    const daily = checks.latest_daily ?? null;
+    if (!latest || !daily) return latest ?? daily;
+    const newer =
+        daily.submitted_at > latest.submitted_at ||
+        (daily.submitted_at === latest.submitted_at && daily.id > latest.id);
+    return newer ? daily : latest;
+}
+
+/** The latest daily check recorded an issue: shown for review, never a block. */
+export function dailyIssue(workspace: VehicleWorkspace): boolean {
+    return workspace.checks.latest_daily?.outcome === 'issue_recorded';
+}
+
 /**
  * One readiness picture for the chip, the readiness card and the header.
- * Blocking reasons come from the server; overdue service and checks are
- * shown as needing review without blocking use.
+ * Blocking reasons come from the server; overdue service and checks, and an
+ * issue from the latest daily check, are shown as needing review without
+ * blocking use.
  */
 export function headerStatus(
     workspace: VehicleWorkspace,
@@ -150,7 +170,8 @@ export function headerStatus(
         overdueSchedules(workspace.schedules).length > 0 ||
         checkOverdue(workspace, today) ||
         // A check Maintenance released (no issue found) no longer needs review.
-        (latest && latest.outcome !== 'passed' && !latest.assessed)
+        (latest && latest.outcome !== 'passed' && !latest.assessed) ||
+        dailyIssue(workspace)
     ) {
         return {
             label: 'Needs assessment',

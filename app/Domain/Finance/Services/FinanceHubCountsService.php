@@ -24,6 +24,7 @@ use App\Domain\Finance\Models\FinPurchaseOrder;
 use App\Domain\Finance\Models\FinVendor;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\BillingEntry;
+use App\Models\FleetFinanceReviewRequest;
 use App\Models\PriceBook;
 use App\Models\Quote;
 use App\Models\RecurringCharge;
@@ -68,6 +69,8 @@ class FinanceHubCountsService
                 'vendors' => $this->count(FinVendor::class),
                 'credit-notes' => $this->count(FinCreditNote::class),
                 'payment-runs' => $this->count(FinPaymentRun::class),
+                // The list opens on requests waiting for Finance, so that's the count.
+                'vehicle-reviews' => $this->waitingVehicleReviews(),
             ],
             'banking' => [
                 'accounts' => $this->count(FinBankAccount::class),
@@ -107,6 +110,16 @@ class FinanceHubCountsService
     {
         try {
             return (int) $model::query()->count();
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    /** Vehicle review requests waiting for a Finance decision, guarded like count(). */
+    protected function waitingVehicleReviews(): int
+    {
+        try {
+            return (int) FleetFinanceReviewRequest::query()->where('status', 'submitted')->count();
         } catch (\Throwable) {
             return 0;
         }
