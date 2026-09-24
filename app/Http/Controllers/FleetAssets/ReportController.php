@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\FleetAssets;
 
 use App\Http\Controllers\Controller;
-use App\Models\Asset;
 use App\Models\Client;
 use App\Models\FleetDriverSession;
 use App\Models\FleetDrivingMetric;
@@ -13,20 +12,38 @@ use App\Models\FleetResidentTransport;
 use App\Models\FleetTrip;
 use App\Models\FleetWorkOrder;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Fleet\FleetTripSiteScope;
+use App\Services\Fleet\ResidentTransportJourneyScope;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class ReportController extends Controller
 {
+    /**
+     * FA-T01: every report total, list and export covers the viewer's
+     * approved Sites only. `fleet.manage` is the explicit all-Sites
+     * authority, as in the sibling Fleet controllers.
+     */
+    private const SITE_BYPASS_PERMISSIONS = ['fleet.manage'];
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly ResidentTransportJourneyScope $journeyScope,
+    ) {}
+
     public function index(Request $request)
     {
         $period = $this->normaliseReportPeriod($request->input('period', '30d'));
         $startDate = $this->reportStartDate($period);
 
-        $vehicleIds = Asset::vehicles()->pluck('id');
+        $vehicleIds = $this->visibleVehicles($request)->pluck('assets.id');
         $hasTripsTable = Schema::hasTable('fleet_trips');
         $filterPersonal = Schema::hasColumn('fleet_trips', 'is_personal');
 
@@ -94,7 +111,7 @@ class ReportController extends Controller
             ->first();
 
         // Compliance - upcoming expirations
-        $expirations = Asset::vehicles()
+        $expirations = $this->visibleVehicles($request)
             ->where('status', 'active')
             ->where(function ($q) {
                 $q->where('wof_expires_at', '<=', now()->addDays(90))
@@ -152,15 +169,17 @@ class ReportController extends Controller
                 ->toArray()
             : [];
 
-        // Incident stats
+        // Incident stats — incidents on the same visible vehicles as every other total.
+        $incidents = fn () => FleetIncident::query()->whereIn('asset_id', $vehicleIds);
+        $incidentsThisMonth = fn () => $incidents()->whereMonth('occurred_at', now()->month)->whereYear('occurred_at', now()->year);
         $incidentStats = Schema::hasTable('fleet_incidents')
             ? [
-                'total' => FleetIncident::whereMonth('occurred_at', now()->month)->whereYear('occurred_at', now()->year)->count(),
-                'by_severity' => FleetIncident::whereMonth('occurred_at', now()->month)->whereYear('occurred_at', now()->year)
+                'total' => $incidentsThisMonth()->count(),
+                'by_severity' => $incidentsThisMonth()
                     ->selectRaw("severity, COUNT(*) as count")->groupBy('severity')->pluck('count', 'severity')->toArray(),
-                'by_type' => FleetIncident::whereMonth('occurred_at', now()->month)->whereYear('occurred_at', now()->year)
+                'by_type' => $incidentsThisMonth()
                     ->selectRaw("incident_type, COUNT(*) as count")->groupBy('incident_type')->pluck('count', 'incident_type')->toArray(),
-                'open' => FleetIncident::whereIn('status', ['reported', 'investigating'])->count(),
+                'open' => $incidents()->whereIn('status', ['reported', 'investigating'])->count(),
             ]
             : ['total' => 0, 'by_severity' => [], 'by_type' => [], 'open' => 0];
 
@@ -188,7 +207,7 @@ class ReportController extends Controller
             ->groupBy('asset_id')
             ->pluck('fuel_cost', 'asset_id');
 
-        $vehicleUtilData = Asset::vehicles()->get(['id', 'name', 'asset_tag'])->map(function ($v) use ($vehicleUtilisation, $vehicleFuelCosts, $periodWeeks) {
+        $vehicleUtilData = $this->visibleVehicles($request)->get(['id', 'name', 'asset_tag'])->map(function ($v) use ($vehicleUtilisation, $vehicleFuelCosts, $periodWeeks) {
             $data = $vehicleUtilisation->get($v->id);
             $trips = (int) ($data->trips ?? 0);
             $km = round((float) ($data->km ?? 0), 1);
@@ -225,6 +244,7 @@ class ReportController extends Controller
         $staffRisk = [];
         if ($hasIncidents && $hasSessions) {
             $driverIncidents = FleetIncident::query()
+                ->whereIn('asset_id', $vehicleIds)
                 ->whereNotNull('driver_user_id')
                 ->where('occurred_at', '>=', $startDate)
                 ->selectRaw('driver_user_id, COUNT(*) as incident_count')
@@ -232,6 +252,7 @@ class ReportController extends Controller
                 ->pluck('incident_count', 'driver_user_id');
 
             $driverTrips = FleetDriverSession::query()
+                ->whereIn('asset_id', $vehicleIds)
                 ->where('started_at', '>=', $startDate)
                 ->selectRaw('user_id, COUNT(*) as session_count')
                 ->groupBy('user_id')
@@ -239,19 +260,26 @@ class ReportController extends Controller
 
             $driverScores = $hasMetrics
                 ? FleetDrivingMetric::query()
+                    ->whereIn('asset_id', $vehicleIds)
                     ->where('period_start', '>=', $startDate)
                     ->selectRaw('asset_id, AVG(score) as avg_score')
                     ->groupBy('asset_id')
                     ->pluck('avg_score', 'asset_id')
                 : collect();
 
-            // Build per-driver data from sessions
-            $driverIds = $driverTrips->keys()->merge($driverIncidents->keys())->unique();
-            $driverNames = \App\Models\User::whereIn('id', $driverIds)->pluck('name', 'id');
+            // Build per-driver data from sessions. A driver the viewer cannot
+            // see as staff gets no row: the row would name them and carry
+            // their personal incident count.
+            $driverNames = $this->visibleDriverNames(
+                $request,
+                $driverTrips->keys()->merge($driverIncidents->keys())->unique()->values()->all(),
+            );
+            $driverIds = $driverNames->keys();
 
             // Map driver to recent vehicles for score lookup
             $driverAssets = $hasSessions
                 ? FleetDriverSession::query()
+                    ->whereIn('asset_id', $vehicleIds)
                     ->where('started_at', '>=', $startDate)
                     ->selectRaw('user_id, asset_id')
                     ->distinct()
@@ -269,7 +297,7 @@ class ReportController extends Controller
 
                 return [
                     'id' => $driverId,
-                    'name' => $driverNames[$driverId] ?? 'Unknown',
+                    'name' => $driverNames[$driverId],
                     'sessions' => $sessions,
                     'incidents' => $incidents,
                     'safety_score' => $avgScore,
@@ -282,9 +310,12 @@ class ReportController extends Controller
         $hasTransports = Schema::hasTable('fleet_resident_transports');
         $residentDemand = [];
         if ($hasTransports) {
-            $transportsByResident = FleetResidentTransport::query()
-                ->whereNotNull('resident_id')
-                ->where('departed_at', '>=', $startDate)
+            // The same resident-journey boundary as the Transport register.
+            $transports = fn () => $this->journeyScope
+                ->applyTransportScope(FleetResidentTransport::query(), $request->user())
+                ->where('departed_at', '>=', $startDate);
+
+            $transportsByResident = $transports()
                 ->selectRaw('resident_id, COUNT(*) as transport_count, MAX(departed_at) as last_transport')
                 ->groupBy('resident_id')
                 ->orderByDesc('transport_count')
@@ -292,11 +323,13 @@ class ReportController extends Controller
                 ->get();
 
             $residentIds = $transportsByResident->pluck('resident_id')->all();
-            $residentNames = Client::whereIn('id', $residentIds)->get(['id', 'first_name', 'last_name'])->keyBy('id');
+            $residentNames = $this->journeyScope
+                ->applyClientScope(Client::query(), $request->user())
+                ->whereIn('id', $residentIds)
+                ->get(['id', 'first_name', 'last_name'])
+                ->keyBy('id');
 
-            $purposeBreakdown = FleetResidentTransport::query()
-                ->whereNotNull('resident_id')
-                ->where('departed_at', '>=', $startDate)
+            $purposeBreakdown = $transports()
                 ->selectRaw('transport_type, COUNT(*) as count')
                 ->groupBy('transport_type')
                 ->pluck('count', 'transport_type')
@@ -406,13 +439,40 @@ class ReportController extends Controller
             'type' => $type,
         ]);
 
+        $vehicles = $this->visibleVehicles($request);
+
         return match ($type) {
-            'trips' => $this->exportTrips($since),
-            'fuel' => $this->exportFuel($since),
-            'maintenance' => $this->exportMaintenance($since),
-            'compliance' => $this->exportCompliance(),
+            'trips' => $this->exportTrips($since, $vehicles, $this->visibleStaff($request)),
+            'fuel' => $this->exportFuel($since, $vehicles),
+            'maintenance' => $this->exportMaintenance($since, $vehicles),
+            'compliance' => $this->exportCompliance($vehicles),
             default => back()->with('error', 'Unknown export type'),
         };
+    }
+
+    /** Vehicles at the viewer's approved Sites: every report total, list and export is drawn from this set. */
+    private function visibleVehicles(Request $request): Builder
+    {
+        return FleetTripSiteScope::vehicles(
+            $this->siteAccess->accessibleSiteIds($request->user(), self::SITE_BYPASS_PERMISSIONS),
+        );
+    }
+
+    /** Current staff the viewer may see — the only people a report names as drivers. */
+    private function visibleStaff(Request $request): Builder
+    {
+        return $this->siteAccess->applyStaffScope(User::query(), $request->user(), self::SITE_BYPASS_PERMISSIONS);
+    }
+
+    /**
+     * @param  list<int>  $userIds
+     * @return Collection<int, string> names keyed by user id, for the visible drivers only
+     */
+    private function visibleDriverNames(Request $request, array $userIds): Collection
+    {
+        return $userIds === []
+            ? collect()
+            : $this->visibleStaff($request)->whereKey($userIds)->pluck('name', 'id');
     }
 
     private function normaliseReportPeriod(mixed $period, bool $allowLegacyNumericDays = false): string|int
@@ -476,24 +536,31 @@ class ReportController extends Controller
             default => now()->endOfDay(),
         };
 
-        $vehicleIds = Asset::vehicles()->pluck('id');
-
         $reimbursementTripQuery = FleetTrip::query()
-            ->whereIn('asset_id', $vehicleIds)
+            ->whereIn('asset_id', $this->visibleVehicles($request)->select('assets.id'))
             ->whereBetween('started_at', [$startDate, $endDate])
             ->whereNotNull('distance_km');
         if (Schema::hasColumn('fleet_trips', 'is_personal')) {
             $reimbursementTripQuery->where('is_personal', false);
         }
-        $staff = $reimbursementTripQuery
-            ->with('driverSession.user:id,name')
-            ->get()
-            ->groupBy(fn ($t) => $t->driverSession?->user_id ?? 0)
-            ->map(function ($trips, $userId) use ($rate) {
-                $user = $trips->first()->driverSession?->user;
+        $businessTrips = $reimbursementTripQuery
+            ->with('driverSession:id,user_id')
+            ->get();
+        $driverNames = $this->visibleDriverNames(
+            $request,
+            $businessTrips->pluck('driverSession.user_id')->filter()->unique()->values()->all(),
+        );
 
+        $staff = $businessTrips
+            // A driver the viewer cannot see is unattributed, like a trip with no driver.
+            ->groupBy(function ($trip) use ($driverNames): int {
+                $userId = (int) $trip->driverSession?->user_id;
+
+                return $driverNames->has($userId) ? $userId : 0;
+            })
+            ->map(function ($trips, $userId) use ($rate, $driverNames) {
                 return [
-                    'name' => $user?->name ?? 'Unknown',
+                    'name' => $driverNames[$userId] ?? 'Unknown',
                     'trips' => $trips->count(),
                     'distance_km' => round((float) $trips->sum('distance_km'), 1),
                     'amount' => round((float) $trips->sum('distance_km') * $rate, 2),
@@ -506,17 +573,24 @@ class ReportController extends Controller
         return response()->json(['staff' => $staff]);
     }
 
-    private function exportTrips($since)
+    private function exportTrips($since, Builder $vehicles, Builder $visibleStaff)
     {
-        return response()->streamDownload(function () use ($since) {
+        return response()->streamDownload(function () use ($since, $vehicles, $visibleStaff) {
             $handle = fopen('php://output', 'w');
             $this->putCsv($handle, ['Trip ID', 'Vehicle', 'Driver', 'Started At', 'Ended At', 'Distance (km)', 'Duration (min)', 'Status']);
 
             $trips = FleetTrip::query()
                 ->leftJoin('assets as trip_assets', 'fleet_trips.asset_id', '=', 'trip_assets.id')
                 ->leftJoin('fleet_driver_sessions as trip_driver_sessions', 'fleet_trips.driver_session_id', '=', 'trip_driver_sessions.id')
-                ->leftJoin('users as trip_drivers', 'trip_driver_sessions.user_id', '=', 'trip_drivers.id')
-                ->whereIn('fleet_trips.asset_id', Asset::vehicles()->select('assets.id'))
+                // Only staff the viewer can see are named; any other driver is left blank.
+                ->leftJoinSub(
+                    $visibleStaff->select(['users.id', 'users.name']),
+                    'trip_drivers',
+                    'trip_driver_sessions.user_id',
+                    '=',
+                    'trip_drivers.id',
+                )
+                ->whereIn('fleet_trips.asset_id', $vehicles->select('assets.id'))
                 ->where('fleet_trips.started_at', '>=', $since)
                 ->when(
                     Schema::hasColumn('fleet_trips', 'is_personal'),
@@ -551,16 +625,16 @@ class ReportController extends Controller
         }, 'fleet-trips-' . now()->format('Y-m-d') . '.csv');
     }
 
-    private function exportFuel($since)
+    private function exportFuel($since, Builder $vehicles)
     {
-        return response()->streamDownload(function () use ($since) {
+        return response()->streamDownload(function () use ($since, $vehicles) {
             $handle = fopen('php://output', 'w');
             $this->putCsv($handle, ['Log ID', 'Vehicle', 'User', 'Date', 'Fuel Type', 'Litres', 'Cost Per Litre', 'Total Cost', 'Odometer (km)']);
 
             $logs = FleetFuelLog::query()
                 ->leftJoin('assets as fuel_assets', 'fleet_fuel_logs.asset_id', '=', 'fuel_assets.id')
                 ->leftJoin('users as fuel_users', 'fleet_fuel_logs.user_id', '=', 'fuel_users.id')
-                ->whereIn('fleet_fuel_logs.asset_id', Asset::vehicles()->select('assets.id'))
+                ->whereIn('fleet_fuel_logs.asset_id', $vehicles->select('assets.id'))
                 ->where('fleet_fuel_logs.logged_at', '>=', $since)
                 ->select([
                     'fleet_fuel_logs.id',
@@ -592,11 +666,10 @@ class ReportController extends Controller
         }, 'fleet-fuel-' . now()->format('Y-m-d') . '.csv');
     }
 
-    private function exportMaintenance($since)
+    private function exportMaintenance($since, Builder $vehicles)
     {
-        $vehicleIds = Asset::vehicles()->pluck('id');
         $workOrders = FleetWorkOrder::query()
-            ->whereIn('asset_id', $vehicleIds)
+            ->whereIn('asset_id', $vehicles->select('assets.id'))
             ->where('created_at', '>=', $since)
             ->with(['asset:id,name,asset_tag', 'reportedBy:id,name', 'assignedTo:id,name'])
             ->orderByDesc('created_at')
@@ -623,9 +696,9 @@ class ReportController extends Controller
         }, 'fleet-maintenance-' . now()->format('Y-m-d') . '.csv');
     }
 
-    private function exportCompliance()
+    private function exportCompliance(Builder $vehicles)
     {
-        $vehicles = Asset::vehicles()
+        $vehicles = $vehicles
             ->get(['id', 'name', 'asset_tag', 'registration_number', 'wof_expires_at', 'registration_expires_at', 'cof_expires_at']);
 
         return response()->streamDownload(function () use ($vehicles) {
@@ -650,12 +723,20 @@ class ReportController extends Controller
         $hasHomeSite = Schema::hasColumn('assets', 'home_site_id');
         $filterPersonal = Schema::hasColumn('fleet_trips', 'is_personal');
 
+        $siteIds = $this->siteAccess->accessibleSiteIds($request->user(), self::SITE_BYPASS_PERMISSIONS);
         $houses = Site::query()
             ->where('type', 'house')
+            ->whereIn('id', $siteIds)
             ->orderBy('name')
             ->get(['id', 'name']);
 
         $selectedHouseId = $request->filled('house_id') ? (int) $request->input('house_id') : null;
+        // A house outside the viewer's approved Sites is concealed like a missing one.
+        abort_if($selectedHouseId !== null && ! $houses->contains('id', $selectedHouseId), 404);
+
+        // Vehicles the viewer can see, by the same Site rule as every other report.
+        $houseVehicles = fn (int $houseId): Builder => FleetTripSiteScope::vehicles($siteIds)
+            ->where('home_site_id', $houseId);
 
         $monthParam = $request->input('month', now()->format('Y-m'));
         $monthStart = \Carbon\Carbon::createFromFormat('Y-m', $monthParam)->startOfMonth();
@@ -676,7 +757,7 @@ class ReportController extends Controller
 
         foreach ($houses as $house) {
             $vehicleIds = $hasHomeSite
-                ? Asset::vehicles()->where('home_site_id', $house->id)->pluck('id')
+                ? $houseVehicles($house->id)->pluck('assets.id')
                 : collect();
 
             $tripsThisMonth = 0;
@@ -695,7 +776,10 @@ class ReportController extends Controller
                 : 0;
 
             $transportLogs = $vehicleIds->isNotEmpty()
-                ? FleetResidentTransport::whereIn('asset_id', $vehicleIds)->whereBetween('departed_at', [$monthStart, $monthEnd])->count()
+                ? $this->journeyScope->applyTransportScope(FleetResidentTransport::query(), $request->user())
+                    ->whereIn('asset_id', $vehicleIds)
+                    ->whereBetween('departed_at', [$monthStart, $monthEnd])
+                    ->count()
                 : 0;
 
             $houseSummaries[] = [
@@ -712,9 +796,7 @@ class ReportController extends Controller
         // Detailed vehicle data for selected house
         $vehicleDetails = [];
         if ($selectedHouseId && $hasHomeSite) {
-            $vehicles = Asset::vehicles()
-                ->where('home_site_id', $selectedHouseId)
-                ->get(['id', 'name', 'asset_tag']);
+            $vehicles = $houseVehicles($selectedHouseId)->get(['id', 'name', 'asset_tag']);
 
             foreach ($vehicles as $vehicle) {
                 $trips = FleetTrip::where('asset_id', $vehicle->id)
