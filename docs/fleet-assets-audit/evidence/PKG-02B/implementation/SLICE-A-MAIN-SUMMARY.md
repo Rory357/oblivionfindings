@@ -32,13 +32,13 @@ An independent security, privacy and idempotency review of the whole package fou
 - **Calendar privacy**: for a vehicle outside the viewer's Sites, bookings and unavailable periods are busy time only, everywhere (feed, Today rail, Bookings & custody, the record route). An appointment's hold shows as "Unavailable · Maintenance" without the work reference or provider to people who can't read that Site's Maintenance.
 - **Retries**: creating a service schedule now takes a request key (`2026_09_24_000500`); a booking edit is a retry only when the same key and the same full payload come back (anything else on an old version is a 409, not a silently lost edit); reusing a key for a different reminder acknowledgement or a different appointment plan is a 409.
 
-### Needs Stephan's decision
+### Decided by Stephan (24 September 2026)
 
-1. **Releasing your own check.** A Maintenance manager at the vehicle's Site can record "No issue found — released for use" on a check they recorded themselves (a reason is required). PKG-01's full release needs a second, independently authorised reviewer. If two people should be needed every time, it's a one-line change in `MaintenanceTransitionService::checkAssessmentRefusal`.
-2. **Finance review requests.** The seeded Finance role has no Fleet access, so today only people with both Fleet and Finance access (for example admin) can open the vehicle's Finance view and decide a request. Either give Finance users `fleet.viewAny`, or add a Finance-side inbox.
-3. **Confirming your own booking.** "Approval not required" lets an approver confirm their own booking with a written justification; the old code always refused self-approval. Please confirm this is intended.
-4. **Fleet-wide settings.** Only admin and the Fleet Manager role hold `fleet.settings.manage`, so Site coordinators now publish checklists for their own vehicle only, and only those two roles can change an all-vehicle checklist or the driving score policy.
-5. **Design sign-off.** The "No issue found" dialog is new UI (not in the v13 mockup), built from the existing record-dialog pattern.
+1. **Releasing your own check: allowed.** A Maintenance manager at the vehicle's Site may record "No issue found — released for use" on a check they recorded themselves; a reason is required and audited. No second person is needed (PKG-01's full release still needs one).
+2. **Finance review requests: whatever is easiest for Finance.** Built as **Finance › Payables › Vehicle reviews** (`/finance/vehicle-reviews`): Finance lists the requests for the vehicles at the Sites it handles (its own Sites, or every Site with `finance.insights.viewAllSites`, `finance.payments.viewAllSites` or `sites.viewAll`), opens their evidence, and resolves or declines each with a note, with no Fleet access. Finance approvers get an in-app notice for each new request, and All Tasks opens the request there. The requester still sees the decision on the vehicle's Finance view.
+3. **Confirming your own booking: intended**, because emergencies happen. It still needs a written justification, which is audited.
+4. **Fleet-wide settings:** only admin and the Fleet Manager role hold `fleet.settings.manage`. Stephan will assign the Fleet Manager role (still in development, no live clients).
+5. **"No issue found" dialog:** new UI not in the v13 mockup, built from the existing record-dialog pattern; explained to Stephan.
 
 ### Known gaps, not fixed on this branch
 
