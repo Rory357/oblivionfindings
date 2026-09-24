@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
@@ -7,6 +8,7 @@ use App\Models\FleetOuting;
 use App\Models\FleetOutingResident;
 use App\Models\FleetVehicleBooking;
 use App\Models\Permission;
+use App\Models\Site;
 use App\Models\User;
 use Laravel\Dusk\Browser;
 
@@ -244,10 +246,32 @@ test('fleet alert actions stay manager-only', function () {
 });
 
 test('fleet outing detail actions stay manager-only', function () {
-    $viewer = fleetBrowserUser('fleet-viewer@test.com', 'Fleet Viewer QA', [
+    // FA-T01: an outing is visible only through a vehicle and a resident at
+    // one of the viewer's Sites, so the view-only viewer is placed at the
+    // house that owns both. The manager sees every Site through fleet.manage.
+    $house = Site::factory()->create([
+        'name' => 'QA Outing House',
+        'type' => 'house',
+        'is_active' => true,
+        'archived' => false,
+        'archived_at' => null,
+    ]);
+
+    $viewer = fleetBrowserUser('fleet-outing-viewer@test.com', 'Fleet Outing Viewer QA', [
         'fleet.viewAny',
         'assets.viewAny',
     ]);
+    $placement = [
+        'primary_site_id' => $house->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+        'is_active' => true,
+    ];
+    $profile = HrEmployeeProfile::query()->where('user_id', $viewer->id)->first();
+    $profile
+        ? $profile->update($placement)
+        : HrEmployeeProfile::factory()->create(['user_id' => $viewer->id, ...$placement]);
 
     $manager = fleetBrowserUser('fleet-manager@test.com', 'Fleet Manager QA', [
         'fleet.viewAny',
@@ -256,7 +280,17 @@ test('fleet outing detail actions stay manager-only', function () {
         'fleet.outings.manage',
     ]);
 
-    $vehicle = fleetBrowserVehicle();
+    $vehicle = Asset::factory()->vehicle()->create([
+        'site_id' => $house->id,
+        'home_site_id' => $house->id,
+        'client_id' => null,
+        'category' => 'vehicle',
+        'status' => 'active',
+    ]);
+    $activeResidents = Client::factory()->count(2)->create([
+        'site_id' => $house->id,
+        'status' => 'active',
+    ]);
 
     $plannedOuting = FleetOuting::factory()->create([
         'asset_id' => $vehicle->id,
@@ -265,7 +299,7 @@ test('fleet outing detail actions stay manager-only', function () {
         'created_by_user_id' => $manager->id,
     ]);
 
-    $plannedResident = Client::query()->orderBy('id')->first() ?? Client::factory()->create();
+    $plannedResident = $activeResidents->first();
     FleetOutingResident::query()->create([
         'outing_id' => $plannedOuting->id,
         'client_id' => $plannedResident->id,
@@ -280,11 +314,6 @@ test('fleet outing detail actions stay manager-only', function () {
         'actual_departure' => now()->subHour(),
         'created_by_user_id' => $manager->id,
     ]);
-
-    $activeResidents = Client::query()->orderBy('id')->take(2)->get();
-    while ($activeResidents->count() < 2) {
-        $activeResidents->push(Client::factory()->create());
-    }
 
     foreach ($activeResidents as $resident) {
         FleetOutingResident::query()->create([
