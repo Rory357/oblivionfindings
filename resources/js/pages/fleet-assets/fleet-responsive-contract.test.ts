@@ -18,7 +18,6 @@ const workerPages = [
     'incidents/index.tsx',
     'resident-tracking/index.tsx',
     'maintenance/schedules/index.tsx',
-    'maintenance/work-orders/index.tsx',
 ] as const;
 
 const managerPages = [
@@ -34,6 +33,12 @@ const managerPages = [
     'reports/reimbursement.tsx',
     'reports/cost-allocation.tsx',
     'reports/community-access.tsx',
+    // PKG-01 (2026-09-20) rebuilt the work queue on the Event Horizon header
+    // with a Table/Cards toggle. Fleet is desktop web-only (the 2026-07-13
+    // fleet audit set no mobile-card requirement) and DESIGN.md scrolls wide
+    // tables inside their own container, so the queue declares horizontal
+    // scroll instead of taking the worker mobile-card branch.
+    'maintenance/work-orders/index.tsx',
 ] as const;
 
 function source(relativePath: string): string {
@@ -52,8 +57,8 @@ function pageFiles(directory: string): string[] {
 
 describe('Fleet responsive and hero contracts', () => {
     it('gives all 25 audited list/report pages an intentional narrow strategy', () => {
-        expect(workerPages).toHaveLength(13);
-        expect(managerPages).toHaveLength(12);
+        expect(workerPages).toHaveLength(12);
+        expect(managerPages).toHaveLength(13);
 
         for (const relativePath of workerPages) {
             const page = source(relativePath);
