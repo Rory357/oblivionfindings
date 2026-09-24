@@ -60,6 +60,14 @@ test('H&S close routes and schema enforce explicit authority and immutable prove
     $seeder = (string) file_get_contents(
         $root.DIRECTORY_SEPARATOR.'database'.DIRECTORY_SEPARATOR.'seeders'.DIRECTORY_SEPARATOR.'RbacSeeder.php',
     );
+    // The admin exclusion list also covers safeguarding and fleet decisions,
+    // so check the H&S closure keys inside it rather than the list's name.
+    preg_match('/\$restrictedIndependentAuthority = \[(.*?)\];/s', $seeder, $restrictedAuthority);
+    preg_match(
+        '/\/\/ Explicit product policy: Compliance Lead holds independent decision.*?->pluck\(\'id\'\)/s',
+        $seeder,
+        $complianceLeadGrant,
+    );
 
     expect($routes)
         ->toContain("Route::middleware('permission:healthSafety.events.close')")
@@ -73,9 +81,15 @@ test('H&S close routes and schema enforce explicit authority and immutable prove
         ->toContain("where('worksafe_site_preserved', true)")
         ->not->toContain("where('worksafe_site_preserved', false)")
         ->and($seeder)
-        ->toContain('$restrictedHsClosureAuthority')
+        ->toContain("->whereNotIn('key', \$restrictedIndependentAuthority)")
+        ->toContain('// Explicit product policy: Compliance Lead holds independent decision')
+        ->and($restrictedAuthority[1] ?? '')
+        ->toContain("'healthSafety.events.close',")
+        ->toContain("'healthSafety.events.closeAny',")
+        ->toContain("'healthSafety.closureExceptions.request',")
         ->toContain("'healthSafety.closureExceptions.approve',")
-        ->toContain('// Explicit product policy: Compliance Lead is the independent,');
+        ->and($complianceLeadGrant[0] ?? '')
+        ->toContain("'healthSafety.closureExceptions.approve',");
 });
 
 test('historical cross-module lifecycle integrations cannot close H&S events', function (): void {

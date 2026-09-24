@@ -146,7 +146,7 @@ export default function WorkOrdersIndex({
                     actionLabel="Clear filters"
                     onAction={() => { setSearch(''); router.visit(base); }} />
             </CardContent></Card> : layout === 'table' ?
-                <Card className="mt-4 max-w-full overflow-x-auto">
+                <Card className="mt-4 max-w-full overflow-x-auto" data-fleet-narrow-strategy="horizontal-scroll">
                     <table className="w-full min-w-[960px] text-sm">
                         <thead className="bg-muted/50 text-xs text-muted-foreground">
                             <tr><th className="px-4 py-3 text-left">Work / source</th>

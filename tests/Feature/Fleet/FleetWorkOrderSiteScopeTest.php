@@ -79,12 +79,29 @@ test('user cannot view or modify fleet work orders from unauthorized foreign sit
         ->get(route('fleet-assets.work-orders.show', $foreignOrder))
         ->assertNotFound();
 
-    // 3. Direct-object update on foreign work order returns 404
+    // 3. Direct-object update on foreign work order returns 404 before payload validation
     $this->actingAs($user)
         ->put(route('fleet-assets.work-orders.update', $foreignOrder), [
             'priority' => 'critical',
         ])
         ->assertNotFound();
+
+    $this->actingAs($user)
+        ->post(route('fleet-assets.work-orders.finance-bills.store', $foreignOrder), [])
+        ->assertNotFound();
+
+    // Bulk actions treat a foreign id like a missing order
+    $this->actingAs($user)
+        ->post(route('fleet-assets.work-orders.bulk-action'), [
+            'action' => 'in_progress',
+            'ids' => [$foreignOrder->id],
+            'versions' => [0],
+            'request_keys' => ['bulk-foreign-probe'],
+        ])
+        ->assertNotFound();
+
+    expect($foreignOrder->fresh()->only(['status', 'priority']))
+        ->toBe(['status' => 'open', 'priority' => 'high']);
 
     // 4. Storing a work order for foreign asset returns 404
     $this->actingAs($user)

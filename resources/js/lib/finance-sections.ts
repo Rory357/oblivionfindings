@@ -6,6 +6,7 @@ import {
     Building2,
     CalendarDays,
     CalendarRange,
+    Car,
     Coins,
     CreditCard,
     DollarSign,
@@ -263,6 +264,15 @@ export const FINANCE_SECTIONS: FinanceSection[] = [
                 icon: Banknote,
                 prefixes: ['/finance/payment-runs'],
                 visible: apView,
+            },
+            {
+                // Review requests Fleet raises from a vehicle's Finance view.
+                key: 'vehicle-reviews',
+                label: 'Vehicle reviews',
+                href: '/finance/vehicle-reviews',
+                icon: Car,
+                prefixes: ['/finance/vehicle-reviews'],
+                visible: (can) => apView(can) || assetsView(can),
             },
         ],
     },

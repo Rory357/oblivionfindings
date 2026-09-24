@@ -10,7 +10,6 @@ use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
-use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Asset;
 use App\Models\ItTicket;
 use App\Models\ItTicketLink;
@@ -239,13 +238,9 @@ class FleetVehicleTechnologyProjectionTest extends TestCase
 
     private function partialTechnology(User $viewer, Asset $vehicle)
     {
-        $version = app(HandleInertiaRequests::class)->version(request());
-
-        return $this->actingAs($viewer)->get("/fleet-assets/vehicles/{$vehicle->id}?tab=technology", [
-            'X-Inertia' => 'true',
-            'X-Inertia-Version' => $version,
-            'X-Inertia-Partial-Component' => 'fleet-assets/vehicles/show',
-            'X-Inertia-Partial-Data' => 'vehicle_technology',
-        ]);
+        return $this->actingAs($viewer)->get(
+            "/fleet-assets/vehicles/{$vehicle->id}?tab=technology",
+            $this->inertiaPartialHeaders('fleet-assets/vehicles/show', 'vehicle_technology'),
+        );
     }
 }

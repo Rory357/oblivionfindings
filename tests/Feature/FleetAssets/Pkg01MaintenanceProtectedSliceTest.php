@@ -33,7 +33,10 @@ use Inertia\Testing\AssertableInertia as Assert;
 use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
+// Tests that commit fixtures for worker processes register
+// CommittedFixtureCleanup so those rows never reach later tests.
 uses(RefreshDatabase::class);
 
 test('queue and related-work search retain identity while undated work stays outside All Tasks', function () {
@@ -782,6 +785,7 @@ test('triage deadlines and provider responses retain exact Auckland source times
 });
 
 test('release requires an independent category-granted reviewer, current passing retest and custody', function () {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     Storage::fake('private');
     $site = pkg01Site();
     $manager = pkg01StaffAt($site, ['fleet.maintenance.manage']);
@@ -1013,6 +1017,7 @@ PHP;
 });
 
 test('a completed held repair can recover a new rule and enabled committed effects deliver once', function () {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     Storage::fake('private');
     expect(config('fleet_maintenance.effects_enabled'))->toBeFalse();
     $site = pkg01Site();
@@ -1161,6 +1166,7 @@ test('a completed held repair can recover a new rule and enabled committed effec
 });
 
 test('an overlapping booking decision waits for the asset lock and sees a newly committed hold', function () {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $site = pkg01Site();
     $manager = pkg01StaffAt($site, ['fleet.maintenance.manage']);
     $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle', 'status' => 'active']);
@@ -1383,6 +1389,7 @@ test('Designer review: authored template configures and records standalone check
 });
 
 test('Designer review: Outing booking waits for the asset lock and a hold leaves no partial outing', function () {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $site = pkg01Site();
     $manager = pkg01StaffAt($site, ['fleet.manage', 'fleet.outings.manage']);
     $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle', 'status' => 'active']);
