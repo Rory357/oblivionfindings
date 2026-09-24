@@ -365,6 +365,16 @@ export type WorkspaceCan = {
     view_vehicle_technology: boolean;
 };
 
+/** A submitted check as the header and readiness summaries show it. */
+export type CheckSummary = {
+    id: number;
+    outcome: string | null;
+    template: string | null;
+    submitted_at: string;
+    /** Maintenance released it: no issue found (the outcome stays as submitted). */
+    assessed: boolean;
+};
+
 export type VehicleWorkspace = {
     vehicle: VehicleProfile;
     readiness: VehicleReadiness;
@@ -411,14 +421,10 @@ export type VehicleWorkspace = {
         total?: number;
     };
     checks: {
-        latest: {
-            id: number;
-            outcome: string | null;
-            template: string | null;
-            submitted_at: string;
-            /** Maintenance released it: no issue found (the outcome stays as submitted). */
-            assessed: boolean;
-        } | null;
+        /** The latest submitted check other than a daily check. */
+        latest: CheckSummary | null;
+        /** The latest daily check: a recorded observation that never blocks use. */
+        latest_daily: CheckSummary | null;
         next_due_at: string | null;
     };
     catalogues: Record<CatalogueKind, Array<{ id: number; label: string }>>;

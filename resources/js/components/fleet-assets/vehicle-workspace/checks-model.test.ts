@@ -63,6 +63,11 @@ describe('check labels', () => {
         expect(outcomeTone('passed')).toBe('success');
         expect(outcomeTone('failed')).toBe('critical');
         expect(outcomeTone('needs_assessment')).toBe('warning');
+        // Daily checks are recorded observations, never Passed or Failed.
+        expect(outcomeLabel('no_issue_recorded')).toBe('No issue recorded');
+        expect(outcomeLabel('issue_recorded')).toBe('Issue recorded');
+        expect(outcomeTone('no_issue_recorded')).toBe('success');
+        expect(outcomeTone('issue_recorded')).toBe('warning');
         expect(questionSummary(condition)).toBe('Condition · Required');
         expect(questionSummary(reading)).toBe('Number / reading · Optional');
     });

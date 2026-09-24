@@ -26,6 +26,7 @@ use Illuminate\Support\Str;
 use Mockery\MockInterface;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class MedicationCompetencyPolicyTest extends TestCase
@@ -256,6 +257,7 @@ class MedicationCompetencyPolicyTest extends TestCase
 
     public function test_concurrent_revocation_wins_before_server_authoritative_administration(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 

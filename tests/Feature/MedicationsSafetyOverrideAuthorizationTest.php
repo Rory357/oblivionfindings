@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Mockery\MockInterface;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class MedicationsSafetyOverrideAuthorizationTest extends TestCase
@@ -256,6 +257,7 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
 
     public function test_concurrent_privileged_overrides_are_serialized_without_duplicate_effects(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 

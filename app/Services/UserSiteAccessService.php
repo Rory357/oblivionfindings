@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Models\WorkplaceInjury;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class UserSiteAccessService
 {
@@ -1124,6 +1125,21 @@ class UserSiteAccessService
         }
 
         return $query->whereIn('site_id', $siteIds);
+    }
+
+    /**
+     * Clients in the user's client Site scope that ClientPolicy::view also
+     * allows — the policy has no SQL form, so it is evaluated per client.
+     *
+     * @param  array<int, string>  $bypassPermissions
+     * @return array<int, int>
+     */
+    public function viewableClientIds(User $user, array $bypassPermissions = []): array
+    {
+        return $this->applyClientScope(Client::query(), $user, $bypassPermissions)
+            ->get()
+            ->filter(fn (Client $client) => Gate::forUser($user)->allows('view', $client))
+            ->modelKeys();
     }
 
     /**

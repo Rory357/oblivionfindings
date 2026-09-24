@@ -31,6 +31,7 @@ use LogicException;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class MedicationOrderLifecycleTest extends TestCase
@@ -991,6 +992,7 @@ class MedicationOrderLifecycleTest extends TestCase
 
     public function test_two_process_discontinue_race_creates_exactly_one_cessation(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $medication = $this->medication(['name' => 'Concurrent discontinue order']);
@@ -1039,6 +1041,7 @@ class MedicationOrderLifecycleTest extends TestCase
 
     public function test_administration_waiting_behind_discontinue_lock_fails_after_revalidation(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $this->grantPermissions($this->manager, ['medications.administer.record']);
@@ -1096,6 +1099,7 @@ class MedicationOrderLifecycleTest extends TestCase
 
     public function test_discontinue_waiting_behind_an_administration_uses_the_post_lock_cessation_time(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $this->grantPermissions($this->manager, ['medications.administer.record']);

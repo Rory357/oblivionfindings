@@ -2,17 +2,33 @@
 
 namespace App\Services\Fleet;
 
+use App\Models\FleetChecklistRun;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class MaintenanceRestrictionService
 {
+    /** Check kinds recorded as observations only: they never affect availability or release. */
+    public const OBSERVATION_KINDS = [FleetChecklistRun::KIND_DAILY];
+
     /** A Maintenance assessment of one check: no issue found, released for use. */
     public const NO_ISSUE_RELEASE = 'no_issue_release';
 
     /** Whether the assessment table exists yet (deploys run code before migrations). */
     private ?bool $assessmentsReady = null;
+
+    /**
+     * Limit a fleet_checklist_runs query to checks that can affect
+     * availability: submitted under PKG-01 (older rows have no submitted_at)
+     * and not a recorded observation such as a daily check.
+     */
+    public static function readinessChecks(Builder $query): Builder
+    {
+        return $query->whereNotNull('submitted_at')->where(fn ($kind) => $kind->whereNull('check_kind')
+            ->orWhereNotIn('check_kind', self::OBSERVATION_KINDS));
+    }
 
     /** @return array{restriction_ids:list<int>,check_run_ids:list<int>} */
     public function blockers(int $assetId, bool $lock = false, array $ignoreRestrictionIds = [], array $ignoreRunIds = []): array
@@ -24,11 +40,11 @@ class MaintenanceRestrictionService
         $releaseQuery = DB::table('fleet_maintenance_actions as action')->join('fleet_work_orders as work', 'work.id', '=', 'action.work_order_id')
             ->where('work.asset_id', $assetId)->where('action.action_type', 'release')->orderByDesc('action.id');
         $lastRelease = ($lock ? $releaseQuery->lockForUpdate() : $releaseQuery)->value('action.occurred_at');
-        $runs = DB::table('fleet_checklist_runs')->where('asset_id', $assetId)->whereNotNull('submitted_at')
+        $runs = self::readinessChecks(DB::table('fleet_checklist_runs')->where('asset_id', $assetId))
             ->where(fn ($q) => $q->whereNull('outcome')->orWhere('outcome', '!=', 'passed'))
             ->when($lastRelease, fn ($q) => $q->where('submitted_at', '>=', $lastRelease))
             ->when($ignoreRunIds !== [], fn ($q) => $q->whereNotIn('id', $ignoreRunIds))->orderBy('id');
-        $blockingRuns = ($lock ? $runs->lockForUpdate() : $runs)->get(['id', 'outcome', 'rule_version_id', 'rule_snapshot_json'])
+        $blockingRuns = ($lock ? $runs->lockForUpdate() : $runs)->get(['id', 'check_kind', 'outcome', 'rule_version_id', 'rule_snapshot_json'])
             ->filter(fn ($run) => self::blocksAvailability($run))->pluck('id')->map(fn ($id) => (int) $id)->all();
         // A Maintenance "no issue found" assessment resolves exactly that check.
         $blockingRuns = array_values(array_diff($blockingRuns, $this->assessedRunIds($blockingRuns, $lock)));
@@ -62,9 +78,9 @@ class MaintenanceRestrictionService
             ->joinSub($latestRelease, 'latest', 'latest.action_id', '=', 'released.id')
             ->pluck('released.occurred_at', 'latest.asset_id');
         $candidates = [];
-        DB::table('fleet_checklist_runs')->whereIn('asset_id', $assetIds)->whereNotNull('submitted_at')
+        self::readinessChecks(DB::table('fleet_checklist_runs')->whereIn('asset_id', $assetIds))
             ->where(fn ($q) => $q->whereNull('outcome')->orWhere('outcome', '!=', 'passed'))
-            ->orderBy('id')->get(['id', 'asset_id', 'submitted_at', 'outcome', 'rule_version_id', 'rule_snapshot_json'])
+            ->orderBy('id')->get(['id', 'asset_id', 'submitted_at', 'check_kind', 'outcome', 'rule_version_id', 'rule_snapshot_json'])
             ->each(function (object $run) use (&$candidates, $releasedAt): void {
                 $release = $releasedAt[$run->asset_id] ?? null;
                 if (($release === null || $run->submitted_at >= $release) && self::blocksAvailability($run)) {
@@ -123,7 +139,7 @@ class MaintenanceRestrictionService
     /** Advisory impact is effective only when it came from an approved, stored rule version. */
     public static function blocksAvailability(object $run): bool
     {
-        if ($run->outcome === 'passed') {
+        if ($run->outcome === 'passed' || in_array($run->check_kind ?? null, self::OBSERVATION_KINDS, true)) {
             return false;
         }
         if (! $run->rule_version_id) {

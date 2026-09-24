@@ -34,6 +34,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 use Mockery;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class ResidentTransportJourneySecurityTest extends TestCase
@@ -1465,6 +1466,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
 
     public function test_concurrent_replay_serializes_one_terminal_custody_transition(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 
@@ -1587,6 +1589,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
 
     public function test_concurrent_authenticated_packing_replay_creates_one_log_and_one_bound_attestation_event(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 

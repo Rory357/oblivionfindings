@@ -1,10 +1,15 @@
+import { locationUrl } from '@/components/fleet-assets/vehicle-workspace/workspace-model';
+import InputError from '@/components/input-error';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatTime } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
 import {
     FleetComplianceBadges,
     fmt,
@@ -13,12 +18,13 @@ import {
     HeroShell,
     HeroStatusPill,
 } from '@/pages/fleet-assets/components/fleet-hero-kit';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Car,
     CheckCircle,
     ClipboardCheck,
+    ClipboardPlus,
     Clock,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -29,6 +35,8 @@ type Vehicle = {
     asset_tag: string | null;
     status: string;
     checked_today: boolean;
+    /** Every check is kept; the card shows the latest of today's. */
+    checks_today: number;
     check_result: 'good' | 'issue' | null;
     check_notes: string | null;
     checked_at: string | null;
@@ -54,12 +62,20 @@ type Props = {
         open_alerts: number;
         critical_alerts: number;
     };
+    can?: { view_vehicles: boolean };
+};
+
+const without = <T,>(record: Record<number, T>, key: number) => {
+    const next = { ...record };
+    delete next[key];
+    return next;
 };
 
 export default function DailyCheck({
     vehicles: rawVehicles,
     summary: rawSummary,
     compliance: rawCompliance,
+    can,
 }: Props) {
     const vehicles = rawVehicles ?? [];
     const summary = rawSummary ?? { total: 0, checked: 0, unchecked: 0 };
@@ -79,8 +95,24 @@ export default function DailyCheck({
     const [activeCheck, setActiveCheck] = useState<number | null>(null);
     const [notes, setNotes] = useState<Record<number, string>>({});
     const [submitting, setSubmitting] = useState<number | null>(null);
+    const [errors, setErrors] = useState<Record<number, string>>({});
+    // One request key per check being recorded, kept across retries so a
+    // repeated submit returns the saved check instead of adding another.
+    const [keys, setKeys] = useState<Record<number, string>>({});
+
+    const toggleCheck = (vehicleId: number) => {
+        setActiveCheck(activeCheck === vehicleId ? null : vehicleId);
+        setKeys((prev) =>
+            prev[vehicleId]
+                ? prev
+                : { ...prev, [vehicleId]: crypto.randomUUID() },
+        );
+    };
 
     const handleSubmit = (vehicleId: number, condition: 'good' | 'issue') => {
+        const requestKey = keys[vehicleId] ?? crypto.randomUUID();
+        setKeys((prev) => ({ ...prev, [vehicleId]: requestKey }));
+        setErrors((prev) => without(prev, vehicleId));
         setSubmitting(vehicleId);
         router.post(
             '/fleet-assets/daily-check',
@@ -88,14 +120,25 @@ export default function DailyCheck({
                 asset_id: vehicleId,
                 condition,
                 notes: notes[vehicleId] ?? '',
+                request_key: requestKey,
             },
             {
                 preserveState: true,
                 preserveScroll: true,
-                onFinish: () => {
-                    setSubmitting(null);
+                onSuccess: () => {
+                    // A later check of this vehicle is a new record.
+                    setKeys((prev) => without(prev, vehicleId));
+                    setNotes((prev) => without(prev, vehicleId));
                     setActiveCheck(null);
                 },
+                onError: (failed) =>
+                    setErrors((prev) => ({
+                        ...prev,
+                        [vehicleId]:
+                            Object.values(failed)[0] ??
+                            'The check couldn’t be saved. Try again.',
+                    })),
+                onFinish: () => setSubmitting(null),
             },
         );
     };
@@ -209,18 +252,19 @@ export default function DailyCheck({
                 </div>
 
                 {/* Vehicle Grid (2-3 columns) */}
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
                     {vehicles.length > 0 ? (
                         vehicles.map((vehicle) => (
                             <Card
                                 key={vehicle.id}
-                                className={`transition-colors ${
+                                className={cn(
+                                    'transition-colors',
                                     vehicle.checked_today
                                         ? vehicle.check_result === 'good'
-                                            ? 'border-primary/30 bg-primary/5 dark:bg-primary/10'
+                                            ? 'border-primary/30 bg-primary/5'
                                             : 'border-status-critical/30 bg-status-critical-bg'
-                                        : 'border-status-warning/30 bg-status-warning-bg'
-                                }`}
+                                        : 'border-status-warning/30 bg-status-warning-bg',
+                                )}
                             >
                                 <CardContent className="p-4">
                                     <div className="flex items-center justify-between gap-4">
@@ -237,9 +281,24 @@ export default function DailyCheck({
                                             )}
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="truncate text-sm font-semibold">
-                                                        {vehicle.name}
-                                                    </span>
+                                                    {can?.view_vehicles ? (
+                                                        <Link
+                                                            href={locationUrl(
+                                                                vehicle.id,
+                                                                {
+                                                                    tab: 'checks',
+                                                                    view: 'recent',
+                                                                },
+                                                            )}
+                                                            className="truncate rounded-sm text-sm font-semibold hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                                        >
+                                                            {vehicle.name}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="truncate text-sm font-semibold">
+                                                            {vehicle.name}
+                                                        </span>
+                                                    )}
                                                     {vehicle.asset_tag && (
                                                         <Badge
                                                             variant="outline"
@@ -258,59 +317,72 @@ export default function DailyCheck({
                                                         )}
                                                         {vehicle.checked_by &&
                                                             ` by ${vehicle.checked_by}`}
+                                                        {vehicle.checks_today >
+                                                            1 &&
+                                                            ` · ${vehicle.checks_today} checks today`}
                                                         {vehicle.check_notes &&
-                                                            ` - ${vehicle.check_notes}`}
+                                                            ` · ${vehicle.check_notes}`}
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
 
                                         <div className="flex shrink-0 items-center gap-2">
-                                            {vehicle.checked_today ? (
-                                                <Badge
+                                            {vehicle.checked_today && (
+                                                <StatusBadge
                                                     variant={
                                                         vehicle.check_result ===
                                                         'good'
-                                                            ? 'default'
-                                                            : 'destructive'
+                                                            ? 'success'
+                                                            : 'critical'
                                                     }
                                                 >
                                                     {vehicle.check_result ===
                                                     'good'
                                                         ? 'Good'
                                                         : 'Issue'}
-                                                </Badge>
-                                            ) : (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        setActiveCheck(
-                                                            activeCheck ===
-                                                                vehicle.id
-                                                                ? null
-                                                                : vehicle.id,
-                                                        )
-                                                    }
-                                                >
-                                                    <Clock className="mr-1.5 h-3.5 w-3.5" />
-                                                    Check
-                                                </Button>
+                                                </StatusBadge>
                                             )}
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                aria-expanded={
+                                                    activeCheck === vehicle.id
+                                                }
+                                                onClick={() =>
+                                                    toggleCheck(vehicle.id)
+                                                }
+                                            >
+                                                {vehicle.checked_today ? (
+                                                    <>
+                                                        <ClipboardPlus className="size-3.5" />
+                                                        Check again
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Clock className="size-3.5" />
+                                                        Check
+                                                    </>
+                                                )}
+                                            </Button>
                                         </div>
                                     </div>
 
                                     {/* Check Form */}
                                     {activeCheck === vehicle.id && (
                                         <article className="mt-4 space-y-3 rounded-lg border bg-background p-4">
-                                            <div>
-                                                <label className="text-sm font-medium">
-                                                    Quick Notes (optional)
-                                                </label>
+                                            <div className="space-y-1.5">
+                                                <Label
+                                                    htmlFor={`daily-check-notes-${vehicle.id}`}
+                                                >
+                                                    Quick notes (optional)
+                                                </Label>
                                                 <Input
+                                                    id={`daily-check-notes-${vehicle.id}`}
                                                     value={
                                                         notes[vehicle.id] ?? ''
                                                     }
+                                                    maxLength={2000}
                                                     onChange={(e) =>
                                                         setNotes((prev) => ({
                                                             ...prev,
@@ -321,7 +393,7 @@ export default function DailyCheck({
                                                     placeholder="Any notes about the vehicle condition..."
                                                 />
                                             </div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 <Button
                                                     onClick={() =>
                                                         handleSubmit(
@@ -333,9 +405,8 @@ export default function DailyCheck({
                                                         submitting ===
                                                         vehicle.id
                                                     }
-                                                    className="bg-primary hover:bg-primary"
                                                 >
-                                                    <CheckCircle className="mr-1.5 h-4 w-4" />
+                                                    <CheckCircle />
                                                     Good
                                                 </Button>
                                                 <Button
@@ -351,7 +422,7 @@ export default function DailyCheck({
                                                         vehicle.id
                                                     }
                                                 >
-                                                    <AlertTriangle className="mr-1.5 h-4 w-4" />
+                                                    <AlertTriangle />
                                                     Issue
                                                 </Button>
                                                 <Button
@@ -364,6 +435,16 @@ export default function DailyCheck({
                                                     Cancel
                                                 </Button>
                                             </div>
+                                            <InputError
+                                                message={errors[vehicle.id]}
+                                            />
+                                            {vehicle.checked_today && (
+                                                <p className="text-caption">
+                                                    This adds a new check.
+                                                    Earlier checks stay on the
+                                                    vehicle&apos;s record.
+                                                </p>
+                                            )}
                                         </article>
                                     )}
                                 </CardContent>

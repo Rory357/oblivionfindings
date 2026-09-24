@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { addMonthsNoOverflow } from './service-schedules';
-import type { ReadinessReason, VehicleWorkspace } from './types';
+import type { CheckSummary, ReadinessReason, VehicleWorkspace } from './types';
 import {
+    dailyIssue,
     formatKm,
     headerStatus,
+    lastCheck,
     locationUrl,
     readLocation,
     reasonDestination,
@@ -197,6 +199,107 @@ describe('vehicle header status', () => {
                 '2026-09-22',
             ),
         ).toEqual({ label: 'Ready', variant: 'success', state: 'ready' });
+    });
+});
+
+const check = (
+    id: number,
+    outcome: string | null,
+    submitted_at: string,
+): CheckSummary => ({
+    id,
+    outcome,
+    template: 'Checklist',
+    submitted_at,
+    assessed: false,
+});
+
+/** Only what the readiness picture reads; everything else is irrelevant here. */
+const workspaceWith = (
+    checks: Partial<VehicleWorkspace['checks']>,
+): VehicleWorkspace =>
+    ({
+        vehicle: { status: 'active' },
+        readiness: { restriction_ids: [], can_proceed: true, reasons: [] },
+        schedules: [],
+        checks: {
+            latest: null,
+            latest_daily: null,
+            next_due_at: null,
+            ...checks,
+        },
+    }) as unknown as VehicleWorkspace;
+
+describe('vehicle checks in the header', () => {
+    const passed = check(4, 'passed', '2026-09-23T21:00:00+00:00');
+
+    it('shows the most recent check, daily checks included', () => {
+        const daily = check(
+            9,
+            'no_issue_recorded',
+            '2026-09-24T20:30:00+00:00',
+        );
+        expect(
+            lastCheck({
+                latest: passed,
+                latest_daily: daily,
+                next_due_at: null,
+            }),
+        ).toBe(daily);
+        expect(
+            lastCheck({
+                latest: passed,
+                latest_daily: null,
+                next_due_at: null,
+            }),
+        ).toBe(passed);
+        expect(
+            lastCheck({ latest: null, latest_daily: daily, next_due_at: null }),
+        ).toBe(daily);
+        expect(
+            lastCheck({ latest: null, latest_daily: null, next_due_at: null }),
+        ).toBeNull();
+        // A later vehicle check is still the last check.
+        const older = check(3, 'issue_recorded', '2026-09-22T20:30:00+00:00');
+        expect(
+            lastCheck({
+                latest: passed,
+                latest_daily: older,
+                next_due_at: null,
+            }),
+        ).toBe(passed);
+    });
+
+    it('keeps a vehicle ready after a daily check with no issue', () => {
+        const daily = check(
+            9,
+            'no_issue_recorded',
+            '2026-09-24T20:30:00+00:00',
+        );
+        const workspace = workspaceWith({
+            latest: passed,
+            latest_daily: daily,
+        });
+        expect(dailyIssue(workspace)).toBe(false);
+        expect(headerStatus(workspace, '2026-09-25')).toEqual({
+            label: 'Ready',
+            variant: 'success',
+            state: 'ready',
+        });
+    });
+
+    it('asks for review, without blocking, when the latest daily check recorded an issue', () => {
+        const issue = check(9, 'issue_recorded', '2026-09-24T20:30:00+00:00');
+        const workspace = workspaceWith({
+            latest: passed,
+            latest_daily: issue,
+        });
+        expect(dailyIssue(workspace)).toBe(true);
+        expect(headerStatus(workspace, '2026-09-25')).toEqual({
+            label: 'Needs assessment',
+            variant: 'warning',
+            state: 'review',
+        });
     });
 });
 
