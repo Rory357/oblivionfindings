@@ -4,6 +4,7 @@ import {
     escapeMapHtml,
     getMapMarkerColor,
     mapMarkerPopupHtml,
+    mapMarkerStatsHtml,
     type MapMarker,
 } from './leaflet-map';
 
@@ -32,6 +33,27 @@ describe('Leaflet map presentation safety', () => {
         expect(escapeMapHtml("A&B's <zone>")).toBe(
             'A&amp;B&#039;s &lt;zone&gt;',
         );
+    });
+
+    it('escapes every label and value in the hover stats card', () => {
+        const html = mapMarkerStatsHtml(
+            marker({
+                title: 'Point <b>3</b>',
+                popup: '<img src=x onerror=alert(1)>',
+                stats: [
+                    ['Speed', '<script>1</script>'],
+                    ['<i>Other</i>', 'Not reported'],
+                ],
+            }),
+        );
+
+        expect(html).not.toContain('<script>');
+        expect(html).not.toContain('<img');
+        expect(html).not.toContain('<i>');
+        expect(html).toContain('Point &lt;b&gt;3&lt;/b&gt;');
+        expect(html).toContain('&lt;script&gt;1&lt;/script&gt;');
+        expect(html).toContain('<span>&lt;i&gt;Other&lt;/i&gt;</span>');
+        expect(html.match(/<section>/g)).toHaveLength(2);
     });
 
     it('uses actual Device state before category colour and rejects CSS injection', () => {

@@ -37,7 +37,7 @@ export default function KnowledgeFile({
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Knowledge', href: document.library_href },
                 { title: document.title, href: document.href },
-                { title: file.name, href: '#' },
+                { title: file.name },
             ]}
         >
             <Head title={file.name} />

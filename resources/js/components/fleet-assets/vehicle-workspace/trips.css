@@ -1,0 +1,1030 @@
+/*
+ * Vehicle trip history, ported from the approved PKG-02B v13 design
+ * (docs/fleet-assets-audit/previews/PKG-02B/v13: trip-studio, trip-timeline,
+ * trip-export; rules from telemetry.css). Scoped to .vehicle-studio; the
+ * export and driver dialogs carry the class on their own content because
+ * they render in a portal. Tokens only.
+ */
+
+.vehicle-studio.journey-studio,
+.vehicle-studio .journey-studio {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+}
+
+/* ── Filters ─────────────────────────────────────────────────────── */
+
+.vehicle-studio .journey-refine {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: end;
+    padding: 0;
+    margin: 0;
+}
+.vehicle-studio .journey-refine label,
+.vehicle-studio .journey-refine .field > .field-label {
+    display: grid;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--foreground);
+}
+.vehicle-studio .journey-refine .trip-search-field {
+    flex: 2 1 190px;
+    min-width: 0;
+}
+.vehicle-studio .trip-search-field input {
+    width: 100%;
+    height: 34px;
+    font-size: 12px;
+}
+.vehicle-studio .journey-refine .trip-date-field {
+    flex: 1 1 145px;
+}
+.vehicle-studio .journey-refine .trip-event-field {
+    flex: 1 1 120px;
+}
+.vehicle-studio .journey-refine .select,
+.vehicle-studio .trip-timeline .select,
+.vehicle-studio .journey-playback .select {
+    height: 34px;
+    font-size: 12px;
+    background-color: var(--card);
+}
+.vehicle-studio .journey-playback .select {
+    width: auto;
+}
+.vehicle-studio .journey-refine > .field {
+    display: grid;
+    min-width: 165px;
+    flex: 1 1 165px;
+    gap: 5px;
+}
+.vehicle-studio .journey-refine > .field button[role='combobox'] {
+    height: 34px;
+    min-height: 34px;
+    font-size: 12px;
+}
+.vehicle-studio .trip-filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.vehicle-studio .trip-date-range {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 4px;
+}
+.vehicle-studio .journey-refine .time-picker-trigger small {
+    display: none;
+}
+.vehicle-studio .journey-refine .time-picker-trigger {
+    min-height: 36px;
+    height: 36px;
+    min-width: 150px;
+}
+.vehicle-studio .journey-refine .time-picker-icon {
+    display: none;
+}
+.vehicle-studio .trip-range-error {
+    flex-basis: 100%;
+    font-size: 11px;
+    color: var(--status-critical);
+}
+
+/* ── Totals ──────────────────────────────────────────────────────── */
+
+.vehicle-studio .journey-totals {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    padding: 14px 18px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+    flex-wrap: wrap;
+}
+.vehicle-studio .journey-totals > span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+.vehicle-studio .journey-totals svg {
+    width: 17px;
+    height: 17px;
+    color: var(--primary);
+}
+.vehicle-studio .journey-totals[aria-busy='true'] {
+    opacity: 0.6;
+}
+
+/* ── Trip selector and pager ─────────────────────────────────────── */
+
+.vehicle-studio .journey-selector {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+.vehicle-studio .journey-selector > button {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    text-align: left;
+    padding: 10px 14px;
+    display: grid;
+    gap: 6px;
+    transition: background 0.15s;
+    min-width: 0;
+}
+.vehicle-studio .journey-selector > button:hover {
+    background: color-mix(in srgb, var(--primary) 3%, var(--card));
+}
+.vehicle-studio .journey-selector > button:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+.vehicle-studio .journey-selector > button[aria-pressed='true'] {
+    border-color: var(--primary);
+    box-shadow: inset 0 3px 0 var(--primary);
+    background: color-mix(in srgb, var(--primary) 5%, var(--card));
+}
+.vehicle-studio .journey-selector > button > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 11px;
+}
+.vehicle-studio .journey-selector strong {
+    display: block;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+}
+.vehicle-studio .journey-selector strong > svg {
+    display: inline;
+    margin: 0 4px;
+    vertical-align: middle;
+    color: var(--primary);
+}
+.vehicle-studio .journey-selector small {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: var(--muted-foreground);
+    flex-wrap: wrap;
+}
+.vehicle-studio .journey-selector small > span {
+    margin-left: auto;
+}
+.vehicle-studio .replay-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+}
+
+/* ── Recorded journey ────────────────────────────────────────────── */
+
+.vehicle-studio .journey-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 310px;
+    gap: 14px;
+    align-items: start;
+}
+.vehicle-studio .journey-map-panel {
+    padding: 0;
+    overflow: hidden;
+}
+.vehicle-studio .journey-map-title {
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+.vehicle-studio .journey-map-title h3 {
+    font-size: 15px;
+    font-weight: 650;
+    margin: 0;
+}
+.vehicle-studio .journey-map-title .studio-eyebrow {
+    margin-bottom: 3px;
+}
+.vehicle-studio .journey-location-strip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: color-mix(in srgb, var(--primary) 5%, var(--card));
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+}
+.vehicle-studio .journey-location-strip > svg {
+    flex-shrink: 0;
+    color: var(--primary);
+}
+.vehicle-studio .journey-location-strip > div {
+    flex: 1;
+    min-width: 0;
+}
+.vehicle-studio .journey-location-strip strong,
+.vehicle-studio .journey-location-strip small {
+    display: block;
+    overflow-wrap: anywhere;
+}
+.vehicle-studio .journey-location-strip small {
+    font-size: 10px;
+    color: var(--muted-foreground);
+    margin-top: 3px;
+}
+.vehicle-studio .journey-route-map {
+    width: 100%;
+    height: 360px;
+    position: relative;
+    isolation: isolate;
+}
+.vehicle-studio .journey-route-map > div:first-child {
+    position: absolute !important;
+    inset: 0;
+    width: 100%;
+    height: 100% !important;
+    border-radius: 0 !important;
+    border: 0 !important;
+}
+.vehicle-studio .journey-route-map .leaflet-container {
+    height: 100% !important;
+}
+/* Greyscale imagery; routes, samples and markers keep their colours. */
+.vehicle-studio .journey-route-map .leaflet-tile-pane {
+    filter: grayscale(1);
+}
+.vehicle-studio .journey-route-map .leaflet-control-layers {
+    display: none;
+}
+.vehicle-studio .journey-map-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px;
+    text-align: center;
+    color: var(--muted-foreground);
+    background: var(--muted);
+    font-size: 12px;
+}
+.vehicle-studio .journey-map-empty strong {
+    color: var(--foreground);
+    font-size: 14px;
+}
+.vehicle-studio .journey-map-legend {
+    position: absolute;
+    z-index: 800;
+    bottom: 28px;
+    left: 12px;
+    padding: 7px 10px;
+    background: var(--card);
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(100% - 24px);
+}
+.vehicle-studio .legend-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    background: var(--primary);
+    border-radius: 50%;
+}
+.vehicle-studio .journey-playback {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+}
+.vehicle-studio .journey-playback > small {
+    font-size: 11px;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+    min-width: 58px;
+}
+.vehicle-studio .journey-playback label {
+    flex: 1;
+    min-width: 120px;
+    font-size: 10px;
+    color: var(--muted-foreground);
+    display: grid;
+    gap: 7px;
+}
+.vehicle-studio .journey-playback input[type='range'] {
+    width: 100%;
+    accent-color: var(--primary);
+}
+.vehicle-studio .journey-playback > strong {
+    min-width: 70px;
+    font-size: 21px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.vehicle-studio .journey-playback strong small {
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--muted-foreground);
+}
+.vehicle-studio .journey-endpoints {
+    padding: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    border-top: 1px solid var(--border);
+}
+.vehicle-studio .journey-endpoints > div {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+.vehicle-studio .journey-endpoints > div > span {
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    background: var(--muted);
+    color: var(--primary);
+    font-size: 11px;
+    font-weight: 600;
+}
+.vehicle-studio .journey-endpoints strong {
+    font-size: 12px;
+    display: block;
+    overflow-wrap: anywhere;
+}
+.vehicle-studio .journey-endpoints small {
+    display: block;
+    font-size: 10px;
+    color: var(--muted-foreground);
+    margin-top: 3px;
+}
+
+/* Stats card on the playback marker (rendered by the shared map). */
+.vehicle-studio .leaflet-map-stats-tooltip.leaflet-tooltip {
+    background: var(--card);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0;
+    box-shadow: 0 7px 25px
+        color-mix(in oklch, var(--foreground) 20%, transparent);
+    white-space: normal;
+}
+.vehicle-studio .leaflet-map-stats-tooltip.leaflet-tooltip::before {
+    display: none;
+}
+.vehicle-studio .leaflet-map-stats-card {
+    width: 255px;
+    padding: 15px;
+}
+.vehicle-studio .leaflet-map-stats-card > strong {
+    font-size: 14px;
+    display: block;
+}
+.vehicle-studio .leaflet-map-stats-card > small {
+    font-size: 10px;
+    color: var(--muted-foreground);
+    display: block;
+    margin: 5px 0 11px;
+}
+.vehicle-studio .leaflet-map-stats-card > div {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+.vehicle-studio .leaflet-map-stats-card section {
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    gap: 3px 7px;
+    padding: 8px;
+    background: var(--muted);
+    border-radius: 7px;
+}
+.vehicle-studio .leaflet-map-stats-card svg {
+    width: 17px;
+    height: 17px;
+    color: var(--primary);
+    grid-row: span 2;
+}
+.vehicle-studio .leaflet-map-stats-card span {
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+.vehicle-studio .leaflet-map-stats-card b {
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+/* ── Behaviour column ────────────────────────────────────────────── */
+
+.vehicle-studio .journey-insights {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+}
+.vehicle-studio .trip-score-card {
+    padding: 12px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    border-top: 3px solid var(--primary);
+}
+.vehicle-studio .trip-score-number {
+    font-size: 28px;
+    line-height: 1;
+    font-weight: 650;
+    color: var(--primary);
+    display: grid;
+    gap: 5px;
+    flex-shrink: 0;
+}
+.vehicle-studio .trip-score-number small {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--muted-foreground);
+    text-align: center;
+}
+.vehicle-studio .trip-score-card .studio-eyebrow {
+    margin-bottom: 0;
+}
+.vehicle-studio .trip-score-card h3 {
+    font-size: 12px;
+    font-weight: 650;
+    margin: 5px 0;
+}
+.vehicle-studio .trip-score-card p {
+    font-size: 11px;
+    color: var(--muted-foreground);
+    margin: 0;
+}
+.vehicle-studio .trip-facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 4px 10px;
+}
+.vehicle-studio .trip-facts > div {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 5px 7px;
+    padding: 7px 3px;
+    border-bottom: 1px solid var(--border);
+    min-width: 0;
+}
+.vehicle-studio .trip-facts svg {
+    grid-row: span 2;
+    color: var(--primary);
+    margin-top: 4px;
+}
+.vehicle-studio .trip-facts strong {
+    font-size: 14px;
+}
+.vehicle-studio .trip-facts small {
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+.vehicle-studio .trip-facts > p {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 7px 3px;
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+.vehicle-studio .trip-speed {
+    padding: 12px;
+}
+.vehicle-studio .trip-speed h3 {
+    font-size: 13px;
+    font-weight: 650;
+    margin: 0;
+}
+.vehicle-studio .trip-speed small,
+.vehicle-studio .trip-speed p {
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+.vehicle-studio .trip-speed svg {
+    width: 100%;
+    height: auto;
+    max-height: 72px;
+    margin: 8px 0 4px;
+}
+.vehicle-studio .trip-speed text {
+    font-size: 9px;
+    fill: var(--muted-foreground);
+}
+.vehicle-studio .trip-speed details {
+    font-size: 10px;
+    color: var(--muted-foreground);
+    margin-top: 7px;
+}
+.vehicle-studio .trip-speed details summary {
+    cursor: pointer;
+}
+.vehicle-studio .trip-driver {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 10px;
+}
+.vehicle-studio .trip-driver > svg {
+    color: var(--primary);
+    flex-shrink: 0;
+}
+.vehicle-studio .trip-driver > div {
+    flex: 1;
+    min-width: 0;
+}
+.vehicle-studio .trip-driver strong {
+    font-size: 12px;
+}
+.vehicle-studio .trip-driver small {
+    display: block;
+    font-size: 10px;
+    color: var(--muted-foreground);
+    line-height: 1.35;
+}
+
+/* ── Timeline and follow-up ──────────────────────────────────────── */
+
+.vehicle-studio .journey-bottom {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 310px;
+    gap: 18px;
+    align-items: start;
+}
+.vehicle-studio .trip-next {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+}
+.vehicle-studio .trip-next h3 {
+    font-size: 15px;
+    font-weight: 650;
+    margin: 0;
+}
+.vehicle-studio .trip-next .studio-eyebrow {
+    margin-bottom: 0;
+}
+.vehicle-studio .trip-next p,
+.vehicle-studio .trip-next details {
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--muted-foreground);
+    margin: 0;
+}
+.vehicle-studio .trip-next details summary {
+    cursor: pointer;
+    color: var(--foreground);
+}
+.vehicle-studio .trip-next > button {
+    width: 100%;
+}
+.vehicle-studio .trip-timeline {
+    padding: 16px;
+    min-width: 0;
+    align-self: start;
+}
+.vehicle-studio .timeline-heading,
+.vehicle-studio .timeline-controls,
+.vehicle-studio .timeline-view-switch,
+.vehicle-studio .timeline-view-switch button,
+.vehicle-studio .timeline-map-link,
+.vehicle-studio .timeline-table-event {
+    display: flex;
+    align-items: center;
+}
+.vehicle-studio .timeline-heading {
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.vehicle-studio .timeline-heading h3 {
+    font-size: 15px;
+    font-weight: 650;
+    margin: 0;
+}
+.vehicle-studio .timeline-heading h3 > span {
+    margin-left: 5px;
+    color: var(--muted-foreground);
+    font-size: 11px;
+    font-weight: 500;
+}
+.vehicle-studio .timeline-controls {
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.vehicle-studio .timeline-controls .select {
+    width: auto;
+}
+.vehicle-studio .timeline-view-switch {
+    padding: 3px;
+    gap: 2px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--muted);
+}
+.vehicle-studio .timeline-view-switch button {
+    justify-content: center;
+    gap: 5px;
+    padding: 6px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+.vehicle-studio .timeline-view-switch button[aria-pressed='true'] {
+    color: var(--primary);
+    background: var(--card);
+    box-shadow: 0 1px 3px color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+.vehicle-studio .timeline-events {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.vehicle-studio .timeline-event {
+    display: grid;
+    align-items: center;
+    grid-template-columns: 28px 68px minmax(0, 1fr) auto;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 8px;
+    text-align: left;
+    border-top: 1px solid var(--border);
+    border-radius: 5px;
+}
+.vehicle-studio .timeline-event:hover,
+.vehicle-studio .timeline-table tbody tr:hover {
+    background: var(--muted);
+}
+.vehicle-studio .timeline-event[aria-pressed='true'],
+.vehicle-studio .timeline-table tr[data-selected='true'] {
+    background: color-mix(in srgb, var(--primary) 6%, var(--card));
+    box-shadow: inset 3px 0 0 var(--primary);
+}
+.vehicle-studio .trip-timeline button:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+.vehicle-studio .timeline-symbol {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 9%, var(--card));
+    flex-shrink: 0;
+}
+.vehicle-studio .timeline-symbol-speed {
+    color: var(--status-warning);
+    background: var(--status-warning-bg);
+}
+.vehicle-studio .timeline-symbol-power {
+    color: var(--status-critical);
+    background: var(--status-critical-bg);
+}
+.vehicle-studio .timeline-time {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted-foreground);
+}
+.vehicle-studio .timeline-event-copy {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+.vehicle-studio .timeline-event strong,
+.vehicle-studio .timeline-table strong {
+    font-size: 12px;
+    font-weight: 600;
+}
+.vehicle-studio .timeline-location {
+    color: var(--muted-foreground);
+    font-size: 11px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+.vehicle-studio .timeline-map-link {
+    gap: 3px;
+    color: var(--primary);
+    font-size: 10px;
+    white-space: nowrap;
+}
+.vehicle-studio .timeline-card {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 10px;
+}
+.vehicle-studio .timeline-card li {
+    display: flex;
+}
+.vehicle-studio .timeline-card .timeline-event {
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-content: start;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+}
+.vehicle-studio .timeline-card .timeline-time {
+    justify-self: end;
+}
+.vehicle-studio .timeline-card .timeline-event-copy,
+.vehicle-studio .timeline-card-detail,
+.vehicle-studio .timeline-card .timeline-map-link {
+    grid-column: 1 / -1;
+}
+.vehicle-studio .timeline-card-detail {
+    color: var(--muted-foreground);
+    font-size: 11px;
+    line-height: 1.5;
+}
+.vehicle-studio .timeline-card-detail small {
+    display: block;
+    margin-top: 8px;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+.vehicle-studio .timeline-table-scroll {
+    max-width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.vehicle-studio .timeline-table {
+    width: 100%;
+    min-width: 490px;
+    border-collapse: collapse;
+    font-size: 11px;
+    text-align: left;
+}
+.vehicle-studio .timeline-table th {
+    background: var(--muted);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    height: auto;
+}
+.vehicle-studio .timeline-table th,
+.vehicle-studio .timeline-table td {
+    padding: 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+    white-space: normal;
+}
+.vehicle-studio .timeline-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+.vehicle-studio .timeline-table-event {
+    gap: 7px;
+}
+.vehicle-studio .timeline-table td:first-child {
+    width: 76px;
+}
+.vehicle-studio .timeline-table td:last-child button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--primary);
+    background: var(--card);
+}
+.vehicle-studio .timeline-selected-detail {
+    display: flex;
+    gap: 8px;
+    padding: 10px 12px;
+    margin-top: 10px;
+    border-radius: 7px;
+    background: var(--muted);
+    font-size: 11px;
+}
+.vehicle-studio .timeline-selected-detail > svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--primary);
+}
+.vehicle-studio .timeline-selected-detail strong {
+    font-weight: 600;
+}
+.vehicle-studio .timeline-selected-detail p {
+    color: var(--muted-foreground);
+    margin: 3px 0;
+}
+.vehicle-studio .timeline-selected-detail small,
+.vehicle-studio .timeline-footnote {
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+.vehicle-studio .timeline-footnote {
+    margin: 12px 0 0;
+}
+.vehicle-studio .timeline-empty {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    padding: 24px 10px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+}
+.vehicle-studio .timeline-empty button {
+    color: var(--primary);
+    padding: 6px 10px;
+}
+.vehicle-studio .telemetry-empty {
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    color: var(--muted-foreground);
+    text-align: center;
+}
+.vehicle-studio .telemetry-empty h3 {
+    font-size: 15px;
+    font-weight: 650;
+    color: var(--foreground);
+    margin: 0;
+}
+.vehicle-studio .telemetry-empty p {
+    font-size: 12px;
+    margin: 0;
+}
+
+/* ── Export dialog (portal content carries .vehicle-studio) ──────── */
+
+.vehicle-studio .trip-export-body {
+    display: grid;
+    gap: 20px;
+}
+.vehicle-studio .report-format {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.vehicle-studio .report-format button {
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    gap: 5px 10px;
+    padding: 16px;
+    text-align: left;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+}
+.vehicle-studio .report-format button:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+.vehicle-studio .report-format button[aria-pressed='true'] {
+    border-color: var(--primary);
+    background: color-mix(in oklch, var(--primary) 7%, var(--card));
+    box-shadow: 0 0 0 1px var(--primary);
+}
+.vehicle-studio .report-format button:disabled {
+    opacity: 0.6;
+}
+.vehicle-studio .report-format svg {
+    grid-row: span 2;
+    color: var(--primary);
+}
+.vehicle-studio .report-format small {
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+.vehicle-studio .report-dates {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+}
+.vehicle-studio .report-dates label {
+    display: grid;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.vehicle-studio .report-dates .time-picker-trigger {
+    width: 100%;
+}
+.vehicle-studio .report-options {
+    display: grid;
+    gap: 13px;
+    font-size: 12px;
+}
+.vehicle-studio .report-options label {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+}
+.vehicle-studio .report-options label[data-disabled='true'] {
+    color: var(--muted-foreground);
+}
+/* The label's own icon only: the checkbox tick keeps its primitive colour. */
+.vehicle-studio .report-options label > svg {
+    color: var(--muted-foreground);
+}
+.vehicle-studio .report-scope {
+    background: var(--muted);
+    padding: 14px;
+    border-radius: 9px;
+    font-size: 12px;
+}
+.vehicle-studio .report-scope p {
+    color: var(--muted-foreground);
+    margin: 7px 0 0;
+    line-height: 1.6;
+}
+
+@media (max-width: 1099px) {
+    .vehicle-studio .journey-workspace {
+        grid-template-columns: minmax(0, 1fr) 280px;
+    }
+    .vehicle-studio .journey-route-map {
+        height: 340px;
+    }
+    .vehicle-studio .journey-bottom {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+@media (max-width: 760px) {
+    .vehicle-studio .journey-workspace {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .vehicle-studio .journey-route-map {
+        height: 300px;
+    }
+    .vehicle-studio .report-format,
+    .vehicle-studio .report-dates,
+    .vehicle-studio .journey-endpoints {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+@media (max-width: 700px) {
+    .vehicle-studio .journey-refine .trip-search-field {
+        flex-basis: 100%;
+    }
+    .vehicle-studio .trip-filter-actions {
+        margin-left: auto;
+    }
+    .vehicle-studio .journey-location-strip {
+        flex-wrap: wrap;
+    }
+}
+@media (max-width: 600px) {
+    .vehicle-studio .journey-selector {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .vehicle-studio .timeline-list .timeline-event {
+        grid-template-columns: 28px minmax(0, 1fr) auto;
+    }
+    .vehicle-studio .timeline-list .timeline-time {
+        grid-column: 2;
+        grid-row: 2;
+    }
+    .vehicle-studio .timeline-list .timeline-map-link {
+        grid-column: 3;
+        grid-row: 1 / 3;
+    }
+    .vehicle-studio .timeline-list .timeline-event-copy {
+        grid-column: 2;
+        grid-row: 1;
+    }
+    .vehicle-studio .timeline-list .timeline-symbol {
+        grid-column: 1;
+        grid-row: 1 / 3;
+    }
+}

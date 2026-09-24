@@ -25,7 +25,12 @@ class ComplianceController extends Controller
 
         $eagerLoads = ['homeSite'];
 
-        $query = $this->access->accessibleAssets($actor, true);
+        // Fleet readers get the register's vehicle scope, which central fleet
+        // oversight widens to every Site; people who only see assigned assets
+        // keep seeing just those vehicles.
+        $query = $this->access->canReadFleetVehicles($actor)
+            ? $this->access->accessibleVehiclesForFleet($actor)
+            : $this->access->accessibleAssets($actor, true);
         if ($hasFleetFields) {
             $query->with($eagerLoads);
         }
@@ -73,9 +78,12 @@ class ComplianceController extends Controller
                 $status = 'warning';
             }
 
+            // A vehicle readiness blocks is "Not ready" (missing evidence, a
+            // hold or an unresolved check), not "Expiring soon"; an expiry
+            // already past stays the more specific status.
             $readiness = $projections[(int) $v->id];
-            if (! $readiness->canProceed) {
-                $status = 'critical';
+            if (! $readiness->canProceed && $status !== 'expired') {
+                $status = 'not_ready';
             }
 
             return [
@@ -96,6 +104,8 @@ class ComplianceController extends Controller
                 'readiness' => $readiness->toArray(),
             ];
         });
+
+        $notReady = $vehiclesData->where('status', 'not_ready')->count();
 
         // Status filter
         if ($request->filled('status') && $request->input('status') !== 'all') {
@@ -159,6 +169,7 @@ class ComplianceController extends Controller
                 'expired_rego' => $expiredRego,
                 'expiring_30' => $expiring30,
                 'expiring_60' => $expiring60,
+                'not_ready' => $notReady,
                 // null (column absent) hides the strip metric entirely.
                 'insurance_expiring' => $hasInsuranceColumn
                     ? $vehicles->filter(function ($v) use ($now) {

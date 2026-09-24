@@ -4,16 +4,22 @@ namespace App\Http\Controllers\FleetAssets;
 
 use App\Http\Controllers\Controller;
 use App\Models\ControlRoomAlert;
+use App\Models\FleetKeyLog;
 use App\Models\FleetOuting;
 use App\Models\FleetVehicleBooking;
+use App\Models\FleetVehicleUnavailablePeriod;
 use App\Models\User;
 use App\Notifications\Fleet\FleetBookingApprovedNotification;
 use App\Notifications\Fleet\FleetBookingRejectedNotification;
 use App\Services\AuditLogger;
 use App\Services\Fleet\Data\VehicleReadinessContext;
+use App\Services\Fleet\MaintenanceFingerprint;
+use App\Services\Fleet\MaintenanceLocalTime;
 use App\Services\Fleet\VehicleBookingAccessService;
 use App\Services\Fleet\VehicleOdometerService;
 use App\Services\Fleet\VehicleReadinessService;
+use App\Services\Fleet\VehicleReturnConcernService;
+use App\Services\Fleet\VehicleStaffDirectory;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -29,6 +35,8 @@ class VehicleBookingController extends Controller
         private readonly VehicleBookingAccessService $bookingAccess,
         private readonly VehicleReadinessService $readiness,
         private readonly VehicleOdometerService $odometer,
+        private readonly VehicleStaffDirectory $staff,
+        private readonly VehicleReturnConcernService $returnConcerns,
     ) {}
 
     public function index(Request $request)
@@ -286,11 +294,18 @@ class VehicleBookingController extends Controller
         $asset = $this->bookingAccess->vehicle($actor, (int) $request->input('check_asset_id'));
         abort_unless($asset, 404);
 
+        // The wizard sends Auckland wall time; bookings are stored in UTC.
+        $checkStart = $this->checkTime((string) $request->input('check_starts_at'));
+        $checkEnd = $this->checkTime((string) $request->input('check_ends_at'));
+        if (! $checkStart || ! $checkEnd) {
+            return [];
+        }
+
         return $this->bookingAccess->accessibleBookings($actor)
             ->where('asset_id', $asset->id)
             ->whereNotIn('status', ['cancelled', 'rejected', 'returned'])
-            ->where('starts_at', '<=', $request->input('check_ends_at'))
-            ->where('ends_at', '>=', $request->input('check_starts_at'))
+            ->where('starts_at', '<=', $checkEnd)
+            ->where('ends_at', '>=', $checkStart)
             ->with('user:id,name')
             ->get()
             ->map(fn ($b) => [
@@ -302,6 +317,18 @@ class VehicleBookingController extends Controller
                 'status' => $b->status,
             ])
             ->values();
+    }
+
+    /** Auckland wall minute (datetime-local) or an absolute timestamp, as UTC. */
+    private function checkTime(string $value): ?Carbon
+    {
+        try {
+            return preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/', $value)
+                ? Carbon::parse(MaintenanceLocalTime::toUtc($value), 'UTC')
+                : Carbon::parse($value)->utc();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /** Status of the wizard's selected vehicle (maintenance warning etc.). */
@@ -407,22 +434,56 @@ class VehicleBookingController extends Controller
             $asset = $this->bookingAccess->vehicle($actor, (int) $identifiers['asset_id'], true);
             abort_unless($asset, 404);
 
+            $usesLocal = $request->filled('starts_local') || $request->filled('ends_local');
             $data = $request->validate([
                 'asset_id' => ['required', 'integer'],
                 'client_id' => ['nullable', 'integer'],
-                'purpose' => ['required', 'string', 'max:500'],
-                'starts_at' => ['required', 'date'],
-                'ends_at' => ['required', 'date', 'after:starts_at'],
+                'purpose' => ['required', 'string', 'max:255'],
+                // Workspace forms send Auckland wall time; older callers send
+                // an absolute starts_at / ends_at.
+                'starts_local' => [$usesLocal ? 'required' : 'nullable', 'string'],
+                'ends_local' => [$usesLocal ? 'required' : 'nullable', 'string'],
+                'starts_offset' => ['nullable', 'string', 'max:6'],
+                'ends_offset' => ['nullable', 'string', 'max:6'],
+                'starts_at' => [$usesLocal ? 'nullable' : 'required', 'date'],
+                'ends_at' => [$usesLocal ? 'nullable' : 'required', 'date', ...($usesLocal ? [] : ['after:starts_at'])],
                 'destination' => ['nullable', 'string', 'max:255'],
                 'passengers' => ['nullable', 'integer', 'min:0', 'max:50'],
                 'pickup_site_id' => ['nullable', 'integer'],
                 'return_site_id' => ['nullable', 'integer'],
+                'pickup_arrangement' => ['nullable', 'string', 'max:255'],
+                'driver_user_id' => ['nullable', 'integer', 'min:1'],
                 'notes' => ['nullable', 'string', 'max:2000'],
                 'approval_route' => ['nullable', 'in:required,not_required'],
                 'approval_not_required_reason' => ['nullable', 'string', 'max:2000'],
                 'approval_not_required_evidence' => ['nullable', 'string', 'max:255'],
                 'readiness_acknowledged' => ['nullable', 'boolean'],
             ]);
+            [$startsAt, $endsAt] = $this->window($data, $usesLocal);
+            $requestKey = $this->requestKey($request);
+            $fingerprint = MaintenanceFingerprint::of([
+                'actor' => (int) $actor->id, 'asset' => (int) $asset->id, 'purpose' => trim($data['purpose']),
+                'starts' => $startsAt->toIso8601String(), 'ends' => $endsAt->toIso8601String(),
+                'driver' => $data['driver_user_id'] ?? null, 'route' => $data['approval_route'] ?? 'required',
+                'reason' => $data['approval_not_required_reason'] ?? null,
+                'evidence' => $data['approval_not_required_evidence'] ?? null,
+            ]);
+            if ($requestKey !== '') {
+                $replayed = FleetVehicleBooking::query()->where('user_id', $actor->id)
+                    ->where('request_key', $requestKey)->lockForUpdate()->first();
+                if ($replayed) {
+                    abort_unless((int) $replayed->asset_id === (int) $asset->id
+                        && hash_equals((string) $replayed->request_fingerprint, $fingerprint), 409,
+                        'This request was already used for a different booking. Reload and try again.');
+
+                    return [$replayed, null];
+                }
+            }
+            if (! empty($data['driver_user_id']) && ! $this->staff->isCandidate($asset, (int) $data['driver_user_id'])) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'driver_user_id' => 'Choose a current staff member at this vehicle\'s site as the driver.',
+                ]);
+            }
             $approvalRoute = $data['approval_route'] ?? 'required';
             $noApprovalReason = trim((string) ($data['approval_not_required_reason'] ?? ''));
             $noApprovalEvidence = trim((string) ($data['approval_not_required_evidence'] ?? ''));
@@ -443,8 +504,6 @@ class VehicleBookingController extends Controller
                 }
             }
 
-            $startsAt = Carbon::parse($data['starts_at'])->utc();
-            $endsAt = Carbon::parse($data['ends_at'])->utc();
             $overlapping = FleetVehicleBooking::query()->where('asset_id', $asset->id)
                 ->whereIn('status', ['pending', 'approved', 'checked_out'])
                 ->where('starts_at', '<', $endsAt)->where('ends_at', '>', $startsAt)
@@ -454,16 +513,28 @@ class VehicleBookingController extends Controller
                     'asset_id' => 'This vehicle is already booked for the selected time period.',
                 ]);
             }
+            if (FleetVehicleUnavailablePeriod::query()->where('asset_id', $asset->id)
+                ->overlapping($startsAt, $endsAt)->lockForUpdate()->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    ($usesLocal ? 'starts_local' : 'starts_at') => 'The vehicle is marked unavailable for part of this time. Choose another time.',
+                ]);
+            }
 
             // client_id is minimum-necessary compatibility input for the
             // accessibility picker only; the booking schema does not own a
             // Client relationship and must not persist that advisory choice.
             $bookingData = $data;
-            unset($bookingData['client_id']);
+            unset($bookingData['client_id'], $bookingData['starts_local'], $bookingData['ends_local'],
+                $bookingData['starts_offset'], $bookingData['ends_offset']);
+            $bookingData['starts_at'] = $startsAt;
+            $bookingData['ends_at'] = $endsAt;
             $bookingData['asset_id'] = $asset->id;
             $bookingData['user_id'] = $actor->id;
             $bookingData['status'] = 'pending';
             $bookingData['approval_route'] = $approvalRoute;
+            $bookingData['lock_version'] = 1;
+            $bookingData['request_key'] = $requestKey !== '' ? $requestKey : null;
+            $bookingData['request_fingerprint'] = $requestKey !== '' ? $fingerprint : null;
             if ($approvalRoute === 'required') {
                 unset($bookingData['approval_not_required_reason'], $bookingData['approval_not_required_evidence']);
             }
@@ -473,7 +544,7 @@ class VehicleBookingController extends Controller
             $confirming = $approvalRoute === 'not_required' && $holdsAuthority;
             $assessment = $this->readiness->assess($asset, new VehicleReadinessContext(
                 purpose: $confirming ? 'booking_confirmation' : 'booking_request',
-                driverUserId: (int) $created->user_id,
+                driverUserId: $created->driverUserId(),
                 startsAt: $created->starts_at,
                 endsAt: $created->ends_at,
                 bookingId: (int) $created->id,
@@ -498,17 +569,136 @@ class VehicleBookingController extends Controller
             return [$created, $assessment];
         });
         [$booking, $assessment] = $booking;
+        $blocking = $assessment?->blockingReasons() ?? [];
+        $message = $booking->status === 'approved'
+            ? 'Booking confirmed with approval-not-required authority recorded.'
+            : ($blocking === [] ? 'Booking request submitted.'
+                : 'Booking request submitted. It stays pending until this is resolved: '
+                    .implode(' ', array_map(fn ($reason): string => $reason->message, array_slice($blocking, 0, 3))));
 
-        $redirect = redirect()->route('fleet-assets.bookings.show', $booking);
-        if ($booking->status === 'approved') {
-            return $redirect->with('success', 'Booking confirmed with approval-not-required authority recorded.');
+        if ($this->wantsJson($request)) {
+            return response()->json(['booking' => $this->bookingResult($booking), 'message' => $message,
+                'pending_reasons' => array_map(fn ($reason): string => $reason->message, array_slice($blocking, 0, 3))]);
         }
-        $blocking = $assessment->blockingReasons();
+        $redirect = redirect()->route('fleet-assets.bookings.show', $booking);
 
-        return $blocking === []
-            ? $redirect->with('success', 'Booking request submitted.')
-            : $redirect->with('warning', 'Booking request submitted. It stays pending until this is resolved: '
-                .implode(' ', array_map(fn ($reason): string => $reason->message, array_slice($blocking, 0, 3))));
+        return $booking->status === 'approved' || $blocking === []
+            ? $redirect->with('success', $message)
+            : $redirect->with('warning', $message);
+    }
+
+    /**
+     * Change a booking's times or details. A confirmed booking whose time
+     * changes goes back to pending unless the approval-not-required authority
+     * can confirm it again; readiness and conflicts are always rechecked.
+     */
+    public function update(Request $request, FleetVehicleBooking $booking)
+    {
+        $actor = $this->readActor($request);
+        $booking = DB::transaction(function () use ($request, $booking, $actor): array {
+            $current = $this->freshReadActor($actor);
+            $canonical = $this->lockBooking($current, (int) $booking->getKey());
+            $manage = $current->canDo('fleet.manage');
+            abort_unless($manage || ((int) $canonical->user_id === (int) $current->id && $canonical->status === 'pending'), 403);
+            abort_unless(in_array($canonical->status, ['pending', 'approved'], true), 409,
+                'Only pending or confirmed bookings can be changed.');
+            $data = $request->validate([
+                'expected_version' => ['required', 'integer', 'min:1'],
+                'starts_local' => ['required', 'string'],
+                'ends_local' => ['required', 'string'],
+                'starts_offset' => ['nullable', 'string', 'max:6'],
+                'ends_offset' => ['nullable', 'string', 'max:6'],
+                'purpose' => ['required', 'string', 'max:255'],
+                'destination' => ['nullable', 'string', 'max:255'],
+                'passengers' => ['nullable', 'integer', 'min:0', 'max:50'],
+                'pickup_arrangement' => ['nullable', 'string', 'max:255'],
+                'driver_user_id' => ['nullable', 'integer', 'min:1'],
+                'notes' => ['nullable', 'string', 'max:2000'],
+                'reason' => ['required', 'string', 'max:2000'],
+            ], ['reason.required' => 'Record the reason for this change.']);
+            [$startsAt, $endsAt] = $this->window($data, true);
+            $asset = $this->bookingAccess->vehicle($current, (int) $canonical->asset_id) ?? abort(404);
+            // Only this request sent again with the same body is a retry of a
+            // saved change; anything else on an older version is a conflict,
+            // never a silent success that drops the edit.
+            $requestKey = $this->requestKey($request);
+            $fingerprint = MaintenanceFingerprint::of([
+                'actor' => (int) $current->id, 'booking' => (int) $canonical->id, 'data' => $data,
+            ]);
+            if ($requestKey !== '' && ($prior = $this->priorChange($canonical, $requestKey)) !== null) {
+                abort_unless(hash_equals((string) ($prior['request_fingerprint'] ?? ''), $fingerprint), 409,
+                    'This request was already used for a different change. Reload and try again.');
+
+                return [$canonical, null];
+            }
+            abort_unless((int) $canonical->lock_version === (int) $data['expected_version'], 409,
+                'This booking changed while you were editing. Reload before saving.');
+            if (! empty($data['driver_user_id']) && ! $this->staff->isCandidate($asset, (int) $data['driver_user_id'])) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'driver_user_id' => 'Choose a current staff member at this vehicle\'s site as the driver.',
+                ]);
+            }
+            $conflict = FleetVehicleBooking::query()->where('asset_id', $asset->id)->whereKeyNot($canonical->id)
+                ->whereIn('status', ['pending', 'approved', 'checked_out'])
+                ->where('starts_at', '<', $endsAt)->where('ends_at', '>', $startsAt)->lockForUpdate()->exists();
+            if ($conflict) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'starts_local' => 'This vehicle is already booked for part of the new time.',
+                ]);
+            }
+            if (FleetVehicleUnavailablePeriod::query()->where('asset_id', $asset->id)
+                ->overlapping($startsAt, $endsAt)->lockForUpdate()->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'starts_local' => 'The vehicle is marked unavailable for part of this time. Choose another time.',
+                ]);
+            }
+
+            $timesChanged = ! $canonical->starts_at->equalTo($startsAt) || ! $canonical->ends_at->equalTo($endsAt)
+                || (int) ($canonical->driver_user_id ?? 0) !== (int) ($data['driver_user_id'] ?? 0);
+            $before = $canonical->only(['starts_at', 'ends_at', 'purpose', 'destination', 'passengers',
+                'pickup_arrangement', 'driver_user_id', 'notes', 'status']);
+            $canonical->fill([
+                'starts_at' => $startsAt, 'ends_at' => $endsAt, 'purpose' => trim($data['purpose']),
+                'destination' => $data['destination'] ?? null, 'passengers' => $data['passengers'] ?? null,
+                'pickup_arrangement' => $data['pickup_arrangement'] ?? null,
+                'driver_user_id' => $data['driver_user_id'] ?? null, 'notes' => $data['notes'] ?? null,
+                'lock_version' => (int) $canonical->lock_version + 1,
+            ]);
+            $assessment = null;
+            if ($canonical->status === 'approved' && $timesChanged) {
+                $assessment = $this->readiness->assess($asset, new VehicleReadinessContext(
+                    purpose: 'booking_confirmation', driverUserId: $canonical->driverUserId(),
+                    startsAt: $startsAt, endsAt: $endsAt, bookingId: (int) $canonical->id,
+                ), true);
+                $reconfirm = $canonical->approval_route === 'not_required'
+                    && ($current->canDo('fleet.bookings.approve') || $manage) && $assessment->canProceed;
+                if (! $reconfirm) {
+                    $canonical->fill(['status' => 'pending', 'approved_by_user_id' => null, 'approved_at' => null,
+                        'approval_authority_recorded_by' => null, 'approval_authority_recorded_at' => null]);
+                }
+            }
+            $canonical->save();
+            AuditLogger::logOrFail('fleet.booking.update', $canonical, [
+                'booking_id' => $canonical->id,
+                'before' => array_map(fn (mixed $value): mixed => $value instanceof \DateTimeInterface ? $value->format(DATE_ATOM) : $value, $before),
+                'reason' => trim($data['reason']),
+                'status' => $canonical->status,
+                'readiness' => $assessment ? $this->decisionEvidence($assessment) : null,
+                // Kept so a retry of exactly this request is recognised.
+                'request_key' => $requestKey !== '' ? $requestKey : null,
+                'request_fingerprint' => $fingerprint,
+            ], $request);
+
+            return [$canonical, $assessment];
+        });
+        [$booking] = $booking;
+        $message = $booking->status === 'pending'
+            ? 'Booking changed. It is pending approval.'
+            : 'Booking changed.';
+
+        return $this->wantsJson($request)
+            ? response()->json(['booking' => $this->bookingResult($booking), 'message' => $message])
+            : back()->with('success', $message);
     }
 
     public function show(Request $request, FleetVehicleBooking $booking)
@@ -530,6 +720,7 @@ class VehicleBookingController extends Controller
             'maintenance_impacts' => $maintenanceImpacts,
             'can' => [
                 'manage' => (bool) $request->user()?->canDo('fleet.manage'),
+                'approve' => (bool) ($request->user()?->canDo('fleet.bookings.approve') || $request->user()?->canDo('fleet.manage')),
                 'view_maintenance' => app(\App\Services\Fleet\MaintenanceAccessService::class)->canRead($actor),
             ],
         ]);
@@ -545,15 +736,22 @@ class VehicleBookingController extends Controller
             // Independent approval can never be self-approval. On the
             // approval-not-required route the authority holder confirms.
             abort_if($independent && $canonical->user_id === $currentActor->id, 403, 'Cannot approve your own booking.');
+            if ($canonical->status === 'approved' && $this->wantsJson($request)) {
+                return $canonical;
+            }
             abort_unless($canonical->status === 'pending', 422, 'Only pending bookings can be approved.');
+            $decision = $request->validate([
+                'readiness_reviewed' => ['nullable', 'boolean'],
+                'decision_notes' => ['nullable', 'string', 'max:2000'],
+            ]);
             $asset = $this->bookingAccess->vehicle($currentActor, (int) $canonical->asset_id) ?? abort(404);
             $assessment = $this->readiness->assess($asset, new VehicleReadinessContext(
-                purpose: 'booking_approval', driverUserId: (int) $canonical->user_id,
+                purpose: 'booking_approval', driverUserId: $canonical->driverUserId(),
                 startsAt: $canonical->starts_at, endsAt: $canonical->ends_at, bookingId: (int) $canonical->id,
             ), true);
             $this->readiness->assertCanProceed($assessment);
 
-            $canonical->update($independent ? [
+            $canonical->update(($independent ? [
                 'status' => 'approved',
                 'approved_by_user_id' => $currentActor->id,
                 'approved_at' => now(),
@@ -562,21 +760,28 @@ class VehicleBookingController extends Controller
                 'approval_authority_recorded_by' => $currentActor->id,
                 'approval_authority_recorded_at' => now(),
                 'approved_at' => now(),
-            ]);
+            ]) + ['lock_version' => (int) $canonical->lock_version + 1]);
 
             AuditLogger::logOrFail('fleet.booking.approve', $canonical, [
                 'booking_id' => $canonical->id,
                 'approval_route' => $canonical->approval_route,
                 'readiness' => $this->decisionEvidence($assessment),
+                'readiness_reviewed' => (bool) ($decision['readiness_reviewed'] ?? false),
+                'reason' => isset($decision['decision_notes']) ? trim((string) $decision['decision_notes']) : null,
             ], $request);
 
             return $canonical;
         });
 
         $booking->load(['asset:id,name', 'user']);
-        $booking->user->notify(new FleetBookingApprovedNotification($booking));
+        if ($booking->wasChanged('status')) {
+            $booking->user->notify(new FleetBookingApprovedNotification($booking));
+        }
+        $message = $booking->approval_route === 'not_required' ? 'Booking confirmed.' : 'Booking approved.';
 
-        return back()->with('success', $booking->approval_route === 'not_required' ? 'Booking confirmed.' : 'Booking approved.');
+        return $this->wantsJson($request)
+            ? response()->json(['booking' => $this->bookingResult($booking), 'message' => $message])
+            : back()->with('success', $message);
     }
 
     public function reject(Request $request, FleetVehicleBooking $booking)
@@ -584,6 +789,10 @@ class VehicleBookingController extends Controller
         $actor = $this->approvalActor($request);
         $booking = DB::transaction(function () use ($request, $booking, $actor): FleetVehicleBooking {
             $canonical = $this->lockBooking($actor, (int) $booking->getKey());
+            if ($canonical->status === 'rejected' && $this->wantsJson($request)
+                && $canonical->rejection_reason === trim((string) $request->input('rejection_reason'))) {
+                return $canonical;
+            }
             abort_unless($canonical->status === 'pending', 422, 'Only pending bookings can be rejected.');
 
             // Validate action payload only after the scoped canonical row is
@@ -594,37 +803,50 @@ class VehicleBookingController extends Controller
 
             $canonical->update([
                 'status' => 'rejected',
-                'rejection_reason' => $data['rejection_reason'],
+                'rejection_reason' => trim($data['rejection_reason']),
+                'lock_version' => (int) $canonical->lock_version + 1,
             ]);
 
             AuditLogger::logOrFail('fleet.booking.reject', $canonical, [
                 'booking_id' => $canonical->id,
-                'reason' => $data['rejection_reason'],
+                'reason' => trim($data['rejection_reason']),
             ], $request);
 
             return $canonical;
         });
 
         $booking->load(['asset:id,name', 'user']);
-        $booking->user->notify(new FleetBookingRejectedNotification($booking));
+        if ($booking->wasChanged('status')) {
+            $booking->user->notify(new FleetBookingRejectedNotification($booking));
+        }
 
-        return back()->with('success', 'Booking rejected.');
+        return $this->wantsJson($request)
+            ? response()->json(['booking' => $this->bookingResult($booking), 'message' => 'Booking request declined.'])
+            : back()->with('success', 'Booking rejected.');
     }
 
     public function checkout(Request $request, FleetVehicleBooking $booking)
     {
         $actor = $this->managerActor($request);
-        DB::transaction(function () use ($request, $booking, $actor): void {
+        $booking = DB::transaction(function () use ($request, $booking, $actor): FleetVehicleBooking {
             $currentActor = $this->freshManagerActor($actor);
             $canonical = $this->lockBooking($currentActor, (int) $booking->getKey());
+            if ($canonical->status === 'checked_out' && $this->wantsJson($request)
+                && (float) $canonical->odometer_out === (float) $request->input('odometer_out')) {
+                return $canonical;
+            }
             abort_unless($canonical->status === 'approved', 422, 'Only approved bookings can be checked out.');
 
             $data = $request->validate([
                 'odometer_out' => ['required', 'numeric', 'min:0'],
+                'checkout_condition' => ['nullable', 'string', 'max:50'],
+                'checkout_evidence_reference' => ['nullable', 'string', 'max:120'],
+                'checkout_notes' => ['nullable', 'string', 'max:2000'],
+                'keys_handed' => ['nullable', 'boolean'],
             ]);
             $asset = $this->bookingAccess->vehicle($currentActor, (int) $canonical->asset_id) ?? abort(404);
             $assessment = $this->readiness->assess($asset, new VehicleReadinessContext(
-                purpose: 'checkout', driverUserId: (int) $canonical->user_id,
+                purpose: 'checkout', driverUserId: $canonical->driverUserId(),
                 startsAt: now(), endsAt: $canonical->ends_at,
                 bookingId: (int) $canonical->id, candidateOdometerKm: (float) $data['odometer_out'],
             ), true);
@@ -634,36 +856,53 @@ class VehicleBookingController extends Controller
                 'source_kind' => 'booking_checkout', 'source_type' => 'fleet_vehicle_booking',
                 'source_id' => (int) $canonical->id, 'source_reference' => $canonical->reference_number,
             ], 'booking-checkout-'.$canonical->id);
+            $keyLog = ($data['keys_handed'] ?? false) ? $this->handOverKey($asset, $canonical) : null;
 
             $canonical->update([
                 'status' => 'checked_out',
                 'checked_out_at' => now(),
                 'odometer_out' => $data['odometer_out'],
                 'checked_out_by' => $currentActor->id,
+                'checkout_condition' => $data['checkout_condition'] ?? null,
+                'checkout_evidence_reference' => $data['checkout_evidence_reference'] ?? null,
+                'checkout_notes' => $data['checkout_notes'] ?? null,
+                'lock_version' => (int) $canonical->lock_version + 1,
             ]);
 
             AuditLogger::logOrFail('fleet.booking.checkout', $canonical, [
                 'booking_id' => $canonical->id,
                 'readiness' => $this->decisionEvidence($assessment),
                 'odometer_observation_id' => $observation->id,
+                'key_log_id' => $keyLog?->id,
+                'reason' => $data['checkout_notes'] ?? null,
             ], $request);
+
+            return $canonical;
         });
 
-        return back()->with('success', 'Vehicle checked out.');
+        return $this->wantsJson($request)
+            ? response()->json(['booking' => $this->bookingResult($booking), 'message' => 'Vehicle checked out.'])
+            : back()->with('success', 'Vehicle checked out.');
     }
 
     public function returnVehicle(Request $request, FleetVehicleBooking $booking)
     {
         $actor = $this->managerActor($request);
-        DB::transaction(function () use ($request, $booking, $actor): void {
+        $booking = DB::transaction(function () use ($request, $booking, $actor): FleetVehicleBooking {
             $currentActor = $this->freshManagerActor($actor);
             $canonical = $this->lockBooking($currentActor, (int) $booking->getKey());
+            if ($canonical->status === 'returned' && $this->wantsJson($request)
+                && (float) $canonical->odometer_in === (float) $request->input('odometer_in')) {
+                return $canonical;
+            }
             abort_unless($canonical->status === 'checked_out', 422, 'Only checked-out bookings can be returned.');
 
             $data = $request->validate([
                 'odometer_in' => ['nullable', 'numeric', 'min:0'],
                 'condition_on_return' => ['nullable', 'string', 'max:50'],
                 'return_notes' => ['nullable', 'string', 'max:1000'],
+                'return_evidence_reference' => ['nullable', 'string', 'max:120'],
+                'keys_received' => ['nullable', 'boolean'],
             ]);
             if (isset($data['odometer_in']) && $canonical->odometer_out !== null
                 && (float) $data['odometer_in'] < (float) $canonical->odometer_out) {
@@ -681,43 +920,201 @@ class VehicleBookingController extends Controller
                 ], 'booking-return-'.$canonical->id)
                 : null;
 
+            $asset = $this->bookingAccess->vehicle($currentActor, (int) $canonical->asset_id) ?? abort(404);
+            $keyLog = ($data['keys_received'] ?? false) ? $this->receiveKey($asset, $canonical) : null;
+
             $canonical->update([
                 'status' => 'returned',
                 'returned_at' => now(),
                 'odometer_in' => $data['odometer_in'] ?? null,
                 'condition_on_return' => $data['condition_on_return'] ?? null,
                 'return_notes' => $data['return_notes'] ?? null,
+                'return_evidence_reference' => $data['return_evidence_reference'] ?? null,
                 'returned_by' => $currentActor->id,
+                'lock_version' => (int) $canonical->lock_version + 1,
             ]);
 
             AuditLogger::logOrFail('fleet.booking.return', $canonical, [
                 'booking_id' => $canonical->id,
                 'odometer_observation_id' => $observation?->id,
+                'keys_received' => (bool) ($data['keys_received'] ?? false),
+                'key_log_id' => $keyLog?->id,
+                'reason' => $data['return_notes'] ?? null,
             ], $request);
+
+            return $canonical;
         });
 
-        return back()->with('success', 'Vehicle returned.');
+        // A concern recorded at return goes to Maintenance as linked work
+        // (once per booking). The return is already recorded either way.
+        $concern = $this->returnConcerns->report($actor, $booking);
+        $message = match ($concern['status'] ?? null) {
+            'created' => 'Vehicle returned. Linked Maintenance work '.($concern['reference'] ?? '#'.$concern['work_order_id'])
+                .' was created for the concern.',
+            'not_routed' => $concern['message'],
+            default => 'Vehicle returned.',
+        };
+
+        return $this->wantsJson($request)
+            ? response()->json(['booking' => $this->bookingResult($booking), 'message' => $message, 'maintenance_report' => $concern])
+            : back()->with(($concern['status'] ?? null) === 'not_routed' ? 'warning' : 'success', $message);
     }
 
     public function cancel(Request $request, FleetVehicleBooking $booking)
     {
         $actor = $this->managerActor($request);
-        DB::transaction(function () use ($request, $booking, $actor): void {
+        $booking = DB::transaction(function () use ($request, $booking, $actor): FleetVehicleBooking {
             $canonical = $this->lockBooking($actor, (int) $booking->getKey());
+            $data = $request->validate(['reason' => ['nullable', 'string', 'max:2000']]);
+            $reason = isset($data['reason']) ? trim((string) $data['reason']) : null;
+            if ($canonical->status === 'cancelled' && $this->wantsJson($request)
+                && $canonical->cancellation_reason === $reason) {
+                return $canonical;
+            }
             abort_unless(
                 in_array($canonical->status, ['pending', 'approved', 'checked_out']),
                 422,
                 'This booking cannot be cancelled in its current state.'
             );
 
-            $canonical->update(['status' => 'cancelled']);
+            $canonical->update([
+                'status' => 'cancelled',
+                'cancellation_reason' => $reason ?: null,
+                'cancelled_by' => $actor->id,
+                'cancelled_at' => now(),
+                'lock_version' => (int) $canonical->lock_version + 1,
+            ]);
 
             AuditLogger::logOrFail('fleet.booking.cancel', $canonical, [
                 'booking_id' => $canonical->id,
+                'reason' => $reason ?: null,
             ], $request);
+
+            return $canonical;
         });
 
-        return back()->with('success', 'Booking cancelled.');
+        return $this->wantsJson($request)
+            ? response()->json(['booking' => $this->bookingResult($booking), 'message' => 'Booking cancelled.'])
+            : back()->with('success', 'Booking cancelled.');
+    }
+
+    /**
+     * Keys go to the booking's driver. Custody is taken from the latest key
+     * record, as the Keys page does; keys already out stop the handover.
+     */
+    private function handOverKey(\App\Models\Asset $asset, FleetVehicleBooking $booking): FleetKeyLog
+    {
+        $siteId = (int) ($asset->site_id ?: $asset->home_site_id) ?: abort(409, 'This vehicle has no site for key custody.');
+        $latest = FleetKeyLog::query()->where('asset_id', $asset->id)->where('site_id', $siteId)
+            ->orderByDesc('id')->lockForUpdate()->first();
+        if ($latest && $latest->action !== 'returned') {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'keys_handed' => 'The key is recorded as out. Record its return on the Keys page before handing it over.',
+            ]);
+        }
+        $log = FleetKeyLog::query()->create([
+            'asset_id' => $asset->id, 'booking_id' => $booking->id, 'site_id' => $siteId,
+            'user_id' => $booking->driverUserId(), 'action' => 'checked_out',
+            'key_number' => $latest?->key_number, 'location' => 'with_driver',
+            'notes' => 'Booking '.($booking->reference_number ?: '#'.$booking->id),
+        ]);
+        AuditLogger::logOrFail('fleet-assets.keys.checkout', $log, [
+            'asset_id' => $asset->id, 'user_id' => $log->user_id, 'site_id' => $siteId, 'booking_id' => $booking->id,
+        ]);
+
+        return $log;
+    }
+
+    private function receiveKey(\App\Models\Asset $asset, FleetVehicleBooking $booking): ?FleetKeyLog
+    {
+        $siteId = (int) ($asset->site_id ?: $asset->home_site_id);
+        if (! $siteId) {
+            return null;
+        }
+        $latest = FleetKeyLog::query()->where('asset_id', $asset->id)->where('site_id', $siteId)
+            ->orderByDesc('id')->lockForUpdate()->first();
+        // Nothing to return when no handover was recorded; the receipt is kept in the audit.
+        if (! $latest || $latest->action === 'returned') {
+            return null;
+        }
+        $log = FleetKeyLog::query()->create([
+            'asset_id' => $asset->id, 'booking_id' => $booking->id, 'site_id' => $siteId,
+            'user_id' => $latest->transferred_to_user_id ?: $latest->user_id, 'action' => 'returned',
+            'key_number' => $latest->key_number, 'location' => 'key_safe',
+            'notes' => 'Returned with booking '.($booking->reference_number ?: '#'.$booking->id),
+        ]);
+        AuditLogger::logOrFail('fleet-assets.keys.return', $log, [
+            'asset_id' => $asset->id, 'site_id' => $siteId, 'booking_id' => $booking->id,
+        ]);
+
+        return $log;
+    }
+
+    private function wantsJson(Request $request): bool
+    {
+        return $request->expectsJson() && ! $request->header('X-Inertia');
+    }
+
+    private function requestKey(Request $request): string
+    {
+        return mb_substr((string) ($request->input('request_key') ?: $request->header('Idempotency-Key') ?: ''), 0, 100);
+    }
+
+    /**
+     * The change already saved on this booking with the request key, if any
+     * (kept with its audit record, written in the same transaction).
+     *
+     * @return array<string,mixed>|null
+     */
+    private function priorChange(FleetVehicleBooking $booking, string $requestKey): ?array
+    {
+        $meta = DB::table('audit_logs')->where('auditable_type', $booking->getMorphClass())
+            ->where('auditable_id', $booking->id)->where('action', 'fleet.booking.update')
+            ->where('meta->request_key', $requestKey)->orderByDesc('id')->value('meta');
+        $decoded = is_string($meta) ? json_decode($meta, true) : null;
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * @param  array<string,mixed>  $data
+     * @return array{0:Carbon,1:Carbon}
+     */
+    private function window(array $data, bool $local): array
+    {
+        if ($local) {
+            $starts = $this->localTime($data['starts_local'] ?? '', $data['starts_offset'] ?? null, 'starts_local');
+            $ends = $this->localTime($data['ends_local'] ?? '', $data['ends_offset'] ?? null, 'ends_local');
+            if (! $ends->greaterThan($starts)) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['ends_local' => 'The return must be after the pickup.']);
+            }
+
+            return [$starts, $ends];
+        }
+
+        return [Carbon::parse($data['starts_at'])->utc(), Carbon::parse($data['ends_at'])->utc()];
+    }
+
+    private function localTime(mixed $local, mixed $offset, string $field): Carbon
+    {
+        try {
+            return Carbon::parse(MaintenanceLocalTime::toUtc((string) $local, $offset === null ? null : (string) $offset), 'UTC');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            throw \Illuminate\Validation\ValidationException::withMessages([$field => collect($exception->errors())->flatten()->first()]);
+        }
+    }
+
+    /** @return array<string,mixed> */
+    private function bookingResult(FleetVehicleBooking $booking): array
+    {
+        return [
+            'id' => (int) $booking->id,
+            'reference' => $booking->reference_number,
+            'status' => $booking->status,
+            'lock_version' => (int) ($booking->lock_version ?? 1),
+            'starts_at' => $booking->starts_at?->toIso8601String(),
+            'ends_at' => $booking->ends_at?->toIso8601String(),
+        ];
     }
 
     private function readActor(Request $request): User

@@ -42,11 +42,14 @@ type Vehicle = {
     name: string;
     asset_tag: string;
     status: string;
+    /** False for a vehicle seen through central fleet oversight, outside the person's Sites. */
+    at_your_sites?: boolean;
     state: {
         status: string;
-        lat: number;
-        lng: number;
-        speed_kph: number;
+        /** Withheld (null) where the trip Site rule doesn't allow positions. */
+        lat: number | null;
+        lng: number | null;
+        speed_kph: number | null;
         battery_pct: number;
         last_seen_at: string;
     } | null;
@@ -166,13 +169,19 @@ export default function VehiclesIndex({
         );
     }, []);
 
+    // Bulk Site and tracker actions need the vehicle's own Site.
+    const selectableVehicles = useMemo(
+        () => filteredVehicles.filter((v) => v.at_your_sites !== false),
+        [filteredVehicles],
+    );
+
     const toggleSelectAll = useCallback(() => {
-        if (selectedIds.length === filteredVehicles.length) {
+        if (selectedIds.length === selectableVehicles.length) {
             setSelectedIds([]);
         } else {
-            setSelectedIds(filteredVehicles.map((v) => v.id));
+            setSelectedIds(selectableVehicles.map((v) => v.id));
         }
-    }, [filteredVehicles, selectedIds.length]);
+    }, [selectableVehicles, selectedIds.length]);
 
     const handleBulkAction = useCallback(
         (action: string) => {
@@ -195,6 +204,7 @@ export default function VehiclesIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Vehicles', href: '/fleet-assets/vehicles' },
             ]}
@@ -362,9 +372,9 @@ export default function VehiclesIndex({
                                         <input
                                             type="checkbox"
                                             checked={
-                                                filteredVehicles.length > 0 &&
+                                                selectableVehicles.length > 0 &&
                                                 selectedIds.length ===
-                                                    filteredVehicles.length
+                                                    selectableVehicles.length
                                             }
                                             onChange={toggleSelectAll}
                                             className="h-3.5 w-3.5 rounded border-border"
@@ -392,6 +402,17 @@ export default function VehiclesIndex({
                                                         checked={selectedIds.includes(
                                                             vehicle.id,
                                                         )}
+                                                        disabled={
+                                                            vehicle.at_your_sites ===
+                                                            false
+                                                        }
+                                                        title={
+                                                            vehicle.at_your_sites ===
+                                                            false
+                                                                ? 'Outside your Sites: bulk Site and tracker actions aren’t available.'
+                                                                : undefined
+                                                        }
+                                                        aria-label={`Select ${vehicle.name ?? vehicle.asset_tag ?? `vehicle ${vehicle.id}`}`}
                                                         onChange={() =>
                                                             toggleSelect(
                                                                 vehicle.id,

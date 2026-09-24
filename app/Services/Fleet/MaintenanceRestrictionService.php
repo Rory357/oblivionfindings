@@ -3,10 +3,17 @@
 namespace App\Services\Fleet;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class MaintenanceRestrictionService
 {
+    /** A Maintenance assessment of one check: no issue found, released for use. */
+    public const NO_ISSUE_RELEASE = 'no_issue_release';
+
+    /** Whether the assessment table exists yet (deploys run code before migrations). */
+    private ?bool $assessmentsReady = null;
+
     /** @return array{restriction_ids:list<int>,check_run_ids:list<int>} */
     public function blockers(int $assetId, bool $lock = false, array $ignoreRestrictionIds = [], array $ignoreRunIds = []): array
     {
@@ -23,6 +30,9 @@ class MaintenanceRestrictionService
             ->when($ignoreRunIds !== [], fn ($q) => $q->whereNotIn('id', $ignoreRunIds))->orderBy('id');
         $blockingRuns = ($lock ? $runs->lockForUpdate() : $runs)->get(['id', 'outcome', 'rule_version_id', 'rule_snapshot_json'])
             ->filter(fn ($run) => self::blocksAvailability($run))->pluck('id')->map(fn ($id) => (int) $id)->all();
+        // A Maintenance "no issue found" assessment resolves exactly that check.
+        $blockingRuns = array_values(array_diff($blockingRuns, $this->assessedRunIds($blockingRuns, $lock)));
+
         return ['restriction_ids' => $restrictionIds, 'check_run_ids' => $blockingRuns];
     }
 
@@ -51,17 +61,43 @@ class MaintenanceRestrictionService
         $releasedAt = DB::table('fleet_maintenance_actions as released')
             ->joinSub($latestRelease, 'latest', 'latest.action_id', '=', 'released.id')
             ->pluck('released.occurred_at', 'latest.asset_id');
+        $candidates = [];
         DB::table('fleet_checklist_runs')->whereIn('asset_id', $assetIds)->whereNotNull('submitted_at')
             ->where(fn ($q) => $q->whereNull('outcome')->orWhere('outcome', '!=', 'passed'))
             ->orderBy('id')->get(['id', 'asset_id', 'submitted_at', 'outcome', 'rule_version_id', 'rule_snapshot_json'])
-            ->each(function (object $run) use (&$result, $releasedAt): void {
+            ->each(function (object $run) use (&$candidates, $releasedAt): void {
                 $release = $releasedAt[$run->asset_id] ?? null;
                 if (($release === null || $run->submitted_at >= $release) && self::blocksAvailability($run)) {
-                    $result[(int) $run->asset_id]['check_run_ids'][] = (int) $run->id;
+                    $candidates[(int) $run->id] = (int) $run->asset_id;
                 }
             });
+        $assessed = array_flip($this->assessedRunIds(array_keys($candidates)));
+        foreach ($candidates as $runId => $assetId) {
+            if (! isset($assessed[$runId])) {
+                $result[$assetId]['check_run_ids'][] = $runId;
+            }
+        }
 
         return $result;
+    }
+
+    /**
+     * Checks Maintenance has assessed as "no issue found — release for use".
+     * Under a lock this is a current read, so a decision committed while the
+     * caller waited for the vehicle lock is seen.
+     *
+     * @param  list<int>  $runIds
+     * @return list<int>
+     */
+    public function assessedRunIds(array $runIds, bool $lock = false): array
+    {
+        if ($runIds === [] || ! ($this->assessmentsReady ??= Schema::hasTable('fleet_maintenance_check_assessments'))) {
+            return [];
+        }
+        $query = DB::table('fleet_maintenance_check_assessments')->whereIn('check_run_id', $runIds)
+            ->where('decision', self::NO_ISSUE_RELEASE)->orderBy('check_run_id');
+
+        return ($lock ? $query->lockForUpdate() : $query)->pluck('check_run_id')->map(fn ($id): int => (int) $id)->all();
     }
 
     /** Call only while holding the canonical asset row in the same transaction. */
