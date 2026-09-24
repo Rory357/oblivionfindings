@@ -1389,8 +1389,10 @@ test('Designer review: Outing booking waits for the asset lock and a hold leaves
     $order = FleetWorkOrder::create(['asset_id' => $asset->id, 'reported_by_user_id' => $manager->id,
         'title' => 'Outing guard', 'category' => 'vehicle', 'priority' => 'medium', 'status' => 'open']);
     pkg01DesignerPolicy($site, $manager, 'hold', ['allowed_kinds' => ['safety']]);
+    // FA-T01: an outing needs a resident from the planner's Sites.
+    $resident = \App\Models\Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
     $outingData = ['title' => 'Concurrent synthetic outing', 'destination' => 'Synthetic destination',
-        'asset_id' => $asset->id, 'planned_departure' => now()->addDay()->toDateTimeString(),
+        'asset_id' => $asset->id, 'resident_ids' => [$resident->id], 'planned_departure' => now()->addDay()->toDateTimeString(),
         'planned_return' => now()->addDay()->addHour()->toDateTimeString()];
     $prefix = sys_get_temp_dir().DIRECTORY_SEPARATOR.'pkg01-outing-'.Str::uuid();
     $ready = $prefix.'-ready'; $attempt = $prefix.'-attempt'; $barrier = $prefix.'-barrier';

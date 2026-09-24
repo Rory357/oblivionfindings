@@ -578,7 +578,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
         Route::post('/outings/{outing}/start', [OutingController::class, 'start'])->whereNumber('outing')->name('fleet-assets.outings.start');
         Route::post('/outings/{outing}/complete', [OutingController::class, 'complete'])->whereNumber('outing')->name('fleet-assets.outings.complete');
         Route::post('/outings/{outing}/cancel', [OutingController::class, 'cancel'])->whereNumber('outing')->name('fleet-assets.outings.cancel');
-        Route::post('/outings/{outing}/residents/{resident}/return', [OutingController::class, 'markResidentReturned'])->name('fleet-assets.outings.resident-return');
+        Route::post('/outings/{outing}/residents/{resident}/return', [OutingController::class, 'markResidentReturned'])->whereNumber(['outing', 'resident'])->name('fleet-assets.outings.resident-return');
         Route::post('/outings/{outing}/residents/return-all', [OutingController::class, 'returnAllResidents'])->whereNumber('outing')->name('fleet-assets.outings.return-all');
     });
 
