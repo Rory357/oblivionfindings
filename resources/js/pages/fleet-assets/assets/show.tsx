@@ -6,7 +6,13 @@ import LeafletMap, { MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -15,6 +21,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import {
     TabsRoot as Tabs,
     TabsContent,
@@ -30,6 +37,7 @@ import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
+    ArrowUpRight,
     Calendar,
     CheckCircle,
     Cpu,
@@ -61,7 +69,15 @@ type Document = {
     name: string;
     type: string;
     uploaded_at: string | null;
-    url: string;
+    /** Null while the file can't be opened, e.g. it hasn't passed its virus check. */
+    url: string | null;
+    status: { label: string; tone: StatusVariant } | null;
+};
+
+/** Set on vehicles: their documents are added and archived in the vehicle profile. */
+type VehicleDocuments = {
+    /** The vehicle profile's Documents, or null when the viewer can't open it. */
+    url: string | null;
 };
 
 const uploadDocumentSteps = [
@@ -279,6 +295,103 @@ type Inspection = {
     inspector: string | null;
     notes: string | null;
 };
+
+export function AssetDocumentsCard({
+    documents,
+    vehicleDocuments,
+    onUpload,
+}: {
+    documents: Document[];
+    vehicleDocuments: VehicleDocuments | null;
+    onUpload: () => void;
+}) {
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div className="space-y-1.5">
+                    <CardTitle>Documents</CardTitle>
+                    {vehicleDocuments && (
+                        <CardDescription>
+                            Vehicle documents are added and archived in the
+                            vehicle profile, and evidence stays with its record
+                            there.
+                        </CardDescription>
+                    )}
+                </div>
+                {!vehicleDocuments ? (
+                    <Button variant="outline" size="sm" onClick={onUpload}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload
+                    </Button>
+                ) : (
+                    vehicleDocuments.url && (
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={vehicleDocuments.url}>
+                                <ArrowUpRight className="mr-2 h-4 w-4" />
+                                Manage in vehicle profile
+                            </Link>
+                        </Button>
+                    )
+                )}
+            </CardHeader>
+            <CardContent>
+                {documents.length > 0 ? (
+                    <div className="space-y-2">
+                        {documents.map((doc) => (
+                            <div
+                                key={doc.id}
+                                className="flex items-center justify-between rounded-md border p-3"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <FileText className="h-5 w-5 text-muted-foreground" />
+                                    <div>
+                                        <div className="text-sm font-medium">
+                                            {doc.name}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {doc.type} &middot; Uploaded{' '}
+                                            {formatDate(doc.uploaded_at)}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {doc.status && (
+                                        <StatusBadge
+                                            variant={doc.status.tone}
+                                            size="sm"
+                                        >
+                                            {doc.status.label}
+                                        </StatusBadge>
+                                    )}
+                                    {doc.url && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            asChild
+                                        >
+                                            <a
+                                                href={doc.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                aria-label={`Download ${doc.name}`}
+                                            >
+                                                <Download className="h-4 w-4" />
+                                            </a>
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground">
+                        No documents uploaded.
+                    </p>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
 
 /** Linked device from canonical Security & Devices registry via device_asset_links. */
 export type LinkedDevice = {
@@ -515,6 +628,7 @@ type Props = {
         trackers: LinkedDevice[];
         inspections: Inspection[];
         documents: Document[];
+        vehicle_documents: VehicleDocuments | null;
         assignments: Assignment[];
         archived_alerts: Alert[];
         work_orders: WorkOrder[];
@@ -643,7 +757,6 @@ export default function AssetShow({
     const work_orders = asset?.work_orders ?? [];
     const service_schedules = asset?.service_schedules ?? [];
     const can_edit = true;
-    const can_upload = true;
     const [docOpen, setDocOpen] = useState(false);
     const [docFile, setDocFile] = useState<File | null>(null);
     const [docTitle, setDocTitle] = useState('');
@@ -751,11 +864,30 @@ export default function AssetShow({
                     backLabel="Assets"
                 />
 
-                {active_maintenance_restrictions > 0 && <div role="status" className="rounded-lg border border-status-critical/40 bg-status-critical-bg px-5 py-4 text-sm text-status-critical">
-                    <strong>Do not use — {active_maintenance_restrictions} active maintenance {active_maintenance_restrictions === 1 ? 'hold' : 'holds'}</strong>
-                    <p className="mt-1">An authorised release is required. Review the maintenance work below before planning use.</p>
-                    <Link className="mt-2 inline-block underline" href={`/fleet-assets/maintenance/work-orders?asset_id=${asset.id}`}>View maintenance work</Link>
-                </div>}
+                {active_maintenance_restrictions > 0 && (
+                    <div
+                        role="status"
+                        className="rounded-lg border border-status-critical/40 bg-status-critical-bg px-5 py-4 text-sm text-status-critical"
+                    >
+                        <strong>
+                            Do not use — {active_maintenance_restrictions}{' '}
+                            active maintenance{' '}
+                            {active_maintenance_restrictions === 1
+                                ? 'hold'
+                                : 'holds'}
+                        </strong>
+                        <p className="mt-1">
+                            An authorised release is required. Review the
+                            maintenance work below before planning use.
+                        </p>
+                        <Link
+                            className="mt-2 inline-block underline"
+                            href={`/fleet-assets/maintenance/work-orders?asset_id=${asset.id}`}
+                        >
+                            View maintenance work
+                        </Link>
+                    </div>
+                )}
 
                 {/* Header Banner Card */}
                 <div
@@ -1272,69 +1404,14 @@ export default function AssetShow({
 
                     {/* Documents Tab */}
                     <TabsContent value="documents">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle>Documents</CardTitle>
-                                {can_upload && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            setDocOpen(true);
-                                            setDocError('');
-                                        }}
-                                    >
-                                        <Upload className="mr-2 h-4 w-4" />
-                                        Upload
-                                    </Button>
-                                )}
-                            </CardHeader>
-                            <CardContent>
-                                {(documents ?? []).length > 0 ? (
-                                    <div className="space-y-2">
-                                        {documents.map((doc) => (
-                                            <div
-                                                key={doc.id}
-                                                className="flex items-center justify-between rounded-md border p-3"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <FileText className="h-5 w-5 text-muted-foreground" />
-                                                    <div>
-                                                        <div className="text-sm font-medium">
-                                                            {doc.name}
-                                                        </div>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            {doc.type} &middot;
-                                                            Uploaded{' '}
-                                                            {formatDate(
-                                                                doc.uploaded_at,
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    asChild
-                                                >
-                                                    <a
-                                                        href={doc.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                    >
-                                                        <Download className="h-4 w-4" />
-                                                    </a>
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">
-                                        No documents uploaded.
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
+                        <AssetDocumentsCard
+                            documents={documents}
+                            vehicleDocuments={asset?.vehicle_documents ?? null}
+                            onUpload={() => {
+                                setDocOpen(true);
+                                setDocError('');
+                            }}
+                        />
 
                         <UploadAssetDocumentWizard
                             open={docOpen}

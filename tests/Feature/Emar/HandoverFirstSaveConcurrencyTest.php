@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class HandoverFirstSaveConcurrencyTest extends TestCase
@@ -29,6 +30,7 @@ class HandoverFirstSaveConcurrencyTest extends TestCase
 
     public function test_two_mysql_first_saves_converge_to_one_handover_cd_verification_and_timeline(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $this->seed(RbacSeeder::class);

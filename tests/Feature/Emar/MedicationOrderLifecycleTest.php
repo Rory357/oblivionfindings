@@ -31,6 +31,7 @@ use LogicException;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class MedicationOrderLifecycleTest extends TestCase
@@ -991,6 +992,7 @@ class MedicationOrderLifecycleTest extends TestCase
 
     public function test_two_process_discontinue_race_creates_exactly_one_cessation(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $medication = $this->medication(['name' => 'Concurrent discontinue order']);
@@ -1039,6 +1041,7 @@ class MedicationOrderLifecycleTest extends TestCase
 
     public function test_administration_waiting_behind_discontinue_lock_fails_after_revalidation(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $this->grantPermissions($this->manager, ['medications.administer.record']);
@@ -1096,6 +1099,7 @@ class MedicationOrderLifecycleTest extends TestCase
 
     public function test_discontinue_waiting_behind_an_administration_uses_the_post_lock_cessation_time(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $this->grantPermissions($this->manager, ['medications.administer.record']);
@@ -1299,7 +1303,11 @@ class MedicationOrderLifecycleTest extends TestCase
             'user_id' => $user->id,
             'primary_site_id' => $this->site->id,
             'secondary_site_ids' => [],
-            'start_date' => today()->subMonth(),
+            // Fixed rather than relative: setUp() creates the manager on the
+            // real clock, and several tests then freeze time at 2026-08-21.
+            // A real-clock-relative start date drifts past that frozen day and
+            // silently removes the manager's current Site authority.
+            'start_date' => '2026-01-01',
             'end_date' => null,
             'is_active' => true,
             'created_by' => $user->id,

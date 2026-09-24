@@ -11,7 +11,10 @@ use Illuminate\Support\Facades\Schema;
 
 test('Designer review: empty package rolls back and every down preserves standalone and corrected sources', function () {
     expect(app()->environment())->toBe('testing');
-    expect(DB::connection()->getDatabaseName())->toMatch('/^oblivion_findings_(?:pkg01_2375_test|codex_test)_'.preg_quote((string) getmypid(), '/').'$/');
+    // Tests\TestCase creates this schema for the current process and drops it at exit.
+    expect(DB::connection()->getDatabaseName())
+        ->toMatch('/^oblivion_findings_\w*test_'.preg_quote((string) getmypid(), '/').'$/')
+        ->toBe(static::$isolatedMysqlDatabase);
     // DDL is tested only in this process-owned disposable schema, outside the
     // RefreshDatabase transaction. No shared or browser database is touched.
     while (DB::transactionLevel() > 0) DB::rollBack();

@@ -45,6 +45,7 @@ class VehicleWorkspacePresenter
         private readonly VehicleMileageFeedService $mileageFeed,
         private readonly SecurityDevicesAccessService $vehicles,
         private readonly VehicleDocumentService $files,
+        private readonly MaintenanceRestrictionService $restrictions,
     ) {}
 
     /** @return array<string,mixed> */
@@ -630,6 +631,11 @@ class VehicleWorkspacePresenter
         $responses = DB::table('control_room_alerts')
             ->whereIn('id', $reports->where('source_type', 'control_room_alert')->pluck('source_id')->filter()->unique()->values()->all())
             ->pluck('reference_number', 'id');
+        // A check Maintenance released as "no issue found" no longer warns.
+        $released = array_flip($this->restrictions->assessedRunIds(
+            $reports->where('source_type', 'fleet_checklist_run')->pluck('source_id')->filter()
+                ->map(fn (mixed $id): int => (int) $id)->unique()->values()->all(),
+        ));
         $sources = [];
         foreach ($reports as $report) {
             $id = (int) $report->work_order_id;
@@ -637,7 +643,9 @@ class VehicleWorkspacePresenter
                 continue;
             }
             $sources[$id] = match ($report->source_type) {
-                'fleet_checklist_run' => ['label' => 'CHK-'.$report->source_id, 'failed_check' => $report->outcome !== null && $report->outcome !== 'passed'],
+                'fleet_checklist_run' => ['label' => 'CHK-'.$report->source_id, 'failed_check' => $report->outcome !== null
+                    && ! in_array($report->outcome, ['passed', FleetChecklistRun::OUTCOME_NO_ISSUE], true)
+                    && ! isset($released[(int) $report->source_id])],
                 'control_room_alert' => ['label' => (string) ($responses[$report->source_id] ?? 'Control Room response'), 'failed_check' => false],
                 default => ['label' => 'Manual report', 'failed_check' => false],
             };
@@ -646,28 +654,45 @@ class VehicleWorkspacePresenter
         return $sources;
     }
 
-    /** @return array<string,mixed> */
+    /**
+     * The latest submitted check and, separately, the latest daily check: a
+     * daily check is a recorded observation, so it never stands in for the
+     * vehicle's check result.
+     *
+     * @return array<string,mixed>
+     */
     private function checks(Asset $asset): array
     {
         if (! Schema::hasTable('fleet_checklist_runs')) {
-            return ['latest' => null, 'next_due_at' => $asset->inspection_due_at?->toDateString()];
+            return ['latest' => null, 'latest_daily' => null, 'next_due_at' => $asset->inspection_due_at?->toDateString()];
         }
-        $latest = DB::table('fleet_checklist_runs as run')->leftJoin('fleet_checklist_templates as template', 'template.id', '=', 'run.template_id')
-            ->where('run.asset_id', $asset->id)->whereNotNull('run.submitted_at')->orderByDesc('run.submitted_at')->orderByDesc('run.id')
-            ->first(['run.id', 'run.outcome', 'run.submitted_at', 'template.name as template_name']);
-        // Maintenance's "no issue found — release for use" on that check; its
-        // original outcome is kept as submitted.
-        $assessed = $latest !== null && Schema::hasTable('fleet_maintenance_check_assessments')
-            && DB::table('fleet_maintenance_check_assessments')->where('check_run_id', $latest->id)
-                ->where('decision', MaintenanceRestrictionService::NO_ISSUE_RELEASE)->exists();
-
         return [
-            'latest' => $latest ? [
-                'id' => (int) $latest->id, 'outcome' => $latest->outcome, 'template' => $latest->template_name,
-                'submitted_at' => CarbonImmutable::parse($latest->submitted_at, 'UTC')->toIso8601String(),
-                'assessed' => $assessed,
-            ] : null,
+            'latest' => $this->latestCheck($asset, false),
+            'latest_daily' => $this->latestCheck($asset, true),
             'next_due_at' => $asset->inspection_due_at?->toDateString(),
         ];
+    }
+
+    /** @return array{id:int, outcome:?string, template:?string, submitted_at:string, assessed:bool}|null */
+    private function latestCheck(Asset $asset, bool $daily): ?array
+    {
+        $run = DB::table('fleet_checklist_runs as run')->leftJoin('fleet_checklist_templates as template', 'template.id', '=', 'run.template_id')
+            ->where('run.asset_id', $asset->id)->whereNotNull('run.submitted_at')
+            ->when($daily,
+                fn ($query) => $query->where('run.check_kind', FleetChecklistRun::KIND_DAILY),
+                fn ($query) => $query->where(fn ($kind) => $kind->whereNull('run.check_kind')->orWhere('run.check_kind', '!=', FleetChecklistRun::KIND_DAILY)))
+            ->orderByDesc('run.submitted_at')->orderByDesc('run.id')
+            ->first(['run.id', 'run.outcome', 'run.submitted_at', 'template.name as template_name']);
+        // Maintenance's "no issue found — release for use" on that check; its
+        // original outcome is kept as submitted. Daily checks are never assessed.
+        $assessed = $run !== null && ! $daily && Schema::hasTable('fleet_maintenance_check_assessments')
+            && DB::table('fleet_maintenance_check_assessments')->where('check_run_id', $run->id)
+                ->where('decision', MaintenanceRestrictionService::NO_ISSUE_RELEASE)->exists();
+
+        return $run ? [
+            'id' => (int) $run->id, 'outcome' => $run->outcome, 'template' => $run->template_name,
+            'submitted_at' => CarbonImmutable::parse($run->submitted_at, 'UTC')->toIso8601String(),
+            'assessed' => $assessed,
+        ] : null;
     }
 }

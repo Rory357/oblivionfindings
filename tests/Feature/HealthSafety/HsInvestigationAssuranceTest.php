@@ -19,6 +19,7 @@ use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class HsInvestigationAssuranceTest extends TestCase
@@ -342,6 +343,7 @@ class HsInvestigationAssuranceTest extends TestCase
 
     public function test_three_actor_concurrency_and_replay_matrix_serializes_review_rework_and_approval(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $site = $this->activeSite('Concurrent assurance');

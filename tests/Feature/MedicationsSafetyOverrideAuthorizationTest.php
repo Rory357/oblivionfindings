@@ -12,10 +12,12 @@ use App\Models\MedicationAllergy;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\Role;
 use App\Models\ServiceContext;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\EnhancedMarService;
 use App\Services\MedicationIncidentIntegrationService;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -24,6 +26,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Mockery\MockInterface;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class MedicationsSafetyOverrideAuthorizationTest extends TestCase
@@ -39,6 +42,13 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
     private User $manager;
 
     private User $witness;
+
+    private User $assessor;
+
+    /** @var array<int, int> */
+    private array $fixtureShiftIds = [];
+
+    private Carbon $doseSlot;
 
     protected function setUp(): void
     {
@@ -63,8 +73,13 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
         $this->worker = $this->makeActor('support_worker', $site);
         $this->manager = $this->makeActor('provider_manager', $site);
         $this->witness = $this->makeActor('support_worker', $site, 'witness-secret');
+        $this->assessor = User::factory()->create([
+            'role' => 'provider_manager',
+            'approved_at' => now(),
+        ]);
         $this->recordValidCompetency($this->worker);
         $this->recordValidCompetency($this->manager);
+        $this->recordValidCompetency($this->witness, canWitnessControlled: true);
 
         $this->client->supportWorkers()->syncWithoutDetaching([
             $this->worker->id,
@@ -72,12 +87,23 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
             $this->witness->id,
         ]);
 
+        // Administration authority is current-work scoped (a covering Shift),
+        // and a controlled witness must be present at the Site at the dose time.
+        foreach ([$this->worker, $this->manager, $this->witness] as $actor) {
+            $this->fixtureShiftIds[] = $this->startShift($actor)->id;
+        }
+
+        // A scheduled dose must target a real schedule cell, so anchor the
+        // order's slot to the current worker-local minute instead of a fixed
+        // clock time that only matches when the suite runs at that time.
+        $this->doseSlot = now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfMinute();
+
         $this->medication = ClientMedication::query()->create([
             'client_id' => $this->client->id,
             'name' => 'Amoxicillin',
             'dosage' => '500mg',
             'frequency' => 'Once daily',
-            'dose_times' => ['09:00'],
+            'dose_times' => [$this->doseSlot->format('H:i')],
             'controlled_drug' => true,
             'active' => true,
             'state' => 'active',
@@ -198,7 +224,7 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
         $this->assertStringContainsString('Safety override authorised', (string) ClientMedicationAdministration::findOrFail($administrationId)->notes);
         $this->assertSame(9, (int) $this->medication->stock()->value('on_hand'));
         $this->assertDatabaseCount('client_controlled_drug_entries', 1);
-        $this->assertDatabaseCount('timeline_events', 1);
+        $this->assertRequestTimelineEventCount(1);
     }
 
     public function test_override_replay_cannot_duplicate_the_dose_stock_audit_or_timeline_event(): void
@@ -226,11 +252,12 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
         $this->assertDatabaseCount('client_controlled_drug_entries', 1);
         $this->assertSame(9, (int) $this->medication->stock()->value('on_hand'));
         $this->assertSame(1, AuditLog::query()->where('action', 'medications.safety_override.authorized')->count());
-        $this->assertDatabaseCount('timeline_events', 1);
+        $this->assertRequestTimelineEventCount(1);
     }
 
     public function test_concurrent_privileged_overrides_are_serialized_without_duplicate_effects(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 
@@ -250,7 +277,7 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
             'safety_override' => $this->overrideReason(),
         ];
         $processes = [];
-        $userIds = [$this->worker->id, $this->manager->id, $this->witness->id];
+        $userIds = [$this->worker->id, $this->manager->id, $this->witness->id, $this->assessor->id];
         $siteId = $this->client->site_id;
         $serviceContextId = $this->client->service_context_id;
 
@@ -393,7 +420,7 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
 
         $this->assertSame(2, ClientMedicationAdministration::query()->where('client_medication_id', $prn->id)->count());
         $this->assertSame(1, AuditLog::query()->where('action', 'medications.safety_override.authorized')->count());
-        $this->assertDatabaseCount('timeline_events', 1);
+        $this->assertRequestTimelineEventCount(1);
     }
 
     private function makeActor(string $roleName, Site $site, string $password = 'password'): User
@@ -423,7 +450,7 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
             'status' => 'given',
             'dose_given' => '500mg',
             'quantity_administered' => 1,
-            'scheduled_for' => now()->startOfMinute()->toIso8601String(),
+            'scheduled_for' => $this->doseSlot->toIso8601String(),
             'administered_at' => now()->toIso8601String(),
             'witnessed_by' => $this->witness->id,
             'witness_credential' => 'witness-secret',
@@ -431,15 +458,60 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
         ];
     }
 
-    private function recordValidCompetency(User $user): void
+    /**
+     * Competency only counts once an independent assessor has declared it and
+     * the staff member has acknowledged it; a controlled witness also needs
+     * the explicit witness sign-off.
+     */
+    private function recordValidCompetency(User $user, bool $canWitnessControlled = false): void
     {
         MedicationCompetencyAssessment::query()->create([
             'user_id' => $user->id,
+            'assessor_id' => $this->assessor->id,
             'assessment_type' => 'annual',
             'status' => 'passed',
-            'assessment_date' => now()->toDateString(),
+            'assessment_date' => now()->subMonth()->toDateString(),
             'expiry_date' => now()->addYear()->toDateString(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'can_witness_controlled' => $canWitnessControlled,
         ]);
+    }
+
+    private function startShift(User $user): Shift
+    {
+        return Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->client->site_id,
+            'service_context_id' => $this->client->service_context_id,
+            'user_id' => $user->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(2),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'started_by' => $user->id,
+            'created_by' => $user->id,
+            'status' => 'in_progress',
+        ]);
+    }
+
+    /**
+     * Each fixture Shift projects its own timeline snapshot. Count every other
+     * timeline row, so any event written by the medication request is caught.
+     */
+    private function assertRequestTimelineEventCount(int $expected): void
+    {
+        $this->assertSame(
+            $expected,
+            DB::table('timeline_events')
+                ->where(function ($query): void {
+                    $query->whereNull('source_type')
+                        ->orWhere('source_type', '!=', Shift::class)
+                        ->orWhereNull('source_id')
+                        ->orWhereNotIn('source_id', $this->fixtureShiftIds);
+                })
+                ->count(),
+        );
     }
 
     private function overrideReason(): array
@@ -464,7 +536,7 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
     {
         $this->assertDatabaseCount('client_medication_administrations', 0);
         $this->assertDatabaseCount('client_controlled_drug_entries', 0);
-        $this->assertDatabaseCount('timeline_events', 0);
+        $this->assertRequestTimelineEventCount(0);
         $this->assertSame(10, (int) $this->medication->stock()->value('on_hand'));
         $this->assertSame(0, AuditLog::query()->where('action', 'medications.safety_override.authorized')->count());
     }

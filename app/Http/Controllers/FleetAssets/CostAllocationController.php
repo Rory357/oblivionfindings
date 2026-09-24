@@ -3,18 +3,33 @@
 namespace App\Http\Controllers\FleetAssets;
 
 use App\Http\Controllers\Controller;
-use App\Models\Asset;
+use App\Models\Client;
 use App\Models\FleetFuelLog;
 use App\Models\FleetResidentTransport;
 use App\Models\FleetTrip;
 use App\Models\FleetWorkOrder;
 use App\Models\Site;
+use App\Services\Fleet\FleetTripSiteScope;
+use App\Services\Fleet\ResidentTransportJourneyScope;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class CostAllocationController extends Controller
 {
+    /**
+     * FA-T01: every cost total, house row, resident row and CSV covers the
+     * viewer's approved Sites only. `fleet.manage` is the explicit all-Sites
+     * authority, as in the sibling Fleet report controllers.
+     */
+    private const SITE_BYPASS_PERMISSIONS = ['fleet.manage'];
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly ResidentTransportJourneyScope $journeyScope,
+    ) {}
+
     public function index(Request $request)
     {
         $days = (int) ($request->input('days', 30));
@@ -27,8 +42,11 @@ class CostAllocationController extends Controller
         $hasTripsTable = Schema::hasTable('fleet_trips');
         $hasTransports = Schema::hasTable('fleet_resident_transports');
 
-        // Get all vehicles with their home site
-        $vehicles = Asset::vehicles();
+        // Vehicles at the viewer's approved Sites: every cost below is drawn from this set.
+        $siteIds = $this->siteAccess->accessibleSiteIds($request->user(), self::SITE_BYPASS_PERMISSIONS);
+        $visibleVehicles = fn () => FleetTripSiteScope::vehicles($siteIds);
+
+        $vehicles = $visibleVehicles();
         if ($hasFleetFields) {
             $vehicles = $vehicles->with('homeSite');
         }
@@ -38,6 +56,7 @@ class CostAllocationController extends Controller
         $fuelByAsset = [];
         if ($hasFuelTable) {
             $fuelByAsset = FleetFuelLog::query()
+                ->whereIn('asset_id', $visibleVehicles()->select('assets.id'))
                 ->where('logged_at', '>=', $since)
                 ->selectRaw('asset_id, SUM(total_cost) as total_fuel')
                 ->groupBy('asset_id')
@@ -49,6 +68,7 @@ class CostAllocationController extends Controller
         $maintenanceByAsset = [];
         if ($hasWorkOrders) {
             $maintenanceByAsset = FleetWorkOrder::query()
+                ->whereIn('asset_id', $visibleVehicles()->select('assets.id'))
                 ->where('created_at', '>=', $since)
                 ->whereNotNull('actual_cost')
                 ->selectRaw('asset_id, SUM(actual_cost) as total_maintenance')
@@ -61,6 +81,7 @@ class CostAllocationController extends Controller
         $tripDistanceByAsset = [];
         if ($hasTripsTable) {
             $tripQuery = FleetTrip::query()
+                ->whereIn('asset_id', $visibleVehicles()->select('assets.id'))
                 ->where('started_at', '>=', $since);
             if (Schema::hasColumn('fleet_trips', 'is_personal')) {
                 $tripQuery->where('is_personal', false);
@@ -72,8 +93,8 @@ class CostAllocationController extends Controller
                 ->toArray();
         }
 
-        // Group costs by house/site
-        $sites = Site::query()->whereNotNull('name')->get(['id', 'name']);
+        // Group costs by house/site — approved Sites only.
+        $sites = Site::query()->whereIn('id', $siteIds)->whereNotNull('name')->get(['id', 'name']);
         $siteMap = $sites->keyBy('id');
 
         $bySite = [];
@@ -81,7 +102,10 @@ class CostAllocationController extends Controller
         $totalMaintenance = 0;
 
         foreach ($vehicles as $vehicle) {
-            $siteId = $hasFleetFields ? ($vehicle->home_site_id ?? $vehicle->site_id) : $vehicle->site_id;
+            // The vehicle's house, else its direct Site — whichever the viewer
+            // is approved for, so a row is never keyed by a foreign Site.
+            $siteId = collect($hasFleetFields ? [$vehicle->home_site_id, $vehicle->site_id] : [$vehicle->site_id])
+                ->first(fn ($candidate) => $candidate && in_array((int) $candidate, $siteIds, true));
             if (!$siteId) {
                 continue;
             }
@@ -123,7 +147,9 @@ class CostAllocationController extends Controller
         // Transport costs per resident
         $byResident = [];
         if ($hasTransports) {
-            $transports = FleetResidentTransport::query()
+            // The same resident-journey boundary as the Transport register.
+            $transports = $this->journeyScope
+                ->applyTransportScope(FleetResidentTransport::query(), $request->user())
                 ->where('created_at', '>=', $since)
                 ->get(['resident_id', 'resident_name', 'asset_id', 'booking_id']);
 
@@ -161,12 +187,15 @@ class CostAllocationController extends Controller
                 }
             }
 
-            // Try to get house names for residents
-            if (Schema::hasTable('clients') && class_exists(\App\Models\Client::class)) {
+            // Try to get house names for residents the viewer may see
+            if (Schema::hasTable('clients')) {
                 $residentIds = collect($byResident)->pluck('id')->filter(fn ($id) => is_numeric($id))->values()->all();
                 if (!empty($residentIds)) {
                     try {
-                        $clients = \App\Models\Client::whereIn('id', $residentIds)->get(['id', 'site_id']);
+                        $clients = $this->journeyScope
+                            ->applyClientScope(Client::query(), $request->user())
+                            ->whereIn('id', $residentIds)
+                            ->get(['id', 'site_id']);
                         foreach ($clients as $client) {
                             if (isset($byResident[$client->id]) && $client->site_id) {
                                 $byResident[$client->id]['house'] = $siteMap->get($client->site_id)?->name ?? '';

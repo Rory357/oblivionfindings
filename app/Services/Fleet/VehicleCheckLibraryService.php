@@ -76,12 +76,13 @@ class VehicleCheckLibraryService
 
     /**
      * Active checklists this vehicle can use, each with its current version.
+     * The daily checklist is recorded from the Daily checks page instead.
      *
      * @return list<array<string,mixed>>
      */
     public function forVehicle(Asset $asset): array
     {
-        $templates = FleetChecklistTemplate::query()->where('is_active', true)
+        $templates = FleetChecklistTemplate::query()->maintenanceChecklists()->where('is_active', true)
             ->orderBy('name')->orderBy('id')->limit(self::LIBRARY_LIMIT)->get();
         $latest = $this->latestVersions($templates->pluck('id')->map(fn (mixed $id): int => (int) $id)->all());
 
@@ -194,8 +195,8 @@ class VehicleCheckLibraryService
                 ]);
                 $version = $this->insertVersion($template, 1, $definition, $current, $requestKey, $fingerprint);
             } else {
-                $template = FleetChecklistTemplate::query()->whereKey($templateId)->where('is_active', true)
-                    ->lockForUpdate()->first() ?? abort(404);
+                $template = FleetChecklistTemplate::query()->maintenanceChecklists()->whereKey($templateId)
+                    ->where('is_active', true)->lockForUpdate()->first() ?? abort(404);
                 $items = is_array($template->items) ? array_values($template->items) : [];
                 $sha = MaintenanceFingerprint::of($items);
                 abort_unless(hash_equals($sha, $expectedSha), 409, self::STALE);

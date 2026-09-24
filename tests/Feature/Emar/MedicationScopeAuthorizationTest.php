@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class MedicationScopeAuthorizationTest extends TestCase
@@ -476,6 +477,7 @@ class MedicationScopeAuthorizationTest extends TestCase
 
     public function test_concurrent_shift_reassignment_wins_before_the_administration_write(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         Carbon::setTestNow();
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
