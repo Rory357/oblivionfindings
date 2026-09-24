@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class NzsAssuranceResolverTest extends TestCase
@@ -333,6 +334,7 @@ class NzsAssuranceResolverTest extends TestCase
 
     public function test_concurrent_replacements_serialize_one_current_head_on_mysql(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $site = Site::factory()->create();

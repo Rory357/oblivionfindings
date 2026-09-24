@@ -26,6 +26,7 @@ use LogicException;
 use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 #[Group('mysql-serial')]
@@ -35,6 +36,7 @@ class ShiftCompletionAttendanceConcurrencyTest extends TestCase
 
     public function test_mysql_completion_and_clock_in_cannot_leave_a_completed_shift_with_an_open_session(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         Carbon::setTestNow(Carbon::parse('2026-08-28 12:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
@@ -195,6 +197,7 @@ class ShiftCompletionAttendanceConcurrencyTest extends TestCase
 
     public function test_mysql_completion_and_clock_out_share_client_shift_attendance_lock_order(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         Carbon::setTestNow(Carbon::parse('2026-08-28 12:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
@@ -355,6 +358,7 @@ class ShiftCompletionAttendanceConcurrencyTest extends TestCase
 
     public function test_clock_out_handover_prelock_serializes_a_competing_save_and_rolls_back_every_partial_write(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         Carbon::setTestNow(Carbon::parse('2026-08-28 12:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
@@ -522,6 +526,7 @@ class ShiftCompletionAttendanceConcurrencyTest extends TestCase
 
     public function test_completion_permission_revoked_while_waiting_on_client_aggregate_writes_nothing(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         Carbon::setTestNow(Carbon::parse('2026-08-28 12:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
@@ -648,6 +653,7 @@ class ShiftCompletionAttendanceConcurrencyTest extends TestCase
 
     public function test_mysql_attendance_correction_and_timesheet_approval_serialize_on_the_payroll_mutex(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         Carbon::setTestNow(
             Carbon::parse('2026-08-28 12:00:00', config('app.worker_timezone', 'Pacific/Auckland'))
                 ->setTimezone(config('app.timezone', 'UTC')),

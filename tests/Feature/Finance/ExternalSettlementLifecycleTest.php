@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 beforeEach(function (): void {
     Storage::fake('local');
@@ -554,6 +555,7 @@ it('keeps the 000130 foreign-key supporting indexes in a MySQL-safe order', func
 });
 
 it('serializes export with accept and accept with settle at forced internal MySQL locks', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
     [$exportBill, $exportBank, $exportCreator, $exportApprover, $exportChecker] = externalSettlementFixture('845.67');

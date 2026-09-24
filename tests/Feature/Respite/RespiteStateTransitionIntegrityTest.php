@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\Event;
 use Inertia\Testing\AssertableInertia;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class RespiteStateTransitionIntegrityTest extends TestCase
@@ -664,6 +665,7 @@ class RespiteStateTransitionIntegrityTest extends TestCase
 
     public function test_two_mysql_workers_serialize_linked_booking_creation_to_one_effect(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $request = $this->bookingRequest('approved');
