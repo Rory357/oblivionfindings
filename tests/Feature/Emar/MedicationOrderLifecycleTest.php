@@ -1303,7 +1303,11 @@ class MedicationOrderLifecycleTest extends TestCase
             'user_id' => $user->id,
             'primary_site_id' => $this->site->id,
             'secondary_site_ids' => [],
-            'start_date' => today()->subMonth(),
+            // Fixed rather than relative: setUp() creates the manager on the
+            // real clock, and several tests then freeze time at 2026-08-21.
+            // A real-clock-relative start date drifts past that frozen day and
+            // silently removes the manager's current Site authority.
+            'start_date' => '2026-01-01',
             'end_date' => null,
             'is_active' => true,
             'created_by' => $user->id,
