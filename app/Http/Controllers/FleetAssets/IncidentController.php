@@ -12,6 +12,7 @@ use App\Models\FleetIncident;
 use App\Models\FleetIncidentAttachment;
 use App\Models\FleetIncidentFollowup;
 use App\Models\FleetResidentTransport;
+use App\Models\FleetVehicleBooking;
 use App\Models\SafeguardingAlert;
 use App\Models\Site;
 use App\Models\User;
@@ -20,6 +21,8 @@ use App\Services\AuditLogger;
 use App\Services\Fleet\FleetSignalService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +38,17 @@ class IncidentController extends Controller
     use RespondsToInertiaOrJson;
     use ServesPrivateAttachments;
 
+    /**
+     * An incident belongs to its asset's Site. `fleet.manage` is the explicit
+     * all-Sites authority, as in the sibling Fleet controllers;
+     * `fleet.incidents.manage` is an action permission and never widens the
+     * Site boundary.
+     */
+    private const SITE_BYPASS_PERMISSIONS = ['fleet.manage'];
+
+    /** Request fields that name a person on the incident. */
+    private const PERSON_FIELDS = ['driver_user_id', 'supervisor_user_id', 'assigned_to_user_id'];
+
     /** Tab → model scope (worklist views). */
     private const TAB_SCOPES = [
         'open' => 'open',
@@ -47,9 +61,16 @@ class IncidentController extends Controller
         'closed' => 'closed',
     ];
 
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     public function index(Request $request)
     {
         $filterKeys = ['vehicle_id', 'driver_id', 'site_id', 'severity', 'incident_type', 'status', 'search', 'date_from', 'date_to', 'tab'];
+
+        // A Site filter outside the viewer's approved Sites is concealed, as on Work orders.
+        if ($request->filled('site_id')) {
+            abort_unless(in_array($this->requestedId($request, 'site_id'), $this->approvedSiteIds($request), true), 404);
+        }
 
         if (! Schema::hasTable('fleet_incidents')) {
             return Inertia::render('fleet-assets/incidents/index', [
@@ -58,7 +79,7 @@ class IncidentController extends Controller
                 'tab' => $request->input('tab', 'all'),
                 'tabCounts' => [],
                 'stats' => $this->emptyStats(),
-                'formOptions' => $this->formOptions(),
+                'formOptions' => $this->formOptions($request),
                 'can' => ['manage' => $this->userCanManage(), 'view_hr_assets' => $this->userCanViewHrAssets()],
                 'detail' => null,
                 'report' => $request->input('report'),
@@ -67,7 +88,8 @@ class IncidentController extends Controller
         }
 
         // Base query with every filter EXCEPT the tab (so hero/tab counts reflect scope).
-        $base = $this->applyFilters(FleetIncident::query(), $request);
+        // Site-scoped first, so the list, hero/tab counts and CSV export share one boundary.
+        $base = $this->applyFilters($this->visibleIncidents($request), $request);
 
         // CSV export honours the active filters.
         if ($request->input('export') === 'csv') {
@@ -85,13 +107,14 @@ class IncidentController extends Controller
             'tabCounts' => fn () => $this->tabCounts((clone $base)),
             'stats' => fn () => $this->stats((clone $base)),
             'filters' => $request->only($filterKeys),
-            'formOptions' => fn () => $this->formOptions(),
+            'formOptions' => fn () => $this->formOptions($request),
             'can' => ['manage' => $this->userCanManage(), 'view_hr_assets' => $this->userCanViewHrAssets()],
-            'detail' => function () use ($incidentParam) {
+            'detail' => function () use ($incidentParam, $request) {
                 if (! $incidentParam) {
                     return null;
                 }
-                $found = FleetIncident::find($incidentParam);
+                // A foreign deep link resolves exactly like a missing one: no detail.
+                $found = $this->visibleIncidents($request)->find($incidentParam);
 
                 return $found ? $this->buildDetailPayload($found) : null;
             },
@@ -145,6 +168,8 @@ class IncidentController extends Controller
 
     public function store(Request $request)
     {
+        $this->assertReferencesVisible($request);
+
         $data = $request->validate($this->captureRules($request, forCreate: true));
 
         $asset = Asset::find($data['asset_id']);
@@ -179,10 +204,18 @@ class IncidentController extends Controller
         // Fleet + resident incident journey has committed successfully.
         $this->emitSignal($incident, 'incident.reported', $incident->occurred_at);
 
-        $incident->load('asset:id,name');
+        // Only managers who can open the incident at its Site are told about it.
+        $incident->load('asset:id,name,site_id');
+        $siteId = (int) $incident->asset?->site_id;
         User::whereHas('roles', function ($q) {
             $q->whereHas('permissions', fn ($p) => $p->where('key', 'fleet.incidents.manage'));
-        })->get()->each->notify(new FleetIncidentReportedNotification($incident));
+        })->get()
+            ->filter(fn (User $manager): bool => in_array(
+                $siteId,
+                $this->siteAccess->accessibleSiteIds($manager, self::SITE_BYPASS_PERMISSIONS),
+                true,
+            ))
+            ->each->notify(new FleetIncidentReportedNotification($incident));
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -199,6 +232,8 @@ class IncidentController extends Controller
 
     public function show(Request $request, FleetIncident $incident)
     {
+        $this->authorizeIncident($request, $incident);
+
         // Modal/axios callers want the JSON detail payload. A direct deep-link
         // opens the detail modal over the list (nothing navigates away — the old
         // full-page show.tsx is retired).
@@ -211,6 +246,9 @@ class IncidentController extends Controller
 
     public function update(Request $request, FleetIncident $incident)
     {
+        $this->authorizeIncident($request, $incident);
+        $this->assertReferencesVisible($request, $incident);
+
         $data = $request->validate($this->captureRules($request, forCreate: false));
 
         $attributes = $this->mapCaptureToColumns($data);
@@ -228,6 +266,8 @@ class IncidentController extends Controller
     /** Lifecycle status move + closure gate. */
     public function updateStatus(Request $request, FleetIncident $incident)
     {
+        $this->authorizeIncident($request, $incident);
+
         $data = $request->validate([
             'status' => ['required', 'string', 'in:reported,investigating,resolved,closed'],
             'resolution_notes' => ['nullable', 'string', 'max:5000'],
@@ -266,6 +306,9 @@ class IncidentController extends Controller
 
     public function addFollowup(Request $request, FleetIncident $incident)
     {
+        $this->authorizeIncident($request, $incident);
+        $this->assertPersonVisible($request, $this->requestedId($request, 'assigned_to_user_id'));
+
         $data = $request->validate([
             'notes' => ['required', 'string', 'max:2000'],
             'assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -288,6 +331,7 @@ class IncidentController extends Controller
 
     public function completeFollowup(Request $request, FleetIncident $incident, FleetIncidentFollowup $followup)
     {
+        $this->authorizeIncident($request, $incident);
         abort_unless((int) $followup->fleet_incident_id === (int) $incident->id, 404);
 
         $followup->update(['completed_at' => now()]);
@@ -301,6 +345,8 @@ class IncidentController extends Controller
 
     public function uploadAttachment(Request $request, FleetIncident $incident)
     {
+        $this->authorizeIncident($request, $incident);
+
         $data = $request->validate([
             'file' => ['required', 'file', 'max:20480'], // 20 MB (dashcam clips)
             'kind' => ['nullable', 'string', 'max:30'],
@@ -333,6 +379,7 @@ class IncidentController extends Controller
 
     public function downloadAttachment(Request $request, FleetIncident $incident, FleetIncidentAttachment $attachment): StreamedResponse
     {
+        $this->authorizeIncident($request, $incident);
         abort_unless((int) $attachment->fleet_incident_id === (int) $incident->id, 404);
 
         // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
@@ -346,6 +393,7 @@ class IncidentController extends Controller
 
     public function destroyAttachment(Request $request, FleetIncident $incident, FleetIncidentAttachment $attachment)
     {
+        $this->authorizeIncident($request, $incident);
         abort_unless((int) $attachment->fleet_incident_id === (int) $incident->id, 404);
 
         $disk = $attachment->disk ?: 'private';
@@ -364,6 +412,8 @@ class IncidentController extends Controller
     /** Log the Land Transport Act s22 Traffic Crash Report (TCR). */
     public function logPoliceReport(Request $request, FleetIncident $incident)
     {
+        $this->authorizeIncident($request, $incident);
+
         $data = $request->validate([
             'traffic_crash_report_reference' => ['nullable', 'string', 'max:60'],
             'police_reference' => ['nullable', 'string', 'max:100'],
@@ -390,6 +440,8 @@ class IncidentController extends Controller
 
     public function logClaim(Request $request, FleetIncident $incident)
     {
+        $this->authorizeIncident($request, $incident);
+
         $data = $request->validate([
             'insurer_name' => ['nullable', 'string', 'max:120'],
             'insurance_reference' => ['nullable', 'string', 'max:100'],
@@ -412,6 +464,8 @@ class IncidentController extends Controller
 
     public function markOffRoad(Request $request, FleetIncident $incident)
     {
+        $this->authorizeIncident($request, $incident);
+
         $data = $request->validate([
             'off_road_from' => ['nullable', 'date'],
             'off_road_to' => ['nullable', 'date'],
@@ -433,6 +487,8 @@ class IncidentController extends Controller
 
     public function backInService(Request $request, FleetIncident $incident)
     {
+        $this->authorizeIncident($request, $incident);
+
         $data = $request->validate([
             'service_resumed_at' => ['nullable', 'date'],
         ]);
@@ -446,6 +502,92 @@ class IncidentController extends Controller
         return $this->inertiaOrJson($request, 'Vehicle returned to service.', [
             'incident' => $this->buildDetailPayload($incident->refresh()),
         ]);
+    }
+
+    /* ================================================================== */
+    /*  Site boundary */
+    /* ================================================================== */
+
+    /** @return array<int, int> */
+    private function approvedSiteIds(Request $request): array
+    {
+        return $this->siteAccess->accessibleSiteIds($request->user(), self::SITE_BYPASS_PERMISSIONS);
+    }
+
+    /** Incidents whose asset sits at one of the viewer's approved Sites. */
+    private function visibleIncidents(Request $request): Builder
+    {
+        $siteIds = $this->approvedSiteIds($request);
+
+        return FleetIncident::query()->whereHas('asset', fn (Builder $asset) => $asset
+            ->whereNotNull('site_id')
+            ->whereIn('site_id', $siteIds));
+    }
+
+    /** Assets at the viewer's approved Sites: report targets, pickers and filter options. */
+    private function visibleAssets(Request $request): Builder
+    {
+        return Asset::query()->whereNotNull('site_id')->whereIn('site_id', $this->approvedSiteIds($request));
+    }
+
+    /** Current staff the viewer may name on an incident — the same people the pickers offer. */
+    private function visibleStaff(Request $request): Builder
+    {
+        return $this->siteAccess->applyStaffScope(User::query(), $request->user(), self::SITE_BYPASS_PERMISSIONS);
+    }
+
+    /** A foreign incident answers 404, exactly like a missing one. */
+    private function authorizeIncident(Request $request, FleetIncident $incident): void
+    {
+        abort_unless($this->visibleIncidents($request)->whereKey($incident->getKey())->exists(), 404);
+    }
+
+    /**
+     * Conceal foreign direct-object ids before payload validation: an asset,
+     * booking or person outside the viewer's Sites answers 404 like a missing
+     * id. Values the incident already holds are not re-checked, so an edit
+     * never trips over a driver who has since left. Malformed values are left
+     * for validation to reject.
+     */
+    private function assertReferencesVisible(Request $request, ?FleetIncident $incident = null): void
+    {
+        $assetId = $this->requestedId($request, 'asset_id');
+        if ($assetId !== null && $assetId !== (int) $incident?->asset_id) {
+            abort_unless($this->visibleAssets($request)->whereKey($assetId)->exists(), 404);
+        }
+
+        // The booking's resident transports drive the resident incident cascade,
+        // so it must belong to the incident's own vehicle.
+        $bookingId = $this->requestedId($request, 'booking_id');
+        $bookingAssetId = $assetId ?? $incident?->asset_id;
+        if ($bookingId !== null && $bookingAssetId && $bookingId !== (int) $incident?->booking_id) {
+            abort_unless(FleetVehicleBooking::query()
+                ->whereKey($bookingId)
+                ->where('asset_id', $bookingAssetId)
+                ->exists(), 404);
+        }
+
+        foreach (self::PERSON_FIELDS as $field) {
+            $userId = $this->requestedId($request, $field);
+            if ($userId !== (int) $incident?->{$field}) {
+                $this->assertPersonVisible($request, $userId);
+            }
+        }
+    }
+
+    private function assertPersonVisible(Request $request, ?int $userId): void
+    {
+        if ($userId !== null) {
+            abort_unless($this->visibleStaff($request)->whereKey($userId)->exists(), 404);
+        }
+    }
+
+    /** A positive integer id from the raw request, or null when absent or malformed. */
+    private function requestedId(Request $request, string $key): ?int
+    {
+        $id = filter_var($request->input($key), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+        return $id === false ? null : $id;
     }
 
     /* ================================================================== */
@@ -1116,14 +1258,14 @@ class IncidentController extends Controller
 
         $term = $data['q'];
         $results = $data['type'] === 'assets'
-            ? Asset::query()
+            ? $this->visibleAssets($request)
                 ->where(fn ($query) => $query
                     ->where('name', 'like', "%{$term}%")
                     ->orWhere('registration_number', 'like', "%{$term}%"))
                 ->orderBy('name')
                 ->limit(20)
                 ->get(['id', 'name', 'registration_number', 'category'])
-            : User::query()
+            : $this->visibleStaff($request)
                 ->where('name', 'like', "%{$term}%")
                 ->orderBy('name')
                 ->limit(20)
@@ -1132,9 +1274,9 @@ class IncidentController extends Controller
         return response()->json(['results' => $results]);
     }
 
-    private function formOptions(): array
+    private function formOptions(Request $request): array
     {
-        $assets = Asset::query()
+        $assets = $this->visibleAssets($request)
             ->orderBy('name')
             ->limit(20)
             ->get(['id', 'name', 'registration_number', 'category'])
@@ -1145,9 +1287,9 @@ class IncidentController extends Controller
                 'category' => $a->category,
             ])->values();
 
-        $selectedAssetId = request()->integer('vehicle_id');
+        $selectedAssetId = $request->integer('vehicle_id');
         if ($selectedAssetId && ! $assets->contains('id', $selectedAssetId)) {
-            $selectedAsset = Asset::query()->find($selectedAssetId, ['id', 'name', 'registration_number', 'category']);
+            $selectedAsset = $this->visibleAssets($request)->find($selectedAssetId, ['id', 'name', 'registration_number', 'category']);
             if ($selectedAsset) {
                 $assets->prepend([
                     'id' => $selectedAsset->id,
@@ -1158,18 +1300,19 @@ class IncidentController extends Controller
             }
         }
 
-        $users = User::query()->orderBy('name')->limit(20)->get(['id', 'name'])
+        $users = $this->visibleStaff($request)->orderBy('name')->limit(20)->get(['id', 'name'])
             ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->values();
-        $selectedUserId = request()->integer('driver_id');
+        $selectedUserId = $request->integer('driver_id');
         if ($selectedUserId && ! $users->contains('id', $selectedUserId)) {
-            $selectedUser = User::query()->find($selectedUserId, ['id', 'name']);
+            $selectedUser = $this->visibleStaff($request)->find($selectedUserId, ['id', 'name']);
             if ($selectedUser) {
                 $users->prepend(['id' => $selectedUser->id, 'name' => $selectedUser->name]);
             }
         }
 
         $sites = Schema::hasTable('sites')
-            ? Site::query()->orderBy('name')->get(['id', 'name'])->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->values()
+            ? Site::query()->whereIn('id', $this->approvedSiteIds($request))->orderBy('name')->get(['id', 'name'])
+                ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->values()
             : collect();
 
         return [

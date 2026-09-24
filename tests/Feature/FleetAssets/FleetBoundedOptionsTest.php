@@ -72,9 +72,18 @@ class FleetBoundedOptionsTest extends TestCase
 
     public function test_incident_option_search_preserves_view_permission_and_caps_results(): void
     {
-        $viewer = $this->makeUser(['fleet.viewAny']);
+        // Incident pickers only offer current staff at the viewer's approved Sites.
+        $site = Site::factory()->create();
+        $viewer = $this->makeUser(['fleet.viewAny'], $site);
         $forbidden = User::factory()->create(['approved_at' => now()]);
-        User::factory()->count(25)->create(['name' => 'Searchable incident driver']);
+        User::factory()->count(25)->create(['name' => 'Searchable incident driver'])
+            ->each(fn (User $driver) => HrEmployeeProfile::factory()->create([
+                'user_id' => $driver->id,
+                'primary_site_id' => $site->id,
+                'secondary_site_ids' => [],
+                'is_active' => true,
+                'start_date' => today()->subMonth(),
+            ]));
 
         $this->actingAs($forbidden)
             ->getJson('/fleet-assets/incidents/options/search?type=users&q=Searchable')
