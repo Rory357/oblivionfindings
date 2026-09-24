@@ -35,6 +35,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Testing\AssertableInertia as Assert;
 use Mockery\MockInterface;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 /**
@@ -868,6 +869,7 @@ class MedicationErrorsTest extends TestCase
 
     public function test_store_retries_the_outer_transaction_after_a_deadlock(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         ['user' => $user, 'client' => $client] = $this->seedErrors();
         $attempts = 0;
         $signals = \Mockery::mock(MedicationSignalService::class);

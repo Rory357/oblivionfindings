@@ -33,6 +33,7 @@ use Mockery;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class FundingClaimBindingTest extends TestCase
@@ -468,6 +469,7 @@ class FundingClaimBindingTest extends TestCase
 
     public function test_same_delivery_claim_commands_serialize_to_one_effect_on_mysql(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $source = $this->deliverySource();
@@ -501,6 +503,7 @@ class FundingClaimBindingTest extends TestCase
 
     public function test_claim_and_invoice_serialize_on_the_same_delivery_use_on_mysql(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $source = $this->deliverySource();
@@ -616,6 +619,7 @@ class FundingClaimBindingTest extends TestCase
 
     public function test_000140_binds_and_reserves_only_an_unambiguous_legacy_delivery_before_unique_indexes(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $connection->commit();
@@ -658,6 +662,7 @@ class FundingClaimBindingTest extends TestCase
 
     public function test_000140_reports_all_legacy_blocker_counts_before_any_ddl(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $connection->commit();

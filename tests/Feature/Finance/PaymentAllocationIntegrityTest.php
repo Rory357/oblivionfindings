@@ -31,6 +31,7 @@ use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 beforeEach(function (): void {
     foreach ([['1000', 'Bank - Operating'], ['1100', 'Accounts Receivable']] as [$code, $name]) {
@@ -358,6 +359,7 @@ it('Site-scopes allocation history while preserving the explicit all-Sites read 
 });
 
 it('serializes aggregate settlement races across matching manual receipts match-all and payment runs on MySQL', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
 
@@ -744,6 +746,7 @@ it('fails closed on canonical organisation client bill and target mismatches', f
 });
 
 it('migrates settlement constraints down and back up with foreign keys removed before unique indexes', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
     $connection->commit();
@@ -832,6 +835,7 @@ it('rejects non-positive non-payable and above-balance AP mutations without chan
 });
 
 it('serializes concurrent and replayed AP payment mutation to one locked bill effect on MySQL', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
 

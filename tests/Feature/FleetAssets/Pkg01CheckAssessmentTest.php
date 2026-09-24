@@ -31,6 +31,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 /**
@@ -564,11 +565,12 @@ class Pkg01CheckAssessmentTest extends TestCase
 
     /**
      * Both scenarios commit their fixtures so a second PHP process can see
-     * them, which makes RefreshDatabase rebuild the schema before the next
-     * test. They share this one test, kept last, so a run pays that at most once.
+     * them. CommittedFixtureCleanup removes those rows afterwards, so the next
+     * test neither sees them nor has to rebuild the schema.
      */
     public function test_the_vehicle_lock_orders_a_release_against_a_new_hold_and_a_waiting_booking_decision(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $recorder = $this->manager();
         $assessor = $this->manager();
         $template = $this->template();

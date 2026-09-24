@@ -22,6 +22,7 @@ use LogicException;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class ChecklistRunOwnershipTest extends TestCase
@@ -498,6 +499,7 @@ class ChecklistRunOwnershipTest extends TestCase
 
     public function test_parallel_completion_and_reassignment_allow_only_the_lock_winner_to_mutate(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 
