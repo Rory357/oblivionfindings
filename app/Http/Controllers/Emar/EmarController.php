@@ -3131,6 +3131,9 @@ class EmarController extends Controller
             'whanau_notes' => $r->whanau_notes,
             'next_review_date' => $r->next_review_date?->toDateString(),
             'is_overdue' => $r->status === 'scheduled' && $r->scheduled_date && $r->scheduled_date->isPast(),
+            // Deep-link to the resident's MAR chart for the row context menu /
+            // detail "Open on MAR" action (mirrors the PRN register's mar_url).
+            'mar_url' => $r->client_id ? EmarUrl::mar($r->client_id) : null,
         ];
     }
 
