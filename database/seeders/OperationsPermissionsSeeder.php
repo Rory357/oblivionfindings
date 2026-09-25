@@ -165,10 +165,14 @@ class OperationsPermissionsSeeder extends Seeder
             $created++;
         }
 
-        // Attach all to admin role
+        // Attach all to admin role, except the independent decisions that only
+        // RbacSeeder's explicit product policy assigns.
         $adminRole = Role::where('name', 'admin')->first();
         if ($adminRole) {
-            $allPermissionIds = Permission::pluck('id')->all();
+            $allPermissionIds = Permission::query()
+                ->whereNotIn('key', RbacSeeder::RESTRICTED_INDEPENDENT_AUTHORITY)
+                ->pluck('id')
+                ->all();
             $adminRole->permissions()->sync($allPermissionIds);
         }
 

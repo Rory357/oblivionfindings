@@ -78,7 +78,11 @@ async function globalSetup(): Promise<void> {
             // rows originally inserted by its migration.
             'HrCalendarEventCategorySeeder',
             // Map every permission row to the admin role so loginAsStaff
-            // (admin@demo.test) can exercise every gated UI surface.
+            // (admin@demo.test) can exercise every gated UI surface, except
+            // the independent decisions (RbacSeeder::RESTRICTED_INDEPENDENT_AUTHORITY):
+            // H&S closure, closure exceptions, safeguarding declassification
+            // and fleet maintenance release. SystemUsersSeeder's
+            // safety@demo.test / compliance@demo.test hold those instead.
             'SeedAllPermissionsToAdminSeeder',
             'ItProvisioningTemplateSeeder',
             'SystemCatalogSeeder',
