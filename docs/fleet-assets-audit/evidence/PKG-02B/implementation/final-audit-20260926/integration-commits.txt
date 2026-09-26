@@ -1,0 +1,17 @@
+e9432132da1e8273ec3efcc5c2295b2f8da8ee05 chore(fleet): carry over the paused PKG-02B build from the Codex worktree
+5891b62e3b802e3a7e8a35f297263ed4aab1bc67 feat(fleet): finish vehicle readiness and add workspace records
+89b6c9062dbd158f670fdc04101763e6b53ab645 feat(fleet): rebuild the vehicle profile to the approved v13 design
+a8233846d6bdca9eb3d70b654366a343e8a41073 docs(fleet): record PKG-02B test results for Main
+beffbb81172c1307af472a584f2912141dac63de feat(fleet): build Stephan's PKG-02B decisions, calendar parity and review fixes
+3a1c216ec615e536081c04169ba9ea88c6e57e48 docs(fleet): record the PKG-02B follow-ups and the calendar design rules
+f92a6169acfbfe7ccb8b45a13c8a06dba3b21414 feat(finance): decide vehicle review requests in Finance › Vehicle reviews
+4a26610e73b40200704307281af11f1744ec7889 feat(fleet): record daily checks as versioned checks that never gate readiness
+4fd8e621efe0ea045b9401957cd16d5245e004a6 fix(fleet): stop the asset register bypassing PKG-02B vehicle file rules
+ed07faae299bf7ddf25fb9488a650bff860d18b1 test(fleet): use Fleet-length request keys in the legacy document route tests
+47d89ffbdce6adc6b2148f637ba2e2cefd75c05c Merge claude/sweet-mclean-6c912c: close the legacy asset-document bypass of PKG-02B rules
+88ffdaef5f2d79af3f9b667974ef2e7cd57f5614 Merge claude/reverent-burnell-a777f7: daily checks recorded as versioned checks
+ea4ad1c9742540f4019b5715501066ee323de37e test(fleet): recognise the Event Horizon header in the Fleet hero contract
+1865c32da9bfed74f7a274b395bcc2fcbb46a1c6 fix(rbac): keep independent decisions out of every admin backfill
+6ea08a67440aa0bed8ad59549d3680487607562b fix(fleet): scope Fleet reports and exports to the viewer's approved Sites
+fa7b5291988cebfb6beaa6e6e10c6c660fb2a959 Merge claude/fervent-brahmagupta-227571: eMAR Reviews cross-module parity
+4ea64c547ed85a5b7504e59599db351f6eba7deb Record Main navigation approval and clean evidence whitespace

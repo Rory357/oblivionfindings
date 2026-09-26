@@ -971,6 +971,11 @@ export function VehicleCalendar({
         };
         const undo = async () => {
             const row = await current();
+            if (row.lock_version !== plan.row.lock_version + 1) {
+                throw new Error(
+                    'This period changed again. Reload and review its latest details; Undo has not changed it.',
+                );
+            }
             if (plan.kind === 'restore-period') {
                 await sendVehicleRecord(
                     `/fleet-assets/vehicles/${vehicle.id}/unavailable-periods/${row.id}/restore`,

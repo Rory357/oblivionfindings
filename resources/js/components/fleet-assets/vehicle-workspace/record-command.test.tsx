@@ -19,6 +19,42 @@ afterEach(() => {
 });
 
 describe('vehicle record command recovery', () => {
+    it('retains multipart values, files, URL and method after an uncertain upload', async () => {
+        const request = vi
+            .fn()
+            .mockRejectedValueOnce(new Error('connection lost'))
+            .mockResolvedValueOnce(response(200, { id: 43 }));
+        vi.stubGlobal('fetch', request);
+        const { result } = renderHook(() => useVehicleRecordCommand(isSaved));
+        const original = new FormData();
+        original.append('title', 'Original evidence');
+        original.append(
+            'files[]',
+            new File(['original'], 'original.pdf', { type: 'application/pdf' }),
+        );
+        await act(async () => {
+            await result.current.submit('/vehicle/documents', original, {
+                method: 'PUT',
+            });
+        });
+        original.set('title', 'Changed after failure');
+        original.delete('files[]');
+        await act(async () => {
+            await result.current.submit('/different', new FormData(), {
+                method: 'DELETE',
+            });
+        });
+        const [url, options] = request.mock.calls[1];
+        expect(url).toBe('/vehicle/documents');
+        expect(options.method).toBe('PUT');
+        expect(options.body.get('title')).toBe('Original evidence');
+        expect(options.body.get('files[]').name).toBe('original.pdf');
+        expect(options.headers['Idempotency-Key']).toBe(
+            request.mock.calls[0][1].headers['Idempotency-Key'],
+        );
+        expect(options.headers['Content-Type']).toBeUndefined();
+    });
+
     it('retries the identical command after an uncertain save, even if a caller supplies different values', async () => {
         const request = vi
             .fn()

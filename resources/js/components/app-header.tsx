@@ -36,8 +36,8 @@ import {
  * truly-centred command search (grid 1fr/auto/1fr — flex spacers drift
  * off-centre), then Report incident / Clock in-out / Ask / Messages /
  * inbox bells / user avatar. No "Live"/sync chip — removed by design.
- * The centred search never yields to the date: full date ≥1320px, short
- * form 1140–1320px, hidden below 1140px.
+ * The centred search never yields to the date: full date ≥1440px, short
+ * form 1320–1440px, hidden below 1320px.
  *
  * Badge semantics (never swap them): violet count = conversations waiting;
  * red count/dot = alerts needing attention.
@@ -122,16 +122,16 @@ export function AppHeader({
                 {/* Day + date, flush to the sidebar seam. Stays put when the
                     sidebar collapses; the centred search always wins the
                     space fight (tiers documented in the file docblock). */}
-                <div className="pointer-events-none absolute top-1/2 left-[256px] hidden -translate-y-1/2 items-baseline gap-1.5 text-sm whitespace-nowrap min-[1140px]:flex">
+                <div className="pointer-events-none absolute top-1/2 left-[256px] hidden -translate-y-1/2 items-baseline gap-1.5 text-sm whitespace-nowrap min-[1320px]:flex">
                     <span className="font-semibold text-sidebar-accent-foreground">
-                        <span className="min-[1320px]:hidden">{shortDay}</span>
-                        <span className="hidden min-[1320px]:inline">
+                        <span className="min-[1440px]:hidden">{shortDay}</span>
+                        <span className="hidden min-[1440px]:inline">
                             {longDay}
                         </span>
                     </span>
                     <span>
-                        <span className="min-[1320px]:hidden">{shortDate}</span>
-                        <span className="hidden min-[1320px]:inline">
+                        <span className="min-[1440px]:hidden">{shortDate}</span>
+                        <span className="hidden min-[1440px]:inline">
                             {longDate}
                         </span>
                     </span>

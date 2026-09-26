@@ -17,6 +17,7 @@ use App\Services\Fleet\MaintenanceAttachmentService;
 use App\Services\Fleet\MaintenanceCheckService;
 use App\Services\Fleet\MaintenanceFingerprint;
 use App\Services\Fleet\MaintenanceRestrictionService;
+use App\Services\Fleet\MaintenanceRollbackGuard;
 use App\Services\Fleet\MaintenanceTransitionService;
 use App\Services\Fleet\VehicleReadinessService;
 use Database\Seeders\RbacSeeder;
@@ -30,6 +31,7 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\Process\Process;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
@@ -311,8 +313,17 @@ class Pkg01CheckAssessmentTest extends TestCase
         $work = $this->actingAs($recorder)->postJson("/fleet-assets/vehicles/{$vehicle->id}/maintenance-reports", [
             'title' => 'Condition concern', 'source_run_id' => $reported, 'request_key' => 'held-report',
         ])->assertOk()->json('work_order.id');
+        // Same vehicle is insufficient: the check must belong to, or have been reported to, this work.
+        try {
+            app(MaintenanceTransitionService::class)->execute($recorder, (int) $work, 'place_restriction', 0,
+                'held-unrelated-source', ['restriction_kind' => 'safety', 'source_run_id' => $source->id]);
+            $this->fail('An unrelated check was accepted as this work order\'s source.');
+        } catch (HttpExceptionInterface $exception) {
+            $this->assertSame(404, $exception->getStatusCode());
+        }
         app(MaintenanceTransitionService::class)->execute($recorder, (int) $work, 'place_restriction', 0,
-            'held-reported-hold', ['restriction_kind' => 'safety']);
+            'held-reported-hold', ['restriction_kind' => 'safety', 'source_run_id' => $reported]);
+        $this->assertDatabaseHas('fleet_maintenance_restrictions', ['work_order_id' => $work, 'source_run_id' => $reported]);
         $this->assess($assessor, $vehicle, $reported)->assertUnprocessable()->assertJsonPath('errors.run.0', $message);
 
         $this->assertSame(0, DB::table('fleet_maintenance_check_assessments')->count());
@@ -558,7 +569,7 @@ class Pkg01CheckAssessmentTest extends TestCase
             $this->assertStringContainsString('check assessments exist', $error->getMessage());
         }
         try {
-            \App\Services\Fleet\MaintenanceRollbackGuard::assertEmpty();
+            MaintenanceRollbackGuard::assertEmpty();
             $this->fail('The PKG-01 rollback guard should refuse while decisions exist.');
         } catch (RuntimeException $error) {
             $this->assertStringContainsString('rollback must not remove its provenance', $error->getMessage());

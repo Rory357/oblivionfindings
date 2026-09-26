@@ -11,29 +11,33 @@ use App\Http\Controllers\FleetAssets\DailyCheckController;
 use App\Http\Controllers\FleetAssets\DashboardController;
 use App\Http\Controllers\FleetAssets\DeviceController;
 use App\Http\Controllers\FleetAssets\DriverController;
+use App\Http\Controllers\FleetAssets\FleetCatalogueController;
 use App\Http\Controllers\FleetAssets\GeofenceController;
 use App\Http\Controllers\FleetAssets\HandoverController;
 use App\Http\Controllers\FleetAssets\IncidentController;
 use App\Http\Controllers\FleetAssets\InspectionController;
 use App\Http\Controllers\FleetAssets\KeyController;
 use App\Http\Controllers\FleetAssets\LiveMapController;
-use App\Http\Controllers\FleetAssets\MaintenanceDashboardController;
 use App\Http\Controllers\FleetAssets\MaintenanceAttachmentController;
+use App\Http\Controllers\FleetAssets\MaintenanceDashboardController;
 use App\Http\Controllers\FleetAssets\MileageController;
 use App\Http\Controllers\FleetAssets\OutingController;
 use App\Http\Controllers\FleetAssets\ReportController;
 use App\Http\Controllers\FleetAssets\ResidentTrackingController;
 use App\Http\Controllers\FleetAssets\ResidentTransportController;
 use App\Http\Controllers\FleetAssets\ServiceScheduleController;
+use App\Http\Controllers\FleetAssets\VehicleAlertController;
 use App\Http\Controllers\FleetAssets\VehicleBookingController;
 use App\Http\Controllers\FleetAssets\VehicleCalendarController;
+use App\Http\Controllers\FleetAssets\VehicleCheckController;
+use App\Http\Controllers\FleetAssets\VehicleController;
+use App\Http\Controllers\FleetAssets\VehicleDocumentController;
+use App\Http\Controllers\FleetAssets\VehicleDrivingController;
+use App\Http\Controllers\FleetAssets\VehicleEvidenceController;
 use App\Http\Controllers\FleetAssets\VehicleFinanceController;
+use App\Http\Controllers\FleetAssets\VehicleMapController;
 use App\Http\Controllers\FleetAssets\VehicleMileageFeedController;
 use App\Http\Controllers\FleetAssets\VehicleObligationReminderController;
-use App\Http\Controllers\FleetAssets\VehicleController;
-use App\Http\Controllers\FleetAssets\FleetCatalogueController;
-use App\Http\Controllers\FleetAssets\VehicleDocumentController;
-use App\Http\Controllers\FleetAssets\VehicleEvidenceController;
 use App\Http\Controllers\FleetAssets\VehicleReminderController;
 use App\Http\Controllers\FleetAssets\VehicleServiceScheduleController;
 use App\Http\Controllers\FleetAssets\VehicleTripHistoryController;
@@ -116,6 +120,8 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     Route::middleware('permission:fleet.manage|fleet.maintenance.manage')->group(function () {
         Route::post('/vehicles/{asset}/appointments', [VehicleCalendarController::class, 'scheduleAppointment'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.appointments.store');
+        Route::post('/vehicles/{asset}/appointments/undo', [VehicleCalendarController::class, 'undoAppointment'])
+            ->whereNumber('asset')->name('fleet-assets.vehicles.appointments.undo');
     });
 
     // PKG-02B vehicle calendar: unavailable periods.
@@ -161,29 +167,29 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     // site routing required). Changing a checklist publishes a new immutable
     // version; submitted checks keep the version they were answered against.
     Route::middleware('permission:fleet.viewAny')->group(function () {
-        Route::get('/vehicles/{asset}/checks', [\App\Http\Controllers\FleetAssets\VehicleCheckController::class, 'index'])
+        Route::get('/vehicles/{asset}/checks', [VehicleCheckController::class, 'index'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.checks.index');
     });
     Route::middleware(['permission:fleet.viewAny', 'permission:fleet.maintenance.manage|fleet.manage'])->group(function () {
-        Route::post('/vehicles/{asset}/checks', [\App\Http\Controllers\FleetAssets\VehicleCheckController::class, 'store'])
+        Route::post('/vehicles/{asset}/checks', [VehicleCheckController::class, 'store'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.checks.store');
-        Route::post('/vehicles/{asset}/checks/{run}/amendments', [\App\Http\Controllers\FleetAssets\VehicleCheckController::class, 'amend'])
+        Route::post('/vehicles/{asset}/checks/{run}/amendments', [VehicleCheckController::class, 'amend'])
             ->whereNumber(['asset', 'run'])->name('fleet-assets.vehicles.checks.amendments.store');
         // Maintenance's "no issue found — release for use" for one check
         // (MaintenanceTransitionService::assessCheck; holds are untouched).
-        Route::post('/vehicles/{asset}/checks/{run}/assessments', [\App\Http\Controllers\FleetAssets\VehicleCheckController::class, 'assess'])
+        Route::post('/vehicles/{asset}/checks/{run}/assessments', [VehicleCheckController::class, 'assess'])
             ->whereNumber(['asset', 'run'])->name('fleet-assets.vehicles.checks.assessments.store');
-        Route::post('/vehicles/{asset}/check-templates', [\App\Http\Controllers\FleetAssets\VehicleCheckController::class, 'storeTemplate'])
+        Route::post('/vehicles/{asset}/check-templates', [VehicleCheckController::class, 'storeTemplate'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.check-templates.store');
-        Route::post('/vehicles/{asset}/check-templates/{template}/versions', [\App\Http\Controllers\FleetAssets\VehicleCheckController::class, 'publishVersion'])
+        Route::post('/vehicles/{asset}/check-templates/{template}/versions', [VehicleCheckController::class, 'publishVersion'])
             ->whereNumber(['asset', 'template'])->name('fleet-assets.vehicles.check-templates.versions.store');
     });
     Route::middleware(['permission:fleet.viewAny', 'permission:fleet.manage'])->group(function () {
-        Route::put('/vehicles/{asset}/check-requirement', [\App\Http\Controllers\FleetAssets\VehicleCheckController::class, 'requirement'])
+        Route::put('/vehicles/{asset}/check-requirement', [VehicleCheckController::class, 'requirement'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.check-requirement.update');
     });
     Route::middleware(['permission:fleet.viewAny', 'permission:fleet.maintenance.report|fleet.maintenance.manage|fleet.manage'])->group(function () {
-        Route::post('/vehicles/{asset}/maintenance-reports', [\App\Http\Controllers\FleetAssets\VehicleCheckController::class, 'report'])
+        Route::post('/vehicles/{asset}/maintenance-reports', [VehicleCheckController::class, 'report'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.maintenance-reports.store');
     });
 
@@ -210,6 +216,8 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
             ->whereNumber('asset')->name('fleet-assets.vehicles.reminders.store');
         Route::put('/vehicles/{asset}/reminders/{reminder}', [VehicleReminderController::class, 'update'])
             ->whereNumber(['asset', 'reminder'])->name('fleet-assets.vehicles.reminders.update');
+        Route::post('/vehicles/{asset}/reminders/{reminder}/undo', [VehicleReminderController::class, 'undo'])
+            ->whereNumber(['asset', 'reminder'])->name('fleet-assets.vehicles.reminders.undo');
         Route::post('/vehicles/{asset}/reminders/{reminder}/{action}', [VehicleReminderController::class, 'act'])
             ->whereNumber(['asset', 'reminder'])->whereIn('action', ['acknowledge', 'complete', 'pause', 'resume', 'snooze'])
             ->name('fleet-assets.vehicles.reminders.act');
@@ -322,23 +330,23 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     // personal-trip data; telemetry needs the vehicle technology view. Geofence
     // assignments are saved inactive and never start monitoring.
     Route::middleware('permission:fleet.viewAny')->group(function () {
-        Route::get('/vehicles/{asset}/location', [\App\Http\Controllers\FleetAssets\VehicleMapController::class, 'location'])
+        Route::get('/vehicles/{asset}/location', [VehicleMapController::class, 'location'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.location');
-        Route::get('/vehicles/{asset}/location/trail', [\App\Http\Controllers\FleetAssets\VehicleMapController::class, 'trail'])
+        Route::get('/vehicles/{asset}/location/trail', [VehicleMapController::class, 'trail'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.location.trail');
-        Route::get('/vehicles/{asset}/geofences/catalogue', [\App\Http\Controllers\FleetAssets\VehicleMapController::class, 'catalogue'])
+        Route::get('/vehicles/{asset}/geofences/catalogue', [VehicleMapController::class, 'catalogue'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.geofences.catalogue');
-        Route::get('/vehicles/{asset}/telemetry', [\App\Http\Controllers\FleetAssets\VehicleMapController::class, 'telemetry'])
+        Route::get('/vehicles/{asset}/telemetry', [VehicleMapController::class, 'telemetry'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.telemetry');
     });
     Route::middleware(['permission:fleet.viewAny', 'permission:fleet.manage|assets.geofences.manage'])->group(function () {
-        Route::get('/vehicles/{asset}/geofences/places', [\App\Http\Controllers\FleetAssets\VehicleMapController::class, 'places'])
+        Route::get('/vehicles/{asset}/geofences/places', [VehicleMapController::class, 'places'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.geofences.places');
-        Route::put('/vehicles/{asset}/geofences/selection', [\App\Http\Controllers\FleetAssets\VehicleMapController::class, 'selection'])
+        Route::put('/vehicles/{asset}/geofences/selection', [VehicleMapController::class, 'selection'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.geofences.selection');
-        Route::post('/vehicles/{asset}/geofences', [\App\Http\Controllers\FleetAssets\VehicleMapController::class, 'storeGeofence'])
+        Route::post('/vehicles/{asset}/geofences', [VehicleMapController::class, 'storeGeofence'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.geofences.store');
-        Route::put('/vehicles/{asset}/geofences/{assignment}', [\App\Http\Controllers\FleetAssets\VehicleMapController::class, 'updateGeofence'])
+        Route::put('/vehicles/{asset}/geofences/{assignment}', [VehicleMapController::class, 'updateGeofence'])
             ->whereNumber(['asset', 'assignment'])->name('fleet-assets.vehicles.geofences.update');
     });
 
@@ -352,44 +360,44 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     // outbox. Services recheck the exact authority; writes are idempotent,
     // version-checked and audited; a foreign or missing vehicle answers 404.
     Route::middleware('permission:fleet.viewAny')->group(function () {
-        Route::get('/vehicles/{asset}/driving', [\App\Http\Controllers\FleetAssets\VehicleDrivingController::class, 'show'])
+        Route::get('/vehicles/{asset}/driving', [VehicleDrivingController::class, 'show'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.driving');
-        Route::get('/vehicles/{asset}/driving/reviews', [\App\Http\Controllers\FleetAssets\VehicleDrivingController::class, 'reviews'])
+        Route::get('/vehicles/{asset}/driving/reviews', [VehicleDrivingController::class, 'reviews'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.driving.reviews');
-        Route::get('/vehicles/{asset}/driving/speed-limits', [\App\Http\Controllers\FleetAssets\VehicleDrivingController::class, 'speedLimits'])
+        Route::get('/vehicles/{asset}/driving/speed-limits', [VehicleDrivingController::class, 'speedLimits'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.driving.speed-limits');
-        Route::get('/vehicles/{asset}/alerts', [\App\Http\Controllers\FleetAssets\VehicleAlertController::class, 'index'])
+        Route::get('/vehicles/{asset}/alerts', [VehicleAlertController::class, 'index'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.alerts.index');
-        Route::get('/vehicles/{asset}/alerts/{alert}', [\App\Http\Controllers\FleetAssets\VehicleAlertController::class, 'show'])
+        Route::get('/vehicles/{asset}/alerts/{alert}', [VehicleAlertController::class, 'show'])
             ->whereNumber(['asset', 'alert'])->name('fleet-assets.vehicles.alerts.show');
     });
     Route::middleware(['permission:fleet.viewAny', 'permission:fleet.manage|fleet.trips.manage'])->group(function () {
-        Route::post('/vehicles/{asset}/driving/trips/{trip}/reviews', [\App\Http\Controllers\FleetAssets\VehicleDrivingController::class, 'review'])
+        Route::post('/vehicles/{asset}/driving/trips/{trip}/reviews', [VehicleDrivingController::class, 'review'])
             ->whereNumber(['asset', 'trip'])->name('fleet-assets.vehicles.driving.reviews.store');
     });
     Route::middleware(['permission:fleet.viewAny', 'permission:fleet.manage'])->group(function () {
-        Route::post('/vehicles/{asset}/driving/policy', [\App\Http\Controllers\FleetAssets\VehicleDrivingController::class, 'publishPolicy'])
+        Route::post('/vehicles/{asset}/driving/policy', [VehicleDrivingController::class, 'publishPolicy'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.driving.policy.store');
-        Route::post('/vehicles/{asset}/driving/speed-limits', [\App\Http\Controllers\FleetAssets\VehicleDrivingController::class, 'proposeLimit'])
+        Route::post('/vehicles/{asset}/driving/speed-limits', [VehicleDrivingController::class, 'proposeLimit'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.driving.speed-limits.store');
-        Route::post('/vehicles/{asset}/driving/speed-limits/{limit}/{action}', [\App\Http\Controllers\FleetAssets\VehicleDrivingController::class, 'reviewLimit'])
+        Route::post('/vehicles/{asset}/driving/speed-limits/{limit}/{action}', [VehicleDrivingController::class, 'reviewLimit'])
             ->whereNumber(['asset', 'limit'])->whereIn('action', ['approve', 'retire'])
             ->name('fleet-assets.vehicles.driving.speed-limits.review');
-        Route::post('/vehicles/{asset}/alerts/route', [\App\Http\Controllers\FleetAssets\VehicleAlertController::class, 'route'])
+        Route::post('/vehicles/{asset}/alerts/route', [VehicleAlertController::class, 'route'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.alerts.route');
-        Route::put('/vehicles/{asset}/alert-plan', [\App\Http\Controllers\FleetAssets\VehicleAlertController::class, 'savePlan'])
+        Route::put('/vehicles/{asset}/alert-plan', [VehicleAlertController::class, 'savePlan'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.alert-plan.update');
-        Route::post('/vehicles/{asset}/alerts/{alert}/follow-up', [\App\Http\Controllers\FleetAssets\VehicleAlertController::class, 'followUp'])
+        Route::post('/vehicles/{asset}/alerts/{alert}/follow-up', [VehicleAlertController::class, 'followUp'])
             ->whereNumber(['asset', 'alert'])->name('fleet-assets.vehicles.alerts.follow-up');
     });
     Route::middleware(['permission:fleet.viewAny', 'permission:controlRoom.alerts.manage'])->group(function () {
-        Route::post('/vehicles/{asset}/alerts/signals/{signal}/retry', [\App\Http\Controllers\FleetAssets\VehicleAlertController::class, 'retry'])
+        Route::post('/vehicles/{asset}/alerts/signals/{signal}/retry', [VehicleAlertController::class, 'retry'])
             ->whereNumber(['asset', 'signal'])->name('fleet-assets.vehicles.alerts.retry');
-        Route::post('/vehicles/{asset}/alerts/{alert}/maintenance', [\App\Http\Controllers\FleetAssets\VehicleAlertController::class, 'maintenance'])
+        Route::post('/vehicles/{asset}/alerts/{alert}/maintenance', [VehicleAlertController::class, 'maintenance'])
             ->whereNumber(['asset', 'alert'])->name('fleet-assets.vehicles.alerts.maintenance');
     });
     Route::middleware(['permission:fleet.viewAny', 'permission:controlRoom.alerts.manage|controlRoom.alerts.escalate'])->group(function () {
-        Route::post('/vehicles/{asset}/alerts/{alert}/{action}', [\App\Http\Controllers\FleetAssets\VehicleAlertController::class, 'act'])
+        Route::post('/vehicles/{asset}/alerts/{alert}/{action}', [VehicleAlertController::class, 'act'])
             ->whereNumber(['asset', 'alert'])->whereIn('action', ['acknowledge', 'triage', 'escalate', 'resolve'])
             ->name('fleet-assets.vehicles.alerts.act');
     });

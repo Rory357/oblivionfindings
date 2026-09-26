@@ -73,7 +73,7 @@ class VehicleCalendarService
         }
         array_push($items, ...$this->bookingItems($viewer, $asset, $start, $end));
         array_push($items, ...$this->unavailableItems($asset, $start, $end, $bookable, $readsMaintenance));
-        array_push($items, ...$this->reminderItems($asset, $start, $end));
+        array_push($items, ...$this->reminderItems($viewer, $asset, $start, $end));
 
         usort($items, fn (array $a, array $b): int => strcmp((string) $a['start'], (string) $b['start']));
 
@@ -508,7 +508,7 @@ class VehicleCalendarService
     }
 
     /** Due dates and follow-ups; none of them reserve the vehicle. @return list<array<string,mixed>> */
-    private function reminderItems(Asset $asset, CarbonImmutable $start, CarbonImmutable $end): array
+    private function reminderItems(User $viewer, Asset $asset, CarbonImmutable $start, CarbonImmutable $end): array
     {
         $items = [];
         FleetServiceSchedule::query()->where('asset_id', $asset->id)->where('is_active', true)
@@ -553,7 +553,7 @@ class VehicleCalendarService
             );
         }
 
-        FleetVehicleReminder::query()->where('asset_id', $asset->id)
+        app(VehicleReminderAccess::class)->scope(FleetVehicleReminder::query(), $viewer)->where('asset_id', $asset->id)
             ->whereIn('state', ['scheduled', 'acknowledged'])
             ->whereBetween('due_at', [$start->utc(), $end->utc()])
             ->orderBy('due_at')->limit(200)->get(['id', 'title', 'due_at', 'state'])

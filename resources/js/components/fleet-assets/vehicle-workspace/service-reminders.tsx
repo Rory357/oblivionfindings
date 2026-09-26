@@ -36,6 +36,7 @@ import {
     Wrench,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { CataloguePicker, formatChoice, PersonPicker } from './choice-picker';
 import {
     ObligationActionDialog,
@@ -47,7 +48,11 @@ import {
     VehicleCollectionToggle,
     VehicleRecordCollection,
 } from './record-collection';
-import { isJsonObject, useVehicleRecordCommand } from './record-command';
+import {
+    isJsonObject,
+    sendVehicleRecord,
+    useVehicleRecordCommand,
+} from './record-command';
 import { ScheduleDialog } from './service-schedules';
 import { openWorkOrder, SourceRecordDialog } from './studio-kit';
 import type {
@@ -726,6 +731,33 @@ export function RemindersPanel({
     );
 }
 
+function offerReminderUndo(
+    vehicleId: number,
+    reminderId: number,
+    result: Record<string, unknown>,
+    onChanged: () => void,
+) {
+    if (!isJsonObject(result.undo)) return;
+    const undo = result.undo;
+    toast.success('Reminder changed', {
+        duration: 10000,
+        action: {
+            label: 'Undo',
+            onClick: () => {
+                sendVehicleRecord(
+                    `/fleet-assets/vehicles/${vehicleId}/reminders/${reminderId}/undo`,
+                    undo,
+                )
+                    .then(() => {
+                        onChanged();
+                        toast.success('Previous reminder restored');
+                    })
+                    .catch((error: Error) => toast.error(error.message));
+            },
+        },
+    });
+}
+
 const STEPS = [
     {
         key: 'source',
@@ -792,6 +824,15 @@ export function ReminderDialog({
     const [step, setStep] = useState(0);
     const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
     const [saved, setSaved] = useState(false);
+    const [savedResult, setSavedResult] = useState<Record<
+        string,
+        unknown
+    > | null>(null);
+    const close = () => {
+        onClose();
+        if (reminder && savedResult)
+            offerReminderUndo(vehicle.id, reminder.id, savedResult, onSaved);
+    };
     const command = useVehicleRecordCommand(isJsonObject);
     const errors = { ...command.errors, ...localErrors };
     const update = <K extends keyof typeof form>(
@@ -882,6 +923,7 @@ export function ReminderDialog({
               );
         if (result) {
             setSaved(true);
+            setSavedResult(result);
             onSaved();
         }
     };
@@ -925,14 +967,52 @@ export function ReminderDialog({
             submitLabel={reminder ? 'Save reminder' : 'Create reminder'}
             onValidateStep={validateStep}
             onSubmit={submit}
-            onClose={onClose}
+            onClose={close}
             onReload={onClose}
             errorKey={JSON.stringify(errors)}
             success={
                 <WizardSuccess
                     title={reminder ? 'Reminder saved' : 'Reminder created'}
-                    blurb="It shows on this vehicle, in All Tasks for its owner and on the site calendar."
-                    onClose={onClose}
+                    blurb={
+                        <>
+                            It shows on this vehicle, in All Tasks for its owner
+                            and on the site calendar.
+                            {reminder &&
+                                savedResult &&
+                                isJsonObject(savedResult.undo) && (
+                                    <Button
+                                        className="mt-4"
+                                        variant="outline"
+                                        onClick={async () => {
+                                            try {
+                                                await sendVehicleRecord(
+                                                    `/fleet-assets/vehicles/${vehicle.id}/reminders/${reminder.id}/undo`,
+                                                    savedResult.undo as Record<
+                                                        string,
+                                                        unknown
+                                                    >,
+                                                );
+                                                setSavedResult(null);
+                                                onSaved();
+                                                onClose();
+                                                toast.success(
+                                                    'Previous reminder restored',
+                                                );
+                                            } catch (error) {
+                                                toast.error(
+                                                    error instanceof Error
+                                                        ? error.message
+                                                        : 'Reload to review the latest reminder.',
+                                                );
+                                            }
+                                        }}
+                                    >
+                                        Undo reminder change
+                                    </Button>
+                                )}
+                        </>
+                    }
+                    onClose={close}
                 />
             }
         >
@@ -1190,6 +1270,7 @@ export function ReminderActionDialog({
             },
         );
         if (result) {
+            offerReminderUndo(vehicleId, reminder.id, result, onSaved);
             onSaved();
             onClose();
         }
@@ -1265,6 +1346,8 @@ const EVENT_LABELS: Record<string, string> = {
     complete: 'Follow-up recorded',
     pause: 'Paused',
     resume: 'Resumed',
+    snooze: 'Snoozed',
+    undo: 'Change undone',
 };
 
 export function ReminderActivityDialog({
@@ -1359,6 +1442,7 @@ export function SnoozeReminderDialog({
             },
         );
         if (result) {
+            offerReminderUndo(vehicleId, reminder.id, result, onSaved);
             onSaved();
             onClose();
         }

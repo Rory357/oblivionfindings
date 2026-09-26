@@ -129,6 +129,17 @@ const recorded = (patch: Partial<RecordedEvent> = {}): RecordedEvent => ({
 });
 
 describe('alert status', () => {
+    it('keeps queued delivery distinct from a received or resolved response', () => {
+        expect(
+            statusLabel({ status: 'delivery_pending', escalation_level: 0 }),
+        ).toBe('Waiting for Control Room');
+        expect(statusVariant('delivery_pending')).toBe('info');
+        expect(availableActions('delivery_pending')).toEqual([]);
+        expect(ackText(item({ status: 'delivery_pending' }), NOW)).toBe(
+            'Waiting for Control Room receipt',
+        );
+        expect(isTerminal('delivery_pending')).toBe(false);
+    });
     it('names each Control Room status the way the design does', () => {
         expect(statusLabel({ status: 'open', escalation_level: 0 })).toBe(
             'New',

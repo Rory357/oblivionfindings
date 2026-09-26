@@ -3,6 +3,7 @@
 namespace App\Services\Sites\Calendar\Providers;
 
 use App\Models\FleetVehicleReminder;
+use App\Services\Fleet\VehicleReminderAccess;
 use App\Services\Sites\Calendar\CalendarItem;
 use Illuminate\Support\Carbon;
 
@@ -24,7 +25,7 @@ class FleetVehicleReminderObligationProvider extends ObligationProvider
             return [];
         }
 
-        $reminders = FleetVehicleReminder::query()
+        $reminders = app(VehicleReminderAccess::class)->scope(FleetVehicleReminder::query(), auth()->user())
             ->whereIn('state', ['scheduled', 'acknowledged'])
             ->whereBetween('due_at', [$start->copy()->utc(), $end->copy()->utc()])
             ->whereHas('asset', fn ($asset) => $asset->whereIn('site_id', $siteIds))

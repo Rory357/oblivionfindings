@@ -420,13 +420,25 @@ final class VehicleTripHistoryService
         }
         // Chronological, as a report reads.
         $trips = array_reverse($trips);
-        $analysis = ($withEvents || $withRoutes)
-            ? $this->analyse($asset, $trips, true, self::ROUTE_SKETCH_POINT_CAP)
-            : array_intersect_key($result['analysis'], array_flip(array_map(fn (FleetTrip $trip) => $trip->id, $trips)));
+        $reviewedIds = SchemaCache::hasTable('fleet_driving_event_reviews')
+            ? DB::table('fleet_driving_event_reviews')->whereIn('fleet_trip_id', array_map(fn (FleetTrip $trip) => $trip->id, $trips))
+                ->distinct()->pluck('fleet_trip_id')->map(fn ($id) => (int) $id)->all()
+            : [];
+        // Even a data-only report must honour dismissed/disputed events. Collect
+        // their stable keys for reviewed trips; do not materialise every route
+        // in a large spreadsheet that did not request journey images/events.
+        $collected = array_values(array_filter($trips, fn (FleetTrip $trip): bool => $withEvents || $withRoutes || in_array((int) $trip->id, $reviewedIds, true)));
+        $analysis = $this->analyse($asset, $collected, true, self::ROUTE_SKETCH_POINT_CAP)
+            + array_intersect_key($result['analysis'], array_flip(array_map(fn (FleetTrip $trip) => $trip->id, $trips)));
 
         $rows = [];
         foreach ($trips as $trip) {
             $a = $analysis[$trip->id];
+            if (in_array((int) $trip->id, $reviewedIds, true)) {
+                [$a['score'], $a['score_state']] = VehicleDrivingInsightsService::reviewedTripScore(
+                    $trip, $a, TripBehaviourAnalyzer::policy(),
+                );
+            }
             $attribution = $result['attribution'][$trip->id];
             $rows[] = $this->tripFacts($trip) + [
                 'driver' => $this->driverView($attribution),

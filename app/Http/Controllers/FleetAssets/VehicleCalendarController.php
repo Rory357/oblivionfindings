@@ -108,7 +108,7 @@ class VehicleCalendarController extends Controller
         $result = $this->appointments->schedule($this->actor($request), (int) $asset->getKey(),
             $request->only(['operation', 'change_reason', 'work_order_id', 'title', 'provider_name', 'starts_local',
                 'ends_local', 'starts_offset', 'ends_offset', 'unavailable', 'provider_reference', 'notes',
-                'source_type', 'source_id']),
+                'source_type', 'source_id', 'expected_version']),
             $this->key($request), $files);
         $order = $result['work_order'];
 
@@ -116,12 +116,24 @@ class VehicleCalendarController extends Controller
             'work_order_id' => (int) $order->id,
             'work_order' => ['id' => $order->id, 'reference' => $order->reference_number, 'version' => (int) $order->version],
             'unavailable_period' => $result['unavailable_period'] ? $this->periodResult($result['unavailable_period']) : null,
+            'undo' => $result['undo'] ?? null,
             'message' => match ($request->input('operation')) {
                 'cancel' => 'Appointment cancelled on the work order. The vehicle is no longer held for it; the work stays open in Maintenance.',
                 'overrun' => 'Overrun recorded on the work order and the vehicle calendar.',
                 default => 'Appointment saved in Maintenance and on the vehicle calendar.',
             },
         ]);
+    }
+
+    public function undoAppointment(Request $request, Asset $asset): JsonResponse
+    {
+        $data = $request->validate(['command_id' => ['required', 'integer', 'min:1'],
+            'expected_version' => ['required', 'integer', 'min:1']]);
+        $result = $this->appointments->undo($this->actor($request), (int) $asset->getKey(),
+            (int) $data['command_id'], (int) $data['expected_version'], $this->key($request));
+
+        return response()->json(['work_order_id' => (int) $result['work_order']->id,
+            'message' => 'Previous internal appointment restored. Provider confirmation remains a separate action.']);
     }
 
     private function actor(Request $request): User

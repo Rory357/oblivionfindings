@@ -1,0 +1,229 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\storage\pkg02b-audit\phpunit.xml
+
+..
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\FleetControlRoomAlertHeroScopeTest[39m
+  [32;1m✓[39;22m[90m [39m[90mfleet hero alert counts are actionable site scoped and globally available to managers[39m[90m                     [39m [90m257.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcanonical vehicle signals appear in fleet alerts without widening site access[39m[90m                               [39m [90m0.65s[39m  
+................
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg01CheckAssessmentTest[39m
+  [32;1m✓[39;22m[90m [39m[90man independent manager releases a check that no approved rule covers[39m[90m                                        [39m [90m1.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe recorder may release their own check only when it recorded no issue and no rule applied[39m[90m                 [39m [90m0.95s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma reason and confirmation are required and nothing is kept without them[39m[90m                                     [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90monly maintenance managers at the vehicles site can assess[39m[90m                                                   [39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma retry returns the same decision and a changed retry or second decision conflicts[39m[90m                          [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma check failed by an approved rule keeps the repair retest and release path[39m[90m                                 [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma check maintenance placed a hold for is released only by independent release[39m[90m                               [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mretests passed advisory and already released checks have nothing to assess[39m[90m                                  [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe release readiness gate applies before a check is released[39m[90m                                               [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mother maintenance holds keep the vehicle unavailable[39m[90m                                                        [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma booking the check stopped can be approved once it is released[39m[90m                                             [39m [90m4.33s[39m  
+  [32;1m✓[39;22m[90m [39m[90man assessed check recorded after a retest no longer prevents release[39m[90m                                        [39m [90m0.95s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma legacy daily check without a submission time never blocks release[39m[90m                                         [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe decision is visible on the check the vehicle and its linked work[39m[90m                                        [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcheck assessments roll back only while empty[39m[90m                                                                [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe vehicle lock orders a release against a new hold and a waiting booking decision[39m[90m                        [39m [90m10.64s[39m  
+......[41;37mF[0m
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bFleetSignalSourceProvisioningTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthe migration provisions the active fleet source when it is missing[39m[90m                                         [39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrunning the migration again changes nothing[39m[90m                                                                 [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90man existing source is left exactly as it was with data set "switched off by an admin"[39m[90m                       [39m [90m0.95s[39m  
+  [32;1m✓[39;22m[90m [39m[90man existing source is left exactly as it was with data set "paused for maintenance"[39m[90m                         [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90man existing source is left exactly as it was with data set "active and renamed by an admin"[39m[90m                 [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrolling back keeps the source[39m[90m                                                                               [39m [90m0.72s[39m  
+  [31;1m⨯[39;22m[90m [39m[90ma vehicle event sent from the profile reaches control room through the migrated source[39m[90m                      [39m [90m2.18s[39m  
+.......
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bFleetVehiclesAllSitesTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthe seeder and the grant migration give admin and the fleet manager role central oversight[39m[90m                  [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe register daily check and profile show every vehicle to central oversight only[39m[90m                           [39m [90m0.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe vehicles own records can be kept across sites[39m[90m                                                           [39m [90m1.02s[39m  
+  [32;1m✓[39;22m[90m [39m[90mbookings trips locations drivers and finance keep their own site rules[39m[90m                                      [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmaintenance work stays with the vehicles site[39m[90m                                                               [39m [90m0.98s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe compliance page follows the register scope[39m[90m                                                              [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe fleet settings grant migration gives admin and the fleet manager role the permission[39m[90m                    [39m [90m0.62s[39m  
+.......
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bLegacyAssetDocumentRoutesTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthe register download refuses vehicle files that have not passed their virus check[39m[90m                         [39m [90m13.59s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclean vehicle files open from the register through the vehicle profile download[39m[90m                             [39m [90m1.33s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinance review evidence opens from the register only for finance viewers[39m[90m                                    [39m [90m2.33s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe register cannot delete files the vehicle profile keeps[39m[90m                                                  [39m [90m9.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe register refuses new vehicle uploads[39m[90m                                                                    [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mother assets keep register upload download and delete[39m[90m                                                       [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe register lists vehicle documents without source owned evidence[39m[90m                                          [39m [90m1.08s[39m  
+...
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bMileageFeedTest[39m
+  [32;1m✓[39;22m[90m [39m[90mreconciling keeps the dashboard reading and plans from the tracker when enabled[39m[90m                             [39m [90m0.95s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreconciling needs a manager and a current tracker sample[39m[90m                                                    [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpausing turns automatic planning off with a reason[39m[90m                                                          [39m [90m0.70s[39m  
+.......
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bObligationRemindersTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdue obligations are delivered once to their owner[39m[90m                                                           [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma delivery without an owner fails visibly and can be retried[39m[90m                                                [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe owner acknowledges without completing the obligation[39m[90m                                                    [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mruc is reminded by distance from the recorded odometer[39m[90m                                                      [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma request key cant be reused for a different acknowledgement or action[39m[90m                                      [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe vehicle check is reminded to its owner like other obligations[39m[90m                                           [39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma vehicle check reminder without an owner fails and is retried to the new owner[39m[90m                             [39m [90m0.70s[39m  
+..............  63 / 142 ( 44%)
+.....
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[39m
+  [32;1m✓[39;22m[90m [39m[90mappointment commands refuse stale edits and changed retries and undo only the exact plan[39m[90m                    [39m [90m0.95s[39m  
+  [32;1m✓[39;22m[90m [39m[90msnooze undo restores an overdue time without overwriting a later change[39m[90m                                     [39m [90m0.87s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe feed shows permitted bookings and only busy time for others[39m[90m                                             [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90munavailable periods are idempotent versioned and block bookings[39m[90m                                             [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma booking change rechecks conflicts and versions[39m[90m                                                            [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mservice appointments plan reschedule overrun and cancel with one vehicle hold[39m[90m                               [39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90msnoozing a reminder only moves it later[39m[90m                                                                     [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevidence can be kept with a booking or unavailable period of this vehicle only[39m[90m                              [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe summary describes the restriction its linked work and release authority[39m[90m                                 [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mactive restrictions span the window and estimates carry their appointment[39m[90m                                   [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma booking or period outside the summary lists opens as its record[39m[90m                                           [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma linked appointment reuses open work from the same due item[39m[90m                                                [39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma period an appointment holds is managed through the appointment[39m[90m                                            [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma cancelled period can be restored while its time is still free[39m[90m                                             [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreversible changes can be put back through their own endpoints[39m[90m                                              [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma return with a concern opens linked maintenance work once[39m[90m                                                  [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma return concern without maintenance routing still returns the vehicle[39m[90m                                      [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mperiods are busy time outside the viewers sites and appointment details follow maintenance access[39m[90m           [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma stale booking change is refused instead of being lost[39m[90m                                                     [39m [90m0.77s[39m  
+........
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleChecksTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthe checks read model follows vehicle access[39m[90m                                                                [39m [90m0.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma check is recorded through the maintenance rules against its exact version[39m[90m                                 [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequired evidence is kept with the check as private vehicle documents[39m[90m                                       [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90mchanging a checklist publishes a new version and keeps earlier checks[39m[90m                                       [39m [90m0.97s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe check requirement sets the checklist owner and due date[39m[90m                                                 [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mamendments are attributed and keep the original check[39m[90m                                                       [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma report from a check keeps it as the source and needs approved routing[39m[90m                                     [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdaily checks stay within the persons fleet sites[39m[90m                                                            [39m [90m0.74s[39m  
+.......
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleDrivingAlertsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdriving insights follow the trip site rule and withhold private trips[39m[90m                                       [39m [90m1.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevent reviews are idempotent version checked audited and recalculate the trip score[39m[90m                         [39m [90m1.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma published scoring policy versions the weights and gates a persons score[39m[90m                                   [39m [90m1.10s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanual speed limits need a second reviewer and evidence before an evaluation uses them[39m[90m                      [39m [90m1.26s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe draft response plan is versioned and owned by site staff[39m[90m                                                [39m [90m0.96s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma recorded overspeed reaches control room and its response links maintenance and a follow up[39m[90m                [39m [90m1.91s[39m  
+  [32;1m✓[39;22m[90m [39m[90man undelivered vehicle signal is retried through recovery and private reports keep no trip or place[39m[90m         [39m [90m1.37s[39m  
+...........
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthe finance view is concealed without finance access[39m[90m                                                        [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlinked records combine finance and vehicle links without double counting[39m[90m                                    [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlinking needs fleet management finance access a reason and the vehicles scope[39m[90m                               [39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90munlinking keeps the finance record and needs a reason[39m[90m                                                       [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlinkable search is scoped to the vehicle and finance access[39m[90m                                                 [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreview requests are idempotent scoped and refuse open duplicates[39m[90m                                            [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreview request files are private and open only for finance viewers[39m[90m                                          [39m [90m1.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90monly finance decides a review request[39m[90m                                                                       [39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe person who asked for a review cannot decide it[39m[90m                                                          [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinance decides review requests in finance without fleet access[39m[90m                                             [39m [90m1.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mopen review requests reach finance in all tasks[39m[90m                                                             [39m [90m0.79s[39m  
+........
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleMapTest[39m
+  [32;1m✓[39;22m[90m [39m[90mlocation shows the reported state and recent trip ends within the viewers sites[39m[90m                             [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpositions during a personal trip or without consent are withheld[39m[90m                                            [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mselecting existing geofences links them inactive and replays safely[39m[90m                                         [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe wizard creates an inactive shared boundary owned by the vehicle site[39m[90m                                    [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanaging an assignment is versioned reviews changed sources and waits for paused monitoring[39m[90m                 [39m [90m1.19s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe catalogue lists permitted boundaries and marks fleet links[39m[90m                                              [39m [90m0.75s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtelemetry needs the vehicle technology view and withholds private samples[39m[90m                                   [39m [90m1.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mwithheld telemetry keeps the row and device health but no driving events[39m[90m                                    [39m [90m0.91s[39m  
+................
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleReadinessTest[39m
+  [32;1m✓[39;22m[90m [39m[90mcompliance evidence needs manage permission and conceals foreign or missing vehicles[39m[90m                        [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompliance versions are retained and stale or conflicting retries are refused[39m[90m                               [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcompliance assessments validate their evidence without inventing any[39m[90m                                        [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma requirement is marked not required with a reason as an audited version and can be required again[39m[90m          [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe register expiry date follows the current version only[39m[90m                                                   [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreadiness names every unassessed requirement and becomes ready with valid evidence[39m[90m                          [39m [90m0.62s[39m  
+  [32;1m✓[39;22m[90m [39m[90mb01 an unresolved applicable assessment blocks confirmation approval and checkout[39m[90m                           [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mb02 recorded ruc coverage applies to observed and checkout readings alike[39m[90m                                   [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexpiry uses the auckland local date and the end of the use[39m[90m                                                  [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90modometer readings are retained corrected in place and never future dated[39m[90m                                    [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90mapproval not required confirms only with authority readiness and acknowledgement[39m[90m                            [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90mself approval is refused only on the independent approval route[39m[90m                                             [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90moverlapping requests are refused while readiness problems leave the request pending[39m[90m                         [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcustody under another booking blocks only overlapping use[39m[90m                                                   [39m [90m0.76s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreturn reading cannot be lower than the checkout reading[39m[90m                                                    [39m [90m0.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlegacy vehicle fields are refused only when they would change the evidence[39m[90m                                  [39m [90m0.66s[39m  
+........ 126 / 142 ( 88%)
+....
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleTripHistoryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mtrip history is concealed outside the viewers sites and needs fleet view[39m[90m                                    [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdriver names from other sites are not shown[39m[90m                                                                 [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist filters by auckland day search driver and event type[39m[90m                                                   [39m [90m0.93s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe list reads the latest days and at most a year and says so[39m[90m                                               [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe list reads at most the latest trips while exports keep their own limits[39m[90m                                 [39m [90m1.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtrip detail reads behaviour from the recorded telemetry[39m[90m                                                     [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpersonal and restricted trips are listed without their places or route[39m[90m                                      [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfirming a driver needs authority a site candidate and is audited[39m[90m                                         [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleting a trip never erases its driver confirmation or event reviews[39m[90m                                       [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexports are scoped branded sanitised and audited[39m[90m                                                            [39m [90m2.57s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdriving metrics count queclink harsh reports and speed episodes[39m[90m                                             [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtrip builder records maximum speed for the trips list[39m[90m                                                       [39m [90m0.67s[39m  
+...........
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleWorkspaceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mworkspace page presents scoped vehicle data and permissions[39m[90m                                                 [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mvehicle details need a reason and the current version[39m[90m                                                       [39m [90m2.44s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdocuments are private and only clean files become available[39m[90m                                                 [39m [90m2.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforged oversized and empty files are refused before anything is recorded[39m[90m                                    [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreplacing files keeps the set its renewal reminder and the previous files until clean[39m[90m                       [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdocuments need document authority and conceal other vehicles files[39m[90m                                          [39m [90m0.81s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreminders keep their identity and completing one never completes its obligation[39m[90m                             [39m [90m0.90s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreminders reach all tasks and the site calendar for permitted readers[39m[90m                                       [39m [90m0.70s[39m  
+  [32;1m✓[39;22m[90m [39m[90mservice schedules use calendar months and move on from the actual service[39m[90m                                   [39m [90m0.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe legacy schedules list only shows accessible vehicles[39m[90m                                                    [39m [90m0.73s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcatalogue additions are deduplicated and need management access[39m[90m                                             [39m [90m0.74s[39m  
+.                                                142 / 142 (100%)
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bWorkspaceRollbackTest[39m
+  [32;1m✓[39;22m[90m [39m[90mPKG-02B migrations roll back only while empty and never discard vehicle records[39m[90m                            [39m [90m24.80s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [41;1m FAILED [49;22m [1mTests\Feature\FleetAssets\Pkg02bFleetSignalSourceProvisioningTest[22m [90m>[39m a vehicle event sent from the profile…   
+[39;1m  Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+-    0 => 'Low vehicle voltage',
++    0 => 'Vehicle power alert',
+ ][39;22m
+
+  at [32mtests\Feature\FleetAssets\Pkg02bFleetSignalSourceProvisioningTest.php[39m:[32m216[39m
+    212▕         $items = collect($this->actingAs($responder)->getJson("/fleet-assets/vehicles/{$vehicle->id}/alerts")->assertOk()
+    213▕             ->assertJsonPath('counts.open', 2)
+    214▕             ->json('items'));
+    215▕         $this->assertSame([$alert->id], $items->where('type', 'response')->pluck('id')->all());
+  ➜ 216▕         $this->assertSame(['Low vehicle voltage'], $items->where('type', 'response')->pluck('kind')->all());
+    217▕         $this->assertSame(['signal:'.$unrouted->id], $items->where('type', 'delivery')->pluck('id')->all());
+    218▕         $this->assertSame('unroutable', $this->outbox($unrouted)->status);
+    219▕     }
+    220▕
+
+  [33m1   [39m[39;1mtests\Feature\FleetAssets\Pkg02bFleetSignalSourceProvisioningTest.php[39;22m:[39;1m216[39;22m
+
+
+  [90mTests:[39m    [31;1m1 failed[39;22m[90m,[39m[39m [39m[32;1m141 passed[39;22m[90m (3270 assertions)[39m
+  [90mDuration:[39m [39m451.81s[39m
+
+
+
+Time: 07:23.386, Memory: 500.00 MB
+
+There was 1 failure:
+
+1) Tests\Feature\FleetAssets\Pkg02bFleetSignalSourceProvisioningTest::test_a_vehicle_event_sent_from_the_profile_reaches_control_room_through_the_migrated_source
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+-    0 => 'Low vehicle voltage',
++    0 => 'Vehicle power alert',
+ ]
+
+C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\tests\Feature\FleetAssets\Pkg02bFleetSignalSourceProvisioningTest.php:216
+
+[37;41mFAILURES![0m
+[37;41mTests: 142[0m[37;41m, Assertions: 3270[0m[37;41m, Failures: 1[0m[37;41m.[0m

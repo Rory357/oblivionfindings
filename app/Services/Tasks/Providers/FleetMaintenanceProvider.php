@@ -8,6 +8,7 @@ use App\Models\FleetVehicleReminder;
 use App\Models\FleetWorkOrder;
 use App\Models\User;
 use App\Services\Fleet\MaintenanceAccessService;
+use App\Services\Fleet\VehicleReminderAccess;
 use App\Services\Tasks\Contracts\ProvidesTaskSourceAliases;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
@@ -88,7 +89,7 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, SiteScopedT
     private function vehicleReminders(User $user, array $filters): array
     {
         $states = empty($filters['include_done']) ? ['scheduled', 'acknowledged'] : ['scheduled', 'acknowledged', 'completed'];
-        $query = FleetVehicleReminder::query()
+        $query = app(VehicleReminderAccess::class)->scope(FleetVehicleReminder::query(), $user)
             ->whereIn('state', $states)
             ->where('due_at', '<=', now()->addDays(self::HORIZON_DAYS))
             ->with(['asset:id,name', 'owner:id,name'])

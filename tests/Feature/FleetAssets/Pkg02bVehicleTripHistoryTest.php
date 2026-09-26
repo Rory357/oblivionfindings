@@ -544,16 +544,37 @@ class Pkg02bVehicleTripHistoryTest extends TestCase
 
         $excel = $this->actingAs($viewer)->get("{$base}/excel?from=2026-09-19&to=2026-09-21");
         $excel->assertOk();
-        $this->assertStringStartsWith('application/vnd.ms-excel', (string) $excel->headers->get('Content-Type'));
-        $this->assertStringContainsString('kwh014-trips-2026-09-19-to-2026-09-21.xls', (string) $excel->headers->get('Content-Disposition'));
-        $sheet = $excel->streamedContent();
-        $this->assertStringContainsString('<Workbook', $sheet);
+        $this->assertStringStartsWith('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', (string) $excel->headers->get('Content-Type'));
+        $this->assertStringContainsString('kwh014-trips-2026-09-19-to-2026-09-21.xlsx', (string) $excel->headers->get('Content-Disposition'));
+        $archive = tempnam(sys_get_temp_dir(), 'trip-export-test-');
+        file_put_contents($archive, $excel->getContent());
+        $zip = new \ZipArchive;
+        try {
+            $this->assertTrue($zip->open($archive));
+            $this->assertNotFalse($zip->locateName('xl/media/image4-1.png'));
+            $this->assertStringStartsWith("\x89PNG", $zip->getFromName('xl/media/image4-1.png'));
+            $sheet = '';
+            for ($entry = 0; $entry < $zip->numFiles; $entry++) {
+                $name = $zip->getNameIndex($entry);
+                if (str_ends_with($name, '.xml') || str_ends_with($name, '.rels')) {
+                    $part = $zip->getFromIndex($entry);
+                    $document = new \DOMDocument;
+                    $this->assertTrue($document->loadXML($part, LIBXML_NONET), $name);
+                    $sheet .= $part;
+                }
+            }
+            $zip->close();
+        } finally {
+            unlink($archive);
+        }
+        $this->assertStringContainsString('Journey sketches', $sheet);
         $this->assertStringContainsString('Kōwhai van', $sheet);
         $this->assertStringContainsString('Kōwhai House', $sheet);
         $this->assertStringContainsString('Trip #'.$business->id, $sheet);
-        // The leading apostrophe (escaped as &apos; in XML) keeps the text literal.
-        $this->assertStringContainsString('<Data ss:Type="String">&apos;=HYPERLINK(', $sheet);
-        $this->assertStringNotContainsString('<Data ss:Type="String">=HYPERLINK', $sheet);
+        // Native inline strings remain literal, even when they start with '='.
+        $this->assertStringContainsString('t="inlineStr"><is><t xml:space="preserve">=HYPERLINK(', $sheet);
+        $this->assertStringNotContainsString('<f>HYPERLINK', $sheet);
+        $this->assertStringContainsString('<f>SUM(I8:I8)</f>', $sheet);
         $this->assertStringNotContainsString('PERSONAL ONLY', $sheet);
         $this->assertStringNotContainsString('Trip #'.$personal->id, $sheet);
         $this->assertStringContainsString('Over fleet speed threshold', $sheet);

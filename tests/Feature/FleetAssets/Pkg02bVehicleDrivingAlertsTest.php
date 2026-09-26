@@ -30,6 +30,8 @@ use App\Services\Files\MalwareScanDisposition;
 use App\Services\Files\MalwareScanner;
 use App\Services\Files\MalwareScanResult;
 use App\Services\Fleet\RecordedVehicleEvents;
+use App\Services\Fleet\VehicleTripHistoryService;
+use App\Services\Fleet\VehicleTripReportExporter;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
@@ -255,6 +257,13 @@ class Pkg02bVehicleDrivingAlertsTest extends TestCase
         // Trip history shows the same reviewed score for the trip.
         $this->actingAs($viewer)->getJson("{$base}/trip-history/{$trip->id}")->assertOk()
             ->assertJsonPath('behaviour.score', 96);
+        $exportScore = function () use ($viewer, $vehicle): array {
+            $history = app(VehicleTripHistoryService::class);
+
+            return $history->exportReport($viewer, $history->vehicle($viewer, $vehicle->id),
+                $history->filters(['from' => '2026-09-21', 'to' => '2026-09-22']), 200, false, false);
+        };
+        $this->assertSame(96, $exportScore()['trips'][0]['behaviour']['score']);
 
         // A retried request is answered once; a reused key with other data is refused.
         $this->actingAs($manager)->withHeader('Idempotency-Key', 'review-braking-1')->postJson($url, $dismiss)
@@ -290,6 +299,11 @@ class Pkg02bVehicleDrivingAlertsTest extends TestCase
         $this->actingAs($viewer)->getJson("{$base}/trip-history/{$trip->id}")->assertOk()
             ->assertJsonPath('behaviour.score', null)
             ->assertJsonPath('behaviour.score_state', 'disputed');
+        $report = $exportScore();
+        $this->assertNull($report['trips'][0]['behaviour']['score']);
+        $this->assertSame('disputed', $report['trips'][0]['behaviour']['score_state']);
+        $this->assertStringContainsString('Withheld · driving event disputed',
+            app(VehicleTripReportExporter::class)->html($report, 'Audit viewer'));
 
         // Reviews are only added; the recorded telemetry is never changed.
         $this->assertSame(3, FleetDrivingEventReview::query()->count());
@@ -905,6 +919,15 @@ class Pkg02bVehicleDrivingAlertsTest extends TestCase
         $source->update(['status' => 'active']);
         $this->actingAs($manager)->withHeader('Idempotency-Key', 'retry-delivery')->postJson($retry, ['expected_attempts' => 1])
             ->assertOk()->assertJsonPath('delivery', 'pending');
+        foreach (['pending', 'processing'] as $deliveryState) {
+            $outbox->fresh()->update(['status' => $deliveryState]);
+            $this->actingAs($manager)->getJson("{$base}/alerts")->assertOk()
+                ->assertJsonPath('counts.open', 1)
+                ->assertJsonPath('items.0.id', 'signal:'.$signal->id)
+                ->assertJsonPath('items.0.status', 'delivery_pending')
+                ->assertJsonPath('items.0.delivery', $deliveryState);
+            $this->assertSame(0, ControlRoomAlert::query()->count());
+        }
         $this->deliver($signal);
         $this->assertSame('sent', $outbox->fresh()->status);
         $alert = ControlRoomAlert::query()->sole();
@@ -932,7 +955,7 @@ class Pkg02bVehicleDrivingAlertsTest extends TestCase
         $this->assertTrue(data_get($privateAlert->context, 'normalized_data.privacy_blocked'));
         $this->assertNull(data_get($privateAlert->context, 'normalized_data.trip_id'));
         $privateDetail = $this->actingAs($manager)->getJson("{$base}/alerts/{$privateAlert->id}")->assertOk()
-            ->assertJsonPath('kind', 'Low vehicle voltage')
+            ->assertJsonPath('kind', 'Vehicle power alert')
             ->assertJsonPath('location', null)
             ->assertJsonPath('location_withheld', 'personal')
             ->assertJsonPath('source.trip', null)

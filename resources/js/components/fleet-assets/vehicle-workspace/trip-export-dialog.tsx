@@ -151,7 +151,7 @@ export function TripExportDialog({
             const response = await fetch(
                 `${tripHistoryUrl(vehicle.id, `/export/${format}`)}?${query({
                     events: events ? 1 : 0,
-                    maps: format === 'pdf' && maps ? 1 : 0,
+                    maps: maps ? 1 : 0,
                 })}`,
                 {
                     credentials: 'same-origin',
@@ -171,7 +171,7 @@ export function TripExportDialog({
                 href: URL.createObjectURL(blob),
                 filename: dispositionFilename(
                     response.headers.get('Content-Disposition'),
-                    `vehicle-trips-${from}-to-${to}.${format === 'pdf' ? 'pdf' : 'xls'}`,
+                    `vehicle-trips-${from}-to-${to}.${format === 'pdf' ? 'pdf' : 'xlsx'}`,
                 ),
                 count,
             });
@@ -260,17 +260,16 @@ export function TripExportDialog({
                         </label>
                     </fieldset>
                     <div className="report-options">
-                        <label data-disabled={format !== 'pdf'}>
+                        <label>
                             <Checkbox
-                                checked={format === 'pdf' && maps}
-                                disabled={!!busy || format !== 'pdf'}
+                                checked={maps}
+                                disabled={!!busy}
                                 onCheckedChange={(value) =>
                                     change(() => setMaps(value === true))
                                 }
                             />
                             <ImageIcon size={16} aria-hidden="true" /> Include
                             route sketches of recorded positions
-                            {format !== 'pdf' && ' (PDF only)'}
                         </label>
                         <label>
                             <Checkbox
@@ -295,8 +294,8 @@ export function TripExportDialog({
                         </strong>
                         <p>
                             Uses the current trip filters, across all pages.
-                            Includes your organisation&apos;s name and brand
-                            colour, coverage and source notes. Dates are
+                            Includes your organisation&apos;s logo, name and
+                            brand colour, coverage and source notes. Dates are
                             inclusive, in Pacific/Auckland time.
                             {scope.state === 'ready' &&
                             scope.personal + scope.restricted > 0

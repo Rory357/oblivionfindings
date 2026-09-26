@@ -2,27 +2,22 @@
 
 namespace App\Services\Fleet;
 
-use App\Http\Controllers\Concerns\SanitizesCsvOutput;
 use App\Models\AppSetting;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Renders a vehicle trip report (VehicleTripHistoryService::exportReport) as
  * a branded PDF (dompdf with the embedded DejaVu Sans font, so macrons such
- * as "Kōwhai" print) or an Excel workbook in SpreadsheetML 2003, the
- * dependency-free format LeaveReportController already streams. Text cells
- * are neutralised against spreadsheet formula injection. Route sketches are
+ * as "Kōwhai" print) or a native Excel workbook with embedded journey images. Text cells
+ * are literal strings, never user-provided formulas. Route sketches are
  * drawn from the recorded positions only; no map imagery is fetched.
  */
 final class VehicleTripReportExporter
 {
-    use SanitizesCsvOutput;
-
     private const DEFAULT_COLOUR = '#7c3aed';
 
     /** @param  array<string,mixed>  $report */
@@ -47,126 +42,13 @@ final class VehicleTripReportExporter
     }
 
     /** @param  array<string,mixed>  $report */
-    public function spreadsheet(array $report, string $generatedBy): StreamedResponse
+    public function spreadsheet(array $report, string $generatedBy): Response
     {
-        $data = $this->viewData($report, $generatedBy);
-
-        return response()->streamDownload(function () use ($data): void {
-            echo $this->spreadsheetXml($data);
-        }, $this->filename($report, 'xls'), [
-            'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+        return response(app(VehicleTripWorkbook::class)->bytes($this->viewData($report, $generatedBy)), 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.$this->filename($report, 'xlsx').'"',
             'Cache-Control' => 'no-store, private',
         ]);
-    }
-
-    /** @param  array<string,mixed>  $report */
-    public function spreadsheetXml(array $data): string
-    {
-        $brand = $data['brand'];
-        $fill = strtoupper($brand['colour']);
-        $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n".'<?mso-application progid="Excel.Sheet"?>'."\n"
-            .'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office"'
-            .' xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'."\n"
-            .'<DocumentProperties xmlns="urn:schemas-microsoft-com:office:office"><Title>'.$this->xml($data['title']).'</Title>'
-            .'<Author>'.$this->xml($brand['name']).'</Author></DocumentProperties>'."\n"
-            .'<Styles>'
-            .'<Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Top" ss:WrapText="1"/><Font ss:FontName="Calibri" ss:Size="11"/></Style>'
-            .'<Style ss:ID="title"><Font ss:FontName="Calibri" ss:Size="16" ss:Bold="1" ss:Color="'.$fill.'"/></Style>'
-            .'<Style ss:ID="note"><Font ss:FontName="Calibri" ss:Size="10" ss:Color="#5B5670"/><Alignment ss:Vertical="Top" ss:WrapText="1"/></Style>'
-            .'<Style ss:ID="head"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="'.$fill.'" ss:Pattern="Solid"/><Alignment ss:Vertical="Center" ss:WrapText="1"/></Style>'
-            .'<Style ss:ID="date"><NumberFormat ss:Format="d mmm yyyy"/><Alignment ss:Vertical="Top"/></Style>'
-            .'<Style ss:ID="one"><NumberFormat ss:Format="0.0"/><Alignment ss:Vertical="Top"/></Style>'
-            .'<Style ss:ID="total"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1"/></Style>'
-            .'<Style ss:ID="totalOne"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1"/><NumberFormat ss:Format="0.0"/></Style>'
-            .'</Styles>'."\n";
-
-        $headers = ['Trip', 'Date', 'Start', 'End', 'Driver', 'Driver status', 'From', 'To', 'Distance (km)',
-            'Duration (min)', 'Max speed (km/h)', 'Coverage (%)', 'Driving events', 'Behaviour score', 'Source'];
-        $intro = [
-            [$brand['name'].' · Trip report', 'title'],
-            [$data['vehicle_line'], null],
-            [$data['range_label'].' · '.$data['timezone'], null],
-            [$data['filters_line'], 'note'],
-            [$data['scope_note'], 'note'],
-        ];
-        $xml .= '<Worksheet ss:Name="Trips"><Table>';
-        foreach ([12, 11, 9, 9, 20, 22, 30, 30, 11, 11, 12, 11, 11, 12, 28] as $width) {
-            $xml .= '<Column ss:Width="'.($width * 6).'"/>';
-        }
-        foreach ($intro as [$text, $style]) {
-            $xml .= '<Row'.($style === 'title' ? ' ss:Height="24"' : '').'>'
-                .'<Cell ss:MergeAcross="'.(count($headers) - 1).'"'.($style ? ' ss:StyleID="'.$style.'"' : '').'>'
-                .'<Data ss:Type="String">'.$this->xml($this->sanitizeCsvCell($text)).'</Data></Cell></Row>';
-        }
-        $xml .= '<Row/>';
-        $headerRow = count($intro) + 2;
-        $xml .= '<Row ss:Height="30">'.implode('', array_map(fn (string $header): string => '<Cell ss:StyleID="head"><Data ss:Type="String">'
-            .$this->xml($header).'</Data></Cell>', $headers)).'</Row>';
-        foreach ($data['trips'] as $trip) {
-            $xml .= '<Row>'
-                .$this->stringCell($trip['reference'])
-                .($trip['date_iso'] ? '<Cell ss:StyleID="date"><Data ss:Type="DateTime">'.$trip['date_iso'].'T00:00:00.000</Data></Cell>' : $this->stringCell(''))
-                .$this->stringCell($trip['start_time'])
-                .$this->stringCell($trip['end_time'])
-                .$this->stringCell($trip['driver_name'])
-                .$this->stringCell($trip['driver_status'])
-                .$this->stringCell($trip['from'])
-                .$this->stringCell($trip['to'])
-                .$this->numberCell($trip['distance_km'], 'one')
-                .$this->numberCell($trip['minutes'])
-                .$this->numberCell($trip['max_speed_kph'], 'one')
-                .$this->numberCell($trip['coverage_pct'])
-                .$this->numberCell($trip['driving_events'])
-                .($trip['score'] !== null ? $this->numberCell($trip['score']) : $this->stringCell($trip['score_label']))
-                .$this->stringCell($trip['source_note'])
-                .'</Row>';
-        }
-        $lastRow = $headerRow + count($data['trips']);
-        $xml .= '<Row>'.'<Cell ss:StyleID="total"><Data ss:Type="String">Total</Data></Cell>'
-            .'<Cell ss:Index="9" ss:StyleID="totalOne" ss:Formula="=SUM(R'.($headerRow + 1).'C:R'.$lastRow.'C)"><Data ss:Type="Number">'
-            .$data['totals']['distance_km'].'</Data></Cell>'
-            .'<Cell ss:StyleID="total" ss:Formula="=SUM(R'.($headerRow + 1).'C:R'.$lastRow.'C)"><Data ss:Type="Number">'
-            .$data['totals']['minutes'].'</Data></Cell>'
-            .'</Row>';
-        // Excel expects WorksheetOptions before AutoFilter.
-        $xml .= '</Table>'
-            .$this->frozenHeader($headerRow)
-            .'<AutoFilter x:Range="R'.$headerRow.'C1:R'.$lastRow.'C'.count($headers).'" xmlns="urn:schemas-microsoft-com:office:excel"/>'
-            .'</Worksheet>'."\n";
-
-        if ($data['include_events']) {
-            $eventHeaders = ['Trip', 'Date', 'Time', 'Event', 'Details', 'Location'];
-            $xml .= '<Worksheet ss:Name="Events"><Table>';
-            foreach ([12, 11, 9, 24, 60, 40] as $width) {
-                $xml .= '<Column ss:Width="'.($width * 6).'"/>';
-            }
-            $xml .= '<Row ss:Height="24"><Cell ss:MergeAcross="5" ss:StyleID="title"><Data ss:Type="String">'
-                .$this->xml($this->sanitizeCsvCell($brand['name'].' · Journey events')).'</Data></Cell></Row>'
-                .'<Row><Cell ss:MergeAcross="5"><Data ss:Type="String">'
-                .$this->xml($this->sanitizeCsvCell($data['range_label'].' · '.$data['timezone'])).'</Data></Cell></Row><Row/>';
-            $xml .= '<Row ss:Height="30">'.implode('', array_map(fn (string $header): string => '<Cell ss:StyleID="head"><Data ss:Type="String">'
-                .$this->xml($header).'</Data></Cell>', $eventHeaders)).'</Row>';
-            $count = 0;
-            foreach ($data['trips'] as $trip) {
-                foreach ($trip['events'] as $event) {
-                    $count++;
-                    $xml .= '<Row>'
-                        .$this->stringCell($trip['reference'])
-                        .($trip['date_iso'] ? '<Cell ss:StyleID="date"><Data ss:Type="DateTime">'.$trip['date_iso'].'T00:00:00.000</Data></Cell>' : $this->stringCell(''))
-                        .$this->stringCell($event['time'])
-                        .$this->stringCell($event['title'])
-                        .$this->stringCell($event['detail'])
-                        .$this->stringCell($event['location'])
-                        .'</Row>';
-                }
-            }
-            $xml .= '</Table>'
-                .$this->frozenHeader(4)
-                .($count > 0 ? '<AutoFilter x:Range="R4C1:R'.(4 + $count).'C6" xmlns="urn:schemas-microsoft-com:office:excel"/>' : '')
-                .'</Worksheet>'."\n";
-        }
-
-        return $xml.'</Workbook>'."\n";
     }
 
     /**
@@ -290,6 +172,7 @@ final class VehicleTripReportExporter
                     .' × harsh acceleration − '.$number($weights['other_harsh']).' × other harsh events − '.$number($weights['overspeed'])
                     .' × overspeed episodes − '.$number($weights['idle_per_minute']).' × idle minutes, from the fleet settings.'
                     .' Scores are withheld below '.$policy['min_score_coverage_pct'].'% coverage.',
+                'Human review applies: dismissed events do not deduct points and disputed events withhold the score. Event counts retain the original recorded observations.',
                 'Overspeed uses the fleet threshold of '.$number($policy['speed_threshold_kph']).' km/h; road speed limits are not checked.',
                 'A booked driver is not proof of who drove. Drivers are shown as confirmed only after someone confirms them.',
             ],
@@ -389,35 +272,6 @@ final class VehicleTripReportExporter
         return 'data:image/svg+xml;base64,'.base64_encode($svg);
     }
 
-    private function frozenHeader(int $row): string
-    {
-        return '<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><FreezePanes/><FrozenNoSplit/>'
-            .'<SplitHorizontal>'.$row.'</SplitHorizontal><TopRowBottomPane>'.$row.'</TopRowBottomPane>'
-            .'<ActivePane>2</ActivePane></WorksheetOptions>';
-    }
-
-    private function stringCell(mixed $value): string
-    {
-        return '<Cell><Data ss:Type="String">'.$this->xml($this->sanitizeCsvCell((string) ($value ?? ''))).'</Data></Cell>';
-    }
-
-    private function numberCell(int|float|null $value, ?string $style = null): string
-    {
-        if ($value === null) {
-            return $this->stringCell('Not recorded');
-        }
-
-        return '<Cell'.($style ? ' ss:StyleID="'.$style.'"' : '').'><Data ss:Type="Number">'.$value.'</Data></Cell>';
-    }
-
-    private function xml(mixed $value): string
-    {
-        // Strip control characters XML 1.0 cannot carry, then escape.
-        $text = preg_replace('/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}]/u', '', (string) $value) ?? '';
-
-        return htmlspecialchars($text, ENT_XML1 | ENT_QUOTES, 'UTF-8');
-    }
-
     private static function time(CarbonImmutable $at, bool $withDate = false): string
     {
         return ($withDate ? $at->format('j M Y').', ' : '').$at->format('g:i a');
@@ -432,6 +286,7 @@ final class VehicleTripReportExporter
             'in_progress' => 'Withheld · trip in progress',
             'personal' => 'Not scored · personal trip',
             'consent' => 'Not scored · tracking consent not in place',
+            'disputed' => 'Withheld · driving event disputed',
             default => 'Withheld',
         };
     }

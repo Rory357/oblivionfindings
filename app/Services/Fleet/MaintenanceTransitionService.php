@@ -181,7 +181,16 @@ class MaintenanceTransitionService
                         $source = DB::table('fleet_checklist_runs')
                             ->where('id', (int) $payload['source_run_id'])
                             ->where('asset_id', $asset->id)
-                            ->where('work_order_id', $order->id)->first();
+                            ->where(function ($query) use ($order): void {
+                                $query->where('work_order_id', $order->id)
+                                    ->orWhereExists(function ($report) use ($order): void {
+                                        $report->selectRaw('1')->from('fleet_maintenance_reports')
+                                            ->where('work_order_id', $order->id)
+                                            ->where('source_type', 'fleet_checklist_run')
+                                            ->whereColumn('source_id', 'fleet_checklist_runs.id')
+                                            ->whereColumn('asset_id', 'fleet_checklist_runs.asset_id');
+                                    });
+                            })->first();
                         abort_unless($source && $source->outcome !== 'passed', 404);
                         $checkRunId = (int) $source->id;
                     }
@@ -287,7 +296,7 @@ class MaintenanceTransitionService
                         $currentActor, $order, (int) $asset->site_id, (string) $asset->category,
                     );
                     $payload['restriction_sources'] = $restrictionSources;
-                    if (\App\Models\Asset::vehicles()->whereKey($asset->id)->exists()) {
+                    if (Asset::vehicles()->whereKey($asset->id)->exists()) {
                         $releaseRestrictionIds = array_map(fn (array $source): int => $source['id'], $restrictionSources);
                         $resolvedCheckRunIds = array_values(array_map(
                             fn (array $source): int => (int) $source['source_run_id'],
@@ -638,8 +647,8 @@ class MaintenanceTransitionService
             ->orderByDesc('id')->first();
         if (! $attestation || (int) $attestation->policy_version_id !== $repairPolicy['id']
             || ! DB::table('fleet_maintenance_attachments')
-            ->where('work_order_id', $order->id)
-            ->where('action_id', $attestation->id)->exists()) {
+                ->where('work_order_id', $order->id)
+                ->where('action_id', $attestation->id)->exists()) {
             throw ValidationException::withMessages(['status' => 'Repair attestation and saved service evidence are required before completion.']);
         }
     }

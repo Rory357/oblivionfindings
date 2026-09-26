@@ -63,7 +63,7 @@ final class VehicleAlertResponseService
     private const SIGNAL_KINDS = [
         'fleet_vehicle_overspeed' => ['overspeed', 'Overspeed threshold'],
         'fleet_vehicle_power_disconnected' => ['power_disconnected', 'Power disconnected'],
-        'fleet_vehicle_low_voltage' => ['low_voltage', 'Low vehicle voltage'],
+        'fleet_vehicle_low_voltage' => ['low_voltage', 'Vehicle power alert'],
         'fleet_device_tamper' => ['towing', 'Unexpected towing or tamper'],
         'fleet_device_offline' => ['tracker_overdue', 'Tracker overdue'],
         'fleet_device_online' => ['tracker_online', 'Tracker reporting again'],
@@ -725,8 +725,8 @@ final class VehicleAlertResponseService
     }
 
     /**
-     * Vehicle signals whose Control Room delivery failed (no response exists
-     * yet), newest first.
+     * Keep unreceived signals visible during retry, until canonical delivery
+     * succeeds. Pending delivery is not a Control Room response or resolution.
      *
      * @return list<array<string,mixed>>
      */
@@ -734,7 +734,7 @@ final class VehicleAlertResponseService
     {
         return FleetSignal::query()->where('asset_id', $vehicle->getKey())
             ->where('occurred_at', '>=', now()->subDays(30))
-            ->whereHas('outbox', fn (Builder $outbox) => $outbox->whereIn('status', VehicleAlertRoutingService::FAILED_DELIVERIES))
+            ->whereHas('outbox', fn (Builder $outbox) => $outbox->whereIn('status', [...VehicleAlertRoutingService::FAILED_DELIVERIES, 'pending', 'processing']))
             ->with('outbox:id,fleet_signal_id,status,attempts')
             ->orderByDesc('occurred_at')->orderByDesc('id')->limit(20)
             ->get(['id', 'asset_id', 'signal_type', 'occurred_at', 'created_at'])
@@ -750,7 +750,7 @@ final class VehicleAlertResponseService
                     'kind_key' => $kindKey,
                     'severity' => null,
                     'priority' => null,
-                    'status' => 'delivery_failed',
+                    'status' => in_array($signal->outbox?->status, VehicleAlertRoutingService::FAILED_DELIVERIES, true) ? 'delivery_failed' : 'delivery_pending',
                     'escalation_level' => 0,
                     'owner' => null,
                     'observed_at' => $signal->occurred_at?->toIso8601String(),

@@ -1,4 +1,5 @@
 import { DateTimeField } from '@/components/fleet-assets/maintenance/date-time-field';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
@@ -19,6 +20,7 @@ import {
     Wrench,
 } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import {
     addLocalMinutes,
     conflictWith,
@@ -27,7 +29,11 @@ import {
 } from './booking-wizard';
 import type { VehicleCalendarSummary } from './calendar-types';
 import { CataloguePicker } from './choice-picker';
-import { isJsonObject, useVehicleRecordCommand } from './record-command';
+import {
+    isJsonObject,
+    sendVehicleRecord,
+    useVehicleRecordCommand,
+} from './record-command';
 import type { VehicleProfile } from './types';
 import {
     fieldProps,
@@ -87,6 +93,11 @@ export function AppointmentWizard({
     onSaved: () => void;
 }) {
     const manage = !!appointment && !!workOrderId;
+    const [workVersions] = useState(() =>
+        Object.fromEntries(
+            summary.open_work.map((work) => [work.id, work.version]),
+        ),
+    );
     const [initial] = useState(() => {
         const start = appointment
             ? toDatetimeLocal(appointment.start)
@@ -206,8 +217,14 @@ export function AppointmentWizard({
         if (manage) body.append('operation', form.operation);
         if (form.changeReason.trim())
             body.append('change_reason', form.changeReason.trim());
-        if (form.work !== NEW_WORK) body.append('work_order_id', form.work);
-        else {
+        if (form.work !== NEW_WORK) {
+            body.append('work_order_id', form.work);
+            if (workVersions[Number(form.work)] !== undefined)
+                body.append(
+                    'expected_version',
+                    String(workVersions[Number(form.work)]),
+                );
+        } else {
             body.append('title', form.type.trim());
             // New work is reported from the due date it plans for, so later
             // plans for the same due date reuse it instead of duplicating it.
@@ -236,12 +253,43 @@ export function AppointmentWizard({
             body,
         );
         if (!result) return;
+        setSavedUndo(isJsonObject(result.undo) ? result.undo : null);
         setSavedText(
             typeof result.message === 'string'
                 ? result.message
                 : 'Appointment saved in Maintenance and on the vehicle calendar.',
         );
         onSaved();
+    };
+    const [savedUndo, setSavedUndo] = useState<Record<string, unknown> | null>(
+        null,
+    );
+    const close = () => {
+        onClose();
+        if (savedUndo) {
+            const undo = savedUndo;
+            toast.success('Appointment changed', {
+                duration: 10000,
+                action: {
+                    label: 'Undo',
+                    onClick: () => {
+                        sendVehicleRecord(
+                            `/fleet-assets/vehicles/${vehicle.id}/appointments/undo`,
+                            undo,
+                        )
+                            .then(() => {
+                                onSaved();
+                                toast.success(
+                                    'Previous internal appointment restored',
+                                );
+                            })
+                            .catch((error: Error) =>
+                                toast.error(error.message),
+                            );
+                    },
+                },
+            });
+        }
     };
 
     const steps = [
@@ -349,7 +397,7 @@ export function AppointmentWizard({
             }
             onValidateStep={validateStep}
             onSubmit={submit}
-            onClose={onClose}
+            onClose={close}
             onReload={() => {
                 onSaved();
                 onClose();
@@ -362,8 +410,39 @@ export function AppointmentWizard({
                             ? 'Appointment cancelled'
                             : 'Appointment saved'
                     }
-                    blurb={savedText ?? ''}
-                    onClose={onClose}
+                    blurb={
+                        <>
+                            {savedText ?? ''}
+                            {savedUndo && (
+                                <Button
+                                    className="mt-4"
+                                    variant="outline"
+                                    onClick={async () => {
+                                        try {
+                                            await sendVehicleRecord(
+                                                `/fleet-assets/vehicles/${vehicle.id}/appointments/undo`,
+                                                savedUndo,
+                                            );
+                                            setSavedUndo(null);
+                                            setSavedText(
+                                                'Previous internal appointment restored. Provider confirmation remains a separate action.',
+                                            );
+                                            onSaved();
+                                        } catch (error) {
+                                            setSavedText(
+                                                error instanceof Error
+                                                    ? error.message
+                                                    : 'Reload to review the latest appointment.',
+                                            );
+                                        }
+                                    }}
+                                >
+                                    Undo appointment change
+                                </Button>
+                            )}
+                        </>
+                    }
+                    onClose={close}
                 />
             }
         >

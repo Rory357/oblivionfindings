@@ -88,15 +88,20 @@ class VehicleTripHistoryController extends Controller
         }
 
         $pdf = $format === 'pdf';
+        $withRoutes = $request->boolean('maps', true);
         $filters = $this->trips->filters($data);
         $report = $this->trips->exportReport(
             $user,
             $vehicle,
             $filters,
-            $pdf ? VehicleTripHistoryService::PDF_TRIP_LIMIT : VehicleTripHistoryService::SPREADSHEET_TRIP_LIMIT,
+            ($pdf || $withRoutes) ? VehicleTripHistoryService::PDF_TRIP_LIMIT : VehicleTripHistoryService::SPREADSHEET_TRIP_LIMIT,
             $request->boolean('events', true),
-            $pdf && $request->boolean('maps', true),
+            $withRoutes,
         );
+        $response = $pdf
+            ? $this->exporter->pdf($report, (string) $user->name)
+            : $this->exporter->spreadsheet($report, (string) $user->name);
+
         AuditLogger::log('fleet.trip_history.exported', $vehicle, [
             'asset_id' => $vehicle->id,
             'format' => $pdf ? 'pdf' : 'spreadsheet',
@@ -108,11 +113,10 @@ class VehicleTripHistoryController extends Controller
             'trips' => $report['totals']['trips'],
             'excluded_personal' => $report['excluded']['personal'],
             'excluded_without_consent' => $report['excluded']['restricted'],
+            'route_images' => $withRoutes ? 'recorded_position_sketches' : 'none',
         ]);
 
-        return $pdf
-            ? $this->exporter->pdf($report, (string) $user->name)
-            : $this->exporter->spreadsheet($report, (string) $user->name);
+        return $response;
     }
 
     /** @return array<string, list<string>> */
