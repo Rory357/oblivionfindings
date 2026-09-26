@@ -134,10 +134,10 @@ describe('Fleet workspace navigation', () => {
                 primary.getAllByRole('link').map((item) => item.textContent),
             ).toEqual(labels);
             expect(
-                primary.getByRole('link', { name: 'Reports', exact: true }),
+                primary.getByRole('link', { name: 'Reports' }),
             ).toHaveAttribute('href', '/fleet-assets/reports');
             expect(
-                primary.getByRole('link', { name: 'Reports', exact: true }),
+                primary.getByRole('link', { name: 'Reports' }),
             ).toHaveAttribute('aria-current', 'page');
             const catalog = buildNavSearchCatalog({
                 role: 'Staff',
@@ -216,9 +216,10 @@ describe('Fleet workspace navigation', () => {
             'Reports',
             'Settings',
         ]);
-        expect(
-            menu.getByRole('link', { name: 'Fleet', exact: true }),
-        ).toHaveAttribute('aria-current', 'page');
+        expect(menu.getByRole('link', { name: 'Fleet' })).toHaveAttribute(
+            'aria-current',
+            'page',
+        );
         expect(
             menu
                 .getAllByRole('link')
@@ -329,16 +330,15 @@ describe('Fleet workspace navigation', () => {
         const menu = within(
             screen.getByRole('group', { name: 'Fleet & Assets navigation' }),
         );
-        expect(
-            menu.getByRole('link', { name: 'Assets', exact: true }),
-        ).toHaveAttribute('href', '/fleet-assets/assets');
+        expect(menu.getByRole('link', { name: 'Assets' })).toHaveAttribute(
+            'href',
+            '/fleet-assets/assets',
+        );
         expect(menu.getByRole('link', { name: 'Maintenance' })).toHaveAttribute(
             'href',
             '/fleet-assets/daily-check',
         );
-        expect(
-            menu.queryByRole('link', { name: 'Fleet', exact: true }),
-        ).toBeNull();
+        expect(menu.queryByRole('link', { name: 'Fleet' })).toBeNull();
         expect(menu.queryByRole('link', { name: 'Reports' })).toBeNull();
         expect(menu.queryByRole('link', { name: 'Settings' })).toBeNull();
     });
@@ -349,9 +349,10 @@ describe('Fleet workspace navigation', () => {
         const menu = within(
             screen.getByRole('group', { name: 'Fleet & Assets navigation' }),
         );
-        expect(
-            menu.getByRole('link', { name: 'Fleet', exact: true }),
-        ).toHaveAttribute('href', '/fleet-assets/bookings');
+        expect(menu.getByRole('link', { name: 'Fleet' })).toHaveAttribute(
+            'href',
+            '/fleet-assets/bookings',
+        );
         expect(menu.getByRole('link', { name: 'Reports' })).toHaveAttribute(
             'href',
             '/fleet-assets/mileage',

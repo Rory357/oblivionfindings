@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Tests\Unit\Maps\OsmReportMapTest" file="C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\tests\Unit\Maps\OsmReportMapTest.php" tests="4" assertions="21" errors="0" failures="0" skipped="0" time="0.486456">
+    <testcase name="test_installed_map_renders_streets_with_local_provenance_and_attribution" file="C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\tests\Unit\Maps\OsmReportMapTest.php" line="31" class="Tests\Unit\Maps\OsmReportMapTest" classname="Tests.Unit.Maps.OsmReportMapTest" assertions="8" time="0.172868"/>
+    <testcase name="test_missing_coverage_and_broken_metadata_never_claim_a_street_map" file="C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\tests\Unit\Maps\OsmReportMapTest.php" line="56" class="Tests\Unit\Maps\OsmReportMapTest" classname="Tests.Unit.Maps.OsmReportMapTest" assertions="6" time="0.136580"/>
+    <testcase name="test_failed_install_keeps_the_previous_dataset_and_its_identity" file="C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\tests\Unit\Maps\OsmReportMapTest.php" line="73" class="Tests\Unit\Maps\OsmReportMapTest" classname="Tests.Unit.Maps.OsmReportMapTest" assertions="3" time="0.175093"/>
+    <testcase name="test_geometry_reads_xy_and_rejects_truncation_wrong_srs_and_excessive_counts" file="C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\tests\Unit\Maps\OsmReportMapTest.php" line="91" class="Tests\Unit\Maps\OsmReportMapTest" classname="Tests.Unit.Maps.OsmReportMapTest" assertions="4" time="0.001915"/>
+  </testsuite>
+</testsuites>

@@ -113,7 +113,7 @@ class VehicleTripHistoryController extends Controller
             'trips' => $report['totals']['trips'],
             'excluded_personal' => $report['excluded']['personal'],
             'excluded_without_consent' => $report['excluded']['restricted'],
-            'route_images' => $withRoutes ? 'recorded_position_sketches' : 'none',
+            'route_images' => $withRoutes ? array_values($this->exporter->routeImageSources()) : [],
         ]);
 
         return $response;

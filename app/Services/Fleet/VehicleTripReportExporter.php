@@ -3,6 +3,7 @@
 namespace App\Services\Fleet;
 
 use App\Models\AppSetting;
+use App\Services\Maps\OsmReportMap;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Storage;
@@ -13,12 +14,19 @@ use Symfony\Component\HttpFoundation\Response;
  * Renders a vehicle trip report (VehicleTripHistoryService::exportReport) as
  * a branded PDF (dompdf with the embedded DejaVu Sans font, so macrons such
  * as "Kōwhai" print) or a native Excel workbook with embedded journey images. Text cells
- * are literal strings, never user-provided formulas. Route sketches are
- * drawn from the recorded positions only; no map imagery is fetched.
+ * are literal strings, never user-provided formulas. Street maps render from
+ * installed public OSM data locally; no trip coordinates leave the server.
  */
 final class VehicleTripReportExporter
 {
     private const DEFAULT_COLOUR = '#7c3aed';
+
+    private array $routeImageSources = [];
+
+    public function routeImageSources(): array
+    {
+        return $this->routeImageSources;
+    }
 
     /** @param  array<string,mixed>  $report */
     public function pdf(array $report, string $generatedBy): Response
@@ -75,6 +83,7 @@ final class VehicleTripReportExporter
      */
     public function viewData(array $report, string $generatedBy): array
     {
+        $this->routeImageSources = [];
         $zone = VehicleTripHistoryService::zone();
         $brand = $this->branding();
         $policy = $report['policy'];
@@ -105,6 +114,12 @@ final class VehicleTripReportExporter
             $behaviour = $trip['behaviour'];
             $driver = $trip['driver'];
             $partial = (bool) $behaviour['partial'];
+            $map = $report['include_routes'] ? app(OsmReportMap::class)->render($trip['points'], $brand['colour'], $partial) : null;
+            if ($map) {
+                $sourceKey = $map['kind'].':'.($map['dataset']['sha256'] ?? 'none');
+                $this->routeImageSources[$sourceKey] ??= ['kind' => $map['kind'], 'dataset' => $map['dataset'], 'trips' => 0];
+                $this->routeImageSources[$sourceKey]['trips']++;
+            }
             $trips[] = [
                 'reference' => $trip['reference'],
                 'date_iso' => $start?->format('Y-m-d'),
@@ -141,7 +156,9 @@ final class VehicleTripReportExporter
                     'location' => $event['location']
                         ?? ($event['lat'] !== null ? number_format((float) $event['lat'], 5).', '.number_format((float) $event['lng'], 5) : 'Not recorded'),
                 ], $trip['events']),
-                'route' => $report['include_routes'] ? $this->routeSketch($trip['points'], $brand['colour'], $partial) : null,
+                'route' => $map ? ($map['image'] ?? $this->routeSketch($trip['points'], $brand['colour'], $partial)) : null,
+                'map_kind' => $map['kind'] ?? 'none',
+                'map_note' => $map['note'] ?? '',
             ];
         }
 
@@ -179,6 +196,7 @@ final class VehicleTripReportExporter
             'trips' => $trips,
             'include_events' => (bool) $report['include_events'],
             'include_routes' => (bool) $report['include_routes'],
+            'has_street_maps' => count(array_filter($trips, fn ($trip) => $trip['map_kind'] === 'local_osm_street_map')) > 0,
         ];
     }
 

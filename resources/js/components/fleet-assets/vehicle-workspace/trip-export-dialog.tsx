@@ -220,7 +220,7 @@ export function TripExportDialog({
                         >
                             <FileText aria-hidden="true" />
                             <strong>PDF report</strong>
-                            <small>Summary, route sketches & trip pages</small>
+                            <small>Summary, journey maps & trip pages</small>
                         </button>
                         {/* eslint-disable-next-line no-restricted-syntax -- Format tile picker from the approved design; a selector card. */}
                         <button
@@ -269,7 +269,7 @@ export function TripExportDialog({
                                 }
                             />
                             <ImageIcon size={16} aria-hidden="true" /> Include
-                            route sketches of recorded positions
+                            journey maps and recorded positions
                         </label>
                         <label>
                             <Checkbox
@@ -335,9 +335,9 @@ export function TripExportDialog({
                     )}
                     <small className="text-caption">
                         Reports are generated on this server from the trips you
-                        can see. Route sketches are drawn from recorded
-                        positions only; no map imagery or location data is sent
-                        to another service.
+                        can see. Street maps use locally installed OpenStreetMap
+                        data. Areas without map data are labelled as route
+                        sketches. Trip locations stay on this server.
                     </small>
                 </div>
                 <DialogFooter className="border-t p-4">

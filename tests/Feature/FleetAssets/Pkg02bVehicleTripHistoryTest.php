@@ -20,6 +20,7 @@ use App\Services\Fleet\FleetDrivingMetricsService;
 use App\Services\Fleet\FleetTripService;
 use App\Services\Fleet\VehicleTripHistoryService;
 use App\Services\Fleet\VehicleTripReportExporter;
+use App\Services\Maps\OsmReportDataset;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\QueryException;
@@ -29,6 +30,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\ReportMapFixture;
 use Tests\TestCase;
 
 /**
@@ -53,6 +55,7 @@ class Pkg02bVehicleTripHistoryTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->travelTo(Carbon::parse('2026-09-22 09:30:00', self::ZONE)->utc());
         config([
+            'report_maps.directory' => storage_path('framework/testing/no-installed-report-map'),
             'fleet.behaviour.speeding_kph' => 60,
             'fleet.trip.coverage_gap_seconds' => 120,
             'fleet.behaviour.score_min_coverage_pct' => 90,
@@ -609,6 +612,58 @@ class Pkg02bVehicleTripHistoryTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('range');
         $this->actingAs($viewer)->getJson("{$base}/csv?from=2026-09-19&to=2026-09-21")->assertNotFound();
         $this->actingAs($outsider)->getJson("{$base}/pdf?from=2026-09-19&to=2026-09-21")->assertNotFound();
+    }
+
+    public function test_local_street_maps_are_embedded_in_both_formats_with_dataset_audit_and_privacy(): void
+    {
+        $directory = sys_get_temp_dir().'/oblivion-export-map-'.bin2hex(random_bytes(8));
+        mkdir($directory);
+        try {
+            $source = ReportMapFixture::create($directory);
+            $sha = hash_file('sha256', $source);
+            app(OsmReportDataset::class)->install($source, $directory.'/installed', 'Synthetic export fixture', '2026-09-23', $sha);
+            config(['report_maps.directory' => $directory.'/installed']);
+            $viewer = $this->siteUser([$this->site], ['fleet.viewAny']);
+            $outsider = $this->siteUser([$this->foreignSite], ['fleet.viewAny']);
+            $vehicle = $this->vehicle($this->site);
+            $this->trip($vehicle, '2026-09-21 08:00', 12);
+            $this->regularSamples($vehicle, '2026-09-21 08:00', 12);
+            $this->trip($vehicle, '2026-09-20 12:00', 30, ['is_personal' => true, 'start_address' => 'PRIVATE LOCATION']);
+            $url = "/fleet-assets/vehicles/{$vehicle->id}/trip-history/export";
+            $service = app(VehicleTripHistoryService::class);
+            $report = $service->exportReport($viewer, $service->vehicle($viewer, $vehicle->id),
+                $service->filters(['from' => '2026-09-19', 'to' => '2026-09-21']), 200, true, true);
+            $html = app(VehicleTripReportExporter::class)->html($report, 'Test Viewer');
+            $this->assertStringContainsString('data:image/png;base64,', $html);
+            $this->assertStringContainsString('OpenStreetMap contributors', $html);
+            $this->assertStringNotContainsString('PRIVATE LOCATION', $html);
+            $this->assertStringNotContainsString('sketch only', $html);
+            $this->actingAs($viewer)->get("{$url}/pdf?from=2026-09-19&to=2026-09-21")->assertOk();
+            $excel = $this->actingAs($viewer)->get("{$url}/excel?from=2026-09-19&to=2026-09-21")->assertOk();
+            $path = $directory.'/report.xlsx';
+            file_put_contents($path, $excel->getContent());
+            $zip = new \ZipArchive;
+            $zip->open($path);
+            $this->assertStringContainsString('Journey maps', $zip->getFromName('xl/workbook.xml'));
+            $this->assertStringContainsString('OpenStreetMap', $zip->getFromName('xl/worksheets/sheet4.xml'));
+            $size = getimagesizefromstring($zip->getFromName('xl/media/image4-1.png'));
+            $this->assertSame([1040, 440], [$size[0], $size[1]]);
+            $zip->close();
+            $audit = AuditLog::query()->where('action', 'fleet.trip_history.exported')->latest('id')->firstOrFail();
+            $this->assertSame('local_osm_street_map', $audit->meta['route_images'][0]['kind']);
+            $this->assertSame($sha, $audit->meta['route_images'][0]['dataset']['sha256']);
+            $this->assertSame(1, $audit->meta['route_images'][0]['trips']);
+            $this->actingAs($outsider)->getJson("{$url}/pdf?from=2026-09-19&to=2026-09-21")->assertNotFound();
+            $this->actingAs($viewer)->get("{$url}/excel?from=2026-09-19&to=2026-09-21&maps=0")->assertOk();
+            $audit = AuditLog::query()->where('action', 'fleet.trip_history.exported')->latest('id')->firstOrFail();
+            $this->assertSame([], $audit->meta['route_images']);
+        } finally {
+            $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
+            foreach ($files as $file) {
+                $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
+            }
+            rmdir($directory);
+        }
     }
 
     public function test_driving_metrics_count_queclink_harsh_reports_and_speed_episodes(): void

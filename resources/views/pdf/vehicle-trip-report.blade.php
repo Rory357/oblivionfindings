@@ -157,7 +157,8 @@
                 <div class="legend">
                     <span class="dot" style="background:#15803d;"></span> Start ·
                     <span class="dot" style="background:#b91c1c;"></span> End ·
-                    Recorded positions joined in time order{{ $trip['partial'] ? ', dashed where coverage is partial' : '' }}. This sketch is not a map and the lines are not verified roads.
+                    Recorded positions joined in time order{{ $trip['partial'] ? ', dashed where coverage is partial' : '' }}. Lines are not verified roads.
+                    <br>{{ $trip['map_note'] }}
                 </div>
             @else
                 <div class="legend">No recorded positions to sketch for this trip.</div>
