@@ -21,5 +21,3 @@ function NavigationFixture() {
     </AppSidebarLayout>;
 }
 createInertiaApp({ page: window.__NAV_PAGE__, resolve: () => NavigationFixture, setup({ el, App, props }) { createRoot(el).render(<App {...props} />); } });
-
-
