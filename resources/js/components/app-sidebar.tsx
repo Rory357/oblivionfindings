@@ -1,3 +1,10 @@
+import {
+    FLEET_WORKSPACES,
+    fleetPrimaryLinkActive,
+    fleetPrimaryLinks,
+    visibleFleetGroups,
+    type FleetNavigationPermissions,
+} from '@/lib/fleet-navigation';
 import { Button } from '@/components/ui/button';
 import {
     SheetContent,
@@ -33,7 +40,6 @@ import {
     Activity,
     AlertOctagon,
     AlertTriangle,
-    ArrowLeftRight,
     Banknote,
     BarChart3,
     Bell,
@@ -53,14 +59,12 @@ import {
     DollarSign,
     FileText,
     FlaskConical,
-    Fuel,
     GitBranch,
     GraduationCap,
     HardHat,
     Heart,
     HeartPulse,
     Home,
-    Key,
     Landmark,
     LayoutDashboard,
     LayoutGrid,
@@ -91,7 +95,6 @@ import {
     Truck,
     UserCheck,
     Users,
-    UserSearch,
     Utensils,
     Wrench,
     X,
@@ -330,6 +333,12 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
             ? 2000 + item.length
             : -1;
     }
+
+    const fleetActive = fleetPrimaryLinkActive(
+        normalizedCurrentPath,
+        normalizedItemPath,
+    );
+    if (fleetActive !== undefined) return fleetActive ? 2000 + item.length : -1;
 
     if (itemQuery.length > 0) {
         return normalizedCurrentPath === normalizedItemPath &&
@@ -1611,238 +1620,11 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
 function buildFleetAssetsSubPanelGroups({
     can,
 }: {
-    can?: any;
+    can?: FleetNavigationPermissions;
 }): SubPanelGroup[] {
-    const groups: SubPanelGroup[] = [];
-
-    // Overview
-    const overview: SubPanelGroup = {
-        label: 'Overview',
-        items: [
-            { title: 'Dashboard', href: '/fleet-assets', icon: LayoutGrid },
-            { title: 'Live Map', href: '/fleet-assets/map', icon: Map },
-            {
-                title: 'Daily Checks',
-                href: '/fleet-assets/daily-check',
-                icon: CheckCircle2,
-            },
-        ],
-    };
-    groups.push(overview);
-
-    // Fleet
-    const fleet: SubPanelGroup = { label: 'Fleet', items: [] };
-    if (can?.fleet?.viewAny) {
-        fleet.items.push({
-            title: 'Vehicles',
-            href: '/fleet-assets/vehicles',
-            icon: Truck,
-        });
-        fleet.items.push({
-            title: 'Trips',
-            href: '/fleet-assets/trips',
-            icon: Route,
-        });
-        fleet.items.push({
-            title: 'Fuel Logs',
-            href: '/fleet-assets/fuel',
-            icon: Fuel,
-        });
-        fleet.items.push({
-            title: 'Compliance',
-            href: '/fleet-assets/compliance',
-            icon: ShieldCheck,
-        });
-    }
-    if (fleet.items.length > 0) groups.push(fleet);
-
-    // Assets
-    const assets: SubPanelGroup = { label: 'Assets', items: [] };
-    if (can?.assets?.viewAny || can?.assets?.viewAssigned) {
-        assets.items.push({
-            title: 'All Assets',
-            href: '/fleet-assets/assets',
-            icon: Package,
-        });
-    }
-    if (can?.hr?.assets?.view) {
-        assets.items.push({
-            title: 'HR Asset Register',
-            href: '/hr/assets',
-            icon: Briefcase,
-        });
-    }
-    if (can?.assets?.alertsView) {
-        assets.items.push({
-            title: 'Alerts',
-            href: '/fleet-assets/alerts',
-            icon: AlertTriangle,
-        });
-    }
-    if (
-        can?.assets?.geofencesManage ||
-        can?.geofences?.viewAny ||
-        can?.fleet?.viewAny
-    ) {
-        assets.items.push({
-            title: 'Geofences',
-            href: '/fleet-assets/geofences',
-            icon: MapPin,
-        });
-    }
-    if (assets.items.length > 0) groups.push(assets);
-
-    // Maintenance
-    const maintenance: SubPanelGroup = { label: 'Maintenance', items: [] };
-    if (can?.fleet?.viewAny || can?.assets?.viewAny) {
-        maintenance.items.push({
-            title: 'Overview',
-            href: '/fleet-assets/maintenance/dashboard',
-            icon: LayoutGrid,
-        });
-        maintenance.items.push({
-            title: 'Work Orders',
-            href: '/fleet-assets/maintenance/work-orders',
-            icon: Wrench,
-        });
-        maintenance.items.push({
-            title: 'Service Schedules',
-            href: '/fleet-assets/maintenance/schedules',
-            icon: CalendarDays,
-        });
-        maintenance.items.push({
-            title: 'Checklists',
-            href: '/fleet-assets/maintenance/checklists',
-            icon: ClipboardCheck,
-        });
-        maintenance.items.push({
-            title: 'Inspections',
-            href: '/fleet-assets/inspections',
-            icon: ClipboardList,
-        });
-    }
-    if (maintenance.items.length > 0) groups.push(maintenance);
-
-    // People
-    const people: SubPanelGroup = { label: 'People', items: [] };
-    if (can?.fleet?.viewAny || can?.hr?.driver?.view) {
-        people.items.push({
-            title: 'Drivers',
-            href: '/fleet-assets/drivers',
-            icon: Users,
-        });
-    }
-    if (can?.fleet?.viewAny || can?.assets?.viewAny) {
-        people.items.push({
-            title: 'Vehicle Bookings',
-            href: '/fleet-assets/bookings',
-            icon: CalendarDays,
-        });
-        people.items.push({
-            title: 'Key Management',
-            href: '/fleet-assets/keys',
-            icon: Key,
-        });
-        people.items.push({
-            title: 'Resident Tracking',
-            href: '/fleet-assets/resident-tracking',
-            icon: UserSearch,
-        });
-        people.items.push({
-            title: 'Transport Logs',
-            href: '/fleet-assets/transports',
-            icon: UserCheck,
-        });
-        people.items.push({
-            title: 'Medication Transit',
-            href: '/fleet-assets/transports/medications',
-            icon: Pill,
-        });
-        people.items.push({
-            title: 'Outings',
-            href: '/fleet-assets/outings',
-            icon: MapPin,
-        });
-        people.items.push({
-            title: 'Shift Handovers',
-            href: '/fleet-assets/handovers',
-            icon: ArrowLeftRight,
-        });
-    }
-    if (people.items.length > 0) groups.push(people);
-
-    // Devices
-    const devices: SubPanelGroup = { label: 'Devices', items: [] };
-    if (can?.assets?.trackersManage || can?.fleet?.viewAny) {
-        devices.items.push({
-            title: 'Tracking Devices',
-            href: '/fleet-assets/devices',
-            icon: Radio,
-        });
-    }
-    if (devices.items.length > 0) groups.push(devices);
-
-    // Safety — keep label/icon consistent with the Health & Safety flyout's
-    // "Fleet Incidents" entry so the same destination reads the same everywhere.
-    // Wandering Alerts now lives as a tab on Resident Tracking
-    // (/fleet-assets/resident-tracking?tab=wandering), so it no longer gets a
-    // sidebar entry of its own.
-    const safety: SubPanelGroup = { label: 'Safety', items: [] };
-    safety.items.push({
-        title: 'Fleet Incidents',
-        href: '/fleet-assets/incidents',
-        icon: Truck,
-    });
-    if (safety.items.length > 0) groups.push(safety);
-
-    // Reports
-    const reports: SubPanelGroup = { label: 'Reports', items: [] };
-    if (can?.fleet?.viewAny || can?.assets?.viewAny || can?.reports?.viewAny) {
-        reports.items.push({
-            title: 'Reports & Analytics',
-            href: '/fleet-assets/reports',
-            icon: FileText,
-        });
-        reports.items.push({
-            title: 'Usage by House',
-            href: '/fleet-assets/reports/by-house',
-            icon: Building2,
-        });
-        reports.items.push({
-            title: 'Mileage Reimbursement',
-            href: '/fleet-assets/reports/reimbursement',
-            icon: Receipt,
-        });
-        reports.items.push({
-            title: 'Mileage Claims',
-            href: '/fleet-assets/mileage',
-            icon: Receipt,
-        });
-        reports.items.push({
-            title: 'Cost Allocation',
-            href: '/fleet-assets/reports/cost-allocation',
-            icon: PieChart,
-        });
-        reports.items.push({
-            title: 'Community Access',
-            href: '/fleet-assets/reports/community-access',
-            icon: Users,
-        });
-    }
-    if (reports.items.length > 0) groups.push(reports);
-
-    // Settings
-    const settings: SubPanelGroup = { label: 'Settings', items: [] };
-    settings.items.push({
-        title: 'Notifications',
-        href: '/fleet-assets/settings/notifications',
-        icon: Bell,
-    });
-    if (settings.items.length > 0) groups.push(settings);
-
-    return groups;
+    const items = fleetPrimaryLinks(can);
+    return items.length ? [{ label: 'Fleet & Assets', items }] : [];
 }
-
 /**
  * Governance pages a viewer can act in — manage, decide, request, or (for
  * the person being reviewed) take part in — keyed by hub tab key
@@ -3350,6 +3132,24 @@ export function buildNavSearchCatalog(ctx: {
     };
 
     for (const icon of iconNavItems) {
+        // Keep relocated Fleet pages discoverable in command search as well as
+        // their workspace menus; consolidation only shortens the left rail.
+        if (icon.id === 'fleet-assets') {
+            for (const workspace of FLEET_WORKSPACES) {
+                for (const group of visibleFleetGroups(workspace, can)) {
+                    for (const item of group.links) {
+                        push({
+                            id: `fleet-assets:${item.href}`,
+                            label: item.label,
+                            href: item.href,
+                            section: icon.label,
+                            group: workspace.label,
+                            icon: workspace.icon,
+                        });
+                    }
+                }
+            }
+        }
         if (icon.href && !icon.subPanel) {
             push({
                 id: icon.id,

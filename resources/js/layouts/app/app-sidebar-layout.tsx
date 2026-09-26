@@ -1,9 +1,11 @@
 import { AppHeader } from '@/components/app-header';
 import { AppSidebar, AppSidebarMobile } from '@/components/app-sidebar';
 import { Breadcrumbs } from '@/components/breadcrumbs';
+import { FleetWorkspaceNavigation } from '@/components/fleet-assets/fleet-workspace-navigation';
 import { Sheet } from '@/components/ui/sheet';
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { fleetWorkspaceForUrl } from '@/lib/fleet-navigation';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
@@ -58,7 +60,11 @@ export default function AppSidebarLayout({
     header,
     contentClassName,
 }: PropsWithChildren<AppSidebarLayoutProps>) {
-    const defaultSidebarOpen = usePage<SharedData>().props.sidebarOpen ?? true;
+    const page = usePage<SharedData>();
+    const defaultSidebarOpen = page.props.sidebarOpen ?? true;
+    const fleetWorkspace = fleetWorkspaceForUrl(page.url);
+    const hasBreadcrumbStrip =
+        breadcrumbs.length > 1 || Boolean(fleetWorkspace);
     const { collapsed, setExpanded } = useAppSidebarState(defaultSidebarOpen);
     const isMobile = useIsMobile();
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -101,13 +107,26 @@ export default function AppSidebarLayout({
                         className="relative flex min-h-[calc(100svh-58px)] w-full min-w-0 flex-col bg-background"
                     >
                         {header === undefined
-                            ? breadcrumbs.length > 1 && (
+                            ? hasBreadcrumbStrip && (
                                   /* 10px above AND below the crumbs (approved
                                    * 2026-09-06 — the strip's one exception to
                                    * the 20px rhythm); the content wrapper
                                    * drops its top padding beneath it. */
-                                  <div className="flex items-center px-5 py-2.5 text-muted-foreground">
-                                      <Breadcrumbs breadcrumbs={breadcrumbs} />
+                                  <div
+                                      className={cn(
+                                          'flex items-center px-5 py-2.5 text-muted-foreground',
+                                          fleetWorkspace &&
+                                              'flex-wrap justify-between gap-x-5 gap-y-1',
+                                      )}
+                                  >
+                                      {breadcrumbs.length > 1 && (
+                                          <Breadcrumbs
+                                              breadcrumbs={breadcrumbs}
+                                          />
+                                      )}
+                                      {fleetWorkspace && (
+                                          <FleetWorkspaceNavigation />
+                                      )}
                                   </div>
                               )
                             : header}
@@ -115,7 +134,7 @@ export default function AppSidebarLayout({
                             className={cn(
                                 contentClassName ?? DEFAULT_CONTENT_CLASS,
                                 header === undefined &&
-                                    breadcrumbs.length > 1 &&
+                                    hasBreadcrumbStrip &&
                                     'pt-0',
                             )}
                         >
