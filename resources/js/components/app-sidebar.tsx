@@ -1,5 +1,6 @@
 import {
     FLEET_WORKSPACES,
+    canDiscoverFleetNavigation,
     fleetPrimaryLinkActive,
     fleetPrimaryLinks,
     visibleFleetGroups,
@@ -716,10 +717,7 @@ function buildIconNavItems({
     }
 
     // Fleet & Assets
-    const hasFleetAssets =
-        can?.fleet?.viewAny ||
-        can?.assets?.viewAny ||
-        can?.assets?.viewAssigned;
+    const hasFleetAssets = canDiscoverFleetNavigation(can);
     if (hasFleetAssets) {
         items.push({
             id: 'fleet-assets',

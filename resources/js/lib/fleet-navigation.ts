@@ -11,7 +11,7 @@ import {
 
 /** Navigation only. The server retains all role, site, record and privacy checks. */
 export interface FleetNavigationPermissions {
-    fleet?: { viewAny?: boolean };
+    fleet?: { viewAny?: boolean; reportsView?: boolean };
     assets?: {
         viewAny?: boolean;
         viewAssigned?: boolean;
@@ -51,6 +51,11 @@ const operational: Visibility = (can) =>
     fleet(can) || Boolean(can?.assets?.viewAny);
 export const canSeeFleetNavigation: Visibility = (can) =>
     operational(can) || Boolean(can?.assets?.viewAssigned);
+const reports: Visibility = (can) =>
+    fleet(can) || Boolean(can?.fleet?.reportsView);
+/** Module admission includes report readers without granting operational links. */
+export const canDiscoverFleetNavigation: Visibility = (can) =>
+    canSeeFleetNavigation(can) || reports(can);
 const inventory: Visibility = (can) =>
     Boolean(can?.assets?.viewAny || can?.assets?.viewAssigned);
 const link = (
@@ -247,26 +252,29 @@ export const FLEET_WORKSPACES: FleetWorkspace[] = [
         icon: BarChart3,
         landings: ['/fleet-assets/reports', '/fleet-assets/mileage'],
         groups: [
-            // fleet.reports.view is not in shared auth.can. Do not substitute the unrelated reports.viewAny permission.
             {
                 label: 'Reports',
-                links: [link('Reports & analytics', 'reports', fleet)],
+                links: [link('Reports & analytics', 'reports', reports)],
             },
             {
                 label: 'Resource use',
                 links: [
-                    link('Usage by house', 'reports/by-house', fleet),
-                    link('Community access', 'reports/community-access', fleet),
+                    link('Usage by house', 'reports/by-house', reports),
+                    link(
+                        'Community access',
+                        'reports/community-access',
+                        reports,
+                    ),
                 ],
             },
             {
                 label: 'Costs & mileage',
                 links: [
-                    link('Cost allocation', 'reports/cost-allocation', fleet),
+                    link('Cost allocation', 'reports/cost-allocation', reports),
                     link(
                         'Mileage reimbursement',
                         'reports/reimbursement',
-                        fleet,
+                        reports,
                     ),
                     link('Mileage claims', 'mileage'),
                 ],
@@ -300,7 +308,7 @@ export function visibleFleetGroups(
 }
 
 export function fleetPrimaryLinks(can: Can) {
-    if (!canSeeFleetNavigation(can)) return [];
+    if (!canDiscoverFleetNavigation(can)) return [];
     return FLEET_WORKSPACES.flatMap((workspace) => {
         const links = visibleFleetGroups(workspace, can).flatMap(
             (group) => group.links,

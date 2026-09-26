@@ -2,6 +2,8 @@
 
 Status: ready for Main's required pre-integration review; **not published**.
 
+Current status after Main review: **N01 is corrected** under handoff revision 2. [DELTA-N01.md](DELTA-N01.md) is the authoritative amended-candidate delta and verification report (66 frontend tests; 7 PHP tests). Its minimal existing-permission projection supersedes the historical limitation below. Still awaiting exact-candidate approval; no push.
+
 Review amendment: the final candidate head supplied to Main includes a small correction after the initial packet: contextual command-search entries use workspace-qualified IDs, so aliases such as Vehicles/Fleet sharing a URL cannot generate duplicate React keys. The regression now asserts unique Fleet search IDs. All 61 focused tests, scoped types and lint passed again; lint also covers the committed verification scripts (explicit Node process import and shared Card in the synthetic body). Browser search for Shift handovers opened `/fleet-assets/handovers`. A fixture HMR rebootstrap warning occurred while editing its synthetic body; it is not an application-source failure. The initial source commit below plus this correction form the final application diff; review the complete base-to-final-head diff rather than only the initial source commit.
 
 Task: `01a0dcfe-f6cd-7873-8eaf-36229ac9c59a`. Worktree: `C:/Users/steph/.codex/worktrees/475b/oblivionfindings`. Branch: `codex/fleet-seven-entry-navigation`.

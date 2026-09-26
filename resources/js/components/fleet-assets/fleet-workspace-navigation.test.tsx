@@ -78,6 +78,126 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Fleet workspace navigation', () => {
+    it.each([
+        {
+            name: 'report only',
+            can: { fleet: { reportsView: true } },
+            labels: ['Reports'],
+            mileage: false,
+        },
+        {
+            name: 'reports and assigned assets',
+            can: {
+                fleet: { reportsView: true },
+                assets: { viewAssigned: true },
+            },
+            labels: [
+                'Overview',
+                'Assets',
+                'Maintenance',
+                'Maps & boundaries',
+                'Reports',
+            ],
+            mileage: false,
+        },
+        {
+            name: 'reports and asset management',
+            can: { fleet: { reportsView: true }, assets: { viewAny: true } },
+            labels: [
+                'Overview',
+                'Fleet',
+                'Assets',
+                'Maintenance',
+                'Maps & boundaries',
+                'Reports',
+                'Settings',
+            ],
+            mileage: true,
+        },
+    ])(
+        'discovers permitted analytics for $name without assuming Fleet operational access',
+        ({ can, labels, mileage }) => {
+            fixture.can = can;
+            fixture.url = '/fleet-assets/reports/cost-allocation?site_id=7';
+            render(
+                <>
+                    <AppSidebar collapsed={false} />
+                    <FleetWorkspaceNavigation />
+                </>,
+            );
+            const primary = within(
+                screen.getByRole('group', {
+                    name: 'Fleet & Assets navigation',
+                }),
+            );
+            expect(
+                primary.getAllByRole('link').map((item) => item.textContent),
+            ).toEqual(labels);
+            expect(
+                primary.getByRole('link', { name: 'Reports', exact: true }),
+            ).toHaveAttribute('href', '/fleet-assets/reports');
+            expect(
+                primary.getByRole('link', { name: 'Reports', exact: true }),
+            ).toHaveAttribute('aria-current', 'page');
+            const catalog = buildNavSearchCatalog({
+                role: 'Staff',
+                can,
+            }).filter((item) => item.section === 'Fleet & Assets');
+            expect(
+                catalog.some(
+                    (item) => item.href === '/fleet-assets/reports/by-house',
+                ),
+            ).toBe(true);
+            expect(
+                catalog.some((item) => item.href === '/fleet-assets/vehicles'),
+            ).toBe(false);
+            expect(
+                catalog.some((item) => item.href === '/fleet-assets/mileage'),
+            ).toBe(mileage);
+            if (!('assets' in can)) {
+                expect(
+                    catalog.every((item) =>
+                        item.href.startsWith('/fleet-assets/reports'),
+                    ),
+                ).toBe(true);
+            }
+            const context = within(
+                screen.getByRole('navigation', { name: 'Reports pages' }),
+            );
+            expect(
+                context.getByRole('link', { name: 'Reports & analytics' }),
+            ).toHaveAttribute('href', '/fleet-assets/reports');
+            fireEvent.keyDown(
+                context.getByRole('button', { name: 'Costs & mileage pages' }),
+                { key: 'Enter' },
+            );
+            expect(
+                screen.getByRole('menuitem', { name: 'Cost allocation' }),
+            ).toHaveAttribute('href', fixture.url);
+            expect(
+                screen.queryByRole('menuitem', { name: 'Mileage claims' }) !==
+                    null,
+            ).toBe(mileage);
+        },
+    );
+
+    it.each([{ reports: { viewAny: true } }, {}])(
+        'does not turn unrelated reporting authority into Fleet access: %j',
+        (can) => {
+            fixture.can = can as FleetNavigationPermissions;
+            fixture.url = '/dashboard';
+            render(<AppSidebar collapsed={false} />);
+            expect(
+                screen.queryByRole('button', { name: 'Fleet & Assets menu' }),
+            ).toBeNull();
+            expect(
+                buildNavSearchCatalog({ role: 'Staff', can }).filter(
+                    (item) => item.section === 'Fleet & Assets',
+                ),
+            ).toEqual([]);
+        },
+    );
+
     it('renders exactly seven primary links and selects Fleet on a filtered nested vehicle URL', () => {
         fixture.url =
             '/fleet-assets/vehicles/42?group=operations&view=calendar#day';
