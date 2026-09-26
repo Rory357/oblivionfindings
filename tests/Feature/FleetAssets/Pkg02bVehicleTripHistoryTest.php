@@ -614,6 +614,75 @@ class Pkg02bVehicleTripHistoryTest extends TestCase
         $this->actingAs($outsider)->getJson("{$base}/pdf?from=2026-09-19&to=2026-09-21")->assertNotFound();
     }
 
+    public function test_excel_duration_totals_recalculate_from_recorded_seconds_without_per_trip_rounding(): void
+    {
+        $viewer = $this->siteUser([$this->site], ['fleet.viewAny']);
+        $service = app(VehicleTripHistoryService::class);
+        $exporter = app(VehicleTripReportExporter::class);
+        // Upward, downward and mixed rounding previously changed the sum on open.
+        foreach ([[40, 40], [20, 20], [29, 31, 61]] as $durations) {
+            $vehicle = $this->vehicle($this->site);
+            foreach ($durations as $index => $seconds) {
+                $start = '2026-09-21 '.sprintf('%02d:00', 8 + $index);
+                $this->trip($vehicle, $start, 1, [
+                    'ended_at' => $this->local($start)->addSeconds($seconds),
+                    'duration_s' => $seconds,
+                ]);
+            }
+            $report = $service->exportReport($viewer, $service->vehicle($viewer, $vehicle->id),
+                $service->filters(['from' => '2026-09-21', 'to' => '2026-09-21']), 200, false, false);
+            $data = $exporter->viewData($report, 'Test Viewer');
+            $seconds = array_sum($durations);
+            $this->assertSame($seconds, $report['totals']['duration_s']);
+            $this->assertSame($seconds, $data['totals']['duration_seconds']);
+            // The shared PDF presentation keeps its existing whole-minute labels.
+            $this->assertSame((int) round($seconds / 60), $data['totals']['minutes']);
+            $this->assertSame(round($seconds / 60).' min', $data['totals']['duration_label']);
+            foreach ($report['trips'] as $index => $trip) {
+                $this->assertSame((int) round($trip['duration_s'] / 60), $data['trips'][$index]['minutes']);
+            }
+            $html = $exporter->html($report, 'Test Viewer');
+            $this->assertStringContainsString($data['totals']['duration_label'], $html);
+            $this->assertStringNotContainsString('fractional minutes', $html);
+
+            $response = $this->actingAs($viewer)->get("/fleet-assets/vehicles/{$vehicle->id}/trip-history/export/excel?from=2026-09-21&to=2026-09-21&maps=0&events=0");
+            $response->assertOk();
+            $archive = tempnam(sys_get_temp_dir(), 'trip-duration-test-');
+            file_put_contents($archive, $response->getContent());
+            $zip = new \ZipArchive;
+            try {
+                $this->assertTrue($zip->open($archive));
+                $sheet = new \DOMDocument;
+                $this->assertTrue($sheet->loadXML($zip->getFromName('xl/worksheets/sheet1.xml'), LIBXML_NONET));
+                $xpath = new \DOMXPath($sheet);
+                $xpath->registerNamespace('s', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+                $sum = 0.0;
+                foreach ($report['trips'] as $index => $trip) {
+                    $row = $index + 8;
+                    $value = (float) $xpath->evaluate("string(//s:c[@r='J{$row}']/s:v)");
+                    $this->assertEqualsWithDelta($trip['duration_s'], $value * 60, 0.00000001);
+                    $this->assertSame('4', $xpath->evaluate("string(//s:c[@r='J{$row}']/@s)"));
+                    $sum += $value;
+                }
+                $lastRow = count($durations) + 7;
+                $totalRow = $lastRow + 1;
+                $formula = $xpath->evaluate("string(//s:c[@r='J{$totalRow}']/s:f)");
+                $cached = (float) $xpath->evaluate("string(//s:c[@r='J{$totalRow}']/s:v)");
+                $this->assertSame("SUM(J8:J{$lastRow})", $formula);
+                $this->assertEqualsWithDelta($seconds, $sum * 60, 0.00000001);
+                $this->assertEqualsWithDelta($seconds, $cached * 60, 0.00000001);
+                $this->assertEqualsWithDelta($sum, $cached, 0.0000000001);
+                $this->assertSame('4', $xpath->evaluate("string(//s:c[@r='J{$totalRow}']/@s)"));
+                $styles = simplexml_load_string($zip->getFromName('xl/styles.xml'), options: LIBXML_NONET);
+                $this->assertSame('2', (string) $styles->cellXfs->xf[4]['numFmtId']); // Built-in 0.00 display only.
+                $this->assertStringContainsString('totals use the unrounded values', $zip->getFromName('xl/worksheets/sheet2.xml'));
+                $zip->close();
+            } finally {
+                unlink($archive);
+            }
+        }
+    }
+
     public function test_local_street_maps_are_embedded_in_both_formats_with_dataset_audit_and_privacy(): void
     {
         $directory = sys_get_temp_dir().'/oblivion-export-map-'.bin2hex(random_bytes(8));

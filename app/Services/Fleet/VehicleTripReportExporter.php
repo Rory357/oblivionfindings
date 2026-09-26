@@ -129,6 +129,7 @@ final class VehicleTripReportExporter
                 'from' => $trip['from'] ?? 'Start position (no address)',
                 'to' => $trip['to'] ?? ($trip['in_progress'] ? 'Trip in progress' : 'End position (no address)'),
                 'distance_km' => (float) $trip['distance_km'],
+                'duration_seconds' => (int) $trip['duration_s'],
                 'minutes' => (int) round($trip['duration_s'] / 60),
                 'max_speed_kph' => $behaviour['max_speed_kph'],
                 'coverage_pct' => $behaviour['coverage_pct'],
@@ -177,6 +178,7 @@ final class VehicleTripReportExporter
             'totals' => [
                 'trips' => (int) $totals['trips'],
                 'distance_km' => round((float) $totals['distance_km'], 1),
+                'duration_seconds' => (int) $totals['duration_s'],
                 'minutes' => $minutes,
                 'duration_label' => intdiv($minutes, 60) > 0 ? intdiv($minutes, 60).' hr '.($minutes % 60).' min' : $minutes.' min',
                 'driving_events' => (int) $totals['driving_events'],

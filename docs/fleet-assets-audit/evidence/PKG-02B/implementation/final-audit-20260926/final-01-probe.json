@@ -1,0 +1,52 @@
+[
+    {
+        "file": "final-01-case-0.xlsx",
+        "input_trip_seconds": [
+            40,
+            40
+        ],
+        "row_minutes": [
+            0.66666666666667,
+            0.66666666666667
+        ],
+        "total_formula": "SUM(J8:J9)",
+        "cached_total_minutes": 1.3333333333333,
+        "independent_sum_minutes": 1.33333333333334,
+        "recorded_total_seconds": 80,
+        "database_bootstrapped": false
+    },
+    {
+        "file": "final-01-case-1.xlsx",
+        "input_trip_seconds": [
+            20,
+            20
+        ],
+        "row_minutes": [
+            0.33333333333333,
+            0.33333333333333
+        ],
+        "total_formula": "SUM(J8:J9)",
+        "cached_total_minutes": 0.66666666666667,
+        "independent_sum_minutes": 0.66666666666666,
+        "recorded_total_seconds": 40,
+        "database_bootstrapped": false
+    },
+    {
+        "file": "final-01-case-2.xlsx",
+        "input_trip_seconds": [
+            29,
+            31,
+            61
+        ],
+        "row_minutes": [
+            0.48333333333333,
+            0.51666666666667,
+            1.0166666666667
+        ],
+        "total_formula": "SUM(J8:J10)",
+        "cached_total_minutes": 2.0166666666667,
+        "independent_sum_minutes": 2.0166666666667,
+        "recorded_total_seconds": 121,
+        "database_bootstrapped": false
+    }
+]

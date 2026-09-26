@@ -1,0 +1,29 @@
+[
+  {
+    "file": "final-01-case-0.xlsx",
+    "engine": "@oai/artifact-tool",
+    "totalCell": "J10",
+    "recalculatedMinutes": 1.33333333333334,
+    "seconds": 80.0000000000004,
+    "formula": "=SUM(J8:J9)",
+    "matchesRecordedSeconds": true
+  },
+  {
+    "file": "final-01-case-1.xlsx",
+    "engine": "@oai/artifact-tool",
+    "totalCell": "J10",
+    "recalculatedMinutes": 0.66666666666666,
+    "seconds": 39.999999999999595,
+    "formula": "=SUM(J8:J9)",
+    "matchesRecordedSeconds": true
+  },
+  {
+    "file": "final-01-case-2.xlsx",
+    "engine": "@oai/artifact-tool",
+    "totalCell": "J11",
+    "recalculatedMinutes": 2.0166666666667,
+    "seconds": 121.00000000000199,
+    "formula": "=SUM(J8:J10)",
+    "matchesRecordedSeconds": true
+  }
+]

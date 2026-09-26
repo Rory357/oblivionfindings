@@ -24,15 +24,15 @@ final class VehicleTripWorkbook
         foreach ($data['trips'] as $trip) {
             $rows[] = [$trip['reference'], $trip['date_iso'], $trip['start_time'], $trip['end_time'],
                 $trip['driver_name'], $trip['driver_status'], $trip['from'], $trip['to'], $trip['distance_km'],
-                $trip['minutes'], $trip['max_speed_kph'], $trip['coverage_pct'], $trip['driving_events'],
+                $trip['duration_seconds'] / 60, $trip['max_speed_kph'], $trip['coverage_pct'], $trip['driving_events'],
                 $trip['score'] ?? $trip['score_label'], $trip['source_note']];
         }
         $lastTripRow = count($rows);
         $rows[] = ['Total', '', '', '', '', '', '', '',
             ['formula' => 'SUM(I8:I'.$lastTripRow.')', 'value' => $data['totals']['distance_km']],
-            ['formula' => 'SUM(J8:J'.$lastTripRow.')', 'value' => $data['totals']['minutes']]];
+            ['formula' => 'SUM(J8:J'.$lastTripRow.')', 'value' => $data['totals']['duration_seconds'] / 60]];
         $sheets[] = ['name' => 'Trips', 'rows' => $rows, 'header' => 7, 'columns' => 15, 'last' => $lastTripRow,
-            'date_column' => 1, 'images' => []];
+            'date_column' => 1, 'duration_column' => 9, 'images' => []];
         if ($data['include_events']) {
             $rows = [...$intro, [], ['Trip', 'Date', 'Time', 'Event', 'Details', 'Location']];
             foreach ($data['trips'] as $trip) {
@@ -44,6 +44,7 @@ final class VehicleTripWorkbook
                 'date_column' => 1, 'images' => []];
         }
         $rows = [[$data['brand']['name'].' · Report notes'], [$data['vehicle_line']], [$data['generated_label']], [],
+            ['Duration retains recorded seconds as fractional minutes. Cells display two decimals; totals use the unrounded values.'],
             ...array_map(fn (string $note): array => [$note], $data['notes'])];
         $sheets[] = ['name' => 'Report notes', 'rows' => $rows, 'header' => 0, 'columns' => 8, 'last' => 0,
             'date_column' => null, 'images' => []];
@@ -158,6 +159,9 @@ final class VehicleTripWorkbook
                     $value = (int) CarbonImmutable::parse('1899-12-30', 'UTC')->diffInDays(CarbonImmutable::parse($value, 'UTC'));
                     $style = 3;
                 }
+                if (($sheet['duration_column'] ?? null) === $col && $row > $sheet['header']) {
+                    $style = 4;
+                }
                 $xml .= '<c r="'.$ref.'" s="'.$style.'"';
                 if (is_array($value)) {
                     $xml .= '><f>'.$value['formula'].'</f><v>'.$value['value'].'</v></c>';
@@ -226,7 +230,7 @@ final class VehicleTripWorkbook
 
     private function styles(string $colour): string
     {
-        return '<styleSheet xmlns="'.self::NS.'"><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="16"/><color rgb="FF'.substr($colour, 1).'"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF'.substr($colour, 1).'"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1"/></xf><xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+        return '<styleSheet xmlns="'.self::NS.'"><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="16"/><color rgb="FF'.substr($colour, 1).'"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF'.substr($colour, 1).'"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1"/></xf><xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="2" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
     }
 
     private function column(int $index): string
