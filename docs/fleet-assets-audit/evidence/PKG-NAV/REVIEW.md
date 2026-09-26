@@ -2,6 +2,8 @@
 
 Status: ready for Main's required pre-integration review; **not published**.
 
+Review amendment: the final candidate head supplied to Main includes a small correction after the initial packet: contextual command-search entries use workspace-qualified IDs, so aliases such as Vehicles/Fleet sharing a URL cannot generate duplicate React keys. The regression now asserts unique Fleet search IDs. All 61 focused tests, scoped types and lint passed again; lint also covers the committed verification scripts (explicit Node process import and shared Card in the synthetic body). Browser search for Shift handovers opened `/fleet-assets/handovers`. A fixture HMR rebootstrap warning occurred while editing its synthetic body; it is not an application-source failure. The initial source commit below plus this correction form the final application diff; review the complete base-to-final-head diff rather than only the initial source commit.
+
 Task: `01a0dcfe-f6cd-7873-8eaf-36229ac9c59a`. Worktree: `C:/Users/steph/.codex/worktrees/475b/oblivionfindings`. Branch: `codex/fleet-seven-entry-navigation`.
 
 Base: `fa7b5291988cebfb6beaa6e6e10c6c660fb2a959` (clean detached starting checkout; independently matched remote main before implementation). Exact implementation commit: `02381fad5e86727eba565696d9209686e2d76b3a`. The later evidence-only commit is the review candidate head supplied with this packet. Use `git diff fa7b5291988cebfb6beaa6e6e10c6c660fb2a959 02381fad5e86727eba565696d9209686e2d76b3a` for the complete application/test diff.

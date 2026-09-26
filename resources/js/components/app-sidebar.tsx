@@ -3139,7 +3139,7 @@ export function buildNavSearchCatalog(ctx: {
                 for (const group of visibleFleetGroups(workspace, can)) {
                     for (const item of group.links) {
                         push({
-                            id: `fleet-assets:${item.href}`,
+                            id: `fleet-assets:${workspace.key}:${item.href}`,
                             label: item.label,
                             href: item.href,
                             section: icon.label,

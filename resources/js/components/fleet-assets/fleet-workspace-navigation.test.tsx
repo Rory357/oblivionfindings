@@ -263,6 +263,12 @@ describe('Fleet workspace navigation', () => {
             role: 'Admin',
             can: fullAccess,
         });
+        const fleetCatalog = catalog.filter(
+            (item) => item.section === 'Fleet & Assets',
+        );
+        expect(new Set(fleetCatalog.map((item) => item.id)).size).toBe(
+            fleetCatalog.length,
+        );
         expect(catalog.find((item) => item.label === 'Checklists')?.href).toBe(
             '/fleet-assets/maintenance/checklists',
         );
