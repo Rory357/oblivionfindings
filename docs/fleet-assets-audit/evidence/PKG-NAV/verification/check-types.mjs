@@ -1,0 +1,14 @@
+import ts from 'typescript';
+import fs from 'node:fs';
+const config = ts.readConfigFile('tsconfig.json', ts.sys.readFile);
+const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, process.cwd());
+const roots = ['resources/js/lib/fleet-navigation.ts', 'resources/js/components/fleet-assets/fleet-workspace-navigation.tsx', 'resources/js/components/app-sidebar.tsx', 'resources/js/layouts/app/app-sidebar-layout.tsx'];
+const program = ts.createProgram(roots, parsed.options);
+const diagnostics = ts.getPreEmitDiagnostics(program);
+const touched = diagnostics.filter(d => d.file && roots.some(p => d.file.fileName.replaceAll('\\','/').endsWith(p)));
+const format = ds => ts.formatDiagnosticsWithColorAndContext(ds,{getCanonicalFileName:f=>f,getCurrentDirectory:()=>process.cwd(),getNewLine:()=> '\n'});
+fs.writeFileSync('.fleet/pkg-nav/types-all.txt',format(diagnostics));
+fs.writeFileSync('.fleet/pkg-nav/types-touched.txt',format(touched));
+console.log(JSON.stringify({total:diagnostics.length,touched:touched.length}));
+console.log(format(touched));
+process.exitCode = touched.length ? 1 : 0;
