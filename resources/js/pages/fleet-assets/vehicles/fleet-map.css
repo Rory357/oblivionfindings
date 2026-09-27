@@ -1,0 +1,73 @@
+.fleet-map .leaflet-map-stats-tooltip {
+    width: 234px;
+    max-width: 260px;
+    white-space: normal;
+    padding: 10px;
+}
+.fleet-map .leaflet-map-stats-card {
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--foreground);
+}
+.fleet-map .leaflet-map-stats-card > strong {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 12px;
+}
+.fleet-map .leaflet-map-stats-card section {
+    display: grid;
+    grid-template-columns: 14px 68px minmax(0, 1fr);
+    gap: 5px;
+    align-items: start;
+    margin: 5px 0;
+}
+.fleet-map .leaflet-map-stats-card svg {
+    width: 14px;
+    height: 14px;
+}
+.fleet-map .leaflet-map-stats-card b {
+    overflow-wrap: anywhere;
+    font-weight: 500;
+}
+.fleet-map .leaflet-map-stats-card footer {
+    margin-top: 7px;
+    color: var(--muted-foreground);
+    font-size: 10px;
+}
+.fleet-map-canvas {
+    height: max(640px, 70vh);
+}
+/* Keep the layer switch visible without relying on a separately loaded sprite. */
+.fleet-map .leaflet-control-layers-toggle {
+    display: grid;
+    place-items: center;
+    background-image: none;
+    color: var(--foreground);
+}
+.fleet-map .leaflet-control-layers-toggle::before {
+    content: '';
+    width: 24px;
+    height: 24px;
+    background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m12 3 10 6-10 6L2 9zM2 13l10 6 10-6M2 17l10 6 10-6'/%3E%3C/svg%3E")
+        center / contain no-repeat;
+}
+.fleet-map [aria-label='Selected vehicle details'] button {
+    font-size: 11px;
+}
+.fleet-map-list {
+    height: max(690px, calc(70vh + 50px));
+}
+@media (min-width: 1024px) {
+    .fleet-map-grid {
+        height: max(740px, calc(70vh + 100px));
+    }
+    .fleet-map-canvas {
+        flex: 1;
+        min-height: 0;
+        height: auto;
+    }
+    .fleet-map-list {
+        height: 100%;
+    }
+}

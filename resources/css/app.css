@@ -1190,3 +1190,8 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 .leaflet-tiles-dark {
     filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
 }
+
+/* Fleet overview: mute only raster basemap tiles; markers retain status tones. */
+.grayscale-map .leaflet-tile-pane {
+    filter: grayscale(1);
+}

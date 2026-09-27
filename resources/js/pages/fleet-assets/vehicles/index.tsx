@@ -1,9 +1,44 @@
+import {
+    BookingWizard,
+    type BookingWizardMode,
+} from '@/components/fleet-assets/vehicle-workspace/booking-wizard';
+import type {
+    BookingRow,
+    VehicleCalendarSummary,
+} from '@/components/fleet-assets/vehicle-workspace/calendar-types';
+import type { VehicleProfile } from '@/components/fleet-assets/vehicle-workspace/types';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
-import LeafletMap, { MapMarker } from '@/components/leaflet-map';
+import { EntityCard } from '@/components/lists/entity-card';
+import { EntityChip, EntityStatusChip } from '@/components/lists/entity-cells';
+import {
+    EntityContextMenu,
+    useEntityContextMenu,
+} from '@/components/lists/entity-menu';
+import { EntityTable } from '@/components/lists/entity-table';
 import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageHeaderViewToggle,
+    type PageHeaderRailItem,
+} from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     Select,
     SelectContent,
@@ -11,36 +46,45 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDateTime, toDatetimeLocal } from '@/lib/datetime';
+import { type CalView } from '@/pages/sites/calendar/_parts';
+import { Head, router } from '@inertiajs/react';
 import {
-    FleetComplianceBadges,
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
-import { Head, Link, router } from '@inertiajs/react';
-import {
-    Battery,
-    Bookmark,
+    ArrowRight,
+    CalendarDays,
     Car,
-    ClipboardCheck,
+    Clock,
+    Columns3,
     Download,
-    Gauge,
-    RefreshCw,
-    Search,
-    WifiOff,
+    LayoutGrid,
+    List,
+    MapPin,
+    Plus,
+    Rows3,
+    Truck,
     X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+    FleetCalendar,
+    type FleetCalendarVehicle,
+    type FleetEvent,
+} from './fleet-calendar';
+import { FleetEvidenceMeters } from './fleet-header';
+import { FleetMap } from './fleet-map';
+import { registerEvidence, useRegisterEvidence } from './register-evidence';
 
 type Vehicle = {
     id: number;
     name: string;
     asset_tag: string;
+    registration_number?: string | null;
+    body_type?: string | null;
+    seating_capacity?: number | null;
+    has_wheelchair_ramp?: boolean;
+    has_hoist?: boolean;
     status: string;
     /** False for a vehicle seen through central fleet oversight, outside the person's Sites. */
     at_your_sites?: boolean;
@@ -50,8 +94,8 @@ type Vehicle = {
         lat: number | null;
         lng: number | null;
         speed_kph: number | null;
-        battery_pct: number;
-        last_seen_at: string;
+        battery_pct: number | null;
+        last_seen_at: string | null;
     } | null;
     home_site: { id: number; name: string } | null;
 };
@@ -72,10 +116,14 @@ function toArray<T>(input: PaginatedOrArray<T> | null | undefined): T[] {
 
 type Props = {
     vehicles: PaginatedOrArray<Vehicle>;
+    all_vehicles?: FleetCalendarVehicle[];
     sites?: Array<{ id: number; name: string }>;
+    assignment_sites?: Array<{ id: number; name: string }>;
+    filters?: Record<string, string | null>;
     hero: {
         total: number;
-        available: number;
+        available: number | null;
+        availability_label?: string;
         in_use: number;
         maintenance: number;
     };
@@ -98,7 +146,10 @@ type Props = {
 
 export default function VehiclesIndex({
     vehicles: rawVehicles,
+    all_vehicles: allVehicles = [],
     sites,
+    assignment_sites: assignmentSites = [],
+    filters = {},
     hero,
     compliance,
     can,
@@ -111,9 +162,255 @@ export default function VehiclesIndex({
         ? (rawVehicles?.meta ?? {})
         : {};
     const canManage = can.manage;
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(filters.search ?? '');
     const [statusFilter, setStatusFilter] = useState('all');
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const contextMenu = useEntityContextMenu<Vehicle>();
+    const [requestPick, setRequestPick] = useState(false);
+    const [pendingRequestWindow, setPendingRequestWindow] = useState<{
+        start?: string;
+        end?: string;
+    } | null>(null);
+    const [workflow, setWorkflow] = useState<{
+        vehicle: VehicleProfile;
+        summary: VehicleCalendarSummary;
+        mode: BookingWizardMode;
+    } | null>(null);
+    const [workflowError, setWorkflowError] = useState('');
+    const [lastTimeChange, setLastTimeChange] = useState<{
+        vehicleId: number;
+        row: BookingRow;
+        version: number;
+    } | null>(null);
+    const workflowRequest = useRef<AbortController | null>(null);
+    useEffect(() => () => workflowRequest.current?.abort(), []);
+    const [calendarRevision, setCalendarRevision] = useState(0);
+    const params =
+        typeof window === 'undefined'
+            ? new URLSearchParams()
+            : new URLSearchParams(window.location.search);
+    const requestedView = params.get('view');
+    const view: 'register' | 'map' | CalView = [
+        'map',
+        'month',
+        'week',
+        'day',
+        'agenda',
+        'timeline',
+    ].includes(requestedView ?? '')
+        ? (requestedView as 'map' | CalView)
+        : 'register';
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') ?? '')
+        ? params.get('date')!
+        : new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'Pacific/Auckland',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+          }).format(new Date());
+    const vehicleId = Number(params.get('vehicle')) || null;
+    const isCalendar = view !== 'register' && view !== 'map';
+    const [meterTarget, setMeterTarget] = useState<HTMLDivElement | null>(null);
+    const [actionTarget, setActionTarget] = useState<HTMLDivElement | null>(
+        null,
+    );
+    const [filterTarget, setFilterTarget] = useState<HTMLDivElement | null>(
+        null,
+    );
+    const headerTargets = {
+        meters: meterTarget,
+        actions: actionTarget,
+        filters: filterTarget,
+    };
+    const layout = params.get('layout') === 'cards' ? 'cards' : 'table';
+    const patchParams = (patch: Record<string, string | number | null>) => {
+        const next = new URLSearchParams(window.location.search);
+        Object.entries(patch).forEach(([key, value]) =>
+            value === null || value === '' || value === 'all'
+                ? next.delete(key)
+                : next.set(key, String(value)),
+        );
+        router.get(
+            `/fleet-assets/vehicles?${next}`,
+            {},
+            { preserveState: false, preserveScroll: true },
+        );
+    };
+    useEffect(() => {
+        if (searchTerm === (filters.search ?? '')) return;
+        const timer = window.setTimeout(
+            () => patchParams({ search: searchTerm.trim(), page: null }),
+            350,
+        );
+        return () => window.clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- only submitted search and current field are relevant
+    }, [searchTerm, filters.search]);
+    const scope = allVehicles.filter(
+        (vehicle) =>
+            (!filters.site_id ||
+                filters.site_id === 'all' ||
+                vehicle.home_site?.id === Number(filters.site_id)) &&
+            (!filters.type ||
+                filters.type === 'all' ||
+                vehicle.body_type === filters.type) &&
+            (!filters.capacity ||
+                filters.capacity === 'all' ||
+                (vehicle.seating_capacity ?? 0) >= Number(filters.capacity)) &&
+            (!filters.access ||
+                filters.access !== 'wheelchair' ||
+                vehicle.has_wheelchair_ramp ||
+                vehicle.has_hoist) &&
+            (!filters.status ||
+                filters.status === 'all' ||
+                vehicle.status === filters.status) &&
+            (!filters.search ||
+                `${vehicle.name} ${vehicle.asset_tag ?? ''} ${vehicle.registration_number ?? ''}`
+                    .toLowerCase()
+                    .includes(filters.search.toLowerCase())),
+    );
+    const profile = (id: number, tab?: string) => {
+        const back = encodeURIComponent(
+            window.location.pathname + window.location.search,
+        );
+        window.location.assign(
+            `/fleet-assets/vehicles/${id}?${tab ? `tab=${tab}&` : ''}${tab === 'calendar' ? `date=${date}&` : ''}return_to=${back}`,
+        );
+    };
+    const openBooking = async (
+        id: number | null,
+        start?: string,
+        end?: string,
+        event?: Pick<FleetEvent, 'kind' | 'recordId' | 'version'>,
+        proposal?: {
+            start: string;
+            end: string;
+            startOffset?: string;
+            endOffset?: string;
+        },
+    ) => {
+        workflowRequest.current?.abort();
+        const controller = new AbortController();
+        workflowRequest.current = controller;
+        if (id === null) {
+            setPendingRequestWindow({ start, end });
+            setRequestPick(true);
+            return;
+        }
+        setWorkflowError('');
+        const vehicle = allVehicles.find((row) => row.id === id);
+        if (!vehicle) {
+            setWorkflowError(
+                'This vehicle is no longer in the permitted fleet.',
+            );
+            return;
+        }
+        try {
+            const summaryResponse = await fetch(
+                `/fleet-assets/vehicles/${id}/calendar/summary`,
+                {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json' },
+                    signal: controller.signal,
+                },
+            );
+            if (!summaryResponse.ok)
+                throw new Error(
+                    'Current booking permissions could not be loaded.',
+                );
+            const summary =
+                (await summaryResponse.json()) as VehicleCalendarSummary;
+            let mode: BookingWizardMode;
+            if (event) {
+                if (event.kind !== 'booking' || !event.recordId)
+                    throw new Error('This entry cannot be edited here.');
+                const recordResponse = await fetch(
+                    `/fleet-assets/vehicles/${id}/calendar/records/booking/${event.recordId}`,
+                    {
+                        credentials: 'same-origin',
+                        headers: { Accept: 'application/json' },
+                        signal: controller.signal,
+                    },
+                );
+                if (!recordResponse.ok)
+                    throw new Error(
+                        'This booking changed or is no longer available. Recheck the calendar.',
+                    );
+                const result = (await recordResponse.json()) as {
+                    row: BookingRow;
+                };
+                if (!result.row.can.edit)
+                    throw new Error(
+                        'You cannot change this booking. Open its source record for the current state.',
+                    );
+                if (proposal && event.version !== result.row.lock_version)
+                    throw new Error(
+                        'This booking changed since the calendar loaded. Recheck before moving it.',
+                    );
+                mode = {
+                    kind: 'change',
+                    row: result.row,
+                    proposedStartLocal: proposal?.start,
+                    proposedEndLocal: proposal?.end,
+                    proposedStartOffset: proposal?.startOffset,
+                    proposedEndOffset: proposal?.endOffset,
+                };
+            } else {
+                if (!summary.can.request)
+                    throw new Error(
+                        'Booking requests are not permitted for this vehicle at your sites.',
+                    );
+                mode = { kind: 'request', startLocal: start, endLocal: end };
+            }
+            if (controller.signal.aborted) return;
+            setWorkflow({
+                vehicle: {
+                    id: vehicle.id,
+                    name: vehicle.name,
+                    asset_tag: vehicle.asset_tag,
+                    registration_number: vehicle.registration_number,
+                    site: vehicle.home_site,
+                } as VehicleProfile,
+                summary,
+                mode,
+            });
+        } catch (reason) {
+            if (controller.signal.aborted) return;
+            setWorkflowError(
+                reason instanceof Error
+                    ? reason.message
+                    : 'The booking source could not be loaded.',
+            );
+        }
+    };
+    const railItems: PageHeaderRailItem<typeof view>[] = [
+        { key: 'register', label: 'Vehicles', icon: Car },
+        { key: 'map', label: 'Map', icon: MapPin },
+        { key: 'month', label: 'Month', icon: LayoutGrid },
+        { key: 'week', label: 'Week', icon: Columns3 },
+        { key: 'day', label: 'Day', icon: Clock },
+        { key: 'agenda', label: 'Agenda', icon: List },
+        { key: 'timeline', label: 'Timeline', icon: Rows3 },
+    ];
+    const registerSource = useRegisterEvidence(view === 'register');
+    const registerStale =
+        registerSource.state === 'ready' &&
+        (!Number.isFinite(Date.parse(registerSource.asOf)) ||
+            Date.now() - Date.parse(registerSource.asOf) > 5 * 60000);
+    const evidenceFor = (id: number) =>
+        registerEvidence(
+            registerStale ? [] : registerSource.events,
+            id,
+            Date.now(),
+        );
+    const currentEvidence = (id: number) =>
+        registerSource.state === 'loading'
+            ? 'Loading calendar evidence…'
+            : registerSource.state === 'failed'
+              ? 'Calendar evidence unavailable'
+              : registerStale
+                ? 'Calendar evidence needs a recheck'
+                : (evidenceFor(id).current?.statusLabel ??
+                  'Assess the selected trip and time');
 
     // Bulk selection
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -124,44 +421,16 @@ export default function VehiclesIndex({
             if (document.hidden) return;
             setIsRefreshing(true);
             router.reload({
-                only: ['vehicles'],
+                only: ['vehicles', 'all_vehicles', 'hero', 'compliance'],
                 onFinish: () => setIsRefreshing(false),
             });
         }, 30000);
         return () => window.clearInterval(interval);
     }, []);
 
-    const filteredVehicles = useMemo(() => {
-        const term = searchTerm.trim().toLowerCase();
-        return (vehicles ?? []).filter((v) => {
-            const name = (v.name ?? v.asset_tag ?? '').toLowerCase();
-            const matchesTerm = !term || name.includes(term);
-            const status = v.state?.status ?? 'offline';
-            if (statusFilter === 'online' && status !== 'online') return false;
-            if (statusFilter === 'offline' && status === 'online') return false;
-            return matchesTerm;
-        });
-    }, [vehicles, searchTerm, statusFilter]);
-
-    const markers = useMemo<MapMarker[]>(() => {
-        return filteredVehicles
-            .filter((v) => v.state?.lat && v.state?.lng)
-            .map((v) => ({
-                id: v.id,
-                lat: Number(v.state!.lat),
-                lng: Number(v.state!.lng),
-                title: v.name ?? v.asset_tag ?? `Vehicle ${v.id}`,
-                type: 'vehicle' as const,
-                status: v.state!.status,
-                popup: `Speed: ${v.state!.speed_kph ?? 0} kph | Battery: ${v.state!.battery_pct ?? 0}%`,
-            }));
-    }, [filteredVehicles]);
-
-    const center = useMemo(() => {
-        if (markers.length > 0)
-            return { lat: markers[0].lat, lng: markers[0].lng };
-        return { lat: -36.8485, lng: 174.7633 };
-    }, [markers]);
+    // The register is filtered before pagination by the server. A second
+    // client-side filter would make its totals and page links dishonest.
+    const filteredVehicles = vehicles;
 
     const toggleSelect = useCallback((id: number) => {
         setSelectedIds((prev) =>
@@ -170,9 +439,8 @@ export default function VehiclesIndex({
     }, []);
 
     // Bulk Site and tracker actions need the vehicle's own Site.
-    const selectableVehicles = useMemo(
-        () => filteredVehicles.filter((v) => v.at_your_sites !== false),
-        [filteredVehicles],
+    const selectableVehicles = filteredVehicles.filter(
+        (v) => v.at_your_sites !== false,
     );
 
     const toggleSelectAll = useCallback(() => {
@@ -201,327 +469,696 @@ export default function VehiclesIndex({
         [selectedIds, bulkSiteId],
     );
 
+    const vehicleActions = (vehicle: Vehicle) => [
+        {
+            label: 'Open vehicle profile',
+            icon: Car,
+            onClick: () => profile(vehicle.id),
+        },
+        {
+            label: 'View fleet calendar',
+            icon: CalendarDays,
+            onClick: () => patchParams({ view: 'week', vehicle: vehicle.id }),
+        },
+        {
+            label: 'View on map',
+            icon: MapPin,
+            onClick: () => patchParams({ view: 'map', mapFocus: vehicle.id }),
+        },
+        ...(vehicle.at_your_sites === false
+            ? []
+            : [
+                  {
+                      label: 'Request this vehicle',
+                      icon: Plus,
+                      onClick: () => void openBooking(vehicle.id),
+                  },
+              ]),
+        {
+            label: 'Open source evidence',
+            icon: ArrowRight,
+            onClick: () => profile(vehicle.id, 'maintenance'),
+        },
+    ];
+    const statusTone = (vehicle: Vehicle) =>
+        ['maintenance', 'out_of_service'].includes(vehicle.status)
+            ? ('warning' as const)
+            : ('neutral' as const);
+
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
-                { title: 'Vehicles', href: '/fleet-assets/vehicles' },
+                { title: 'Fleet', href: '/fleet-assets/vehicles' },
             ]}
         >
-            <Head title="Vehicles" />
-            <PageShell>
-                <HeroShell
-                    footer={
-                        <FleetComplianceBadges
-                            wofDue={compliance.wof_due}
-                            wofExpired={compliance.wof_expired}
-                            regoDue={compliance.rego_due}
-                            regoExpired={compliance.rego_expired}
-                            cofDue={compliance.cof_due}
-                            cofExpired={compliance.cof_expired}
-                            insuranceExpiring={compliance.insurance_expiring}
-                            insuranceExpired={compliance.insurance_expired}
-                            openAlerts={compliance.open_alerts}
-                            criticalAlerts={compliance.critical_alerts}
-                            hrefs={{
-                                wof: '/fleet-assets/compliance',
-                                rego: '/fleet-assets/compliance',
-                                cof: '/fleet-assets/compliance',
-                                insurance: '/fleet-assets/compliance',
-                                alerts: '/fleet-assets/alerts',
-                            }}
-                        />
-                    }
-                >
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={Car} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Vehicle fleet · live sync
-                                {isRefreshing && (
-                                    <RefreshCw className="h-3 w-3 animate-spin" />
+            <Head title="Fleet" />
+            <PageHeader
+                icon={Truck}
+                title="Fleet"
+                titleChip={
+                    <PageHeaderStatusChip variant="neutral">
+                        {sites?.find(
+                            (site) => String(site.id) === filters.site_id,
+                        )?.name ?? 'All permitted sites'}
+                    </PageHeaderStatusChip>
+                }
+                subline="Vehicles, use and bookings · Pacific/Auckland"
+                actions={
+                    <>
+                        {isCalendar ? (
+                            <div className="contents" ref={setActionTarget} />
+                        ) : (
+                            <>
+                                {view === 'register' && (
+                                    <>
+                                        <PageHeaderSearch
+                                            value={searchTerm}
+                                            onChange={setSearchTerm}
+                                            placeholder="Search name, registration or tag"
+                                        />
+                                        <PageHeaderGlassButton
+                                            aria-label="Export permitted register CSV"
+                                            onClick={() =>
+                                                window.location.assign(
+                                                    `/fleet-assets/vehicles?${new URLSearchParams({ ...Object.fromEntries(params), export: 'csv' })}`,
+                                                )
+                                            }
+                                        >
+                                            <Download className="size-4" />
+                                            Export
+                                        </PageHeaderGlassButton>
+                                    </>
                                 )}
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Vehicles
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Live vehicle tracking and management.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
-                                label="Total"
-                                value={fmt(hero.total)}
-                                caption="in the fleet"
-                                tone="neutral"
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
+                                    onClick={() => void openBooking(null)}
+                                >
+                                    Request vehicle
+                                </PageHeaderPrimaryButton>
+                            </>
+                        )}
+                    </>
+                }
+                meters={
+                    view === 'map' ? (
+                        <div className="contents" ref={setMeterTarget} />
+                    ) : (
+                        <>
+                            {isCalendar ? (
+                                <div
+                                    className="contents"
+                                    ref={setMeterTarget}
+                                />
+                            ) : (
+                                <PageHeaderMeterBlock
+                                    label="Permitted vehicles"
+                                    onClick={() =>
+                                        patchParams({
+                                            view: 'register',
+                                            site_id: null,
+                                            status: null,
+                                            type: null,
+                                            capacity: null,
+                                            access: null,
+                                            search: null,
+                                        })
+                                    }
+                                >
+                                    <PageHeaderMeterBig>
+                                        {hero.total}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Complete fleet scope
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            )}
+                            <FleetEvidenceMeters
+                                total={hero.total}
+                                inUse={hero.in_use}
+                                maintenance={hero.maintenance}
+                                onAssess={() => void openBooking(vehicleId)}
                             />
-                            <HeroClusterTile
-                                label="Available"
-                                value={fmt(hero.available)}
-                                caption="ready to book"
-                                tone={
-                                    hero.available > 0 ? 'success' : 'warning'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/bookings"
-                                label="In use"
-                                value={fmt(hero.in_use)}
-                                caption="checked out"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/maintenance/work-orders"
-                                label="Maintenance"
-                                value={fmt(hero.maintenance)}
-                                caption="in the workshop"
-                                tone={
-                                    hero.maintenance > 0 ? 'warning' : 'success'
-                                }
-                            />
+                        </>
+                    )
+                }
+                filters={
+                    <>
+                        <PageHeaderFilterSelect
+                            label="Site"
+                            value={filters.site_id ?? 'all'}
+                            options={[
+                                { value: 'all', label: 'All sites' },
+                                ...(sites ?? []).map((site) => ({
+                                    value: String(site.id),
+                                    label: site.name,
+                                })),
+                            ]}
+                            onChange={(value) =>
+                                patchParams({ site_id: value, page: null })
+                            }
+                        />
+                        {isCalendar ? (
+                            <div className="contents" ref={setFilterTarget} />
+                        ) : (
+                            <>
+                                <PageHeaderFilterSelect
+                                    label="Type"
+                                    value={filters.type ?? 'all'}
+                                    options={[
+                                        { value: 'all', label: 'All types' },
+                                        ...[
+                                            ...new Set(
+                                                allVehicles
+                                                    .map(
+                                                        (vehicle) =>
+                                                            vehicle.body_type,
+                                                    )
+                                                    .filter(
+                                                        (
+                                                            type,
+                                                        ): type is string =>
+                                                            !!type,
+                                                    ),
+                                            ),
+                                        ].map((type) => ({
+                                            value: type,
+                                            label: type,
+                                        })),
+                                    ]}
+                                    onChange={(value) =>
+                                        patchParams({ type: value, page: null })
+                                    }
+                                />
+                                <PageHeaderFilterSelect
+                                    label="Seats"
+                                    value={filters.capacity ?? 'all'}
+                                    options={[
+                                        { value: 'all', label: 'Any capacity' },
+                                        ...[4, 5, 7, 8, 10].map((count) => ({
+                                            value: String(count),
+                                            label: `${count}+ seats`,
+                                        })),
+                                    ]}
+                                    onChange={(value) =>
+                                        patchParams({
+                                            capacity: value,
+                                            page: null,
+                                        })
+                                    }
+                                />
+                                <PageHeaderFilterSelect
+                                    label="Access"
+                                    value={filters.access ?? 'all'}
+                                    options={[
+                                        { value: 'all', label: 'Any access' },
+                                        {
+                                            value: 'wheelchair',
+                                            label: 'Wheelchair access',
+                                        },
+                                    ]}
+                                    onChange={(value) =>
+                                        patchParams({
+                                            access: value,
+                                            page: null,
+                                        })
+                                    }
+                                />
+                                <PageHeaderFilterSelect
+                                    label="Status"
+                                    value={filters.status ?? 'all'}
+                                    options={[
+                                        { value: 'all', label: 'All statuses' },
+                                        ...[
+                                            ...new Set(
+                                                allVehicles.map(
+                                                    (vehicle) => vehicle.status,
+                                                ),
+                                            ),
+                                        ].map((status) => ({
+                                            value: status,
+                                            label: status,
+                                        })),
+                                    ]}
+                                    onChange={(value) =>
+                                        patchParams({
+                                            status: value,
+                                            page: null,
+                                        })
+                                    }
+                                />
+                                {view === 'register' && (
+                                    <PageHeaderViewToggle
+                                        value={layout}
+                                        onChange={(value) =>
+                                            patchParams({ layout: value })
+                                        }
+                                        options={[
+                                            {
+                                                value: 'table',
+                                                label: 'List',
+                                                icon: List,
+                                            },
+                                            {
+                                                value: 'cards',
+                                                label: 'Cards',
+                                                icon: LayoutGrid,
+                                            },
+                                        ]}
+                                    />
+                                )}
+                            </>
+                        )}
+                    </>
+                }
+                rail={
+                    <PageHeaderRail
+                        items={railItems}
+                        value={view}
+                        onSelect={(next) =>
+                            patchParams({ view: next, page: null })
+                        }
+                        ariaLabel="Fleet views"
+                    />
+                }
+            />
+            <PageShell>
+                {view === 'register' && (
+                    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                        <div
+                            className="flex flex-wrap gap-2"
+                            aria-label="Recorded expiry and alert counts"
+                        >
+                            {[
+                                [
+                                    'WoF',
+                                    compliance.wof_due,
+                                    compliance.wof_expired,
+                                ],
+                                [
+                                    'Rego',
+                                    compliance.rego_due,
+                                    compliance.rego_expired,
+                                ],
+                                [
+                                    'CoF',
+                                    compliance.cof_due,
+                                    compliance.cof_expired,
+                                ],
+                                [
+                                    'Insurance',
+                                    compliance.insurance_expiring,
+                                    compliance.insurance_expired,
+                                ],
+                            ].map(([label, due, expired]) => (
+                                <a
+                                    key={String(label)}
+                                    href="/fleet-assets/compliance"
+                                >
+                                    <StatusBadge
+                                        variant={
+                                            Number(expired) > 0
+                                                ? 'critical'
+                                                : Number(due) > 0
+                                                  ? 'warning'
+                                                  : 'neutral'
+                                        }
+                                    >
+                                        {label}:{' '}
+                                        {due === null || expired === null
+                                            ? 'Not assessed'
+                                            : Number(expired) > 0
+                                              ? `${expired} expired`
+                                              : Number(due) > 0
+                                                ? `${due} due soon`
+                                                : 'No expiry alerts'}
+                                    </StatusBadge>
+                                </a>
+                            ))}
+                            <a href="/fleet-assets/alerts">
+                                <StatusBadge
+                                    variant={
+                                        compliance.critical_alerts
+                                            ? 'critical'
+                                            : compliance.open_alerts
+                                              ? 'warning'
+                                              : 'neutral'
+                                    }
+                                >
+                                    Alerts: {compliance.open_alerts} open
+                                </StatusBadge>
+                            </a>
                         </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <FleetHeroAction
-                            href="/fleet-assets/bookings?new=1"
-                            icon={Bookmark}
-                            emphasis
-                        >
-                            Book vehicle
-                        </FleetHeroAction>
-                        <FleetHeroAction
-                            href="/fleet-assets/daily-check"
-                            icon={ClipboardCheck}
-                        >
-                            Daily check
-                        </FleetHeroAction>
-                        <FleetHeroAction
-                            href="/fleet-assets/vehicles?export=csv"
-                            icon={Download}
-                            external
-                        >
-                            Export CSV
-                        </FleetHeroAction>
-                    </div>
-                </HeroShell>
+                )}
 
-                {vehicles.length === 0 &&
-                !searchTerm &&
-                statusFilter === 'all' ? (
+                {view === 'map' ? (
+                    <FleetMap
+                        headerTarget={meterTarget}
+                        permittedCount={hero.total}
+                        scopeIds={scope.map((vehicle) => vehicle.id)}
+                        requestableIds={allVehicles
+                            .filter((vehicle) => vehicle.at_your_sites)
+                            .map((vehicle) => vehicle.id)}
+                        onProfile={(vehicle, tab) => profile(vehicle.id, tab)}
+                        onCalendar={(vehicle) =>
+                            profile(vehicle.id, 'calendar')
+                        }
+                        onRequest={(vehicle) => void openBooking(vehicle.id)}
+                    />
+                ) : view !== 'register' ? (
+                    <FleetCalendar
+                        headerTargets={headerTargets}
+                        vehicleCriteria={Object.entries({
+                            Search: filters.search,
+                            Type: filters.type,
+                            Seats: filters.capacity,
+                            Access: filters.access,
+                            Status: filters.status,
+                        })
+                            .filter(([, value]) => value && value !== 'all')
+                            .map(([label, value]) => `${label}: ${value}`)}
+                        onClearCriteria={() =>
+                            patchParams({
+                                search: null,
+                                type: null,
+                                capacity: null,
+                                access: null,
+                                status: null,
+                                page: null,
+                            })
+                        }
+                        onView={(next) => patchParams({ view: next })}
+                        key={calendarRevision}
+                        view={view}
+                        date={date}
+                        vehicles={scope}
+                        vehicleId={vehicleId}
+                        onDate={(next) => patchParams({ date: next })}
+                        onDay={(next) =>
+                            patchParams({ view: 'day', date: next })
+                        }
+                        onVehicle={(id) => patchParams({ vehicle: id })}
+                        onRequest={(id, start, end) =>
+                            void openBooking(id, start, end)
+                        }
+                        onEdit={(event, proposal) =>
+                            void openBooking(
+                                event.vehicleId,
+                                undefined,
+                                undefined,
+                                event,
+                                proposal,
+                            )
+                        }
+                        onProfile={(id) => profile(id)}
+                    />
+                ) : vehicles.length === 0 ? (
                     <FleetEmptyState
                         icon={Car}
-                        title="No vehicles tracked yet"
-                        description="Add vehicles to start fleet tracking. Authorised vehicle locations appear when governed tracking evidence is available."
-                        actionLabel="Add Vehicle"
-                        actionHref="/fleet-assets/assets?new=1&category=vehicle"
+                        title={
+                            hero.total === 0
+                                ? 'No vehicles in your permitted fleet'
+                                : 'No vehicles match these filters'
+                        }
+                        description={
+                            hero.total === 0
+                                ? 'Vehicle records will appear here when they are assigned to permitted sites.'
+                                : 'Try clearing the search, site, type, capacity, access or status criteria.'
+                        }
+                        actionLabel={
+                            hero.total === 0 ? undefined : 'Clear filters'
+                        }
+                        actionHref={
+                            hero.total === 0
+                                ? undefined
+                                : '/fleet-assets/vehicles'
+                        }
                     />
                 ) : (
                     <>
-                        {/* Map + Vehicle List side by side */}
-                        <div className="grid gap-4 lg:grid-cols-[3fr,2fr]">
-                            {/* Map */}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                             <div>
-                                <LeafletMap
-                                    center={center}
-                                    zoom={12}
-                                    markers={markers}
-                                    height={500}
-                                />
+                                <h2 className="text-section-title">
+                                    Vehicle register
+                                </h2>
+                                <p className="text-caption">
+                                    {vehicles.length} on this page ·{' '}
+                                    {paginationMeta.total ?? vehicles.length}{' '}
+                                    matching · {hero.total} permitted overall
+                                </p>
+                                <p className="text-caption">
+                                    Calendar context: next 14 days ·{' '}
+                                    {registerSource.state === 'ready' &&
+                                    !registerStale
+                                        ? `Source checked ${formatDateTime(registerSource.asOf)}`
+                                        : registerSource.state === 'loading'
+                                          ? 'Checking source records…'
+                                          : 'Open the calendar to recheck source records'}
+                                </p>
                             </div>
-
-                            {/* Vehicle List */}
-                            <div className="space-y-3">
-                                <div className="flex flex-col gap-2">
-                                    <div className="relative">
-                                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                        <Input
-                                            placeholder="Search vehicles..."
-                                            value={searchTerm}
-                                            onChange={(e) =>
-                                                setSearchTerm(e.target.value)
-                                            }
-                                            className="pl-9"
-                                        />
-                                    </div>
-                                    <Select
-                                        value={statusFilter}
-                                        onValueChange={setStatusFilter}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All statuses
-                                            </SelectItem>
-                                            <SelectItem value="online">
-                                                Online
-                                            </SelectItem>
-                                            <SelectItem value="offline">
-                                                Offline
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                {/* Select All */}
-                                {canManage && (
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                        <input
-                                            type="checkbox"
-                                            checked={
-                                                selectableVehicles.length > 0 &&
-                                                selectedIds.length ===
-                                                    selectableVehicles.length
-                                            }
-                                            onChange={toggleSelectAll}
-                                            className="h-3.5 w-3.5 rounded border-border"
-                                        />
-                                        <span>Select all</span>
-                                    </div>
-                                )}
-
-                                <div
-                                    className="space-y-2"
-                                    style={{
-                                        maxHeight: '420px',
-                                        overflowY: 'auto',
-                                    }}
-                                >
-                                    {filteredVehicles.length > 0 ? (
-                                        filteredVehicles.map((vehicle) => (
-                                            <div
-                                                key={vehicle.id}
-                                                className={`flex items-start ${canManage ? 'gap-2' : ''}`}
-                                            >
-                                                {canManage && (
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedIds.includes(
-                                                            vehicle.id,
-                                                        )}
-                                                        disabled={
-                                                            vehicle.at_your_sites ===
-                                                            false
-                                                        }
-                                                        title={
-                                                            vehicle.at_your_sites ===
-                                                            false
-                                                                ? 'Outside your Sites: bulk Site and tracker actions aren’t available.'
-                                                                : undefined
-                                                        }
-                                                        aria-label={`Select ${vehicle.name ?? vehicle.asset_tag ?? `vehicle ${vehicle.id}`}`}
-                                                        onChange={() =>
-                                                            toggleSelect(
-                                                                vehicle.id,
-                                                            )
-                                                        }
-                                                        className="mt-3.5 h-3.5 w-3.5 rounded border-border"
-                                                    />
-                                                )}
-                                                <Link
-                                                    href={`/fleet-assets/vehicles/${vehicle.id}`}
-                                                    className="flex flex-1 flex-col gap-2 rounded-lg border p-3 transition-colors hover:bg-muted/50"
-                                                >
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2">
-                                                            <Car className="h-4 w-4 text-muted-foreground" />
-                                                            <span className="text-sm font-semibold">
-                                                                {vehicle.name ??
-                                                                    vehicle.asset_tag ??
-                                                                    `Vehicle ${vehicle.id}`}
-                                                            </span>
-                                                        </div>
-                                                        <Badge
-                                                            variant={
-                                                                vehicle.state
-                                                                    ?.status ===
-                                                                'online'
-                                                                    ? 'default'
-                                                                    : 'secondary'
-                                                            }
-                                                        >
-                                                            {vehicle.state
-                                                                ?.status ??
-                                                                'offline'}
-                                                        </Badge>
-                                                    </div>
-                                                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                                        {vehicle.state
-                                                            ?.speed_kph !=
-                                                            null && (
-                                                            <span className="inline-flex items-center gap-1">
-                                                                <Gauge className="h-3 w-3" />
-                                                                {
-                                                                    vehicle
-                                                                        .state
-                                                                        .speed_kph
-                                                                }{' '}
-                                                                kph
-                                                            </span>
-                                                        )}
-                                                        {vehicle.state
-                                                            ?.battery_pct !=
-                                                            null && (
-                                                            <span className="inline-flex items-center gap-1">
-                                                                <Battery className="h-3 w-3" />
-                                                                {
-                                                                    vehicle
-                                                                        .state
-                                                                        .battery_pct
-                                                                }
-                                                                %
-                                                            </span>
-                                                        )}
-                                                        {vehicle.state
-                                                            ?.last_seen_at && (
-                                                            <span>
-                                                                Last seen:{' '}
-                                                                {formatDateTime(
-                                                                    vehicle
-                                                                        .state
-                                                                        .last_seen_at,
-                                                                )}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {vehicle.home_site ? (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="text-[10px] font-normal"
-                                                            >
-                                                                Assigned to{' '}
-                                                                {
-                                                                    vehicle
-                                                                        .home_site
-                                                                        .name
-                                                                }
-                                                            </Badge>
-                                                        ) : (
-                                                            <Badge
-                                                                variant="secondary"
-                                                                className="text-[10px] font-normal"
-                                                            >
-                                                                Pool Vehicle
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                </Link>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <FleetEmptyState
-                                            icon={WifiOff}
-                                            title="No vehicles match your filters"
-                                            compact
-                                        />
-                                    )}
-                                </div>
-                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                    patchParams({
+                                        search: null,
+                                        site_id: null,
+                                        type: null,
+                                        capacity: null,
+                                        access: null,
+                                        status: null,
+                                        page: null,
+                                    })
+                                }
+                            >
+                                Clear filters
+                            </Button>
                         </div>
+                        {layout === 'table' ? (
+                            <EntityTable
+                                rows={filteredVehicles}
+                                rowKey={(vehicle) => vehicle.id}
+                                identityLabel="Vehicle"
+                                identityWidth="1.5fr"
+                                minWidth={930}
+                                identity={(vehicle) => ({
+                                    icon: Car,
+                                    name: vehicle.name,
+                                    subline:
+                                        [
+                                            vehicle.registration_number,
+                                            vehicle.asset_tag,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' · ') ||
+                                        'No registration or asset tag',
+                                })}
+                                columns={[
+                                    {
+                                        key: 'site',
+                                        label: 'Home site / type',
+                                        width: '1.1fr',
+                                        cell: (vehicle) => (
+                                            <div>
+                                                {vehicle.home_site?.name ??
+                                                    'No home site'}
+                                                <span className="text-caption block">
+                                                    {vehicle.body_type ??
+                                                        'Type not recorded'}
+                                                </span>
+                                            </div>
+                                        ),
+                                    },
+                                    {
+                                        key: 'capacity',
+                                        label: 'Capacity / access',
+                                        width: '1fr',
+                                        cell: (vehicle) => (
+                                            <div>
+                                                {vehicle.seating_capacity ==
+                                                null
+                                                    ? 'Seats unknown'
+                                                    : `${vehicle.seating_capacity} seats`}
+                                                <span className="text-caption block">
+                                                    {vehicle.has_wheelchair_ramp ||
+                                                    vehicle.has_hoist
+                                                        ? 'Wheelchair equipment recorded'
+                                                        : 'Access not recorded'}
+                                                </span>
+                                            </div>
+                                        ),
+                                    },
+                                    {
+                                        key: 'status',
+                                        label: 'Use / source evidence',
+                                        width: '1fr',
+                                        cell: (vehicle) => (
+                                            <div>
+                                                <EntityStatusChip
+                                                    variant={statusTone(
+                                                        vehicle,
+                                                    )}
+                                                >
+                                                    {vehicle.status}
+                                                </EntityStatusChip>
+                                                <span className="text-caption block">
+                                                    {currentEvidence(
+                                                        vehicle.id,
+                                                    )}
+                                                </span>
+                                                <span className="text-caption block">
+                                                    {vehicle.state?.last_seen_at
+                                                        ? `Tracker report ${formatDateTime(vehicle.state.last_seen_at)}`
+                                                        : 'No recent tracker report'}
+                                                </span>
+                                            </div>
+                                        ),
+                                    },
+                                    {
+                                        key: 'next',
+                                        label: 'Next record / action',
+                                        width: '0.85fr',
+                                        cell: (vehicle) => (
+                                            <div>
+                                                <p className="text-caption">
+                                                    {evidenceFor(vehicle.id)
+                                                        .next
+                                                        ? `${evidenceFor(vehicle.id).next!.statusLabel} · ${formatDateTime(evidenceFor(vehicle.id).next!.start)}`
+                                                        : 'Open calendar to assess availability'}
+                                                </p>
+                                                <Button
+                                                    variant="link"
+                                                    size="sm"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        patchParams({
+                                                            view: 'week',
+                                                            vehicle: vehicle.id,
+                                                        });
+                                                    }}
+                                                >
+                                                    View calendar{' '}
+                                                    <ArrowRight className="size-3" />
+                                                </Button>
+                                            </div>
+                                        ),
+                                    },
+                                ]}
+                                actionsFor={vehicleActions}
+                                onOpen={(vehicle) => profile(vehicle.id)}
+                                onRowContextMenu={contextMenu.open}
+                                selection={
+                                    canManage
+                                        ? {
+                                              keys: new Set(selectedIds),
+                                              onToggle: (vehicle) =>
+                                                  toggleSelect(vehicle.id),
+                                              labelFor: (vehicle) =>
+                                                  `Select ${vehicle.name}`,
+                                              canSelect: (vehicle) =>
+                                                  vehicle.at_your_sites !==
+                                                  false,
+                                          }
+                                        : undefined
+                                }
+                            />
+                        ) : (
+                            <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+                                {filteredVehicles.map((vehicle) => (
+                                    <EntityCard
+                                        key={vehicle.id}
+                                        meridian="neutral"
+                                        icon={Car}
+                                        name={vehicle.name}
+                                        subline={
+                                            [
+                                                vehicle.registration_number,
+                                                vehicle.asset_tag,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(' · ') ||
+                                            'No registration or tag'
+                                        }
+                                        actions={vehicleActions(vehicle)}
+                                        onOpen={() => profile(vehicle.id)}
+                                        onContextMenu={(event) =>
+                                            contextMenu.open(event, vehicle)
+                                        }
+                                        selection={
+                                            canManage
+                                                ? {
+                                                      checked:
+                                                          selectedIds.includes(
+                                                              vehicle.id,
+                                                          ),
+                                                      label: `Select ${vehicle.name}`,
+                                                      onToggle: () =>
+                                                          toggleSelect(
+                                                              vehicle.id,
+                                                          ),
+                                                      disabled:
+                                                          vehicle.at_your_sites ===
+                                                          false,
+                                                  }
+                                                : undefined
+                                        }
+                                        chips={
+                                            <>
+                                                <EntityChip>
+                                                    {vehicle.body_type ??
+                                                        'Type unknown'}
+                                                </EntityChip>
+                                                <EntityChip>
+                                                    {vehicle.seating_capacity ==
+                                                    null
+                                                        ? 'Seats unknown'
+                                                        : `${vehicle.seating_capacity} seats`}
+                                                </EntityChip>
+                                            </>
+                                        }
+                                        alerts={
+                                            <>
+                                                <EntityStatusChip
+                                                    variant={statusTone(
+                                                        vehicle,
+                                                    )}
+                                                >
+                                                    {vehicle.status}
+                                                </EntityStatusChip>
+                                                <span className="text-caption block">
+                                                    {currentEvidence(
+                                                        vehicle.id,
+                                                    )}
+                                                </span>
+                                            </>
+                                        }
+                                        footer={{
+                                            personIcon: MapPin,
+                                            primary:
+                                                vehicle.home_site?.name ??
+                                                'No home site',
+                                            secondary: vehicle.state
+                                                ?.last_seen_at
+                                                ? `Tracker report ${formatDateTime(vehicle.state.last_seen_at)}`
+                                                : 'Tracking evidence unavailable',
+                                        }}
+                                        openLabel="Open profile"
+                                    />
+                                ))}
+                            </div>
+                        )}
+                        {contextMenu.ctx && (
+                            <EntityContextMenu
+                                x={contextMenu.ctx.x}
+                                y={contextMenu.ctx.y}
+                                icon={Car}
+                                title={contextMenu.ctx.record.name}
+                                items={vehicleActions(contextMenu.ctx.record)}
+                                onClose={contextMenu.close}
+                            />
+                        )}
 
                         {/* Bulk Action Bar */}
                         {canManage && selectedIds.length > 0 && (
@@ -540,7 +1177,7 @@ export default function VehiclesIndex({
                                             <SelectValue placeholder="Assign to site" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {(sites ?? []).map((s) => (
+                                            {assignmentSites.map((s) => (
                                                 <SelectItem
                                                     key={s.id}
                                                     value={String(s.id)}
@@ -605,6 +1242,140 @@ export default function VehiclesIndex({
                                 </div>
                             )}
                     </>
+                )}
+                {workflowError && (
+                    <div
+                        role="alert"
+                        className="mt-3 rounded-lg border border-status-critical bg-status-critical-bg p-3 text-status-critical-foreground"
+                    >
+                        {workflowError}
+                    </div>
+                )}
+                {lastTimeChange && !workflow && (
+                    <Card
+                        role="status"
+                        className="mt-3 flex flex-wrap items-center gap-3 p-3"
+                    >
+                        <span className="text-sm">
+                            Booking time changed. Returning to the previous time
+                            requires review and current source checks.
+                        </span>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                                void openBooking(
+                                    lastTimeChange.vehicleId,
+                                    undefined,
+                                    undefined,
+                                    {
+                                        kind: 'booking',
+                                        recordId: lastTimeChange.row.id,
+                                        version: lastTimeChange.version,
+                                    },
+                                    {
+                                        start: toDatetimeLocal(
+                                            lastTimeChange.row.starts_at,
+                                        ),
+                                        end: toDatetimeLocal(
+                                            lastTimeChange.row.ends_at,
+                                        ),
+                                    },
+                                )
+                            }
+                        >
+                            Undo time change
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setLastTimeChange(null)}
+                        >
+                            Dismiss
+                        </Button>
+                    </Card>
+                )}
+                {requestPick && (
+                    <Dialog
+                        open={requestPick}
+                        onOpenChange={(open) => {
+                            setRequestPick(open);
+                            if (!open) setPendingRequestWindow(null);
+                        }}
+                    >
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>
+                                    Choose a vehicle to request
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Only vehicles at your approved sites can be
+                                    requested.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <select
+                                className="w-full rounded-md border bg-card p-2"
+                                aria-label="Vehicle to request"
+                                defaultValue=""
+                                onChange={(event) => {
+                                    const id = Number(event.target.value);
+                                    if (id) {
+                                        setRequestPick(false);
+                                        void openBooking(
+                                            id,
+                                            pendingRequestWindow?.start,
+                                            pendingRequestWindow?.end,
+                                        );
+                                        setPendingRequestWindow(null);
+                                    }
+                                }}
+                            >
+                                <option value="">Select vehicle</option>
+                                {scope
+                                    .filter((vehicle) => vehicle.at_your_sites)
+                                    .map((vehicle) => (
+                                        <option
+                                            key={vehicle.id}
+                                            value={vehicle.id}
+                                        >
+                                            {vehicle.name} ·{' '}
+                                            {vehicle.home_site?.name ??
+                                                'No home site'}
+                                        </option>
+                                    ))}
+                            </select>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setRequestPick(false);
+                                    setPendingRequestWindow(null);
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                        </DialogContent>
+                    </Dialog>
+                )}
+                {workflow && (
+                    <BookingWizard
+                        vehicle={workflow.vehicle}
+                        summary={workflow.summary}
+                        mode={workflow.mode}
+                        onTimeChanged={(row, version) =>
+                            setLastTimeChange({
+                                vehicleId: workflow.vehicle.id,
+                                row,
+                                version,
+                            })
+                        }
+                        onClose={() => setWorkflow(null)}
+                        onSaved={() => {
+                            setCalendarRevision((value) => value + 1);
+                            router.reload({
+                                only: ['vehicles', 'all_vehicles', 'hero'],
+                            });
+                        }}
+                    />
                 )}
             </PageShell>
         </AppLayout>

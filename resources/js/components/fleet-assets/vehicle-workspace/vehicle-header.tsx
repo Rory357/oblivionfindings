@@ -63,6 +63,7 @@ export function VehicleHeader({
     onPhoto,
     onStartCheck,
     onReport,
+    returnHref = '/fleet-assets/vehicles',
 }: {
     workspace: VehicleWorkspace;
     tab: MainTab;
@@ -73,6 +74,7 @@ export function VehicleHeader({
     onStartCheck?: () => void;
     /** Report a problem; omitted when the person can't report. */
     onReport?: () => void;
+    returnHref?: string;
 }) {
     const { vehicle, can, odometer, checks, work } = workspace;
     const status = headerStatus(workspace);
@@ -116,7 +118,7 @@ export function VehicleHeader({
             mark={
                 <div className="identity-mark">
                     <Link
-                        href="/fleet-assets/vehicles"
+                        href={returnHref}
                         className="hero-back"
                         aria-label="Back to vehicles"
                     >

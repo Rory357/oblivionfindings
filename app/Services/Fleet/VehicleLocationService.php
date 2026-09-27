@@ -53,6 +53,32 @@ final class VehicleLocationService
         return (string) config('app.worker_timezone', 'Pacific/Auckland');
     }
 
+    /** The canonical privacy projection for one entry in the fleet-wide map. */
+    public function fleetMapState(User $user, Asset $vehicle, ?bool $positionAccess = null): array
+    {
+        $snapshot = $vehicle->relationLoaded('fleetState')
+            ? $vehicle->fleetState
+            : FleetVehicleStateSnapshot::query()
+                ->with(['lastEvent:id,occurred_at,received_at,external_power,event_type', 'lastTrip:id,is_personal,consent_blocked,started_at,ended_at'])
+                ->find($vehicle->getKey());
+        $visible = $positionAccess ?? $this->positionsVisible($user, $vehicle);
+        $state = $snapshot ? $this->state($vehicle, $snapshot, $visible) : null;
+
+        return [
+            'tracker_linked' => $snapshot !== null || $this->trackerLinked($vehicle),
+            'position' => $state ? [
+                'lat' => $state['lat'], 'lng' => $state['lng'],
+                'observed_at' => $state['observed_at'],
+                'received_at' => $state['received_at'],
+                'fresh' => $state['fresh'],
+                'withheld' => $state['withheld'],
+                'speed_kph' => $state['speed_kph'],
+                'battery_pct' => $state['battery_pct'],
+                'status' => $state['status'],
+            ] : null,
+        ];
+    }
+
     /** @return array<string,mixed> */
     public function present(User $user, Asset $vehicle): array
     {
@@ -191,6 +217,23 @@ final class VehicleLocationService
         $siteIds = array_values(array_map('intval', $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS)));
 
         return FleetTripSiteScope::vehicles($siteIds)->whereKey($vehicle->getKey())->exists();
+    }
+
+    /**
+     * Resolve the same trip Site rule once for a complete map or register page.
+     *
+     * @param  list<int>  $vehicleIds
+     * @return list<int>
+     */
+    public function visibleVehicleIds(User $user, array $vehicleIds): array
+    {
+        if ($vehicleIds === []) {
+            return [];
+        }
+        $siteIds = array_values(array_map('intval', $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS)));
+
+        return FleetTripSiteScope::vehicles($siteIds)->whereKey($vehicleIds)
+            ->pluck('assets.id')->map(fn (mixed $id): int => (int) $id)->all();
     }
 
     /**

@@ -35,9 +35,10 @@ import { EntityKebab, type MenuItem } from './entity-menu';
 
 type IconType = ComponentType<{ className?: string }>;
 
-export type EntityMeridian = 'critical' | 'warning' | 'success';
+export type EntityMeridian = 'critical' | 'warning' | 'success' | 'neutral';
 
 const MERIDIAN: Record<EntityMeridian, string> = {
+    neutral: 'bg-muted-foreground',
     critical: 'bg-status-critical',
     warning: 'bg-status-warning',
     success: 'bg-status-success',
