@@ -16,6 +16,11 @@ return [
     ],
 
     'maps' => [
+        'boundary_tile_url' => env('BOUNDARY_TILE_URL', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
+        'boundary_tile_attribution' => env('BOUNDARY_TILE_ATTRIBUTION', '&copy; OpenStreetMap contributors'),
+        'boundary_address_search_enabled' => env('BOUNDARY_ADDRESS_SEARCH_ENABLED', false),
+        'address_search_autocomplete' => env('ADDRESS_SEARCH_AUTOCOMPLETE', false),
+        'address_search_attribution' => env('ADDRESS_SEARCH_ATTRIBUTION', 'Address provider'),
         'client_zone_address_search_enabled' => env('CLIENT_ZONE_ADDRESS_SEARCH_ENABLED', true),
         'address_search_endpoint' => env('ADDRESS_SEARCH_ENDPOINT', 'https://nominatim.openstreetmap.org'),
         'address_search_cache_store' => env('ADDRESS_SEARCH_CACHE_STORE', 'database'),

@@ -36,7 +36,7 @@ class SiteReadinessService
             $this->item('rooms_configured', 'Capacity / rooms configured', 'Sites', $this->roomsConfigured($site), 'configure_rooms'),
             $this->item('hazards_reviewed', 'Hazards reviewed in last 90 days', 'Sites', $this->hazardsReviewed($site), 'review_hazards'),
             $this->item('checklists_scheduled', 'At least one checklist scheduled', 'Sites', $this->count($site, 'checklist_assignments_count', 'checklistAssignments') > 0, 'schedule_checklist'),
-            $this->item('geofence', 'Geofence configured', 'Sites', $this->count($site, 'active_geofences_count', 'geofences', fn () => $site->geofences()->where('is_active', true)->count()) > 0, 'configure_geofence'),
+            $this->item('geofence', 'Geofence configured', 'Sites', $this->count($site, 'configured_geofences_count', 'geofences', fn () => $site->geofences()->whereNull('retired_at')->whereNotNull('shape')->count()) > 0, 'configure_geofence'),
         ];
 
         $criticalDone = collect($critical)->where('done', true)->count();

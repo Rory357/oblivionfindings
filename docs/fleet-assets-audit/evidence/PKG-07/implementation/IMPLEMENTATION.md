@@ -1,0 +1,40 @@
+# PKG-07 production implementation
+
+The approved v9 design is implemented in the application routes in the isolated 806c checkout. The frozen mockup remains unchanged. The production workspace is `/fleet-assets/geofences`; the Fleet map entry redirects there for authorised Fleet readers. This document records implementation scope and integration boundaries, not deployment approval. The subsequent direct visual comparison and completed alignment are recorded in `PARITY.md`.
+
+## Delivered behaviour
+
+- Server-scoped, searchable and paginated boundary list/cards; map, purpose rules, events and retained history.
+- Searchable bounded Site, boundary and vehicle/asset pickers. The map loads 300 areas and 100 resources at a time, offers explicit load-more controls and a server search finder, and clusters positioned resources. Records without position evidence remain available in the directory.
+- Circle, rectangle and polygon editor, coordinate input, draggable handles, undo/redo, map context menu and keyboard equivalents, limited GeoJSON import, explicit review, required reason and retry-safe save.
+- Revision checks protect concurrent edits. Detail and geometry versions are separate. Copies retain source provenance. Retired geometry remains available in retained history.
+- Inactive purpose proposals retain direction, multiple time windows, following-day timing, weekdays, date limits/exceptions, quality and response proposals. Weekly overlap validation includes Sunday-to-Monday. Blank operating thresholds remain unconfigured.
+- Vehicle/asset map status uses actual observations and each linked area's geometry, with stale, uncertain, missing and unlinked states. Map status is evidence for review, not an activation command or inferred alert.
+- Boundary and purpose-rule history retain the original settings and geometry. Actor/date/category filters, comparisons and audited bounded JSON exports do not reconstruct missing historical facts. Events link to readable Control Room follow-up records.
+- Address lookup reuses the existing Site Nominatim adapter. Following the user's explicit choice of free OpenStreetMap, the isolated preview enables submitted searches: type, press Search addresses (or Enter), then choose a result to fill the address and coordinates. Public Nominatim never receives type-ahead requests; enabling public autocomplete fails closed. Provider-wide shared caching and rate limiting also cover Site/Client lookup. Attribution links to OpenStreetMap copyright. Unavailable service retains Site/manual entry. Choosing a Site prefills an untouched new boundary; entered locations, drawn points and existing geometry are preserved.
+
+## Canonical owners and connections
+
+- **Site profile:** selects an explicit shared boundary through a searchable picker, shows configured geometry independently of active monitoring, and opens the paged library. Site create/edit/retire commands use canonical versioned writes. Legacy profile settings and assignments are preserved.
+- **Vehicle profile:** shares the existing assignment register and geometry. Expanded purpose proposals open in the full workspace so a smaller legacy editor cannot discard fields. New and changed profile assignments also retain rule history.
+- **Asset profile and devices:** links into the map by resource ID. Non-personal asset position requires a visible tracker, one current unambiguous asset pairing and a telemetry observation after that pairing. Installation coordinates and heartbeat timestamps are not position evidence.
+- **Client Location / People Locations:** the inspected People Locations v2 remains a separate design candidate. The existing Client Location service remains the production owner for person profiles, consent, custody and drafts. Its searchable picker uses canonical eligible boundaries. An expiring same-actor opaque handoff can create/select shared geometry and return it to the original mounted draft; it carries no person identifier in the Fleet URL. Return and save recheck consent, scope and source version. Cancelling expires the channel. Client rule versions retain canonical source provenance without starting monitoring.
+- **Client home/respite, portal and EVV:** existing house/resident boundaries and references are protected dependencies. Shared geometry cannot be silently moved or retired while protected. Person-specific rules, addresses and tracking history remain with authorised Client workflows.
+- **Fleet telemetry, signals, Control Room and timelines:** the existing evaluator remains authoritative. Existing signals retain the boundary version and snapshot used for the decision. Private/consent-blocked journeys are excluded from the shared directory and event projection, including unlinked reports whose timestamps fall within a private trip. A geometry change never manufactures a crossing or follow-up.
+- **Maintenance:** the old scope-normalisation command skips versioned boundaries so it cannot silently rewrite reviewed scope. Geometry deletion is replaced with retirement where this workspace owns the action; migrations refuse destructive rollback once retained evidence exists.
+
+There is no separate production `LocationProfile` entity in the inspected checkout. Client Location is the integration owner; introducing another profile or tracking store would split authority. A boundary's availability, permitted use, a purpose proposal and monitoring authority are distinct states.
+
+## Three audit passes
+
+1. **Authority and evidence:** reviewed Site/object access, client consent, inactive creation, idempotency, stale writes, protected dependencies, historical geometry and copy provenance. Added retained snapshots and guarded retirement/legacy unlinking.
+2. **Scale and interaction:** replaced full-list dropdowns with server search, capped pages, added load-more and search-to-pin, preserved loaded map pages/selection on refresh, added map context/keyboard actions, and used shared dialog/wizard shells with scrollable bodies and persistent footer actions.
+3. **Integration and failure paths:** audited Site, vehicle/asset profiles, Client Location, EVV, devices and signal consumers. Fixed old scope rewrites, retrospective trip privacy, tracker pairing evidence, address-result races, overnight overlap validation and stale rule review. Added targeted regression coverage and checked the production browser independently of the frozen mockup.
+
+Browser verification also corrected header focus-return scrolling, dark-theme notice contrast, the post-save View boundary destination, and the completeness of the final rule review. View links now use Inertia's canonical navigation queue and history state, avoiding an early-load URL race. The preview exposed an existing schema-cache problem: Laravel's default MySQL table listing inspected all local schemas. The cache now explicitly lists the current application's database, avoiding cross-checkout table detection and slow login requests. The shared cache remains migration-invalidated.
+
+## Verification and deployment
+
+Final results are recorded separately in `VERIFICATION.md`; in-progress logs are not proof of success. The local preview uses only the task's synthetic `oblivion_findings_pkg07_preview` database. Automated tests use isolated test databases or explicitly documented transaction-only QA checks. Main's application environment and data are not used.
+
+Before a production rollout, apply the two additive migrations through the normal release process, configure approved map/address providers, and review monitoring proposals with their existing owners. Saving these proposals does not enable a new evaluator, send notifications or grant personal tracking authority. No production deployment, monitoring activation, commit or push is included in this local implementation.

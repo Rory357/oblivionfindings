@@ -447,7 +447,9 @@ abstract class TestCase extends BaseTestCase
             ]);
 
             $process->setInput(file_get_contents($schemaPath));
-            $process->setTimeout(300);
+            // Large local schema imports can exceed five minutes on Windows.
+            // Keep the existing default; slow machines can opt into a longer cold boot.
+            $process->setTimeout(max(30, (int) ($this->environmentValue('MYSQL_TEST_SCHEMA_TIMEOUT') ?? 300)));
             $process->run();
 
             if ($process->isSuccessful()) {

@@ -15,6 +15,7 @@ use App\Services\UserSiteAccessService;
 use App\Support\SchemaCache;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -59,7 +60,7 @@ final class VehicleLocationService
         $vehicle->loadMissing(['site:id,name,latitude,longitude', 'homeSite:id,name,latitude,longitude']);
         $positions = $this->positionsVisible($user, $vehicle);
         $snapshot = FleetVehicleStateSnapshot::query()
-            ->with(['lastEvent:id,occurred_at,received_at,external_power,event_type', 'lastTrip:id,is_personal,consent_blocked,started_at,ended_at'])
+            ->with(['lastEvent:id,occurred_at,received_at,external_power,event_type,accuracy_m,consent_blocked', 'lastTrip:id,is_personal,consent_blocked,started_at,ended_at'])
             ->find($vehicle->getKey());
         $state = $snapshot ? $this->state($vehicle, $snapshot, $positions) : null;
         $canViewAlerts = $user->canDo('controlRoom.viewAny')
@@ -93,6 +94,37 @@ final class VehicleLocationService
                 'add_reminder' => $user->canDo('fleet.manage'),
             ],
         ];
+    }
+
+    /** Minimal map projection with the same personal-trip and consent checks as the profile. */
+    public function mapState(User $user, Asset $vehicle): ?array
+    {
+        $snapshot = FleetVehicleStateSnapshot::query()
+            ->with(['lastEvent:id,occurred_at,received_at,external_power,event_type,accuracy_m,consent_blocked', 'lastTrip:id,is_personal,consent_blocked,started_at,ended_at'])
+            ->find($vehicle->id);
+
+        return $snapshot ? $this->state($vehicle, $snapshot, $this->positionsVisible($user, $vehicle)) : null;
+    }
+
+    /** Bounded directory pages share snapshot and Site access queries. */
+    public function mapStates(User $user, Collection $vehicles): array
+    {
+        if ($vehicles->isEmpty()) {
+            return [];
+        }
+        $siteIds = array_values(array_map('intval', $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS)));
+        $ids = $vehicles->pluck('id');
+        $visible = array_fill_keys(FleetTripSiteScope::vehicles($siteIds)->whereKey($ids)->pluck('id')->all(), true);
+        $snapshots = FleetVehicleStateSnapshot::query()->whereIn('asset_id', $ids)
+            ->with(['lastEvent:id,occurred_at,received_at,external_power,event_type,accuracy_m,consent_blocked', 'lastTrip:id,is_personal,consent_blocked,started_at,ended_at'])
+            ->get()->keyBy('asset_id');
+        $states = [];
+        foreach ($vehicles as $vehicle) {
+            $snapshot = $snapshots->get($vehicle->id);
+            $states[$vehicle->id] = $snapshot ? $this->state($vehicle, $snapshot, isset($visible[$vehicle->id])) : null;
+        }
+
+        return $states;
     }
 
     /**
@@ -199,13 +231,14 @@ final class VehicleLocationService
         $event = $snapshot->lastEvent;
         $observed = $event?->occurred_at ?? $snapshot->last_seen_at;
         $withheld = match (true) {
-            (bool) $snapshot->consent_blocked => 'consent',
+            (bool) $snapshot->consent_blocked || (bool) $event?->consent_blocked || (bool) $snapshot->lastTrip?->consent_blocked => 'consent',
             ! $positions => 'access',
             $this->personalAt($vehicle, $observed, $snapshot->lastTrip) => 'personal',
             default => null,
         };
         $hasPosition = $withheld === null && $snapshot->latitude !== null && $snapshot->longitude !== null;
         $fresh = $observed !== null
+            && $observed->lessThanOrEqualTo(now())
             && $snapshot->status !== 'offline'
             && $observed->greaterThanOrEqualTo(now()->subMinutes(self::FRESH_MINUTES));
         $trip = $snapshot->lastTrip;
@@ -217,6 +250,7 @@ final class VehicleLocationService
             'lat' => $hasPosition ? round((float) $snapshot->latitude, 7) : null,
             'lng' => $hasPosition ? round((float) $snapshot->longitude, 7) : null,
             'withheld' => $withheld,
+            'accuracy_m' => $hasPosition ? $event?->accuracy_m : null,
             'speed_kph' => $withheld === null && $snapshot->speed_kph !== null ? round((float) $snapshot->speed_kph, 1) : null,
             'heading_deg' => $withheld === null ? $snapshot->heading_deg : null,
             // Ignition and movement describe the journey: a withheld report keeps
@@ -291,7 +325,7 @@ final class VehicleLocationService
         }
         $moment = CarbonImmutable::instance($at)->utc()->format('Y-m-d H:i:s');
 
-        return FleetTrip::query()->where('asset_id', $vehicle->getKey())->where('is_personal', true)
+        return FleetTrip::query()->where('asset_id', $vehicle->getKey())->where(fn (Builder $q) => $q->where('is_personal', true)->orWhere('consent_blocked', true))
             ->where('started_at', '<=', $moment)
             ->where(fn (Builder $end) => $end->whereNull('ended_at')->orWhere('ended_at', '>=', $moment))
             ->exists();

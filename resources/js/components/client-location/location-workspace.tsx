@@ -825,6 +825,7 @@ export default function LocationWorkspace({
                     center={editing.center}
                     draft={editing.draft}
                     boundaries={envelope.boundaries}
+                    canUseSharedBuilder={envelope.can_use_shared_builder}
                     url={location.zonesUrl}
                     fingerprint={envelope.access_fingerprint}
                     onAccessEnded={accessEnded}

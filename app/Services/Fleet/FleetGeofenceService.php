@@ -10,9 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class FleetGeofenceService
 {
-    public function __construct(protected FleetSignalService $signals)
-    {
-    }
+    public function __construct(protected FleetSignalService $signals) {}
 
     public function evaluate(Asset $asset, float $lat, float $lon, CarbonInterface $occurredAt): void
     {
@@ -27,6 +25,13 @@ class FleetGeofenceService
 
         foreach ($geofences as $geofence) {
             DB::transaction(function () use ($asset, $geofence, $lat, $lon, $occurredAt) {
+                // Serialise against canonical edits and retirement, then recheck the link.
+                $geofence = AssetGeofence::query()->whereKey($geofence->id)->lockForUpdate()->first();
+                if (! $geofence || ! $geofence->is_active || $geofence->retired_at
+                    || ((int) $geofence->asset_id !== (int) $asset->id && ! $geofence->assignedAssets()->whereKey($asset->id)->exists())
+                    || VehicleGeofenceRules::fromBoundary($geofence) === null) {
+                    return;
+                }
                 $inside = $this->isInside($geofence, $lat, $lon);
 
                 $state = FleetGeofenceState::query()
@@ -35,7 +40,7 @@ class FleetGeofenceService
                     ->lockForUpdate()
                     ->first();
 
-                if (!$state) {
+                if (! $state) {
                     $state = new FleetGeofenceState([
                         'asset_id' => $asset->id,
                         'geofence_id' => $geofence->id,
@@ -59,6 +64,9 @@ class FleetGeofenceService
                             'occurred_at' => $occurredAt,
                             'payload' => [
                                 'geofence_name' => $geofence->name,
+                                'boundary_version' => $geofence->geometry_version,
+                                'boundary_revision' => $geofence->revision,
+                                'boundary_snapshot' => VehicleGeofenceRules::fromBoundary($geofence),
                             ],
                         ]);
                     } else {
@@ -72,6 +80,9 @@ class FleetGeofenceService
                             'occurred_at' => $occurredAt,
                             'payload' => [
                                 'geofence_name' => $geofence->name,
+                                'boundary_version' => $geofence->geometry_version,
+                                'boundary_revision' => $geofence->revision,
+                                'boundary_snapshot' => VehicleGeofenceRules::fromBoundary($geofence),
                             ],
                         ]);
                     }
@@ -96,6 +107,9 @@ class FleetGeofenceService
                             'idempotency_key' => $idempotency,
                             'payload' => [
                                 'geofence_name' => $geofence->name,
+                                'boundary_version' => $geofence->geometry_version,
+                                'boundary_revision' => $geofence->revision,
+                                'boundary_snapshot' => VehicleGeofenceRules::fromBoundary($geofence),
                                 'dwell_minutes' => $dwellMinutes,
                             ],
                         ]);
@@ -139,6 +153,7 @@ class FleetGeofenceService
         $dLon = deg2rad($lon2 - $lon1);
         $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) ** 2;
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
         return $earthRadius * $c;
     }
 
@@ -164,7 +179,7 @@ class FleetGeofenceService
                 && ($lat < ($xj - $xi) * ($lon - $yi) / ($yj - $yi + 0.0) + $xi);
 
             if ($intersect) {
-                $inside = !$inside;
+                $inside = ! $inside;
             }
         }
 

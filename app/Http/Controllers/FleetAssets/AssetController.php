@@ -6,8 +6,8 @@ use App\Domain\Finance\Presenters\AssetFinanceTechnologyProjectionPresenter;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
-use App\Models\AssetCategory;
 use App\Models\AssetAssignment;
+use App\Models\AssetCategory;
 use App\Models\AssetDocument;
 use App\Models\Client;
 use App\Models\ClientEmergencyContact;
@@ -544,9 +544,11 @@ class AssetController extends Controller
         ];
 
         return Inertia::render('fleet-assets/assets/show', [
+            'boundaries_href' => ($user->canDo('fleet.viewAny') || $user->canDo('assets.geofences.manage'))
+                ? '/fleet-assets/geofences?tab=map&resource='.$asset->id : null,
             'asset' => $safeAsset,
             'active_maintenance_restrictions' => $asset->site_id && $this->hasTable('fleet_maintenance_restrictions')
-                ? \Illuminate\Support\Facades\DB::table('fleet_maintenance_restrictions')
+                ? DB::table('fleet_maintenance_restrictions')
                     ->where('asset_id', $asset->id)->where('state', 'active')->count()
                 : 0,
             'timeline' => $timeline,

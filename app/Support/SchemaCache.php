@@ -30,7 +30,12 @@ final class SchemaCache
     {
         self::$tables ??= array_fill_keys(array_map('strtolower', Cache::rememberForever(
             'schema-cache:'.self::stamp().':tables',
-            fn (): array => Schema::getTableListing(schemaQualified: false),
+            // Laravel can list every MySQL schema when no schema is supplied.
+            // Inspect only this application's database, including in isolated checkouts.
+            fn (): array => Schema::getTableListing(
+                schema: Schema::getConnection()->getDriverName() === 'mysql' ? Schema::getConnection()->getDatabaseName() : null,
+                schemaQualified: false,
+            ),
         )), true);
 
         return isset(self::$tables[strtolower($table)]);
