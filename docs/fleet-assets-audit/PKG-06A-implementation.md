@@ -3,6 +3,8 @@
 User approved implementation of the frozen v9 design on 27 September 2026.
 Branch: `codex/assets-register-implementation`. Frozen previews remain unchanged.
 
+Current integration candidate: application commit `556e582cbd43aff875e1640ebc9e32fb9f52f6a0`, reconciled with published main `ba5bff2e8b6c22796369443f1cdac918039950dd`. The fresh integrated run passes 68 backend/infrastructure tests (855 assertions), 37 frontend tests, full TypeScript and scoped lint. The earlier six TypeScript errors below describe the old base and are now resolved by current main. See [the exact-candidate review packet](implementation/PKG-06A/REVIEW-PACKET.md) for integration evidence and QR-label ownership notes. Phone/device testing is explicitly deferred by Stephan; publication remains with Main's review and serial integration workflow.
+
 ## Delivery checklist
 
 - [x] Canonical register: searchable assigned site/room selectors, list/cards, attention/archive, retained selection, canonical ownership filters and room assignment on creation.
