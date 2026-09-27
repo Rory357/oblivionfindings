@@ -2,7 +2,7 @@ import React, { useRef, useState } from "react";
 import { CalendarDays, Check, ChevronDown } from "lucide-react";
 import { LeaveCalendarRange } from "@/components/hr/leave-calendar-range";
 import { formatDateOnly } from "@/lib/datetime";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { usePickerPlacement } from "./use-picker-placement";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -30,7 +30,7 @@ export function DatePicker({
   trigger?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const isMobile = useIsMobile();
+  const placement = usePickerPlacement(open, 390);
   const [draft, setDraft] = useState(value);
   const calendar = useRef<HTMLDivElement>(null);
   const changeOpen = (next: boolean) => {
@@ -39,7 +39,7 @@ export function DatePicker({
   };
   return (
     <Popover open={open} onOpenChange={changeOpen}>
-      <PopoverTrigger asChild>
+      <PopoverTrigger ref={placement.trigger} asChild>
         {trigger ?? (
         <Button
           id={id}
@@ -62,8 +62,8 @@ export function DatePicker({
       </PopoverTrigger>
       <PopoverContent
         className="date-picker-popover"
-        side={isMobile ? "bottom" : "right"}
-        align={isMobile ? "start" : "center"}
+        side={placement.side}
+        align={placement.align}
         collisionPadding={16}
         sideOffset={8}
         aria-label={`${label} picker`}
