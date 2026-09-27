@@ -1,0 +1,61 @@
+F                                                                   1 / 1 (100%)
+   FAIL  PKG07MainPrivacyReviewTest
+  ⨯ directory and history withhold private vehicle evidence even without a trip link                           598.62s
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  PKG07MainPrivacyReviewTest > directory and history withhold private vehicle evidence even without a trip…
+  Consent-blocked location evidence must also be withheld from boundary history and follow-up counts.
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+-    'events' => 0,
+-    'follow_up' => 0,
+-    'follow_up_events' => 0,
++    'events' => 1,
++    'follow_up' => 1,
++    'follow_up_events' => 1,
+ ]
+
+  at C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG07MainPrivacyReviewTest.php:28
+     24▕         $boundary = \App\Models\AssetGeofence::query()->where('name', 'Privacy test area')->sole();
+     25▕         $events = $this->getJson('/fleet-assets/geofences/events?boundary_id='.$boundary->id)->assertOk();
+     26▕         $summary = $this->getJson('/fleet-assets/geofences/summary?site_id='.$boundary->site_id)->assertOk();
+     27▕         $followUp = $this->getJson('/fleet-assets/geofences/events?boundary_id='.$boundary->id.'&follow_up=1')->assertOk();
+  ➜  28▕         $this->assertSame(
+     29▕             ['events' => 0, 'follow_up' => 0, 'follow_up_events' => 0],
+     30▕             ['events' => $events->json('total'), 'follow_up' => $summary->json('follow_up'), 'follow_up_events' => $followUp->json('total')],
+     31▕             'Consent-blocked location evidence must also be withheld from boundary history and follow-up counts.'
+     32▕         );
+
+  1   C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG07MainPrivacyReviewTest.php:28
+
+
+  Tests:    1 failed (41 assertions)
+  Duration: 598.89s
+
+
+
+Time: 09:58.850, Memory: 94.00 MB
+
+There was 1 failure:
+
+1) PKG07MainPrivacyReviewTest::test_directory_and_history_withhold_private_vehicle_evidence_even_without_a_trip_link
+Consent-blocked location evidence must also be withheld from boundary history and follow-up counts.
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+-    'events' => 0,
+-    'follow_up' => 0,
+-    'follow_up_events' => 0,
++    'events' => 1,
++    'follow_up' => 1,
++    'follow_up_events' => 1,
+ ]
+
+C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG07MainPrivacyReviewTest.php:28
+
+FAILURES!
+Tests: 1, Assertions: 41, Failures: 1.

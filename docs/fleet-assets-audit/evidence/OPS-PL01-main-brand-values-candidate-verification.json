@@ -1,0 +1,15 @@
+{
+  "candidate": "419e4c890c84a322ec031cd07cc06f61acf80d39",
+  "parent": "a69d7f465137b9be0e3ce0c4483e83a71c0c59a9",
+  "tree": "57a73b2afdbe7709fbcbc6a8fc51e055089b98c1",
+  "sourceFiles": 46,
+  "frozenFiles": 41,
+  "referenceFiles": 6,
+  "changedFiles": 132,
+  "mismatches": [],
+  "unmanifested": [],
+  "absent": [],
+  "status": "",
+  "masterSha256": "c4837ab675f9dffdb6a8597636f49d5761da114e6c155dc08e6bb8a209d63fd0",
+  "originalProbeSha256": "e776329c19864efd628d166c61c2f40b18d32deb7db84e31b6932c9def29d62d"
+}

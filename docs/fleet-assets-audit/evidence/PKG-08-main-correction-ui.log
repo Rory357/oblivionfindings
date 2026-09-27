@@ -1,0 +1,9 @@
+
+ RUN  v4.1.5 C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings
+
+
+ Test Files  5 passed (5)
+      Tests  25 passed (25)
+   Start at  03:23:11
+   Duration  16.05s (transform 680ms, setup 7.28s, import 4.81s, tests 986ms, environment 53.60s)
+

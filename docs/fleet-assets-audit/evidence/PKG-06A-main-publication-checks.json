@@ -1,0 +1,14 @@
+{
+  "verifiedAt": "2026-09-27T05:21:07.6989079Z",
+  "commit": "b05702d7208c88d9cffb9c092df23d3b02300b1e",
+  "tree": "74aa04faf7eaa321543b89bf592db186804ce61d",
+  "protectedCount": 79,
+  "protectedMismatchCount": 0,
+  "sourceCount": 38,
+  "sourceMismatchCount": 0,
+  "buildCount": 1654,
+  "buildMismatchCount": 0,
+  "manifestSHA256": "20283B14868876B50279A23298C5C701056A8F40334E64F65101A12C3583166B",
+  "hotPresent": false,
+  "verification": "Main independently hashed actual files before evidence copies and programme updates."
+}

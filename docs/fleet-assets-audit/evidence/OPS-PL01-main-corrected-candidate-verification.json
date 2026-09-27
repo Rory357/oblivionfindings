@@ -1,0 +1,16 @@
+{
+  "candidate": "a69d7f465137b9be0e3ce0c4483e83a71c0c59a9",
+  "parent": "ff856d9814086006d158dc788f4ebe55b9838305",
+  "tree": "287dd069e0bc8d2ad959813815965faf6da29965",
+  "sourceFiles": 42,
+  "frozenFiles": 41,
+  "referenceFiles": 6,
+  "changedFiles": 112,
+  "mismatches": [],
+  "unmanifested": [],
+  "absent": [],
+  "guideChanges": "",
+  "mainProbeSha256": "9f039e6b47fc831bf88f409401c02da850a479dc9be0fc27c7491bf34dc3e64c",
+  "masterSha": "c4837ab675f9dffdb6a8597636f49d5761da114e6c155dc08e6bb8a209d63fd0",
+  "status": ""
+}

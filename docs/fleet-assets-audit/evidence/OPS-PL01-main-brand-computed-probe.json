@@ -1,0 +1,12 @@
+[
+  {
+    "case": "ordinary",
+    "warning": "orange",
+    "warningForeground": "black"
+  },
+  {
+    "case": "extra_declaration",
+    "warning": "transparent",
+    "warningForeground": "transparent"
+  }
+]

@@ -1,0 +1,37 @@
+
+   FAIL  PKG06BMainKitBoundaryTest
+  ⨯ main valid ordinary component edit cannot split an active kit                                              335.74s  
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  PKG06BMainKitBoundaryTest > main valid ordinary component edit cannot split an active kit                    
+  A complete, otherwise valid ordinary edit must not split a currently linked kit.
+Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+-    'status' => 422,
+-    'component_site' => 1,
++    'status' => 302,
++    'component_site' => 2,
+     'parent_site' => 1,
+     'active_kit_links' => 1,
+ ]
+
+  at C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG06BMainKitBoundaryTest.php:53
+     49▕         $response = $this->putJson('/fleet-assets/assets/'.$component->id, $base + [
+     50▕             'site_id' => $destination->id, 'home_site_id' => $destination->id,
+     51▕             'expected_version' => $component->fresh()->asset_profile_version,
+     52▕         ]);
+  ➜  53▕         $this->assertSame([
+     54▕             'status' => 422, 'component_site' => $origin->id, 'parent_site' => $origin->id, 'active_kit_links' => 1,
+     55▕         ], [
+     56▕             'status' => $response->status(), 'component_site' => $component->fresh()->site_id,
+     57▕             'parent_site' => $parent->fresh()->site_id,
+
+  1   C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG06BMainKitBoundaryTest.php:53
+
+
+  Tests:    1 failed (4 assertions)
+  Duration: 335.98s
+
+

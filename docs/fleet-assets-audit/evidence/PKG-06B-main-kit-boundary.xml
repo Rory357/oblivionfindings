@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="PKG06BMainKitBoundaryTest" file="PKG06BMain Kit Boundary" tests="1" assertions="4" errors="0" failures="1" skipped="0" time="335.736112">
+    <testcase name="Main valid ordinary component edit cannot split an active kit" file="PKG06BMain Kit Boundary::Main valid ordinary component edit cannot split an active kit" class="PKG06BMainKitBoundaryTest" classname="PKG06BMainKitBoundaryTest" assertions="4" time="335.736112">
+      <failure type="PHPUnit\Framework\ExpectationFailedException">Main valid ordinary component edit cannot split an active kitA complete, otherwise valid ordinary edit must not split a currently linked kit.
+Failed asserting that two arrays are identical.&#13;
+at C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG06BMainKitBoundaryTest.php:53</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

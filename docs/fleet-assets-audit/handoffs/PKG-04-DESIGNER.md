@@ -1,0 +1,41 @@
+# PKG-04 — Fleet register and calendar Designer
+
+Owner: MAIN ASTRA. Revision: 2. Updated: 2026-09-27. Status: local implementation and owning-Designer audit delivered; integration pending.
+
+## Later direct authority and completion
+
+Stephan subsequently authorised one GPT-6 Sol Extra High implementer and then the owning Astra Extra High to archive it, independently audit, fix and finish. Main verified the actual user direction, completed worker and archived model metadata. The owning Designer delivered the full Fleet register/calendar/map implementation and parity corrections in worktree1eb2; [Main completion receipt](../evidence/PKG-04-main-completion-handoff.md) records evidence and remaining integration dependencies. Sol must not be restarted for this handoff. The original design-only/no-Sol instructions below describe the launch stage and are superseded only by this specific subsequent authority. They do not prohibit the work already expressly approved; all unrelated ownership/privacy/reference protections remain. No new worker, commit, merge, push or deployment is released by this receipt.
+
+## Authority, references and isolation
+
+Stephan requests “start the next 2 mockups aswell please”, following the stated order Fleet/PKG-04, Transport/PKG-05, Assets register then asset profile/PKG-06. Main releases this Fleet mockup alongside a separately isolated Transport mockup. This is a specific design-overlap exception to older sequencing, not a transfer of application ownership or acceptance/closure of any previous package. Do not contact, question, wake, poll or interrupt any sibling task, especially the finishing PKG-02B Vehicle Profile. Do not send routine Main progress/start messages. Work autonomously here and present the frozen candidate directly to Stephan.
+
+Use actual **GPT-6 Astra Extra High (`gpt-6-astra/xhigh`)** and verify effective metadata before substantive writes. Pin this real task with supported controls. No Sol, Implementer, subagent, another Designer or recurring monitor. All future frontend remains Astra/xhigh, but implementation is not released now.
+
+Read this brief first, applicable AGENTS.md, `docs/architecture/single-tenant-application.md`, and Rory's current DESIGN.md and approved linked guides. Those design references are authoritative and READ-ONLY. Read focused latest Main context from the absolute root `C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/`: headers of 00/03/05/09; `12-navigation-page-inventory.md`; `14-scope-workflow-approval.md`; WF-02 and relevant R1/R2 in `02-approved-workflows.md`; canonical owners in01; current `handoffs/PKG-02B-BUILD.md` for reuse boundaries; `evidence/PKG-NAV-main-publication.md`. These latest Main files are uncommitted and may differ from your inherited copies. Record source hashes; do not copy Main's entire dirty checkout or restart Section0/the audit.
+
+Canonical Revision10 is `C:/Users/steph/Downloads/oblivion-findings-fleet-assets-complete-astra-prompt-v10.md`, SHA256 `C4837AB675F9DFFDB6A8597636F49D5761DA114E6C155DC08E6BB8A209D63FD0`, with recorded amendments and latest direct directions. Main freshly fetched/read remote main at **`4ea64c547ed85a5b7504e59599db351f6eba7deb`**. It includes the approved seven-entry navigation. Verify your actual clean isolated worktree/model; record a newer published baseline and relevant differences if setup advances. Preserve other checkouts, preview versions, servers and Main's uncommitted documentation/public/.user.ini. Do not infer full-CI/deployment success from the navigation publication.
+
+## Bounded desktop design
+
+Design the **Fleet landing: vehicle register plus fleet-wide calendar/readiness comparison**, with a scoped Site entry/return adapter. This is not another Overview or a second Vehicle Profile. The current individual vehicle workspace already owns the vehicle-specific calendar, evidence, service/check/document/history/detail experience. Reuse its published/source interfaces and frozen references as read-only precedent without asking its task anything.
+
+Inspect actual `resources/js/pages/fleet-assets/vehicles/index.tsx`, booking pages, `VehicleBookingController`, `VehicleCalendarController`, `VehicleBookingAccessService`, `VehicleCalendarService`, `FleetVehicleBooking`, Asset/readiness/restriction projections and shared SiteCalendar integration. Confirm current route/component ownership instead of assuming all old audit gaps persist. Read the published `resources/js/lib/fleet-navigation.ts` and contextual navigation component so mockup navigation matches main, without changing them.
+
+Produce one coherent clickable desktop journey:
+
+- A useful vehicle register with search, filters by permitted site/type/capacity/accessibility/status, suitable list/cards patterns, vehicle identity/home site, trackerless vehicles, clear source/freshness and specific next actions. Keep unknown evidence, due work, active restriction, in-use/overdue and readiness distinct. Avoid invented safety scores or null-as-green summaries.
+- Fleet-wide day/week/month and agenda/list calendar views as appropriate to the approved workflow, comparing permitted vehicles and opening the selected vehicle's existing profile/calendar. Preserve site/vehicle/date/filter context on entry and return. Bookings, holds, maintenance estimates, confirmed appointments, actual downtime and compliance reminders remain visibly distinct; a reminder does not block the entire day.
+- Selecting a permitted available slot pre-fills the correct vehicle/site/time into the canonical booking request path. Show requester versus driver, pending/approved/declined, stale/conflicting slots, accessible list/form alternatives, edit/reschedule/extend/cancel, late return and unavailable resources. Reuse the existing approval/checkout readiness contract; do not invent a second availability engine.
+- Demonstrate busy-only versus authorised booking detail, restricted-site/direct-link denial, missing driver eligibility or compliance, concurrent/stale state recovery, overnight/multi-day and Pacific/Auckland time handling. No hidden client identity/destination in calendar labels, counts, search or export previews.
+- Connect source-owned Maintenance and shared Site context via minimal drilldown/return demonstrations. Do not redesign Site, Maintenance, vehicle detail, Transport demand or the Overview task's content. Transport requests needing allocation belong to PKG-05; a small labelled source/request handoff here is enough.
+
+One operating organisation with roles, approved sites, canonical ownership and privacy; no tenancy features. Reuse Asset as identity, FleetVehicleBooking/reservation/readiness as booking authority, Maintenance restrictions, HR eligibility and shared Calendar/Tasks. Exact pending-hold durations, buffers, exception grants and operational applicability remain approved-policy inputs. Show unresolved configuration honestly; illustrative fixtures do not enact policy or create new legal rules. External calendars/maps/tracking subscriptions cannot be required for basic booking.
+
+Use current PageHeader/PageHeaderRail, LIST/CALENDAR/POPUP/NAVIGATION/token guides, premium evidence controls only where actually needed, and searchable modal selectors. Existing frozen previews and Rory rules remain read-only. Desktop keyboard, focus, useful resizing and actual zoom where available; no mobile/tablet/PWA design.
+
+## Artifact and stop gate
+
+Write only new versioned PKG-04 preview artifacts and your page/evidence records in this checkout, with clearly synthetic data and no imports of uncommitted sibling code. Use a unique available preview port without stopping or reconfiguring any existing server. No app/shared-component/backend/routes/schema/guide edits, operational database writes, notification/provider actions, merge/push or worker.
+
+Verify real browser journeys at sensible approved desktop sizes and record actual results and limits; no blanket production or full-CI claim. Freeze a reviewable candidate with URL, screenshots, source/file hashes, source-to-design reuse/ownership map, state coverage and unresolved decisions. Keep one self-contained packet for later Main review. **Stop at Stephan's explicit approval of the exact mockup.** No implementation or repeated Main setup gate; no acceptance of earlier packages inferred.

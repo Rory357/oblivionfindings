@@ -1,0 +1,39 @@
+{
+  "candidate": "25b1a8f18728fb908a39de1f1dc63a34c10e4950",
+  "sources": {
+    "resources/js/pages/fleet-assets/vehicles/fleet-calendar.tsx": "6776bcb64ab4c64916b466ecc637465ddb235d53ab4a7f84b19b5053b2607094",
+    "resources/js/components/fleet-assets/vehicle-workspace/booking-wizard.tsx": "08f91d070e4c30a939cc68e59c60098b6dfb523159e194b1344831d84938c098",
+    "resources/js/lib/datetime.ts": "d558321f11b5e545c6b8e1eff6347e1c088cf725a32d0ee38438a3b219baec60"
+  },
+  "event": {
+    "id": "booking:probe",
+    "vehicleId": 1,
+    "kind": "booking",
+    "editable": true,
+    "start": "2027-04-04T01:30:00+13:00",
+    "end": "2027-04-04T03:30:00+12:00"
+  },
+  "originalDurationMinutes": 180,
+  "expectedProposal": {
+    "start": "2027-04-05T01:30",
+    "end": "2027-04-05T04:30"
+  },
+  "probes": [
+    {
+      "timezone": "UTC",
+      "proposal": {
+        "start": "2027-04-05T01:30",
+        "end": "2027-04-05T03:30"
+      },
+      "actualDurationMinutes": 120
+    },
+    {
+      "timezone": "Pacific/Auckland",
+      "proposal": {
+        "start": "2027-04-05T01:30",
+        "end": "2027-04-05T03:30"
+      },
+      "actualDurationMinutes": 120
+    }
+  ]
+}

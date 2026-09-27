@@ -1,0 +1,140 @@
+{
+  "candidate": "38239d35506bf97c4b6f865a13aa10933b4cb439",
+  "baseline": {
+    "scripts": [
+      "http://127.0.0.1:5194/@vite/client",
+      "http://127.0.0.1:5194/resources/js/app.tsx"
+    ],
+    "switches": [
+      {
+        "checked": "true",
+        "label": "Booking decisions In-app"
+      },
+      {
+        "checked": "false",
+        "label": "Booking decisions Email"
+      },
+      {
+        "checked": "true",
+        "label": "Maintenance reminders In-app"
+      },
+      {
+        "checked": "false",
+        "label": "Maintenance reminders Email"
+      },
+      {
+        "checked": "true",
+        "label": "Handover updates In-app"
+      },
+      {
+        "checked": "false",
+        "label": "Handover updates Email"
+      },
+      {
+        "checked": "false",
+        "label": "Import results In-app"
+      },
+      {
+        "checked": "true",
+        "label": "Import results Email"
+      }
+    ],
+    "url": "http://127.0.0.1:8794/fleet-assets/settings/notifications#notifications",
+    "viewport": {
+      "height": 720,
+      "width": 1280
+    }
+  },
+  "checks": [
+    {
+      "draftSummary": "IN-APP COPIES\n4\nOf 4 event types · draft choices"
+    },
+    {
+      "cancelReloadPreservesDraft": "true"
+    },
+    {
+      "review": "Review notification changes\n\nThese choices affect your optional copies. Required responses remain with their source owners.\n\nImport results\nIn-app\nOff → On\nNew source\nPersonal choice\nBack to preferences\nSave preferences\nClose"
+    },
+    {
+      "afterReload": {
+        "summary": "IN-APP COPIES\n3\nOf 4 event types · saved choices",
+        "importChoice": "false",
+        "saveEnabled": false
+      }
+    },
+    {
+      "previewMetrics": {
+        "clientWidth": 978,
+        "rect": {
+          "bottom": 677.796875,
+          "height": 635.59375,
+          "left": 150,
+          "right": 1130,
+          "top": 42.203125,
+          "width": 980,
+          "x": 150,
+          "y": 42.203125
+        },
+        "scrollWidth": 978,
+        "viewportHeight": 720
+      }
+    },
+    {
+      "headerFocusAfterChangingEvent": "Preview a notification"
+    },
+    {
+      "rowFocusAfterChangingEvent": "Actions for Booking decisions"
+    },
+    {
+      "overrideRows": 4
+    },
+    {
+      "inherited": {
+        "summary": "IN-APP COPIES\n4\nOf 4 event types · inherited defaults",
+        "allDisabled": true
+      }
+    }
+  ],
+  "final": {
+    "switches": [
+      {
+        "checked": "true",
+        "label": "Booking decisions In-app"
+      },
+      {
+        "checked": "false",
+        "label": "Booking decisions Email"
+      },
+      {
+        "checked": "true",
+        "label": "Maintenance reminders In-app"
+      },
+      {
+        "checked": "false",
+        "label": "Maintenance reminders Email"
+      },
+      {
+        "checked": "true",
+        "label": "Handover updates In-app"
+      },
+      {
+        "checked": "false",
+        "label": "Handover updates Email"
+      },
+      {
+        "checked": "false",
+        "label": "Import results In-app"
+      },
+      {
+        "checked": "true",
+        "label": "Import results Email"
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1280
+    }
+  },
+  "browserZoom": "Ordinary viewport only; genuine 125% remains unverified",
+  "savedPreferenceWrites": "None; changed only an unsaved draft and restored using existing GET Reload saved"
+}

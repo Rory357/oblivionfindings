@@ -1,0 +1,12 @@
+{
+    "dashboard_only": {
+        "canonicalCanReadAlert": false,
+        "clientAlertReportOffered": true,
+        "staffAlertReportOffered": true
+    },
+    "alert_reader": {
+        "canonicalCanReadAlert": true,
+        "clientAlertReportOffered": false,
+        "staffAlertReportOffered": false
+    }
+}

@@ -1,0 +1,14 @@
+{
+  "candidate": "ff856d9814086006d158dc788f4ebe55b9838305",
+  "parent": "926b4981b0289da08a20baca0995117fb53e413e",
+  "tree": "5c6fde56a918f7762010e9a4ca3d0635b43c59d7",
+  "sourceFiles": 41,
+  "frozenFiles": 41,
+  "changedFiles": 91,
+  "mismatches": [],
+  "unmanifested": [],
+  "absent": [],
+  "guideChanges": "",
+  "masterSha": "c4837ab675f9dffdb6a8597636f49d5761da114e6c155dc08e6bb8a209d63fd0",
+  "status": ""
+}

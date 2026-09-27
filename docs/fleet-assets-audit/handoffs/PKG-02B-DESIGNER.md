@@ -1,6 +1,26 @@
 # PKG-02B — Vehicle profile and readiness Designer handoff
 
-Owner: MAIN ASTRA. Revision 1. 21 September 2026. **Prepared; launch only after Main verifies PKG-02A publication. Design/mockup only.**
+Owner: MAIN ASTRA. Revision 6. 22 September 2026. **Stephan approved v13 and instructed the build to start. Same task01a0c2bb-fcff-7cb1-8bab-882d84477c6c in worktree5b0a; current build release supersedes design-only restrictions below.**
+
+## Current execution direction
+
+Follow [PKG-02B-BUILD.md](PKG-02B-BUILD.md), Main's self-contained implementation release and coordination contract. Stephan explicitly requests no continuous Main/build back-and-forth. Designer owns routine contracts, implementation, corrections and QA in this task; only genuine boundary conflicts or the consolidated final review packet return to Main. Astra Extra High owns frontend and final fidelity; Sol may do backend only under the Designer's bounded brief and serial writer handoff. Readonly guides and frozen v1–v13 remain protected. No repeat user start approval or arbitrary internal-slice approval gate. Final technical review, authorised integration and operating acceptance remain separate.
+
+## Current gate — preserve v13 and await exact design approval
+
+[Main v13 review](../evidence/PKG-02B-main-v13-review.md) resolves B01–B03 for candidate56781fb5239a1b5a65fe69be015f782e15f4b665ea7a3c203bb00ca355090181, manifestC537D72D3617A05467C3A9FC91CA9A9E7B422FCF30E7D1C87A687D2145874C30. Main independently checked file/preservation identities, source and targeted regressions/rendered journeys. Stop at Stephan's exact mockup approval; genuine browser zoom is not yet verified, and native export/picker/production evidence limits remain explicit. No implementation/worker/integration/activation release. Broader v12 scope, ownership prerequisites and read-only current guides remain authoritative. The correction instructions below describe the prior v12 checkpoint and are not another request to edit frozen files.
+
+## Current direction — verified expanded design and v12 corrections
+
+Read [Main's v12 scope and review](../evidence/PKG-02B-main-v12-review.md). It records the actual user-message authority for the full vehicle calendar/trips/telemetry/Control Room, universal geofence/checklist, catalogue and document/Finance interfaces. That direction supersedes the historical compact-calendar-only design limit below. It does not release those modules' implementation or waive shared ownership, policy, privacy or exact approval gates.
+
+Correct B01 unresolved compliance permitting Ready/Confirmed, verify and correct B02 inconsistent RUC-range gates, and correct B03 past-date validation routing/default. Same verified gpt-6-astra/xhigh Designer, no worker or application writer. Preserve v1–v12 and return a newly frozen candidate with targeted evidence. Main has not approved v12; Stephan's “ok let main know” is handoff permission only. Do not request implementation approval on the defective candidate.
+
+The user's explicit 21 September 20:52 UTC guide-addition request and later catalogue/document follow-up narrowly authorise the already inspected additive DESIGN/POPUP/new MAP_GEOFENCING references. Their exact hashes are in Main's review. Treat them as read-only now; no further guide editing is included in these corrections. Canonical Revision10+A1–A6 is unchanged. Genuine desktop zoom and native export/picker evidence limits remain explicit; supplemental narrow-window checks do not expand the master into mobile work.
+
+The remaining sections preserve the initial setup and reuse contract; read the current scope/review first where later verified directions supersede them.
+
+Main independently verified PKG-02A remote publication, all125 source blobs and219 documentation entries at5307692ec59be84f3503c06354419b7da95be805. See the current Main-local evidence/PKG-02A-main-publication-verification.md revision1; hosting CI is in progress and older packages remain open. Main also independently verified this Designer's clean matching baseline and actual gpt-6-astra/xhigh turn metadata; evidence/PKG-02B-main-setup-release.md revision1. The setup gate is satisfied. Proceed with the bounded mockup and stop at exact mockup approval; no repeat user permission is needed.
 
 ## Authority, model and baseline
 

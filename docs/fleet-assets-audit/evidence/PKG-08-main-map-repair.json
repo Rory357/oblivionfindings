@@ -1,0 +1,55 @@
+{
+  "candidate": "b07888e9b413696649ceceb03bbae3ee38edf166",
+  "fleet": {
+    "frames": [
+      {
+        "height": 688,
+        "mapHeight": 686,
+        "tiles": 9,
+        "viewportHeight": 686,
+        "width": 639.5
+      }
+    ],
+    "scripts": [
+      "http://127.0.0.1:5194/@vite/client",
+      "http://127.0.0.1:5194/resources/js/app.tsx"
+    ],
+    "url": "http://127.0.0.1:8794/fleet-assets/vehicles?view=map",
+    "viewport": {
+      "height": 720,
+      "width": 1280
+    }
+  },
+  "canonicalHandoff": true,
+  "location": {
+    "maps": [
+      {
+        "border": "0px",
+        "frameHeight": 645.1875,
+        "mapHeight": 645.1875
+      }
+    ],
+    "url": "http://127.0.0.1:8794/fleet-assets/vehicles/1?tab=map&view=location&return_to=%2Ffleet-assets%2Fvehicles%3FmapFocus%3D1%26view%3Dmap"
+  },
+  "expanded": {
+    "maps": [
+      {
+        "frameHeight": 495.5,
+        "mapHeight": 495.5,
+        "paths": 1
+      }
+    ]
+  },
+  "trip": {
+    "maps": [
+      {
+        "frameHeight": 360,
+        "mapHeight": 360,
+        "paths": 21
+      }
+    ],
+    "selected": "Point 2 of 21",
+    "url": "http://127.0.0.1:8794/fleet-assets/vehicles/1?tab=trips&return_to=%2Ffleet-assets%2Fvehicles%3FmapFocus%3D1%26view%3Dmap"
+  },
+  "browserZoom": "Not verified; ordinary viewport only"
+}

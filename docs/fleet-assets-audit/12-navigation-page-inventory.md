@@ -2,12 +2,26 @@
 
 **Approval checkpoint 2026-09-19 09:53:08 UTC:** Stephan approved the Section 12 scope/navigation/WF-01–WF-10 and first PKG-01 design release; [exact decision](14-scope-workflow-approval.md). Original audit findings and proposal text below are retained as the reviewed artifact. No mockup/implementation approval is implied.
 
-Owner: MAIN ASTRA. Revision: 1. Date: 2026-09-19.
-Authority: Revision 10 + A1/A2. **PROPOSED; awaiting scope/navigation approval.** Local baseline: `19354ecbc70046d12dfdf9c86f888e65fa1879d1`.
+Owner: MAIN ASTRA. Revision: 3. Updated: 2026-09-27.
+Authority: Revision 10 and approved amendments, original Section12 approval and the explicit Transport navigation correction below. Historical audit baseline: `19354ecbc70046d12dfdf9c86f888e65fa1879d1`. Original route inventory and observations remain historical source evidence; the revised destination mapping is the current approved design plan, not implemented application navigation.
+
+## Approved People Locations design destination — 27 September
+
+Add **People Locations** to the Operations navigation in the OPS-PL01 mockup. [Plan and scope](handoffs/OPS-PL01-DESIGNER.md). One workspace contains Map, People, Analytics, Alerts, History and a dedicated Settings page, with separately authorised Clients/Staff/Both views. Existing Client Location, staff/lone-worker, Device, consent and Control Room records remain authoritative. Plan contextual links and safe preservation of existing Resident Tracking/Client Location deep links; do not remove routes or broaden permissions. This changes the proposed Operations navigation only; the Fleet & Assets eight destinations below are unchanged. Actual application navigation is not implemented by this design release, and exact mockup approval is still required.
+
+## Approved Transport correction — 26 September
+
+Stephan questioned why Transport planning, approvals and overview were buried within Fleet. Main proposed a direct Transport entry and a complete operational workspace. Stephan approved: “yes please also notifi the sesion”. This approves the following eight destinations, in order: **Overview · Fleet · Transport · Assets · Maintenance · Maps & boundaries · Reports · Settings**. Transport is a sibling of Fleet within the existing Fleet & Assets hub. It is not a new global application module or an extra hub.
+
+The current published seven-entry source remains a historical implementation result. This correction changes the navigation plan and PKG-05 mockup only; actual navigation implementation/publication awaits the appropriate release. Existing/frozen sibling previews may still display seven items and must be reconciled with this approved plan before their later design/integration acceptance. Main is authorised to notify the existing PKG-05 Designer; other sessions are not contacted or interrupted by this decision. Rory's approved design-rule files remain read-only.
+
+Transport must demonstrate **Overview**, **Requests & approvals**, **Planner**, **Journeys**, and **Returns & handovers** as focused views. The overview shows today's departures, unallocated requests, decisions awaiting the authorised approver, overdue returns and owned exceptions with truthful scoped counts and drilldowns. Approvals reuse the canonical request/booking decision, policy and permission boundaries; no duplicate approval store, invented authority or financial approval follows. Allocation, booking confirmation, actual journey progress, return receipt, handover acceptance and vehicle release remain distinct.
+
+The Transport planner organises demand, vehicles, drivers, escorts and equipment through the existing Fleet booking/readiness contracts. Fleet retains the resource register and fleet-wide vehicle calendar; both show the same booking identities. Outings, passenger accountability and permission-limited medication logistics remain discoverable in Transport and their existing contextual modules. My Day, Client, Site and vehicle/booking entry and return paths remain mandatory. Existing deep links, permissions and source records are preserved; this plan does not prescribe new route slugs or advanced route optimisation.
 
 ## One hub, distinct workspaces
 
-Retain one **Fleet & Assets** hub. Its focused destinations are Overview, Fleet, Assets, Maintenance, Maps & boundaries, Reports and Settings. Each uses the current approved grouped navigation; a workspace opens one useful operational view, not all content at once. Within Fleet, distinguish Vehicles, Calendar/bookings, Transport demand/journeys and operating records. The vehicle Calendar remains on the vehicle profile. Assets starts with site/room inventory. Maintenance starts with owned work, and distinguishes schedules/templates from completed evidence.
+Retain one **Fleet & Assets** hub. Its focused destinations are Overview, Fleet, Transport, Assets, Maintenance, Maps & boundaries, Reports and Settings. Each uses the current approved grouped navigation; a workspace opens one useful operational view, not all content at once. Fleet contains Vehicles, Calendar/bookings and operating records. Transport owns the connected demand, approvals, planning, actual journey and handover workspace described above. The vehicle Calendar remains on the vehicle profile. Assets starts with site/room inventory. Maintenance starts with owned work, and distinguishes schedules/templates from completed evidence.
 
 Client tracking remains a permission-scoped specialist entry through Clients and authorised tracking; Device, HR, Finance and Control Room ownership remains visible by contextual links. A shared navigation hub never grants access to personal tracking. No second Fleet hub or separate asset identity is introduced. Final presentation is a future Designer task, not a mockup in this audit.
 
@@ -35,12 +49,12 @@ Current source: [app-sidebar.tsx](../../resources/js/components/app-sidebar.tsx#
 | 16 | Inspections `/inspections` | Merge | Maintenance → Inspections/history; contextual pre/post-use actions and immutable evidence. |
 | 17 | Drivers `/drivers` | Relocate | Fleet → People/eligibility projection; HR remains source, minimal disclosure and actionable links. |
 | 18 | Vehicle Bookings `/bookings` | Merge | Fleet → Calendar/bookings; same records as vehicle/Site calendar, approvals and operational checkout/return. |
-| 19 | Key Management `/keys` | Relocate | Vehicle/booking custody and Fleet outstanding-handover queue; preserve ledger and recovery, no separate module. |
+| 19 | Key Management `/keys` | Relocate | Vehicle/booking custody and Transport returns/handover context; preserve canonical key ledger, Fleet contextual access and recovery, no separate module. |
 | 20 | Resident Tracking `/resident-tracking` | Relocate | Authorised Client Location/tracking workspace; contextual specialist link only for permitted users. |
-| 21 | Transport Logs `/transports` | Merge | Fleet → Transport journeys; distinct from unallocated requests, preserve trip and passenger records. |
+| 21 | Transport Logs `/transports` | Merge | Transport → Journeys; distinct from requests/approvals and planning, preserve actual trip and passenger records and existing deep links. |
 | 22 | Medication Transit `/transports/medications` | Relocate | Journey detail and authorised medication logistics queue; preserve exact logistics/eMAR permission boundaries. |
-| 23 | Outings `/outings` | Merge | Fleet → Transport/Outings, also Client/Site context; preserve approved outing and passenger accountability. |
-| 24 | Shift Handovers `/handovers` | Relocate | My Day/Site and vehicle custody; global pending/disputed queue in Fleet, recipient acceptance retained. |
+| 23 | Outings `/outings` | Merge | Transport → discoverable Outings view/context, also Client/Site; preserve approved outing and passenger accountability. |
+| 24 | Shift Handovers `/handovers` | Relocate | My Day/Site and vehicle custody; scoped pending/disputed queue in Transport → Returns & handovers, recipient acceptance retained. |
 | 25 | Tracking Devices `/devices` | Relocate | Security & Devices registry; Fleet filtered pairing/health/consent projection and contextual deep links preserved. |
 | 26 | Fleet Incidents `/incidents` | Relocate | Existing H&S investigation/Control Room response; contextual Fleet/Asset report and filtered worklist retained. |
 | 27 | Reports & Analytics `/reports` | Keep | Reports landing; task questions and permission-aware drilldowns. |

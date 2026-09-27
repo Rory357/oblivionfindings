@@ -1,0 +1,442 @@
+{
+  "base": "ba5bff2e8b6c22796369443f1cdac918039950dd",
+  "candidate": "49e0be5b1c1716aeb4e681529bb71fdce2a7abc0",
+  "baseFailures": 31,
+  "candidateFailures": 34,
+  "matchingSignatures": [
+    {
+      "signature": "Tests\\Feature\\Catering\\SiteMealPlannerSiteAccessTest > meal plann…",
+      "context": [
+        "Expected response status code [403] but received 404.",
+        "Failed asserting that 404 is identical to 403.",
+        "at tests/Feature/Catering/SiteMealPlannerSiteAccessTest.php:110",
+        "106▕         'meal-planner/takeaway-vendors',",
+        "107▕     ] as $path) {",
+        "108▕         $this->actingAs($this->mealViewer)",
+        "109▕             ->getJson(\"/sites/{$this->hiddenMealSite->id}/{$path}\")"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\Catering\\SiteMealPlannerSiteAccessTest > inventory…",
+      "context": [
+        "Expected response status code [403] but received 404.",
+        "Failed asserting that 404 is identical to 403.",
+        "at tests/Feature/Catering/SiteMealPlannerSiteAccessTest.php:221",
+        "217▕             'delta' => 2,",
+        "218▕             'unit' => 'each',",
+        "219▕             'reason' => 'delivery',",
+        "220▕         ])"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ControlRoom\\ControlRoomMyTasksControllerTest > inde…",
+      "context": [
+        "Property [my_alerts] does not have the expected size.",
+        "Failed asserting that actual size 0 matches expected size 1.",
+        "at tests/Feature/ControlRoom/ControlRoomMyTasksControllerTest.php:59",
+        "55▕             ->get('/control-room/my-tasks')",
+        "56▕             ->assertOk()",
+        "57▕             ->assertInertia(fn ($page) => $page",
+        "58▕                 ->component('control-room/my-tasks')"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ControlRoom\\ControlRoomMyTasksControllerTest > inde…",
+      "context": [
+        "Property [my_alerts] does not have the expected size.",
+        "Failed asserting that actual size 0 matches expected size 1.",
+        "at tests/Feature/ControlRoom/ControlRoomMyTasksControllerTest.php:76",
+        "72▕",
+        "73▕         $this->actingAs($this->admin)",
+        "74▕             ->get('/control-room/my-tasks')",
+        "75▕             ->assertInertia(fn ($page) => $page"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ControlRoom\\ControlRoomMyTasksControllerTest > resi…",
+      "context": [
+        "Property [my_alerts.0.id] does not exist.",
+        "Failed asserting that false is true.",
+        "at tests/Feature/ControlRoom/ControlRoomMyTasksControllerTest.php:94",
+        "90▕         $this->actingAs($this->admin)",
+        "91▕             ->get('/control-room/my-tasks')",
+        "92▕             ->assertOk()",
+        "93▕             ->assertInertia(fn ($page) => $page"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ControlRoom\\ControlRoomMyTasksControllerTest > comp…",
+      "context": [
+        "Expected response status code [201, 301, 302, 303, 307, 308] but received 404.",
+        "Failed asserting that false is true.",
+        "at tests/Feature/ControlRoom/ControlRoomMyTasksControllerTest.php:112",
+        "108▕         ]);",
+        "109▕",
+        "110▕         $this->actingAs($this->admin)",
+        "111▕             ->post(\"/control-room/my-tasks/followups/{$note->id}/complete\")"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\AttendanceClockOutTaskUpdateTest > clock out applie…",
+      "context": [
+        "Session is missing expected key [success].",
+        "Failed asserting that false is true.",
+        "at tests/Feature/AttendanceClockOutTaskUpdateTest.php:83",
+        "79▕                 'handover_notes' => 'Tasks completed before leaving.',",
+        "80▕                 'follow_up_needed' => false,",
+        "81▕             ],",
+        "82▕         ])"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\AttendanceClockOutTaskUpdateTest > clock out with s…",
+      "context": [
+        "Session is missing expected key [errors].",
+        "Failed asserting that false is true.",
+        "at tests/Feature/AttendanceClockOutTaskUpdateTest.php:129",
+        "125▕                 'handover_notes' => 'This handover should not persist.',",
+        "126▕                 'follow_up_needed' => false,",
+        "127▕             ],",
+        "128▕         ])"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ClientProfileDataGapsBuildTest > medication stock i…",
+      "context": [
+        "Property [medical.medications.0.stock.on_hand] does not match the expected value.",
+        "Failed asserting that '24.00' is identical to 24.",
+        "at tests/Feature/ClientProfileDataGapsBuildTest.php:214",
+        "210▕",
+        "211▕         $this->actingAs($this->admin)",
+        "212▕             ->get(\"/operations/clients/{$this->client->id}\")",
+        "213▕             ->assertInertia(fn (Assert $page) => $page"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ControlRoom\\ControlRoomSafetyHandov…  QueryException",
+      "context": [
+        "SQLSTATE[45000]: <<Unknown error>>: 1644 H&S events may only close through the canonical closure service (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: oblivion_findings_codex_test_4446, SQL: update `hs_events` set `status` = closed, `hs_events`.`updated_at` = 2026-09-27 04:30:58 where `id` = 5)",
+        "at vendor/laravel/framework/src/Illuminate/Database/Connection.php:612",
+        "608▕             $statement = $this->getPdo()->prepare($query);",
+        "609▕",
+        "610▕             $this->bindValues($statement, $this->prepareBindings($bindings));",
+        "611▕",
+        "➜ 612▕             $statement->execute();"
+      ]
+    },
+    {
+      "signature": "Tests\\Architecture\\ItSecuritySingleTenantBoundaryTest > it keeps…",
+      "context": [
+        "Expected: <?php\\n",
+        "\\n",
+        "namespace App\\Http\\Controllers\\FleetAssets;\\n",
+        "... (27 more lines)",
+        "To contain: SecurityDevicesAccessService",
+        "at tests/Architecture/ItSecuritySingleTenantBoundaryTest.php:16"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\Auth\\AuthenticationTest > users can authenticate us…",
+      "context": [
+        "Failed asserting that two strings are equal.",
+        "-'http://localhost/dashboard'",
+        "+'http://localhost/my-day'",
+        "at tests/Feature/Auth/AuthenticationTest.php:22",
+        "18▕         'password' => 'password',",
+        "19▕     ]);"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\Auth\\AuthenticationTest > approved unverified users…",
+      "context": [
+        "Failed asserting that two strings are equal.",
+        "-'http://localhost/dashboard'",
+        "+'http://localhost/my-day'",
+        "at tests/Feature/Auth/AuthenticationTest.php:34",
+        "30▕         'password' => 'password',",
+        "31▕     ]);"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ClientControllerTest > coordinator can view any cli…",
+      "context": [
+        "Expected response status code [200] but received 403.",
+        "Failed asserting that 403 is identical to 200.",
+        "at tests/Feature/ClientControllerTest.php:479",
+        "475▕         $client = Client::factory()->create();",
+        "476▕",
+        "477▕         $response = $this->actingAs($this->coordinator)->get(\"/operations/clients/{$client->id}\");",
+        "478▕"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ClientControllerTest > auditor can view any client",
+      "context": [
+        "Expected response status code [200] but received 403.",
+        "Failed asserting that 403 is identical to 200.",
+        "at tests/Feature/ClientControllerTest.php:515",
+        "511▕         $client = Client::factory()->create();",
+        "512▕",
+        "513▕         $response = $this->actingAs($this->auditor)->get(\"/operations/clients/{$client->id}\");",
+        "514▕"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ClientControllerTest > show returns permission flag…",
+      "context": [
+        "Expected response status code [200] but received 403.",
+        "Failed asserting that 403 is identical to 200.",
+        "at tests/Feature/ClientControllerTest.php:1014",
+        "1010▕         $client = Client::factory()->create();",
+        "1011▕",
+        "1012▕         $response = $this->actingAs($this->coordinator)->get(\"/operations/clients/{$client->id}\");",
+        "1013▕"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ClientControllerTest > store creates portal user wh…",
+      "context": [
+        "Failed asserting that two strings are equal.",
+        "The following exception occurred during the last request:",
+        "TypeError: App\\Services\\AuthorizationEvidenceLockService::{closure:App\\Services\\AuthorizationEvidenceLockService::hydrateForUsers():67}(): Argument #1 ($user) must be of type App\\Models\\User|int, null given in /home/runner/work/oblivionfindings/oblivionfindings/app/Services/AuthorizationEvidenceLockService.php:67",
+        "Stack trace:",
+        "#0 [internal function]: App\\Services\\AuthorizationEvidenceLockService->{closure:App\\Services\\AuthorizationEvidenceLockService::hydrateForUsers():67}()",
+        "#1 /home/runner/work/oblivionfindings/oblivionfindings/vendor/laravel/framework/src/Illuminate/Collections/Arr.php(842): array_map()"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ClientControllerTest > stor…  ModelNotFoundException",
+      "context": [
+        "No query results for model [App\\Models\\User].",
+        "at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:786",
+        "782▕         if (! is_null($model = $this->first($columns))) {",
+        "783▕             return $model;",
+        "784▕         }",
+        "785▕",
+        "➜ 786▕         throw (new ModelNotFoundException)->setModel(get_class($this->model));"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ClientControllerTest > port…  ModelNotFoundException",
+      "context": [
+        "No query results for model [App\\Models\\User].",
+        "at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:786",
+        "782▕         if (! is_null($model = $this->first($columns))) {",
+        "783▕             return $model;",
+        "784▕         }",
+        "785▕",
+        "➜ 786▕         throw (new ModelNotFoundException)->setModel(get_class($this->model));"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ClientControllerTest > store does not persist creat…",
+      "context": [
+        "Failed asserting that null is an instance of class App\\Models\\Client.",
+        "at tests/Feature/ClientControllerTest.php:152",
+        "148▕     private function findClientByEmail(string $email): Client",
+        "149▕     {",
+        "150▕         $client = Client::all()->firstWhere('email', $email);",
+        "151▕",
+        "➜ 152▕         $this->assertInstanceOf(Client::class, $client);"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ClientControllerTest > stor…  ModelNotFoundException",
+      "context": [
+        "No query results for model [App\\Models\\User].",
+        "at vendor/laravel/framework/src/Illuminate/Database/Eloquent/Builder.php:786",
+        "782▕         if (! is_null($model = $this->first($columns))) {",
+        "783▕             return $model;",
+        "784▕         }",
+        "785▕",
+        "➜ 786▕         throw (new ModelNotFoundException)->setModel(get_class($this->model));"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\Compliance\\ComplianceDashboardSiteS…  ErrorException",
+      "context": [
+        "Undefined array key \"cd\"",
+        "at vendor/laravel/framework/src/Illuminate/Collections/Collection.php:1976",
+        "1972▕      * @return TValue",
+        "1973▕      */",
+        "1974▕     public function offsetGet($offset): mixed",
+        "1975▕     {",
+        "➜ 1976▕         return $this->items[$offset];"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\Compliance\\ComplianceDashboardSiteS…  ErrorException",
+      "context": [
+        "Undefined array key \"cd\"",
+        "at vendor/laravel/framework/src/Illuminate/Collections/Collection.php:1976",
+        "1972▕      * @return TValue",
+        "1973▕      */",
+        "1974▕     public function offsetGet($offset): mixed",
+        "1975▕     {",
+        "➜ 1976▕         return $this->items[$offset];"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\Assurance\\NzsAssuranceResolverTest…   QueryException",
+      "context": [
+        "SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'client_id' cannot be null (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: oblivion_findings_codex_test_3933, SQL: insert into `shifts` (`client_id`, `service_context_id`, `user_id`, `starts_at`, `ends_at`, `location`, `notes`, `status`, `created_by`, `site_id`, `organization_id`, `updated_at`, `created_at`) values (?, ?, 11, 2026-09-28 04:00:00, 2026-09-28 12:00:00, ?, Rerum modi aspernatur ut facere pariatur. Culpa iste non harum ut occaecati sunt. Corporis numquam itaque deserunt reprehenderit aut rem soluta odio., scheduled, 12, 6, 1, 2026-09-27 04:30:06, 2026-09-27 04:30:06))",
+        "at vendor/laravel/framework/src/Illuminate/Database/MySqlConnection.php:53",
+        "49▕             $this->bindValues($statement, $this->prepareBindings($bindings));",
+        "50▕",
+        "51▕             $this->recordsHaveBeenModified();",
+        "52▕",
+        "➜  53▕             $result = $statement->execute();"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\Catering\\SiteMealClinicalAuthorityTest > Site A cat…",
+      "context": [
+        "Expected response status code [403] but received 404.",
+        "Failed asserting that 404 is identical to 403.",
+        "at tests/Feature/Catering/SiteMealClinicalAuthorityTest.php:153",
+        "149▕         ->assertJsonPath('clients.0.restriction_authority.restriction_id', $restriction->id);",
+        "150▕",
+        "151▕     $this->actingAs($this->planner)",
+        "152▕         ->getJson(\"/sites/{$this->siteB->id}/meal-planner/bootstrap\")"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\Catering\\SiteMealClinicalAuthorityTest > wrong-Site…",
+      "context": [
+        "Expected response status code [403] but received 404.",
+        "Failed asserting that 404 is identical to 403.",
+        "at tests/Feature/Catering/SiteMealClinicalAuthorityTest.php:211",
+        "207▕         ->assertNotFound();",
+        "208▕",
+        "209▕     $this->actingAs($this->author)",
+        "210▕         ->postJson(\"/sites/{$this->siteB->id}/clinical-meal-restrictions/residents/{$this->clientB->id}\", $payload)"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\Catering\\SiteMealClinicalAuthorityTest > discrepanc…",
+      "context": [
+        "Expected response status code [403] but received 404.",
+        "Failed asserting that 404 is identical to 403.",
+        "at tests/Feature/Catering/SiteMealClinicalAuthorityTest.php:454",
+        "450▕         ->postJson(\"/sites/{$this->siteB->id}/meal-planner/residents/{$this->clientB->id}/restriction-discrepancies\", [",
+        "451▕             'details' => $details,",
+        "452▕             'idempotency_key' => (string) Str::uuid(),",
+        "453▕         ])"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\Catering\\MealServiceAtomicityTest > wrong Site and…",
+      "context": [
+        "Expected response status code [403] but received 404.",
+        "Failed asserting that 404 is identical to 403.",
+        "at tests/Feature/Catering/MealServiceAtomicityTest.php:266",
+        "262▕         ->postJson(\"/sites/{$this->stockSite->id}/meal-plan/{$otherEntry->id}/serve\")",
+        "263▕         ->assertNotFound();",
+        "264▕     $this->actingAs($this->stockWorker)",
+        "265▕         ->postJson(\"/sites/{$this->otherStockSite->id}/meal-plan/{$otherEntry->id}/serve\")"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ControlRoom\\ControlRoomRouteReadinessTest > alert d…",
+      "context": [
+        "Failed asserting that two arrays are identical.",
+        "-Array &0 []",
+        "+Array &0 [",
+        "+    0 => 'it/control-room/alerts/{alert}/handoff',",
+        "+    1 => 'it/control-room/alerts/{alert}/handoff',",
+        "+    2 => 'it/control-room/alerts/{alert}/handoff/commands/{requestUuid}',",
+        "+    3 => 'it/control-room/alerts/{alert}/handoff/commands/{requestUuid}/cancel',",
+        "+]"
+      ]
+    }
+  ],
+  "newlyObservedSignatures": [
+    {
+      "signature": "Tests\\Feature\\ControlRoom\\ControlRoomAlertNestedProvenanceTest >…",
+      "context": [
+        "Failed asserting that null is identical to 2.",
+        "at tests/Feature/ControlRoom/ControlRoomAlertNestedProvenanceTest.php:112",
+        "108▕         ]);",
+        "109▕",
+        "110▕         $workspace = app(AlertWorkspaceService::class)->build($viewer, $alert->id);",
+        "111▕",
+        "➜ 112▕         $this->assertSame($asset->id, data_get($workspace, 'alert.asset.id'));"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ControlRoom\\ControlRoomAlertNestedProvenanceTest >…",
+      "context": [
+        "The local context site keeps the alert in the local worklist.",
+        "Failed asserting that null is not null.",
+        "at tests/Feature/ControlRoom/ControlRoomAlertNestedProvenanceTest.php:217",
+        "213▕",
+        "214▕         $poisonedWorkspace = app(AlertWorkspaceService::class)->build($viewer, $poisoned->id);",
+        "215▕         $validWorkspace = app(AlertWorkspaceService::class)->build($viewer, $valid->id);",
+        "216▕"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ControlRoom\\ControlRoomOperationalSurfaceSiteIsolat…",
+      "context": [
+        "Property [alerts] does not have the expected size.",
+        "Failed asserting that actual size 0 matches expected size 1.",
+        "at tests/Feature/ControlRoom/ControlRoomOperationalSurfaceSiteIsolationTest.php:352",
+        "348▕                 ->has('sites', 1)",
+        "349▕                 ->where('sites.0.id', $siteA->id)",
+        "350▕                 ->has('geofences', 1)",
+        "351▕                 ->where('geofences.0.id', $visibleGeofence->id)"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\Compliance\\ComplianceDashboardSiteScopeTest > incid…",
+      "context": [
+        "Failed asserting that 1 is identical to 2.",
+        "at tests/Feature/Compliance/ComplianceDashboardSiteScopeTest.php:278",
+        "274▕         $kpis = collect($props['kpis'])->keyBy('key');",
+        "275▕",
+        "276▕         $this->assertSame(1, $kpis['incidents']['value']);",
+        "277▕         $this->assertSame([$visibleIncident->id], collect($props['relatedIncidents'])->pluck('id')->all());",
+        "➜ 278▕         $this->assertSame(2, $props['controlRoom']['open']);"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\ControlRoom\\ControlRoomJourneyAuthorizationTest > g…",
+      "context": [
+        "Property [journeys.data] does not have the expected size.",
+        "Failed asserting that actual size 1 matches expected size 2.",
+        "at tests/Feature/ControlRoom/ControlRoomJourneyAuthorizationTest.php:363",
+        "359▕         $this->actingAs($globalOperator)",
+        "360▕             ->get('/control-room/incidents')",
+        "361▕             ->assertOk()",
+        "362▕             ->assertInertia(fn ($page) => $page"
+      ]
+    }
+  ],
+  "baseSignaturesNotReachedOrNotRepeated": [
+    {
+      "signature": "Tests\\Feature\\ControlRoom\\ControlRoomNestedRecordAuthorizationTes…",
+      "context": [
+        "Expected response status code [403] but received 404.",
+        "Failed asserting that 404 is identical to 403.",
+        "at tests/Feature/ControlRoom/ControlRoomNestedRecordAuthorizationTest.php:202",
+        "198▕         $before = $this->snapshotAlertData($this->visibleAlert);",
+        "199▕",
+        "200▕         $response = $this->dispatchJson($method, $uri, $payload);",
+        "201▕"
+      ]
+    },
+    {
+      "signature": "Tests\\Feature\\DraftTimesheetServiceReconci…  NotFoundHttpException",
+      "context": [
+        "The requested medication record was not found.",
+        "at vendor/laravel/framework/src/Illuminate/Foundation/Application.php:1437",
+        "1433▕      */",
+        "1434▕     public function abort($code, $message = '', array $headers = [])",
+        "1435▕     {",
+        "1436▕         if ($code == 404) {",
+        "➜ 1437▕             throw new NotFoundHttpException($message, null, 0, $headers);"
+      ]
+    }
+  ],
+  "limitation": "Matching signatures support inherited-failure classification; extra signatures require investigation. Fail-fast batches can prevent later tests from running, so absence is not proof of a fix. Truncated PHPUnit display names are retained honestly."
+}

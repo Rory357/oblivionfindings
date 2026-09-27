@@ -1,0 +1,115 @@
+{
+  "headSha": "f7d517359da6ffdf90de2f259111fe5e8a1133f2",
+  "observer": "MAIN ASTRA",
+  "observedDate": "2026-09-27",
+  "source": "Independent gh run view responses for the four exact-head workflows",
+  "runs": [
+    {
+      "conclusion": "failure",
+      "headSha": "f7d517359da6ffdf90de2f259111fe5e8a1133f2",
+      "jobs": [
+        {
+          "conclusion": "failure",
+          "name": "ci (feature, 1, 8, 12)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "failure",
+          "name": "ci (feature, 3, 8, 12)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "failure",
+          "name": "ci (feature, 4, 8, 12)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "failure",
+          "name": "ci (feature, 5, 8, 12)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "failure",
+          "name": "ci (feature, 2, 8, 12)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "failure",
+          "name": "ci (foundation, 0, 1, 30)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "failure",
+          "name": "ci (feature, 6, 8, 12)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "failure",
+          "name": "ci (feature, 0, 8, 12)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "failure",
+          "name": "ci (feature, 7, 8, 12)",
+          "status": "completed"
+        }
+      ],
+      "status": "completed",
+      "url": "https://github.com/Rory357/oblivionfindings/actions/runs/36241291382"
+    },
+    {
+      "conclusion": "success",
+      "headSha": "f7d517359da6ffdf90de2f259111fe5e8a1133f2",
+      "jobs": [
+        {
+          "conclusion": "success",
+          "name": "mysql-bootstrap",
+          "status": "completed"
+        }
+      ],
+      "status": "completed",
+      "url": "https://github.com/Rory357/oblivionfindings/actions/runs/36241291362"
+    },
+    {
+      "conclusion": "failure",
+      "headSha": "f7d517359da6ffdf90de2f259111fe5e8a1133f2",
+      "jobs": [
+        {
+          "conclusion": "failure",
+          "name": "quality",
+          "status": "completed"
+        }
+      ],
+      "status": "completed",
+      "url": "https://github.com/Rory357/oblivionfindings/actions/runs/36241291356"
+    },
+    {
+      "conclusion": "failure",
+      "headSha": "f7d517359da6ffdf90de2f259111fe5e8a1133f2",
+      "jobs": [
+        {
+          "conclusion": "failure",
+          "name": "visual (chromium-desktop)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "failure",
+          "name": "visual (it-security-desktop-1280)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "failure",
+          "name": "visual (it-security-desktop-1440)",
+          "status": "completed"
+        },
+        {
+          "conclusion": "failure",
+          "name": "visual (chromium-desktop-visual)",
+          "status": "completed"
+        }
+      ],
+      "status": "completed",
+      "url": "https://github.com/Rory357/oblivionfindings/actions/runs/36241291375"
+    }
+  ]
+}

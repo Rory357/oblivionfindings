@@ -1,0 +1,40 @@
+{
+  "publishedAt": "2026-09-27T05:15:26.0789717Z",
+  "approvedCandidate": "b05702d7208c88d9cffb9c092df23d3b02300b1e",
+  "previousMain": "79ea01a561f7d2fa5affa592dc096f516d663635",
+  "localMain": "b05702d7208c88d9cffb9c092df23d3b02300b1e",
+  "originMain": "b05702d7208c88d9cffb9c092df23d3b02300b1e",
+  "remoteHeadVerifiedAfterPush": "b05702d7208c88d9cffb9c092df23d3b02300b1e",
+  "tree": "74aa04faf7eaa321543b89bf592db186804ce61d",
+  "integration": "Ordinary fast-forward and ordinary push",
+  "protectedFiles": 79,
+  "changedProtectedPaths": [],
+  "approvedSourceFiles": 38,
+  "sourceMismatchPaths": [],
+  "compiledFilesVerified": 1654,
+  "buildManifestSHA256": "20283b14868876b50279a23298c5c701056a8f40334e64f65101a12c3583166b",
+  "publicHotPresent": false,
+  "dependencyInstall": "Added one locked dependency, install scripts disabled; package and lock files unchanged",
+  "actualMainChecks": {
+    "FrontendFiles": 7,
+    "PhpSyntaxFiles": 21,
+    "ESLint": "passed",
+    "FrontendTests": 67,
+    "Types": "passed"
+  },
+  "candidateChecks": {
+    "BackendAssertions": 1097,
+    "BackendTests": 48,
+    "FrontendTests": 83,
+    "Desktop": "passed, synthetic preview",
+    "Build": "passed, 4m43"
+  },
+  "operationalMigrationsRun": false,
+  "deploymentRun": false,
+  "previewProcessesChanged": false,
+  "phoneTesting": "Deferred by user",
+  "activationPrerequisites": [
+    "2026_09_27_120000_create_asset_register_workflows.php",
+    "2026_09_27_140000_retain_stocktake_history_asset_references.php"
+  ]
+}

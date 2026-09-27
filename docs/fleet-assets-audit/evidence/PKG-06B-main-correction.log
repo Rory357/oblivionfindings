@@ -1,0 +1,33 @@
+
+   WARN  PKG06BMainCorrectionTest
+  ! dispatch does not move asset and receipt requires every kit item → file_get_contents(C:\Users\steph\.code… 297.81s  
+  ! same command replays once but changed and stale submissions are rejected → file_get_contents(C:\Users\steph… 1.01s  
+  ! profile uses canonical assignment receipts and requires explicit attestation → file_get_contents(C:\Users\s… 1.10s  
+  ! linked components move only with an acknowledged kit receipt → file_get_contents(C:\Users\steph\.codex\work… 1.05s  
+  ! permissions and foreign asset file ids are enforced → file_get_contents(C:\Users\steph\.codex\worktrees\882… 1.88s  
+  ! files are scanned versioned and archived without losing bytes → file_get_contents(C:\Users\steph\.codex\wor… 6.70s  
+  ! profile and printable qr return real authorised content → file_get_contents(C:\Users\steph\.codex\worktrees… 4.04s  
+  ! asset finance requests reuse the finance queue and duplicate boundary → file_get_contents(C:\Users\steph\.c… 1.01s  
+  ! schema probe stays in the configured application schema → file_get_contents(C:\Users\steph\.codex\worktrees… 0.79s  
+  ! source costs exclude estimates drafts reversals old and foreign allocations → file_get_contents(C:\Users\st… 1.10s  
+  ! original check evidence uses source permissions and submitted template → file_get_contents(C:\Users\steph\.… 1.05s  
+  ! scan identity is server owned and foreign observations are withheld → file_get_contents(C:\Users\steph\.cod… 0.96s  
+  ! bulk labels support both media replay protection and access revocation → file_get_contents(C:\Users\steph\.… 2.83s  
+  ! viewers cannot create missing qr identity and expired batches cannot download → file_get_contents(C:\Users</>… 3.22s  
+  ! label workspace filters canonical lifecycle without leaking other sites → file_get_contents(C:\Users\steph</>… 0.87s  
+  ! published label history replays its original layout but new batches use the shared minimum → file_get_conte… 1.35s  
+  ! pending receipt blocks register room edits and rechecks the destination room → file_get_contents(C:\Users\s… 1.00s  
+  ! ownership requires its permission and preserves canonical placement → file_get_contents(C:\Users\steph\.cod… 1.00s  
+  ! replacement review records a request without retiring or posting → file_get_contents(C:\Users\steph\.codex</>… 0.83s  
+  ! asset visibility does not expand finance review scope or replacement details → file_get_contents(C:\Users\s… 1.41s  
+  ! complete ordinary edits cannot split parent or component but unrelated edits and unlinked moves work → file… 1.09s  
+  ! linked kit room home site and client placement cannot be changed by ordinary edit → file_get_contents(C:\Us… 1.16s  
+  ! component with an unresolved movement cannot be linked to a kit → file_get_contents(C:\Users\steph\.codex\w… 1.27s  
+  ! outstanding component loan must return before kit linking → file_get_contents(C:\Users\steph\.codex\worktre… 1.01s  
+  ! receipt refuses a legacy independently linked component until explicitly removed → file_get_contents(C:\Use… 0.94s  
+  ! main valid ordinary component edit cannot split an active kit → file_get_contents(C:\Users\steph\.codex\wor… 0.90s  
+  ! main profile withholds reviews outside finance site scope → file_get_contents(C:\Users\steph\.codex\worktre… 0.96s  
+
+  Tests:    27 warnings (383 assertions)
+  Duration: 342.58s
+

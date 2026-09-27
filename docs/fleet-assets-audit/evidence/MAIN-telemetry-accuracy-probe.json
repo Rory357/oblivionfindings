@@ -1,0 +1,16 @@
+{
+    "queclink": {
+        "hdop_only": 1.8,
+        "metres_and_hdop": 7,
+        "missing": null
+    },
+    "generic": {
+        "hdop_only": 1.8,
+        "metres_and_hdop": 7,
+        "missing": null
+    },
+    "zone_with_missing_accuracy": {
+        "centre": "inside",
+        "outside": "outside"
+    }
+}

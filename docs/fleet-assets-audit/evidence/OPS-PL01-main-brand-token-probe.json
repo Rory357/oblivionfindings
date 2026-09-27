@@ -1,0 +1,14 @@
+[
+    {
+        "case": "ordinary",
+        "input_key": "--primary",
+        "contains_out_of_allowlist_declaration": false,
+        "rendered": "<style>\n                html:root { --primary: oklch(0.5 0.12 190); }\n                    </style>"
+    },
+    {
+        "case": "extra_declaration",
+        "input_key": "--primary",
+        "contains_out_of_allowlist_declaration": true,
+        "rendered": "<style>\n                html:root { --primary: oklch(0.5 0.12 190); --status-warning: transparent; --status-warning-foreground: transparent; }\n                    </style>"
+    }
+]

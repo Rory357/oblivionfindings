@@ -1,0 +1,13 @@
+{
+  "candidate": "79ea01a561f7d2fa5affa592dc096f516d663635",
+  "publishedBase": "a6b9fae6a73516548b02e64c41cf1fc94ce43f01",
+  "localMain": "79ea01a561f7d2fa5affa592dc096f516d663635",
+  "remoteMain": "79ea01a561f7d2fa5affa592dc096f516d663635",
+  "tree": "496b55b3eb17934b07d408fc209209a37bde52f9",
+  "preservedPathCount": 70,
+  "changedProtectedPaths": [],
+  "integratedFrontendTests": 35,
+  "buildManifestSha256": "A0EF7FAB0846BC532076444C74117C95BC1DE534BEA551DEC5AF494E3F8B339E",
+  "deploymentPerformed": false,
+  "recordedAt": "2026-09-27T17:54:01.3805580+13:00"
+}

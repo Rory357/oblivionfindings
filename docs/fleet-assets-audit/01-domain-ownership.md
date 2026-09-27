@@ -1,6 +1,10 @@
 # Observed domain ownership
 
-Owner: MAIN ASTRA. Revision: 2. Updated: 2026-09-19.
+Owner: MAIN ASTRA. Revision: 3. Updated: 2026-09-22.
+
+## PKG-02B requested interfaces — design, not new canonical stores
+
+The [verified v12 scope/review](evidence/PKG-02B-main-v12-review.md) adds universal geofence and vehicle-checklist design requirements. Shared geometry/version/owner must reconcile AssetGeofence with existing Client Location assignments/history; profile selection, schedules and monitoring stay separate. Existing Maintenance/Fleet checklist ownership must supply configurable templates and immutable submissions; no competing library. Fleet retains vehicle/bookings/service/mileage evidence, shared Tasks/Calendar projects source-owned reminders, HR retains driver authority, Security & Devices supplies capability/provenance and Control Room owns alert triage/create-or-link Maintenance. Finance retains financial approval/posting. Stable permissioned catalogues and private versioned evidence need explicit reuse/persistence contracts before implementation. Mockup-local stores are not approved production ownership decisions. The original baseline map below remains historical evidence, not a claim that these requested interfaces are implemented.
 Status: Full audit source map; proposed contracts unapproved. Source: Revision 10 + A1/A2; local code baseline `19354ecbc70046d12dfdf9c86f888e65fa1879d1`.
 
 The following relationships are present at the recorded local baseline. “Present” does not mean the complete workflow passed. See the [full audit](10-full-audit.md) and [integration matrix](13-integration-matrix.md) for findings, evidence and target gaps.

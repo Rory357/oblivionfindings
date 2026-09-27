@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="PKG06BMainBoundaryTest" file="PKG06BMain Boundary" tests="2" assertions="17" errors="0" failures="1" skipped="0" time="343.873619">
+    <testcase name="Main ordinary component edit cannot split an active kit" file="PKG06BMain Boundary::Main ordinary component edit cannot split an active kit" class="PKG06BMainBoundaryTest" classname="PKG06BMainBoundaryTest" assertions="2" time="342.987242"/>
+    <testcase name="Main profile withholds reviews outside finance site scope" file="PKG06BMain Boundary::Main profile withholds reviews outside finance site scope" class="PKG06BMainBoundaryTest" classname="PKG06BMainBoundaryTest" assertions="15" time="0.886378">
+      <failure type="PHPUnit\Framework\ExpectationFailedException">Main profile withholds reviews outside finance site scopeProperty [workspace.finance_reviews] does not have the expected size.
+Failed asserting that actual size 1 matches expected size 0.&#13;
+at vendor\laravel\framework\src\Illuminate\Testing\Fluent\Concerns\Has.php:34
+at vendor\laravel\framework\src\Illuminate\Testing\Fluent\Concerns\Has.php:116
+at C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG06BMainBoundaryTest.php:76
+at vendor\inertiajs\inertia-laravel\src\Testing\TestResponseMacros.php:26
+at vendor\laravel\framework\src\Illuminate\Macroable\Traits\Macroable.php:132
+at vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:2059
+at C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG06BMainBoundaryTest.php:75</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

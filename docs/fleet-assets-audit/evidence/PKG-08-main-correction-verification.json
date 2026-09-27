@@ -1,0 +1,52 @@
+{
+  "candidate": "b07888e9b413696649ceceb03bbae3ee38edf166",
+  "base": "926b4981b0289da08a20baca0995117fb53e413e",
+  "parent": "322b4ebfdaf4a242d9bd705b5a6f958ca973f8ee",
+  "tree": "3b82fa66b5421a0e089e84bbb7cd6bd13671940f",
+  "correctionPaths": [
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/README.md",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser-map-fixture.php",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/fleet-map-repaired.png",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/map-provider-fallback.png",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/settings-implemented-final.png",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/vehicle-location-repaired.png",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/vehicle-trip-repaired.png",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/map-fixture-result.json",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/map-layout-fixture.tsx",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/map-layout.html",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/map-sdk-fixture.ts",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-build.txt",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-eslint.json",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-frontend-tests.json",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-populated-maps.json",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-preservation.json",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-rendered-map-results.json",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-typecheck.txt",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-zoom-blocker.json",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/source-manifest.json",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/vite.map-regression.mts",
+    "resources/js/components/leaflet-map.tsx"
+  ],
+  "mainHead": "926b4981b0289da08a20baca0995117fb53e413e",
+  "sourceFiles": 40,
+  "changedSourceFiles": 39,
+  "normalisedWorking": [],
+  "unchangedReferences": [
+    "app/Http/Controllers/FleetAssets/GeofenceController.php"
+  ],
+  "previewCounts": {
+    "v1": 70,
+    "v2": 85,
+    "v3": 46,
+    "v4": 65,
+    "v5": 75,
+    "v6": 96
+  },
+  "protectedReferences": 10,
+  "mismatches": [],
+  "unmanifested": [],
+  "status": "?? storage/framework/pkg08-map-regression/\n?? storage/framework/pkg08-vite/",
+  "sourceManifestGitSha256": "5de949ab7bb07afa9f1d094d1a6829ccf7f819bfe4ca07149d70c461f6772ca9",
+  "frozenManifestSha256": "50e3df5741943eb76cc2c2b78ccb750bb56ca9cffe58d9f022d134a78b89dfb7",
+  "frozenBundleSha256": "0851383d39dccf21d2618a4a8e9c622bc0e7fc1590960679a432531a2634a578"
+}

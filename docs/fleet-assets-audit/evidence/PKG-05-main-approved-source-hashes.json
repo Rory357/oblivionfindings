@@ -1,0 +1,194 @@
+[
+  {
+    "Path": "app/Http/Controllers/ClientController.php",
+    "SHA256": "4417F31FEA3B02D4142FC2F5CB423EBB30689364681C5D35D6B1126718182825"
+  },
+  {
+    "Path": "app/Http/Controllers/FleetAssets/HandoverController.php",
+    "SHA256": "91AB9F3CFC089C45575D5AC86C3A85AFAE77568A8708639BB8811B0F1C662198"
+  },
+  {
+    "Path": "app/Http/Controllers/FleetAssets/TransportWorkspaceController.php",
+    "SHA256": "4E3A402601CEF8900696702CDDB7CEEC3B9F0504DFAE18F246CFBA1B6AA437C8"
+  },
+  {
+    "Path": "app/Http/Controllers/FleetAssets/VehicleBookingController.php",
+    "SHA256": "915312FFCE926475DA81B229C80C11F12990F8E603D6C0A9ECD2861EA4618571"
+  },
+  {
+    "Path": "app/Http/Controllers/Operations/ClientTransportBookingController.php",
+    "SHA256": "A0A83E2B23FD15A6616CD09BFC1212D55F3378B3956002EF557A6BB865DA54DB"
+  },
+  {
+    "Path": "app/Models/ClientTransportBooking.php",
+    "SHA256": "AF1F4FEAE69B4AA5B45CD270222A920B76D1C9AFF4ABA200F8B84D22D2A87ADC"
+  },
+  {
+    "Path": "app/Models/FleetKeyLog.php",
+    "SHA256": "6770FC783116B8B19CEC8A0BB102E113D36258CC858DF481CBF02D9A634F5366"
+  },
+  {
+    "Path": "app/Models/FleetResidentTransport.php",
+    "SHA256": "7981D38DC4C745980BD06D90A50712E5C639ECE4A8303E5C88453785C001897F"
+  },
+  {
+    "Path": "app/Models/FleetShiftHandover.php",
+    "SHA256": "261A0252E24D453D8E66ADF1DD6ADFB2E640A4C3108A90EBA6F5DEBFBE000AF6"
+  },
+  {
+    "Path": "app/Models/TransportRequestEvent.php",
+    "SHA256": "1C719889B54EF00F979F28E8C128762A8BEF62221B83A13C73C02808A55FD0D9"
+  },
+  {
+    "Path": "app/Services/Fleet/ResidentTransportJourneyScope.php",
+    "SHA256": "AB95C1F1924AF25A1874F06E40478098B0B223D91D44EC77FB9C9886CA8A952F"
+  },
+  {
+    "Path": "app/Services/Fleet/ResidentTransportJourneyService.php",
+    "SHA256": "1DC99330F8F98A6EA8292B900B99CA671118922C00353ACA01DEA6A58B9EA4FC"
+  },
+  {
+    "Path": "app/Services/Fleet/TransportRequestService.php",
+    "SHA256": "4B124CED163186B29C07391AFABDCC315AD7C22B34DE2264ADC5E347D6D83DC2"
+  },
+  {
+    "Path": "app/Services/Fleet/TransportWorkspacePresenter.php",
+    "SHA256": "BA7BD9DD533880C90CCA80A5312BD2FDEA6A03B2ED27200360C5F6A3FB8CFD75"
+  },
+  {
+    "Path": "app/Services/Fleet/VehicleCalendarService.php",
+    "SHA256": "6F320E0E8DAB6F15F69FB3A13076610E0A0090D27AE7C4D905BE988CCB9E5C69"
+  },
+  {
+    "Path": "database/migrations/2026_09_27_120000_add_transport_workspace_contracts.php",
+    "SHA256": "5048B283E38C99EA8D6F51C0FE45DA019E4EC92A297F452B17C686C2DC52A476"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx",
+    "SHA256": "DBA91178FC47277EE28E88FF595B708A882873D98B4E784F18AC24AC9716C5EA"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/maintenance/date-picker.tsx",
+    "SHA256": "1412AB76826CABBEDB1BAC5DBB5A4975AF68655602A1F8C28EC7BCBF61CDED4E"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/transport/calendar-actions.test.ts",
+    "SHA256": "3FF0481135F5CF684BE205E8C6FAE49F659EA297256D3ED83D6E9FF55A13D2C7"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/transport/calendar-actions.ts",
+    "SHA256": "D03B8713C306234AF9DC272F52B9391036675A1644AB9E70F49FDB7365F8B4B9"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/transport/calendar.tsx",
+    "SHA256": "D369E7004BA572B8FCA8D85F0B72E5597F799F3DF083AA8E883720CEE5AF8ABA"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/transport/dialogs.tsx",
+    "SHA256": "935C56E7126170630F79D19A25C9F4A65E68420D546A91929BC320FBEC948552"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/transport/model.test.ts",
+    "SHA256": "A8B1D4FF60CD2122450BC9EC244364B84AC5C1BA317366EF452250EB148E6D35"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/transport/model.ts",
+    "SHA256": "8211994982A9554FDFAD9BD27C338541EB137FA1E8C9E902772FB0E481BE23F4"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/transport/overview.tsx",
+    "SHA256": "F5E44E47A61A91EB691ECEEE5118C66D871CB8AD140ACEB0B96C25B8FB5DDE1F"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/transport/planner.tsx",
+    "SHA256": "758FBEA7CCF40C34C4F434AD2784ECFB6037653B00A57136B4C21C0DA6C02C33"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/transport/record-detail.tsx",
+    "SHA256": "32A59C86E87A8301DD4CED7E0EB545CBFF5089EB1ECF5875E4F63C0990B5DE0F"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/transport/reschedule-dialog.tsx",
+    "SHA256": "6E42B089EA05D6DF66C6DF8AFEB194298ED82D7308D1484933F14C88BFCF74FD"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/transport/transport.css",
+    "SHA256": "BDB4DC2C49C771D978CB70855242AF0BAAC67895056390C0FA1159E3359C4ECC"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/transport/types.ts",
+    "SHA256": "ED7B4D27D89B9CFEBC424DF662A872828F023327C857490AA8F5633786469E70"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/transport/ui.tsx",
+    "SHA256": "29E44E02DDE0859D5E252057E3A247D69DC900E3A8B4BB7B57FEFEC1EF011BD4"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/vehicle-workspace/add-evidence-dialog.tsx",
+    "SHA256": "1EC0D77352A1D66C88FF01FD7DAFCC0C6C6D0467F9FFA338129F85681DFD6AAD"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/vehicle-workspace/booking-decision-wizard.tsx",
+    "SHA256": "5C42BCA7BB55559EF3D5BD334B174F207CD63E1E817DED634CC173E618E5882D"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/vehicle-workspace/calendar-types.ts",
+    "SHA256": "65825A7C6ED39E6D20184D8F9DBD876F16318E7A30D340A8078FC3B1A7E027A1"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/vehicle-workspace/search-select.tsx",
+    "SHA256": "D86BC80CA8A2DD3CC733F0AD3169749880E1437F787DD4682E3FE30CD19FE2A6"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/vehicle-workspace/vehicle-calendar.tsx",
+    "SHA256": "D5396FAE9F4863DEA7997782EC0F7C3AF3F6D1AE32AE643D6E255604CCBDCB9A"
+  },
+  {
+    "Path": "resources/js/components/fleet-assets/vehicle-workspace/wizard-kit.tsx",
+    "SHA256": "8493558C1C97D123C79286B738DB229CA5163C3D1C9DAD28DD7D49D95DF1A598"
+  },
+  {
+    "Path": "resources/js/lib/fleet-navigation.ts",
+    "SHA256": "053211462B410EFFB91EA21E28094937AE2ED6E1BEE45F6FC1A4CFD2D28A0BED"
+  },
+  {
+    "Path": "resources/js/pages/fleet-assets/bookings/show.tsx",
+    "SHA256": "87F7D97FBDF6E90E1330EBCB4DA661CAAE726C6A386B432CAB0EA7B7F17AE2A4"
+  },
+  {
+    "Path": "resources/js/pages/fleet-assets/handovers/index.tsx",
+    "SHA256": "45B4FFF7CB060F2BF434491F8F820A7569A3936B52C7CFCBD838229CD2D72D50"
+  },
+  {
+    "Path": "resources/js/pages/fleet-assets/transports/record.tsx",
+    "SHA256": "D630B34A49945219FE4E1E88E0AA10F20ADA6E6BE973D9B6E7A459F1D300F65C"
+  },
+  {
+    "Path": "resources/js/pages/fleet-assets/transports/workspace.tsx",
+    "SHA256": "65642C12C6F8263AC05B72B8E14DBB4C02812043CF7DEEA42B34E8540208380B"
+  },
+  {
+    "Path": "resources/js/pages/operations/clients/show.tsx",
+    "SHA256": "68A718256F81E5B4DFBEFD05AB0BF8C1396211218FE7E31E1CA492B1B6D19E04"
+  },
+  {
+    "Path": "resources/js/pages/sites/calendar/_parts.tsx",
+    "SHA256": "3FC796C01C44962029B196EDB19E63C38C33898968B528EA0561AF2CFD1118B1"
+  },
+  {
+    "Path": "resources/views/pdf/transport-workspace.blade.php",
+    "SHA256": "2C0FC4BD493B710212A8A0B406342BB034CDDD0D31DE177BEB5F28B88919FD96"
+  },
+  {
+    "Path": "routes/fleet-assets.php",
+    "SHA256": "AD524D59C77E638646E897AF45AA490A951B1DD5F10E2438CF84A3E13471755F"
+  },
+  {
+    "Path": "tests/Feature/FleetAssets/TransportWorkspaceTest.php",
+    "SHA256": "412D932B8F2C521771BAAA660B5A48478FC14F15DE0FD4CD2774E731A839F949"
+  },
+  {
+    "Path": "tsconfig.transport-check.json",
+    "SHA256": "781AE365EED5DAE6CD02267F913707C7EE8D623331E949E67642A4CE613D00F1"
+  }
+]

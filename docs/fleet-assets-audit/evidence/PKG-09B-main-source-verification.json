@@ -1,0 +1,20 @@
+{
+  "candidate": "e4bb17b56405a748072bf83e8c30af323822e0bc",
+  "base": "926b4981b0289da08a20baca0995117fb53e413e",
+  "workingHead": "e4bb17b56405a748072bf83e8c30af323822e0bc",
+  "sourceFiles": 46,
+  "payloadFiles": 94,
+  "frozenFiles": 122,
+  "normalisedGit": [
+    "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/acceptance-verified.log",
+    "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/production-build-final.log",
+    "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-acceptance-tests.log",
+    "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-baseline.log",
+    "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-build.log",
+    "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-export-final.log",
+    "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-scope-tests.log"
+  ],
+  "mismatches": [],
+  "undeclared": [],
+  "checkedAt": "2026-09-27T21:53:00.292Z"
+}
