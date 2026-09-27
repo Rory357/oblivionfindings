@@ -1,0 +1,264 @@
+{
+  "calendar_save_undo": {
+    "results": [
+      "Reviewed Month drag saves through the canonical booking command",
+      "Saved Month move has the proposed Auckland date",
+      "Move preserves canonical booking identity and unrelated fields",
+      "Reviewed Undo saves against the freshly loaded version",
+      "Undo restores the original window and records both versioned changes",
+      "Undo also preserves canonical fields",
+      "Fleet source page hides incompatible legacy forms for linked bookings",
+      "Fleet handoff opens the authorised current Transport record"
+    ],
+    "beforeVersion": 3,
+    "restoredVersion": 5
+  },
+  "calendar_time_grid": {
+    "results": [
+      "Week pointer move proposes a departure one hour later",
+      "Week pointer move preserves the original duration",
+      "Started journeys have no move or resize handle",
+      "Day resize preserves departure",
+      "Day resize proposes a later return",
+      "Overlapping resize is rejected by canonical availability checks",
+      "A rejected save retains the reviewed draft",
+      "Cancelled movement and rejected resize leave the persisted booking unchanged"
+    ]
+  },
+  "modals": {
+    "results": [
+      {
+        "width": 1280,
+        "height": 800,
+        "fits": true,
+        "footerVisible": true
+      },
+      {
+        "width": 1366,
+        "height": 768,
+        "fits": true,
+        "footerVisible": true
+      },
+      {
+        "width": 1440,
+        "height": 1000,
+        "fits": true,
+        "footerVisible": true
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "fits": true,
+        "footerVisible": true
+      }
+    ],
+    "aria": {
+      "label": "radix-_r_1b_",
+      "title": "Charlie Example · TR-11"
+    },
+    "sections": "Journey, return, links and searchable history verified",
+    "simpleNote": "Correct tier; dirty draft retained or discarded explicitly"
+  },
+  "layout": {
+    "results": [
+      {
+        "view": "overview",
+        "width": 1280,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "overview",
+        "width": 1366,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "overview",
+        "width": 1440,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "overview",
+        "width": 1920,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "requests",
+        "width": 1280,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "requests",
+        "width": 1366,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "requests",
+        "width": 1440,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "requests",
+        "width": 1920,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "planner",
+        "width": 1280,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "planner",
+        "width": 1366,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "planner",
+        "width": 1440,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "planner",
+        "width": 1920,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "calendar",
+        "width": 1280,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "calendar",
+        "width": 1366,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "calendar",
+        "width": 1440,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "calendar",
+        "width": 1920,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "journeys",
+        "width": 1280,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "journeys",
+        "width": 1366,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "journeys",
+        "width": 1440,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "journeys",
+        "width": 1920,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "returns",
+        "width": 1280,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "returns",
+        "width": 1366,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "returns",
+        "width": 1440,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      },
+      {
+        "view": "returns",
+        "width": 1920,
+        "heroToHeadingGap": 18,
+        "canonicalGap": 18,
+        "sectionBelowHeading": true,
+        "overflow": false
+      }
+    ],
+    "errors": [],
+    "warnings": [],
+    "passed": true
+  },
+  "build_manifest_sha256": "b2d9f3ec6661938c73cfdb343e981e2fad6375b05b3ee9eb1ca61681a459c768",
+  "comparison_base": "ba5bff2e8b6c22796369443f1cdac918039950dd",
+  "verified_at": "2026-09-27T17:12:22+13:00"
+}

@@ -1,0 +1,31 @@
+async (page) => {
+ const results=[],root='C:/Users/steph/.codex/worktrees/b9b9/oblivionfindings/docs/fleet-assets-audit/previews/PKG-05/v2/iterations/01-workflow/';
+ const check=(name,pass,detail='')=>{results.push({name,pass:!!pass,detail});if(!pass)throw Error(name)};
+ const main=()=>page.locator('main').innerText(),role=async v=>page.getByRole('combobox',{name:'Preview role'}).selectOption(v);
+ const go=async(path)=>{await page.evaluate(p=>location.hash='/fleet-assets/transports/'+p,path);await page.waitForTimeout(80)};
+ const choose=async(label,name)=>{await page.getByRole('combobox',{name:label,exact:true}).click();await page.getByRole('option').filter({hasText:name}).click()};
+ page.setDefaultTimeout(7000);await page.goto('http://127.0.0.1:4396/#/fleet-assets/transports/overview');await page.reload();
+ await role('driver');await go('requests/TR-1042');
+ check('R1-01 Unassessed direct request has no driver checkout action',await page.getByRole('button',{name:'Collect keys & equipment',exact:true}).count()===0&&await page.getByRole('button',{name:'Record departure',exact:true}).count()===0);
+ await role('allocator');await go('bookings/BK-210');
+ check('R1-02 Pending booking does not claim confirmed preparation',(await main()).includes('Proposed booking · decision required')&&!(await main()).includes('Confirmed plan'));
+ await role('approver');await page.getByRole('button',{name:'Reject booking',exact:true}).click();await page.getByLabel('Reason for rejecting this booking').fill('Driver availability needs a different window.');await page.getByRole('dialog').getByRole('button',{name:'Reject booking',exact:true}).click();
+ check('R1-03 Rejection retains demand for reallocation',(await main()).includes('Rejected booking')&&(await main()).includes('Awaiting allocation'));
+ await go('bookings/BK-212');check('R1-04 Source not-required authority discoverable',(await main()).includes('Approval not required')&&(await main()).includes('recorded source reason and authority'));
+ await role('allocator');await go('overview');await page.getByRole('button',{name:'Request transport',exact:true}).click();
+ await choose('Passenger','Jordan Lee');check('R1-05 Passenger change resets matching site',(await page.getByRole('combobox',{name:'Request site',exact:true}).innerText()).includes('Kōwhai House')&&await page.getByLabel('Pickup point',{exact:true}).inputValue()==='Kōwhai House');
+ await page.getByLabel('Purpose',{exact:true}).fill('Library visit');await page.getByLabel('Destination',{exact:true}).fill('West library');await page.getByRole('button',{name:'Review request',exact:true}).click();
+ check('R1-06 Review includes complete route and support',(await page.getByRole('dialog').innerText()).includes('Kōwhai House → West library')&&(await page.getByRole('dialog').innerText()).includes('including driver'));
+ await page.screenshot({path:root+'request-review.png'});await page.getByRole('button',{name:'Submit transport request',exact:true}).click();
+ check('R1-07 New request starts without old note/history',(await main()).includes('Needs assessment')&&(await main()).includes('0 notes · 0 files'));
+ await page.getByRole('button',{name:'Cancel / not fulfilled',exact:true}).click();await choose('Outcome','Client chose not to travel');await page.getByLabel('Outcome reason',{exact:true}).fill('Client chose a different activity.');await page.getByRole('button',{name:'Record outcome',exact:true}).click();
+ check('R1-08 Cancellation is a demand outcome without false progress',(await main()).includes('Client chose not to travel')&&await page.getByRole('list',{name:'Trip progress'}).count()===0);
+ await role('driver');await go('bookings/BK-212');await page.getByRole('button',{name:'Complete vehicle check',exact:true}).click();await page.getByLabel('Check observation').fill('Passed source check.');await page.getByRole('button',{name:'Submit vehicle check',exact:true}).click();await page.getByRole('button',{name:'Collect keys & equipment',exact:true}).click();await choose('Actual giver','Ben Carter');await page.getByLabel('Keys physically received',{exact:true}).check();await page.getByRole('button',{name:'Record checkout',exact:true}).click();
+ check('R1-09 Unchecked equipment blocks checkout',(await page.getByRole('dialog').innerText()).includes('Confirm actual keys and required equipment received.'));
+ await page.getByRole('button',{name:'Cancel',exact:true}).click();await page.getByRole('button',{name:'Discard changes',exact:true}).click();await page.getByRole('button',{name:'Collect keys & equipment',exact:true}).click();
+ check('R1-10 Discard removes draft selections',!(await page.getByLabel('Keys physically received',{exact:true}).isChecked())&&!(await page.getByRole('combobox',{name:'Actual giver',exact:true}).innerText()).includes('Ben Carter'));
+ await page.getByRole('button',{name:'Cancel',exact:true}).click();await go('journeys/J-99999');check('R1-11 Unknown journey never falls back to fixture',(await main()).includes('Record unavailable')&&!(await main()).includes('Sam Wilson'));
+ await go('overview');await page.getByRole('combobox',{name:'Date filter'}).selectOption('2026-09-29');check('R1-12 Empty overview explains selected scope',(await main()).includes('No transport in this scope'));
+ await page.screenshot({path:root+'empty-scope.png'});
+ return {round:1,results};
+}

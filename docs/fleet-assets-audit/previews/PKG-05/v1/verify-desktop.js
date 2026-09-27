@@ -1,0 +1,26 @@
+async(page)=>{
+ await page.bringToFront();await page.emulateMedia({reducedMotion:'reduce'});page.setDefaultTimeout(8000);
+ const out=[],b=n=>page.getByRole('button',{name:n,exact:true}),seen=async t=>page.getByText(t,{exact:false}).first().waitFor({state:'visible',timeout:5000});
+ await page.goto('http://127.0.0.1:4395/');
+ for(const [width,height] of [[1280,800],[1440,1000],[1920,1080]]){
+  await page.setViewportSize({width,height});await page.waitForTimeout(100);
+  const g=await page.evaluate(()=>({width:innerWidth,height:innerHeight,scroll:document.documentElement.scrollWidth}));if(g.scroll>g.width+1)throw Error('Horizontal overflow '+width);
+  await page.screenshot({path:'screenshots/desktop-'+width+'.png'});out.push(g);
+ }
+ await page.setViewportSize({width:1440,height:1000});await b('My Day').click();await b('View request').click();await b('Back to My Day').click();await seen('Your transport work');
+ await b('Sites & Locations').click();await b('View request').click();await b('Back to Aurora House').click();await seen('Transport at Aurora House');
+ await b('Operations').click();await b('View request').click();await b('Back to client').click();await seen('Transport for Alex');out.push('My Day, Site and Client entry/return preserved');
+ await b('Request from this context').click();await seen('Client context · Alex Morgan');await b('Close').click();
+ await b('Fleet',{exact:true}).last().click();await b('Request transport').first().click();
+ await page.getByLabel('Purpose',{exact:true}).fill('Community workshop');await b('Close').click();await b('Keep draft and close').click();await b('Resume draft').click();if(await page.getByLabel('Purpose',{exact:true}).inputValue()!=='Community workshop')throw Error('Draft lost');
+ await page.getByRole('combobox',{name:'Client',exact:true}).focus();await page.keyboard.press('Enter');await page.getByPlaceholder('Search client…').fill('Jordan');await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');await seen('Jordan Lee');
+ await page.getByRole('combobox',{name:'Pickup site',exact:true}).click();await page.keyboard.press('Escape');if(!(await page.getByRole('dialog',{name:'Request transport',exact:true}).isVisible()))throw Error('Escape closed parent');
+ await b('Continue').click();await page.getByRole('button',{name:/Pickup date:/}).click();await b('Use date').click();await page.getByRole('button',{name:/Pickup time:/}).click();await b('Type time').click();await page.getByLabel('Pickup time hour',{exact:true}).fill('10');await page.getByLabel('Pickup time minute',{exact:true}).fill('15');await b('Use time').click();
+ await b('Continue').click();await seen('10:15 AM');await page.screenshot({path:'screenshots/18-request-review.png'});
+ await b('Submit request').click();await seen('Transport requested');await b('Check original attempt').click();await seen('No duplicate created');await b('Open record').click();await seen('TR-1044');await seen('Community workshop');await seen('Unassigned');out.push('Request before allocation: retained draft, searchable keyboard picker, nested Escape, shared calendar/time picker, review, original request retry');
+ await b('Record outcome').click();await page.getByRole('radio',{name:/Client chose not to travel/}).click();await page.getByLabel('Reason',{exact:true}).fill('Client chose a different activity.');await page.getByRole('dialog').getByRole('button',{name:'Record outcome',exact:true}).click();await seen('Cancellation recorded');await b('View recorded outcome').click();await b('Activity & history').click();await seen('Client chose not to travel');out.push('Client choice is retained in outcome history');
+ for(const [choice,expected] of [['Requester cancelled','Cancellation recorded'],['No suitable transport','Not fulfilled']]){await page.goto('http://127.0.0.1:4395/');await page.getByRole('row').filter({hasText:'TR-1042'}).click();await b('Record outcome').click();await page.getByRole('radio',{name:new RegExp(choice)}).click();await page.getByLabel('Reason',{exact:true}).fill(choice+' — synthetic reason');await page.getByRole('dialog').getByRole('button',{name:'Record outcome',exact:true}).click();await seen(expected);out.push(choice+' distinct outcome');}
+ await page.goto('http://127.0.0.1:4395/');await b('Request transport').first().click();for(let i=0;i<22;i++)await page.keyboard.press('Tab');let trapped=await page.evaluate(()=>!!document.activeElement.closest('[role=dialog]'));if(!trapped)throw Error('Focus left wizard');for(let i=0;i<22;i++)await page.keyboard.press('Shift+Tab');trapped=await page.evaluate(()=>!!document.activeElement.closest('[role=dialog]'));if(!trapped)throw Error('Reverse focus left wizard');await page.keyboard.press('Escape');const focus=await page.evaluate(()=>document.activeElement.textContent);out.push({focusReturn:focus,focusTrapBothDirections:true});
+ await b('Preview scenarios').click();await b('Limited passenger context').click();await page.getByRole('searchbox').fill('Alex Morgan');await b('Clear filters').click();const text=await page.locator('body').innerText();if(/Alex Morgan|Jordan Lee/.test(text))throw Error('Clear filter privacy regression');out.push('Limited context remains limited after clearing filters');
+ await page.goto('http://127.0.0.1:4395/');return out;
+}

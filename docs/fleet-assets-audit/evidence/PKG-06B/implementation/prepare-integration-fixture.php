@@ -34,7 +34,7 @@ $app = require 'bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 $user = User::whereKey($fixture['user'])->where('email', 'pkg06b-verification@example.invalid')->firstOrFail();
 $asset = Asset::findOrFail($fixture['asset']);
-foreach (['2026_09_26_000100_pkg02b_appointment_command_receipts.php', '2026_09_27_000100_add_receipt_confirmation_to_asset_assignments.php'] as $file) {
+foreach (['2026_09_26_000100_pkg02b_appointment_command_receipts.php', '2026_09_27_000100_add_receipt_confirmation_to_asset_assignments.php', '2026_09_27_120000_add_transport_workspace_contracts.php'] as $file) {
     Artisan::call('migrate', ['--path' => 'database/migrations/'.$file, '--force' => true]);
 }
 $assignment = $asset->assignments()->whereNull('released_at')->first();

@@ -14,6 +14,9 @@ class FleetShiftHandover extends Model
     use WritesLegacyStorageContext;
 
     protected $fillable = [
+        'booking_id',
+        'request_key',
+        'request_fingerprint',
         'asset_id',
         'outgoing_user_id',
         'incoming_user_id',

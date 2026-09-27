@@ -56,6 +56,7 @@ export function WorkspaceWizard({
     onReload,
     success,
     errorKey,
+    freeNavigation = false,
     children,
 }: {
     title: string;
@@ -79,6 +80,8 @@ export function WorkspaceWizard({
     success: ReactNode;
     /** Changes whenever the visible errors change; moves focus to the first invalid field. */
     errorKey: string;
+    /** Section navigation is free; Continue and Submit still validate. */
+    freeNavigation?: boolean;
     children: ReactNode;
 }) {
     const [discard, setDiscard] = useState(false);
@@ -114,7 +117,8 @@ export function WorkspaceWizard({
                 stepIndex={step}
                 onStepClick={(next) => {
                     if (command.locked) return;
-                    if (next < step || onValidateStep(step)) setStep(next);
+                    if (freeNavigation || next < step || onValidateStep(step))
+                        setStep(next);
                 }}
                 pct={pct}
                 footerStart={

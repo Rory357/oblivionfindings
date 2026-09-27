@@ -20,6 +20,7 @@ export function DatePicker({
     invalid,
     describedBy,
     allowClear = false,
+    trigger,
 }: {
     id: string;
     label: string;
@@ -28,6 +29,7 @@ export function DatePicker({
     invalid?: boolean;
     describedBy?: string;
     allowClear?: boolean;
+    trigger?: React.ReactNode;
 }) {
     const isMobile = useIsMobile();
     const [open, setOpen] = useState(false);
@@ -40,26 +42,28 @@ export function DatePicker({
     return (
         <Popover open={open} onOpenChange={changeOpen}>
             <PopoverTrigger asChild>
-                <Button
-                    type="button"
-                    id={id}
-                    variant="outline"
-                    className="time-picker-trigger"
-                    aria-label={`${label}: ${value ? formatDateOnly(value) : 'Choose date'}`}
-                    aria-invalid={invalid}
-                    aria-describedby={describedBy}
-                >
-                    <span className="time-picker-icon">
-                        <CalendarDays className="size-4" />
-                    </span>
-                    <span>
-                        <strong>
-                            {value ? formatDateOnly(value) : 'Choose date'}
-                        </strong>
-                        <small>Choose a day on the calendar</small>
-                    </span>
-                    <ChevronDown className="size-4" />
-                </Button>
+                {trigger ?? (
+                    <Button
+                        type="button"
+                        id={id}
+                        variant="outline"
+                        className="time-picker-trigger"
+                        aria-label={`${label}: ${value ? formatDateOnly(value) : 'Choose date'}`}
+                        aria-invalid={invalid}
+                        aria-describedby={describedBy}
+                    >
+                        <span className="time-picker-icon">
+                            <CalendarDays className="size-4" />
+                        </span>
+                        <span>
+                            <strong>
+                                {value ? formatDateOnly(value) : 'Choose date'}
+                            </strong>
+                            <small>Choose a day on the calendar</small>
+                        </span>
+                        <ChevronDown className="size-4" />
+                    </Button>
+                )}
             </PopoverTrigger>
             <PopoverContent
                 className="date-picker-popover"

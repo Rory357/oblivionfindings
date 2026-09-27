@@ -1,0 +1,22 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\8821\oblivionfindings\phpunit.pkg06b.xml
+
+...................................................[41;37mF[0m...........   63 / 63 (100%)
+
+Time: 08:38.375, Memory: 174.00 MB
+
+There was 1 failure:
+
+1) Tests\Feature\FleetAssets\TransportWorkspaceTest::test_allocation_is_atomic_and_changes_keep_the_booking_identity
+Expected response status code [200] but received 404.
+Failed asserting that 404 is identical to 200.
+
+C:\Users\steph\.codex\worktrees\8821\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\Users\steph\.codex\worktrees\8821\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:176
+C:\Users\steph\.codex\worktrees\8821\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\Concerns\AssertsStatusCodes.php:16
+C:\Users\steph\.codex\worktrees\8821\oblivionfindings\tests\Feature\FleetAssets\TransportWorkspaceTest.php:95
+
+[37;41mFAILURES![0m
+[37;41mTests: 63[0m[37;41m, Assertions: 1451[0m[37;41m, Failures: 1[0m[37;41m.[0m

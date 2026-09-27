@@ -18,7 +18,7 @@ describe('canonical assignment custody', () => {
                 receipt_confirmed_at: null,
                 recipient_visible: true,
             },
-        } as Props['asset'];
+        } as unknown as Props['asset'];
         const data = {
             ready: true,
             permissions: { manageAssignments: true },

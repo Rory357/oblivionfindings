@@ -1,0 +1,59 @@
+{
+  "results": [
+    {
+      "name": "qa-filtered-returns.pdf valid PDF",
+      "pass": true
+    },
+    {
+      "name": "qa-filtered-history.pdf valid PDF",
+      "pass": true
+    },
+    {
+      "name": "qa-full-return.pdf valid PDF",
+      "pass": true
+    },
+    {
+      "name": "qa-vehicle-history.pdf valid PDF",
+      "pass": true
+    },
+    {
+      "name": "qa-macron.pdf valid PDF",
+      "pass": true
+    },
+    {
+      "name": "Return export includes only matching passenger",
+      "pass": true
+    },
+    {
+      "name": "History export obeys search",
+      "pass": true
+    },
+    {
+      "name": "Full record export includes receipt and separate storage observation",
+      "pass": true
+    },
+    {
+      "name": "Unicode arrow and fraction remain intact",
+      "pass": true
+    },
+    {
+      "name": "Vehicle history export contains only the filtered leg",
+      "pass": true
+    },
+    {
+      "name": "Site macron survives PDF export",
+      "pass": true
+    },
+    {
+      "name": "All exports free of encoding corruption",
+      "pass": true
+    }
+  ],
+  "pages": {
+    "qa-filtered-returns.pdf": 1,
+    "qa-filtered-history.pdf": 1,
+    "qa-full-return.pdf": 2,
+    "qa-vehicle-history.pdf": 1,
+    "qa-macron.pdf": 1
+  }
+}

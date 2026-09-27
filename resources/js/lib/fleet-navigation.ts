@@ -5,6 +5,7 @@ import {
     Map,
     Package,
     Truck,
+    Route,
     Wrench,
     type LucideIcon,
 } from 'lucide-react';
@@ -70,7 +71,7 @@ const link = (
     visible,
 });
 
-/** The seven workspaces and their short contextual menus share one route map. */
+/** Workspaces and their short contextual menus share one route map. */
 export const FLEET_WORKSPACES: FleetWorkspace[] = [
     {
         key: 'overview',
@@ -111,14 +112,6 @@ export const FLEET_WORKSPACES: FleetWorkspace[] = [
             { label: 'Vehicles', links: [link('Vehicles', 'vehicles', fleet)] },
             { label: 'Bookings', links: [link('Bookings', 'bookings')] },
             {
-                label: 'Transport',
-                links: [
-                    link('Transport journeys', 'transports'),
-                    link('Outings', 'outings'),
-                    link('Medication transit', 'transports/medications'),
-                ],
-            },
-            {
                 label: 'Operating records',
                 links: [
                     link('Trips', 'trips', fleet),
@@ -138,6 +131,27 @@ export const FLEET_WORKSPACES: FleetWorkspace[] = [
                     link('Shift handovers', 'handovers'),
                 ],
             },
+        ],
+    },
+    {
+        key: 'transport',
+        label: 'Transport',
+        icon: Route,
+        landings: ['/fleet-assets/transports/overview'],
+        groups: [
+            { label: 'Transport workspace', links: [
+                link('Overview', 'transports/overview'),
+                link('Requests & approvals', 'transports/requests'),
+                link('Planner', 'transports/planner'),
+                link('Calendar', 'transports/calendar'),
+                link('Journeys', 'transports/journeys'),
+                link('Returns & handovers', 'transports/returns'),
+            ] },
+            { label: 'Connected records', links: [
+                link('All journey records', 'transports'),
+                link('Outings', 'outings'),
+                link('Medication transit', 'transports/medications'),
+            ] },
         ],
     },
     {

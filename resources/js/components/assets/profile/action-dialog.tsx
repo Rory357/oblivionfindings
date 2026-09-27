@@ -5,7 +5,6 @@ import {
 } from '@/components/fleet-assets/vehicle-workspace/record-command';
 import { VehicleSearchSelect as SearchSelect } from '@/components/fleet-assets/vehicle-workspace/search-select';
 import { WorkspaceWizard } from '@/components/fleet-assets/vehicle-workspace/wizard-kit';
-import { formatDateOnly } from '@/lib/datetime';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +14,7 @@ import {
     ReviewRow,
     WizardSuccessPane,
 } from '@/components/wizard/shell';
+import { formatDateOnly } from '@/lib/datetime';
 import {
     ArrowRightLeft,
     CheckCircle,

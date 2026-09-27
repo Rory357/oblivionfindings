@@ -1,0 +1,55 @@
+### Result
+{"results":[{"name":"V-overview Header has meaningful current scope meters","pass":true,"detail":""},{"name":"V-overview No page-wide horizontal overflow","pass":true,"detail":""},{"name":"V-requests Header has meaningful current scope meters","pass":true,"detail":""},{"name":"V-requests No page-wide horizontal overflow","pass":true,"detail":""},{"name":"V-planner Header has meaningful current scope meters","pass":true,"detail":""},{"name":"V-planner No page-wide horizontal overflow","pass":true,"detail":""},{"name":"V-journeys Header has meaningful current scope meters","pass":true,"detail":""},{"name":"V-journeys No page-wide horizontal overflow","pass":true,"detail":""},{"name":"V-returns Header has meaningful current scope meters","pass":true,"detail":""},{"name":"V-returns No page-wide horizontal overflow","pass":true,"detail":""},{"name":"V11 Journey route no longer collides with its heading","pass":true,"detail":"{\"headerBottom\":634.421875,\"routeTop\":652.421875,\"width\":567.875}"},{"name":"V12 Return banner has working context actions","pass":true,"detail":""},{"name":"V-journey-1280 Return action visible without scrolling","pass":true,"detail":"{\"x\":1110.734375,\"y\":388.40625,\"width\":118.265625,\"height\":42}"},{"name":"V-journey-1280 No page overflow","pass":true,"detail":""},{"name":"V-planner-1280 Workbench remains within viewport width","pass":true,"detail":""},{"name":"V-journey-1024 Return action visible without scrolling","pass":true,"detail":"{\"x\":854.734375,\"y\":374.140625,\"width\":118.265625,\"height\":42}"},{"name":"V-journey-1024 No page overflow","pass":true,"detail":""},{"name":"V-planner-1024 Workbench remains within viewport width","pass":true,"detail":""},{"name":"V-journey-1920 Return action visible without scrolling","pass":true,"detail":"{\"x\":1739.734375,\"y\":392.75,\"width\":118.265625,\"height\":42}"},{"name":"V-journey-1920 No page overflow","pass":true,"detail":""},{"name":"V-planner-1920 Workbench remains within viewport width","pass":true,"detail":""},{"name":"V22 Assessment meter count matches the queue","pass":true,"detail":""},{"name":"V23 Assessment/information meter matches two requests","pass":true,"detail":""},{"name":"V24 Out-of-site passenger absent from requester queue","pass":true,"detail":""},{"name":"V25 Direct out-of-site link has no passenger data","pass":true,"detail":""},{"name":"V26 Unknown journey does not resolve to another passenger","pass":true,"detail":""},{"name":"V27 Denied view suppresses counts and passenger details","pass":true,"detail":""},{"name":"V28 Stale results have an explicit refresh action","pass":true,"detail":""},{"name":"V29 Stale menu has no mutating actions","pass":true,"detail":""},{"name":"V30 Unconfigured staff authority is explicit and blocks return","pass":true,"detail":""},{"name":"V31 No runtime page errors","pass":true,"detail":"[]"},{"name":"V32 Preview requests stay local and read-only","pass":true,"detail":"[{\"url\":\"http://127.0.0.1:4397/\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/dist/app.css\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/preview.css\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/refinement.css\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/dist/app.js\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/dist/app.css\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/preview.css\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/refinement.css\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/dist/app.js\",\"method\":\"GET\"}]"}],"errors":[],"requests":[{"url":"http://127.0.0.1:4397/","method":"GET"},{"url":"http://127.0.0.1:4397/dist/app.css","method":"GET"},{"url":"http://127.0.0.1:4397/preview.css","method":"GET"},{"url":"http://127.0.0.1:4397/refinement.css","method":"GET"},{"url":"http://127.0.0.1:4397/dist/app.js","method":"GET"},{"url":"http://127.0.0.1:4397/","method":"GET"},{"url":"http://127.0.0.1:4397/dist/app.css","method":"GET"},{"url":"http://127.0.0.1:4397/preview.css","method":"GET"},{"url":"http://127.0.0.1:4397/refinement.css","method":"GET"},{"url":"http://127.0.0.1:4397/dist/app.js","method":"GET"}]}
+### Ran Playwright code
+```js
+await (async(page)=>{
+ const results=[],root='C:/Users/steph/.codex/worktrees/b9b9/oblivionfindings/docs/fleet-assets-audit/previews/PKG-05/v3/',errors=[],requests=[];
+ const onError=e=>errors.push(e.message),onRequest=r=>requests.push({url:r.url(),method:r.method()});page.on('pageerror',onError);page.on('request',onRequest);
+ const check=(name,pass,detail='')=>{results.push({name,pass:!!pass,detail});if(!pass)throw Error(name)};
+ const main=()=>page.locator('main').innerText();
+ const role=async v=>page.getByRole('combobox',{name:'Preview role',exact:true}).selectOption(v);
+ const go=async p=>{await page.goto('http://127.0.0.1:4397/#/fleet-assets/transports/'+p);await page.waitForTimeout(90);await page.evaluate(()=>window.scrollTo(0,0))};
+ const scenario=async(state,value)=>{await page.getByRole('button',{name:'Preview scenarios'}).click();await page.getByRole('combobox',{name:state,exact:true}).selectOption(value);await page.getByRole('button',{name:'Return to preview'}).click()};
+ page.setDefaultTimeout(6500);await page.bringToFront();await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:1440,height:1000});
+ await go('overview');await page.reload();await page.getByRole('heading',{name:'Transport today',exact:true}).waitFor();
+ for(const [view,title]of [['overview','Overview'],['requests','Requests & approvals'],['planner','Planner'],['journeys','Journeys'],['returns','Returns & handovers']]){
+  await go(view);await page.getByRole('heading',{name:title,exact:true,level:1}).waitFor();
+  check('V-'+view+' Header has meaningful current scope meters',await page.locator('[data-testid=hero] .eh-meter').count()===(view==='overview'?6:4));
+  check('V-'+view+' No page-wide horizontal overflow',await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await page.screenshot({path:root+'final-'+view+'-1440.png',fullPage:true});
+ }
+ await go('journeys/J-609?from=journeys');await page.screenshot({path:root+'final-journey-detail-1440.png',fullPage:true});
+ const routeLayout=await page.locator('.journey-grid>section').first().evaluate(el=>{const h=el.querySelector('.card-title').getBoundingClientRect(),route=el.querySelector('.route-compact').getBoundingClientRect();return {headerBottom:h.bottom,routeTop:route.top,width:route.width}});
+ check('V11 Journey route no longer collides with its heading',routeLayout.routeTop>=routeLayout.headerBottom&&routeLayout.width>400,JSON.stringify(routeLayout));
+ await go('returns/TR-1048?from=returns');await page.screenshot({path:root+'final-return-detail-1440.png',fullPage:true});
+ await page.locator('[data-testid=hero]').click({button:'right',position:{x:600,y:50}});check('V12 Return banner has working context actions',await page.getByRole('menuitem',{name:'View passenger journey',exact:true}).isVisible());await page.keyboard.press('Escape');
+ for(const width of [1280,1024,1920]){
+  await page.setViewportSize({width,height:width===1920?1080:800});await go('journeys/J-608?from=journeys');await role('driver');await page.evaluate(()=>window.scrollTo(0,0));
+  const box=await page.getByRole('button',{name:'Record return',exact:true}).boundingBox();
+  check('V-journey-'+width+' Return action visible without scrolling',box&&box.y+box.height<(width===1920?1080:800),JSON.stringify(box));
+  check('V-journey-'+width+' No page overflow',await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await page.screenshot({path:root+'final-journey-'+width+'.png',fullPage:true});
+  await role('allocator');await go('planner');check('V-planner-'+width+' Workbench remains within viewport width',await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await page.screenshot({path:root+'final-planner-'+width+'.png',fullPage:true});
+ }
+ await page.setViewportSize({width:1440,height:1000});await go('requests');await page.getByRole('button',{name:'View needs assessment',exact:true}).click();
+ check('V22 Assessment meter count matches the queue',await page.getByRole('row').count()===2&&(await main()).includes('Alex Morgan'));
+ await go('planner');await page.getByRole('button',{name:'View assessment first',exact:true}).click();check('V23 Assessment/information meter matches two requests',await page.getByRole('row').count()===3&&(await main()).includes('Jordan Lee'));
+ await role('requester');await go('requests');await page.getByRole('button',{name:'All requests',exact:true}).click();
+ check('V24 Out-of-site passenger absent from requester queue',!(await main()).includes('Jordan Lee'));
+ await go('requests/TR-1043');check('V25 Direct out-of-site link has no passenger data',(await main()).includes('Record unavailable')&&!(await main()).includes('Jordan Lee'));
+ await go('journeys/not-a-journey');check('V26 Unknown journey does not resolve to another passenger',(await main()).includes('Record unavailable')&&!(await main()).includes('Sam Taylor'));
+ await role('allocator');await go('journeys');await scenario('Source state','denied');check('V27 Denied view suppresses counts and passenger details',(await main()).includes('Transport access unavailable')&&!(await main()).includes('Charlie Brown')&&(await main()).includes('Unavailable in this scope'));
+ await scenario('Source state','stale');check('V28 Stale results have an explicit refresh action',await page.getByRole('button',{name:'Refresh source',exact:true}).isVisible());
+ await page.getByRole('row').filter({hasText:'Charlie Brown'}).click({button:'right'});check('V29 Stale menu has no mutating actions',!(await page.getByRole('menuitem').allTextContents()).some(t=>/Complete journey|Open medication handoff|Record return/.test(t)));await page.keyboard.press('Escape');await page.getByRole('button',{name:'Refresh source',exact:true}).click();
+ await go('journeys/J-608?from=journeys');await role('driver');await page.getByRole('button',{name:'Preview scenarios'}).click();await page.getByLabel('Demonstrate proposed staff custody authority',{exact:true}).uncheck();await page.getByRole('button',{name:'Return to preview'}).click();
+ check('V30 Unconfigured staff authority is explicit and blocks return',(await main()).includes('Fleet must record this action')&&await page.getByRole('button',{name:'Record return',exact:true}).count()===0);
+ await page.reload();await go('journeys/J-609?from=journeys');
+ check('V31 No runtime page errors',errors.length===0,JSON.stringify(errors));check('V32 Preview requests stay local and read-only',requests.every(r=>r.url.startsWith('http://127.0.0.1:4397/')&&r.method==='GET'),JSON.stringify(requests));
+ page.off('pageerror',onError);page.off('request',onRequest);return {results,errors,requests};
+}
+)(page);
+```
+### Page
+- Page URL: http://127.0.0.1:4397/#/fleet-assets/transports/journeys/J-609?from=journeys
+- Page Title: Transport · PKG-05 v3 design preview
