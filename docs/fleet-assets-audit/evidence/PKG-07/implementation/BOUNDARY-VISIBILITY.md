@@ -14,7 +14,7 @@ Stale resource relationships now say “Last recorded inside/outside” rather t
 
 Ten focused frontend checks passed in `boundary-visibility-tests.log`, including three new behavioural regression cases. They verify visible geometry during a pending refresh, replacement data after success, immediate clearing on a Site change, clearing after denial and permitted deep-link selection. Geometry, clustering and policy checks also remain green. The Leaflet rendering itself is verified separately in the browser, rather than inferred from the component mock used for request-lifecycle tests.
 
-Focused implementation TypeScript diagnostics are empty (`boundary-visibility-types.log`). Existing unrelated diagnostics remain separately recorded. No backend schema, fixture or production data change was required for this fix.
+The historical limited TypeScript helper reported no implementation diagnostics (`boundary-visibility-types.log`), but omitted tests and did not use the full repository compilation context. Its graph diagnostics do not establish inherited repository failures. See `VERIFICATION.md` for Main's T07-01 finding and the authoritative repository check. No backend schema, fixture or production data change was required for this fix.
 
 ## Browser result
 

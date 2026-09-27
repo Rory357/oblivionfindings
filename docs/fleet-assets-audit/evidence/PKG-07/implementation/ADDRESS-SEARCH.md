@@ -15,7 +15,7 @@ The user explicitly selected the existing free OpenStreetMap service after being
 
 - Seventeen focused frontend checks pass across address search, wizard autofill, map visibility, geometry, scale and rule policy (`address-frontend-tests.log`). New cases cover no request on typing, explicit submission, selection without a second search, stale responses, Enter submission, Site autofill, preservation of manual/map/copied locations, unloaded Site details and missing-position verification. The original seven geometry/policy checks also passed separately (`address-geometry-regression.log`).
 - Six backend feature tests pass with 111 assertions (`address-backend-tests.log`), including public submitted result/coordinates, cached repeat query, management denial, disabled lookup and forbidden public autocomplete. Provider HTTP is faked in these checks. Tests use the existing rollback-only synthetic QA bootstrap.
-- Focused implementation TypeScript diagnostics are empty (`address-types.log` / `typecheck.json`); unrelated imported graph diagnostics remain recorded separately. Targeted Pint and formatting pass.
+- The historical limited TypeScript helper reported no implementation diagnostics (`address-types.log` / `typecheck.json`), but omitted tests and did not use the full repository compilation context. Main's later T07-01 finding and the authoritative repository check are recorded in `VERIFICATION.md`; the helper's graph diagnostics do not establish inherited repository failures. Targeted Pint and formatting pass.
 
 ## Live verification
 

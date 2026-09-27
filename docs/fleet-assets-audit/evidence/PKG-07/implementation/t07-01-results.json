@@ -1,0 +1,85 @@
+{
+  "date": "2026-09-27",
+  "branch": "codex/pkg07-maps-boundaries",
+  "verified_source_commit": "8e7ba8efefc77ebf7d0bd9d936ccbacf33fc1d2a",
+  "published_base": "b05702d7208c88d9cffb9c092df23d3b02300b1e",
+  "supersedes_candidate": "09976ffb448ab6149412bbe5a6c0c3977846b6a2",
+  "source_paths": 68,
+  "source_manifest": "source-hashes.json",
+  "source_manifest_mismatches": [],
+  "finding": {
+    "id": "T07-01",
+    "before_command": "node node_modules/typescript/bin/tsc --noEmit",
+    "before_exit_code": 1,
+    "before_diagnostics": 4,
+    "before_log": "t07-01-types-before.log",
+    "fix": "Use ZoneSchedule for the schedule fixture; remove unsupported Testing Library exact options. No production type, tsconfig or test inclusion changes.",
+    "previous_helper_limit": "The custom checker omitted tests and did not use the full repository compilation context; its graph diagnostics do not establish inherited repository failures."
+  },
+  "checks": [
+    {
+      "command": "node node_modules/typescript/bin/tsc --noEmit",
+      "exit_code": 0,
+      "diagnostics": 0,
+      "log": "t07-01-types-after.log",
+      "note": "An empty output log is expected for this successful command."
+    },
+    {
+      "command": "node node_modules/vitest/vitest.mjs run resources/js/pages/fleet-assets/geofences/workspace/ resources/js/pages/fleet-assets/vehicles/fleet-map.test.ts resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts resources/js/components/fleet-assets/vehicle-workspace/booking-time.test.ts resources/js/pages/fleet-assets/assets/register/",
+      "exit_code": 0,
+      "tests": 46,
+      "files": 10,
+      "log": "t07-01-frontend.log"
+    },
+    {
+      "command": "php docs/fleet-assets-audit/evidence/PKG-07/implementation/run-tests.php --bootstrap docs/fleet-assets-audit/evidence/PKG-07/implementation/preview-privacy-bootstrap.php tests/Feature/FleetAssets/Pkg07BoundariesTest.php tests/Feature/FleetAssets/Pkg07MapPrivacyTest.php tests/Feature/Sites/SiteGeofenceTest.php",
+      "exit_code": 0,
+      "tests": 14,
+      "assertions": 193,
+      "log": "t07-01-backend.log",
+      "isolation": "Rollback-only transactions against synthetic oblivion_findings_pkg07_preview; no migration, schema reset or Main application data."
+    },
+    {
+      "command": "php docs/fleet-assets-audit/evidence/PKG-07/implementation/run-tests.php tests/Unit/Support/SchemaCacheScopeTest.php",
+      "exit_code": 0,
+      "tests": 1,
+      "assertions": 3,
+      "log": "t07-01-schema-scope.log",
+      "isolation": "Mock-based unit test without database access."
+    },
+    {
+      "command": "node node_modules/eslint/bin/eslint.js <34 TS/TSX paths from source-files.txt> --format json --output-file docs/fleet-assets-audit/evidence/PKG-07/implementation/t07-01-lint.json --max-warnings 0",
+      "exit_code": 0,
+      "errors": 0,
+      "warnings": 0,
+      "log": "t07-01-lint.json"
+    },
+    {
+      "command": "node node_modules/vite/bin/vite.js build --emptyOutDir false",
+      "exit_code": 0,
+      "duration": "5m 25s",
+      "log": "t07-01-build.log",
+      "advisories": "Existing chunks larger than 500 kB."
+    }
+  ],
+  "browser": {
+    "url": "http://127.0.0.1:4426/fleet-assets/geofences?layout=list&page=1&selected=130&status=available&tab=map",
+    "build_manifest_sha256": "0ED86EEA3B6D0333C7BD189C558EA7722A4B61924334C35847BE934C56DDBB58",
+    "boundaries_displayed": 127,
+    "selected_geometry_retained_during_refresh": true,
+    "selected_svg_path_unchanged_after_refresh": true,
+    "address_query": "Te Papa Wellington",
+    "selected_result": "Museum of New Zealand, 55, Cable Street, Te Aro, Wellington, Wellington City, Wellington, 6011, New Zealand",
+    "latitude": -41.2903326,
+    "longitude": 174.7819275,
+    "approved_site_preserves_selected_address": true,
+    "map_editor_verified": true,
+    "errors": [],
+    "screenshots": ["t07-01-map.png", "t07-01-editor.png"],
+    "test_draft_discarded_without_save": true,
+    "original_user_draft_untouched": true
+  },
+  "main_approval": "pending substantive/privacy review and serial integration slot",
+  "actual_main_mutated": false,
+  "github_push": false
+}
