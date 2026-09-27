@@ -1,5 +1,6 @@
 import {
     BookingWizard,
+    defaultBookingStart,
     type BookingWizardMode,
 } from '@/components/fleet-assets/vehicle-workspace/booking-wizard';
 import type {
@@ -32,13 +33,6 @@ import {
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import {
     Select,
     SelectContent,
@@ -166,10 +160,10 @@ export default function VehiclesIndex({
     const [statusFilter, setStatusFilter] = useState('all');
     const [isRefreshing, setIsRefreshing] = useState(false);
     const contextMenu = useEntityContextMenu<Vehicle>();
-    const [requestPick, setRequestPick] = useState(false);
-    const [pendingRequestWindow, setPendingRequestWindow] = useState<{
-        start?: string;
-        end?: string;
+    const [requestDraft, setRequestDraft] = useState<{
+        vehicleId?: number;
+        startLocal?: string;
+        endLocal?: string;
     } | null>(null);
     const [workflow, setWorkflow] = useState<{
         vehicle: VehicleProfile;
@@ -291,9 +285,15 @@ export default function VehiclesIndex({
         workflowRequest.current?.abort();
         const controller = new AbortController();
         workflowRequest.current = controller;
-        if (id === null) {
-            setPendingRequestWindow({ start, end });
-            setRequestPick(true);
+        if (!event) {
+            setWorkflowError('');
+            setWorkflow(null);
+            setRequestDraft({
+                vehicleId: id ?? undefined,
+                startLocal:
+                    start ?? defaultBookingStart(isCalendar ? date : undefined),
+                endLocal: end,
+            });
             return;
         }
         setWorkflowError('');
@@ -1295,66 +1295,32 @@ export default function VehiclesIndex({
                         </Button>
                     </Card>
                 )}
-                {requestPick && (
-                    <Dialog
-                        open={requestPick}
-                        onOpenChange={(open) => {
-                            setRequestPick(open);
-                            if (!open) setPendingRequestWindow(null);
+                {requestDraft && (
+                    <BookingWizard
+                        requestVehicles={scope
+                            .filter((vehicle) => vehicle.at_your_sites)
+                            .map((vehicle) => ({
+                                id: vehicle.id,
+                                name: vehicle.name,
+                                asset_tag: vehicle.asset_tag,
+                                registration_number:
+                                    vehicle.registration_number ?? null,
+                                site: vehicle.home_site,
+                            }))}
+                        initialVehicleId={requestDraft.vehicleId}
+                        mode={{
+                            kind: 'request',
+                            startLocal: requestDraft.startLocal,
+                            endLocal: requestDraft.endLocal,
                         }}
-                    >
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>
-                                    Choose a vehicle to request
-                                </DialogTitle>
-                                <DialogDescription>
-                                    Only vehicles at your approved sites can be
-                                    requested.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <select
-                                className="w-full rounded-md border bg-card p-2"
-                                aria-label="Vehicle to request"
-                                defaultValue=""
-                                onChange={(event) => {
-                                    const id = Number(event.target.value);
-                                    if (id) {
-                                        setRequestPick(false);
-                                        void openBooking(
-                                            id,
-                                            pendingRequestWindow?.start,
-                                            pendingRequestWindow?.end,
-                                        );
-                                        setPendingRequestWindow(null);
-                                    }
-                                }}
-                            >
-                                <option value="">Select vehicle</option>
-                                {scope
-                                    .filter((vehicle) => vehicle.at_your_sites)
-                                    .map((vehicle) => (
-                                        <option
-                                            key={vehicle.id}
-                                            value={vehicle.id}
-                                        >
-                                            {vehicle.name} ·{' '}
-                                            {vehicle.home_site?.name ??
-                                                'No home site'}
-                                        </option>
-                                    ))}
-                            </select>
-                            <Button
-                                variant="outline"
-                                onClick={() => {
-                                    setRequestPick(false);
-                                    setPendingRequestWindow(null);
-                                }}
-                            >
-                                Cancel
-                            </Button>
-                        </DialogContent>
-                    </Dialog>
+                        onClose={() => setRequestDraft(null)}
+                        onSaved={() => {
+                            setCalendarRevision((value) => value + 1);
+                            router.reload({
+                                only: ['vehicles', 'all_vehicles', 'hero'],
+                            });
+                        }}
+                    />
                 )}
                 {workflow && (
                     <BookingWizard

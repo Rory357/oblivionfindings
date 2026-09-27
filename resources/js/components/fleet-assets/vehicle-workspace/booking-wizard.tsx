@@ -22,8 +22,13 @@ import {
     ShieldCheck,
     UserRound,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { bookingOffset, bookingOffsets } from './booking-time';
+import {
+    BookingVehiclePicker,
+    type BookingVehicle,
+} from './booking-vehicle-picker';
+import './booking-wizard.css';
 import type {
     BookingRow,
     CalendarDriver,
@@ -32,7 +37,6 @@ import type {
 } from './calendar-types';
 import { uploadSummary, useEvidenceUpload } from './evidence-upload';
 import { isJsonObject, useVehicleRecordCommand } from './record-command';
-import type { VehicleProfile } from './types';
 import {
     fieldProps,
     StagedFilesField,
@@ -136,21 +140,93 @@ function driverLabel(driver: CalendarDriver): string {
 }
 
 export function BookingWizard({
-    vehicle,
-    summary,
+    vehicle: suppliedVehicle,
+    summary: suppliedSummary,
+    requestVehicles,
+    initialVehicleId,
     mode,
     onClose,
     onSaved,
     onTimeChanged,
 }: {
-    vehicle: VehicleProfile;
-    summary: VehicleCalendarSummary;
     mode: BookingWizardMode;
     onClose: () => void;
     onSaved: () => void;
     onTimeChanged?: (before: BookingRow, savedVersion: number) => void;
-}) {
+} & (
+    | {
+          vehicle: BookingVehicle;
+          summary: VehicleCalendarSummary;
+          requestVehicles?: never;
+          initialVehicleId?: never;
+      }
+    | {
+          mode: Extract<BookingWizardMode, { kind: 'request' }>;
+          requestVehicles: BookingVehicle[];
+          initialVehicleId?: number;
+          vehicle?: never;
+          summary?: never;
+      }
+)) {
     const auth = usePage<SharedData>().props.auth;
+    const [selectedId, setSelectedId] = useState(initialVehicleId ?? null);
+    const [loaded, setLoaded] = useState<{
+        id: number;
+        summary: VehicleCalendarSummary;
+    } | null>(null);
+    const [loadError, setLoadError] = useState('');
+    const [loadRevision, setLoadRevision] = useState(0);
+    const choosingVehicle = requestVehicles !== undefined;
+    const vehicle = choosingVehicle
+        ? requestVehicles.find((row) => row.id === selectedId)
+        : suppliedVehicle;
+    const summary = choosingVehicle
+        ? vehicle && loaded?.id === vehicle.id
+            ? loaded.summary
+            : undefined
+        : suppliedSummary;
+    const vehicleId = vehicle?.id;
+    useEffect(() => {
+        if (!choosingVehicle || vehicleId === undefined) return;
+        const controller = new AbortController();
+        void (async () => {
+            try {
+                const response = await fetch(
+                    `/fleet-assets/vehicles/${vehicleId}/calendar/summary`,
+                    {
+                        credentials: 'same-origin',
+                        headers: { Accept: 'application/json' },
+                        signal: controller.signal,
+                    },
+                );
+                if (!response.ok)
+                    throw new Error(
+                        'Current booking permissions could not be loaded. Try again.',
+                    );
+                const data = (await response.json()) as VehicleCalendarSummary;
+                if (data.asset.id !== vehicleId || !data.can.request)
+                    throw new Error(
+                        'Booking requests are not permitted for this vehicle at your sites. Choose another vehicle.',
+                    );
+                if (!controller.signal.aborted) {
+                    setLoaded({ id: vehicleId, summary: data });
+                    setLocalErrors((previous) => {
+                        const next = { ...previous };
+                        delete next.request_vehicle;
+                        return next;
+                    });
+                }
+            } catch (error) {
+                if (!controller.signal.aborted)
+                    setLoadError(
+                        error instanceof Error
+                            ? error.message
+                            : 'Booking details could not be loaded. Try again.',
+                    );
+            }
+        })();
+        return () => controller.abort();
+    }, [choosingVehicle, vehicleId, loadRevision]);
     const block = mode.kind === 'block' || mode.kind === 'change-block';
     const changing = mode.kind === 'change' || mode.kind === 'change-block';
     const booking = mode.kind === 'change' ? mode.row : null;
@@ -214,16 +290,33 @@ export function BookingWizard({
     const [conflict, setConflict] = useState('');
     const [savedText, setSavedText] = useState<string | null>(null);
     const command = useVehicleRecordCommand(isJsonObject);
-    const evidence = useEvidenceUpload(vehicle.id);
+    const evidence = useEvidenceUpload(vehicle?.id ?? null);
     const errors: Record<string, string> = {
         ...command.errors,
         ...localErrors,
     };
     // Server time errors land on the times step, whatever key they use.
     if (errors.asset_id) errors.starts_local = errors.asset_id;
-    const drivers = summary.drivers;
+    const drivers = summary?.drivers ?? [];
     const today = toDatetimeLocal(new Date().toISOString());
-    const authority = summary.can.authority;
+    const authority = summary?.can.authority ?? false;
+
+    const selectVehicle = (id: number) => {
+        if (id === selectedId) return;
+        setSelectedId(id);
+        setLoaded(null);
+        setLoadError('');
+        setConflict('');
+        setLocalErrors({});
+        setForm((old) => ({
+            ...old,
+            driver_user_id: null,
+            ready: false,
+            approval_route: 'required',
+            pickup: '',
+        }));
+        command.clearError('asset_id');
+    };
 
     const stepList = block
         ? [
@@ -326,7 +419,7 @@ export function BookingWizard({
           ? { kind: 'unavailable' as const, id: period.id }
           : undefined;
     const alternatives = (() => {
-        if (!conflict) return [];
+        if (!conflict || !summary) return [];
         const minutes = Math.max(30, minutesBetween(form.start, form.end));
         return [1, 2, 3]
             .map((days) => {
@@ -342,6 +435,18 @@ export function BookingWizard({
         const key = stepList[at]?.key;
         const found: Record<string, string> = {};
         if (key === 'times') {
+            if (!vehicle)
+                found.request_vehicle =
+                    requestVehicles?.length === 0
+                        ? 'No vehicles at your approved sites match the current Fleet filters. Close this request and adjust the filters.'
+                        : 'Choose a vehicle for this request.';
+            else if (!summary)
+                found.request_vehicle =
+                    loadError ||
+                    'Wait for current booking permissions to load.';
+            else if (mode.kind === 'request' && !summary.can.request)
+                found.request_vehicle =
+                    'Booking requests are not permitted for this vehicle.';
             if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(form.start))
                 found.starts_local = block
                     ? 'Choose when the vehicle becomes unavailable.'
@@ -377,7 +482,7 @@ export function BookingWizard({
                     found.starts_local =
                         'Choose a current or future pickup / block start.';
             }
-            if (Object.keys(found).length === 0) {
+            if (Object.keys(found).length === 0 && summary) {
                 const clash = conflictWith(
                     summary,
                     form.start,
@@ -417,6 +522,11 @@ export function BookingWizard({
     };
 
     const submit = async () => {
+        if (!vehicle || !summary) {
+            validateStep(0);
+            setStep(0);
+            return;
+        }
         if (!command.uncertain) {
             for (let at = 0; at < reviewStep; at++) {
                 if (!validateStep(at)) {
@@ -542,11 +652,13 @@ export function BookingWizard({
         ? 'This period marks the vehicle unavailable on the calendar. It does not create or clear a safety restriction.'
         : changing
           ? 'A confirmed booking whose time or driver changes returns to pending approval, unless approval is not required and readiness still passes. The change and its reason are kept in the booking history.'
-          : summary.use_problem
-            ? `${summary.use_problem} This request stays pending until readiness is resolved.`
-            : authority
-              ? 'Approval required → coordinator review. Approval not required → confirmed only when readiness and conflict checks pass. Keys, checkout and return are always recorded.'
-              : 'You can request the approval-not-required path with a reason or evidence. A coordinator must verify your authority before confirmation.';
+          : !summary
+            ? 'Choose a vehicle to load current booking permissions and readiness. The request is checked again when saved.'
+            : summary.use_problem
+              ? `${summary.use_problem} This request stays pending until readiness is resolved.`
+              : authority
+                ? 'Approval required → coordinator review. Approval not required → confirmed only when readiness and conflict checks pass. Keys, checkout and return are always recorded.'
+                : 'You can request the approval-not-required path with a reason or evidence. A coordinator must verify your authority before confirmation.';
     const driverName =
         drivers.find((driver) => driver.id === form.driver_user_id)?.name ??
         booking?.driver?.name ??
@@ -568,6 +680,7 @@ export function BookingWizard({
               ? 'Save changes'
               : 'Save booking request';
     const requiredDone = [
+        !!vehicle && !!summary,
         !!form.start,
         !!form.end,
         !!form.purpose.trim(),
@@ -578,18 +691,18 @@ export function BookingWizard({
         <WorkspaceWizard
             title={title}
             description={[
-                vehicle.name,
-                vehicle.asset_tag,
-                vehicle.site?.name,
+                vehicle?.name,
+                vehicle?.asset_tag,
+                vehicle?.site?.name,
                 'Pacific/Auckland',
             ]
                 .filter(Boolean)
                 .join(' · ')}
             railIcon={CalendarClock}
             railSub={
-                [vehicle.registration_number, vehicle.site?.name]
+                [vehicle?.registration_number, vehicle?.site?.name]
                     .filter(Boolean)
-                    .join(' · ') || vehicle.name
+                    .join(' · ') || 'Fleet · booking request'
             }
             steps={stepList}
             step={step}
@@ -599,14 +712,15 @@ export function BookingWizard({
                     100,
             )}
             context={{
-                name: vehicle.name,
-                detail: [
-                    vehicle.asset_tag,
-                    vehicle.registration_number,
-                    vehicle.site?.name,
-                ]
-                    .filter(Boolean)
-                    .join(' · '),
+                name: vehicle?.name ?? 'Choose a vehicle',
+                detail:
+                    [
+                        vehicle?.asset_tag,
+                        vehicle?.registration_number,
+                        vehicle?.site?.name,
+                    ]
+                        .filter(Boolean)
+                        .join(' · ') || 'Only vehicles at your approved sites',
             }}
             command={{
                 ...command,
@@ -615,6 +729,8 @@ export function BookingWizard({
             }}
             dirty={
                 JSON.stringify(form) !== JSON.stringify(initial) ||
+                (choosingVehicle &&
+                    selectedId !== (initialVehicleId ?? null)) ||
                 files.length > 0
             }
             saved={savedText !== null}
@@ -667,15 +783,73 @@ export function BookingWizard({
             )}
             {stepKey === 'times' && (
                 <div className="space-y-5">
+                    {choosingVehicle && initialVehicleId === undefined && (
+                        <WizardField
+                            id="request_vehicle"
+                            label="Vehicle"
+                            error={errors.request_vehicle}
+                            hint="Search vehicles at your approved sites. Fleet filters apply."
+                        >
+                            <BookingVehiclePicker
+                                vehicles={requestVehicles}
+                                value={selectedId}
+                                onChange={selectVehicle}
+                                error={errors.request_vehicle}
+                            />
+                        </WizardField>
+                    )}
+                    {choosingVehicle && requestVehicles.length === 0 && (
+                        <p role="status" className="text-subtle">
+                            No vehicles at your approved sites match the current
+                            Fleet filters. Close this request and adjust the
+                            filters.
+                        </p>
+                    )}
+                    {choosingVehicle && initialVehicleId !== undefined && (
+                        <p className="text-subtle">
+                            Vehicle retained from your calendar or map
+                            selection. Return to Fleet to choose another
+                            vehicle.
+                        </p>
+                    )}
+                    {choosingVehicle && vehicle && !summary && !loadError && (
+                        <p role="status">
+                            Loading current booking permissions and readiness…
+                        </p>
+                    )}
+                    {loadError && (
+                        <div role="alert" className="space-y-2">
+                            <p>{loadError}</p>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setLoadError('');
+                                    setLoaded(null);
+                                    setLoadRevision((value) => value + 1);
+                                }}
+                            >
+                                Try again
+                            </Button>
+                        </div>
+                    )}
+                    {choosingVehicle &&
+                        initialVehicleId !== undefined &&
+                        errors.request_vehicle && (
+                            <p role="alert">{errors.request_vehicle}</p>
+                        )}
                     <p className="text-subtle">
-                        {[vehicle.name, vehicle.asset_tag, vehicle.site?.name]
+                        {[
+                            vehicle?.name,
+                            vehicle?.asset_tag,
+                            vehicle?.site?.name,
+                            'Pacific/Auckland',
+                        ]
                             .filter(Boolean)
-                            .join(' · ')}{' '}
-                        · Pacific/Auckland
+                            .join(' · ')}
                     </p>
                     <DateTimeField
                         id="starts_local"
-                        label={block ? 'Block start' : 'Pickup / block start'}
+                        label={block ? 'Block start' : 'Pickup'}
                         value={form.start}
                         onChange={(value) => update('start', value)}
                         error={errors.starts_local}
@@ -708,7 +882,7 @@ export function BookingWizard({
                     )}
                     <DateTimeField
                         id="ends_local"
-                        label={block ? 'Block end' : 'Return / block end'}
+                        label={block ? 'Block end' : 'Return'}
                         value={form.end}
                         onChange={(value) => update('end', value)}
                         error={errors.ends_local}
