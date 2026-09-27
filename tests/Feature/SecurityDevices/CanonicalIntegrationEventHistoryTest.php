@@ -66,7 +66,7 @@ class CanonicalIntegrationEventHistoryTest extends TestCase
         ]);
 
         $trackingConsentType = ConsentType::factory()->create([
-            'name' => 'Asset Location Tracking (Safety)',
+            'name' => 'Personal Tracker (Wandering Risk)',
             'purpose' => 'Client personal safety tracking',
             'active' => true,
         ]);

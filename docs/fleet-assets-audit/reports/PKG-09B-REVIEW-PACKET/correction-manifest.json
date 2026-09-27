@@ -1,8 +1,8 @@
 {
   "package": "PKG-09B",
-  "recordedAt": "2026-09-27T22:58:44.577Z",
+  "recordedAt": "2026-09-27T23:44:34.771Z",
   "branch": "codex/fleet-personal-reports",
-  "parent": "e4bb17b56405a748072bf83e8c30af323822e0bc",
+  "parent": "ba2e0aeec341ff68dedbfafd4fb4d64642e8bd5b",
   "base": "926b4981b0289da08a20baca0995117fb53e413e",
   "candidateIdentity": "The commit containing this manifest; exact correction SHA is supplied in the handback.",
   "checksumMeaning": "Source worktreeSha256 and evidence sha256 identify copied worktree bytes. normalizedLfSha256 is provided for text files to permit Git line-ending normalization. Binary evidence uses its raw SHA-256.",
@@ -16,7 +16,8 @@
     "app/Services/Reporting/ReportSourceEvidence.php",
     "config/operational-reports.php",
     "resources/js/pages/reporting/workspace.tsx",
-    "tests/Feature/Reporting/OperationalReportPrivacyTest.php"
+    "tests/Feature/Reporting/OperationalReportPrivacyTest.php",
+    "tests/Feature/SecurityDevices/CanonicalIntegrationEventHistoryTest.php"
   ],
   "completeApplicationAndTestFiles": [
     {
@@ -306,6 +307,12 @@
       "bytes": 35452,
       "worktreeSha256": "d6481a89c155f007a605b437896f22837ae549392d7b61e7f36e99b93f7bc8dd",
       "normalizedLfSha256": "d6481a89c155f007a605b437896f22837ae549392d7b61e7f36e99b93f7bc8dd"
+    },
+    {
+      "path": "tests/Feature/SecurityDevices/CanonicalIntegrationEventHistoryTest.php",
+      "bytes": 8991,
+      "worktreeSha256": "d240f4b1af7f43f8cbb0a32cdf46dfb467df6f75877d35b9d5a6f400f86863c0",
+      "normalizedLfSha256": "d240f4b1af7f43f8cbb0a32cdf46dfb467df6f75877d35b9d5a6f400f86863c0"
     }
   ],
   "evidence": [
@@ -492,9 +499,91 @@
       "bytes": 723,
       "sha256": "6d1d4262d10e5783ada4307622e8f83a532acebcd63ef8d036241fc1a571c706",
       "normalizedLfSha256": "8af3e32ffade2bf99a580cdd1be4076afa0ef3f7c052a706e1b2f32216cfb85a"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/fixture-tests.log",
+      "bytes": 340,
+      "sha256": "1ab29e1d19c4741c21b7c89379a074e601531599b237ac3ec2eadaf798c0eafe",
+      "normalizedLfSha256": "424962170a0c6aff5b7958a8ccea3655b6e04ed2f05e5c90f360a83b20c7fb68"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/fixture-tests.xml",
+      "bytes": 3864,
+      "sha256": "f5722d6de271bc651fe264f309ffb737ae84fb03c6578f6765abf5f2d98052e5",
+      "normalizedLfSha256": "f5722d6de271bc651fe264f309ffb737ae84fb03c6578f6765abf5f2d98052e5"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/fixture-verification.json",
+      "bytes": 5085,
+      "sha256": "75bf1e093a2a16187f655fb68c94e4b5d4ad6733f81492e4dd7fdbdbbaa0a217",
+      "normalizedLfSha256": "75bf1e093a2a16187f655fb68c94e4b5d4ad6733f81492e4dd7fdbdbbaa0a217"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/fixture-database-cleanup.json",
+      "bytes": 169,
+      "sha256": "6576f766c8038773bd2b49ff46839af5aff11ea1694722fdc9b24d3f2ceba2e0",
+      "normalizedLfSha256": "6fb3711f64ee6c5a23505df6165ab3a21f90de5a89aee4e4ffd782f828e0ce76"
     }
   ],
   "validation": {
+    "unique_cases": 48,
+    "passing_cases": 48,
+    "passing_assertions": 838,
+    "failures": [],
+    "latest_run_cases": [
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_client_location_history_keeps_narrow_fallback_for_unbackfilled_legacy_rows",
+        "assertions": 6,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_client_location_history_reads_canonical_integration_event_identity",
+        "assertions": 6,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_portal_location_history_reads_canonical_integration_event_identity",
+        "assertions": 6,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_resident_tracking_history_reads_canonical_integration_event_identity",
+        "assertions": 15,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.DeviceCustodyAuthorizationTest::test_generic_fleet_or_asset_consent_does_not_authorise_resident_location",
+        "assertions": 9,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.PersonalTrackingConsentWithdrawalTest::test_withdrawal_stops_collection_and_blocks_ui_api_export_direct_url_and_cached_recheck",
+        "assertions": 94,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      }
+    ]
+  },
+  "openGates": [
+    "Main review of the frozen fixture successor",
+    "Genuine 125% browser zoom acceptance/amendment"
+  ],
+  "excluded": [
+    "Credentials, session cookies and MFA secrets",
+    "Preview runtime helpers and preview logs",
+    "Generated production build",
+    "Operating data and unowned source changes"
+  ],
+  "privacyCorrectionParent": "e4bb17b56405a748072bf83e8c30af323822e0bc",
+  "fixtureSuccessorApplicationAndTestFiles": [
+    "tests/Feature/SecurityDevices/CanonicalIntegrationEventHistoryTest.php"
+  ],
+  "priorPrivacyCorrectionValidation": {
     "unique_cases": 47,
     "passing_cases": 43,
     "passing_assertions": 796,
@@ -505,14 +594,49 @@
       "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_client_location_history_reads_canonical_integration_event_identity"
     ]
   },
-  "openGates": [
-    "Genuine browser zoom at 125%",
-    "Four known canonical-history HTTP 403 baseline failures during combined acceptance"
-  ],
-  "excluded": [
-    "Credentials, session cookies and MFA secrets",
-    "Preview runtime helpers and preview logs",
-    "Generated production build",
-    "Operating data and unowned source changes"
-  ]
+  "fixtureSuccessorValidation": {
+    "tests": 6,
+    "assertions": 136,
+    "failures": 0,
+    "errors": 0,
+    "durationSeconds": 257.985,
+    "cases": [
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_client_location_history_keeps_narrow_fallback_for_unbackfilled_legacy_rows",
+        "assertions": 6,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_client_location_history_reads_canonical_integration_event_identity",
+        "assertions": 6,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_portal_location_history_reads_canonical_integration_event_identity",
+        "assertions": 6,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_resident_tracking_history_reads_canonical_integration_event_identity",
+        "assertions": 15,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.DeviceCustodyAuthorizationTest::test_generic_fleet_or_asset_consent_does_not_authorise_resident_location",
+        "assertions": 9,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.PersonalTrackingConsentWithdrawalTest::test_withdrawal_stops_collection_and_blocks_ui_api_export_direct_url_and_cached_recheck",
+        "assertions": 94,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      }
+    ]
+  }
 }

@@ -1,8 +1,8 @@
 # PKG-09B corrections and authenticated application verification
 
-The correction candidate resolves owner verification for T09B-01, T09B-02 and T09B-04. T09B-03 (genuine 125% browser zoom) remains open. Four previously reproduced canonical-history HTTP 403 test failures remain a combined-acceptance gate; this packet does not waive them or grant production approval.
+The correction candidate resolves owner verification for T09B-01, T09B-02 and T09B-04. T09B-03 (genuine 125% browser zoom) remains open. The four prior canonical-history HTTP 403 failures are resolved in the fixture successor documented in FIXTURE-CORRECTION.md. Its six bounded regressions pass; Main review and the zoom acceptance/amendment remain pending. This packet does not grant production approval.
 
-Candidate branch: codex/fleet-personal-reports. Parent: e4bb17b56405a748072bf83e8c30af323822e0bc. Original base: 926b4981b0289da08a20baca0995117fb53e413e. The exact correction commit is the commit containing this document and correction-manifest.json. The original packet is preserved as historical evidence.
+Candidate branch: codex/fleet-personal-reports. Fixture successor parent: ba2e0aeec341ff68dedbfafd4fb4d64642e8bd5b. Privacy correction parent: e4bb17b56405a748072bf83e8c30af323822e0bc. Original base: 926b4981b0289da08a20baca0995117fb53e413e. The exact correction commit is the commit containing this document and correction-manifest.json. The original packet is preserved as historical evidence.
 
 ## Privacy corrections (T09B-01)
 
@@ -20,7 +20,7 @@ The application remains for one operating organisation across multiple sites. Th
 
 ## Automated verification
 
-The deduplicated latest scoped results are 43 passing cases with 796 passing assertions: 42 Reports cases plus the personal-tracking consent withdrawal case. Four unchanged CanonicalIntegrationEventHistoryTest cases return HTTP 403 where their fixtures expect 200; these were independently reproduced on the prior baseline and remain open. See test-summary.json and the raw JUnit files under the corrections evidence directory.
+The fixture successor passes six tests with 136 assertions. Latest deduplicated scoped evidence is 48 passing cases with 838 assertions and no remaining failures among those cases; see fixture-verification.json and FIXTURE-CORRECTION.md. The earlier privacy-correction evidence below is retained for traceability. At that point 43 cases passed with 796 assertions, while four canonical-history success fixtures returned HTTP 403; test-summary.json and final-tests.xml preserve that historical result.
 
 - Initial Reports suite: 39 tests, 635 assertions, passed.
 - Expanded run: 46 tests, 755 assertions, one test-fixture error and the four known baseline failures. The fixture error assumed a legacy physical payload column absent from this schema; the test was corrected to mutate canonical raw_payload.
@@ -66,4 +66,4 @@ Main remained read-only. The reviewed shared People Locations sources have no di
 
 All four isolated automated-test database families were removed; only the owned synthetic preview database is retained for review. Credentials, session cookies, MFA secrets, runtime preview helpers, generated build files and unrelated preview logs are excluded from the commit. The explicit correction-allowlist.txt contains ten application/test paths and this evidence packet. correction-manifest.json records the complete current application/test payload and correction evidence hashes.
 
-Remaining acceptance work is genuine 125% browser zoom and resolution or explicit acceptance of the four baseline canonical-history failures during combined integration. Owner verification here is not final integration or production sign-off.
+The canonical-history fixture failures are resolved by the bounded successor. Main review and genuine 125% browser zoom acceptance/amendment remain pending. Owner verification here is not final integration or production sign-off.
