@@ -281,7 +281,9 @@ $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 config(['finance.spend_approval.enforce' => false]);
 $bill = App\Domain\Finance\Models\FinBill::findOrFail((int) $argv[2]);
 $actor = App\Models\User::findOrFail((int) $argv[3]);
-Illuminate\Support\Facades\Auth::login($actor);
+// The service race needs actor context, not concurrent interactive-login
+// listeners writing the same user's session and login audit before the barrier.
+Illuminate\Support\Facades\Auth::setUser($actor);
 Illuminate\Support\Facades\DB::statement('SET SESSION innodb_lock_wait_timeout = 90');
 file_put_contents($argv[6], 'attempting');
 try {
@@ -310,7 +312,10 @@ PHP;
         $deadline = microtime(true) + 60;
         while (collect($paths)->contains(fn ($path) => ! is_file($path))) {
             if (microtime(true) >= $deadline) {
-                throw new RuntimeException('Bill workers did not reach the shared lock.');
+                $diagnostics = array_map(fn (Process $process): string => $process->isRunning()
+                    ? 'worker still starting'
+                    : trim($process->getErrorOutput().' '.$process->getOutput()), $processes);
+                throw new RuntimeException('Bill workers did not reach the shared lock: '.implode(' | ', $diagnostics));
             }
             usleep(10_000);
         }
