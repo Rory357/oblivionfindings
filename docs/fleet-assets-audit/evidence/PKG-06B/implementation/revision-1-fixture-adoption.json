@@ -1,0 +1,20 @@
+{
+    "database": "oblivion_findings_pkg06b_8821_test_36804",
+    "migrations": [
+        {
+            "migration": "2026_09_27_000100_version_shared_boundaries",
+            "batch": 9
+        },
+        {
+            "migration": "2026_09_27_000200_retain_client_boundary_provenance",
+            "batch": 10
+        },
+        {
+            "migration": "2026_09_27_000300_retain_boundary_event_and_rule_provenance",
+            "batch": 11
+        }
+    ],
+    "labelHistoryUnchanged": true,
+    "labelHistorySha256": "ee718eb14f42eaa1785d909bbd2661eb0b6f6035cbca216df0584d78864b40f5",
+    "operationalDatabaseUsed": false
+}
