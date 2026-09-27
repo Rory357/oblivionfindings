@@ -12,6 +12,7 @@ use App\Models\FleetFinanceReviewRequest;
 use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\Fleet\MaintenanceAccessService;
+use App\Services\Fleet\VehicleFinanceReviewQueue;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -63,7 +64,7 @@ final class AssetProfilePresenter
         $permissions['assess'] = $this->maintenance->canManage($actor);
         $permissions['finance_review'] = $actor->canDo('finance.assets.view') && $permissions['update'];
         $financeView = $actor->canDo('finance.assets.view');
-        $financeReviews = $financeView ? FleetFinanceReviewRequest::where('asset_id', $asset->id)->when(! $actor->canDo('finance.ap.view'), fn ($query) => $query->whereNotIn('source_type', ['bill', 'purchase_order']))->with('requestedBy:id,name')->latest('id')->limit(50)->get()->map(fn ($review) => [
+        $financeReviews = $financeView ? app(VehicleFinanceReviewQueue::class)->scoped($actor)->where('asset_id', $asset->id)->when(! $actor->canDo('finance.ap.view'), fn ($query) => $query->whereNotIn('source_type', ['bill', 'purchase_order']))->with('requestedBy:id,name')->latest('id')->limit(50)->get()->map(fn ($review) => [
             'id' => $review->id, 'reference' => $review->reference_number, 'type' => $review->typeLabel(), 'status' => $review->status, 'note' => $review->note, 'amount' => $review->amount, 'by' => $review->requestedBy?->name, 'at' => $review->created_at?->toISOString(), 'decision' => $review->decision_note, 'url' => '/finance/vehicle-reviews?request='.$review->id,
         ])->values() : [];
         $financeSources = [['value' => 'vehicle', 'label' => $asset->asset_tag.' · '.$asset->name]];

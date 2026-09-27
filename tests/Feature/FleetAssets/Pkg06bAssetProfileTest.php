@@ -13,6 +13,7 @@ use App\Models\AssetKitItem;
 use App\Models\AssetLabelBatch;
 use App\Models\AssetProfileEvent;
 use App\Models\AssetScanEvent;
+use App\Models\Client;
 use App\Models\FleetChecklistRun;
 use App\Models\FleetChecklistTemplate;
 use App\Models\FleetFinanceReviewRequest;
@@ -26,11 +27,13 @@ use App\Services\Files\MalwareScanDisposition;
 use App\Services\Files\MalwareScanner;
 use App\Services\Files\MalwareScanResult;
 use App\Services\Fleet\VehicleFinanceReviewQueue;
+use App\Services\Fleet\VehicleFinanceService;
 use App\Support\SchemaCache;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
@@ -389,6 +392,138 @@ class Pkg06bAssetProfileTest extends TestCase
         $this->assertSame('submitted', $request->status);
         $this->assertSame('active', $this->asset->fresh()->status);
         $this->assertSame($before, DB::table('fin_journals')->count());
+    }
+
+    public function test_asset_visibility_does_not_expand_finance_review_scope_or_replacement_details(): void
+    {
+        $requester = $this->user([$this->origin], ['assets.viewAny', 'assets.update', 'finance.assets.view']);
+        $id = $this->actingAs($requester)->postJson('/assets/'.$this->asset->id.'/finance-review', [
+            'request_type' => 'replacement_review', 'source' => 'vehicle', 'note' => 'Restricted replacement proposal',
+            'amount' => '8123.45', 'request_key' => (string) Str::uuid(),
+        ])->assertOk()->json('id');
+        $review = FleetFinanceReviewRequest::findOrFail($id);
+        $review->update(['status' => 'resolved', 'decision_note' => 'Restricted source decision']);
+        $viewer = $this->user([$this->destination], ['assets.viewAny', 'assets.update', 'finance.assets.view', 'securityDevices.devices.viewAllSites']);
+        $this->assertTrue(Gate::forUser($viewer)->allows('view', $this->asset));
+        $this->assertNotContains($this->origin->id, app(VehicleFinanceService::class)->financeSiteIds($viewer));
+        $this->assertNull(app(VehicleFinanceReviewQueue::class)->present($viewer, [], $id)['focus']);
+        $this->actingAs($viewer)->get('/fleet-assets/assets/'.$this->asset->id)->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+            ->has('workspace.finance_reviews', 0)->where('workspace.permissions.finance_review', true)
+            ->where('workspace.sources.costs.allowed', false)->has('workspace.sources.costs.totals', 0));
+
+        $local = $this->user([$this->origin], ['assets.viewAny', 'finance.assets.view']);
+        $central = $this->user([$this->destination], ['assets.viewAny', 'finance.assets.view', 'securityDevices.devices.viewAllSites', 'finance.insights.viewAllSites']);
+        foreach ([$local, $central] as $allowed) {
+            $this->assertContains($this->origin->id, app(VehicleFinanceService::class)->financeSiteIds($allowed));
+            $this->actingAs($allowed)->get('/fleet-assets/assets/'.$this->asset->id)->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('workspace.finance_reviews', 1)->where('workspace.finance_reviews.0.id', $id)
+                ->where('workspace.finance_reviews.0.amount', '8123.45')->where('workspace.finance_reviews.0.decision', 'Restricted source decision')
+                ->where('workspace.finance_reviews.0.url', '/finance/vehicle-reviews?request='.$id)
+                ->where('workspace.permissions.finance_review', false));
+            $this->assertFalse(app(VehicleFinanceReviewQueue::class)->present($allowed, [], $id)['focus']['can_decide']);
+        }
+        $review->update(['source_type' => 'bill', 'source_id' => 987]);
+        $this->actingAs($local)->get('/fleet-assets/assets/'.$this->asset->id)->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->has('workspace.finance_reviews', 0));
+        $payables = $this->user([$this->origin], ['assets.viewAny', 'finance.assets.view', 'finance.ap.view']);
+        $this->actingAs($payables)->get('/fleet-assets/assets/'.$this->asset->id)->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->has('workspace.finance_reviews', 1));
+    }
+
+    public function test_complete_ordinary_edits_cannot_split_parent_or_component_but_unrelated_edits_and_unlinked_moves_work(): void
+    {
+        $component = Asset::factory()->forSite($this->origin)->create(['category' => 'equipment', 'status' => 'active', 'home_site_id' => $this->origin->id]);
+        $this->ordinaryEdit($component, ['site_id' => $this->destination->id, 'home_site_id' => $this->destination->id])->assertRedirect();
+        $this->ordinaryEdit($component, ['site_id' => $this->origin->id, 'home_site_id' => $this->origin->id])->assertRedirect();
+        $item = $this->command('kit_add', ['name' => 'Linked sling', 'component_asset_id' => $component->id])->assertOk()->json('kit_item_id');
+        foreach ([$this->asset, $component] as $member) {
+            $this->ordinaryEdit($member, ['description' => 'Ordinary detail correction'])->assertRedirect();
+            $this->ordinaryEdit($member, ['site_id' => $this->destination->id, 'home_site_id' => $this->destination->id])->assertUnprocessable()->assertJsonValidationErrors('site_id');
+            $this->assertSame($this->origin->id, $member->fresh()->site_id);
+        }
+        $this->assertNull(AssetKitItem::findOrFail($item)->removed_at);
+        $this->command('kit_remove', ['kit_item_id' => $item])->assertOk();
+        $this->ordinaryEdit($component, ['site_id' => $this->destination->id, 'home_site_id' => $this->destination->id])->assertRedirect();
+        $this->assertSame($this->destination->id, $component->fresh()->site_id);
+        $this->assertNotNull(AssetKitItem::findOrFail($item)->removed_at);
+        $this->assertSame(0, AssetCustodyMovement::whereIn('asset_id', [$this->asset->id, $component->id])->count());
+    }
+
+    public function test_linked_kit_room_home_site_and_client_placement_cannot_be_changed_by_ordinary_edit(): void
+    {
+        $component = Asset::factory()->forSite($this->origin)->create(['category' => 'equipment', 'status' => 'active', 'home_site_id' => $this->origin->id]);
+        $room = SiteRoom::create(['site_id' => $this->origin->id, 'name' => 'Other room']);
+        $client = Client::factory()->create(['site_id' => $this->origin->id]);
+        $permission = Permission::firstOrCreate(['key' => 'clients.viewAny'], ['description' => 'View clients', 'group' => 'clients']);
+        $this->manager->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
+        $this->manager = $this->manager->fresh();
+        $this->command('kit_add', ['name' => 'Linked sling', 'component_asset_id' => $component->id])->assertOk();
+        foreach ([$this->asset, $component] as $member) {
+            foreach (['site_room_id' => $room->id, 'home_site_id' => $this->destination->id, 'client_id' => $client->id, 'location' => 'Different cupboard'] as $field => $value) {
+                $this->ordinaryEdit($member, [$field => $value])->assertUnprocessable()->assertJsonValidationErrors($field);
+            }
+            $this->assertNull($member->fresh()->site_room_id);
+            $this->assertNull($member->fresh()->client_id);
+            $this->assertSame($this->origin->id, $member->fresh()->home_site_id);
+        }
+    }
+
+    public function test_component_with_an_unresolved_movement_cannot_be_linked_to_a_kit(): void
+    {
+        foreach (['pending_receipt', 'incomplete', 'disputed'] as $state) {
+            $component = Asset::factory()->forSite($this->origin)->create(['category' => 'equipment', 'status' => 'active']);
+            $movement = $this->componentCommand($component, 'dispatch', ['destination_site_id' => $this->destination->id, 'recipient_user_id' => $this->manager->id])->assertOk()->json('movement_id');
+            if ($state !== 'pending_receipt') {
+                $this->componentCommand($component, 'receive', ['movement_id' => $movement, 'outcome' => $state, 'received_kit' => []])->assertOk();
+            }
+            $this->command('kit_add', ['name' => 'Unresolved component', 'component_asset_id' => $component->id])->assertConflict();
+            $this->assertSame(0, AssetKitItem::where('component_asset_id', $component->id)->count());
+            $this->assertSame($state, AssetCustodyMovement::findOrFail($movement)->state);
+            $this->componentCommand($component, 'receive', ['movement_id' => $movement, 'outcome' => 'acknowledged', 'received_kit' => []])->assertOk();
+            $this->assertSame($this->destination->id, $component->fresh()->site_id);
+        }
+    }
+
+    public function test_outstanding_component_loan_must_return_before_kit_linking(): void
+    {
+        $component = Asset::factory()->forSite($this->origin)->create(['category' => 'equipment', 'status' => 'active']);
+        $movement = $this->componentCommand($component, 'dispatch', ['kind' => 'loan', 'destination_site_id' => $this->origin->id, 'recipient_user_id' => $this->manager->id, 'return_due_on' => today()->addWeek()->toDateString()])->assertOk()->json('movement_id');
+        $this->componentCommand($component, 'receive', ['movement_id' => $movement, 'outcome' => 'acknowledged', 'received_kit' => []])->assertOk();
+        $this->command('kit_add', ['name' => 'Loan component', 'component_asset_id' => $component->id])->assertConflict();
+        $return = $this->componentCommand($component, 'return', ['movement_id' => $movement, 'recipient_user_id' => $this->manager->id])->assertOk()->json('movement_id');
+        $this->componentCommand($component, 'receive', ['movement_id' => $return, 'outcome' => 'acknowledged', 'received_kit' => []])->assertOk();
+        $this->command('kit_add', ['name' => 'Returned component', 'component_asset_id' => $component->id])->assertOk();
+        $this->assertSame('returned', AssetCustodyMovement::findOrFail($movement)->state);
+    }
+
+    public function test_receipt_refuses_a_legacy_independently_linked_component_until_explicitly_removed(): void
+    {
+        $component = Asset::factory()->forSite($this->origin)->create(['category' => 'equipment', 'status' => 'active']);
+        $movement = $this->componentCommand($component, 'dispatch', ['destination_site_id' => $this->destination->id, 'recipient_user_id' => $this->manager->id])->assertOk()->json('movement_id');
+        // Existing inconsistent data from the earlier implementation still fails closed at receipt.
+        $link = AssetKitItem::create(['asset_id' => $this->asset->id, 'component_asset_id' => $component->id, 'name' => 'Legacy link', 'added_by_user_id' => $this->manager->id]);
+        $this->componentCommand($component, 'receive', ['movement_id' => $movement, 'outcome' => 'acknowledged', 'received_kit' => []])->assertUnprocessable();
+        $this->assertSame($this->origin->id, $component->fresh()->site_id);
+        $this->assertSame('pending_receipt', AssetCustodyMovement::findOrFail($movement)->state);
+        $this->assertNull($link->fresh()->removed_at);
+        $this->command('kit_remove', ['kit_item_id' => $link->id])->assertOk();
+        $this->componentCommand($component, 'receive', ['movement_id' => $movement, 'outcome' => 'acknowledged', 'received_kit' => []])->assertOk();
+        $this->assertNotNull($link->fresh()->removed_at);
+    }
+
+    private function ordinaryEdit(Asset $asset, array $values = [])
+    {
+        $asset = $asset->fresh();
+
+        return $this->actingAs($this->manager)->putJson('/fleet-assets/assets/'.$asset->id, array_replace([
+            'name' => $asset->name, 'category' => 'equipment', 'status' => 'active', 'risk_level' => 'low',
+            'site_id' => $asset->site_id, 'home_site_id' => $asset->home_site_id, 'expected_version' => $asset->asset_profile_version,
+        ], $values));
+    }
+
+    private function componentCommand(Asset $asset, string $action, array $values)
+    {
+        return $this->actingAs($this->manager)->postJson('/assets/'.$asset->id.'/profile-actions', $values + [
+            'action' => $action, 'request_key' => (string) Str::uuid(), 'expected_version' => $asset->fresh()->asset_profile_version, 'reason' => 'Synthetic component custody',
+        ]);
     }
 
     private function command(string $action, array $values = [])

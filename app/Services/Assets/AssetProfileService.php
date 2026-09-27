@@ -78,7 +78,7 @@ final class AssetProfileService
 
     private function dispatch(User $actor, Asset $asset, array $data): array
     {
-        abort_if(AssetKitItem::where('component_asset_id', $asset->id)->whereNull('removed_at')->exists(), 409, 'Dispatch this component with its parent kit, or remove it from the kit first.');
+        abort_if(AssetKitItem::where('component_asset_id', $asset->id)->whereNull('removed_at')->lockForUpdate()->first(['id']), 409, 'Dispatch this component with its parent kit, or remove it from the kit first.');
         $pending = AssetCustodyMovement::where('asset_id', $asset->id)->whereIn('state', ['pending_receipt', 'incomplete', 'disputed'])->lockForUpdate()->first();
         abort_if($pending, 409, 'Resolve the outstanding receipt before starting another movement.');
         $loan = null;
@@ -94,7 +94,7 @@ final class AssetProfileService
         $sites = $this->access->accessibleSiteIds($actor);
         abort_unless(in_array($origin, $sites, true) && in_array($destination, $sites, true), 404);
         abort_if($asset->client_id && $origin !== $destination, 409, 'Client-owned equipment must retain its canonical client/site ownership. Resolve placement with the source owner first.');
-        $this->integrity->assertPlacementChangeAllowed($asset, ['site_id' => $destination, 'home_site_id' => $asset->home_site_id === null ? null : $destination]);
+        $this->integrity->assertPlacementChangeAllowed($asset, ['site_id' => $destination, 'home_site_id' => $asset->home_site_id === null ? null : $destination], movingKitParentId: (int) $asset->id);
         $recipient = $this->access->assignableStaffMember($actor, (int) ($data['recipient_user_id'] ?? 0), true) ?? abort(404);
         $profile = HrEmployeeProfile::where('user_id', $recipient->id)->where('is_active', true)->lockForUpdate()->first();
         $staffSites = array_map('intval', [$profile?->primary_site_id, ...($profile?->secondary_site_ids ?? [])]);
@@ -104,7 +104,7 @@ final class AssetProfileService
         if ($kind === 'loan' && empty($data['return_due_on'])) {
             throw ValidationException::withMessages(['return_due_on' => 'Choose the expected return date.']);
         }
-        $kit = AssetKitItem::where('asset_id', $asset->id)->whereNull('removed_at')->get(['id', 'name', 'component_asset_id'])->toArray();
+        $kit = AssetKitItem::where('asset_id', $asset->id)->whereNull('removed_at')->lockForUpdate()->get(['id', 'name', 'component_asset_id'])->toArray();
         $this->movableComponents($actor, $asset, $kit, $destination);
         $movement = AssetCustodyMovement::create([
             'asset_id' => $asset->id, 'kind' => $kind, 'state' => 'pending_receipt',
@@ -190,7 +190,7 @@ final class AssetProfileService
             $room = $movement->destination_room_id
                 ? SiteRoom::where('site_id', $movement->destination_site_id)->whereKey($movement->destination_room_id)->lockForUpdate()->firstOrFail()
                 : null;
-            $this->integrity->assertPlacementChangeAllowed($asset, ['site_id' => $movement->destination_site_id, 'home_site_id' => $asset->home_site_id === null ? null : $movement->destination_site_id]);
+            $this->integrity->assertPlacementChangeAllowed($asset, ['site_id' => $movement->destination_site_id, 'home_site_id' => $asset->home_site_id === null ? null : $movement->destination_site_id, 'site_room_id' => $room?->id, 'room_id' => null, 'location' => $room?->name], movingKitParentId: (int) $asset->id);
             $components = $this->movableComponents($actor, $asset, $movement->kit_snapshot, (int) $movement->destination_site_id);
             $asset->forceFill(['site_id' => $movement->destination_site_id, 'home_site_id' => $asset->home_site_id === null ? null : $movement->destination_site_id, 'site_room_id' => $room?->id, 'room_id' => null, 'location' => $room?->name])->save();
             foreach ($components as $component) {
@@ -219,7 +219,7 @@ final class AssetProfileService
 
     private function addKit(User $actor, Asset $asset, array $data): array
     {
-        abort_if(AssetKitItem::where('component_asset_id', $asset->id)->whereNull('removed_at')->exists(), 409, 'A component already in a kit cannot contain another kit.');
+        abort_if(AssetKitItem::where('component_asset_id', $asset->id)->whereNull('removed_at')->lockForUpdate()->first(['id']), 409, 'A component already in a kit cannot contain another kit.');
         $componentId = $data['component_asset_id'] ?? null;
         if ($componentId) {
             abort_if((int) $componentId === (int) $asset->id, 422, 'An asset cannot contain itself.');
@@ -228,11 +228,14 @@ final class AssetProfileService
             abort_if($component->status === 'retired' || Asset::vehicles()->whereKey($component->id)->exists(), 422, 'Choose an active equipment component. Vehicles retain their own profile and custody.');
             abort_unless($component->site_id === $asset->site_id, 422, 'Choose a component at this asset’s site.');
             abort_if($component->client_id !== $asset->client_id, 422, 'Components must have the same ownership context.');
-            abort_if(AssetKitItem::where('component_asset_id', $componentId)->whereNull('removed_at')->exists(), 409, 'This component already belongs to a kit.');
+            abort_if(AssetKitItem::where('component_asset_id', $componentId)->whereNull('removed_at')->lockForUpdate()->first(['id']), 409, 'This component already belongs to a kit.');
+            abort_if(AssetCustodyMovement::where('asset_id', $componentId)->where(function ($query) {
+                $query->whereIn('state', ['pending_receipt', 'incomplete', 'disputed'])->orWhere(fn ($loan) => $loan->where('kind', 'loan')->where('state', 'acknowledged')->whereNull('returned_at'));
+            })->lockForUpdate()->first(['id']), 409, 'Resolve the component’s outstanding custody movement before adding it to a kit.');
             // Keep one level: no cycles or nested movements claiming receipt of other kits.
-            abort_if(AssetKitItem::where('asset_id', $componentId)->whereNull('removed_at')->exists() || AssetKitItem::where('component_asset_id', $asset->id)->whereNull('removed_at')->exists(), 409, 'Nested kits require separate reconciliation.');
+            abort_if(AssetKitItem::where('asset_id', $componentId)->whereNull('removed_at')->lockForUpdate()->first(['id']), 409, 'Nested kits require separate reconciliation.');
         }
-        abort_if(AssetCustodyMovement::where('asset_id', $asset->id)->whereIn('state', ['pending_receipt', 'incomplete', 'disputed'])->exists(), 409, 'Resolve the receipt before changing its kit.');
+        abort_if(AssetCustodyMovement::where('asset_id', $asset->id)->whereIn('state', ['pending_receipt', 'incomplete', 'disputed'])->lockForUpdate()->first(['id']), 409, 'Resolve the receipt before changing its kit.');
         $item = AssetKitItem::create(['asset_id' => $asset->id, 'component_asset_id' => $componentId, 'name' => $data['name'], 'added_by_user_id' => $actor->id]);
 
         return ['kit_item_id' => $item->id, 'message' => 'Kit item added. A linked component keeps its own maintenance history.'];
@@ -261,12 +264,12 @@ final class AssetProfileService
         foreach ($ids as $id) {
             $component = $this->access->assignableAsset($actor, (int) $id, true) ?? abort(404);
             Gate::forUser($actor)->authorize('manageAssignments', $component);
-            abort_unless(AssetKitItem::where('asset_id', $asset->id)->where('component_asset_id', $id)->whereNull('removed_at')->exists(), 409, 'The linked kit changed. Reconcile its contents before moving it.');
+            abort_unless(AssetKitItem::where('asset_id', $asset->id)->where('component_asset_id', $id)->whereNull('removed_at')->lockForUpdate()->first(['id']), 409, 'The linked kit changed. Reconcile its contents before moving it.');
             abort_if($component->status === 'retired' || $component->site_id !== $asset->site_id || $component->client_id !== $asset->client_id, 409, 'A linked component has a different placement or lifecycle. Reconcile the kit before moving it.');
             abort_if(AssetCustodyMovement::where('asset_id', $id)->where(function ($query) {
                 $query->whereIn('state', ['pending_receipt', 'incomplete', 'disputed'])->orWhere(fn ($loan) => $loan->where('kind', 'loan')->where('state', 'acknowledged')->whereNull('returned_at'));
-            })->exists(), 409, 'Resolve the linked component’s outstanding custody movement first.');
-            $this->integrity->assertPlacementChangeAllowed($component, ['site_id' => $destination, 'home_site_id' => $component->home_site_id === null ? null : $destination]);
+            })->lockForUpdate()->first(['id']), 409, 'Resolve the linked component’s outstanding custody movement first.');
+            $this->integrity->assertPlacementChangeAllowed($component, ['site_id' => $destination, 'home_site_id' => $component->home_site_id === null ? null : $destination], movingKitParentId: (int) $asset->id);
             $components[] = $component;
         }
 
