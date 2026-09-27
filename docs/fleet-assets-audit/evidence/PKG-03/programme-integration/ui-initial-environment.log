@@ -1,0 +1,26 @@
+
+ RUN  v4.1.5 C:/Users/steph/.codex/worktrees/dcf0/oblivionfindings
+
+·························
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/finance/document-preview.test.tsx [ resources/js/components/finance/document-preview.test.tsx ]
+ FAIL  resources/js/components/fleet-assets/maintenance/cost-workspace.test.tsx [ resources/js/components/fleet-assets/maintenance/cost-workspace.test.tsx ]
+ FAIL  resources/js/components/fleet-assets/vehicle-workspace/finance-studio.test.tsx [ resources/js/components/fleet-assets/vehicle-workspace/finance-studio.test.tsx ]
+ FAIL  resources/js/pages/finance/bills/Show.test.tsx [ resources/js/pages/finance/bills/Show.test.tsx ]
+ FAIL  resources/js/pages/finance/vehicle-reviews/history.test.tsx [ resources/js/pages/finance/vehicle-reviews/history.test.tsx ]
+Error: Denied ID C:/Users/steph/Herd/oblivionfindings/node_modules/pdfjs-dist/build/pdf.worker.min.mjs?url
+  File: C:/Users/steph/Herd/oblivionfindings/node_modules/pdfjs-dist/build/pdf.worker.min.mjs?url
+ ❯ loadAndTransform ../../../../Herd/oblivionfindings/node_modules/vite/dist/node/chunks/config.js:22696:33
+ ❯ doTransform ../../../../Herd/oblivionfindings/node_modules/vite/dist/node/chunks/config.js:22673:17
+ ❯ fetchModule ../../../../Herd/oblivionfindings/node_modules/vite/dist/node/chunks/config.js:34073:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+
+ Test Files  5 failed | 7 passed (12)
+      Tests  25 passed (25)
+   Start at  10:47:53
+   Duration  37.34s (transform 4.01s, setup 21.26s, import 83.69s, tests 2.47s, environment 153.66s)
+

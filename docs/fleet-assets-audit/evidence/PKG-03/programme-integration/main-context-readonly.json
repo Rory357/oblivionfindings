@@ -1,0 +1,38 @@
+[
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\00-project-rules.md",
+    "sha256": "0DF8B4EE470F06C99AD62971A4CC3C13FE3EE88C0C29A4667F3AED14501EF919"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\01-domain-ownership.md",
+    "sha256": "315123740BAE45D61B173A9A6C53953D7077765ECB9778AADDC8B11426C34E0B"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\02-approved-workflows.md",
+    "sha256": "1E8F9B6C9CB53AE62963570A8C4C3DAB5EA379DBAC793F25E8745594A8EB81E1"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\03-dependency-map.md",
+    "sha256": "CFC0603B6342766E910FBB21374011A2539A0C192F33DFC566745E72D59EB7D7"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\05-page-register.md",
+    "sha256": "28254995977A4802BCF902BC2D7D13EEE15FA423D79A8207C78C98A6E5B33D54"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\09-amendments.md",
+    "sha256": "66386328E5D6D2B272D7502AF75A5817495AF582C34CA9AA9A2860701549230F"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\13-integration-matrix.md",
+    "sha256": "5EEB5B61E9D8B5843453AC9D95F9AA6884836781595411672EA50D234C3FDA23"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\handoffs\\PKG-03-DESIGNER.md",
+    "sha256": "EA9CD90C5136497DDBE2B8CF12B8828944D7C89A81CED0854A81BFCA162331F5"
+  },
+  {
+    "path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\evidence\\PKG-03-main-local-integration-intake.md",
+    "sha256": "7AC84288956316C0683B99991ADBC7C6B9F5F4AABE9DEF3123BB3C2CAD12BB71"
+  }
+]

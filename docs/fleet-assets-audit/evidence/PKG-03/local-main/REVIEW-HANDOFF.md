@@ -1,5 +1,7 @@
 # PKG-03 local-main integration candidate
 
+**28 September successor:** the current consolidated candidate and scope are recorded in [the programme integration packet](../programme-integration/REVIEW-PACKET.md), on Main base `926b4981b`. The earlier bases and runs below remain historical evidence. No local-main integration is claimed by either packet.
+
 Stephan's direct request: “can you let main know can you get this on main locally”. Local integration only; no remote push or operational deployment is authorised by this request. Main retains technical review and the serial integration slot. This chat owns the actual local merge after that review, preserving Main's existing dirty programme files.
 
 ## Exact candidate
