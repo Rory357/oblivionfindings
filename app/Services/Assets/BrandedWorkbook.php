@@ -7,7 +7,7 @@ use ZipArchive;
 /** Small, typed OOXML workbook. All user content is an inline string, never a formula. */
 final class BrandedWorkbook
 {
-    public function bytes(array $sheets, array $brand, string $title): string
+    public function bytes(array $sheets, array $brand, string $title, string $category = 'STOCKTAKE'): string
     {
         $path = tempnam(sys_get_temp_dir(), 'asset-xlsx-');
         $zip = new ZipArchive;
@@ -49,7 +49,7 @@ final class BrandedWorkbook
                     $xml .= '<col min="'.($column + 1).'" max="'.($column + 1).'" width="'.$width.'" customWidth="1"/>';
                 }
                 $xml .= '</cols><sheetData>';
-                $all = [[$brand['name']], [$title], ['STOCKTAKE · '.$name], [], ...$rows];
+                $all = [[$brand['name']], [$title], [$category.' · '.$name], [], ...$rows];
                 foreach ($all as $r => $row) {
                     $lines = 1;
                     foreach ($row as $c => $value) {

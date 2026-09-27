@@ -806,6 +806,7 @@ export default function LoneWorkerIndex({
                             </Link>
                         ) : null}
                     </HeroShell>
+                    <GuardrailButton asChild variant="outline"><Link href="/operations/people-location-reports/staff">Build a safety report</Link></GuardrailButton>
                 </div>
 
                 <TabStrip

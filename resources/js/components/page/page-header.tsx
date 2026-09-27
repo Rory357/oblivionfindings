@@ -1077,6 +1077,7 @@ export function PageHeaderRail<K extends string>({
     value,
     onSelect,
     onFind,
+    showFind = true,
     ariaLabel = 'Views',
     onItemContextMenu,
     decorations,
@@ -1087,6 +1088,8 @@ export function PageHeaderRail<K extends string>({
     /** Custom palette opener (record profiles); omitted → the rail's own
      *  built-in views palette. */
     onFind?: () => void;
+    /** Two-view workspaces can omit the redundant Find control. */
+    showFind?: boolean;
     ariaLabel?: string;
     onItemContextMenu?: (key: K, event: React.MouseEvent) => void;
     decorations?: Partial<Record<K, ReactNode>>;
@@ -1114,7 +1117,7 @@ export function PageHeaderRail<K extends string>({
             // Measurement row: one node per item, then More, then Find.
             const nodes = Array.from(measureRow.children) as HTMLElement[];
             if (nodes.length < items.length + 2) return;
-            const findW = nodes[nodes.length - 1].offsetWidth;
+            const findW = showFind ? nodes[nodes.length - 1].offsetWidth : 0;
             const moreW = nodes[nodes.length - 2].offsetWidth;
             const itemW = nodes
                 .slice(0, items.length)
@@ -1175,7 +1178,7 @@ export function PageHeaderRail<K extends string>({
         observer.observe(measureRow);
         return () => observer.disconnect();
         // eslint-disable-next-line react-hooks/exhaustive-deps -- itemsKey stands in for items
-    }, [itemsKey, value, onFind]);
+    }, [itemsKey, value, onFind, showFind]);
 
     const visibleItems =
         visibleKeys == null
@@ -1238,64 +1241,72 @@ export function PageHeaderRail<K extends string>({
           visibleItems[0]?.key);
     return (
         <div
-            role="tablist"
-            aria-label={ariaLabel}
             ref={containerRef}
             className="relative flex w-full flex-nowrap items-end gap-1"
         >
-            {visibleItems.map((it) => {
-                const on = it.key === value;
-                return (
-                    <button
-                        key={it.key}
-                        type="button"
-                        role="tab"
-                        aria-selected={on}
-                        ref={(button) => {
-                            if (button) tabButtons.current.set(it.key, button);
-                            else tabButtons.current.delete(it.key);
-                        }}
-                        tabIndex={it.key === entryKey ? 0 : -1}
-                        onFocus={() => setFocusedKey(it.key)}
-                        onKeyDown={(event) => {
-                            const index = visibleItems.findIndex(
-                                (item) => item.key === it.key,
-                            );
-                            const next =
-                                event.key === 'Home'
-                                    ? 0
-                                    : event.key === 'End'
-                                      ? visibleItems.length - 1
-                                      : event.key === 'ArrowRight'
-                                        ? (index + 1) % visibleItems.length
-                                        : event.key === 'ArrowLeft'
-                                          ? (index + visibleItems.length - 1) %
-                                            visibleItems.length
-                                          : null;
-                            if (next === null) return;
-                            event.preventDefault();
-                            // Manual activation keeps navigation and unsaved-work guards
-                            // with the existing Enter/Space/click action.
-                            tabButtons.current
-                                .get(visibleItems[next].key)
-                                ?.focus();
-                        }}
-                        onClick={() => onSelect(it.key)}
-                        onContextMenu={
-                            onItemContextMenu
-                                ? (event) => onItemContextMenu(it.key, event)
-                                : undefined
-                        }
-                        className={railTabClass(on)}
-                    >
-                        <RailTabInner
-                            item={it}
-                            on={on}
-                            decoration={decorations?.[it.key]}
-                        />
-                    </button>
-                );
-            })}
+            <div
+                role="tablist"
+                aria-label={ariaLabel}
+                className="flex shrink-0 flex-nowrap items-end gap-1"
+            >
+                {visibleItems.map((it) => {
+                    const on = it.key === value;
+                    return (
+                        <button
+                            key={it.key}
+                            type="button"
+                            role="tab"
+                            aria-selected={on}
+                            ref={(button) => {
+                                if (button)
+                                    tabButtons.current.set(it.key, button);
+                                else tabButtons.current.delete(it.key);
+                            }}
+                            tabIndex={it.key === entryKey ? 0 : -1}
+                            onFocus={() => setFocusedKey(it.key)}
+                            onKeyDown={(event) => {
+                                const index = visibleItems.findIndex(
+                                    (item) => item.key === it.key,
+                                );
+                                const next =
+                                    event.key === 'Home'
+                                        ? 0
+                                        : event.key === 'End'
+                                          ? visibleItems.length - 1
+                                          : event.key === 'ArrowRight'
+                                            ? (index + 1) % visibleItems.length
+                                            : event.key === 'ArrowLeft'
+                                              ? (index +
+                                                    visibleItems.length -
+                                                    1) %
+                                                visibleItems.length
+                                              : null;
+                                if (next === null) return;
+                                event.preventDefault();
+                                // Manual activation keeps navigation and unsaved-work guards
+                                // with the existing Enter/Space/click action.
+                                tabButtons.current
+                                    .get(visibleItems[next].key)
+                                    ?.focus();
+                            }}
+                            onClick={() => onSelect(it.key)}
+                            onContextMenu={
+                                onItemContextMenu
+                                    ? (event) =>
+                                          onItemContextMenu(it.key, event)
+                                    : undefined
+                            }
+                            className={railTabClass(on)}
+                        >
+                            <RailTabInner
+                                item={it}
+                                on={on}
+                                decoration={decorations?.[it.key]}
+                            />
+                        </button>
+                    );
+                })}
+            </div>
             {overflowItems.length > 0 ? (
                 <Popover open={moreOpen} onOpenChange={setMoreOpen}>
                     <PopoverTrigger asChild>
@@ -1353,22 +1364,24 @@ export function PageHeaderRail<K extends string>({
                     </PopoverContent>
                 </Popover>
             ) : null}
-            <button
-                type="button"
-                ref={findButton}
-                onClick={
-                    onFind ??
-                    (() => {
-                        pickedKey.current = null;
-                        setViewsFindOpen(true);
-                    })
-                }
-                title={onFind ? 'Find a section (/)' : 'Find a view'}
-                aria-label={onFind ? 'Find a section' : 'Find a view'}
-                className={cn(railPillClass, 'ml-auto')}
-            >
-                {findChip}
-            </button>
+            {showFind && (
+                <button
+                    type="button"
+                    ref={findButton}
+                    onClick={
+                        onFind ??
+                        (() => {
+                            pickedKey.current = null;
+                            setViewsFindOpen(true);
+                        })
+                    }
+                    title={onFind ? 'Find a section (/)' : 'Find a view'}
+                    aria-label={onFind ? 'Find a section' : 'Find a view'}
+                    className={cn(railPillClass, 'ml-auto')}
+                >
+                    {findChip}
+                </button>
+            )}
             {/* Hidden measurement row — mirrors every tab (plus the widest
                 possible More pill and the Find chip) so the overflow point
                 is computed from real widths, never guessed. */}
@@ -1401,7 +1414,7 @@ export function PageHeaderRail<K extends string>({
                     {findChip}
                 </button>
             </div>
-            {onFind ? null : (
+            {onFind || !showFind ? null : (
                 <RailViewsPalette
                     items={items}
                     open={viewsFindOpen}

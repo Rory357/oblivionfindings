@@ -940,3 +940,5 @@ app(Schedule::class)
 
 // Canonical commercial follow-ups; no generic notification or external send.
 app(Schedule::class)->command('vendors:check-renewals')->dailyAt('00:05')->timezone(config('app.worker_timezone'))->withoutOverlapping();
+
+Illuminate\Support\Facades\Schedule::command('reports:run-schedules')->everyFiveMinutes()->withoutOverlapping();
