@@ -266,4 +266,35 @@ class AssetRegisterWorkflowTest extends TestCase
         $this->asset->update(['site_id' => $otherSite->id, 'site_room_id' => null]);
         $this->get(self::BASE.'/labels/'.$batch['id'].'/zip')->assertNotFound();
     }
+
+    public function test_label_replay_requires_the_original_selection_and_layout(): void
+    {
+        $second = Asset::factory()->forSite($this->site)->create();
+        $payload = $this->labelPayload([$second->id, $this->asset->id]);
+        $batch = $this->postJson(self::BASE.'/labels', $payload)->assertCreated()->json();
+        $payload['asset_ids'] = [(string) $this->asset->id, (string) $second->id];
+        $payload['layout']['width'] = '60.0';
+        $this->postJson(self::BASE.'/labels', $payload)->assertOk()->assertJsonPath('id', $batch['id']);
+        $changed = $payload;
+        $changed['layout']['copies'] = 2;
+        $this->postJson(self::BASE.'/labels', $changed)->assertConflict();
+        $changed = $payload;
+        $changed['asset_ids'] = [$this->asset->id];
+        $this->postJson(self::BASE.'/labels', $changed)->assertConflict();
+        $this->assertDatabaseCount('asset_label_batches', 1);
+    }
+
+    public function test_print_permission_does_not_grant_permission_to_create_a_missing_qr_identity(): void
+    {
+        $this->asset->update(['qr_token' => null]);
+        $this->postJson(self::BASE.'/labels', $this->labelPayload([$this->asset->id]))->assertForbidden();
+        $this->assertNull($this->asset->fresh()->qr_token);
+        $this->assertDatabaseCount('asset_label_batches', 0);
+
+        $permission = Permission::firstOrCreate(['key' => 'assets.update'], ['description' => 'Update assets', 'group' => 'assets']);
+        $this->actor->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
+        $this->actingAs($this->actor->fresh());
+        $this->postJson(self::BASE.'/labels', $this->labelPayload([$this->asset->id]))->assertCreated();
+        $this->assertNotEmpty($this->asset->fresh()->qr_token);
+    }
 }

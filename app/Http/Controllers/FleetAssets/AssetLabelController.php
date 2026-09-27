@@ -27,10 +27,18 @@ class AssetLabelController extends Controller
     {
         $this->authorize('viewAny', Asset::class);
         $data = $request->validate(['request_id' => 'required|uuid', 'asset_ids' => 'required|array|min:1|max:200', 'asset_ids.*' => 'required|integer|distinct',
-            'layout' => 'required|array', 'layout.width' => 'required|numeric|min:40|max:190', 'layout.height' => 'required|numeric|min:40|max:277',
+            'layout' => 'required|array:width,height,margin,gap,copies,start', 'layout.width' => 'required|numeric|min:40|max:190', 'layout.height' => 'required|numeric|min:40|max:277',
             'layout.margin' => 'required|numeric|min:5|max:30', 'layout.gap' => 'required|numeric|min:0|max:15',
             'layout.copies' => 'required|integer|min:1|max:20', 'layout.start' => 'required|integer|min:1|max:100']);
         $layout = $data['layout'];
+        foreach (['width', 'height', 'margin', 'gap'] as $key) {
+            $layout[$key] = (float) $layout[$key];
+        }
+        foreach (['copies', 'start'] as $key) {
+            $layout[$key] = (int) $layout[$key];
+        }
+        $data['asset_ids'] = array_map('intval', $data['asset_ids']);
+        sort($data['asset_ids']);
         $columns = (int) floor((210 - 2 * $layout['margin'] + $layout['gap']) / ($layout['width'] + $layout['gap']));
         $rows = (int) floor((297 - 2 * $layout['margin'] + $layout['gap']) / ($layout['height'] + $layout['gap']));
         abort_unless($columns > 0 && $rows > 0 && $layout['start'] <= $columns * $rows, 422, 'This label layout does not fit an A4 sheet.');
@@ -40,6 +48,7 @@ class AssetLabelController extends Controller
             User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
             if ($batch = AssetLabelBatch::where('request_id', $data['request_id'])->first()) {
                 abort_unless($batch->created_by_user_id === $request->user()->id, 404);
+                abort_unless($batch->asset_ids === $data['asset_ids'] && $batch->layout == [...$layout, 'columns' => $columns, 'rows' => $rows], 409, 'This request was already used for different labels. Start a new batch.');
 
                 return $batch;
             }
@@ -47,6 +56,7 @@ class AssetLabelController extends Controller
             abort_unless($assets->count() === count($data['asset_ids']), 404);
             foreach ($assets as $asset) {
                 if (! $asset->qr_token) {
+                    $this->authorize('update', $asset);
                     $asset->update(['qr_token' => Str::random(32)]);
                 }
             }
