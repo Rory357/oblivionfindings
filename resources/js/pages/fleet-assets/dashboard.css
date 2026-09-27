@@ -1,0 +1,1236 @@
+.fleet-overview {
+    display: grid;
+    gap: 18px;
+    padding-bottom: 30px;
+}
+.fleet-overview .eh-header {
+    overflow: clip;
+}
+.fleet-overview.fo-dialog {
+    padding-bottom: 24px;
+    max-height: 90dvh;
+    overflow-y: auto;
+}
+.fleet-overview .fo-overview-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.8fr);
+    gap: 18px;
+    align-items: start;
+}
+.fleet-overview .fo-main-col,
+.fleet-overview .fo-side-col {
+    min-width: 0;
+    display: grid;
+    gap: 18px;
+}
+.fleet-overview .fo-card,
+.fleet-overview .fo-map-panel {
+    min-width: 0;
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: 0 12px 32px -28px rgba(18, 25, 56, 0.55);
+    padding: 20px;
+}
+.fleet-overview .fo-map-panel {
+    position: relative;
+}
+.fleet-overview .fo-section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 15px;
+}
+.fleet-overview .fo-section-head h2 {
+    font-size: 18px;
+    line-height: 1.25;
+    font-weight: 750;
+    letter-spacing: -0.025em;
+    color: var(--foreground);
+}
+.fleet-overview .fo-section-head h3 {
+    font-size: 16px;
+    font-weight: 700;
+}
+.fleet-overview .fo-section-head p:not(.fo-eyebrow) {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--muted-foreground);
+    margin-top: 4px;
+}
+.fleet-overview .fo-eyebrow {
+    color: var(--primary);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+.fleet-overview .fo-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex: none;
+}
+.fleet-overview .fo-map-toolbar,
+.fleet-overview .fo-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.fleet-overview .fo-segmented {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    background: var(--muted);
+    border-radius: 9px;
+}
+.fleet-overview .fo-segmented button,
+.fleet-overview .fo-controls > button,
+.fleet-overview .fo-controls > select {
+    border-radius: 7px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+    border: 1px solid transparent;
+}
+.fleet-overview .fo-segmented button.active,
+.fleet-overview .fo-controls > button.active {
+    color: var(--primary);
+    background: var(--card);
+    font-weight: 700;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.fleet-overview .fo-controls > button,
+.fleet-overview .fo-controls > select {
+    border-color: var(--border);
+    background: var(--background);
+    color: var(--foreground);
+}
+.fleet-overview .fo-stale-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    padding: 7px 10px;
+    border-radius: 8px;
+    color: var(--muted-foreground);
+    font-size: 12px;
+}
+.fleet-overview .fo-map-search {
+    width: min(170px, 100%);
+    border: 1px solid var(--border);
+    background: var(--background);
+    border-radius: 8px;
+    padding: 7px 9px;
+    color: var(--foreground);
+    font-size: 12px;
+    outline: none;
+}
+.fleet-overview .fo-map-search:focus-visible {
+    box-shadow: 0 0 0 2px var(--ring);
+}
+.fleet-overview .fo-stale-toggle.active {
+    border-color: var(--status-warning);
+    color: var(--status-warning);
+    font-weight: 700;
+}
+.fleet-overview .fo-group-toggle.active {
+    border-color: color-mix(in srgb, var(--primary) 25%, transparent);
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    color: var(--primary);
+}
+.fleet-overview .fo-map-count {
+    margin-left: auto;
+    color: var(--muted-foreground);
+    font-size: 12px;
+    white-space: nowrap;
+}
+.fleet-overview .fo-map-count button {
+    text-decoration: underline;
+    color: var(--primary);
+}
+.fleet-overview .fo-map-canvas {
+    height: 470px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    position: relative;
+    background: var(--muted);
+}
+.fleet-overview .fo-map-canvas > div:first-child {
+    height: 100%;
+}
+.fleet-overview .fo-map-canvas .leaflet-tile-pane {
+    filter: grayscale(1) saturate(0) contrast(0.88) brightness(1.04);
+}
+.fleet-overview .leaflet-map-stats-tooltip.leaflet-tooltip {
+    max-width: min(280px, calc(100vw - 40px));
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: var(--card);
+    color: var(--foreground);
+    box-shadow: 0 8px 26px rgba(0, 0, 0, 0.24);
+    white-space: normal;
+}
+.fleet-overview .leaflet-map-stats-tooltip.leaflet-tooltip::before {
+    display: none;
+}
+.fleet-overview .leaflet-map-stats-card {
+    width: 250px;
+    max-width: 100%;
+    padding: 12px;
+}
+.fleet-overview .leaflet-map-stats-card > strong {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+.fleet-overview .leaflet-map-stats-card > div {
+    display: grid;
+    gap: 5px;
+}
+.fleet-overview .leaflet-map-stats-card section {
+    display: grid;
+    grid-template-columns: 16px 70px minmax(0, 1fr);
+    align-items: start;
+    gap: 6px;
+    border-radius: 6px;
+    padding: 5px 6px;
+    background: var(--muted);
+}
+.fleet-overview .leaflet-map-stats-card svg {
+    width: 15px;
+    height: 15px;
+    color: var(--primary);
+}
+.fleet-overview .leaflet-map-stats-card span,
+.fleet-overview .leaflet-map-stats-card footer {
+    color: var(--muted-foreground);
+    font-size: 10px;
+}
+.fleet-overview .leaflet-map-stats-card b {
+    font-size: 10px;
+    overflow-wrap: anywhere;
+}
+.fleet-overview .leaflet-map-stats-card footer {
+    margin-top: 8px;
+}
+.fleet-overview .fo-map-legend {
+    position: absolute;
+    z-index: 500;
+    left: 12px;
+    bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    background: color-mix(in srgb, var(--card), transparent 4%);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 10px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+.fleet-overview .fo-map-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.fleet-overview .fo-map-legend i {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--primary);
+}
+.fleet-overview .fo-map-legend .fo-pin-asset {
+    background: var(--chart-2);
+}
+.fleet-overview .fo-map-legend .fo-pin-stale {
+    background: var(--status-warning);
+}
+.fleet-overview .fo-tile-notice {
+    position: absolute;
+    z-index: 500;
+    left: 12px;
+    top: 12px;
+    background: var(--card);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+}
+.fleet-overview .fo-map-expanded {
+    position: fixed;
+    z-index: 80;
+    inset: 12px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+.fleet-overview .fo-map-expanded .fo-map-canvas {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+}
+.fleet-overview .fo-map-detail,
+.fleet-overview .fo-map-list {
+    position: absolute;
+    z-index: 700;
+    top: 145px;
+    right: 34px;
+    width: min(340px, calc(100% - 55px));
+    max-height: calc(100% - 180px);
+    overflow: auto;
+    background: var(--card);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 17px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.22);
+}
+.fleet-overview .fo-map-detail {
+    top: 145px;
+}
+.fleet-overview .fo-map-detail h3 {
+    font-size: 17px;
+    font-weight: 750;
+    padding-right: 20px;
+}
+.fleet-overview .fo-map-detail > p {
+    color: var(--muted-foreground);
+    font-size: 12px;
+    margin: 5px 0 9px;
+}
+.fleet-overview .fo-map-detail .fo-eyebrow {
+    color: var(--primary);
+}
+.fleet-overview .fo-close {
+    position: absolute;
+    right: 14px;
+    top: 13px;
+}
+.fleet-overview .fo-map-detail dl {
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+}
+.fleet-overview .fo-map-detail dl div {
+    display: grid;
+    grid-template-columns: 75px 1fr;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 0;
+    font-size: 11px;
+}
+.fleet-overview .fo-map-detail dt {
+    color: var(--muted-foreground);
+}
+.fleet-overview .fo-map-detail dd {
+    font-weight: 600;
+}
+.fleet-overview .fo-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+}
+.fleet-overview .fo-resource-chooser {
+    display: grid;
+    gap: 5px;
+}
+.fleet-overview .fo-resource-chooser button,
+.fleet-overview .fo-list-row {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 9px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    text-align: left;
+    font-size: 12px;
+}
+.fleet-overview .fo-resource-chooser button:hover,
+.fleet-overview .fo-list-row:hover {
+    background: var(--muted);
+}
+.fleet-overview .fo-resource-chooser button span,
+.fleet-overview .fo-list-row > span:last-child {
+    color: var(--muted-foreground);
+    font-size: 10px;
+}
+.fleet-overview .fo-map-list {
+    top: 145px;
+}
+.fleet-overview .fo-input {
+    width: 100%;
+    border: 1px solid var(--border);
+    background: var(--background);
+    border-radius: 8px;
+    padding: 9px 11px;
+    font-size: 13px;
+    outline: none;
+    margin-bottom: 10px;
+}
+.fleet-overview .fo-input:focus-visible {
+    box-shadow: 0 0 0 2px var(--ring);
+}
+.fleet-overview .fo-list-row {
+    border-radius: 0;
+    border-width: 0 0 1px;
+}
+.fleet-overview .fo-list-row span:first-child {
+    display: grid;
+    gap: 2px;
+}
+.fleet-overview .fo-list-row small {
+    color: var(--muted-foreground);
+}
+.fleet-overview .fo-donut-layout {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    align-items: center;
+    gap: 18px;
+}
+.fleet-overview .fo-donut {
+    width: 160px;
+    height: 160px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    transform: rotate(-90deg);
+}
+.fleet-overview .fo-donut span {
+    width: 116px;
+    height: 116px;
+    border-radius: 50%;
+    background: var(--card);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0;
+    transform: rotate(90deg);
+    color: var(--foreground);
+}
+.fleet-overview .fo-donut strong {
+    font-size: 25px;
+    line-height: 1.15;
+}
+.fleet-overview .fo-donut small {
+    color: var(--muted-foreground);
+    font-size: 9px;
+}
+.fleet-overview .fo-donut-legend {
+    display: grid;
+    gap: 3px;
+}
+.fleet-overview .fo-donut-legend button {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    padding: 7px 5px;
+    border-radius: 7px;
+    font-size: 11px;
+    text-align: left;
+}
+.fleet-overview .fo-donut-legend button:hover {
+    background: var(--muted);
+}
+.fleet-overview .fo-donut-legend i {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    flex: none;
+}
+.fleet-overview .fo-donut-legend span {
+    flex: 1;
+}
+.fleet-overview .fo-donut-legend strong {
+    font-variant-numeric: tabular-nums;
+}
+.fleet-overview .fo-side-col .fo-donut-layout {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    gap: 9px;
+}
+.fleet-overview .fo-side-col .fo-donut-legend {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.fleet-overview .fo-note {
+    color: var(--muted-foreground);
+    font-size: 11px;
+    line-height: 1.5;
+    margin-top: 12px;
+}
+.fleet-overview .fo-work-rows {
+    border-top: 1px solid var(--border);
+}
+.fleet-overview .fo-work-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 4px;
+    min-width: 0;
+}
+.fleet-overview .fo-row-icon {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    color: var(--primary);
+    background: color-mix(in srgb, var(--primary), transparent 90%);
+    border-radius: 8px;
+}
+.fleet-overview .fo-row-main {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+.fleet-overview .fo-row-main strong {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.fleet-overview .fo-row-main small,
+.fleet-overview .fo-row-due small {
+    color: var(--muted-foreground);
+    font-size: 10px;
+}
+.fleet-overview .fo-row-due {
+    display: grid;
+    gap: 2px;
+    flex: none;
+    min-width: 94px;
+    font-size: 11px;
+}
+.fleet-overview .fo-row-link {
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 700;
+}
+.fleet-overview .fo-side-col .fo-work-row {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    gap: 4px 9px;
+}
+.fleet-overview .fo-side-col .fo-row-icon {
+    grid-row: 1 / 3;
+}
+.fleet-overview .fo-side-col .fo-row-main {
+    grid-column: 2 / 4;
+}
+.fleet-overview .fo-side-col .fo-row-due {
+    grid-column: 2;
+    min-width: 0;
+}
+.fleet-overview .fo-side-col .fo-work-row > button {
+    grid-column: 3;
+    grid-row: 2;
+}
+.fleet-overview .fo-empty {
+    text-align: center;
+    color: var(--muted-foreground);
+    padding: 26px 12px;
+    font-size: 12px;
+}
+.fleet-overview .fo-text-link {
+    color: var(--primary);
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.fleet-overview .fo-bars {
+    height: 105px;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    align-items: end;
+    gap: 8px;
+    margin-top: 15px;
+}
+.fleet-overview .fo-bars > button {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    color: var(--muted-foreground);
+}
+.fleet-overview .fo-bars i {
+    width: min(100%, 23px);
+    border-radius: 4px 4px 0 0;
+    background: color-mix(in srgb, var(--primary), transparent 20%);
+    min-height: 2px;
+}
+.fleet-overview .fo-workspace {
+    min-height: 450px;
+}
+.fleet-overview .fo-workspace > .fo-section-head > .fo-donut-layout {
+    max-width: 350px;
+}
+.fleet-overview .fo-count {
+    background: var(--muted);
+    border-radius: 8px;
+    padding: 6px 9px;
+    font-size: 11px;
+    font-weight: 700;
+}
+.fleet-overview .fo-status {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 6px;
+    padding: 4px 7px;
+    font-size: 10px;
+    font-weight: 750;
+    white-space: nowrap;
+    background: var(--muted);
+}
+.fleet-overview .fo-good {
+    color: var(--status-success);
+    background: var(--status-success-bg);
+}
+.fleet-overview .fo-danger {
+    color: var(--status-critical);
+    background: var(--status-critical-bg);
+}
+.fleet-overview .fo-info {
+    color: var(--status-info);
+    background: var(--status-info-bg);
+}
+.fleet-overview .fo-unknown {
+    color: var(--status-warning);
+    background: var(--status-warning-bg);
+}
+.fleet-overview .fo-pager {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 13px;
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+.fleet-overview .fo-saved {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    padding: 0 3px;
+    font-size: 11px;
+}
+.fleet-overview .fo-saved > span,
+.fleet-overview .fo-saved-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.fleet-overview .fo-saved-item {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding-left: 10px;
+}
+.fleet-overview .fo-saved-item button:first-child {
+    font-weight: 700;
+}
+.fleet-overview .fo-saved > button {
+    color: var(--primary);
+    text-decoration: underline;
+}
+.fleet-overview .fo-footer {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+    color: var(--muted-foreground);
+    font-size: 11px;
+    padding: 0 4px;
+}
+.fleet-overview .fo-footer button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--primary);
+}
+.fo-source-list {
+    display: grid;
+    border-top: 1px solid var(--border);
+}
+.fo-source-list > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 11px 2px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+}
+.fo-source-list > div > span:first-child {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+}
+.fo-source-list small {
+    color: var(--muted-foreground);
+    font-size: 11px;
+    line-height: 1.35;
+}
+.fo-save-label {
+    display: grid;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+}
+.fo-error {
+    color: var(--status-critical);
+    font-size: 12px;
+}
+@media (max-width: 1150px) {
+    .fleet-overview .fo-overview-grid {
+        grid-template-columns: 1fr;
+    }
+    .fleet-overview .fo-side-col {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .fleet-overview .fo-load {
+        grid-column: 1 / -1;
+    }
+}
+@media (max-width: 750px) {
+    .fleet-overview .fo-card,
+    .fleet-overview .fo-map-panel {
+        padding: 15px;
+    }
+    .fleet-overview .fo-side-col {
+        grid-template-columns: 1fr;
+    }
+    .fleet-overview .fo-load {
+        grid-column: auto;
+    }
+    .fleet-overview .fo-map-canvas {
+        height: 390px;
+    }
+    .fleet-overview .fo-donut-layout {
+        grid-template-columns: 130px 1fr;
+    }
+    .fleet-overview .fo-donut {
+        width: 130px;
+        height: 130px;
+    }
+    .fleet-overview .fo-donut span {
+        width: 92px;
+        height: 92px;
+    }
+    .fleet-overview .fo-row-due {
+        display: none;
+    }
+}
+
+/* Approved v9 composition: priorities, full-width map, work beside availability. */
+.fleet-overview .fo-operations-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 20px;
+    align-items: start;
+}
+.fleet-overview .fo-operations-work {
+    display: grid;
+    gap: 24px;
+    min-width: 0;
+}
+.fleet-overview .fo-section-head h2 {
+    font-size: 16px;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+}
+.fleet-overview .fo-section-head {
+    margin-bottom: 12px;
+}
+.fleet-overview .fo-urgent-strip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+}
+.fleet-overview .fo-urgent-strip > strong {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    padding-right: 10px;
+}
+.fleet-overview .fo-urgent-strip > strong > svg {
+    color: var(--status-warning);
+}
+.fleet-overview .fo-urgent-strip > button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    min-height: 40px;
+    flex: 1;
+    background: var(--muted);
+}
+.fleet-overview .fo-urgent-strip > button:hover {
+    background: var(--accent);
+}
+.fleet-overview .fo-urgent-strip b {
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+}
+.fleet-overview .fo-urgent-strip > button > svg:first-child {
+    color: var(--status-warning);
+}
+.fleet-overview .fo-urgent-strip > button > svg:last-child {
+    margin-left: auto;
+    color: var(--muted-foreground);
+}
+.fleet-overview .fo-availability-visual {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.fleet-overview .fo-donut-wrap {
+    width: 210px;
+    height: 210px;
+    position: relative;
+    margin: 0 auto 8px;
+}
+.fleet-overview .fo-donut-centre {
+    position: absolute;
+    inset: 50px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    gap: 3px;
+    color: var(--muted-foreground);
+}
+.fleet-overview .fo-donut-centre strong {
+    font-size: 36px;
+    line-height: 1.1;
+    font-weight: 650;
+    letter-spacing: -1px;
+    color: var(--foreground);
+    font-variant-numeric: tabular-nums;
+}
+.fleet-overview .fo-donut-centre span {
+    font-size: 11px;
+    white-space: nowrap;
+}
+.fleet-overview .fo-donut-sector {
+    cursor: pointer;
+    outline: none;
+}
+.fleet-overview .fo-donut-sector:focus-visible {
+    stroke: var(--foreground);
+    stroke-width: 2;
+}
+.fleet-overview .fo-availability-legend {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.fleet-overview .fo-availability-legend button {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+    padding: 8px;
+    border-radius: 8px;
+    min-height: 52px;
+}
+.fleet-overview .fo-availability-legend button:hover,
+.fleet-overview .fo-availability-legend .is-highlighted {
+    background: var(--muted);
+}
+.fleet-overview .fo-chart-key {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    flex: none;
+}
+.fleet-overview .fo-chart-key-success {
+    background: var(--status-success-bg);
+    color: var(--status-success);
+}
+.fleet-overview .fo-chart-key-info {
+    background: var(--status-info-bg);
+    color: var(--status-info);
+}
+.fleet-overview .fo-chart-key-critical {
+    background: var(--status-critical-bg);
+    color: var(--status-critical);
+}
+.fleet-overview .fo-chart-key-warning {
+    background: var(--status-warning-bg);
+    color: var(--status-warning);
+}
+.fleet-overview .fo-availability-legend button > span:nth-child(2) {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+.fleet-overview .fo-availability-legend strong {
+    font-size: 12px;
+    font-weight: 600;
+}
+.fleet-overview .fo-availability-legend small {
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+.fleet-overview .fo-availability-legend b {
+    font-size: 15px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+}
+.fleet-overview .fo-availability-panel > .fo-note {
+    margin-top: 18px;
+    font-size: 11px;
+}
+.fleet-overview .fo-table-owner {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+}
+.fleet-overview .fo-table-owner small {
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+.fleet-overview .fo-agenda-groups {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--card);
+}
+.fleet-overview .fo-agenda-day + .fo-agenda-day {
+    border-top: 1px solid var(--border);
+}
+.fleet-overview .fo-agenda-day > h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 12px 18px;
+    background: var(--muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+.fleet-overview .fo-agenda-day > h3 > span {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1px 5px;
+    background: var(--card);
+}
+.fleet-overview .fo-agenda-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 18px;
+    border-top: 1px solid var(--border);
+    min-width: 0;
+}
+.fleet-overview .fo-agenda-row:hover {
+    background: color-mix(in oklch, var(--muted), transparent 35%);
+}
+.fleet-overview .fo-agenda-record {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    border-radius: 6px;
+}
+.fleet-overview .fo-agenda-record > strong {
+    font-size: 12px;
+    font-weight: 650;
+}
+.fleet-overview .fo-agenda-record > span {
+    font-size: 12px;
+}
+.fleet-overview .fo-agenda-record > small {
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+.fleet-overview .fo-booking-total {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 0 0 8px;
+}
+.fleet-overview .fo-booking-total > strong {
+    font-size: 24px;
+    letter-spacing: -0.5px;
+    font-weight: 650;
+}
+.fleet-overview .fo-booking-total > span {
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+.fleet-overview .fo-booking-chart {
+    display: flex;
+    padding: 28px 2px 0;
+    gap: 14px;
+}
+.fleet-overview .fo-booking-axis {
+    width: 32px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 124px;
+    flex-shrink: 0;
+    color: var(--muted-foreground);
+    font-size: 10px;
+}
+.fleet-overview .fo-booking-columns {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    flex: 1;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+}
+.fleet-overview .fo-booking-columns > button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    padding: 4px 5px 10px;
+    border-radius: 8px;
+}
+.fleet-overview .fo-booking-columns > button:hover {
+    background: var(--accent);
+}
+.fleet-overview .fo-booking-columns > button > strong {
+    font-size: 11px;
+    font-weight: 600;
+}
+.fleet-overview .fo-booking-columns > button > small {
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+.fleet-overview .fo-booking-track {
+    height: 120px;
+    width: min(100%, 52px);
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(to top, var(--muted), transparent);
+    border-radius: 6px;
+}
+.fleet-overview .fo-booking-bar {
+    display: block;
+    min-height: 2px;
+    width: 100%;
+    border-radius: 6px 6px 0 0;
+    background: linear-gradient(
+        to top,
+        var(--primary),
+        color-mix(in oklch, var(--primary), var(--card) 28%)
+    );
+}
+.fleet-overview .fo-booking-value {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    transform: translateY(-19px);
+    font-size: 11px;
+    text-align: center;
+    font-weight: 650;
+    color: var(--foreground);
+}
+.fleet-overview .fo-chart-note {
+    padding-top: 14px;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--muted-foreground);
+}
+.fleet-overview .fo-receipt-empty {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    font-size: 12px;
+}
+.fleet-overview .fo-receipt-empty > svg {
+    color: var(--primary);
+    flex: none;
+}
+.fleet-overview .fo-receipt-empty > div {
+    flex: 1;
+}
+.fleet-overview .fo-receipt-empty p {
+    margin-top: 4px;
+    color: var(--muted-foreground);
+}
+
+.fleet-overview .fo-receipt-rows {
+    display: grid;
+    gap: 0;
+}
+.fleet-overview .fo-receipt-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border-top: 1px solid var(--border);
+    color: inherit;
+    text-decoration: none;
+}
+.fleet-overview .fo-receipt-row:hover,
+.fleet-overview .fo-receipt-row:focus-visible {
+    background: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+.fleet-overview .fo-receipt-row span:first-child {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+}
+.fleet-overview .fo-receipt-row small {
+    color: var(--muted-foreground);
+}
+.fleet-overview .fo-receipt-row span:last-child {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+    font-size: 0.78rem;
+    color: var(--muted-foreground);
+}
+.fleet-overview .fo-receipt-more {
+    margin: 0.75rem 1rem;
+    font-size: 0.78rem;
+    color: var(--muted-foreground);
+}
+@media (max-width: 640px) {
+    .fleet-overview .fo-receipt-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+    .fleet-overview .fo-receipt-row span:last-child {
+        white-space: normal;
+    }
+}
+.fleet-overview .fo-map-search {
+    flex: 1;
+    min-width: 180px;
+    width: auto;
+    order: -1;
+    min-height: 40px;
+}
+.fleet-overview .fo-map-canvas {
+    height: 520px;
+}
+.fleet-overview .fo-map-summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12px;
+    margin-top: 12px;
+}
+.fleet-overview .fo-map-summary button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--primary);
+}
+.fleet-overview .fo-map-sources {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-size: 10px;
+    color: var(--muted-foreground);
+    margin-top: 10px;
+}
+.fleet-overview .fo-map-sources span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+@media (max-width: 1150px) {
+    .fleet-overview .fo-operations-grid {
+        grid-template-columns: minmax(0, 1fr) 260px;
+    }
+    .fleet-overview .fo-availability-panel {
+        padding: 14px;
+    }
+    .fleet-overview .fo-urgent-strip > strong {
+        width: 100%;
+    }
+    .fleet-overview .fo-map-canvas {
+        height: 480px;
+    }
+}
+@media (max-width: 900px) {
+    .fleet-overview .fo-operations-grid {
+        grid-template-columns: 1fr;
+    }
+    .fleet-overview .fo-availability-visual {
+        flex-direction: row;
+        gap: 20px;
+    }
+    .fleet-overview .fo-availability-legend {
+        flex: 1;
+    }
+    .fleet-overview .fo-urgent-strip > button {
+        flex-basis: 100%;
+    }
+}
+@media (max-width: 540px) {
+    .fleet-overview .fo-availability-visual {
+        flex-direction: column;
+    }
+    .fleet-overview .fo-booking-columns {
+        gap: 3px;
+    }
+    .fleet-overview .fo-booking-total {
+        flex-direction: column;
+    }
+    .fleet-overview .fo-agenda-row {
+        flex-wrap: wrap;
+    }
+    .fleet-overview .fo-map-canvas {
+        height: 380px;
+    }
+}

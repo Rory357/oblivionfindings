@@ -1,1542 +1,2597 @@
-import { FleetStatCard } from '@/components/fleet-stat-card';
-import LeafletMap, { MapMarker } from '@/components/leaflet-map';
+/* eslint-disable no-restricted-syntax -- Map markers, filter segments and dense list selectors use compact button layouts; shared Button remains the standard action control. */
+import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
+import {
+    EntityContextMenu,
+    EntityKebab,
+    type MenuItem,
+} from '@/components/lists/entity-menu';
 import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBar,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderRail,
+    PageHeaderSearch,
+} from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTime } from '@/lib/datetime';
+import { Head, Link, router, useRemember } from '@inertiajs/react';
 import {
-    formatCurrency,
-    formatRelativeTime,
-    formatTime,
-    severityVariant,
-} from '@/lib/fleet-utils';
-import {
-    FleetAttentionStrip,
-    FleetComplianceBadges,
-    FleetHeroAction,
-    fmt,
-    HeroCluster,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroSegmented,
-    HeroShell,
-    HeroStatusPill,
-    HeroSummaryMetric,
-    HeroSummaryStrip,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
-import { Head, Link, router } from '@inertiajs/react';
-import {
-    Activity,
-    AlertTriangle,
-    Bell,
+    ArrowRight,
     Bookmark,
-    Calendar,
+    CalendarDays,
     Car,
-    CheckCircle2,
-    ClipboardCheck,
-    ClipboardList,
-    FileBarChart,
-    Fuel,
+    ChevronLeft,
+    ChevronRight,
+    Database,
+    Layers,
+    LayoutDashboard,
+    List,
     MapPin,
-    Radio,
-    Receipt,
+    Maximize2,
+    Minimize2,
+    Package,
     RefreshCw,
-    Route,
-    Settings,
+    RotateCcw,
     ShieldAlert,
-    Smartphone,
-    Users,
-    UserSearch,
     Wrench,
+    X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import './dashboard.css';
+import {
+    bookingOverlapsOverviewDay,
+    boundedOverviewPage,
+    browserViewsToImport,
+    isOverviewOverdue,
+    normalizeOverviewFilters,
+} from './overview-model';
+import {
+    AvailabilityDonut,
+    BookingLoad,
+    UpcomingAgenda,
+    WorkRows,
+} from './overview-panels';
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
-
-type Props = {
-    vehicles: Array<{
-        id: number;
-        name: string;
-        asset_tag: string;
-        status: string;
-        state: {
-            status: string;
-            lat: number;
-            lng: number;
-            speed_kph: number;
-            battery_pct: number;
-            consent_blocked: boolean;
-            last_seen_at: string;
-        } | null;
-        home_site: {
-            id: number;
-            name: string;
-            latitude: number;
-            longitude: number;
-        } | null;
-    }>;
-    stats: {
-        total_vehicles: number;
-        online_count: number;
-        offline_count: number;
-        total_assets: number;
-        active_alerts: number;
-        critical_alerts: number;
-        fuel_cost_mtd: number;
-        distance_mtd: number;
-        total_devices: number | null;
-        online_devices: number | null;
-        recent_bookings_count: number;
-        checked_out_count: number;
-        overdue_count: number;
-        /** Overdue returns within the active scope lens — feeds the Bookings tile caption. */
-        overdue_count_scoped: number;
-        outings_past_return: number;
-        /** Outings past return within the active scope lens — feeds the Outings tile caption. */
-        outings_past_return_scoped: number;
-        upcoming_maintenance_count: number;
-        trips_today: number;
-        vehicles_in_maintenance: number;
-        wof_due_30: number;
-        wof_expired: number;
-        rego_due_30: number;
-        rego_expired: number;
-        cof_due: number;
-        cof_expired: number;
-        /** `null` when the schema has no insurance column — hides the chip. */
-        insurance_expiring: number | null;
-        insurance_expired: number | null;
-        transports_today: number;
-        open_wandering_alerts: number;
-        tracked_residents?: number | null;
-        active_outings?: number;
-    };
-    can: {
-        view_technology: boolean;
-    };
-    /** Cluster scope lens — `mine` filters cluster counts to the user's site server-side. */
-    scope: 'all' | 'mine';
-    /** False when the user has no resolvable site — the scope lens is hidden. */
-    has_site: boolean;
-    houses: Array<{
-        id: number;
-        name: string;
-        address: string;
-        latitude: number;
-        longitude: number;
-    }>;
-    recent_signals: Array<{
-        id: number;
-        signal_type: string;
-        severity_hint: string;
-        occurred_at: string;
-        asset: { id: number; name: string };
-    }>;
-    vehicle_status_breakdown: Record<string, number>;
-    asset_status_breakdown: Record<string, number>;
-    maintenance_stats: Record<string, number>;
-    recent_alerts: Array<{
-        id: number;
-        title: string;
-        severity: string;
-        status: string;
-        created_at: string;
-    }>;
-    fleet_by_site?: Array<{
-        id: number;
-        name: string;
-        vehicle_count: number;
-        online_count: number;
-        active_alerts: number;
-        fuel_cost_mtd: number;
-    }>;
-    after_hours_trips?: Array<{
-        id: number;
-        vehicle: string;
-        driver: string;
-        started_at: string;
-        time: string;
-        date: string;
-        distance_km: number;
-    }>;
-    my_site_vehicles?: Array<{
-        id: number;
-        name: string;
-        status: string;
-    }>;
-    today_outings?: Array<{
-        id: number;
-        title: string;
-        destination: string;
-        status: string;
-        planned_departure: string | null;
-        asset: { id: number; name: string } | null;
-        driver: { id: number; name: string } | null;
-        resident_count: number;
-    }>;
-};
-
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
-
-// Using shared formatRelativeTime and severityVariant from fleet-utils
-
-/* ------------------------------------------------------------------ */
-/*  Donut / Ring Chart Component                                       */
-/* ------------------------------------------------------------------ */
-
-type DonutSegment = {
-    label: string;
-    value: number;
-    color: string;
-};
-
-function DonutChart({
-    segments,
-    size = 140,
-    strokeWidth = 18,
-    centerLabel,
-    centerValue,
-}: {
-    segments: DonutSegment[];
-    size?: number;
-    strokeWidth?: number;
-    centerLabel?: string;
-    centerValue?: string | number;
-}) {
-    const radius = (size - strokeWidth) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const total = segments.reduce((sum, s) => sum + s.value, 0);
-
-    if (total === 0) {
-        return (
-            <div
-                className="flex flex-col items-center justify-center"
-                style={{ width: size, height: size }}
-            >
-                <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-                    <circle
-                        cx={size / 2}
-                        cy={size / 2}
-                        r={radius}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={strokeWidth}
-                        className="text-muted/20"
-                    />
-                    <text
-                        x="50%"
-                        y="50%"
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        className="fill-muted-foreground text-xs"
-                    >
-                        No data
-                    </text>
-                </svg>
-            </div>
-        );
-    }
-
-    let offset = 0;
-
-    return (
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-            {/* Background ring */}
-            <circle
-                cx={size / 2}
-                cy={size / 2}
-                r={radius}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={strokeWidth}
-                className="text-muted/10"
-            />
-            {/* Segments */}
-            {segments
-                .filter((s) => s.value > 0)
-                .map((segment, i) => {
-                    const pct = segment.value / total;
-                    const dashLength = pct * circumference;
-                    const dashGap = circumference - dashLength;
-                    const rotation = (offset / total) * 360 - 90;
-                    offset += segment.value;
-                    return (
-                        <circle
-                            key={i}
-                            cx={size / 2}
-                            cy={size / 2}
-                            r={radius}
-                            fill="none"
-                            stroke={segment.color}
-                            strokeWidth={strokeWidth}
-                            strokeDasharray={`${dashLength} ${dashGap}`}
-                            strokeLinecap="butt"
-                            transform={`rotate(${rotation} ${size / 2} ${size / 2})`}
-                        />
-                    );
-                })}
-            {/* Center text */}
-            {centerValue !== undefined && (
-                <>
-                    <text
-                        x="50%"
-                        y="46%"
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        className="fill-foreground text-2xl font-bold"
-                        style={{ fontSize: 22, fontWeight: 700 }}
-                    >
-                        {centerValue}
-                    </text>
-                    {centerLabel && (
-                        <text
-                            x="50%"
-                            y="64%"
-                            textAnchor="middle"
-                            dominantBaseline="central"
-                            className="fill-muted-foreground"
-                            style={{ fontSize: 10 }}
-                        >
-                            {centerLabel}
-                        </text>
-                    )}
-                </>
-            )}
-        </svg>
-    );
-}
-
-function DonutLegend({ segments }: { segments: DonutSegment[] }) {
-    const total = segments.reduce((sum, s) => sum + s.value, 0);
-    return (
-        <div className="mt-3 space-y-1.5">
-            {segments.map((s, i) => (
-                <div
-                    key={i}
-                    className="flex items-center justify-between text-xs"
-                >
-                    <div className="flex items-center gap-2">
-                        <span
-                            className="inline-block h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: s.color }}
-                        />
-                        <span className="text-muted-foreground">{s.label}</span>
-                    </div>
-                    <span className="font-medium tabular-nums">
-                        {s.value}
-                        {total > 0 && (
-                            <span className="ml-1 text-muted-foreground">
-                                ({Math.round((s.value / total) * 100)}%)
-                            </span>
-                        )}
-                    </span>
-                </div>
-            ))}
-        </div>
-    );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Explore link-row                                                   */
-/* ------------------------------------------------------------------ */
-
-/** The eight navigation-jobs. Action-jobs (book, fuel, incident, work order,
- *  daily check) live only in the hero footer — never duplicated here. */
-const EXPLORE_LINKS: Array<{
-    label: string;
+type View = 'overview' | 'attention' | 'upcoming' | 'availability';
+type Availability = 'Available now' | 'In use' | 'Restricted' | 'Unknown';
+export type Resource = {
+    id: number;
+    kind: 'vehicle' | 'asset';
+    name: string;
+    ref: string;
+    registration: string | null;
+    site_id: number | null;
+    site: string | null;
+    availability: Availability | null;
+    readiness_note: string | null;
+    location: {
+        lat: number;
+        lng: number;
+        observed_at: string | null;
+        source: string;
+        fresh: boolean;
+    } | null;
     href: string;
-    icon: React.ElementType;
-}> = [
-    { label: 'Vehicles', href: '/fleet-assets/vehicles', icon: Car },
-    { label: 'Assets', href: '/fleet-assets/assets', icon: ClipboardList },
-    { label: 'Devices', href: '/fleet-assets/devices', icon: Smartphone },
-    { label: 'Reports', href: '/fleet-assets/reports', icon: FileBarChart },
-    { label: 'Map', href: '/fleet-assets/map', icon: MapPin },
-    {
-        label: 'Residents',
-        href: '/fleet-assets/resident-tracking',
-        icon: UserSearch,
-    },
-    { label: 'Outings', href: '/fleet-assets/outings', icon: Route },
-    { label: 'Mileage', href: '/fleet-assets/mileage', icon: Receipt },
+    can_book: boolean;
+    can_location: boolean;
+};
+export type WorkItem = {
+    id: string;
+    type: 'booking' | 'work' | 'due' | 'appointment';
+    category?: 'returns' | 'restricted' | 'unassigned' | 'work' | 'evidence';
+    title: string;
+    owner?: string | null;
+    detail?: string;
+    ref: string;
+    resource: string;
+    resource_ref: string;
+    site_id: number | null;
+    site: string | null;
+    due_at: string | null;
+    starts_at: string | null;
+    ends_at: string | null;
+    href: string;
+};
+type Overview = {
+    as_of: string;
+    timezone: string;
+    viewer_key: number;
+    sites: { id: number; name: string }[];
+    vehicles: Resource[];
+    assets: Resource[];
+    attention: WorkItem[];
+    agenda: WorkItem[];
+    receipts: {
+        state: 'loaded' | 'unavailable' | 'no_access';
+        count: number | null;
+        page: number;
+        pages: number;
+        site: string;
+        query: string;
+        rows: {
+            id: number;
+            asset_id: number;
+            asset: string;
+            ref: string;
+            site_id: number | null;
+            site: string | null;
+            assigned_at: string | null;
+            href: string;
+        }[];
+    };
+    bookings: {
+        id: number;
+        asset_id: number;
+        status: string;
+        starts_at: string | null;
+        ends_at: string | null;
+    }[];
+    booked_hours: {
+        date: string;
+        site_id: number | null;
+        asset_id: number;
+        hours: number;
+    }[];
+    sources: {
+        name: string;
+        state: 'loaded' | 'unavailable' | 'no_access';
+        count: number | null;
+        description: string;
+    }[];
+    can: {
+        fleet: boolean;
+        assets: boolean;
+        booking: boolean;
+        maintenance: boolean;
+        settings: boolean;
+    };
+};
+type Props = { overview: Overview; saved_views: SavedView[] };
+type Filters = {
+    view: View;
+    site: string;
+    period: 'week' | 'today';
+    q: string;
+    attention: string;
+    due: string;
+    sort: string;
+    availability: string;
+    mapType: string;
+    mapFresh: string;
+    agendaKind: string;
+    agendaDay: string;
+};
+const DEFAULT: Filters = {
+    view: 'overview',
+    site: 'all',
+    period: 'week',
+    q: '',
+    attention: 'all',
+    due: 'all',
+    sort: 'due',
+    availability: 'all',
+    mapType: 'all',
+    mapFresh: 'all',
+    agendaKind: 'all',
+    agendaDay: 'all',
+};
+const SAVABLE: (keyof Filters)[] = [
+    'view',
+    'site',
+    'period',
+    'q',
+    'attention',
+    'due',
+    'sort',
+    'availability',
+    'mapType',
+    'mapFresh',
+    'agendaKind',
+    'agendaDay',
 ];
+type SavedView = { name: string; filters: Filters };
+const PAGE_SIZE = 5;
 
-/* ------------------------------------------------------------------ */
-/*  Main Dashboard Component                                           */
-/* ------------------------------------------------------------------ */
+function usableSavedViews(
+    value: unknown,
+    sites: Overview['sites'],
+): SavedView[] {
+    if (!Array.isArray(value)) return [];
+    const names = new Set<string>();
+    return value
+        .flatMap((item): SavedView[] => {
+            if (!item || typeof item.name !== 'string' || !item.filters)
+                return [];
+            const name = item.name.trim().slice(0, 40);
+            if (!name || names.has(name.toLocaleLowerCase())) return [];
+            names.add(name.toLocaleLowerCase());
+            const filters = normalizeOverviewFilters(item.filters, DEFAULT);
+            if (
+                filters.site !== 'all' &&
+                !sites.some((site) => String(site.id) === filters.site)
+            )
+                filters.site = 'all';
+            return [{ name, filters }];
+        })
+        .slice(0, 6);
+}
 
-export default function FleetAssetsDashboard({
-    vehicles,
-    stats: rawStats,
-    houses,
-    recent_signals,
-    vehicle_status_breakdown,
-    asset_status_breakdown,
-    maintenance_stats,
-    recent_alerts,
-    fleet_by_site,
-    after_hours_trips,
-    my_site_vehicles,
-    today_outings,
-    scope,
-    has_site,
-    can,
-}: Props) {
-    const stats = rawStats ?? {
-        total_vehicles: 0,
-        online_count: 0,
-        offline_count: 0,
-        total_assets: 0,
-        active_alerts: 0,
-        critical_alerts: 0,
-        fuel_cost_mtd: 0,
-        distance_mtd: 0,
-        total_devices: null,
-        online_devices: null,
-        recent_bookings_count: 0,
-        checked_out_count: 0,
-        overdue_count: 0,
-        overdue_count_scoped: 0,
-        outings_past_return: 0,
-        outings_past_return_scoped: 0,
-        upcoming_maintenance_count: 0,
-        trips_today: 0,
-        vehicles_in_maintenance: 0,
-        wof_due_30: 0,
-        wof_expired: 0,
-        rego_due_30: 0,
-        rego_expired: 0,
-        cof_due: 0,
-        cof_expired: 0,
-        insurance_expiring: null,
-        insurance_expired: null,
-        transports_today: 0,
-        open_wandering_alerts: 0,
-        tracked_residents: null,
-        active_outings: 0,
+function readFilters(): Filters {
+    if (typeof window === 'undefined') return DEFAULT;
+    const params = new URLSearchParams(window.location.search);
+    return {
+        view: ['overview', 'attention', 'upcoming', 'availability'].includes(
+            params.get('view') || '',
+        )
+            ? (params.get('view') as View)
+            : 'overview',
+        site: params.get('site') || 'all',
+        period: params.get('period') === 'today' ? 'today' : 'week',
+        q: (params.get('q') || '').slice(0, 120),
+        attention: [
+            'all',
+            'returns',
+            'restricted',
+            'unassigned',
+            'work',
+            'evidence',
+        ].includes(params.get('attention') || '')
+            ? params.get('attention')!
+            : 'all',
+        due: ['all', 'overdue', 'today', 'undated'].includes(
+            params.get('due') || '',
+        )
+            ? params.get('due')!
+            : 'all',
+        sort: params.get('sort') === 'resource' ? 'resource' : 'due',
+        availability: [
+            'all',
+            'Available now',
+            'In use',
+            'Restricted',
+            'Unknown',
+        ].includes(params.get('availability') || '')
+            ? params.get('availability')!
+            : 'all',
+        mapType: ['all', 'vehicle', 'asset'].includes(
+            params.get('mapType') || '',
+        )
+            ? params.get('mapType')!
+            : 'all',
+        mapFresh: ['all', 'stale'].includes(params.get('mapFresh') || '')
+            ? params.get('mapFresh')!
+            : 'all',
+        agendaKind: ['all', 'booking', 'appointment', 'due', 'work'].includes(
+            params.get('agendaKind') || '',
+        )
+            ? params.get('agendaKind')!
+            : 'all',
+        agendaDay: /^(all|today|tomorrow|rest|\d{4}-\d{2}-\d{2})$/.test(
+            params.get('agendaDay') || '',
+        )
+            ? params.get('agendaDay')!
+            : 'all',
     };
-    const canViewTechnology = can?.view_technology ?? false;
-
-    const vsb = vehicle_status_breakdown ?? {};
-    const asb = asset_status_breakdown ?? {};
-    const ms = maintenance_stats ?? {};
-
-    // Map tab filter
-    const [mapFilter, setMapFilter] = useState<'all' | 'active' | 'inactive'>(
-        'all',
-    );
-
-    // Live-sync timestamp + in-flight spinner for the hero status pill.
-    const [lastUpdated, setLastUpdated] = useState<Date>(() => new Date());
-    const [isRefreshing, setIsRefreshing] = useState(false);
-
-    // 30-second auto-refresh (all hero stats travel inside `stats`; the current
-    // URL query — including ?scope=mine — is preserved by router.reload).
-    useEffect(() => {
-        const interval = window.setInterval(() => {
-            if (document.hidden) return;
-            setIsRefreshing(true);
-            router.reload({
-                only: [
-                    'vehicles',
-                    'stats',
-                    'recent_signals',
-                    'vehicle_status_breakdown',
-                    'asset_status_breakdown',
-                    'maintenance_stats',
-                    'recent_alerts',
-                ],
-                onFinish: () => {
-                    setIsRefreshing(false);
-                    setLastUpdated(new Date());
-                },
-            });
-        }, 30000);
-        return () => window.clearInterval(interval);
-    }, []);
-
-    // Scope lens — server-side cluster filter, same pattern as the maintenance
-    // dashboard's period control.
-    const handleScopeChange = (key: string) => {
-        router.get('/fleet-assets', key === 'mine' ? { scope: 'mine' } : {}, {
-            preserveState: true,
-        });
-    };
-
-    // Filtered vehicles for map
-    const filteredVehicles = useMemo(() => {
-        const v = vehicles ?? [];
-        if (mapFilter === 'active')
-            return v.filter((veh) => veh.state?.status === 'online');
-        if (mapFilter === 'inactive')
-            return v.filter(
-                (veh) => !veh.state || veh.state.status !== 'online',
-            );
-        return v;
-    }, [vehicles, mapFilter]);
-
-    const markers = useMemo<MapMarker[]>(() => {
-        const vehicleMarkers: MapMarker[] = filteredVehicles
-            .filter((v) => v.state?.lat && v.state?.lng)
-            .map((v) => ({
-                id: `v-${v.id}`,
-                lat: Number(v.state!.lat),
-                lng: Number(v.state!.lng),
-                title: v.name ?? v.asset_tag ?? `Vehicle ${v.id}`,
-                type: 'vehicle' as const,
-                status: v.state!.status,
-                popup: `Speed: ${v.state!.speed_kph ?? 0} kph | Battery: ${v.state!.battery_pct ?? 0}%`,
-            }));
-
-        const houseMarkers: MapMarker[] = (houses ?? [])
-            .filter((h) => h.latitude && h.longitude)
-            .map((h) => ({
-                id: `h-${h.id}`,
-                lat: Number(h.latitude),
-                lng: Number(h.longitude),
-                title: h.name,
-                type: 'house' as const,
-                popup: h.address,
-            }));
-
-        return [...vehicleMarkers, ...houseMarkers];
-    }, [filteredVehicles, houses]);
-
-    const center = useMemo(() => {
-        const firstVehicle = (vehicles ?? []).find(
-            (v) => v.state?.lat && v.state?.lng,
-        );
-        if (firstVehicle) {
-            return {
-                lat: Number(firstVehicle.state!.lat),
-                lng: Number(firstVehicle.state!.lng),
-            };
-        }
-        return { lat: -36.8485, lng: 174.7633 };
-    }, [vehicles]);
-
-    /* ---- Donut segment data ---- */
-
-    const vehicleDonutSegments: DonutSegment[] = [
-        { label: 'Online', value: vsb['online'] ?? 0, color: '#7c3aed' },
-        { label: 'Offline', value: vsb['offline'] ?? 0, color: '#ef4444' },
-        { label: 'Idle', value: vsb['idle'] ?? 0, color: '#f59e0b' },
-        { label: 'Moving', value: vsb['moving'] ?? 0, color: '#3b82f6' },
-    ];
-
-    const assetDonutSegments: DonutSegment[] = [
-        { label: 'Active', value: asb['active'] ?? 0, color: '#7c3aed' },
-        { label: 'Fault', value: asb['fault'] ?? 0, color: '#f97316' },
-        { label: 'Offline', value: asb['offline'] ?? 0, color: '#64748b' },
-        { label: 'Retired', value: asb['retired'] ?? 0, color: '#94a3b8' },
-    ];
-
-    const maintenanceDonutSegments: DonutSegment[] = [
-        { label: 'Open', value: ms['open'] ?? 0, color: '#3b82f6' },
-        {
-            label: 'In Progress',
-            value: ms['in_progress'] ?? 0,
-            color: '#f59e0b',
-        },
-        { label: 'Completed', value: ms['completed'] ?? 0, color: '#a78bfa' },
-        { label: 'Cancelled', value: ms['cancelled'] ?? 0, color: '#ef4444' },
-    ];
-
-    const totalVehicleStates = vehicleDonutSegments.reduce(
-        (s, d) => s + d.value,
-        0,
-    );
-    const totalAssets = assetDonutSegments.reduce((s, d) => s + d.value, 0);
-    const totalWorkOrders = maintenanceDonutSegments.reduce(
-        (s, d) => s + d.value,
-        0,
-    );
-
+}
+function writeFilters(value: Filters, resetReceiptPage = false) {
+    const url = new URL(window.location.href);
+    if (resetReceiptPage) url.searchParams.delete('receipt_page');
+    for (const key of SAVABLE) {
+        const part = value[key];
+        if (part === DEFAULT[key]) url.searchParams.delete(key);
+        else url.searchParams.set(key, part);
+    }
+    router.replace({
+        url: url.pathname + url.search,
+        preserveState: true,
+        preserveScroll: true,
+    });
+    return url.pathname + url.search;
+}
+function nzDay(value: string, zone: string): string {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: zone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(new Date(value));
+    const get = (type: string) =>
+        parts.find((part) => part.type === type)?.value || '';
+    return `${get('year')}-${get('month')}-${get('day')}`;
+}
+function dayLabel(value: string, zone: string) {
+    if (!value) return 'No due date';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value))
+        return new Intl.DateTimeFormat('en-NZ', {
+            timeZone: 'UTC',
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+        }).format(new Date(`${value}T12:00:00Z`));
+    return new Intl.DateTimeFormat('en-NZ', {
+        timeZone: zone,
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        hour: 'numeric',
+        minute: '2-digit',
+    }).format(new Date(value));
+}
+function matches(term: string, ...parts: (string | null | undefined)[]) {
+    return parts
+        .join(' ')
+        .toLocaleLowerCase()
+        .includes(term.trim().toLocaleLowerCase());
+}
+function pageRows<T>(rows: T[], page: number) {
+    const current = boundedOverviewPage(page, rows.length);
+    return rows.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+}
+function Pager({
+    page,
+    count,
+    onPage,
+}: {
+    page: number;
+    count: number;
+    onPage: (page: number) => void;
+}) {
+    const pages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+    page = boundedOverviewPage(page, count);
+    if (pages <= 1) return null;
     return (
-        <AppLayout
-            breadcrumbs={[{ title: 'Fleet & Assets', href: '/fleet-assets' }]}
+        <nav aria-label="Results pages" className="fo-pager">
+            <span>
+                {Math.min((page - 1) * PAGE_SIZE + 1, count)}–
+                {Math.min(page * PAGE_SIZE, count)} of {count}
+            </span>
+            <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => onPage(page - 1)}
+                aria-label="Previous page"
+            >
+                <ChevronLeft className="size-4" />
+            </Button>
+            <span>
+                Page {page} of {pages}
+            </span>
+            <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= pages}
+                onClick={() => onPage(page + 1)}
+                aria-label="Next page"
+            >
+                <ChevronRight className="size-4" />
+            </Button>
+        </nav>
+    );
+}
+function stateClass(state: string | null) {
+    return state === 'Available now'
+        ? 'fo-good'
+        : state === 'Restricted'
+          ? 'fo-danger'
+          : state === 'In use'
+            ? 'fo-info'
+            : 'fo-unknown';
+}
+function Status({ state }: { state: string | null }) {
+    return (
+        <span className={`fo-status ${stateClass(state)}`}>
+            {state || 'Site record'}
+        </span>
+    );
+}
+
+function MapPanel({
+    resources,
+    filter,
+    onFilter,
+    freshness,
+    onFreshness,
+    onOpen,
+    focusId,
+    onFocusHandled,
+}: {
+    resources: Resource[];
+    filter: string;
+    onFilter: (value: string) => void;
+    freshness: string;
+    onFreshness: (value: string) => void;
+    onOpen: (href: string) => void;
+    focusId: string | null;
+    onFocusHandled: () => void;
+}) {
+    const [selected, setSelected] = useState<string | null>(null);
+    const [expanded, setExpanded] = useState(false);
+    const [list, setList] = useState<'all' | 'unknown' | null>(null);
+    const [listQuery, setListQuery] = useState('');
+    const [listPage, setListPage] = useState(1);
+    const [context, setContext] = useState<{
+        x: number;
+        y: number;
+        id: string;
+    } | null>(null);
+    const [tiles, setTiles] = useState<'loading' | 'loaded' | 'failed'>(
+        'loading',
+    );
+    const [mapQuery, setMapQuery] = useState('');
+    const [groupNearby, setGroupNearby] = useState(true);
+    const [mapKey, setMapKey] = useState(0);
+    const mapRef = useRef<HTMLDivElement>(null);
+    const visible = useMemo(
+        () =>
+            resources.filter(
+                (resource) =>
+                    (filter === 'all' || resource.kind === filter) &&
+                    matches(
+                        mapQuery,
+                        resource.name,
+                        resource.ref,
+                        resource.registration,
+                        resource.site,
+                    ),
+            ),
+        [resources, filter, mapQuery],
+    );
+    const known = useMemo(
+        () => visible.filter((resource) => resource.location !== null),
+        [visible],
+    );
+    const unknown = visible.filter((resource) => resource.location === null);
+    const plotted = useMemo(
+        () =>
+            known.filter(
+                (resource) =>
+                    freshness !== 'stale' ||
+                    (resource.kind === 'vehicle' && !resource.location?.fresh),
+            ),
+        [known, freshness],
+    );
+    // Identical Site coordinates represent distinct assets. Keep an explicit
+    // chooser so every record is reachable even at Leaflet's maximum zoom.
+    const markerGroups = useMemo(() => {
+        const groups = new Map<string, Resource[]>();
+        for (const resource of plotted) {
+            const key = `${resource.location!.lat.toFixed(6)},${resource.location!.lng.toFixed(6)}`;
+            groups.set(key, [...(groups.get(key) || []), resource]);
+        }
+        return Array.from(groups.values());
+    }, [plotted]);
+    const markers: MapMarker[] = useMemo(
+        () =>
+            markerGroups.map((group) => {
+                const first = group[0];
+                const isGroup = group.length > 1;
+                const assetSiteGroup = group.every(
+                    (item) => item.kind === 'asset',
+                );
+                const staleTrackerGroup = group.some(
+                    (item) => item.kind === 'vehicle' && !item.location?.fresh,
+                );
+                return {
+                    id: isGroup
+                        ? `group-${first.location!.lat},${first.location!.lng}`
+                        : `${first.kind}-${first.id}`,
+                    lat: first.location!.lat,
+                    lng: first.location!.lng,
+                    type: isGroup ? 'default' : first.kind,
+                    color: assetSiteGroup
+                        ? 'var(--chart-2)'
+                        : staleTrackerGroup
+                          ? 'var(--status-warning)'
+                          : 'var(--primary)',
+                    title: isGroup
+                        ? `${group.length} resources at this recorded point`
+                        : `${first.registration || first.ref} · ${first.name}`,
+                    stats: isGroup
+                        ? [
+                              [
+                                  'Resources',
+                                  group
+                                      .map(
+                                          (item) =>
+                                              item.registration || item.ref,
+                                      )
+                                      .join(' · '),
+                              ],
+                              [
+                                  'Sources',
+                                  [
+                                      ...new Set(
+                                          group.map(
+                                              (item) => item.location!.source,
+                                          ),
+                                      ),
+                                  ].join(' · '),
+                              ],
+                          ]
+                        : [
+                              [
+                                  'Availability',
+                                  first.availability || 'Not a vehicle',
+                              ],
+                              ['Site', first.site || 'Unknown'],
+                              ['Source', first.location!.source],
+                              [
+                                  'Observed',
+                                  first.location!.observed_at
+                                      ? dayLabel(
+                                            first.location!.observed_at,
+                                            'Pacific/Auckland',
+                                        )
+                                      : 'No live observation',
+                              ],
+                          ],
+                    hint: 'Select for evidence and actions · right-click for options',
+                };
+            }),
+        [markerGroups],
+    );
+    const markerItems = markers.map((marker, index) => ({
+        marker,
+        group: markerGroups[index],
+    }));
+    const current = markerItems.find(
+        (item) => String(item.marker.id) === selected,
+    );
+    useEffect(() => {
+        if (!focusId) return;
+        const match = markerItems.find((entry) =>
+            entry.group.some(
+                (resource) => `${resource.kind}-${resource.id}` === focusId,
+            ),
+        );
+        setSelected(
+            match && match.group.length > 1 ? String(match.marker.id) : focusId,
+        );
+        mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        onFocusHandled();
+    }, [focusId, markerItems, onFocusHandled]);
+    const shownRows = (list === 'unknown' ? unknown : visible).filter((item) =>
+        matches(listQuery, item.name, item.ref, item.registration, item.site),
+    );
+    const safePage = Math.min(
+        listPage,
+        Math.max(1, Math.ceil(shownRows.length / PAGE_SIZE)),
+    );
+    const openDetails = useCallback((id: string | number) => {
+        setSelected(String(id));
+        setList(null);
+        setContext(null);
+    }, []);
+    useEffect(() => {
+        setListPage(1);
+    }, [list, listQuery]);
+    useEffect(() => {
+        if (!expanded) return;
+        const close = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape' || context) return;
+            if (list) {
+                setList(null);
+                return;
+            }
+            if (selected) {
+                setSelected(null);
+                return;
+            }
+            setExpanded(false);
+        };
+        window.addEventListener('keydown', close);
+        return () => window.removeEventListener('keydown', close);
+    }, [expanded, context, list, selected]);
+    useEffect(() => {
+        if (!expanded) return;
+        const previousOverflow = document.body.style.overflow;
+        const previousFocus = document.activeElement as HTMLElement | null;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            previousFocus?.focus();
+        };
+    }, [expanded]);
+    const actions = (resource: Resource): MenuItem[] => [
+        {
+            label:
+                resource.kind === 'vehicle'
+                    ? 'Open vehicle profile'
+                    : 'Open asset profile',
+            icon: ArrowRight,
+            onClick: () => onOpen(resource.href),
+        },
+        ...(resource.can_location
+            ? [
+                  {
+                      label: 'View location evidence',
+                      icon: MapPin,
+                      onClick: () =>
+                          onOpen(`${resource.href}?tab=map&view=location`),
+                  },
+              ]
+            : []),
+        ...(resource.can_book
+            ? [
+                  {
+                      label: 'Open bookings',
+                      icon: CalendarDays,
+                      onClick: () =>
+                          onOpen(
+                              `/fleet-assets/bookings?asset_id=${resource.id}`,
+                          ),
+                  },
+              ]
+            : []),
+    ];
+    const contextGroup = context
+        ? markerItems.find((item) => String(item.marker.id) === context.id)
+              ?.group
+        : null;
+    return (
+        <section
+            className={`fo-map-panel ${expanded ? 'fo-map-expanded' : ''}`}
+            ref={mapRef}
+            aria-label="Fleet and asset locations"
+            role={expanded ? 'dialog' : 'region'}
+            aria-modal={expanded || undefined}
+            onKeyDown={(event) => {
+                if (!expanded || context || event.key !== 'Tab') return;
+                const controls = Array.from(
+                    mapRef.current?.querySelectorAll<HTMLElement>(
+                        'button:not(:disabled), a[href], input, select, [tabindex="0"]',
+                    ) || [],
+                ).filter((element) => element.getClientRects().length > 0);
+                const first = controls[0],
+                    last = controls[controls.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last?.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first?.focus();
+                }
+            }}
         >
-            <Head title="Fleet & Assets" />
-            <PageShell>
-                <HeroShell
-                    footer={
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="mr-1 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
-                                Quick actions
-                            </span>
-                            <FleetHeroAction
-                                href="/fleet-assets/bookings?new=1"
-                                icon={Bookmark}
-                                emphasis
-                            >
-                                Book vehicle
-                            </FleetHeroAction>
-                            <FleetHeroAction
-                                href="/fleet-assets/daily-check"
-                                icon={ClipboardCheck}
-                            >
-                                Daily check
-                            </FleetHeroAction>
-                            <FleetHeroAction
-                                href="/fleet-assets/fuel"
-                                icon={Fuel}
-                            >
-                                Log fuel
-                            </FleetHeroAction>
-                            <FleetHeroAction
-                                href="/fleet-assets/incidents?report=vehicle"
-                                icon={ShieldAlert}
-                            >
-                                Report incident
-                            </FleetHeroAction>
-                            <FleetHeroAction
-                                href="/fleet-assets/maintenance/work-orders?new=1"
-                                icon={Wrench}
-                            >
-                                New work order
-                            </FleetHeroAction>
-                            <Link
-                                href="/fleet-assets/settings/notifications"
-                                className="ml-auto inline-flex h-[34px] w-[34px] items-center justify-center rounded-lg text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
-                                aria-label="Fleet notification settings"
-                            >
-                                <Settings className="h-4 w-4" />
-                            </Link>
-                        </div>
+            <div className="fo-section-head">
+                <div>
+                    <h2>Vehicles &amp; assets on the map</h2>
+                    <p>Last reported locations · approved Sites only</p>
+                </div>
+                <div className="fo-head-actions">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            setList('all');
+                            setSelected(null);
+                        }}
+                    >
+                        <List className="size-4" /> List {visible.length}
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setExpanded(!expanded)}
+                        aria-label={
+                            expanded ? 'Exit full screen map' : 'Expand map'
+                        }
+                    >
+                        {expanded ? (
+                            <Minimize2 className="size-4" />
+                        ) : (
+                            <Maximize2 className="size-4" />
+                        )}
+                    </Button>
+                </div>
+            </div>
+            <div className="fo-map-toolbar">
+                <div className="fo-segmented" aria-label="Map resource type">
+                    {[
+                        ['all', 'All'],
+                        ['vehicle', 'Vehicles'],
+                        ['asset', 'Assets'],
+                    ].map(([value, label]) => (
+                        <button
+                            key={value}
+                            className={filter === value ? 'active' : ''}
+                            aria-pressed={filter === value}
+                            onClick={() => {
+                                onFilter(value);
+                                setSelected(null);
+                            }}
+                        >
+                            {label}{' '}
+                            <small>
+                                {
+                                    resources.filter(
+                                        (item) =>
+                                            value === 'all' ||
+                                            item.kind === value,
+                                    ).length
+                                }
+                            </small>
+                        </button>
+                    ))}
+                </div>
+                <input
+                    type="search"
+                    className="fo-map-search"
+                    aria-label="Search map resources"
+                    placeholder="Find on map"
+                    value={mapQuery}
+                    onChange={(event) => setMapQuery(event.target.value)}
+                />
+                <button
+                    className={`fo-stale-toggle ${freshness === 'stale' ? 'active' : ''}`}
+                    aria-pressed={freshness === 'stale'}
+                    onClick={() =>
+                        onFreshness(freshness === 'stale' ? 'all' : 'stale')
                     }
                 >
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={Car} />
-                        <div className="min-w-0 flex-1">
-                            <HeroStatusPill>
-                                Fleet command · updated{' '}
-                                <span aria-live="polite">
-                                    {formatTime(lastUpdated.toISOString())}
-                                </span>
-                                {isRefreshing && (
-                                    <RefreshCw className="h-3 w-3 animate-spin motion-reduce:animate-none" />
-                                )}
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight md:text-[28px]">
-                                Fleet & Assets
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Real-time fleet tracking, asset management, and
-                                operational insights.
+                    Last-known tracker ·{' '}
+                    {
+                        known.filter(
+                            (item) =>
+                                item.kind === 'vehicle' &&
+                                !item.location?.fresh,
+                        ).length
+                    }
+                </button>
+                <button
+                    className={`fo-stale-toggle fo-group-toggle ${groupNearby ? 'active' : ''}`}
+                    aria-pressed={groupNearby}
+                    onClick={() => setGroupNearby(!groupNearby)}
+                >
+                    <Layers size={14} /> Group nearby
+                </button>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Reset map view"
+                    onClick={() => setMapKey((key) => key + 1)}
+                >
+                    <RotateCcw size={15} />
+                </Button>
+            </div>
+            <div className="fo-map-canvas">
+                <LeafletMap
+                    key={mapKey}
+                    center={
+                        markers.length
+                            ? { lat: markers[0].lat, lng: markers[0].lng }
+                            : { lat: -41.2865, lng: 174.7767 }
+                    }
+                    zoom={markers.length ? 12 : 5}
+                    markers={markers}
+                    clustering={groupNearby}
+                    clusterThreshold={0}
+                    showMarkerPopups={false}
+                    autoFit
+                    fitMarkers={false}
+                    observeResize
+                    height="100%"
+                    onMarkerClick={openDetails}
+                    onContext={(point) =>
+                        point.markerId
+                            ? setContext({
+                                  x: point.x,
+                                  y: point.y,
+                                  id: String(point.markerId),
+                              })
+                            : setContext(null)
+                    }
+                    onTileStatus={setTiles}
+                />
+                {tiles === 'failed' && (
+                    <div className="fo-tile-notice">
+                        Street tiles unavailable. Recorded resources remain in
+                        the list.
+                    </div>
+                )}
+            </div>
+            <div className="fo-map-summary">
+                <span>{plotted.length} mapped</span>
+                <button onClick={() => setList('unknown')}>
+                    {unknown.length} without a location <ArrowRight size={13} />
+                </button>
+            </div>
+            <div className="fo-map-sources">
+                <span>
+                    <Car size={13} />
+                    Vehicle report
+                </span>
+                <span>
+                    <Package size={13} />
+                    Recorded asset Site
+                </span>
+                <span>
+                    <MapPin size={13} />
+                    Last-known tracker
+                </span>
+                <span>
+                    <Layers size={13} />
+                    Number = nearby pins
+                </span>
+            </div>
+            <p className="fo-note">
+                Select a pin for details and actions · hover for a quick look ·
+                right-click for shortcuts. Equipment pins show a recorded Site,
+                not live GPS.
+            </p>
+            {current && (
+                <div className="fo-map-detail">
+                    <button
+                        className="fo-close"
+                        onClick={() => setSelected(null)}
+                        aria-label="Close location details"
+                    >
+                        <X className="size-4" />
+                    </button>
+                    {current.group.length > 1 ? (
+                        <>
+                            <p className="fo-eyebrow">Shared recorded point</p>
+                            <h3>{current.group.length} resources</h3>
+                            <p>
+                                Select a resource for its own evidence and
+                                actions.
                             </p>
-                        </div>
-                        {has_site && (
-                            <div className="flex items-center gap-2 self-start">
-                                <HeroSegmented
-                                    variant="segmented"
-                                    label="Scope"
-                                    ariaLabel="Cluster scope"
-                                    value={scope ?? 'all'}
-                                    onChange={handleScopeChange}
-                                    items={[
-                                        { key: 'all', label: 'All sites' },
-                                        { key: 'mine', label: 'My site' },
-                                    ]}
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Escalations across every accessible Site are never filtered by the scope lens. */}
-                    <FleetAttentionStrip
-                        overdueReturns={stats.overdue_count ?? 0}
-                        outingsPastReturn={stats.outings_past_return ?? 0}
-                        criticalAlerts={stats.critical_alerts ?? 0}
-                    />
-
-                    <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-[1.25fr_1fr_1fr]">
-                        <HeroCluster title="Fleet status" icon={Car}>
-                            <HeroClusterTile
-                                href="/fleet-assets/vehicles?status=online"
-                                label="Online"
-                                value={fmt(stats.online_count)}
-                                caption="reporting live"
-                                tone={
-                                    stats.online_count > 0
-                                        ? 'success'
-                                        : 'neutral'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/bookings"
-                                label="In use"
-                                value={fmt(stats.checked_out_count)}
-                                caption="checked out"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/maintenance/work-orders"
-                                label="Maintenance"
-                                value={fmt(stats.vehicles_in_maintenance)}
-                                caption="in the workshop"
-                                tone={
-                                    stats.vehicles_in_maintenance > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/vehicles?status=offline"
-                                label="Offline"
-                                value={fmt(stats.offline_count)}
-                                caption="no recent signal"
-                                tone={
-                                    (stats.offline_count ?? 0) > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                            />
-                        </HeroCluster>
-
-                        <HeroCluster title="Today" icon={Calendar} columns={3}>
-                            <HeroClusterTile
-                                href="/fleet-assets/trips"
-                                label="Trips today"
-                                value={fmt(stats.trips_today)}
-                                caption="journeys logged"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/bookings"
-                                label="Bookings"
-                                value={fmt(stats.recent_bookings_count)}
-                                caption={
-                                    (stats.overdue_count_scoped ?? 0) > 0
-                                        ? `${stats.overdue_count_scoped} overdue return${stats.overdue_count_scoped === 1 ? '' : 's'}`
-                                        : 'pending + approved'
-                                }
-                                tone={
-                                    (stats.overdue_count_scoped ?? 0) > 0
-                                        ? 'warning'
-                                        : 'neutral'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/outings"
-                                label="Outings"
-                                value={fmt(stats.active_outings)}
-                                caption={
-                                    (stats.outings_past_return_scoped ?? 0) > 0
-                                        ? `${stats.outings_past_return_scoped} past return`
-                                        : 'planned or underway'
-                                }
-                                tone={
-                                    (stats.outings_past_return_scoped ?? 0) > 0
-                                        ? 'critical'
-                                        : 'neutral'
-                                }
-                            />
-                        </HeroCluster>
-
-                        <HeroCluster
-                            title="Resident movement"
-                            icon={Users}
-                            columns={3}
-                        >
-                            <HeroClusterTile
-                                href="/fleet-assets/transports"
-                                label="Transports"
-                                value={fmt(stats.transports_today)}
-                                caption="resident journeys today"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href={
-                                    canViewTechnology
-                                        ? '/fleet-assets/resident-tracking'
-                                        : undefined
-                                }
-                                label="Tracked"
-                                value={
-                                    canViewTechnology
-                                        ? fmt(stats.tracked_residents)
-                                        : 'Restricted'
-                                }
-                                caption={
-                                    canViewTechnology
-                                        ? 'residents with devices'
-                                        : 'Security access required'
-                                }
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/resident-tracking?tab=wandering"
-                                label="Wandering"
-                                value={fmt(stats.open_wandering_alerts)}
-                                caption={
-                                    (stats.open_wandering_alerts ?? 0) > 0
-                                        ? 'respond now'
-                                        : 'none active'
-                                }
-                                tone={
-                                    (stats.open_wandering_alerts ?? 0) > 0
-                                        ? 'critical'
-                                        : 'success'
-                                }
-                            />
-                        </HeroCluster>
-                    </div>
-
-                    {/* Accessible-Site compliance horizon — successor of the old Compliance cluster;
-                        identical composition to /fleet-assets/vehicles so the heroes read as siblings. */}
-                    <FleetComplianceBadges
-                        wofDue={stats.wof_due_30 ?? 0}
-                        wofExpired={stats.wof_expired ?? 0}
-                        regoDue={stats.rego_due_30 ?? 0}
-                        regoExpired={stats.rego_expired ?? 0}
-                        cofDue={stats.cof_due ?? 0}
-                        cofExpired={stats.cof_expired ?? 0}
-                        insuranceExpiring={stats.insurance_expiring ?? null}
-                        insuranceExpired={stats.insurance_expired ?? null}
-                        openAlerts={stats.active_alerts ?? 0}
-                        criticalAlerts={stats.critical_alerts ?? 0}
-                        hrefs={{
-                            wof: '/fleet-assets/compliance',
-                            rego: '/fleet-assets/compliance',
-                            cof: '/fleet-assets/compliance',
-                            insurance: '/fleet-assets/compliance',
-                            alerts: '/fleet-assets/alerts',
-                        }}
-                    />
-
-                    <HeroSummaryStrip label="This month">
-                        <HeroSummaryMetric tone="neutral">
-                            {formatCurrency(stats.fuel_cost_mtd ?? 0)} fuel
-                        </HeroSummaryMetric>
-                        <HeroSummaryMetric tone="neutral">
-                            {fmt(stats.distance_mtd, ' km')} travelled
-                        </HeroSummaryMetric>
-                        <HeroSummaryMetric
-                            tone={
-                                !canViewTechnology
-                                    ? 'neutral'
-                                    : (stats.total_devices ?? 0) -
-                                            (stats.online_devices ?? 0) >
-                                        0
-                                      ? 'warning'
-                                      : 'success'
-                            }
-                        >
-                            {canViewTechnology ? (
-                                <>
-                                    {fmt(stats.online_devices)} of{' '}
-                                    {fmt(stats.total_devices)} devices online
-                                </>
-                            ) : (
-                                <span className="inline-flex items-center gap-1.5">
-                                    <ShieldAlert
-                                        className="h-3.5 w-3.5"
-                                        aria-hidden="true"
-                                    />
-                                    Device health access restricted
-                                </span>
-                            )}
-                        </HeroSummaryMetric>
-                        <HeroSummaryMetric tone="neutral">
-                            {fmt(stats.upcoming_maintenance_count)} services due
-                        </HeroSummaryMetric>
-                    </HeroSummaryStrip>
-                </HeroShell>
-
-                {/* ============================================================ */}
-                {/*  ROW 1 - KPI Cards                                           */}
-                {/* ============================================================ */}
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-                    <FleetStatCard
-                        label="Vehicles"
-                        value={stats.total_vehicles ?? 0}
-                        icon={Car}
-                    />
-                    {stats.overdue_count > 0 && (
-                        <FleetStatCard
-                            label="Overdue Returns"
-                            value={stats.overdue_count}
-                            icon={Car}
-                            color="red"
-                            href="/fleet-assets/bookings"
-                        />
-                    )}
-                    <Card className="border bg-primary/10 dark:bg-primary/20">
-                        <CardContent className="p-4">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                        Alerts
-                                    </p>
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="text-2xl font-bold">
-                                            {stats.active_alerts ?? 0}
-                                        </span>
-                                        {(stats.critical_alerts ?? 0) > 0 && (
-                                            <Badge className="h-4 border-0 bg-status-critical-bg px-1 text-[9px] text-status-critical">
-                                                {stats.critical_alerts} crit
-                                            </Badge>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-status-warning">
-                                    <AlertTriangle className="h-4 w-4 text-status-warning" />
-                                </div>
-                            </div>
-                            <div className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
-                                <Wrench className="h-3 w-3" />{' '}
-                                {stats.upcoming_maintenance_count ?? 0} upcoming
-                                services
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <FleetStatCard
-                        label="Fuel MTD"
-                        value={formatCurrency(stats.fuel_cost_mtd ?? 0)}
-                        icon={Fuel}
-                    />
-                    {canViewTechnology &&
-                        (stats.tracked_residents ?? 0) > 0 && (
-                            <FleetStatCard
-                                label="Tracked Residents"
-                                value={stats.tracked_residents ?? 0}
-                                icon={UserSearch}
-                                color="purple"
-                            />
-                        )}
-                </div>
-
-                {/* ============================================================ */}
-                {/*  MAIN GRID - Map left, widgets right                         */}
-                {/* ============================================================ */}
-                <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
-                    {/* LEFT COLUMN - Map (spans full height) */}
-                    <Card className="overflow-hidden lg:row-span-2">
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="flex items-center gap-2 text-sm">
-                                    <MapPin className="h-4 w-4" /> Fleet Map
-                                    <Badge
-                                        variant="secondary"
-                                        className="ml-1 text-[10px]"
-                                    >
-                                        {markers.length}
-                                    </Badge>
-                                </CardTitle>
-                                <div className="flex gap-1">
-                                    {(
-                                        ['all', 'active', 'inactive'] as const
-                                    ).map((tab) => (
-                                        <Button
-                                            key={tab}
-                                            variant={
-                                                mapFilter === tab
-                                                    ? 'default'
-                                                    : 'ghost'
-                                            }
-                                            size="sm"
-                                            className="h-6 px-2 text-[10px] capitalize"
-                                            onClick={() => setMapFilter(tab)}
-                                        >
-                                            {tab}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            <LeafletMap
-                                center={center}
-                                zoom={12}
-                                markers={markers}
-                                height={520}
-                            />
-                        </CardContent>
-                    </Card>
-
-                    {/* RIGHT COLUMN - Stacked tiles */}
-                    <div className="space-y-4">
-                        {/* Explore — the navigation-jobs; action-jobs live in the hero footer only. */}
-                        {/* eslint-disable-next-line no-restricted-syntax -- slim single-row link strip, not a Card surface */}
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-card px-4 py-3">
-                            <span className="text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase">
-                                Explore
-                            </span>
-                            {EXPLORE_LINKS.map((link) => (
-                                <Link
-                                    key={link.label}
-                                    href={link.href}
-                                    className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-muted-foreground transition-colors hover:text-primary"
-                                >
-                                    <link.icon className="h-3.5 w-3.5" />
-                                    {link.label}
-                                </Link>
-                            ))}
-                        </div>
-
-                        {/* Donut charts - 3 side by side */}
-                        <div className="grid grid-cols-3 gap-3">
-                            <Card>
-                                <CardContent className="flex flex-col items-center px-2 pt-4 pb-3">
-                                    <p className="mb-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                        Vehicles
-                                    </p>
-                                    <DonutChart
-                                        segments={vehicleDonutSegments}
-                                        centerValue={
-                                            totalVehicleStates ||
-                                            stats.total_vehicles
+                            <div className="fo-resource-chooser">
+                                {current.group.map((resource) => (
+                                    <button
+                                        key={`${resource.kind}-${resource.id}`}
+                                        onClick={() =>
+                                            setSelected(
+                                                `${resource.kind}-${resource.id}`,
+                                            )
                                         }
-                                        centerLabel=""
-                                        size={80}
-                                    />
-                                    <div className="mt-2 w-full space-y-0.5">
-                                        {vehicleDonutSegments.map((s, i) => (
-                                            <div
-                                                key={i}
-                                                className="flex items-center justify-between text-[9px]"
-                                            >
-                                                <span className="flex items-center gap-1">
-                                                    <span
-                                                        className="h-1.5 w-1.5 rounded-full"
-                                                        style={{
-                                                            backgroundColor:
-                                                                s.color,
-                                                        }}
-                                                    />
-                                                    {s.label}
-                                                </span>
-                                                <span className="font-medium tabular-nums">
-                                                    {s.value}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardContent className="flex flex-col items-center px-2 pt-4 pb-3">
-                                    <p className="mb-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                        Assets
-                                    </p>
-                                    <DonutChart
-                                        segments={assetDonutSegments}
-                                        centerValue={
-                                            totalAssets || stats.total_assets
-                                        }
-                                        centerLabel=""
-                                        size={80}
-                                    />
-                                    <div className="mt-2 w-full space-y-0.5">
-                                        {assetDonutSegments.map((s, i) => (
-                                            <div
-                                                key={i}
-                                                className="flex items-center justify-between text-[9px]"
-                                            >
-                                                <span className="flex items-center gap-1">
-                                                    <span
-                                                        className="h-1.5 w-1.5 rounded-full"
-                                                        style={{
-                                                            backgroundColor:
-                                                                s.color,
-                                                        }}
-                                                    />
-                                                    {s.label}
-                                                </span>
-                                                <span className="font-medium tabular-nums">
-                                                    {s.value}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardContent className="flex flex-col items-center px-2 pt-4 pb-3">
-                                    <p className="mb-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                        Work Orders
-                                    </p>
-                                    <DonutChart
-                                        segments={maintenanceDonutSegments}
-                                        centerValue={totalWorkOrders}
-                                        centerLabel=""
-                                        size={80}
-                                    />
-                                    <div className="mt-2 w-full space-y-0.5">
-                                        {maintenanceDonutSegments.map(
-                                            (s, i) => (
-                                                <div
-                                                    key={i}
-                                                    className="flex items-center justify-between text-[9px]"
-                                                >
-                                                    <span className="flex items-center gap-1">
-                                                        <span
-                                                            className="h-1.5 w-1.5 rounded-full"
-                                                            style={{
-                                                                backgroundColor:
-                                                                    s.color,
-                                                            }}
-                                                        />
-                                                        {s.label}
-                                                    </span>
-                                                    <span className="font-medium tabular-nums">
-                                                        {s.value}
-                                                    </span>
-                                                </div>
-                                            ),
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </div>
-                </div>
-
-                {/* ============================================================ */}
-                {/*  BOTTOM GRID - Alerts + Activity + After Hours               */}
-                {/* ============================================================ */}
-                <div className="grid gap-4 lg:grid-cols-3">
-                    {/* Recent Alerts */}
-                    <Card className="lg:col-span-2">
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="flex items-center gap-2 text-sm">
-                                    <Bell className="h-4 w-4" /> Recent Alerts
-                                </CardTitle>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-6 text-[10px]"
-                                    asChild
-                                >
-                                    <Link href="/fleet-assets/alerts">
-                                        View all
-                                    </Link>
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            {(recent_alerts ?? []).length > 0 ? (
-                                <div
-                                    data-fleet-narrow-strategy="horizontal-scroll"
-                                    className="overflow-x-auto"
-                                >
-                                    <table className="w-full text-xs">
-                                        <thead>
-                                            <tr className="border-b text-left text-muted-foreground">
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Alert
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Severity
-                                                </th>
-                                                <th className="pr-4 pb-2 font-medium">
-                                                    Status
-                                                </th>
-                                                <th className="pb-2 text-right font-medium">
-                                                    Time
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {(recent_alerts ?? [])
-                                                .slice(0, 6)
-                                                .map((alert) => (
-                                                    <tr
-                                                        key={alert.id}
-                                                        className="border-b border-border/50 last:border-0"
-                                                    >
-                                                        <td className="py-2 pr-4">
-                                                            <span className="font-medium">
-                                                                {alert.title ??
-                                                                    `Alert #${alert.id}`}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-2 pr-4">
-                                                            <Badge
-                                                                variant={severityVariant(
-                                                                    alert.severity ??
-                                                                        'low',
-                                                                )}
-                                                                className="text-[10px]"
-                                                            >
-                                                                {alert.severity ??
-                                                                    'low'}
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="py-2 pr-4">
-                                                            <span className="text-muted-foreground capitalize">
-                                                                {(
-                                                                    alert.status ??
-                                                                    ''
-                                                                ).replace(
-                                                                    /_/g,
-                                                                    ' ',
-                                                                )}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-2 text-right text-muted-foreground">
-                                                            {alert.created_at
-                                                                ? formatRelativeTime(
-                                                                      alert.created_at,
-                                                                  )
-                                                                : '-'}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                                    <CheckCircle2 className="mb-1.5 h-6 w-6 text-primary" />
-                                    <p className="text-xs font-medium">
-                                        All clear
-                                    </p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Activity Feed */}
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="flex items-center gap-2 text-sm">
-                                <Activity className="h-4 w-4" /> Activity
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {(recent_signals ?? []).length > 0 ? (
-                                <div className="space-y-1.5">
-                                    {(recent_signals ?? [])
-                                        .slice(0, 6)
-                                        .map((signal) => (
-                                            <div
-                                                key={signal.id}
-                                                className="flex items-center gap-2 rounded border border-border/50 px-2 py-1.5 text-[10px]"
-                                            >
-                                                <Radio className="h-3 w-3 shrink-0 text-muted-foreground" />
-                                                <span className="flex-1 truncate font-medium">
-                                                    {signal.asset?.name ??
-                                                        'Unknown'}
-                                                </span>
-                                                <Badge
-                                                    variant={severityVariant(
-                                                        signal.severity_hint ??
-                                                            'low',
-                                                    )}
-                                                    className="h-3.5 shrink-0 px-1 text-[8px]"
-                                                >
-                                                    {signal.severity_hint ??
-                                                        'low'}
-                                                </Badge>
-                                            </div>
-                                        ))}
-                                </div>
-                            ) : (
-                                <p className="py-6 text-center text-xs text-muted-foreground">
-                                    No recent activity.
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* ============================================================ */}
-                {/*  TODAY'S OUTINGS                                               */}
-                {/* ============================================================ */}
-                {(today_outings ?? []).length > 0 && (
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="flex items-center gap-2 text-sm">
-                                    <MapPin className="h-4 w-4" /> Today's
-                                    Outings
-                                </CardTitle>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-6 text-[10px]"
-                                    asChild
-                                >
-                                    <Link href="/fleet-assets/outings">
-                                        View all
-                                    </Link>
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                {(today_outings ?? []).map((outing) => (
-                                    <Link
-                                        key={outing.id}
-                                        href={`/fleet-assets/outings/${outing.id}`}
-                                        className="flex flex-col gap-1 rounded-lg border p-3 text-xs transition-colors hover:bg-muted/50"
                                     >
-                                        <div className="flex items-center justify-between">
-                                            <span className="truncate font-semibold">
-                                                {outing.title}
-                                            </span>
-                                            <Badge
-                                                variant={
-                                                    outing.status === 'active'
-                                                        ? 'default'
-                                                        : 'outline'
-                                                }
-                                                className="shrink-0 text-[9px]"
-                                            >
-                                                {outing.status}
-                                            </Badge>
-                                        </div>
-                                        <span className="truncate text-muted-foreground">
-                                            {outing.destination}
-                                        </span>
-                                        <div className="flex items-center gap-2 text-muted-foreground">
-                                            {outing.asset && (
-                                                <span>{outing.asset.name}</span>
-                                            )}
-                                            {outing.resident_count > 0 && (
-                                                <span>
-                                                    {outing.resident_count}{' '}
-                                                    resident
-                                                    {outing.resident_count !== 1
-                                                        ? 's'
-                                                        : ''}
-                                                </span>
-                                            )}
-                                            {outing.planned_departure && (
-                                                <span>
-                                                    {formatTime(
-                                                        outing.planned_departure,
-                                                    )}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </Link>
+                                        {resource.name}
+                                        <span>{resource.ref}</span>
+                                    </button>
                                 ))}
                             </div>
-                        </CardContent>
-                    </Card>
-                )}
+                        </>
+                    ) : (
+                        <ResourceDetail
+                            resource={current.group[0]}
+                            actions={actions(current.group[0])}
+                        />
+                    )}
+                </div>
+            )}
+            {selected &&
+                !current &&
+                (() => {
+                    const resource = resources.find(
+                        (item) => `${item.kind}-${item.id}` === selected,
+                    );
+                    return resource ? (
+                        <div className="fo-map-detail">
+                            <button
+                                className="fo-close"
+                                onClick={() => setSelected(null)}
+                                aria-label="Close location details"
+                            >
+                                <X className="size-4" />
+                            </button>
+                            <ResourceDetail
+                                resource={resource}
+                                actions={actions(resource)}
+                            />
+                        </div>
+                    ) : null;
+                })()}
+            {list && (
+                <div className="fo-map-list">
+                    <div className="fo-section-head">
+                        <div>
+                            <p className="fo-eyebrow">Resource list</p>
+                            <h3>
+                                {list === 'unknown'
+                                    ? 'Without a recorded pin'
+                                    : 'All resources in scope'}
+                            </h3>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setList(null)}
+                            aria-label="Close resource list"
+                        >
+                            <X className="size-4" />
+                        </Button>
+                    </div>
+                    <input
+                        type="search"
+                        value={listQuery}
+                        onChange={(event) => setListQuery(event.target.value)}
+                        placeholder="Search name, registration or Site"
+                        aria-label="Search resource list"
+                        className="fo-input"
+                    />
+                    {pageRows(shownRows, safePage).map((item) => (
+                        <button
+                            key={`${item.kind}-${item.id}`}
+                            className="fo-list-row"
+                            onClick={() => {
+                                setSelected(`${item.kind}-${item.id}`);
+                                setList(null);
+                            }}
+                        >
+                            <span>
+                                <strong>{item.name}</strong>
+                                <small>
+                                    {item.ref} · {item.site || 'Site unknown'}
+                                </small>
+                            </span>
+                            <span>
+                                {item.location
+                                    ? item.location.source
+                                    : 'Location unknown'}
+                            </span>
+                        </button>
+                    ))}
+                    {shownRows.length === 0 && (
+                        <p className="fo-empty">No matching resources.</p>
+                    )}
+                    <Pager
+                        page={safePage}
+                        count={shownRows.length}
+                        onPage={setListPage}
+                    />
+                </div>
+            )}
+            {context && contextGroup && (
+                <EntityContextMenu
+                    x={context.x}
+                    y={context.y}
+                    icon={contextGroup[0].kind === 'vehicle' ? Car : Package}
+                    title={
+                        contextGroup.length > 1
+                            ? `${contextGroup.length} resources · choose one`
+                            : contextGroup[0].name
+                    }
+                    items={
+                        contextGroup.length > 1
+                            ? contextGroup.map((item) => ({
+                                  label: `${item.name} · ${item.ref}`,
+                                  onClick: () =>
+                                      setSelected(`${item.kind}-${item.id}`),
+                              }))
+                            : actions(contextGroup[0])
+                    }
+                    onClose={() => setContext(null)}
+                />
+            )}
+        </section>
+    );
+}
+function ResourceDetail({
+    resource,
+    actions,
+}: {
+    resource: Resource;
+    actions: MenuItem[];
+}) {
+    return (
+        <>
+            <p className="fo-eyebrow">
+                {resource.kind === 'vehicle'
+                    ? 'Vehicle location'
+                    : 'Asset Site record'}
+            </p>
+            <h3>{resource.name}</h3>
+            <p>
+                {resource.registration || resource.ref} ·{' '}
+                {resource.site || 'Site unknown'}
+            </p>
+            <Status state={resource.availability} />
+            <dl>
+                <div>
+                    <dt>Source</dt>
+                    <dd>{resource.location?.source || 'Location unknown'}</dd>
+                </div>
+                <div>
+                    <dt>Observed</dt>
+                    <dd>
+                        {resource.location?.observed_at
+                            ? dayLabel(
+                                  resource.location.observed_at,
+                                  'Pacific/Auckland',
+                              )
+                            : 'No live observation'}
+                    </dd>
+                </div>
+                <div>
+                    <dt>Readiness</dt>
+                    <dd>
+                        {resource.readiness_note || 'Check the source record'}
+                    </dd>
+                </div>
+            </dl>
+            <div className="fo-detail-actions">
+                {actions.map((action) => (
+                    <Button
+                        key={action.label}
+                        variant="outline"
+                        size="sm"
+                        onClick={action.onClick}
+                    >
+                        {action.label}
+                    </Button>
+                ))}
+            </div>
+        </>
+    );
+}
 
-                {/* ============================================================ */}
-                {/*  VEHICLES AT YOUR SITE                                        */}
-                {/* ============================================================ */}
-                {(my_site_vehicles ?? []).length > 0 && (
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="flex items-center gap-2 text-sm">
-                                <Car className="h-4 w-4" /> Vehicles at Your
-                                Site
-                                <Badge
-                                    variant="secondary"
-                                    className="ml-1 text-[10px]"
+export default function FleetAssetsDashboard({ overview, saved_views }: Props) {
+    const [filters, setFilters] = useState<Filters>(readFilters);
+    const [attentionPage, setAttentionPage] = useRemember(
+        1,
+        'FleetOverview.attentionPage',
+    );
+    const [agendaPage, setAgendaPage] = useRemember(
+        1,
+        'FleetOverview.agendaPage',
+    );
+    const [vehiclePage, setVehiclePage] = useRemember(
+        1,
+        'FleetOverview.vehiclePage',
+    );
+    const [focusResource, setFocusResource] = useState<string | null>(null);
+    const [dataOpen, setDataOpen] = useState(false);
+    const [chartOpen, setChartOpen] = useState(false);
+    const [saveOpen, setSaveOpen] = useState(false);
+    const [saveName, setSaveName] = useState('');
+    const [renameFrom, setRenameFrom] = useState<string | null>(null);
+    const [saveError, setSaveError] = useState('');
+    const [saved, setSaved] = useState<SavedView[]>(() =>
+        usableSavedViews(saved_views, overview.sites),
+    );
+    const [undo, setUndo] = useState<SavedView[] | null>(null);
+    const [legacyViews, setLegacyViews] = useState<SavedView[]>([]);
+    const [savingViews, setSavingViews] = useState(false);
+    const savingViewsRef = useRef(false);
+    const receiptReloadTimer = useRef<number | null>(null);
+    const [viewMessage, setViewMessage] = useState('');
+    const [refreshMessage, setRefreshMessage] = useState('');
+    const [refreshing, setRefreshing] = useState(false);
+    const [receiptError, setReceiptError] = useState('');
+    const storageKey = `fleet-overview-views-v1-${overview.viewer_key}`;
+    const zone = overview.timezone || 'Pacific/Auckland';
+    const today = nzDay(overview.as_of, zone);
+    const resources = [...overview.vehicles, ...overview.assets];
+    const update = (patch: Partial<Filters>) => {
+        const next = normalizeOverviewFilters(
+            { ...filters, ...patch },
+            DEFAULT,
+        );
+        setFilters(next);
+        const scopeChanged = next.site !== filters.site || next.q !== filters.q;
+        writeFilters(next, scopeChanged);
+        if (scopeChanged) {
+            if (receiptReloadTimer.current !== null)
+                window.clearTimeout(receiptReloadTimer.current);
+            receiptReloadTimer.current = window.setTimeout(() => {
+                loadReceiptScope(
+                    window.location.pathname + window.location.search,
+                );
+                receiptReloadTimer.current = null;
+            }, 250);
+        }
+        setAttentionPage(1);
+        setAgendaPage(1);
+        setVehiclePage(1);
+    };
+    useEffect(() => {
+        setSaved(usableSavedViews(saved_views, overview.sites));
+    }, [saved_views, overview.sites]);
+    useEffect(() => {
+        try {
+            const value = JSON.parse(localStorage.getItem(storageKey) || '[]');
+            setLegacyViews(usableSavedViews(value, overview.sites));
+        } catch {
+            setLegacyViews([]);
+        }
+    }, [storageKey, overview.sites]);
+    useEffect(() => {
+        const listener = () => setFilters(readFilters());
+        window.addEventListener('popstate', listener);
+        return () => {
+            window.removeEventListener('popstate', listener);
+            if (receiptReloadTimer.current !== null)
+                window.clearTimeout(receiptReloadTimer.current);
+        };
+    }, []);
+    const persist = (next: SavedView[], afterSave?: () => void) => {
+        if (savingViewsRef.current) return;
+        savingViewsRef.current = true;
+        setSavingViews(true);
+        setViewMessage('Saving views…');
+        const previous = saved;
+        let finished = false;
+        const finish = () => {
+            if (finished) return;
+            finished = true;
+            savingViewsRef.current = false;
+            setSavingViews(false);
+            offInvalid();
+            offException();
+        };
+        const fail = () => {
+            setViewMessage('Could not save views. Try again.');
+            finish();
+        };
+        const offInvalid = router.on('invalid', (event) => {
+            event.preventDefault();
+            fail();
+        });
+        const offException = router.on('exception', (event) => {
+            event.preventDefault();
+            fail();
+        });
+        try {
+            router.put(
+                '/settings/ui-preferences/fleet.overview.saved-views',
+                {
+                    value: next,
+                },
+                {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        setSaved(next);
+                        setUndo(previous);
+                        setViewMessage('Saved to your account.');
+                        afterSave?.();
+                    },
+                    onError: fail,
+                    onCancel: () => {
+                        setViewMessage(
+                            'Save cancelled. Your previous views are intact.',
+                        );
+                        finish();
+                    },
+                    onFinish: finish,
+                },
+            );
+        } catch {
+            fail();
+        }
+    };
+    const saveView = () => {
+        const name = saveName.trim();
+        if (!name || name.length > 40) {
+            setSaveError('Enter a name of 1–40 characters.');
+            return;
+        }
+        if (
+            saved.some(
+                (item) =>
+                    item.name !== renameFrom &&
+                    item.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
+            )
+        ) {
+            setSaveError('A view already has this name.');
+            return;
+        }
+        const close = () => {
+            setSaveOpen(false);
+            setRenameFrom(null);
+            setSaveName('');
+            setSaveError('');
+        };
+        if (renameFrom)
+            persist(
+                saved.map((item) =>
+                    item.name === renameFrom ? { ...item, name } : item,
+                ),
+                close,
+            );
+        else {
+            if (saved.length >= 6) {
+                setSaveError('You can save up to six views.');
+                return;
+            }
+            persist([...saved, { name, filters }], close);
+        }
+    };
+    const scoped = (resource: Resource) =>
+        (filters.site === 'all' || String(resource.site_id) === filters.site) &&
+        matches(
+            filters.q,
+            resource.name,
+            resource.ref,
+            resource.registration,
+            resource.site,
+        );
+    const vehicles = overview.vehicles.filter(scoped);
+    const assets = overview.assets.filter(scoped);
+    const relatedRefs = new Set(
+        [...vehicles, ...assets].map((item) => item.ref),
+    );
+    const workScoped = (item: WorkItem) =>
+        (filters.site === 'all' || String(item.site_id) === filters.site) &&
+        (matches(
+            filters.q,
+            item.title,
+            item.ref,
+            item.resource,
+            item.resource_ref,
+            item.site,
+        ) ||
+            (filters.q.trim() && relatedRefs.has(item.resource_ref)));
+    const attention = overview.attention
+        .filter(workScoped)
+        .filter(
+            (item) =>
+                filters.attention === 'all' ||
+                item.category === filters.attention,
+        )
+        .filter((item) => {
+            if (filters.due === 'all') return true;
+            if (filters.due === 'undated') return !item.due_at;
+            if (!item.due_at) return false;
+            const due = nzDay(item.due_at, zone);
+            return filters.due === 'today'
+                ? due === today
+                : isOverviewOverdue(item.due_at, overview.as_of);
+        })
+        .sort((a, b) =>
+            filters.sort === 'resource'
+                ? a.resource.localeCompare(b.resource)
+                : (a.due_at || '9999').localeCompare(b.due_at || '9999'),
+        );
+    const tomorrowDate = new Date(`${today}T12:00:00Z`);
+    tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
+    const tomorrow = tomorrowDate.toISOString().slice(0, 10);
+    const agendaForPeriod = overview.agenda
+        .filter(workScoped)
+        .filter((item) => {
+            const time = item.starts_at || item.due_at;
+            if (!time) return false;
+            const day = /^\d{4}-\d{2}-\d{2}$/.test(time)
+                ? time
+                : nzDay(time, zone);
+            return filters.period !== 'today' || day === today;
+        })
+        .sort((a, b) =>
+            (a.starts_at || a.due_at || '').localeCompare(
+                b.starts_at || b.due_at || '',
+            ),
+        );
+    const isBookedDay =
+        filters.agendaKind === 'booking' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(filters.agendaDay);
+    const agenda = (
+        isBookedDay
+            ? [
+                  ...agendaForPeriod,
+                  ...overview.attention.filter(
+                      (item) => item.type === 'booking' && workScoped(item),
+                  ),
+              ]
+            : agendaForPeriod
+    )
+        .filter(
+            (item) =>
+                filters.agendaKind === 'all' ||
+                item.type === filters.agendaKind,
+        )
+        .filter((item) => {
+            const time = item.starts_at || item.due_at || '';
+            if (
+                item.type === 'booking' &&
+                /^\d{4}-\d{2}-\d{2}$/.test(filters.agendaDay)
+            ) {
+                const booking = overview.bookings.find(
+                    (row) => item.id === `booking-${row.id}`,
+                );
+                return (
+                    !!booking &&
+                    bookingOverlapsOverviewDay(
+                        booking.starts_at,
+                        booking.ends_at,
+                        filters.agendaDay,
+                        zone,
+                    )
+                );
+            }
+            const day = /^\d{4}-\d{2}-\d{2}$/.test(time)
+                ? time
+                : nzDay(time, zone);
+            if (filters.agendaDay === 'today') return day === today;
+            if (filters.agendaDay === 'tomorrow') return day === tomorrow;
+            if (filters.agendaDay === 'rest') return day > tomorrow;
+            return filters.agendaDay === 'all' || day === filters.agendaDay;
+        });
+    const availableVehicles = vehicles.filter(
+        (vehicle) =>
+            filters.availability === 'all' ||
+            vehicle.availability === filters.availability,
+    );
+    const counts = ['Available now', 'In use', 'Restricted', 'Unknown'].map(
+        (state) =>
+            vehicles.filter((vehicle) => vehicle.availability === state).length,
+    );
+    const scopedAttention = overview.attention.filter(workScoped);
+    const needsAttention = scopedAttention.length;
+    const bookedHours = overview.booked_hours.filter((row) =>
+        vehicles.some((vehicle) => vehicle.id === row.asset_id),
+    );
+    const bookingsHealthy =
+        overview.sources.find((source) => source.name === 'Bookings')?.state ===
+        'loaded';
+    const openBookedDay = (day: string) =>
+        update({
+            view: 'upcoming',
+            period: 'week',
+            agendaKind: 'booking',
+            agendaDay: day,
+        });
+    const noKnownAvailability =
+        overview.sources.find((source) => source.name === 'Bookings')?.state !==
+            'loaded' ||
+        overview.sources.find((source) => source.name === 'Vehicle readiness')
+            ?.state !== 'loaded';
+    const siteName =
+        filters.site === 'all'
+            ? `${overview.sites.length} approved ${overview.sites.length === 1 ? 'Site' : 'Sites'}`
+            : overview.sites.find((site) => String(site.id) === filters.site)
+                  ?.name || 'Approved Site';
+    const summary = `${siteName} · ${vehicles.length} ${vehicles.length === 1 ? 'vehicle' : 'vehicles'} · ${assets.length} ${assets.length === 1 ? 'asset' : 'assets'} · observed ${dayLabel(overview.as_of, zone)}`;
+    const inSite = (siteId: number | null) =>
+        filters.site === 'all' || String(siteId) === filters.site;
+    const sourceCount = (name: string, fallback: number | null) => {
+        if (filters.site === 'all' || fallback === null) return fallback;
+        if (name === 'Bookings')
+            return overview.bookings.filter((row) =>
+                inSite(
+                    overview.vehicles.find(
+                        (vehicle) => vehicle.id === row.asset_id,
+                    )?.site_id ?? null,
+                ),
+            ).length;
+        if (name === 'Vehicle readiness')
+            return overview.vehicles.filter((vehicle) =>
+                inSite(vehicle.site_id),
+            ).length;
+        if (name === 'Maintenance')
+            return overview.attention.filter(
+                (row) => row.type === 'work' && inSite(row.site_id),
+            ).length;
+        if (name === 'Locations')
+            return [...overview.vehicles, ...overview.assets].filter(
+                (resource) => inSite(resource.site_id) && resource.location,
+            ).length;
+        if (name === 'Planning')
+            return overview.agenda.filter(
+                (row) =>
+                    ['appointment', 'due'].includes(row.type) &&
+                    inSite(row.site_id),
+            ).length;
+        if (name === 'Assignments and receipt') return overview.receipts.count;
+        return fallback;
+    };
+    const legacyNeedsImport = legacyViews.some(
+        (local) =>
+            !saved.some(
+                (account) =>
+                    account.name.toLocaleLowerCase() ===
+                        local.name.toLocaleLowerCase() &&
+                    JSON.stringify(account.filters) ===
+                        JSON.stringify(local.filters),
+            ),
+    );
+    const importableLegacy = browserViewsToImport(saved, legacyViews);
+    const navigate = (href: string) => router.visit(href);
+    const openView = (view: View) => update({ view });
+    const receiptInScope =
+        overview.receipts.site === filters.site &&
+        overview.receipts.query === filters.q.trim().slice(0, 120);
+    const receiptCount = receiptInScope ? overview.receipts.count : null;
+    const loadReceiptScope = (url: string) => {
+        setReceiptError('');
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            offInvalid();
+            offException();
+        };
+        const fail = () => {
+            setReceiptError('Could not load receipts. Try again.');
+            finish();
+        };
+        const offInvalid = router.on('invalid', (event) => {
+            event.preventDefault();
+            fail();
+        });
+        const offException = router.on('exception', (event) => {
+            event.preventDefault();
+            fail();
+        });
+        try {
+            router.get(
+                url,
+                {},
+                {
+                    only: ['overview'],
+                    replace: true,
+                    preserveState: true,
+                    preserveScroll: true,
+                    onError: fail,
+                    onFinish: finish,
+                },
+            );
+        } catch {
+            fail();
+        }
+    };
+    const goReceiptPage = (page: number) => {
+        const url = new URL(window.location.href);
+        if (page <= 1) url.searchParams.delete('receipt_page');
+        else url.searchParams.set('receipt_page', String(page));
+        loadReceiptScope(url.pathname + url.search);
+    };
+    const openReceipts = () => {
+        if (overview.receipts.state !== 'loaded') {
+            setDataOpen(true);
+            return;
+        }
+        if (filters.view !== 'overview') update({ view: 'overview' });
+        window.setTimeout(
+            () =>
+                document
+                    .getElementById('fo-receipts')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+            100,
+        );
+    };
+    const refresh = () => {
+        setRefreshing(true);
+        setRefreshMessage('');
+        const failed = () =>
+            setRefreshMessage(
+                'Refresh failed. Existing observations remain visible. Try again.',
+            );
+        const offInvalid = router.on('invalid', (event) => {
+            event.preventDefault();
+            failed();
+        });
+        const offException = router.on('exception', (event) => {
+            event.preventDefault();
+            failed();
+        });
+        router.reload({
+            only: ['overview'],
+            onSuccess: (page) => {
+                const latest = page.props.overview as Overview;
+                const unavailable = latest.sources.filter(
+                    (source) => source.state === 'unavailable',
+                );
+                setRefreshMessage(
+                    unavailable.length
+                        ? `Refreshed. Still unavailable: ${unavailable.map((source) => source.name).join(', ')}.`
+                        : 'Latest source data loaded.',
+                );
+            },
+            onError: failed,
+            onFinish: () => {
+                setRefreshing(false);
+                offInvalid();
+                offException();
+            },
+        });
+    };
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Fleet & Assets', href: '/fleet-assets' },
+            ]}
+        >
+            <Head title="Fleet & Assets Overview" />
+            <PageShell>
+                <div className="fleet-overview">
+                    <PageHeader
+                        icon={LayoutDashboard}
+                        title="Fleet & Assets"
+                        subline={summary}
+                        actions={
+                            <>
+                                <PageHeaderSearch
+                                    value={filters.q}
+                                    onChange={(q) => update({ q })}
+                                    placeholder="Search resources and work"
+                                />
+                                <PageHeaderGlassButton
+                                    icon={Bookmark}
+                                    disabled={savingViews}
+                                    onClick={() => {
+                                        setRenameFrom(null);
+                                        setSaveName('');
+                                        setSaveOpen(true);
+                                    }}
                                 >
-                                    {(my_site_vehicles ?? []).length}
-                                </Badge>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                                {(my_site_vehicles ?? []).map((v) => (
-                                    <div
-                                        key={v.id}
-                                        className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/30"
+                                    Save view
+                                </PageHeaderGlassButton>
+                                <PageHeaderGlassButton
+                                    icon={Database}
+                                    onClick={() => setDataOpen(true)}
+                                >
+                                    Data status
+                                </PageHeaderGlassButton>
+                            </>
+                        }
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Needs attention"
+                                    tone={needsAttention ? 'critical' : 'brand'}
+                                    onClick={() => openView('attention')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {needsAttention}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Returns and open work
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Available now"
+                                    value={
+                                        noKnownAvailability
+                                            ? '—'
+                                            : `${counts[0]} / ${vehicles.length}`
+                                    }
+                                    onClick={() => openView('availability')}
+                                >
+                                    <PageHeaderMeterBar
+                                        percent={
+                                            vehicles.length
+                                                ? (counts[0] /
+                                                      vehicles.length) *
+                                                  100
+                                                : 0
+                                        }
+                                    />
+                                    <PageHeaderMeterCaption>
+                                        {counts[3]} unknown · check before use
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Coming up"
+                                    onClick={() => openView('upcoming')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {agendaForPeriod.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Bookings, appointments, due work
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Receipt to confirm"
+                                    tone="warning"
+                                    onClick={openReceipts}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {overview.receipts.state === 'loaded' &&
+                                        receiptCount !== null
+                                            ? receiptCount
+                                            : '—'}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {overview.receipts.state === 'loaded'
+                                            ? receiptCount === null
+                                                ? 'Updating selected scope…'
+                                                : 'Active assignments awaiting verification'
+                                            : overview.receipts.state ===
+                                                'no_access'
+                                              ? 'Assignment access required'
+                                              : 'Receipt source unavailable'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
+                        filters={
+                            <>
+                                <PageHeaderFilterSelect
+                                    label="All approved Sites"
+                                    value={filters.site}
+                                    options={[
+                                        {
+                                            value: 'all',
+                                            label: 'All approved Sites',
+                                        },
+                                        ...overview.sites.map((site) => ({
+                                            value: String(site.id),
+                                            label: site.name,
+                                        })),
+                                    ]}
+                                    onChange={(site) => update({ site })}
+                                />
+                                <PageHeaderFilterSelect
+                                    label="Next 7 days"
+                                    value={filters.period}
+                                    allValue="week"
+                                    options={[
+                                        { value: 'week', label: 'Next 7 days' },
+                                        { value: 'today', label: 'Today' },
+                                    ]}
+                                    onChange={(period) =>
+                                        update({
+                                            period: period as Filters['period'],
+                                        })
+                                    }
+                                />
+                            </>
+                        }
+                        rail={
+                            <PageHeaderRail
+                                items={[
+                                    {
+                                        key: 'overview',
+                                        label: 'Overview',
+                                        icon: LayoutDashboard,
+                                    },
+                                    {
+                                        key: 'attention',
+                                        label: 'Needs attention',
+                                        count: attention.length,
+                                        alert: true,
+                                        icon: ShieldAlert,
+                                    },
+                                    {
+                                        key: 'upcoming',
+                                        label: 'Coming up',
+                                        count: agendaForPeriod.length,
+                                        icon: CalendarDays,
+                                    },
+                                    {
+                                        key: 'availability',
+                                        label: 'Availability',
+                                        count: vehicles.length,
+                                        icon: Car,
+                                    },
+                                ]}
+                                value={filters.view}
+                                onSelect={openView}
+                            />
+                        }
+                    />
+                    <div className="fo-footer fo-observation">
+                        <span>
+                            Observed {formatDateTime(overview.as_of)} · {zone}
+                        </span>
+                        <button onClick={() => setDataOpen(true)}>
+                            Data status <ArrowRight className="size-3" />
+                        </button>
+                    </div>
+                    {(filters.q || filters.site !== 'all') && (
+                        <div className="fo-controls" aria-label="Active scope">
+                            <span>
+                                {filters.site !== 'all'
+                                    ? siteName
+                                    : 'All approved Sites'}
+                                {filters.q ? ` · Search: ${filters.q}` : ''}
+                            </span>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => update({ q: '', site: 'all' })}
+                            >
+                                Clear search and Site
+                            </Button>
+                        </div>
+                    )}
+                    {(saved.length > 0 ||
+                        undo ||
+                        legacyNeedsImport ||
+                        viewMessage) && (
+                        <div className="fo-saved">
+                            <span>
+                                <Bookmark className="size-3.5" /> Saved views
+                            </span>
+                            {importableLegacy.length > 0 && (
+                                <button
+                                    disabled={savingViews}
+                                    onClick={() =>
+                                        persist([...saved, ...importableLegacy])
+                                    }
+                                >
+                                    Import {importableLegacy.length} view
+                                    {importableLegacy.length === 1
+                                        ? ''
+                                        : 's'}{' '}
+                                    from this browser
+                                </button>
+                            )}
+                            {legacyNeedsImport &&
+                                importableLegacy.length === 0 && (
+                                    <span>
+                                        Remove a saved view to make room for
+                                        browser views.
+                                    </span>
+                                )}
+                            {saved.map((item) => (
+                                <div key={item.name} className="fo-saved-item">
+                                    <button
+                                        disabled={savingViews}
+                                        onClick={() => {
+                                            const validated = {
+                                                ...DEFAULT,
+                                                ...normalizeOverviewFilters(
+                                                    item.filters,
+                                                    DEFAULT,
+                                                ),
+                                                site: overview.sites.some(
+                                                    (site) =>
+                                                        String(site.id) ===
+                                                        item.filters.site,
+                                                )
+                                                    ? item.filters.site
+                                                    : 'all',
+                                            };
+                                            update(validated);
+                                        }}
                                     >
-                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
-                                            <Car className="h-4 w-4 text-primary dark:text-primary" />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-medium">
-                                                {v.name}
-                                            </p>
-                                            <Badge
-                                                variant={
-                                                    v.status === 'online'
-                                                        ? 'default'
-                                                        : 'secondary'
+                                        {item.name}
+                                    </button>
+                                    <EntityKebab
+                                        label={`Actions for ${item.name}`}
+                                        actions={
+                                            savingViews
+                                                ? []
+                                                : [
+                                                      {
+                                                          label: 'Update with current filters',
+                                                          onClick: () =>
+                                                              persist(
+                                                                  saved.map(
+                                                                      (view) =>
+                                                                          view.name ===
+                                                                          item.name
+                                                                              ? {
+                                                                                    ...view,
+                                                                                    filters,
+                                                                                }
+                                                                              : view,
+                                                                  ),
+                                                              ),
+                                                      },
+                                                      {
+                                                          label: 'Rename',
+                                                          onClick: () => {
+                                                              setRenameFrom(
+                                                                  item.name,
+                                                              );
+                                                              setSaveName(
+                                                                  item.name,
+                                                              );
+                                                              setSaveOpen(true);
+                                                          },
+                                                      },
+                                                      {
+                                                          label: 'Remove',
+                                                          onClick: () =>
+                                                              persist(
+                                                                  saved.filter(
+                                                                      (view) =>
+                                                                          view !==
+                                                                          item,
+                                                                  ),
+                                                              ),
+                                                      },
+                                                  ]
+                                        }
+                                    />
+                                </div>
+                            ))}
+                            {undo && (
+                                <button
+                                    disabled={savingViews}
+                                    onClick={() => {
+                                        persist(undo, () => setUndo(null));
+                                    }}
+                                >
+                                    Undo last change
+                                </button>
+                            )}
+                            {viewMessage && (
+                                <span role="status">{viewMessage}</span>
+                            )}
+                        </div>
+                    )}
+                    {filters.view === 'overview' && (
+                        <>
+                            <section
+                                className="fo-urgent-strip"
+                                aria-label="Priority follow-ups"
+                            >
+                                <strong>
+                                    <ShieldAlert size={17} />
+                                    Follow up
+                                </strong>
+                                {[
+                                    {
+                                        key: 'returns',
+                                        label: 'Overdue returns',
+                                        Icon: CalendarDays,
+                                    },
+                                    {
+                                        key: 'restricted',
+                                        label: 'Restricted vehicles',
+                                        Icon: ShieldAlert,
+                                    },
+                                    {
+                                        key: 'unassigned',
+                                        label: 'Unassigned repairs',
+                                        Icon: Wrench,
+                                    },
+                                ].map(({ key, label, Icon }) => (
+                                    <button
+                                        key={key}
+                                        onClick={() =>
+                                            update({
+                                                view: 'attention',
+                                                attention: key,
+                                                due: 'all',
+                                            })
+                                        }
+                                    >
+                                        <Icon size={16} />
+                                        <b>
+                                            {key === 'returns' &&
+                                            !bookingsHealthy
+                                                ? '—'
+                                                : scopedAttention.filter(
+                                                      (item) =>
+                                                          item.category === key,
+                                                  ).length}
+                                        </b>
+                                        <span>{label}</span>
+                                        <ArrowRight size={14} />
+                                    </button>
+                                ))}
+                            </section>
+                            <MapPanel
+                                resources={[...vehicles, ...assets]}
+                                filter={filters.mapType}
+                                onFilter={(mapType) => update({ mapType })}
+                                freshness={filters.mapFresh}
+                                onFreshness={(mapFresh) => update({ mapFresh })}
+                                onOpen={navigate}
+                                focusId={focusResource}
+                                onFocusHandled={() => setFocusResource(null)}
+                            />
+                            <div className="fo-operations-grid">
+                                <div className="fo-operations-work">
+                                    <section>
+                                        <div className="fo-section-head">
+                                            <div>
+                                                <h2>Needs attention</h2>
+                                                <p>
+                                                    {Math.min(
+                                                        scopedAttention.length,
+                                                        4,
+                                                    )}{' '}
+                                                    of {scopedAttention.length}{' '}
+                                                    shown · follow-ups that need
+                                                    action
+                                                </p>
+                                            </div>
+                                            <button
+                                                className="fo-text-link"
+                                                onClick={() =>
+                                                    update({
+                                                        view: 'attention',
+                                                        attention: 'all',
+                                                        due: 'all',
+                                                    })
                                                 }
-                                                className="mt-0.5 h-4 px-1.5 text-[9px]"
                                             >
-                                                {v.status}
-                                            </Badge>
+                                                View all{' '}
+                                                <ArrowRight size={14} />
+                                            </button>
                                         </div>
+                                        <WorkRows
+                                            items={scopedAttention.slice(0, 4)}
+                                            zone={zone}
+                                            navigate={navigate}
+                                        />
+                                    </section>
+                                    <section>
+                                        <div className="fo-section-head">
+                                            <div>
+                                                <h2>Coming up</h2>
+                                                <p>
+                                                    Next in your selected period
+                                                </p>
+                                            </div>
+                                            <button
+                                                className="fo-text-link"
+                                                onClick={() =>
+                                                    openView('upcoming')
+                                                }
+                                            >
+                                                View all{' '}
+                                                {agendaForPeriod.length}{' '}
+                                                <ArrowRight size={14} />
+                                            </button>
+                                        </div>
+                                        <UpcomingAgenda
+                                            items={agendaForPeriod.slice(0, 2)}
+                                            today={today}
+                                            navigate={navigate}
+                                        />
+                                    </section>
+                                </div>
+                                <section className="fo-card fo-availability-panel">
+                                    <div className="fo-section-head">
+                                        <div>
+                                            <h2>Vehicle availability</h2>
+                                            <p>
+                                                Recorded state ·{' '}
+                                                {formatDateTime(overview.as_of)}
+                                            </p>
+                                        </div>
+                                        <button
+                                            aria-label="About vehicle availability"
+                                            onClick={() => setDataOpen(true)}
+                                        >
+                                            <Database size={17} />
+                                        </button>
+                                    </div>
+                                    <AvailabilityDonut
+                                        vehicles={vehicles}
+                                        onSelect={(availability) =>
+                                            update({
+                                                view: 'availability',
+                                                availability,
+                                            })
+                                        }
+                                    />
+                                    <p className="fo-note">
+                                        No recorded block is not a safety
+                                        assurance. Driver, time and checkout
+                                        checks still apply.
+                                    </p>
+                                    <button
+                                        className="fo-text-link"
+                                        onClick={() => openView('availability')}
+                                    >
+                                        Inspect vehicle evidence{' '}
+                                        <ArrowRight size={14} />
+                                    </button>
+                                </section>
+                            </div>
+                            <BookingLoad
+                                hours={bookedHours}
+                                site={filters.site}
+                                today={today}
+                                healthy={bookingsHealthy}
+                                onDay={openBookedDay}
+                            />
+                            <section
+                                id="fo-receipts"
+                                className="fo-card fo-receipt-panel"
+                            >
+                                {receiptError && (
+                                    <div role="alert" className="fo-notice">
+                                        {receiptError}{' '}
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() =>
+                                                loadReceiptScope(
+                                                    window.location.pathname +
+                                                        window.location.search,
+                                                )
+                                            }
+                                        >
+                                            Retry receipts
+                                        </Button>
+                                    </div>
+                                )}
+                                <div className="fo-section-head">
+                                    <div>
+                                        <h2>Asset receipt</h2>
+                                        <p>
+                                            Active assignments awaiting an
+                                            explicit receipt verification in the
+                                            selected Site and search.
+                                        </p>
+                                    </div>
+                                    <span
+                                        className={`fo-status ${overview.receipts.state === 'loaded' ? '' : 'fo-unknown'}`}
+                                    >
+                                        {overview.receipts.state === 'loaded' &&
+                                        receiptCount !== null
+                                            ? `${receiptCount} pending`
+                                            : overview.receipts.state ===
+                                                'loaded'
+                                              ? 'Updating…'
+                                              : overview.receipts.state ===
+                                                  'no_access'
+                                                ? 'No access'
+                                                : 'Unavailable'}
+                                    </span>
+                                </div>
+                                {receiptInScope &&
+                                overview.receipts.state === 'loaded' &&
+                                overview.receipts.rows.length > 0 ? (
+                                    <div className="fo-receipt-rows">
+                                        {overview.receipts.rows.map((row) => (
+                                            <Link
+                                                key={row.id}
+                                                href={row.href}
+                                                className="fo-receipt-row"
+                                            >
+                                                <span>
+                                                    <strong>{row.asset}</strong>
+                                                    <small>
+                                                        {row.ref} ·{' '}
+                                                        {row.site ||
+                                                            'Site not shown'}
+                                                    </small>
+                                                </span>
+                                                <span>
+                                                    {row.assigned_at
+                                                        ? formatDateTime(
+                                                              row.assigned_at,
+                                                          )
+                                                        : 'Date unavailable'}{' '}
+                                                    <ArrowRight size={14} />
+                                                </span>
+                                            </Link>
+                                        ))}
+                                        <Pager
+                                            page={overview.receipts.page}
+                                            count={overview.receipts.count ?? 0}
+                                            onPage={goReceiptPage}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="fo-receipt-empty">
+                                        <Package size={22} />
+                                        <div>
+                                            <strong>
+                                                {!receiptInScope
+                                                    ? 'Updating selected scope'
+                                                    : overview.receipts
+                                                            .state === 'loaded'
+                                                      ? 'No receipt verifications pending'
+                                                      : overview.receipts
+                                                              .state ===
+                                                          'no_access'
+                                                        ? 'Assignment access required'
+                                                        : 'Receipt source unavailable'}
+                                            </strong>
+                                            <p>
+                                                {!receiptInScope
+                                                    ? 'Loading matching assignments…'
+                                                    : overview.receipts
+                                                            .state === 'loaded'
+                                                      ? 'No active assignment in this Site and search is awaiting verification.'
+                                                      : 'Open data status for source details.'}
+                                            </p>
+                                        </div>
+                                        {overview.receipts.state !==
+                                            'loaded' && (
+                                            <button
+                                                className="fo-text-link"
+                                                onClick={() =>
+                                                    setDataOpen(true)
+                                                }
+                                            >
+                                                View data status{' '}
+                                                <ArrowRight size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </section>
+                        </>
+                    )}
+                    {filters.view === 'attention' && (
+                        <section className="fo-card fo-workspace">
+                            <div className="fo-section-head">
+                                <div>
+                                    <p className="fo-eyebrow">
+                                        Source-owned work
+                                    </p>
+                                    <h2>Needs attention</h2>
+                                    <p>
+                                        Open the canonical record for decisions
+                                        and updates.
+                                    </p>
+                                </div>
+                                <span className="fo-count">
+                                    {attention.length}{' '}
+                                    {attention.length === 1 ? 'item' : 'items'}
+                                </span>
+                            </div>
+                            <div className="fo-controls">
+                                <select
+                                    aria-label="Attention category"
+                                    value={filters.attention}
+                                    onChange={(event) =>
+                                        update({
+                                            attention: event.target.value,
+                                        })
+                                    }
+                                >
+                                    <option value="all">All follow-up</option>
+                                    <option value="returns">
+                                        Overdue returns
+                                    </option>
+                                    <option value="restricted">
+                                        Active holds
+                                    </option>
+                                    <option value="work">
+                                        Maintenance work
+                                    </option>
+                                    <option value="evidence">
+                                        Readiness evidence
+                                    </option>
+                                    <option value="unassigned">
+                                        Owner needed
+                                    </option>
+                                </select>
+                                <select
+                                    aria-label="Due date"
+                                    value={filters.due}
+                                    onChange={(event) =>
+                                        update({ due: event.target.value })
+                                    }
+                                >
+                                    <option value="all">Any due date</option>
+                                    <option value="overdue">Overdue</option>
+                                    <option value="today">Due today</option>
+                                    <option value="undated">No due date</option>
+                                </select>
+                                <select
+                                    aria-label="Sort attention"
+                                    value={filters.sort}
+                                    onChange={(event) =>
+                                        update({ sort: event.target.value })
+                                    }
+                                >
+                                    <option value="due">Due soonest</option>
+                                    <option value="resource">
+                                        Resource name
+                                    </option>
+                                </select>
+                                {(filters.attention !== 'all' ||
+                                    filters.due !== 'all') && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                            update({
+                                                attention: 'all',
+                                                due: 'all',
+                                            })
+                                        }
+                                    >
+                                        Clear filters
+                                    </Button>
+                                )}
+                            </div>
+                            <WorkRows
+                                items={pageRows(attention, attentionPage)}
+                                zone={zone}
+                                navigate={navigate}
+                            />
+                            <Pager
+                                page={attentionPage}
+                                count={attention.length}
+                                onPage={setAttentionPage}
+                            />
+                        </section>
+                    )}
+                    {filters.view === 'upcoming' && (
+                        <section className="fo-card fo-workspace">
+                            <div className="fo-section-head">
+                                <div>
+                                    <p className="fo-eyebrow">Planning</p>
+                                    <h2>Coming up</h2>
+                                    <p>
+                                        Confirmed bookings are reservations.
+                                        Date-only work has no invented
+                                        appointment time.
+                                    </p>
+                                </div>
+                                <span className="fo-count">
+                                    {agenda.length}{' '}
+                                    {agenda.length === 1 ? 'item' : 'items'}
+                                </span>
+                            </div>
+                            <div className="fo-controls">
+                                <button
+                                    className={
+                                        filters.agendaDay === 'today' ||
+                                        filters.period === 'today'
+                                            ? 'active'
+                                            : ''
+                                    }
+                                    onClick={() =>
+                                        update({
+                                            period: 'week',
+                                            agendaDay: 'today',
+                                        })
+                                    }
+                                >
+                                    Today
+                                </button>
+                                <button
+                                    className={
+                                        filters.agendaDay === 'tomorrow'
+                                            ? 'active'
+                                            : ''
+                                    }
+                                    onClick={() =>
+                                        update({
+                                            period: 'week',
+                                            agendaDay: 'tomorrow',
+                                        })
+                                    }
+                                >
+                                    Tomorrow
+                                </button>
+                                <button
+                                    className={
+                                        filters.agendaDay === 'rest'
+                                            ? 'active'
+                                            : ''
+                                    }
+                                    onClick={() =>
+                                        update({
+                                            period: 'week',
+                                            agendaDay: 'rest',
+                                        })
+                                    }
+                                >
+                                    Rest of week
+                                </button>
+                                <button
+                                    className={
+                                        filters.agendaDay === 'all' &&
+                                        filters.period === 'week'
+                                            ? 'active'
+                                            : ''
+                                    }
+                                    onClick={() =>
+                                        update({
+                                            period: 'week',
+                                            agendaDay: 'all',
+                                        })
+                                    }
+                                >
+                                    All 7 days
+                                </button>
+                                <select
+                                    aria-label="Coming up type"
+                                    value={filters.agendaKind}
+                                    onChange={(event) =>
+                                        update({
+                                            agendaKind: event.target.value,
+                                        })
+                                    }
+                                >
+                                    <option value="all">All types</option>
+                                    <option value="booking">Bookings</option>
+                                    <option value="appointment">
+                                        Appointments
+                                    </option>
+                                    <option value="work">
+                                        Maintenance work
+                                    </option>
+                                    <option value="due">Due dates</option>
+                                </select>
+                                {(filters.agendaDay !== 'all' ||
+                                    filters.agendaKind !== 'all' ||
+                                    filters.period !== 'week') && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                            update({
+                                                agendaDay: 'all',
+                                                agendaKind: 'all',
+                                                period: 'week',
+                                            })
+                                        }
+                                    >
+                                        Clear agenda filters
+                                    </Button>
+                                )}
+                            </div>
+                            {/\d{4}-\d{2}-\d{2}/.test(filters.agendaDay) && (
+                                <p className="fo-note">
+                                    Bookings overlapping{' '}
+                                    {dayLabel(filters.agendaDay, zone)}
+                                </p>
+                            )}
+                            <UpcomingAgenda
+                                items={pageRows(agenda, agendaPage)}
+                                today={today}
+                                navigate={navigate}
+                            />
+                            <Pager
+                                page={agendaPage}
+                                count={agenda.length}
+                                onPage={setAgendaPage}
+                            />
+                            <Button
+                                variant="outline"
+                                onClick={() => setChartOpen(true)}
+                            >
+                                <CalendarDays size={16} />
+                                Booking load
+                            </Button>
+                        </section>
+                    )}
+                    {filters.view === 'availability' && (
+                        <section className="fo-card fo-workspace">
+                            <div className="fo-section-head">
+                                <div>
+                                    <p className="fo-eyebrow">
+                                        Evidence, not clearance
+                                    </p>
+                                    <h2>Vehicle availability</h2>
+                                    <p>
+                                        Check the vehicle profile before making
+                                        a use decision.
+                                    </p>
+                                </div>
+                                <AvailabilityDonut
+                                    vehicles={vehicles}
+                                    onSelect={(availability) =>
+                                        update({ availability })
+                                    }
+                                />
+                            </div>
+                            <div className="fo-controls">
+                                {[
+                                    'all',
+                                    'Available now',
+                                    'In use',
+                                    'Restricted',
+                                    'Unknown',
+                                ].map((state) => (
+                                    <button
+                                        key={state}
+                                        className={
+                                            filters.availability === state
+                                                ? 'active'
+                                                : ''
+                                        }
+                                        onClick={() =>
+                                            update({ availability: state })
+                                        }
+                                    >
+                                        {state === 'all'
+                                            ? 'All vehicles'
+                                            : state}
+                                    </button>
+                                ))}
+                            </div>
+                            {pageRows(availableVehicles, vehiclePage).map(
+                                (vehicle) => (
+                                    <div
+                                        key={vehicle.id}
+                                        className="fo-work-row"
+                                    >
+                                        <span className="fo-row-icon">
+                                            <Car className="size-4" />
+                                        </span>
+                                        <div className="fo-row-main">
+                                            <strong>{vehicle.name}</strong>
+                                            <small>
+                                                {vehicle.registration ||
+                                                    vehicle.ref}{' '}
+                                                ·{' '}
+                                                {vehicle.site || 'Site unknown'}{' '}
+                                                · {vehicle.readiness_note}
+                                            </small>
+                                        </div>
+                                        <Status state={vehicle.availability} />
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="h-7 shrink-0 px-2 text-[10px]"
-                                            asChild
+                                            onClick={() => {
+                                                update({
+                                                    view: 'overview',
+                                                    mapType: 'all',
+                                                    mapFresh: 'all',
+                                                });
+                                                setFocusResource(
+                                                    `vehicle-${vehicle.id}`,
+                                                );
+                                            }}
                                         >
-                                            <Link
-                                                href={`/fleet-assets/bookings?new=1&asset_id=${v.id}`}
-                                            >
-                                                Book
-                                            </Link>
+                                            View on map
                                         </Button>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* ============================================================ */}
-                {/*  BOTTOM ROW - Fleet by Site + After Hours side by side        */}
-                {/* ============================================================ */}
-                {((fleet_by_site ?? []).length > 0 ||
-                    (after_hours_trips ?? []).length > 0) && (
-                    <div className="grid gap-4 lg:grid-cols-2">
-                        {(fleet_by_site ?? []).length > 0 && (
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="flex items-center gap-2 text-sm">
-                                        <MapPin className="h-4 w-4" /> Fleet by
-                                        Site
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div
-                                        data-fleet-narrow-strategy="horizontal-scroll"
-                                        className="overflow-x-auto"
-                                    >
-                                        <table className="w-full text-xs">
-                                            <thead>
-                                                <tr className="border-b text-left text-muted-foreground">
-                                                    <th className="pr-3 pb-2 font-medium">
-                                                        Site
-                                                    </th>
-                                                    <th className="pr-3 pb-2 text-right font-medium">
-                                                        Vehicles
-                                                    </th>
-                                                    <th className="pr-3 pb-2 text-right font-medium">
-                                                        Online
-                                                    </th>
-                                                    <th className="pr-3 pb-2 text-right font-medium">
-                                                        Alerts
-                                                    </th>
-                                                    <th className="pb-2 text-right font-medium">
-                                                        Fuel
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {(fleet_by_site ?? []).map(
-                                                    (site) => (
-                                                        <tr
-                                                            key={site.id}
-                                                            className="border-b border-border/50 last:border-0"
-                                                        >
-                                                            <td className="py-2 pr-3">
-                                                                <Link
-                                                                    href={`/fleet-assets?site=${site.id}`}
-                                                                    className="text-xs font-medium text-primary hover:underline"
-                                                                >
-                                                                    {site.name}
-                                                                </Link>
-                                                            </td>
-                                                            <td className="py-2 pr-3 text-right tabular-nums">
-                                                                {
-                                                                    site.vehicle_count
-                                                                }
-                                                            </td>
-                                                            <td className="py-2 pr-3 text-right">
-                                                                <span className="inline-flex items-center gap-1">
-                                                                    {site.online_count >
-                                                                        0 && (
-                                                                        <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
-                                                                    )}
-                                                                    <span className="tabular-nums">
-                                                                        {
-                                                                            site.online_count
-                                                                        }
-                                                                    </span>
-                                                                </span>
-                                                            </td>
-                                                            <td className="py-2 pr-3 text-right">
-                                                                {site.active_alerts >
-                                                                0 ? (
-                                                                    <Badge
-                                                                        variant="destructive"
-                                                                        className="h-4 px-1 text-[9px]"
-                                                                    >
-                                                                        {
-                                                                            site.active_alerts
-                                                                        }
-                                                                    </Badge>
-                                                                ) : (
-                                                                    <span className="text-muted-foreground">
-                                                                        0
-                                                                    </span>
-                                                                )}
-                                                            </td>
-                                                            <td className="py-2 text-right text-muted-foreground tabular-nums">
-                                                                $
-                                                                {(
-                                                                    site.fuel_cost_mtd ??
-                                                                    0
-                                                                ).toLocaleString(
-                                                                    'en-NZ',
-                                                                    {
-                                                                        minimumFractionDigits: 0,
-                                                                        maximumFractionDigits: 0,
-                                                                    },
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    ),
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-                        {(after_hours_trips ?? []).length > 0 && (
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="flex items-center gap-2 text-sm">
-                                        <AlertTriangle className="h-4 w-4 text-status-warning" />{' '}
-                                        After-Hours Activity
-                                        <Badge
-                                            variant="outline"
-                                            className="ml-auto text-[10px]"
+                                        <Link
+                                            href={vehicle.href}
+                                            className="fo-row-link"
                                         >
-                                            7 days
-                                        </Badge>
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-1.5">
-                                        {(after_hours_trips ?? [])
-                                            .slice(0, 6)
-                                            .map((trip) => (
-                                                <div
-                                                    key={trip.id}
-                                                    className="flex items-center gap-2 rounded border border-status-warning/30 bg-status-warning-bg px-2.5 py-1.5 text-xs dark:border-status-warning/30"
-                                                >
-                                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-status-warning" />
-                                                    <span className="truncate font-medium">
-                                                        {trip.vehicle}
-                                                    </span>
-                                                    <span className="truncate text-muted-foreground">
-                                                        {trip.driver}
-                                                    </span>
-                                                    <span className="ml-auto shrink-0 text-[10px] tabular-nums">
-                                                        {trip.time}
-                                                    </span>
-                                                </div>
-                                            ))}
+                                            Open{' '}
+                                            <ArrowRight className="size-4" />
+                                        </Link>
                                     </div>
-                                </CardContent>
-                            </Card>
-                        )}
-                    </div>
-                )}
+                                ),
+                            )}
+                            {availableVehicles.length === 0 && (
+                                <p className="fo-empty">
+                                    No vehicles match this scope. Clear the
+                                    state filter or change the Site.
+                                </p>
+                            )}
+                            <Pager
+                                page={vehiclePage}
+                                count={availableVehicles.length}
+                                onPage={setVehiclePage}
+                            />
+                        </section>
+                    )}
+
+                    <Dialog open={chartOpen} onOpenChange={setChartOpen}>
+                        <DialogContent className="fleet-overview fo-dialog sm:max-w-3xl">
+                            <DialogHeader>
+                                <DialogTitle>Booking load</DialogTitle>
+                                <DialogDescription>
+                                    Confirmed reservation hours for your
+                                    selected vehicles.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <BookingLoad
+                                hours={bookedHours}
+                                site={filters.site}
+                                today={today}
+                                healthy={bookingsHealthy}
+                                onDay={(day) => {
+                                    setChartOpen(false);
+                                    openBookedDay(day);
+                                }}
+                            />
+                        </DialogContent>
+                    </Dialog>
+                    <Dialog open={dataOpen} onOpenChange={setDataOpen}>
+                        <DialogContent className="fleet-overview fo-dialog sm:max-w-xl">
+                            <DialogHeader>
+                                <DialogTitle>Data status</DialogTitle>
+                                <DialogDescription>
+                                    Source records within your approved Site
+                                    scope. Loaded data does not confirm safety,
+                                    availability or receipt.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="fo-source-list">
+                                {overview.sources.map((source) => {
+                                    const count =
+                                        source.state === 'loaded'
+                                            ? sourceCount(
+                                                  source.name,
+                                                  source.count,
+                                              )
+                                            : null;
+                                    return (
+                                        <div key={source.name}>
+                                            <span>
+                                                <strong>{source.name}</strong>
+                                                <small>
+                                                    {source.description}
+                                                </small>
+                                            </span>
+                                            <span
+                                                className={`fo-status ${source.state === 'loaded' ? 'fo-good' : 'fo-unknown'}`}
+                                            >
+                                                {source.state === 'no_access'
+                                                    ? 'No access'
+                                                    : source.state ===
+                                                        'unavailable'
+                                                      ? 'Unavailable'
+                                                      : count === 0
+                                                        ? 'No records'
+                                                        : `${count} observed`}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <p className="fo-note">
+                                Counts use{' '}
+                                {filters.site === 'all'
+                                    ? 'all approved Sites'
+                                    : siteName}{' '}
+                                before text search, except receipt counts which
+                                follow the selected Site and search. Tracker
+                                positions are subject to consent and
+                                personal-trip privacy. Registered Site pins are
+                                approximate.
+                            </p>
+                            {refreshMessage && (
+                                <p role="status" className="fo-note">
+                                    {refreshMessage}
+                                </p>
+                            )}
+                            <Button
+                                variant="outline"
+                                disabled={refreshing}
+                                onClick={refresh}
+                            >
+                                <RefreshCw
+                                    className={`size-4 ${refreshing ? 'animate-spin' : ''}`}
+                                />{' '}
+                                Refresh sources
+                            </Button>
+                        </DialogContent>
+                    </Dialog>
+                    <Dialog
+                        open={saveOpen}
+                        onOpenChange={(open) => {
+                            setSaveOpen(open);
+                            if (!open) setRenameFrom(null);
+                        }}
+                    >
+                        <DialogContent className="fleet-overview fo-dialog sm:max-w-sm">
+                            <DialogHeader>
+                                <DialogTitle>
+                                    {renameFrom
+                                        ? 'Rename saved view'
+                                        : 'Save current view'}
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Keep these filters in your account across
+                                    devices. Up to six views.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <label className="fo-save-label">
+                                View name
+                                <input
+                                    className="fo-input"
+                                    maxLength={40}
+                                    value={saveName}
+                                    onChange={(event) => {
+                                        setSaveName(event.target.value);
+                                        setSaveError('');
+                                    }}
+                                    onKeyDown={(event) => {
+                                        if (event.key === 'Enter') saveView();
+                                    }}
+                                />
+                            </label>
+                            {(saveError ||
+                                viewMessage.startsWith('Could not')) && (
+                                <p className="fo-error" role="alert">
+                                    {saveError || viewMessage}
+                                </p>
+                            )}
+                            <Button onClick={saveView} disabled={savingViews}>
+                                {renameFrom ? 'Rename view' : 'Save view'}
+                            </Button>
+                        </DialogContent>
+                    </Dialog>
+                </div>
             </PageShell>
         </AppLayout>
     );
