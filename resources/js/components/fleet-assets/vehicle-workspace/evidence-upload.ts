@@ -19,7 +19,7 @@ export type UploadOutcome = {
  * Upload evidence files owned by a record that has just been saved. The
  * record stands on its own; a failed upload can be retried from its row.
  */
-export function useEvidenceUpload(vehicleId: number) {
+export function useEvidenceUpload(vehicleId: number | null) {
     const command = useVehicleRecordCommand(isJsonObject);
 
     const upload = async (
@@ -33,6 +33,7 @@ export function useEvidenceUpload(vehicleId: number) {
         },
     ): Promise<UploadOutcome | null> => {
         if (!files.length) return { uploaded: 0, waiting: 0, blocked: 0 };
+        if (vehicleId === null) return null;
         const form = new FormData();
         form.append('category', meta.category);
         form.append('document_date', meta.documentDate ?? todayInAuckland());
