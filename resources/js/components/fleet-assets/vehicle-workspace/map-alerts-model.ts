@@ -88,6 +88,8 @@ export function statusLabel(item: {
     switch (item.status) {
         case 'delivery_failed':
             return 'Delivery failed';
+        case 'delivery_pending':
+            return 'Waiting for Control Room';
         case 'open':
             return escalated ? 'Escalated' : 'New';
         case 'ack':
@@ -105,6 +107,7 @@ export function statusLabel(item: {
 
 export function statusVariant(status: AlertStatus): StatusVariant {
     if (status === 'delivery_failed') return 'critical';
+    if (status === 'delivery_pending') return 'info';
     if (status === 'dismissed') return 'neutral';
     return isTerminal(status) ? 'success' : 'warning';
 }
@@ -112,6 +115,7 @@ export function statusVariant(status: AlertStatus): StatusVariant {
 /** The design's action set: New → acknowledge/triage/escalate; open → triage/escalate/resolve. */
 export function availableActions(status: AlertStatus): LifecycleAction[] {
     if (status === 'delivery_failed') return ['retry'];
+    if (status === 'delivery_pending') return [];
     if (isTerminal(status)) return [];
     if (status === 'open') return ['acknowledge', 'triage', 'escalate'];
     return ['triage', 'escalate', 'resolve'];
@@ -139,6 +143,8 @@ export function minutesBetween(
 /** The queue row's response-clock line, from Control Room's acknowledgement target. */
 export function ackText(item: AlertItem, now: number): string {
     if (item.status === 'delivery_failed') return 'Delivery retry required';
+    if (item.status === 'delivery_pending')
+        return 'Waiting for Control Room receipt';
     if (item.acknowledged_at) return 'Acknowledged';
     if (isTerminal(item.status)) return 'Closed without acknowledgement';
     if (!item.acknowledge_by) return 'No acknowledgement target set';

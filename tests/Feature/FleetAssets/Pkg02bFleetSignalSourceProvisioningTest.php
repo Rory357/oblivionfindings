@@ -213,7 +213,7 @@ class Pkg02bFleetSignalSourceProvisioningTest extends TestCase
             ->assertJsonPath('counts.open', 2)
             ->json('items'));
         $this->assertSame([$alert->id], $items->where('type', 'response')->pluck('id')->all());
-        $this->assertSame(['Low vehicle voltage'], $items->where('type', 'response')->pluck('kind')->all());
+        $this->assertSame(['Vehicle power alert'], $items->where('type', 'response')->pluck('kind')->all());
         $this->assertSame(['signal:'.$unrouted->id], $items->where('type', 'delivery')->pluck('id')->all());
         $this->assertSame('unroutable', $this->outbox($unrouted)->status);
     }

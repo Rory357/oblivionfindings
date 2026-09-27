@@ -236,6 +236,39 @@ final class VehicleLocationService
             ->pluck('assets.id')->map(fn (mixed $id): int => (int) $id)->all();
     }
 
+    /**
+     * Minimal position for overview maps. Reuse the profile's privacy and
+     * freshness decision without loading trails, alerts or geofences for
+     * every vehicle on the landing page.
+     *
+     * @return array{lat:float,lng:float,observed_at:?string,source:string,fresh:bool}|null
+     */
+    public function lastPermittedPosition(User $user, Asset $vehicle): ?array
+    {
+        if (! $this->positionsVisible($user, $vehicle)) {
+            return null;
+        }
+        $snapshot = FleetVehicleStateSnapshot::query()
+            ->with(['lastEvent:id,occurred_at,received_at,external_power,event_type',
+                'lastTrip:id,is_personal,consent_blocked,started_at,ended_at'])
+            ->find($vehicle->getKey());
+        if (! $snapshot) {
+            return null;
+        }
+        $state = $this->state($vehicle, $snapshot, true);
+        if ($state['lat'] === null || $state['lng'] === null
+            || ! is_finite($state['lat']) || ! is_finite($state['lng'])
+            || abs($state['lat']) > 90 || abs($state['lng']) > 180) {
+            return null;
+        }
+
+        return [
+            'lat' => $state['lat'], 'lng' => $state['lng'],
+            'observed_at' => $state['observed_at'],
+            'source' => 'Tracker report', 'fresh' => (bool) $state['fresh'],
+        ];
+    }
+
     /** @return array<string,mixed> */
     private function state(Asset $vehicle, FleetVehicleStateSnapshot $snapshot, bool $positions): array
     {

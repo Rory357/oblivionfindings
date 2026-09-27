@@ -40,7 +40,7 @@ final class RecordedVehicleEvents
     public const KIND_LABELS = [
         'overspeed' => 'Overspeed threshold',
         'power_disconnected' => 'Power disconnected',
-        'low_voltage' => 'Low vehicle voltage',
+        'low_voltage' => 'Vehicle power alert',
     ];
 
     /** Driving events a person can review. */

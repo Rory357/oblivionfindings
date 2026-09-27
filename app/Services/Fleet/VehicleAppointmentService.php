@@ -5,6 +5,7 @@ namespace App\Services\Fleet;
 use App\Models\FleetVehicleUnavailablePeriod;
 use App\Models\FleetWorkOrder;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +45,102 @@ class VehicleAppointmentService
      */
     public function schedule(User $actor, int $assetId, array $data, string $requestKey, array $files = []): array
     {
+        $current = User::query()->findOrFail($actor->id);
+        abort_unless($this->access->canManage($current), 403);
+        abort_unless(mb_strlen($requestKey) >= 8 && mb_strlen($requestKey) <= 100, 422, 'A request key is required.');
+        $fileIdentities = [];
+        foreach ($files as $file) {
+            if (! $file instanceof UploadedFile || ! $file->isValid()) {
+                throw ValidationException::withMessages(['files' => 'A file could not be read. Remove it and try again.']);
+            }
+            $fileIdentities[] = ['name' => $file->getClientOriginalName(), 'sha256' => hash_file('sha256', $file->getRealPath())];
+        }
+        $fingerprint = MaintenanceFingerprint::of(['actor' => $current->id, 'asset' => $assetId, 'data' => $data, 'files' => $fileIdentities]);
+
+        return DB::transaction(function () use ($current, $assetId, $data, $requestKey, $files, $fingerprint): array {
+            $asset = $this->access->asset($current, $assetId, true);
+            $receipt = DB::table('fleet_vehicle_appointment_commands')->where('asset_id', $assetId)
+                ->where('request_key', $requestKey)->lockForUpdate()->first();
+            if ($receipt) {
+                abort_unless(hash_equals($receipt->fingerprint, $fingerprint), 409, 'This request was already used for a different appointment change.');
+                $order = $this->access->scopedWorkOrders($current)->whereKey($receipt->work_order_id)->firstOrFail();
+
+                return $this->current($assetId, $order) + ['undo' => $this->undoDescriptor($receipt, $order)];
+            }
+            $legacy = DB::table('fleet_maintenance_actions as action')
+                ->join('fleet_work_orders as work', 'work.id', '=', 'action.work_order_id')
+                ->where('work.asset_id', $assetId)->whereIn('action.idempotency_key', [$requestKey.':plan', $requestKey.':cancel'])->exists();
+            abort_if($legacy, 409, 'This older appointment request cannot be replayed safely. Reload its work order.');
+            $order = empty($data['work_order_id']) ? null : $this->access->scopedWorkOrders($current)
+                ->whereKey((int) $data['work_order_id'])->where('asset_id', $assetId)->lockForUpdate()->firstOrFail();
+            if ($order) {
+                Validator::make($data, ['expected_version' => ['required', 'integer', 'min:0']])->validate();
+                abort_unless((int) $data['expected_version'] === (int) $order->version, 409,
+                    'This work order changed while you were editing. Reload before changing its appointment.');
+            }
+            $before = $order ? $this->appointmentSnapshot($order) : null;
+            $result = $this->performSchedule($current, $assetId, $data, $requestKey, $files);
+            $saved = $result['work_order'];
+            $canUndo = ($data['operation'] ?? 'plan') === 'plan' && $before !== null;
+            $id = DB::table('fleet_vehicle_appointment_commands')->insertGetId([
+                'asset_id' => $assetId, 'work_order_id' => $saved->id, 'actor_user_id' => $current->id,
+                'request_key' => $requestKey, 'fingerprint' => $fingerprint,
+                'before_json' => $canUndo ? json_encode($before, JSON_THROW_ON_ERROR) : null,
+                'resulting_version' => (int) $saved->version, 'created_at' => now(),
+            ]);
+            AuditLogger::logOrFail('fleet.vehicle.appointment.command', $saved, ['actor_id' => $current->id,
+                'asset_id' => $assetId, 'command_id' => $id, 'operation' => $data['operation'] ?? 'plan']);
+
+            return $result + ['undo' => $canUndo ? ['command_id' => $id, 'expected_version' => (int) $saved->version] : null];
+        }, 3);
+    }
+
+    /** The prior internal plan is restored through Maintenance; external bookings are never sent. */
+    public function undo(User $actor, int $assetId, int $commandId, int $expectedVersion, string $requestKey): array
+    {
+        return DB::transaction(function () use ($actor, $assetId, $commandId, $expectedVersion, $requestKey): array {
+            $current = User::query()->findOrFail($actor->id);
+            abort_unless($this->access->canManage($current), 403);
+            $this->access->asset($current, $assetId, true);
+            $receipt = DB::table('fleet_vehicle_appointment_commands')->where('asset_id', $assetId)
+                ->where('id', $commandId)->where('actor_user_id', $current->id)->first() ?? abort(404);
+            $before = json_decode((string) $receipt->before_json, true);
+            abort_unless(is_array($before) && $expectedVersion === (int) $receipt->resulting_version, 409,
+                'This appointment change cannot be undone.');
+
+            return $this->schedule($current, $assetId, $before + [
+                'work_order_id' => (int) $receipt->work_order_id, 'expected_version' => $expectedVersion,
+                'notes' => 'Undo: previous internal appointment restored.',
+                'change_reason' => 'Undo appointment command '.$commandId,
+            ], $requestKey);
+        }, 3);
+    }
+
+    private function undoDescriptor(object $receipt, FleetWorkOrder $order): ?array
+    {
+        return $receipt->before_json !== null && (int) $receipt->resulting_version === (int) $order->version
+            ? ['command_id' => (int) $receipt->id, 'expected_version' => (int) $order->version] : null;
+    }
+
+    private function appointmentSnapshot(FleetWorkOrder $order): ?array
+    {
+        $plan = $this->currentPlan((int) $order->id);
+        if ($plan === null) {
+            return null;
+        }
+        $payload = json_decode((string) DB::table('fleet_maintenance_actions')->where('work_order_id', $order->id)
+            ->where('action_type', 'plan_provider')->orderByDesc('id')->value('payload_json'), true);
+        $start = CarbonImmutable::parse($plan['starts_at'])->setTimezone('Pacific/Auckland');
+        $end = CarbonImmutable::parse($plan['ends_at'])->setTimezone('Pacific/Auckland');
+
+        return ['provider_name' => $payload['provider_name'],
+            'starts_local' => $start->format('Y-m-d\TH:i'), 'ends_local' => $end->format('Y-m-d\TH:i'),
+            'starts_offset' => $start->format('P'), 'ends_offset' => $end->format('P'),
+            'unavailable' => FleetVehicleUnavailablePeriod::query()->where('work_order_id', $order->id)->where('state', 'active')->exists()];
+    }
+
+    private function performSchedule(User $actor, int $assetId, array $data, string $requestKey, array $files = []): array
+    {
         abort_unless($this->access->canManage($actor), 403);
         abort_unless(mb_strlen($requestKey) >= 8, 422, 'A request key is required.');
         $operation = (string) ($data['operation'] ?? 'plan');
@@ -69,16 +166,6 @@ class VehicleAppointmentService
             if (trim((string) ($data['change_reason'] ?? '')) === '') {
                 throw ValidationException::withMessages(['change_reason' => $operation === 'cancel'
                     ? 'Record why the appointment is cancelled.' : 'Record why the appointment ran over.']);
-            }
-        }
-        // A retry of a change that already went through returns the current
-        // state: the checks below describe the appointment before the change.
-        if (! empty($data['work_order_id'])) {
-            $asset = $this->access->asset($actor, $assetId);
-            $order = $this->access->scopedWorkOrders($actor)->whereKey((int) $data['work_order_id'])
-                ->where('asset_id', $asset->id)->first() ?? abort(404);
-            if ($this->replayed($actor, (int) $order->id, $requestKey.($operation === 'cancel' ? ':cancel' : ':plan'))) {
-                return $this->current((int) $asset->id, $order);
             }
         }
         if ($operation === 'cancel') {
@@ -151,9 +238,7 @@ class VehicleAppointmentService
                 $this->access->asset($actor, (int) $asset->id, true);
                 // A retry reports the plan this request already made, wherever it landed.
                 $planned = $this->plannedWith($actor, (int) $asset->id, $requestKey.':plan', $planFingerprint);
-                if ($planned !== null) {
-                    return $this->current((int) $asset->id, $planned);
-                }
+                abort_if($planned !== null, 409, 'This older appointment request cannot be replayed safely. Reload its work order.');
                 $this->reports->assertSourceBelongsToAsset($source['type'], $source['id'], (int) $asset->id);
                 $linked = $this->linkedWorkIds($actor, (int) $asset->id, $source);
             }
@@ -171,9 +256,10 @@ class VehicleAppointmentService
             } elseif ($linked !== []) {
                 // Open work already reported from this due item takes the appointment.
                 $order = FleetWorkOrder::query()->findOrFail($linked[0]);
-                if ($this->replayed($actor, (int) $order->id, $requestKey.':plan', $planFingerprint)) {
-                    return $this->current((int) $asset->id, $order);
-                }
+                abort_if($this->currentPlan((int) $order->id) !== null, 409,
+                    'This due item already has an appointment. Open that appointment to review its current plan before changing it.');
+                abort_if($this->replayed($actor, (int) $order->id, $requestKey.':plan', $planFingerprint), 409,
+                    'This older appointment request cannot be replayed safely. Reload its work order.');
             } else {
                 abort_unless($this->access->canReport($actor), 403);
                 $order = $this->reports->submit($actor, [
@@ -187,9 +273,8 @@ class VehicleAppointmentService
                 ]);
                 // The report is replay-safe on its own; a retry after the plan
                 // landed must not re-run the notes, files or unavailable period.
-                if ($this->replayed($actor, (int) $order->id, $requestKey.':plan', $planFingerprint)) {
-                    return $this->current((int) $asset->id, $order);
-                }
+                abort_if($this->replayed($actor, (int) $order->id, $requestKey.':plan', $planFingerprint), 409,
+                    'This older appointment request cannot be replayed safely. Reload its work order.');
                 $existingWork = false;
             }
 

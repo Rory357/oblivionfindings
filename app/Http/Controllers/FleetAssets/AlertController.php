@@ -97,7 +97,7 @@ class AlertController extends Controller
                 'fleetSignal.asset.client:id,site_id',
                 'assignedTo:id,name',
             ])
-            ->whereIn('source', ['fleet', 'asset', 'tracker', 'geofence']);
+            ->whereIn('source', $this->fleetAlertSources());
         $siteAccess->applyAlertScope($crQuery, $user, $bypassPermissions);
 
         if ($request->filled('status')) {
@@ -458,7 +458,7 @@ class AlertController extends Controller
      */
     protected function fleetAlertSources(): array
     {
-        return ['fleet', 'asset', 'tracker', 'geofence'];
+        return ['fleet', 'asset', 'tracker', 'geofence', 'queclink_fleet'];
     }
 
     protected function siteAccess(): UserSiteAccessService

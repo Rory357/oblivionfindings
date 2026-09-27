@@ -15,7 +15,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Files\MalwareScanDisposition;
 use App\Services\Files\MalwareScanner;
-use Carbon\CarbonImmutable;
+use App\Services\Files\MalwareScanResult;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Private, versioned vehicle documents. A set is one document made of one or
@@ -72,6 +73,7 @@ class VehicleDocumentService
         private readonly MalwareScanner $scanner,
         private readonly VehicleReminderService $reminders,
         private readonly VehicleBookingAccessService $bookings,
+        private readonly MaintenanceAccessService $maintenance,
     ) {}
 
     /**
@@ -100,9 +102,11 @@ class VehicleDocumentService
             'finance_review_request' => $actor->canDo('finance.assets.view')
                 && $this->access->vehicleAtAccessibleSite($actor, $asset),
             // Booking evidence follows the booking's own Site rule, as the calendar does.
-            'booking' => $this->bookings->accessibleBookings($actor)->whereKey((int) $sourceId)->exists(),
+            'booking' => $this->bookings->accessibleBookings($actor)->where('asset_id', $asset->id)->whereKey((int) $sourceId)->exists(),
+            'service_completion' => $this->maintenance->canRead($actor)
+                && in_array((int) $asset->site_id, $this->maintenance->approvedSiteIds($actor), true),
             // Speed-limit evidence belongs to driving insights, which follow the trip Site rule.
-            'speed_limit' => $this->access->vehicleAtAccessibleSite($actor, $asset),
+            'speed_limit', 'unavailable_period' => $this->access->vehicleAtAccessibleSite($actor, $asset),
             default => true,
         };
     }
@@ -112,10 +116,11 @@ class VehicleDocumentService
      * with a booking, speed limit or Finance request need access to the
      * vehicle's Site (a booking's own rule still applies on top).
      */
-    private function assertSourceWritable(User $actor, Asset $asset, ?string $sourceType): void
+    private function assertSourceWritable(User $actor, Asset $asset, ?string $sourceType, mixed $sourceId): void
     {
-        if (in_array($sourceType, ['booking', 'finance_review_request', 'speed_limit'], true)) {
-            abort_unless($this->access->vehicleAtAccessibleSite($actor, $asset), 404);
+        abort_unless($this->sourceVisible($actor, $asset, $sourceType, $sourceId), 404);
+        if ($sourceType === 'finance_review_request') {
+            $this->assertSource($asset, $sourceType, $sourceId);
         }
     }
 
@@ -146,6 +151,7 @@ class VehicleDocumentService
         [$set, $reserved] = DB::transaction(function () use ($actor, $assetId, $meta, $checked, $requestKey, $fingerprint): array {
             [$current, $asset] = $this->resolve($actor, $assetId,
                 $meta['source_type'] === 'booking' && $meta['source_id'] !== null ? (int) $meta['source_id'] : null);
+            $this->assertSourceWritable($current, $asset, $meta['source_type'], $meta['source_id']);
             $prior = AssetDocumentSet::query()->where('asset_id', $asset->id)->where('request_key', $requestKey)->lockForUpdate()->first();
             if ($prior) {
                 abort_unless(hash_equals((string) $prior->request_fingerprint, $fingerprint), 409, 'This request was already used for a different document.');
@@ -153,7 +159,6 @@ class VehicleDocumentService
                 return [$prior, $prior->files()->where('request_key', 'like', $requestKey.':%')->orderBy('id')->get()->all()];
             }
             $this->assertSource($asset, $meta['source_type'], $meta['source_id']);
-            $this->assertSourceWritable($current, $asset, $meta['source_type']);
             $set = AssetDocumentSet::query()->create([
                 'asset_id' => $asset->id, 'category' => $meta['category'], 'reference' => $meta['reference'],
                 'document_date' => $meta['document_date'], 'expires_on' => $meta['expires_on'],
@@ -193,7 +198,7 @@ class VehicleDocumentService
         [$set, $reserved] = DB::transaction(function () use ($actor, $assetId, $setId, $checked, $reason, $expectedVersion, $requestKey, $fingerprint): array {
             [$current, $asset] = $this->resolve($actor, $assetId);
             $set = $this->lockSet($asset, $setId);
-            $this->assertSourceWritable($current, $asset, $set->source_type);
+            $this->assertSourceWritable($current, $asset, $set->source_type, $set->source_id);
             if ($this->replayed($set, $requestKey, $fingerprint)) {
                 return [$set, $set->files()->where('request_key', 'like', $requestKey.':%')->orderBy('id')->get()->all()];
             }
@@ -221,7 +226,7 @@ class VehicleDocumentService
         return DB::transaction(function () use ($actor, $assetId, $setId, $meta, $expectedVersion, $requestKey, $fingerprint): AssetDocumentSet {
             [$current, $asset] = $this->resolve($actor, $assetId);
             $set = $this->lockSet($asset, $setId);
-            $this->assertSourceWritable($current, $asset, $set->source_type);
+            $this->assertSourceWritable($current, $asset, $set->source_type, $set->source_id);
             if ($this->replayed($set, $requestKey, $fingerprint)) {
                 return $set;
             }
@@ -252,7 +257,7 @@ class VehicleDocumentService
             [$current, $asset] = $this->resolve($actor, $assetId);
             $document = AssetDocument::query()->whereKey($documentId)->where('asset_id', $asset->id)->whereNotNull('document_set_id')->first() ?? abort(404);
             $set = $this->lockSet($asset, (int) $document->document_set_id);
-            $this->assertSourceWritable($current, $asset, $set->source_type);
+            $this->assertSourceWritable($current, $asset, $set->source_type, $set->source_id);
             $document = AssetDocument::query()->whereKey($documentId)->lockForUpdate()->firstOrFail();
             $fingerprint = MaintenanceFingerprint::of(['actor' => (int) $current->id, 'document' => $documentId, 'reason' => trim($reason), 'pause' => $pauseRenewal]);
             if ($this->replayed($set, $requestKey, $fingerprint)) {
@@ -278,7 +283,7 @@ class VehicleDocumentService
     {
         [$current, $asset] = DB::transaction(fn (): array => $this->resolve($actor, $assetId));
         $document = AssetDocument::query()->whereKey($documentId)->where('asset_id', $asset->id)->whereNotNull('document_set_id')->first() ?? abort(404);
-        $this->assertSourceWritable($current, $asset, $document->source_type);
+        $this->assertSourceWritable($current, $asset, $document->source_type, $document->source_id);
         abort_unless(in_array($document->state, ['scan_unavailable', 'publication_failed', 'reserved', 'stored'], true), 409,
             'Only files still waiting for their check can be retried.');
         abort_unless($document->storage_path && Storage::disk(self::DISK)->exists($document->storage_path), 409,
@@ -293,7 +298,7 @@ class VehicleDocumentService
         [$current, $asset] = DB::transaction(fn (): array => $this->resolve($actor, $assetId));
         $document = AssetDocument::query()->whereKey($documentId)->where('asset_id', $asset->id)
             ->where('state', AssetDocument::STATE_LEGACY)->first() ?? abort(404);
-        $this->assertSourceWritable($current, $asset, $document->source_type);
+        $this->assertSourceWritable($current, $asset, $document->source_type, $document->source_id);
         $disk = Storage::disk($document->storage_disk ?: 'local');
         abort_unless($disk->exists($document->storage_path), 409, 'The original file is no longer in storage.');
         $scan = $this->scan($disk->path($document->storage_path));
@@ -460,6 +465,7 @@ class VehicleDocumentService
                 // Recheck the actor, the vehicle and the document before publishing.
                 [$current, $asset] = $this->resolve($actor, $assetId,
                     $document->source_type === 'booking' && $document->source_id ? (int) $document->source_id : null);
+                $this->assertSourceWritable($current, $asset, $document->source_type, $document->source_id);
                 $locked = AssetDocument::query()->whereKey($document->id)->where('asset_id', $asset->id)->lockForUpdate()->firstOrFail();
                 if ($locked->document_set_id) {
                     $set = $this->lockSet($asset, (int) $locked->document_set_id);
@@ -476,7 +482,7 @@ class VehicleDocumentService
             }, 3);
         } catch (\Throwable $exception) {
             $document->forceFill(['state' => 'publication_failed'])->save();
-            if ($exception instanceof \Symfony\Component\HttpKernel\Exception\HttpException) {
+            if ($exception instanceof HttpException) {
                 throw $exception;
             }
 
@@ -484,12 +490,12 @@ class VehicleDocumentService
         }
     }
 
-    private function scan(string $path): \App\Services\Files\MalwareScanResult
+    private function scan(string $path): MalwareScanResult
     {
         try {
             return $this->scanner->scanPath($path, (array) config('it.inbound_mail.malware_scanner', []));
         } catch (\Throwable) {
-            return new \App\Services\Files\MalwareScanResult(MalwareScanDisposition::Unavailable, 'clamav', 'scanner_failed');
+            return new MalwareScanResult(MalwareScanDisposition::Unavailable, 'clamav', 'scanner_failed');
         }
     }
 

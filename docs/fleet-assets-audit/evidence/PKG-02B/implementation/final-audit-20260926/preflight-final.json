@@ -1,0 +1,13 @@
+{
+    "status": "PASS",
+    "root": "C:\\Users\\steph\\.codex\\worktrees\\pkg02b-final-audit\\oblivionfindings",
+    "php": "8.4.16",
+    "databaseBase": "oblivion_findings_pkg02b_final_test",
+    "processToken": "Actual test PID; inherited tokens prohibited",
+    "existingPackageSchemas": [],
+    "autoload": "App and Tests resolve locally",
+    "appBootstrapped": false,
+    "databaseWrites": false,
+    "testCaseSha256": "89872e92712993d42361d9d444a80a92ec5f633eedfc2179c78447adf337330f",
+    "profileSha256": "41e9970f0ca1fcee7e29a19b881847a0d8adea223183e8edb84eafe409b20525"
+}
