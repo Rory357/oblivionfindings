@@ -1,7 +1,7 @@
 {
   "base": "926b4981b0289da08a20baca0995117fb53e413e",
   "branch": "codex/ops-pl01-implementation",
-  "digest": "e36113fe3fa5d204824594bf0dfc67584656ba65694485431cbf7fb92d2d1437",
+  "digest": "b58f80f71b4ac2c185973f93dd05be892afdd95023e5bbaa9b90e468f4f23556",
   "files": [
     {
       "path": "app/Domain/SecurityDevices/Services/PersonalTrackingPrivacyService.php",
@@ -22,6 +22,11 @@
       "path": "app/Http/Controllers/Operations/PeopleLocationController.php",
       "sha256": "1872ececf74ef7672a194eb6173754780246e75dcf7bc5d9bb4bed0f63c86177",
       "bytes": 8316
+    },
+    {
+      "path": "app/Http/Controllers/Settings/BrandingController.php",
+      "sha256": "1bcf0200dda36421cc7ccf82c246fe3807c63c26a4f69cc64af559983b543631",
+      "bytes": 8090
     },
     {
       "path": "app/Services/Clients/ClientProfileSectionAccess.php",
@@ -52,6 +57,11 @@
       "path": "app/Services/Tracking/PeopleLocationService.php",
       "sha256": "f2176f1cf9806c63d4a5b1af590d9e1e8ae16565831e760e095416c1ccf23acf",
       "bytes": 26353
+    },
+    {
+      "path": "app/Support/BrandThemeTokens.php",
+      "sha256": "376a724cf6de48ea8a899511146923f8e1752093277400821f5af24a3f8f874c",
+      "bytes": 7779
     },
     {
       "path": "database/migrations/2026_09_27_230000_add_people_location_export_permission.php",
@@ -170,8 +180,8 @@
     },
     {
       "path": "resources/views/app.blade.php",
-      "sha256": "74b9099b03a2452bc93d28c8ecfc2bdc44097408fe57bae6c7919369274fcaaa",
-      "bytes": 6137
+      "sha256": "94611dc9b19b3c26b580ee6ceef22eb1df3351ece9cfbb8c61585628dd38fdf0",
+      "bytes": 5233
     },
     {
       "path": "resources/views/pdf/people-location-report.blade.php",
@@ -207,6 +217,16 @@
       "path": "tests/Feature/SecurityDevices/CanonicalIntegrationEventHistoryTest.php",
       "sha256": "8284a2e19b3f91ef825fae2e33741b5988acb6eee61f59b201df84b13727f4bf",
       "bytes": 9084
+    },
+    {
+      "path": "tests/Feature/SettingsControllerTest.php",
+      "sha256": "525dcb6b5d153d06be8a6d2ba39997607cf279ef23a1c9a4cf79056a1a84e21a",
+      "bytes": 81964
+    },
+    {
+      "path": "tests/Unit/BrandThemeTokensTest.php",
+      "sha256": "a7a74bb9f1ceee4aba4a39ba813cb6178be2919f252b2cf1ed13f267ec2cb556",
+      "bytes": 4520
     },
     {
       "path": "tests/Unit/PeopleLocationsReturnUrlTest.php",

@@ -4,6 +4,8 @@ Prepared 28 September 2026 in the existing `codex/ops-pl01-implementation` workt
 
 **T-PL01-01, T-PL01-02 and T-PL01-03 are corrected. T-PL01-04 remains partly verified and blocked on manual 125% page-zoom setup. This is not an integration approval or a claim of complete browser acceptance.**
 
+Main independently closed T-PL01-01, T-PL01-02 and T-PL01-03 on `a69d7f465`. The subsequent T-PL01-05 repair and current 46-file manifest are documented in [BRAND-VALUES.md](BRAND-VALUES.md). The validation and 42-file references below describe the preceding correction revision and remain historical evidence. T-PL01-04 is still pending.
+
 ## T-PL01-01 — Current alert and capability authority
 
 The workspace refreshes its actor after observation/history reads and before composing independently controlled alerts, map boundaries, preferences and capability flags. Revoked history authority clears the history projection. The new regression removes Control Room/history/export/staff permissions during a read, retains the permitted person, and withholds alert identity, details, links and counts together with the revoked flags. Main's original alert probe passes unchanged.

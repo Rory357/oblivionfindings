@@ -1,0 +1,62 @@
+
+   PASS  Tests\Unit\BrandThemeTokensTest
+  ✓ it retains supported colour values and normalizes legacy channels with (' #4F46E5 ', '#4f46e5')              0.01s
+  ✓ it retains supported colour values and normalizes legacy channels with ('#abc', '#abc')
+  ✓ it retains supported colour values and normalizes legacy channels with ('#abcf', '#abcf')
+  ✓ it retains supported colour values and normalizes legacy channels with ('#12345678', '#12345678')
+  ✓ it retains supported colour values and normalizes legacy channels with ('oklch(0.5 0.12 190)', 'oklch(0.5 0.12 190)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('oklch(72% .12 190 / 80%)', 'oklch(72% .12 190 / 80%)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('rgb(12, 40, 70)', 'rgb(12, 40, 70)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('rgba(12, 40, 70, .8)', 'rgba(12, 40, 70, .8)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('rgb(20% 30% 40% / 80%)', 'rgb(20% 30% 40% / 80%)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('rgb(20%, 30%, 40%)', 'rgb(20%, 30%, 40%)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('hsl(220, 90%, 56%)', 'hsl(220, 90%, 56%)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('hsla(220, 90%, 56%, .8)', 'hsla(220, 90%, 56%, .8)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('hsl(.5turn 90% 56% / .8)', 'hsl(.5turn 90% 56% / .8)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('220 90% 56%', 'hsl(220 90% 56%)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('hwb(190 20% 30%)', 'hwb(190 20% 30%)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('lab(50% 10 20)', 'lab(50% 10 20)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('lch(50% 10 190deg)', 'lch(50% 10 190deg)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('oklab(.5 .1 .2 / .8)', 'oklab(.5 .1 .2 / .8)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('color(display-p3 0.1 0.2 0.3)', 'color(display-p3 0.1 0.2 0.3)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('RebeccaPurple', 'rebeccapurple')
+  ✓ it retains supported colour values and normalizes legacy channels with ('transparent', 'transparent')
+  ✓ it retains supported colour values and normalizes legacy channels with ('currentColor', 'currentcolor')
+  ✓ it retains supported colour values and normalizes legacy channels with ('color-mix(in oklch, #059669 1…arent)', 'color-mix(in oklch, #059669 1…arent)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('color-mix(in oklch, #059669 7…e 30%)', 'color-mix(in oklch, #059669 7…e 30%)')
+  ✓ it retains supported colour values and normalizes legacy channels with ('color-mix(in srgb, rgb(10, 20…blue))', 'color-mix(in srgb, rgb(10, 20…blue))')
+  ✓ it only emits supported nonnegative radius lengths with ('0')
+  ✓ it only emits supported nonnegative radius lengths with ('0.750rem')
+  ✓ it only emits supported nonnegative radius lengths with ('.5em')
+  ✓ it only emits supported nonnegative radius lengths with ('12px')
+  ✓ it only emits supported nonnegative radius lengths with (' 10% ')
+  ✓ it only emits supported nonnegative radius lengths with ('2vw')
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "declarati… 0.01s
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "block"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "style tag"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "comment"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "escaped delimiter"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "important"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "url"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "reference"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "unknown function"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "unbalanced mix"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "invalid mix weight"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "zero weights"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "unrecognised"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "bad hex"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "incomplete rgb"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "bad hsl"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "mixed legacy rgb"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "extra channel"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "bad radius"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "compound radius"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "number"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "array"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "null"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "empty"
+  ✓ it omits malformed values for every allowed key at the real Blade emission boundary with dataset "control"
+  ✓ it cannot expand the property allowlist or bypass it with a personal accent
+
+  Tests:    57 passed (84 assertions)
+  Duration: 0.34s

@@ -1310,13 +1310,13 @@ class SettingsControllerTest extends TestCase
         $light = AppSetting::where('key', 'theme.light')->first();
         $this->assertNotNull($light);
         $this->assertIsArray($light->value);
-        $this->assertEquals('220 90% 56%', $light->value['--primary']);
+        $this->assertEquals('hsl(220 90% 56%)', $light->value['--primary']);
         $this->assertEquals('0.5rem', $light->value['--radius']);
 
         $dark = AppSetting::where('key', 'theme.dark')->first();
         $this->assertNotNull($dark);
         $this->assertIsArray($dark->value);
-        $this->assertEquals('220 90% 40%', $dark->value['--primary']);
+        $this->assertEquals('hsl(220 90% 40%)', $dark->value['--primary']);
     }
 
     public function test_branding_update_filters_disallowed_css_variables(): void
@@ -1336,6 +1336,44 @@ class SettingsControllerTest extends TestCase
         $this->assertNotNull($light);
         $this->assertArrayHasKey('--primary', $light->value);
         $this->assertArrayNotHasKey('--evil-var', $light->value);
+    }
+
+    public function test_branding_omits_invalid_values_on_save_and_when_reading_legacy_rows(): void
+    {
+        $injection = 'oklch(0.5 0.12 190); --status-warning: transparent';
+        $valid = ['--accent' => 'color-mix(in oklch, #059669 15%, transparent)'];
+        $invalid = ['--primary' => $injection, '--radius' => '1rem} html{--status-warning:transparent'];
+        $this->actingAs($this->admin)->post('/settings/branding', [
+            'theme' => ['light' => [...$valid, ...$invalid], 'dark' => ['--primary' => '#059669']],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame($valid, AppSetting::where('key', 'theme.light')->value('value'));
+        $this->assertSame(['--primary' => '#059669'], AppSetting::where('key', 'theme.dark')->value('value'));
+
+        // Bypass the save path to reproduce existing malformed stored settings.
+        AppSetting::updateOrCreate(['key' => 'theme.light'], ['value' => [...$valid, ...$invalid]]);
+        $this->get('/settings/branding')->assertOk()->assertInertia(fn ($page) => $page
+            ->component('settings/branding')->where('theme.light', $valid)
+            ->where('theme.dark', ['--primary' => '#059669']));
+    }
+
+    public function test_branding_render_omits_legacy_injection_and_preserves_personal_accent(): void
+    {
+        AppSetting::updateOrCreate(['key' => 'theme.light'], ['value' => [
+            '--primary' => '#059669',
+            '--accent' => 'red; --status-warning: transparent',
+            '--radius' => '1rem} html{--status-warning-foreground:transparent',
+        ]]);
+        AppSetting::updateOrCreate(['key' => 'theme.dark'], ['value' => ['--primary' => 'oklch(0.72 0.12 190)']]);
+        $this->admin->forceFill(['accent_colour' => '#c026d3', 'theme' => 'dark'])->save();
+        $this->actingAs($this->admin)->get('/settings/profile')->assertOk()
+            ->assertSee('--base-font-size: 14px; --primary: #c026d3;', false)
+            ->assertSee('html:root { --primary: #059669; }', false)
+            ->assertSee('html.dark { --primary: oklch(0.72 0.12 190); }', false)
+            ->assertDontSee('--status-warning: transparent;', false)
+            ->assertDontSee('--status-warning-foreground:transparent;', false);
+        $this->admin->forceFill(['accent_colour' => 'red;'])->save();
+        $this->get('/settings/profile')->assertOk()
+            ->assertDontSee('--base-font-size: 14px; --primary:', false);
     }
 
     public function test_branding_update_uploads_logo(): void

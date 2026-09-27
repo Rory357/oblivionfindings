@@ -2,7 +2,7 @@
 // Pull the authenticated user's appearance preferences once, so the first
 // paint respects them without a flash of default styling.
 $_authUser = auth()->user();
-$_userAccent = $_authUser?->accent_colour;
+$_userAccent = \App\Support\BrandThemeTokens::personalAccent($_authUser?->accent_colour);
 $_userFontSize = $_authUser?->font_size ?? 14;
 $_userDensity = $_authUser?->sidebar_density ?? 'comfortable';
 $_userReduceMotion = (bool) ($_authUser?->reduce_motion ?? false);
@@ -77,46 +77,10 @@ if ($_userReduceMotion) {
 
     {{-- Organisation theme overrides (admin-configurable) --}}
     @php
-    $theme = $page['props']['theme'] ?? ['light' => [], 'dark' => []];
-    $light = is_array($theme['light'] ?? null) ? $theme['light'] : [];
-    $dark = is_array($theme['dark'] ?? null) ? $theme['dark'] : [];
-
-    $allowedVars = [
-    '--primary', '--primary-foreground',
-    '--secondary', '--secondary-foreground',
-    '--accent', '--accent-foreground',
-    '--background', '--foreground',
-    '--card', '--card-foreground',
-    '--popover', '--popover-foreground',
-    '--border', '--input', '--ring',
-    '--sidebar', '--sidebar-foreground',
-    '--sidebar-primary', '--sidebar-primary-foreground',
-    '--sidebar-accent', '--sidebar-accent-foreground',
-    '--sidebar-border', '--sidebar-ring',
-    '--radius',
-    ];
-
-    $toCss = function (array $vars) use ($allowedVars) {
-    $out = '';
-    foreach ($vars as $k => $v) {
-    if (!is_string($k) || !in_array($k, $allowedVars, true)) {
-    continue;
-    }
-    if (!is_string($v)) {
-    continue;
-    }
-    $val = trim($v);
-    if ($val === '') {
-    continue;
-    }
-    // Keep it simple: rely on allowed var names and basic trimming.
-    $out .= $k . ': ' . e($val) . ';';
-    }
-    return $out;
-    };
-
-    $lightCss = $toCss($light);
-    $darkCss = $toCss($dark);
+    $theme = $page['props']['theme'] ?? [];
+    // Validate at emission as well as save: older stored rows are untrusted CSS.
+    $lightCss = \App\Support\BrandThemeTokens::css($theme['light'] ?? []);
+    $darkCss = \App\Support\BrandThemeTokens::css($theme['dark'] ?? []);
     @endphp
 
     @if($lightCss || $darkCss)

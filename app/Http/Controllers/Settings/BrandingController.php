@@ -4,29 +4,12 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
+use App\Support\BrandThemeTokens;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class BrandingController extends Controller
 {
-    /**
-     * Allowed CSS variables that admins can override.
-     */
-    private array $allowedVars = [
-        '--primary', '--primary-foreground',
-        '--secondary', '--secondary-foreground',
-        '--accent', '--accent-foreground',
-        '--background', '--foreground',
-        '--card', '--card-foreground',
-        '--popover', '--popover-foreground',
-        '--border', '--input', '--ring',
-        '--sidebar', '--sidebar-foreground',
-        '--sidebar-primary', '--sidebar-primary-foreground',
-        '--sidebar-accent', '--sidebar-accent-foreground',
-        '--sidebar-border', '--sidebar-ring',
-        '--radius',
-    ];
-
     public function edit(Request $request)
     {
         $user = $request->user();
@@ -56,10 +39,10 @@ class BrandingController extends Controller
             ->toArray();
 
         return inertia('settings/branding', [
-            'allowedVars' => $this->allowedVars,
+            'allowedVars' => BrandThemeTokens::ALLOWED,
             'theme' => [
-                'light' => is_array($themeLight) ? $themeLight : [],
-                'dark' => is_array($themeDark) ? $themeDark : [],
+                'light' => BrandThemeTokens::filter($themeLight),
+                'dark' => BrandThemeTokens::filter($themeDark),
             ],
             'branding' => [
                 'name' => is_string($brandingName) ? $brandingName : null,
@@ -131,26 +114,8 @@ class BrandingController extends Controller
         $light = (array) data_get($data, 'theme.light', []);
         $dark = (array) data_get($data, 'theme.dark', []);
 
-        $filter = function (array $vars) {
-            $out = [];
-            foreach ($vars as $k => $v) {
-                if (!is_string($k) || !in_array($k, $this->allowedVars, true)) {
-                    continue;
-                }
-                if (!is_string($v)) {
-                    continue;
-                }
-                $val = trim($v);
-                if ($val === '') {
-                    continue;
-                }
-                $out[$k] = $val;
-            }
-            return $out;
-        };
-
-        $lightFiltered = $filter($light);
-        $darkFiltered = $filter($dark);
+        $lightFiltered = BrandThemeTokens::filter($light);
+        $darkFiltered = BrandThemeTokens::filter($dark);
 
         if (count($lightFiltered) === 0) {
             AppSetting::query()->where('key', 'theme.light')->delete();
