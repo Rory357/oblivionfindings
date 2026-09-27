@@ -36,6 +36,7 @@ import type {
 } from './calendar-types';
 import { uploadSummary, useEvidenceUpload } from './evidence-upload';
 import { isJsonObject, useVehicleRecordCommand } from './record-command';
+import './studio.css';
 import {
     fieldProps,
     StagedFilesField,
