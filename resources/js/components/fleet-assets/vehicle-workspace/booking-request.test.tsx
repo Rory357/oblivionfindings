@@ -146,10 +146,10 @@ describe('Fleet request opens inside the canonical wizard', () => {
             screen.getByRole('heading', { name: 'Request vehicle booking' }),
         ).toBeVisible();
         expect(screen.getByLabelText('Vehicle')).toBeVisible();
-        expect(screen.getByLabelText('Pickup date and time')).toHaveValue(
+        expect(screen.getByLabelText('Pickup')).toHaveValue(
             start,
         );
-        expect(screen.getByLabelText('Return date and time')).toHaveValue(end);
+        expect(screen.getByLabelText('Return')).toHaveValue(end);
         fireEvent.click(screen.getByText('Continue'));
         expect(
             screen.getByText('Choose a vehicle for this request.'),
@@ -171,7 +171,7 @@ describe('Fleet request opens inside the canonical wizard', () => {
             .mockResolvedValueOnce(response(2));
         vi.stubGlobal('fetch', fetcher);
         open();
-        fireEvent.change(screen.getByLabelText('Pickup date and time'), {
+        fireEvent.change(screen.getByLabelText('Pickup'), {
             target: { value: '2099-10-01T08:45' },
         });
         fireEvent.change(screen.getByLabelText('Vehicle'), {
@@ -198,10 +198,10 @@ describe('Fleet request opens inside the canonical wizard', () => {
             true,
         );
         expect(screen.queryByText(/not permitted for this vehicle/)).toBeNull();
-        expect(screen.getByLabelText('Pickup date and time')).toHaveValue(
+        expect(screen.getByLabelText('Pickup')).toHaveValue(
             '2099-10-01T08:45',
         );
-        expect(screen.getByLabelText('Return date and time')).toHaveValue(end);
+        expect(screen.getByLabelText('Return')).toHaveValue(end);
         fireEvent.click(screen.getByText('Continue'));
         expect(
             screen.getByRole('heading', { name: 'People & purpose' }),
@@ -221,7 +221,7 @@ describe('Fleet request opens inside the canonical wizard', () => {
         await screen.findByText(
             'Current booking permissions could not be loaded. Try again.',
         );
-        expect(screen.getByLabelText('Return date and time')).toHaveValue(end);
+        expect(screen.getByLabelText('Return')).toHaveValue(end);
         fireEvent.click(screen.getByText('Try again'));
         await waitFor(() =>
             expect(
@@ -251,7 +251,7 @@ describe('Fleet request opens inside the canonical wizard', () => {
             '/fleet-assets/vehicles/2/calendar/summary',
             expect.anything(),
         );
-        expect(screen.getByLabelText('Pickup date and time')).toHaveValue(
+        expect(screen.getByLabelText('Pickup')).toHaveValue(
             start,
         );
     });

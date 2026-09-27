@@ -848,7 +848,7 @@ export function BookingWizard({
                     </p>
                     <DateTimeField
                         id="starts_local"
-                        label={block ? 'Block start' : 'Pickup date and time'}
+                        label={block ? 'Block start' : 'Pickup'}
                         value={form.start}
                         onChange={(value) => update('start', value)}
                         error={errors.starts_local}
@@ -881,7 +881,7 @@ export function BookingWizard({
                     )}
                     <DateTimeField
                         id="ends_local"
-                        label={block ? 'Block end' : 'Return date and time'}
+                        label={block ? 'Block end' : 'Return'}
                         value={form.end}
                         onChange={(value) => update('end', value)}
                         error={errors.ends_local}
