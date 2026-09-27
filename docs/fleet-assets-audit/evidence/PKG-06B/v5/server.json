@@ -1,0 +1,40 @@
+{
+  "candidateUrl": "http://127.0.0.1:8900/#view=overview&section=library&scenario=normal",
+  "port": 8900,
+  "pid": 51748,
+  "execSession": 1838,
+  "root": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/docs/fleet-assets-audit/previews/PKG-06B/v5/",
+  "identity": "8821-v5",
+  "checkedAtUtc": "2026-09-26T12:09:54.643Z",
+  "resources": [
+    {
+      "file": "index.html",
+      "status": 200,
+      "source": "8821-v5",
+      "cache": "no-store",
+      "servedSha256": "3fa63539f6b208e1dccefbf2a64cbb91aeb35abf9edb3e7a8816a3d37a306a2f",
+      "diskSha256": "3fa63539f6b208e1dccefbf2a64cbb91aeb35abf9edb3e7a8816a3d37a306a2f",
+      "match": true
+    },
+    {
+      "file": "app.js",
+      "status": 200,
+      "source": "8821-v5",
+      "cache": "no-store",
+      "servedSha256": "ddb4ff1d479e575e532ba6aa62293ccb568b257a2bd05d20b64b34ddc6fa26c2",
+      "diskSha256": "ddb4ff1d479e575e532ba6aa62293ccb568b257a2bd05d20b64b34ddc6fa26c2",
+      "match": true
+    },
+    {
+      "file": "app.css",
+      "status": 200,
+      "source": "8821-v5",
+      "cache": "no-store",
+      "servedSha256": "d0c81ce912a828279f7dc6cd6b390748716c5cf7cd5937c39c1bdb25d4e5026f",
+      "diskSha256": "d0c81ce912a828279f7dc6cd6b390748716c5cf7cd5937c39c1bdb25d4e5026f",
+      "match": true
+    }
+  ],
+  "operations": "Static local GET/HEAD only, no-store, connect-src none",
+  "pidSource": "Recorded static-server launch; optional Win32_Process reinspection was denied by environment. HTTP identity and bundle equality verified."
+}

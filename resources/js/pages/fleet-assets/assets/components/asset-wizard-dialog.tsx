@@ -13,6 +13,7 @@
  * (Inertia fires onSuccess for back()->with('error') redirects too).
  *
  * NZ English, semantic design tokens only. */
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -68,6 +69,7 @@ type ClientOption = {
 
 /** Editable slice of an asset — what the show/edit payloads expose. */
 export type AssetWizardAsset = {
+    asset_profile_version?: number;
     id: number;
     name: string;
     asset_tag: string | null;
@@ -452,6 +454,7 @@ export function AssetWizardDialog({
         setProcessing(true);
 
         const payload = {
+            expected_version: asset?.asset_profile_version,
             name: data.name,
             asset_tag: nn(data.asset_tag),
             category: nn(data.category),
@@ -807,7 +810,9 @@ function StepDetails({ data, set, errors }: StepProps) {
                         <Field
                             label="Odometer"
                             hint="recorded on the vehicle"
-                            error={errors.odometer_km ?? errors.vehicle_evidence}
+                            error={
+                                errors.odometer_km ?? errors.vehicle_evidence
+                            }
                         >
                             <p className="text-subtle py-2">
                                 {data.odometer_km
@@ -823,23 +828,27 @@ function StepDetails({ data, set, errors }: StepProps) {
                         Purchase &amp; warranty
                     </SubHead>
                     <Field label="Purchase date" error={errors.purchase_date}>
-                        <Input
-                            type="date"
+                        <DatePicker
+                            id="asset-purchase-date"
+                            label="Purchase date"
+                            allowClear
+                            invalid={!!errors.purchase_date}
                             value={data.purchase_date}
-                            onChange={(e) =>
-                                set('purchase_date', e.target.value)
-                            }
+                            onChange={(value) => set('purchase_date', value)}
                         />
                     </Field>
                     <Field
                         label="Warranty expires"
                         error={errors.warranty_expires_at}
                     >
-                        <Input
-                            type="date"
+                        <DatePicker
+                            id="asset-warranty-expires"
+                            label="Warranty expires"
+                            allowClear
+                            invalid={!!errors.warranty_expires_at}
                             value={data.warranty_expires_at}
-                            onChange={(e) =>
-                                set('warranty_expires_at', e.target.value)
+                            onChange={(value) =>
+                                set('warranty_expires_at', value)
                             }
                         />
                     </Field>
@@ -949,21 +958,26 @@ function StepCompliance({ data, set, errors }: StepProps) {
             <div className="grid gap-4">
                 {data.category === 'vehicle' ? (
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <SubHead icon={Car}>Registration, WoF, CoF and RUC</SubHead>
+                        <SubHead icon={Car}>
+                            Registration, WoF, CoF and RUC
+                        </SubHead>
                         <InfoCard icon={Info}>
                             {data.registration_expires_at ||
                             data.wof_expires_at ||
                             data.cof_expires_at ? (
                                 <>
                                     Last recorded: registration{' '}
-                                    {data.registration_expires_at || 'not recorded'}
-                                    , WoF {data.wof_expires_at || 'not recorded'},
-                                    CoF {data.cof_expires_at || 'not recorded'}.{' '}
+                                    {data.registration_expires_at ||
+                                        'not recorded'}
+                                    , WoF{' '}
+                                    {data.wof_expires_at || 'not recorded'}, CoF{' '}
+                                    {data.cof_expires_at || 'not recorded'}
+                                    .{' '}
                                 </>
                             ) : null}
                             These are recorded with their evidence on the
-                            vehicle&apos;s Service &amp; compliance tab, so every
-                            change keeps its source and history.
+                            vehicle&apos;s Service &amp; compliance tab, so
+                            every change keeps its source and history.
                             {errors.vehicle_evidence ? (
                                 <span className="mt-1 block font-medium text-destructive">
                                     {errors.vehicle_evidence}
@@ -998,14 +1012,14 @@ function StepCompliance({ data, set, errors }: StepProps) {
                                         label="Next inspection due"
                                         error={errors.inspection_due_at}
                                     >
-                                        <Input
-                                            type="date"
+                                        <DatePicker
+                                            id="asset-inspection-due"
+                                            label="Next inspection due"
+                                            allowClear
+                                            invalid={!!errors.inspection_due_at}
                                             value={data.inspection_due_at}
-                                            onChange={(e) =>
-                                                set(
-                                                    'inspection_due_at',
-                                                    e.target.value,
-                                                )
+                                            onChange={(value) =>
+                                                set('inspection_due_at', value)
                                             }
                                         />
                                     </Field>
@@ -1034,14 +1048,16 @@ function StepCompliance({ data, set, errors }: StepProps) {
                                         label="Next maintenance due"
                                         error={errors.maintenance_due_at}
                                     >
-                                        <Input
-                                            type="date"
+                                        <DatePicker
+                                            id="asset-maintenance-due"
+                                            label="Next maintenance due"
+                                            allowClear
+                                            invalid={
+                                                !!errors.maintenance_due_at
+                                            }
                                             value={data.maintenance_due_at}
-                                            onChange={(e) =>
-                                                set(
-                                                    'maintenance_due_at',
-                                                    e.target.value,
-                                                )
+                                            onChange={(value) =>
+                                                set('maintenance_due_at', value)
                                             }
                                         />
                                     </Field>

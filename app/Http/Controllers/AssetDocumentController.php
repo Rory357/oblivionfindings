@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Asset;
 use App\Models\AssetDocument;
 use App\Models\FleetVehicleComplianceVersion;
+use App\Services\Assets\AssetDocumentService;
 use App\Services\AuditLogger;
 use App\Services\Fleet\VehicleDocumentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AssetDocumentController extends Controller
@@ -30,41 +32,46 @@ class AssetDocumentController extends Controller
             'version' => ['nullable', 'string', 'max:80'],
             'effective_date' => ['nullable', 'date'],
             'expiry_date' => ['nullable', 'date'],
-            'notes' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $file = $request->file('file');
-        $disk = 'local';
+        $request->merge(['request_key' => $request->input('request_key') ?: $request->header('Idempotency-Key') ?: (string) Str::uuid()]);
+        $data['request_key'] = $request->validate(['request_key' => ['required', 'string', 'max:80']])['request_key'];
+        $document = app(AssetDocumentService::class)->upload($request->user(), $asset, $request->file('file'), $data);
 
-        $path = $file->storeAs(
-            "assets/{$asset->id}",
-            time() . '_' . preg_replace('/\s+/', '_', $file->getClientOriginalName()),
-            $disk
-        );
+        return $request->expectsJson() ? response()->json(['document' => ['id' => $document->id, 'state' => $document->state]], 201) : back();
+    }
 
-        $doc = AssetDocument::create([
-            'asset_id' => $asset->id,
-            'uploaded_by_user_id' => $request->user()?->id,
-            'title' => $data['title'],
-            'category' => $data['category'] ?? null,
-            'version' => $data['version'] ?? null,
-            'effective_date' => $data['effective_date'] ?? null,
-            'expiry_date' => $data['expiry_date'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'storage_disk' => $disk,
-            'storage_path' => $path,
-            'original_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getClientMimeType(),
-            'size_bytes' => $file->getSize(),
+    public function replace(Request $request, Asset $asset, AssetDocument $document, AssetDocumentService $documents)
+    {
+        $this->authorize('manageDocuments', $asset);
+        abort_unless($document->asset_id === $asset->id, 404);
+        $data = $request->validate([
+            'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,csv,jpg,jpeg,png,gif,txt,rtf'],
+            'title' => ['required', 'string', 'max:255'], 'category' => ['nullable', 'string', 'max:120'],
+            'effective_date' => ['nullable', 'date'], 'expiry_date' => ['nullable', 'date'], 'notes' => ['nullable', 'string', 'max:5000'],
+            'reason' => ['required', 'string', 'max:2000', 'not_regex:/^\s*$/'], 'expected_version' => ['required', 'integer', 'min:0'],
+            'request_key' => ['required', 'string', 'max:80'],
         ]);
+        $file = $documents->upload($request->user(), $asset, $request->file('file'), $data, $document);
 
-        AuditLogger::log('assets.documents.create', $doc, [
-            'asset_id' => $asset->id,
-            'site_id' => $asset->site_id,
-            'client_id' => $asset->client_id,
-        ]);
+        return response()->json(['document' => ['id' => $file->id, 'state' => $file->state]], 201);
+    }
 
-        return back();
+    public function archive(Request $request, Asset $asset, AssetDocument $document, AssetDocumentService $documents)
+    {
+        $this->authorize('manageDocuments', $asset);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:2000', 'not_regex:/^\s*$/']]);
+        $file = $documents->archive($request->user(), $asset, $document, trim($data['reason']));
+
+        return response()->json(['document' => ['id' => $file->id, 'archived' => true]]);
+    }
+
+    public function retry(Request $request, Asset $asset, AssetDocument $document, AssetDocumentService $documents)
+    {
+        $file = $documents->retry($request->user(), $asset, $document);
+
+        return response()->json(['document' => ['id' => $file->id, 'state' => $file->state]]);
     }
 
     public function download(Request $request, Asset $asset, AssetDocument $document, VehicleDocumentService $vehicleDocuments)
@@ -76,20 +83,21 @@ class AssetDocumentController extends Controller
         abort_unless($document->isOpenable(), 409, 'This file is not available to open. It has not passed its virus check.');
         // Vehicle files stream through the vehicle profile's download, which
         // rechecks vehicle access and sends the private-file headers.
-        if ($document->isVehicleManaged()) {
-            return $vehicleDocuments->download($request->user(), $asset->id, $document->id);
+        if ($document->isVehicleManaged() && Asset::vehicles()->whereKey($asset->id)->exists()) {
+            return $vehicleDocuments->download($request->user(), $asset->id, $document->id, $request->boolean('inline'));
         }
 
-        AuditLogger::log('assets.documents.download', $document, [
-            'asset_id' => $asset->id,
-            'site_id' => $asset->site_id,
-            'client_id' => $asset->client_id,
-        ]);
+        abort_if($document->isSourceOwned(), 404);
+        $disk = Storage::disk($document->storage_disk ?: 'private');
+        abort_unless($disk->exists($document->storage_path), 404, 'The original file is unavailable.');
+        $mime = $document->detected_mime ?: ($disk->mimeType($document->storage_path) ?: 'application/octet-stream');
+        $inline = $request->boolean('inline') && in_array($mime, ['application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp'], true);
+        AuditLogger::log('assets.documents.download', $document, ['asset_id' => $asset->id, 'inline' => $inline]);
 
-        return Storage::disk($document->storage_disk)->download(
-            $document->storage_path,
-            $document->original_name ?? basename($document->storage_path)
-        );
+        return $disk->response($document->storage_path, VehicleDocumentService::safeName($document->original_name ?: 'document'), [
+            'Content-Type' => $mime, 'Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; sandbox; frame-ancestors 'none'", 'Referrer-Policy' => 'no-referrer',
+        ], $inline ? 'inline' : 'attachment');
     }
 
     public function destroy(Request $request, Asset $asset, AssetDocument $document)
@@ -97,6 +105,7 @@ class AssetDocumentController extends Controller
         $this->authorize('manageDocuments', $asset);
         abort_unless($document->asset_id === $asset->id, 404);
         // PKG-02B keeps vehicle files: they are archived with a reason, never deleted.
+        abort_unless(Asset::vehicles()->whereKey($asset->id)->exists(), 409, 'Archive the document with a reason. Asset file originals and history are retained.');
         abort_if($document->isVehicleManaged(), 409,
             'This file is kept in the vehicle profile. Archive it there and record why, instead of deleting it.');
         abort_if(FleetVehicleComplianceVersion::query()->where('asset_document_id', $document->id)->exists(), 409,

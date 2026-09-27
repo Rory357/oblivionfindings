@@ -6,14 +6,16 @@ use App\Domain\Finance\Presenters\AssetFinanceTechnologyProjectionPresenter;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
-use App\Models\AssetCategory;
 use App\Models\AssetAssignment;
+use App\Models\AssetCategory;
+use App\Models\AssetCustodyMovement;
 use App\Models\AssetDocument;
 use App\Models\Client;
 use App\Models\ClientEmergencyContact;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Assets\AssetMutationIntegrityService;
+use App\Services\Assets\AssetProfilePresenter;
 use App\Services\AuditLogger;
 use App\Services\Fleet\VehicleLegacyEvidenceGuard;
 use Illuminate\Http\Request;
@@ -344,7 +346,7 @@ class AssetController extends Controller
         foreach ($asset->inspections as $item) {
             $timeline->push([
                 'type' => 'inspection',
-                'date' => optional($item->created_at)->toISOString(),
+                'date' => optional($item->inspected_at ?? $item->created_at)->toISOString(),
                 'summary' => "Inspection #{$item->id}",
                 'id' => $item->id,
             ]);
@@ -362,8 +364,8 @@ class AssetController extends Controller
         foreach ($asset->scanEvents as $item) {
             $timeline->push([
                 'type' => 'scan',
-                'date' => optional($item->created_at)->toISOString(),
-                'summary' => "QR scan by user #{$item->user_id}",
+                'date' => optional($item->scanned_at)->toISOString(),
+                'summary' => 'QR scan recorded',
                 'id' => $item->id,
             ]);
         }
@@ -545,8 +547,9 @@ class AssetController extends Controller
 
         return Inertia::render('fleet-assets/assets/show', [
             'asset' => $safeAsset,
+            'workspace' => app(AssetProfilePresenter::class)->present($user, $asset, $request->integer('history_before') ?: null),
             'active_maintenance_restrictions' => $asset->site_id && $this->hasTable('fleet_maintenance_restrictions')
-                ? \Illuminate\Support\Facades\DB::table('fleet_maintenance_restrictions')
+                ? DB::table('fleet_maintenance_restrictions')
                     ->where('asset_id', $asset->id)->where('state', 'active')->count()
                 : 0,
             'timeline' => $timeline,
@@ -676,6 +679,7 @@ class AssetController extends Controller
         $user = $request->user() ?? abort(403);
         $this->authorize('update', $asset);
         $data = $request->validate([
+            'expected_version' => ['nullable', 'integer', 'min:1'],
             'name' => ['required', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:120'],
             'asset_category_id' => ['nullable', 'integer', 'exists:asset_categories,id'],
@@ -718,6 +722,20 @@ class AssetController extends Controller
 
         $asset = DB::transaction(function () use ($user, $asset, $data): Asset {
             $locked = $this->deviceAccess->assignableAsset($user, (int) $asset->getKey(), true) ?? abort(404);
+            if (isset($data['expected_version']) && (int) $locked->asset_profile_version !== (int) $data['expected_version']) {
+                throw ValidationException::withMessages(['name' => 'This asset changed while you were editing. Close this draft and review the latest record before applying changes.']);
+            }
+            unset($data['expected_version']);
+            if (Schema::hasColumn('assets', 'asset_profile_version')) {
+                $locked->forceFill(['asset_profile_version' => (int) $locked->asset_profile_version + 1]);
+                if (AssetCustodyMovement::where('asset_id', $locked->id)->whereIn('state', ['pending_receipt', 'incomplete', 'disputed'])->exists()) {
+                    foreach (['site_id', 'home_site_id', 'client_id', 'location'] as $field) {
+                        if (array_key_exists($field, $data) && (string) $data[$field] !== (string) $locked->{$field}) {
+                            throw ValidationException::withMessages([$field => 'Resolve the pending receipt before changing asset placement.']);
+                        }
+                    }
+                }
+            }
             $data = $this->authorisePlacement($user, $data, true);
             $this->mutationIntegrity->assertOrdinaryStatusUpdate($locked, $data['status'] ?? null);
             $this->mutationIntegrity->assertPlacementChangeAllowed($locked, $data);

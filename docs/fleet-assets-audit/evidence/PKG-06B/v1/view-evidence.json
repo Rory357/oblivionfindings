@@ -1,0 +1,162 @@
+[
+  {
+    "group": "Overview",
+    "section": "Summary",
+    "screenshot": "final-overview-summary.png",
+    "url": "http://127.0.0.1:8896/#view=overview&section=summary&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Overview",
+    "section": "Location & observations",
+    "screenshot": "final-overview-location-observations.png",
+    "url": "http://127.0.0.1:8896/#view=overview&section=summary&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Overview",
+    "section": "Asset details",
+    "screenshot": "final-overview-asset-details.png",
+    "url": "http://127.0.0.1:8896/#view=overview&section=summary&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Custody",
+    "section": "Current custody",
+    "screenshot": "final-custody-current-custody.png",
+    "url": "http://127.0.0.1:8896/#view=custody&section=current&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Custody",
+    "section": "Movement history",
+    "screenshot": "final-custody-movement-history.png",
+    "url": "http://127.0.0.1:8896/#view=custody&section=current&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Maintenance",
+    "section": "Issues & work",
+    "screenshot": "final-maintenance-issues-work.png",
+    "url": "http://127.0.0.1:8896/#view=maintenance&section=work&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Maintenance",
+    "section": "Original checks",
+    "screenshot": "final-maintenance-original-checks.png",
+    "url": "http://127.0.0.1:8896/#view=maintenance&section=work&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Maintenance",
+    "section": "Service & calibration",
+    "screenshot": "final-maintenance-service-calibration.png",
+    "url": "http://127.0.0.1:8896/#view=maintenance&section=work&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Documents",
+    "section": "Private library",
+    "screenshot": "final-documents-private-library.png",
+    "url": "http://127.0.0.1:8896/#view=documents&section=library&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Documents",
+    "section": "Photos",
+    "screenshot": "final-documents-photos.png",
+    "url": "http://127.0.0.1:8896/#view=documents&section=library&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Documents",
+    "section": "Versions & archive",
+    "screenshot": "final-documents-versions-archive.png",
+    "url": "http://127.0.0.1:8896/#view=documents&section=library&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Components & kit",
+    "section": "Kit contents",
+    "screenshot": "final-components-kit-kit-contents.png",
+    "url": "http://127.0.0.1:8896/#view=components&section=kit&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Components & kit",
+    "section": "Replacement history",
+    "screenshot": "final-components-kit-replacement-history.png",
+    "url": "http://127.0.0.1:8896/#view=components&section=kit&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Lifecycle",
+    "section": "Asset history",
+    "screenshot": "final-lifecycle-asset-history.png",
+    "url": "http://127.0.0.1:8896/#view=lifecycle&section=timeline&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Lifecycle",
+    "section": "Purchase & Finance",
+    "screenshot": "final-lifecycle-purchase-finance.png",
+    "url": "http://127.0.0.1:8896/#view=lifecycle&section=timeline&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  },
+  {
+    "group": "Lifecycle",
+    "section": "Retirement review",
+    "screenshot": "final-lifecycle-retirement-review.png",
+    "url": "http://127.0.0.1:8896/#view=lifecycle&section=timeline&scenario=normal",
+    "fit": {
+      "width": 1600,
+      "scrollWidth": 1600
+    }
+  }
+]

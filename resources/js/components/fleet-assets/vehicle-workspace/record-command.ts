@@ -124,8 +124,8 @@ export function useVehicleRecordCommand<T>(
                         ? serverMessage ||
                               'This record changed while you were editing. Review its latest version before saving again.'
                         : response.status === 403
-                          ? 'You no longer have access to make this change. Reload this vehicle to check what is available.'
-                          : 'Your access or session has changed. Reload this vehicle to check what is available.',
+                          ? 'You no longer have access to make this change. Reload this record to check what is available.'
+                          : 'Your access or session has changed. Reload this record to check what is available.',
                 );
             } else {
                 setUncertain(true);

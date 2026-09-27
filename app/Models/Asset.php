@@ -83,6 +83,7 @@ class Asset extends Model
     ];
 
     protected $casts = [
+        'asset_profile_version' => 'integer',
         'insurance_expires_at' => 'date',
         'vehicle_profile_version' => 'integer',
         'purchase_date' => 'date',

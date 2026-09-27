@@ -6,6 +6,14 @@
 *.md diff=markdown
 *.php diff=php
 
+# Frozen Asset Profile design artifacts retain their recorded byte hashes.
+docs/fleet-assets-audit/previews/PKG-06B/** -text whitespace=cr-at-eol
+docs/fleet-assets-audit/evidence/PKG-06B/v*/** -text whitespace=cr-at-eol
+docs/fleet-assets-audit/pages/PKG-06B-asset-profile-v*.md -text whitespace=cr-at-eol
+# Generated preview bundles contain intentional whitespace in library strings.
+docs/fleet-assets-audit/previews/PKG-06B/**/app.js -whitespace
+docs/fleet-assets-audit/evidence/PKG-06B/v8/qr-export-validation.cjs -whitespace
+
 CHANGELOG.md export-ignore
 README.md export-ignore
 .github/workflows/browser-tests.yml export-ignore

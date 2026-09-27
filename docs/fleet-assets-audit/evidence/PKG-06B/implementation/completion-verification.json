@@ -1,0 +1,28 @@
+{
+  "date": "2026-09-27",
+  "worktree": "8821",
+  "implementation": "http://127.0.0.1:8905/fleet-assets/assets/1",
+  "bulkLabels": "http://127.0.0.1:8905/fleet-assets/asset-register/labels/workspace",
+  "backend": {
+    "freshRegression": {"tests": 31, "assertions": 564, "passed": true},
+    "additionalRollbackTests": {"tests": 3, "assertions": 29, "passed": true}
+  },
+  "ui": {"files": 6, "tests": 39, "passed": true},
+  "typescript": "passed",
+  "eslint": "passed",
+  "phpFormatting": "passed",
+  "diffWhitespace": "passed",
+  "productionBuild": {"passed": true, "duration": "5m 29s", "browserBundle": "app-Jte2U_jh.js", "hotFileRemoved": true},
+  "frozenV9": {"files": 42, "changed": 0},
+  "browser": {
+    "datePicker": "Shared calendar for purchase, warranty, inspection and maintenance dates; optional clearing verified",
+    "mobileCalendar": {"viewport": 390, "left": 16, "right": 374, "bottom": 529.5},
+    "mobileLabels": {"viewport": 390, "contentWidth": 375, "headerOverflow": "clip", "headerScrollTop": 0},
+    "sourcePdf": "Original Maintenance attachment rendered two pages through shared viewer",
+    "originalCheck": "Original detail displayed submitted brake answer and protected evidence",
+    "location": "Assigned placement, manual observation, device provenance and QR observation shown separately",
+    "replacementReview": "Shared wizard preselected Asset replacement review; test draft discarded",
+    "qrFiles": "See bulk-label-verification.json: A4 offset rollover, custom 60x50mm pages, all 9 PDF/PNG codes decoded, SVG logos and manifest verified"
+  },
+  "releaseBoundary": "Local implementation and synthetic verification complete. Production migration/configuration, deployment and physical printer/scanner calibration were not performed."
+}

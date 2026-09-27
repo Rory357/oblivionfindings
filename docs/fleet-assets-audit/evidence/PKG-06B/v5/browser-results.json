@@ -1,0 +1,94 @@
+{
+  "checks": [
+    {
+      "name": "Read-only exception and borrower-departure shortcuts cannot open mutation forms",
+      "status": "passed"
+    },
+    {
+      "name": "Browser Back restores scenario and edit authority",
+      "status": "passed"
+    },
+    {
+      "name": "Old Photos and Versions URLs retain their document scope after reload",
+      "status": "passed"
+    },
+    {
+      "name": "Direct-object denial hides asset identity and profile find",
+      "status": "passed"
+    },
+    {
+      "name": "Unsaved Maintenance next action prompts and preserves its draft",
+      "status": "passed"
+    },
+    {
+      "name": "Search file handoff closes cleanly and restores usable focus",
+      "status": "passed"
+    },
+    {
+      "name": "Exception captures chosen type, reason and active actor",
+      "status": "passed"
+    },
+    {
+      "name": "Document List/Cards and context menu remain functional in final revision",
+      "status": "passed"
+    },
+    {
+      "name": "Fourteen sections navigate, reload and retain their selected content",
+      "status": "passed",
+      "views": 14
+    },
+    {
+      "name": "Dark document view visually inspected with semantic tokens",
+      "status": "passed"
+    },
+    {
+      "name": "Dark theme and smaller desktop widths retain readable layout without horizontal overflow",
+      "status": "failed",
+      "error": "locator.click: Timeout 6000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'More', exact: true })\u001b[22m\n"
+    },
+    {
+      "name": "Corrected overflow-control selector at 1280 and 1024 desktop widths",
+      "status": "failed",
+      "error": "locator.click: Timeout 6000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('menuitem', { name: 'History', exact: true })\u001b[22m\n"
+    },
+    {
+      "name": "Desktop overflow menu and both smaller layouts",
+      "status": "passed",
+      "widths": [
+        1280,
+        1024
+      ]
+    },
+    {
+      "name": "Final receipt regression: a complete arrival with discrepancy does not acknowledge custody",
+      "status": "passed"
+    },
+    {
+      "name": "Final empty-library first upload updates the header count",
+      "status": "passed"
+    },
+    {
+      "name": "Shared calendar preserves year, Cancel draft and Escape parent dialog",
+      "status": "failed",
+      "error": "Escape left calendar open"
+    },
+    {
+      "name": "Shared calendar settled transitions: January 2027, Cancel and Escape",
+      "status": "passed",
+      "selected": "2027-01-05",
+      "cancelRetains": "2026-09-30",
+      "escape": "parent retained"
+    }
+  ],
+  "pageErrors": [],
+  "requests": [
+    "http://127.0.0.1:8900/",
+    "http://127.0.0.1:8900/app.css",
+    "http://127.0.0.1:8900/app.js"
+  ],
+  "notes": [
+    "Three failed harness attempts retained: two overflow-menu locator assumptions, one assertion before the calendar close animation settled. All corrected checks passed.",
+    "Fourteen page views passed route and reload checks. Desktop viewports: 1600, 1280, 1024. Genuine browser zoom unverified.",
+    "No production application, backend or authorization test is implied."
+  ]
+}

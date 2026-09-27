@@ -2,6 +2,8 @@ import {
     AssetFinanceTechnologyProjectionPanel,
     type AssetFinanceTechnologyProjection,
 } from '@/components/assets/asset-finance-technology-projection';
+import type { ProfileWorkspace } from '@/components/assets/profile/types';
+import { AssetProfileWorkspace } from '@/components/assets/profile/workspace';
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -586,7 +588,8 @@ type ServiceSchedule = {
     next_due_at: string | null;
 };
 
-type Props = {
+export type Props = {
+    workspace?: ProfileWorkspace;
     active_maintenance_restrictions: number;
     asset: {
         id: number;
@@ -692,7 +695,15 @@ function isExpired(dateStr: string | null): boolean {
     return new Date(dateStr) < new Date();
 }
 
-export default function AssetShow({
+export default function AssetShow(props: Props) {
+    return props.workspace ? (
+        <AssetProfileWorkspace {...props} workspace={props.workspace} />
+    ) : (
+        <LegacyAssetShow {...props} />
+    );
+}
+
+function LegacyAssetShow({
     asset,
     active_maintenance_restrictions,
     timeline,
@@ -756,7 +767,7 @@ export default function AssetShow({
     const alerts = asset?.archived_alerts ?? [];
     const work_orders = asset?.work_orders ?? [];
     const service_schedules = asset?.service_schedules ?? [];
-    const can_edit = true;
+    const can_edit = false;
     const [docOpen, setDocOpen] = useState(false);
     const [docFile, setDocFile] = useState<File | null>(null);
     const [docTitle, setDocTitle] = useState('');

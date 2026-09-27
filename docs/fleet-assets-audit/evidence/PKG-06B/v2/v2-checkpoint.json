@@ -1,0 +1,15 @@
+{
+  "status": "Consistency pass completed; superseded by three further user-requested audit rounds",
+  "url": "http://127.0.0.1:8897/",
+  "bundleSha256": "dfacb12582b15a4fa59e8e035111e836f2f1a6f281104222f3b6d3eee0db3740",
+  "sourceReuse": [
+    "VehicleRecordCollection",
+    "VehicleCollectionToggle",
+    "PageHeaderSearchTrigger",
+    "PageHeaderMeterBig",
+    "EntityTable",
+    "EntityCard",
+    "Entity menus"
+  ],
+  "verification": "Fourteen sections and key document/search flows passed after defects were repaired; earlier harness errors and repaired runtime failure retained in browser-results.json."
+}

@@ -1,0 +1,214 @@
+[
+  {
+    "url": "http://127.0.0.1:8896/#view=overview&section=summary&scenario=normal",
+    "file": "frozen-01-summary.png",
+    "expected": "Asset at a glance",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=overview&section=location&scenario=normal",
+    "file": "frozen-02-observations.png",
+    "expected": "These sources answer different questions",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=overview&section=identity&scenario=normal",
+    "file": "frozen-03-identity.png",
+    "expected": "Identity & ownership",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=custody&section=current&scenario=normal",
+    "file": "frozen-04-custody.png",
+    "expected": "Accountable custody",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=custody&section=movements&scenario=normal",
+    "file": "frozen-05-movements.png",
+    "expected": "Movement history",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=maintenance&section=work&scenario=normal",
+    "file": "frozen-06-maintenance.png",
+    "expected": "Issues & Maintenance history",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=maintenance&section=checks&scenario=normal",
+    "file": "frozen-07-checks.png",
+    "expected": "Original submitted checks",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=maintenance&section=service&scenario=normal",
+    "file": "frozen-08-service.png",
+    "expected": "Service & calibration requirements",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=documents&section=library&scenario=normal",
+    "file": "frozen-09-documents.png",
+    "expected": "Private document library",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=documents&section=photos&scenario=normal",
+    "file": "frozen-10-photos.png",
+    "expected": "Photos & original evidence",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=documents&section=versions&scenario=normal",
+    "file": "frozen-11-versions.png",
+    "expected": "Version history & archived files",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=components&section=kit&scenario=normal",
+    "file": "frozen-12-kit.png",
+    "expected": "Components & removable kit",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=components&section=componentHistory&scenario=normal",
+    "file": "frozen-13-component-history.png",
+    "expected": "Component replacement history",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=lifecycle&section=timeline&scenario=normal",
+    "file": "frozen-14-history.png",
+    "expected": "Asset history",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=lifecycle&section=finance&scenario=normal",
+    "file": "frozen-15-finance.png",
+    "expected": "Financial decisions remain in Finance",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=lifecycle&section=retirement&scenario=normal",
+    "file": "frozen-16-retirement.png",
+    "expected": "Retirement & disposal review",
+    "present": true,
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=overview&section=summary&scenario=normal",
+    "file": "frozen-17-summary-viewport.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=overview&section=summary&scenario=normal",
+    "file": "frozen-18-work-dialog.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    },
+    "dialog": "Brake assessment · MW-271\n\nAS-104 · Transfer hoist · Synthetic, private source context\n\nAsset hold remains active\n\nWork completion, retest, independent release and Finance review remain separate.\n\nReported concern\n\nThe original check records a brake concern. Assessment and source evidence are outstanding.\n\nOriginal check CHK-882 · v2\nAwaiting vendor\nNotes & updates\nAdd note\n1 update · Expand\n\nMara Ellis · 25 Sep, 3:10 pm — The service report is still being retrieved.\n\nWork details\nNext action\nProgress\nOpen\nIn progress\nAwaiting internal feedback\nAwaiting approval\nAwaiting vendor\nAwaiting parts\nAwaiting scheduling\nOn hold\nCompleted/Closed\nCancelled\nSave work details\nResponsible owner\nMara Ellis\nTarget\nNot set · No response policy assumed\nComplete work\n\nProgress “On hold” describes waiting work; it does not create or remove an asset restriction.\n\nFail this save (demo)\nClose"
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=overview&section=summary&scenario=normal",
+    "file": "frozen-19-receipt-dialog.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=overview&section=summary&scenario=normal",
+    "file": "frozen-20-desktop-1280.png",
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "noHorizontalOverflow": true
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=overview&section=summary&scenario=normal",
+    "file": "frozen-21-desktop-1024.png",
+    "viewport": {
+      "width": 1024,
+      "height": 768
+    },
+    "noHorizontalOverflow": true
+  },
+  {
+    "url": "http://127.0.0.1:8896/#view=overview&section=summary&scenario=denied",
+    "file": "frozen-22-denied.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    },
+    "identityHidden": true
+  }
+]

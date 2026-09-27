@@ -62,6 +62,9 @@ final class AssetAssignmentService
             AuditLogger::logOrFail('assets.assignment.created', $asset, [
                 'assignment_id' => $assignment->id,
             ]);
+            if ($asset->getRawOriginal('asset_profile_version') !== null) {
+                $asset->forceFill(['asset_profile_version' => (int) $asset->asset_profile_version + 1])->save();
+            }
 
             return $assignment;
         }, 3);
@@ -88,6 +91,9 @@ final class AssetAssignmentService
                 AuditLogger::logOrFail('assets.assignment.released', $asset, [
                     'assignment_id' => $assignment->id,
                 ]);
+                if ($asset->getRawOriginal('asset_profile_version') !== null) {
+                    $asset->forceFill(['asset_profile_version' => (int) $asset->asset_profile_version + 1])->save();
+                }
             }
 
             return $assignment->fresh();

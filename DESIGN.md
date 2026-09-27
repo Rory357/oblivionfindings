@@ -605,6 +605,18 @@ before.
   exists. Actions with no backend are hidden, never stubbed, and are listed
   in the handoff.
 
+## File viewing and downloading (approved by Stephan 2026-09-27)
+
+Use the shared `FilePreviewDialog` in `components/files/file-preview-dialog.tsx`
+for an in-context PDF or image. A metadata cover is not a file preview and an
+"Available" badge must not promise bytes that cannot be retrieved. Reuse its
+page navigation, zoom, accessible page text, loading/error/retry states and
+original-file Download action. Preserve the exact file/version identity.
+Unsupported formats offer a labelled download rather than a false preview.
+The source module rechecks access and file state on every request; the dialog
+does not supply authorization or certify a malware check. Full contract:
+`design_styles/FILE_PREVIEW_STYLE_GUIDE.md` and the popup guide's file viewer rule.
+
 ## Conformance sweep (run on request)
 
 When asked to "check everything conforms", audit the codebase against this
@@ -732,6 +744,15 @@ file. Concrete, mechanically-checkable probes:
     module-owned progress and an obvious guarded completion path. Flag copied
     domain statuses, forced Ticket terminology, hidden essential blockers and
     parallel task/evidence identities. This is not a bulk migration instruction.
+
+23. **File-viewer consistency** (approved by Stephan 2026-09-27) — check that
+    View opens real content, Download returns the original permitted version,
+    long names remain identifiable, and missing/blocked/unsupported files,
+    expired access, slow loading and retry have truthful outcomes. Check
+    keyboard focus, text alternatives, bounded zoom/page controls, request
+    cancellation and private response headers against
+    `design_styles/FILE_PREVIEW_STYLE_GUIDE.md`. Mockup fixtures must stay
+    labelled; they are not production document storage.
 
 Report findings grouped by pattern with file:line references; fix only when
 asked, and migrate one pattern at a time.

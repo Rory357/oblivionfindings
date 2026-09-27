@@ -259,6 +259,12 @@ export default function AssetsIndex({
                         >
                             Export CSV
                         </FleetHeroAction>
+                        <FleetHeroAction
+                            href="/fleet-assets/asset-register/labels/workspace"
+                            icon={Download}
+                        >
+                            QR labels
+                        </FleetHeroAction>
                     </div>
                 </HeroShell>
 

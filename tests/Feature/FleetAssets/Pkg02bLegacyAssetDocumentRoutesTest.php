@@ -192,7 +192,7 @@ class Pkg02bLegacyAssetDocumentRoutesTest extends TestCase
         $this->assertSame([], Storage::disk('local')->allFiles());
     }
 
-    public function test_other_assets_keep_register_upload_download_and_delete(): void
+    public function test_other_assets_keep_scanned_register_upload_download_and_retained_archive(): void
     {
         $manager = $this->manager();
         $hoist = $this->equipment($this->site);
@@ -201,15 +201,17 @@ class Pkg02bLegacyAssetDocumentRoutesTest extends TestCase
             'file' => $this->pdf('hoist-manual.pdf'), 'title' => 'Hoist manual',
         ])->assertSessionHasNoErrors();
         $file = AssetDocument::query()->where('asset_id', $hoist->id)->sole();
-        $this->assertFalse($file->isVehicleManaged());
-        Storage::disk('local')->assertExists($file->storage_path);
+        $this->assertSame('available', $file->state);
+        $this->assertNotNull($file->document_set_id);
+        Storage::disk('private')->assertExists($file->storage_path);
 
         $this->actingAs($manager)->get($this->registerUrl($hoist, $file))->assertOk()->assertDownload('hoist-manual.pdf');
         $this->assertDatabaseHas('audit_logs', ['action' => 'assets.documents.download', 'auditable_id' => $file->id]);
 
-        $this->actingAs($manager)->delete($this->registerDeleteUrl($hoist, $file))->assertRedirect();
-        $this->assertModelMissing($file);
-        Storage::disk('local')->assertMissing($file->storage_path);
+        $this->actingAs($manager)->delete($this->registerDeleteUrl($hoist, $file))->assertStatus(409);
+        $this->actingAs($manager)->postJson("/assets/{$hoist->id}/documents/{$file->id}/archive", ['reason' => 'Superseded'])->assertOk();
+        $this->assertNotNull($file->fresh()->archived_at);
+        Storage::disk('private')->assertExists($file->storage_path);
     }
 
     public function test_the_register_lists_vehicle_documents_without_source_owned_evidence(): void
