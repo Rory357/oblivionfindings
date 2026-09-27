@@ -4,12 +4,18 @@ namespace Tests\Feature\FleetAssets;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
+use App\Models\AssetStocktake;
+use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
+use App\Services\Assets\AssetStocktakeService;
+use App\Services\Fleet\VehicleTripReportExporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 use ZipArchive;
@@ -296,5 +302,150 @@ class AssetRegisterWorkflowTest extends TestCase
         $this->actingAs($this->actor->fresh());
         $this->postJson(self::BASE.'/labels', $this->labelPayload([$this->asset->id]))->assertCreated();
         $this->assertNotEmpty($this->asset->fresh()->qr_token);
+    }
+
+    private function countWithUndoneExtra(Asset $extra, bool $finish): array
+    {
+        $count = $this->start(['asset_ids' => [$this->asset->id]]);
+        $count = $this->command($count, 'found', ['key' => 'asset-'.$extra->id, 'asset_id' => $extra->id, 'confirm_extra' => true])->assertOk()->json();
+        $count = $this->command($count, 'undo', ['key' => 'asset-'.$extra->id])->assertOk()->json();
+        $this->assertCount(1, $count['entries']);
+        if ($finish) {
+            $count = $this->command($count, 'found')->assertOk()->json();
+            $count = $this->command($count, 'finish')->assertOk()->json();
+        }
+
+        return $count;
+    }
+
+    public function test_undone_extra_history_remains_access_scoped_in_lists_resume_and_exports(): void
+    {
+        $extra = Asset::factory()->forSite($this->site)->create(['name' => 'Historical extra', 'status' => 'active']);
+        $counts = [$this->countWithUndoneExtra($extra, false), $this->countWithUndoneExtra($extra, true)];
+        $evidence = [];
+        foreach ($counts as $count) {
+            $this->assertDatabaseHas('asset_stocktake_asset_refs', ['asset_stocktake_id' => $count['id'], 'asset_id' => $extra->id]);
+            $this->getJson(self::BASE.'/stocktakes/'.$count['id'])->assertOk()->assertSee('Historical extra');
+            $evidence[$count['id']] = AssetStocktake::findOrFail($count['id'])->only(['entries', 'activity', 'version', 'status']);
+        }
+        $hidden = Site::factory()->create(['is_active' => true]);
+        $extra->update(['site_id' => $hidden->id, 'site_room_id' => null]);
+        $this->get('/fleet-assets/assets/'.$extra->id)->assertNotFound();
+        foreach ($counts as $count) {
+            $this->getJson(self::BASE.'/stocktakes/'.$count['id'])->assertNotFound();
+            foreach (['pdf', 'xlsx'] as $format) {
+                $this->get(self::BASE.'/stocktakes/'.$count['id'].'/export/'.$format)->assertNotFound();
+            }
+            $this->command($count, 'found')->assertNotFound();
+            $this->assertSame($evidence[$count['id']], AssetStocktake::findOrFail($count['id'])->only(['entries', 'activity', 'version', 'status']));
+        }
+        $this->getJson(self::BASE.'/stocktakes')->assertOk()->assertJsonPath('total', 0)->assertJsonPath('resume', null)->assertJsonPath('summary.counts', 0);
+        $this->getJson(self::BASE.'/stocktakes?workspace=followups')->assertOk()->assertJsonPath('total', 0);
+        $this->getJson(self::BASE.'/stocktakes?workspace=coverage')->assertOk()->assertJsonPath('data.0.counts', 0);
+    }
+
+    public function test_legacy_history_references_are_backfilled_without_rewriting_evidence(): void
+    {
+        $extra = Asset::factory()->forSite($this->site)->create(['status' => 'active']);
+        $count = $this->countWithUndoneExtra($extra, true);
+        $saved = AssetStocktake::findOrFail($count['id']);
+        // Reproduce the earlier event shape and missing reference after Undo.
+        $saved->activity = array_map(fn ($event) => array_diff_key($event, ['asset_id' => true]), $saved->activity);
+        $saved->save();
+        DB::table('asset_stocktake_asset_refs')->where('asset_stocktake_id', $saved->id)->where('asset_id', $extra->id)->delete();
+        $before = $saved->fresh()->getRawOriginal();
+        $extra->update(['site_id' => Site::factory()->create(['is_active' => true])->id, 'site_room_id' => null]);
+        $this->getJson(self::BASE.'/stocktakes/'.$saved->id)->assertNotFound();
+
+        $migration = require database_path('migrations/2026_09_27_140000_retain_stocktake_history_asset_references.php');
+        $migration->up();
+        $migration->up();
+        $this->assertDatabaseHas('asset_stocktake_asset_refs', ['asset_stocktake_id' => $saved->id, 'asset_id' => $extra->id]);
+        $this->assertSame($before, $saved->fresh()->getRawOriginal());
+        $this->getJson(self::BASE.'/stocktakes')->assertOk()->assertJsonPath('total', 0);
+        foreach (['pdf', 'xlsx'] as $format) {
+            $this->get(self::BASE.'/stocktakes/'.$saved->id.'/export/'.$format)->assertNotFound();
+        }
+    }
+
+    private function allowPlacementEdits(Site $destination): void
+    {
+        HrEmployeeProfile::where('user_id', $this->actor->id)->firstOrFail()->update(['secondary_site_ids' => [$destination->id]]);
+        foreach (['assets.update', 'clients.viewAny'] as $key) {
+            $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key, 'group' => 'assets']);
+            $this->actor->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
+        }
+        $this->actingAs($this->actor->fresh());
+    }
+
+    public function test_revoked_extra_site_access_also_hides_retained_count_history(): void
+    {
+        $extraSite = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $profile = HrEmployeeProfile::where('user_id', $this->actor->id)->firstOrFail();
+        $profile->update(['secondary_site_ids' => [$extraSite->id]]);
+        $this->actingAs($this->actor->fresh());
+        $extra = Asset::factory()->forSite($extraSite)->create(['status' => 'active']);
+        $count = $this->countWithUndoneExtra($extra, true);
+        $profile->update(['secondary_site_ids' => []]);
+        $this->actingAs($this->actor->fresh());
+        $this->getJson(self::BASE.'/stocktakes/'.$count['id'])->assertNotFound();
+        $this->getJson(self::BASE.'/stocktakes')->assertOk()->assertJsonPath('total', 0);
+        foreach (['pdf', 'xlsx'] as $format) {
+            $this->get(self::BASE.'/stocktakes/'.$count['id'].'/export/'.$format)->assertNotFound();
+        }
+    }
+
+    public function test_report_time_matches_the_worker_zone_regression_in_the_register(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-27T01:00:00Z'));
+        try {
+            $count = $this->start();
+            $count = $this->command($count, 'found')->assertOk()->json();
+            $count = $this->command($count, 'finish')->assertOk()->json();
+            $report = app(AssetStocktakeService::class)->present(AssetStocktake::findOrFail($count['id']));
+            $html = view('pdf.asset-stocktake', ['report' => $report, 'brand' => app(VehicleTripReportExporter::class)->branding()])->render();
+            $this->assertStringContainsString('27 Sep 2026, 2:00 pm NZDT', $html);
+        } finally {
+            $this->travelBack();
+        }
+    }
+
+    public function test_ordinary_edit_preserves_same_site_room_and_reconciles_destination_room(): void
+    {
+        $destination = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $this->allowPlacementEdits($destination);
+        $destinationRoom = SiteRoom::create(['site_id' => $destination->id, 'name' => 'Destination room']);
+        $payload = ['name' => 'Room assigned asset', 'site_id' => $this->site->id, 'status' => 'active', 'risk_level' => 'medium'];
+        $this->post('/fleet-assets/assets', [...$payload, 'site_room_id' => $this->room->id])->assertRedirect();
+        $asset = Asset::where('name', $payload['name'])->firstOrFail();
+        $this->put('/fleet-assets/assets/'.$asset->id, $payload)->assertRedirect();
+        $this->assertSame($this->room->id, $asset->fresh()->site_room_id);
+        $payload['site_id'] = $destination->id;
+        $this->put('/fleet-assets/assets/'.$asset->id, $payload)->assertRedirect();
+        $this->assertSame($destination->id, $asset->fresh()->site_id);
+        $this->assertNull($asset->fresh()->site_room_id);
+        $this->put('/fleet-assets/assets/'.$asset->id, [...$payload, 'site_room_id' => $destinationRoom->id])->assertRedirect();
+        $this->assertSame($destinationRoom->id, $asset->fresh()->site_room_id);
+        $this->put('/fleet-assets/assets/'.$asset->id, [...$payload, 'site_room_id' => $this->room->id])->assertNotFound();
+        $this->assertSame($destinationRoom->id, $asset->fresh()->site_room_id);
+    }
+
+    public function test_imported_room_is_cleared_on_a_client_derived_site_move(): void
+    {
+        $destination = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $this->allowPlacementEdits($destination);
+        $client = Client::factory()->create(['site_id' => $destination->id]);
+        $csv = "name,asset_tag,site_id,site_room_id\nImported chair,IMPORTED-ROOM,{$this->site->id},{$this->room->id}\n";
+        $batch = $this->postJson(self::BASE.'/imports', ['file' => UploadedFile::fake()->createWithContent('rooms.csv', $csv)])->assertCreated()->json();
+        $endpoint = self::BASE.'/imports/'.$batch['id'];
+        $batch = $this->patchJson($endpoint, ['version' => $batch['version'], 'action' => 'validate', 'mapping' => $batch['mapping']])->assertOk()->json();
+        $this->patchJson($endpoint, ['version' => $batch['version'], 'action' => 'import', 'row_numbers' => [2]])->assertOk();
+        $asset = Asset::where('asset_tag', 'IMPORTED-ROOM')->firstOrFail();
+        $this->assertSame($this->room->id, $asset->site_room_id);
+        $this->put('/fleet-assets/assets/'.$asset->id, ['name' => $asset->name, 'site_id' => $this->site->id, 'client_id' => $client->id,
+            'status' => 'active', 'risk_level' => 'medium'])->assertRedirect();
+        $this->assertSame($destination->id, $asset->fresh()->site_id);
+        $this->assertSame($client->id, $asset->fresh()->client_id);
+        $this->assertNull($asset->fresh()->site_room_id);
     }
 }

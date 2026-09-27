@@ -8,6 +8,7 @@ use App\Models\AssetStocktake;
 use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\AuditLogger;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -28,18 +29,33 @@ final class AssetStocktakeService
 
     private function syncReferences(AssetStocktake $count): void
     {
-        DB::table('asset_stocktake_asset_refs')->where('asset_stocktake_id', $count->id)->delete();
-        $rows = collect($count->entries)->pluck('asset_id')->filter()->unique()->map(fn ($id) => ['asset_stocktake_id' => $count->id, 'asset_id' => $id])->all();
+        // Undo changes the checklist, not the identities retained in audit history.
+        $rows = $this->referencedAssetIds($count)->map(fn ($id) => ['asset_stocktake_id' => $count->id, 'asset_id' => $id])->all();
         foreach (array_chunk($rows, 500) as $chunk) {
-            DB::table('asset_stocktake_asset_refs')->insert($chunk);
+            DB::table('asset_stocktake_asset_refs')->insertOrIgnore($chunk);
         }
+    }
+
+    private function referencedAssetIds(AssetStocktake $count): Collection
+    {
+        // Older events retain their authoritative identity in the undo snapshot.
+        // Never infer identities from the displayed name or key.
+        $activity = collect($count->activity);
+
+        return collect($count->entries)->pluck('asset_id')
+            ->merge($activity->pluck('asset_id'))
+            ->merge($activity->pluck('previous.asset_id'))
+            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id) => (int) $id)->unique()->values();
     }
 
     public function visible(User $user, AssetStocktake $count, bool $write = false): void
     {
         Gate::forUser($user)->authorize('viewAny', Asset::class);
         abort_unless($this->access->accessibleSites($user)->whereKey($count->site_id)->exists(), 404);
-        $ids = collect($count->entries)->pluck('asset_id')->filter()->unique()->values();
+        $ids = $this->referencedAssetIds($count)
+            ->merge(DB::table('asset_stocktake_asset_refs')->where('asset_stocktake_id', $count->id)->pluck('asset_id'))
+            ->unique()->values();
         abort_unless($this->access->accessibleAssets($user)->whereKey($ids)->count() === $ids->count(), 404);
         if ($write) {
             abort_unless($user->canDo('assets.scan.record'), 403);
@@ -166,6 +182,7 @@ final class AssetStocktakeService
                 }
                 abort_if($index === false, 422, 'Choose an item in this count, or confirm an extra asset.');
                 $event['key'] = $entries[$index]['key'];
+                $event['asset_id'] = $entries[$index]['asset_id'];
                 $event['name'] = $entries[$index]['name'];
                 $event['previous'] = $entries[$index];
                 if ($action === 'undo') {

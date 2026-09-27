@@ -1,7 +1,15 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { api, download, REGISTER } from './api';
+import { api, download, REGISTER, stamp } from './api';
 
 afterEach(() => vi.unstubAllGlobals());
+
+it('shows the worker date and time across daylight saving and UTC date boundaries', () => {
+    expect(stamp('2026-09-27T01:00:00Z')).toBe('27 September 2026, 2:00 pm');
+    expect(stamp('2026-07-12T20:15:00Z')).toBe('13 July 2026, 8:15 am');
+    expect(stamp('2026-09-26T14:30:00Z')).toBe('27 September 2026, 3:30 am');
+    expect(stamp('invalid')).toBe('Not recorded');
+    expect(stamp(null)).toBe('Not recorded');
+});
 
 it('rejects a sign-in page returned in place of an exported report', async () => {
     vi.stubGlobal(

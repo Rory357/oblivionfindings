@@ -1,3 +1,5 @@
+import { formatDateTimeLong } from '@/lib/datetime';
+
 export const REGISTER = '/fleet-assets/asset-register';
 
 export class RegisterError extends Error {
@@ -108,9 +110,4 @@ export type Page<T> = {
     total: number;
 };
 export const stamp = (value?: string | null) =>
-    value
-        ? new Intl.DateTimeFormat('en-NZ', {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-          }).format(new Date(value))
-        : 'Not recorded';
+    formatDateTimeLong(value, 'Not recorded');

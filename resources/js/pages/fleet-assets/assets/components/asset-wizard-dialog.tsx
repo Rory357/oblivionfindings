@@ -689,6 +689,12 @@ export function AssetWizardDialog({
                         )}
                     </div>
                 )}
+                {stepKey === 'location' && isEdit && (
+                    <p className="mt-4 text-sm text-muted-foreground">
+                        Changing the site or client clears the assigned room if
+                        it belongs to a different site.
+                    </p>
+                )}
                 {stepKey === 'compliance' ? (
                     <StepCompliance data={data} set={set} errors={errors} />
                 ) : null}

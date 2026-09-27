@@ -819,6 +819,7 @@ class AssetController extends Controller
             'category' => ['nullable', 'string', 'max:120'],
             'asset_category_id' => ['nullable', 'integer', 'exists:asset_categories,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'site_room_id' => ['sometimes', 'nullable', 'integer'],
             'home_site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
             'asset_tag' => ['nullable', 'string', 'max:100'],
@@ -860,12 +861,19 @@ class AssetController extends Controller
             $data = $this->authorisePlacement($user, $data, true);
             $this->mutationIntegrity->assertOrdinaryStatusUpdate($locked, $data['status'] ?? null);
             $this->mutationIntegrity->assertPlacementChangeAllowed($locked, $data);
-            $before = $locked->only(['site_id', 'home_site_id', 'client_id', 'status']);
+            if (array_key_exists('site_room_id', $data)) {
+                if ($data['site_room_id'] !== null) {
+                    SiteRoom::where('site_id', $data['site_id'])->lockForUpdate()->findOrFail($data['site_room_id']);
+                }
+            } elseif ((int) $locked->site_id !== (int) $data['site_id']) {
+                $data['site_room_id'] = null;
+            }
+            $before = $locked->only(['site_id', 'site_room_id', 'home_site_id', 'client_id', 'status']);
             $locked->update($data);
             AuditLogger::logOrFail('assets.update', $locked, [
                 'asset_id' => $locked->id,
                 'before' => $before,
-                'after' => $locked->only(['site_id', 'home_site_id', 'client_id', 'status']),
+                'after' => $locked->only(['site_id', 'site_room_id', 'home_site_id', 'client_id', 'status']),
             ]);
 
             return $locked->fresh();
