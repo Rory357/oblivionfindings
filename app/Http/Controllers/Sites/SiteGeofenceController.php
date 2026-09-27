@@ -5,119 +5,44 @@ namespace App\Http\Controllers\Sites;
 use App\Http\Controllers\Controller;
 use App\Models\AssetGeofence;
 use App\Models\Site;
-use App\Rules\GeofenceShape;
-use App\Services\AuditLogger;
-use App\Services\Fleet\GeofenceStateCleanupService;
+use App\Services\Fleet\BoundaryService;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
-class SiteGeofenceController extends Controller
+/** Site entry point delegates to the canonical versioned commands; never selects the first area. */
+final class SiteGeofenceController extends Controller
 {
-    public function store(Request $request, Site $site)
+    public function __construct(private readonly BoundaryService $boundaries) {}
+
+    public function store(Request $r, Site $site)
     {
-        $data = $this->validatedData($request, $site);
+        $this->site($r, $site);
+        $b = $this->boundaries->save($r->user(), array_replace($r->all(), ['site_id' => $site->id]));
 
-        $geofence = AssetGeofence::query()
-            ->where('site_id', $site->id)
-            ->whereNull('asset_id')
-            ->first() ?? new AssetGeofence;
-
-        $geofence->fill($this->geofenceAttributes($data, $site));
-        $geofence->save();
-        $geofence->assignedAssets()->sync($data['asset_ids'] ?? []);
-
-        AuditLogger::log('site.geofence.save', $geofence, [
-            'site_id' => $site->id,
-            'geofence_id' => $geofence->id,
-        ]);
-
-        return back()->with('success', 'Site geofence saved.');
+        return back()->with('success', 'Shared boundary created. Monitoring remains inactive.');
     }
 
-    public function update(Request $request, Site $site, AssetGeofence $geofence)
+    public function update(Request $r, Site $site, AssetGeofence $geofence)
     {
-        $this->ensureSiteScopedGeofence($site, $geofence);
+        $this->site($r, $site);
+        abort_unless((int) $geofence->site_id === (int) $site->id && $geofence->asset_id === null, 404);
+        $this->boundaries->save($r->user(), array_replace($r->all(), ['site_id' => $site->id]), $geofence->id);
 
-        $data = $this->validatedData($request, $site);
-
-        $geofence->update($this->geofenceAttributes($data, $site));
-        $geofence->assignedAssets()->sync($data['asset_ids'] ?? []);
-
-        AuditLogger::log('site.geofence.save', $geofence, [
-            'site_id' => $site->id,
-            'geofence_id' => $geofence->id,
-        ]);
-
-        return back()->with('success', 'Site geofence saved.');
+        return back()->with('success', 'Shared boundary updated. Existing purpose settings retained.');
     }
 
-    public function destroy(Request $request, Site $site, AssetGeofence $geofence, GeofenceStateCleanupService $cleanup)
+    public function destroy(Request $r, Site $site, AssetGeofence $geofence)
     {
-        $this->ensureSiteScopedGeofence($site, $geofence);
+        $this->site($r, $site);
+        abort_unless((int) $geofence->site_id === (int) $site->id && $geofence->asset_id === null, 404);
+        $data = $r->validate(['expected_revision' => ['required', 'integer'], 'reason' => ['required', 'string']]);
+        $this->boundaries->retire($r->user(), $geofence->id, $data['expected_revision'], $data['reason']);
 
-        $cleanup->cleanup($geofence);
-
-        AuditLogger::log('site.geofence.delete', $geofence, [
-            'site_id' => $site->id,
-            'geofence_id' => $geofence->id,
-        ]);
-
-        $geofence->delete();
-
-        return back()->with('success', 'Site geofence deleted.');
+        return back()->with('success', 'Boundary retired. Geometry and evidence retained.');
     }
 
-    private function validatedData(Request $request, Site $site): array
+    private function site(Request $r, Site $site): void
     {
-        return $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'string', 'in:circle,polygon'],
-            'shape' => ['required', 'array', new GeofenceShape],
-            'breach_type' => ['required', 'string', 'in:enter,exit,both'],
-            'is_active' => ['boolean'],
-            'asset_ids' => ['array'],
-            'asset_ids.*' => [
-                'integer',
-                Rule::exists('assets', 'id')->where(fn ($query) => $query->where('site_id', $site->id)),
-            ],
-        ]);
-    }
-
-    private function geofenceAttributes(array $data, Site $site): array
-    {
-        return [
-            'asset_id' => null,
-            'site_id' => $site->id,
-            'name' => $data['name'],
-            'type' => $data['type'],
-            'scope' => $this->scopeForSite($site),
-            'shape' => $data['shape'],
-            'breach_type' => $data['breach_type'],
-            'alert_config' => null,
-            'time_rules' => null,
-            'is_active' => (bool) ($data['is_active'] ?? true),
-        ];
-    }
-
-    /**
-     * Derive a sensible default scope from the site's type. Residential
-     * houses get `house`; facilities get `asset`; everything else stays
-     * `site`. Operators can override later via the editor's scope field.
-     */
-    private function scopeForSite(Site $site): string
-    {
-        return match ($site->type) {
-            'house', 'residential' => 'house',
-            'facility' => 'asset',
-            default => 'site',
-        };
-    }
-
-    private function ensureSiteScopedGeofence(Site $site, AssetGeofence $geofence): void
-    {
-        abort_unless(
-            (int) $geofence->site_id === (int) $site->id && $geofence->asset_id === null,
-            404
-        );
+        $actor = $this->boundaries->actor($r->user(), true);
+        abort_unless($this->boundaries->access->accessibleSites($actor)->whereKey($site->id)->exists(), 404);
     }
 }

@@ -82,7 +82,7 @@ class VehicleCalendarController extends Controller
         $vehicles = $this->vehicles->accessibleVehiclesForFleet($viewer)
             ->with([
                 'homeSite:id,name,latitude,longitude', 'site:id,name,latitude,longitude',
-                'fleetState.lastEvent:id,occurred_at,received_at,external_power,event_type',
+                'fleetState.lastEvent:id,occurred_at,received_at,external_power,event_type,accuracy_m,consent_blocked',
                 'fleetState.lastTrip:id,is_personal,consent_blocked,started_at,ended_at',
             ])
             ->orderBy('name')->orderBy('id')->get();

@@ -696,7 +696,7 @@ export function VehicleLocationPanel({
                                                 item.monitoring === 'on'
                                             }
                                             onClick={() =>
-                                                setWizard({ initial: item })
+                                                item.workspace_href ? window.location.assign(item.workspace_href) : setWizard({ initial: item })
                                             }
                                         >
                                             Manage

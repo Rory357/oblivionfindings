@@ -11,16 +11,17 @@ use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplate;
-use App\Models\SiteHazard;
 use App\Models\SiteCoverageRequirement;
 use App\Models\SiteDocument;
 use App\Models\SiteDocumentFolder;
 use App\Models\SiteFacilityZone;
+use App\Models\SiteHazard;
 use App\Models\SiteHoResource;
 use App\Models\SiteHouseRoom;
 use App\Models\SiteStaffRequirement;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Fleet\BoundaryService;
 use App\Services\NotificationService;
 use App\Services\Sites\SiteContactService;
 use App\Services\Sites\SitePhysicalRoomService;
@@ -583,7 +584,7 @@ class SiteController extends Controller
             // Rostering + geofence fan-out (all reuse existing models).
             $this->persistCoverageRequirements($site, $coverage, $user);
             $this->persistStaffRequirements($site, $credentials, $user);
-            $this->persistSiteGeofence($site, $geofence);
+            $this->persistSiteGeofence($site, $geofence, $user);
 
             // Documents last so disk writes only happen once every DB op succeeds.
             $this->saveDocuments($site, $request, $user?->id);
@@ -706,7 +707,7 @@ class SiteController extends Controller
      *
      * @param  array<string, mixed>|null  $geofence
      */
-    private function persistSiteGeofence(Site $site, ?array $geofence): void
+    private function persistSiteGeofence(Site $site, ?array $geofence, ?User $actor): void
     {
         if (! $geofence) {
             return;
@@ -718,7 +719,7 @@ class SiteController extends Controller
             return;
         }
 
-        AssetGeofence::create([
+        $boundary = AssetGeofence::create([
             'asset_id' => null,
             'site_id' => $site->id,
             'name' => "{$site->name} Geofence",
@@ -737,6 +738,7 @@ class SiteController extends Controller
             'time_rules' => null,
             'is_active' => (bool) ($geofence['is_active'] ?? true),
         ]);
+        app(BoundaryService::class)->record($boundary->refresh(), $actor, 'Boundary created through the Site setup workflow.', 'created');
     }
 
     private function saveDocuments(Site $site, Request $request, ?int $userId): void
@@ -1335,7 +1337,7 @@ class SiteController extends Controller
             'checklistRuns as overdue_checklists_count' => fn ($q) => $q->overdue(),
             'checklistAssignments as checklist_assignments_count' => fn ($q) => $q->active(),
             'assets as open_maintenance_count' => fn ($q) => $this->openMaintenanceQuery($q),
-            'geofences as active_geofences_count' => fn ($q) => $q->where('is_active', true),
+            'geofences as configured_geofences_count' => fn ($q) => $q->whereNull('retired_at')->whereNotNull('shape'),
             'hoResources as ho_resources_count' => fn ($q) => $q->active(),
             'facilityZones as facility_zones_count' => fn ($q) => $q->active(),
             'serviceContexts as respite_service_contexts_count' => fn ($q) => $q

@@ -59,6 +59,7 @@ export type CatalogueBoundary = SharedBoundary & {
 };
 
 export type LinkedGeofence = {
+    workspace_href?: string | null;
     key: string;
     assignment_id: number | null;
     geofence_id: number | null;

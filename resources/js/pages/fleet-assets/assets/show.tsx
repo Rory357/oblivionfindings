@@ -658,6 +658,7 @@ type Props = {
         current_holder_name: string | null;
     } | null;
     can_view_hr_assets: boolean;
+    boundaries_href?: string | null;
     asset_finance_technology: AssetFinanceTechnologyProjection;
     /** Option lists for the edit wizard. */
     sites?: Array<{ id: number; name: string }>;
@@ -711,6 +712,7 @@ export default function AssetShow({
     timeline,
     hr_asset,
     can_view_hr_assets,
+    boundaries_href,
     asset_finance_technology,
     sites,
     clients,
@@ -1390,6 +1392,7 @@ export default function AssetShow({
 
                             <div className="space-y-4">
                                 {/* Location Map */}
+                                {boundaries_href && <Button asChild variant="outline"><Link href={boundaries_href}><MapPin/>Open in Maps & boundaries</Link></Button>}
                                 {trackerMarkers.length > 0 && (
                                     <Card>
                                         <CardHeader>

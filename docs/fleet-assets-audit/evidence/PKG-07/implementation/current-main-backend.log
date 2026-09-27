@@ -1,0 +1,34 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\806c\oblivionfindings\phpunit.xml
+
+......
+   PASS  Tests\Feature\FleetAssets\Pkg07BoundariesTest
+  ✓ versioned writes are scoped retry safe and keep original evidence                                            1.09s
+  ✓ scale search rule proposals and dependency checks share the canonical register                               0.60s
+  ✓ client handoff is opaque and rechecks consent and source versions                                            1.21s
+  ✓ protected geometry and public geocoding cannot be bypassed                                                   0.22s
+  ✓ submitted public address search returns coordinates caches results and requires management access            0.24s
+  ✓ schedule windows and rule retry retain only valid reviewed proposals                                         0.33s
+..
+   PASS  Tests\Feature\FleetAssets\Pkg07MapPrivacyTest
+  ✓ directory and history withhold private vehicle evidence even without a trip link                             0.91s
+  ✓ asset positions require observations from the current unambiguous pairing                                    0.58s
+......                                                    14 / 14 (100%)
+   PASS  Tests\Feature\Sites\SiteGeofenceTest
+  ✓ site boundary creation stays inactive and completes geometry readiness                                       0.90s
+  ✓ explicit site boundary edits preserve purpose settings and reject stale writes                               0.69s
+  ✓ site retirement retains evidence and blocks linked dependencies without fake crossings                       0.78s
+  ✓ assigned site geofence is evaluated for assigned fleet assets                                                0.53s
+  ✓ geofence containment treats invalid or incomplete shapes as outside                                          0.40s
+  ✓ site geofence routes require geofence management permission                                                  0.58s
+
+  Tests:    14 passed (193 assertions)
+  Duration: 9.37s
+
+
+
+Time: 00:09.087, Memory: 110.00 MB
+
+OK (14 tests, 193 assertions)

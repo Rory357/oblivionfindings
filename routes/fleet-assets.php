@@ -428,10 +428,28 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     // Geofences — read
     Route::middleware('permission:fleet.viewAny|assets.geofences.manage')->group(function () {
         Route::get('/geofences', [GeofenceController::class, 'index'])->name('fleet-assets.geofences.index');
+        Route::get('/geofences/catalogue', [GeofenceController::class, 'catalogue']);
+        Route::get('/geofences/summary', [GeofenceController::class, 'summary']);
+        Route::get('/geofences/sites', [GeofenceController::class, 'sites']);
+        Route::get('/geofences/resources', [GeofenceController::class, 'resources']);
+        Route::get('/geofences/rules', [GeofenceController::class, 'rules']);
+        Route::get('/geofences/events', [GeofenceController::class, 'events']);
+        Route::get('/geofences/handoffs/{token}', [GeofenceController::class, 'handoff']);
+        Route::post('/geofences/handoffs/{token}/return', [GeofenceController::class, 'returnBoundary']);
+        Route::get('/geofences/{geofence}', [GeofenceController::class, 'show'])->whereNumber('geofence');
+        Route::get('/geofences/{geofence}/history', [GeofenceController::class, 'history'])->whereNumber('geofence');
+        Route::get('/geofences/{geofence}/rule-history', [GeofenceController::class, 'ruleHistory'])->whereNumber('geofence');
+        Route::get('/geofences/{geofence}/versions/{revision}', [GeofenceController::class, 'version'])->whereNumber(['geofence', 'revision']);
     });
 
     // Geofences — write
     Route::middleware('permission:assets.geofences.manage|fleet.manage')->group(function () {
+        Route::post('/geofences/address-search', [GeofenceController::class, 'addresses'])->middleware('throttle:20,1');
+        Route::post('/geofences/{geofence}/legacy-links', [GeofenceController::class, 'legacyLinks'])->whereNumber('geofence');
+        Route::get('/geofences/{geofence}/history/export', [GeofenceController::class, 'export'])->whereNumber('geofence');
+        Route::post('/geofences/rules', [GeofenceController::class, 'storeRule']);
+        Route::put('/geofences/rules/{assignment}', [GeofenceController::class, 'updateRule'])->whereNumber('assignment');
+        Route::delete('/geofences/rules/{assignment}', [GeofenceController::class, 'removeRule'])->whereNumber('assignment');
         Route::get('/geofences/create', [GeofenceController::class, 'create'])->name('fleet-assets.geofences.create');
         Route::post('/geofences', [GeofenceController::class, 'store'])->name('fleet-assets.geofences.store');
         Route::get('/geofences/{geofence}/edit', [GeofenceController::class, 'edit'])->whereNumber('geofence')->name('fleet-assets.geofences.edit');

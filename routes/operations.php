@@ -37,12 +37,12 @@ use App\Http\Controllers\Operations\ClientFamilyChatController;
 use App\Http\Controllers\Operations\ClientFundController;
 use App\Http\Controllers\Operations\ClientLeaveExcursionController;
 use App\Http\Controllers\Operations\ClientLocationLocateController;
-use App\Http\Controllers\Operations\ClientTrackerModeController;
 use App\Http\Controllers\Operations\ClientLocationZoneDraftController;
 use App\Http\Controllers\Operations\ClientMealLogController;
 use App\Http\Controllers\Operations\ClientOnboardingWorkflowController;
 use App\Http\Controllers\Operations\ClientPathPlanController;
 use App\Http\Controllers\Operations\ClientRoutineController;
+use App\Http\Controllers\Operations\ClientTrackerModeController;
 use App\Http\Controllers\Operations\ClientTransportBookingController;
 use App\Http\Controllers\Operations\ConsentRequestController;
 use App\Http\Controllers\Operations\CustomFormController;
@@ -131,6 +131,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             });
         Route::get('/clients/{client}/location/zones', [ClientLocationZoneDraftController::class, 'index'])
             ->whereNumber('client')->name('operations.clients.location.zones.index');
+        Route::post('/clients/{client}/location/zones/boundary-handoff', [ClientLocationZoneDraftController::class, 'startBoundaryHandoff'])->whereNumber('client')->middleware('throttle:20,1');
+        Route::delete('/clients/{client}/location/zones/boundary-handoff/{token}', [ClientLocationZoneDraftController::class, 'cancelBoundaryHandoff'])->whereNumber('client');
+        Route::get('/clients/{client}/location/zones/boundaries', [ClientLocationZoneDraftController::class, 'boundaries'])->whereNumber('client');
+        Route::get('/clients/{client}/location/zones/boundary-handoff/{token}', [ClientLocationZoneDraftController::class, 'takeBoundaryHandoff'])->whereNumber('client');
         Route::post('/clients/{client}/location/zones/address-search', [ClientLocationZoneDraftController::class, 'searchAddress'])
             ->whereNumber('client')->middleware('throttle:20,1')->name('operations.clients.location.zones.address-search');
         Route::post('/clients/{client}/location/zones', [ClientLocationZoneDraftController::class, 'store'])
