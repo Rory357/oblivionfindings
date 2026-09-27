@@ -1,0 +1,386 @@
+.pl-map .leaflet-tile-pane {
+    filter: grayscale(1);
+}
+.pl-map-mark {
+    display: flex;
+    width: 38px;
+    height: 38px;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border: 2px solid var(--background);
+    border-radius: 50%;
+    font-weight: 650;
+    box-shadow: 0 2px 6px #0003;
+}
+.pl-map-stale {
+    border: 3px dashed var(--status-warning);
+    background: var(--background);
+    color: var(--foreground);
+}
+.pl-map-selected {
+    outline: 3px solid var(--primary);
+    outline-offset: 3px;
+}
+.pl-map-chooser {
+    display: grid;
+    gap: 6px;
+    max-height: 280px;
+    overflow: auto;
+}
+.pl-map-chooser button {
+    padding: 8px;
+    text-align: left;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.pl-map-chooser button:focus-visible {
+    outline: 2px solid var(--primary);
+}
+.pl-neutral-card > div:first-child {
+    background: var(--border);
+}
+
+/* Approved OPS-PL01 v5 chart anatomy, scoped to this workspace. */
+.pl-ins-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.pl-ins-chart-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 20px;
+}
+.pl-ins-top-charts {
+    grid-template-columns: minmax(300px, 0.85fr) minmax(0, 1.25fr);
+}
+.pl-ins-history-grid {
+    grid-template-columns: minmax(0, 1.4fr) minmax(290px, 0.8fr);
+}
+.pl-ins-chart-panel {
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+    min-width: 0;
+    border-radius: 14px;
+}
+.pl-ins-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 20px 20px 12px;
+}
+.pl-ins-panel-head p {
+    margin-top: 4px;
+}
+.pl-ins-panel-body {
+    padding: 8px 20px 20px;
+    flex: 1;
+    min-width: 0;
+}
+.pl-ins-panel-foot {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted-foreground);
+    font-size: 12px;
+    line-height: 1.5;
+    background: color-mix(in srgb, var(--muted) 35%, var(--card));
+}
+.pl-ins-chart {
+    width: 100%;
+    min-width: 0;
+}
+.pl-ins-donut {
+    position: relative;
+    height: 210px;
+}
+.pl-ins-donut-value {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+.pl-ins-donut-value b {
+    font-size: 28px;
+    letter-spacing: -1px;
+    line-height: 1.2;
+}
+.pl-ins-donut-value span {
+    font-size: 11px;
+    color: var(--muted-foreground);
+    margin-top: 3px;
+}
+.pl-ins-legend-button {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-height: 38px;
+    padding: 7px 8px;
+    text-align: left;
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--foreground);
+}
+.pl-ins-legend-button:hover {
+    background: var(--muted);
+}
+.pl-ins-legend-button:focus-visible,
+.pl-ins-priority-strip button:focus-visible,
+.pl-ins-back-analysis:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+}
+.pl-ins-legend-button strong {
+    font-variant-numeric: tabular-nums;
+}
+.pl-ins-legend-button small {
+    color: var(--muted-foreground);
+    min-width: 32px;
+    text-align: right;
+}
+.pl-ins-swatch,
+.pl-ins-legend-inline i {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.pl-ins-legend-inline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+.pl-ins-legend-inline span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.pl-ins-small-legend {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 12px;
+}
+.pl-ins-site-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.pl-ins-analytics-intro {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.pl-ins-analytics-intro b {
+    font-size: 14px;
+}
+.pl-ins-analytics-intro p {
+    margin-top: 4px;
+}
+.pl-ins-priority-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--card);
+}
+.pl-ins-priority-strip button {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+    padding: 18px 20px;
+    min-height: 90px;
+    color: var(--foreground);
+    transition: background 0.15s;
+}
+.pl-ins-priority-strip button + button {
+    border-left: 1px solid var(--border);
+}
+.pl-ins-priority-strip button:hover:enabled {
+    background: var(--muted);
+}
+.pl-ins-priority-strip button:disabled {
+    cursor: default;
+}
+.pl-ins-priority-strip button > svg:first-child {
+    color: var(--primary);
+    flex-shrink: 0;
+}
+.pl-ins-priority-strip b {
+    display: block;
+    font-size: 13px;
+}
+.pl-ins-priority-strip small {
+    display: block;
+    color: var(--muted-foreground);
+    font-size: 11px;
+    line-height: 1.5;
+    margin-top: 4px;
+}
+.pl-ins-priority-strip span {
+    flex: 1;
+}
+.pl-ins-active-filter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 10px;
+    font-size: 12px;
+}
+.pl-ins-breakdown > summary {
+    color: var(--primary);
+    padding: 12px 0;
+    font-weight: 600;
+}
+.pl-ins-breakdown[open] > summary {
+    margin-bottom: 8px;
+}
+.pl-ins-foot-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.pl-ins-foot-actions > span {
+    margin-right: auto;
+}
+.pl-ins-gap-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--muted);
+    color: var(--muted-foreground);
+}
+.pl-ins-mobile-cards {
+    display: none;
+}
+.pl-ins-response-unavailable > div:first-child {
+    background: var(--border);
+}
+.pl-ins-back-analysis {
+    margin-bottom: 16px;
+    color: var(--primary);
+    font-size: 12px;
+    min-height: 36px;
+    padding: 0 8px;
+    border-radius: 6px;
+}
+.pl-ins-search-clear {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    min-width: 24px;
+    color: inherit;
+}
+.pl-ins-filter-label {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 11px;
+    color: var(--primary-foreground);
+}
+@media (max-width: 1200px) {
+    .pl-ins-priority-strip button {
+        padding: 14px 12px;
+    }
+    .pl-ins-top-charts {
+        grid-template-columns: minmax(280px, 1fr) minmax(0, 1.1fr);
+    }
+    .pl-ins-history-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+}
+@media (max-width: 767px) {
+    .pl-ins-chart-grid,
+    .pl-ins-top-charts,
+    .pl-ins-history-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .pl-ins-priority-strip {
+        grid-template-columns: 1fr;
+    }
+    .pl-ins-priority-strip button + button {
+        border-left: 0;
+        border-top: 1px solid var(--border);
+    }
+    .pl-ins-desktop-table {
+        display: none;
+    }
+    .pl-ins-mobile-cards {
+        display: block;
+    }
+    .pl-ins-analytics-intro {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .pl-ins-active-filter {
+        flex-wrap: wrap;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .pl-ins-priority-strip button {
+        transition: none;
+    }
+}
+
+.pl-refresh-summary {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+}
+.pl-refresh-summary p {
+    margin-top: 3px;
+}
+.pl-history-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 16px;
+}
+.pl-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+.pl-ins-breakdown > summary {
+    cursor: pointer;
+}
+.pl-ins-breakdown > summary:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+}
+
+.pl-ins-legend-button {
+    height: auto;
+    justify-content: flex-start;
+    white-space: normal;
+}
+.pl-ins-priority-strip button {
+    height: auto;
+    white-space: normal;
+}

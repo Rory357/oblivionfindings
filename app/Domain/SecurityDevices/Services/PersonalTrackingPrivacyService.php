@@ -85,6 +85,27 @@ class PersonalTrackingPrivacyService
             ->values();
     }
 
+    /** Batch read using the same assignment and consent decisions as single-record access. */
+    public function authorisedClientAssignmentsForClients(array $clientIds): Collection
+    {
+        $clients = Client::query()->whereIn('id', $clientIds)->where('status', 'active')
+            ->whereHas('site', fn ($q) => $q->where('is_active', true)->where('archived', false)->whereNull('archived_at'))
+            ->get(['id', 'site_id'])->keyBy('id');
+        $assignments = DeviceAssignment::query()->current()->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+            ->whereIn('assignable_id', $clients->keys())->with('device')->orderBy('device_id')->orderBy('id')->get();
+        $consents = ConsentValidationService::currentResidentLocationConsents($assignments->pluck('consent_id')->unique()->all());
+
+        return $assignments->filter(function (DeviceAssignment $assignment) use ($clients, $consents): bool {
+            $client = $clients->get($assignment->assignable_id);
+            $consent = $consents->get($assignment->consent_id);
+            $assignment->setRelation('consent', $consent);
+
+            return $this->evaluateClientAssignment($assignment, (int) $assignment->assignable_id, $client,
+                $consent, $assignment->device, $client && (int) $client->site_id === (int) $assignment->custody_site_id,
+                fn () => $consent !== null);
+        })->values();
+    }
+
     public function activeConsentForClientAssignment(Client $client): ?ClientConsent
     {
         return $this->authorisedClientAssignment($client)?->consent;

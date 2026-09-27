@@ -255,6 +255,9 @@ export default function LocationWorkspace({
                     </Button>
                 </nav>
                 <div className="location-actions">
+                    <Button asChild variant="outline">
+                        <Link href={`/operations/people-locations/history?selected=c${clientId}`}>Day &amp; outing reports</Link>
+                    </Button>
                     {location.canExport && location.exportUrl && (
                         <Button
                             variant="outline"

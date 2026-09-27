@@ -5,6 +5,7 @@ namespace App\Services\Integration;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Models\FleetTelemetryEvent;
 use App\Models\Integration\IntegrationEvent;
+use App\Support\SchemaCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -32,6 +33,19 @@ class IntegrationEventHistoryService
             $includeEventType,
             $retentionDays,
         )->map(fn (array $location): array => collect($location)->except('device_id')->all());
+    }
+
+    /** Includes an explicit scan-limit signal, even when invalid source events were discarded. */
+    public function forDeviceWindow(Device $device, array $filters, int $retentionDays): array
+    {
+        $devices = collect([$device])->keyBy('id');
+        $cutoff = now()->subDays(max(1, $retentionDays));
+        $limited = false;
+        $locations = $this->integrationEventLocationsForDevices($devices, $filters, true, $cutoff, 501, $limited)
+            ->merge($this->fleetTelemetryLocationsForDevices($devices, $filters, true, $cutoff, 501, $limited))
+            ->sortByDesc('timestamp');
+
+        return ['positions' => $locations->take(500)->values(), 'truncated' => $limited || $locations->count() > 500];
     }
 
     /**
@@ -92,8 +106,9 @@ class IntegrationEventHistoryService
         bool $includeEventType,
         \DateTimeInterface $retentionCutoff,
         int $candidateLimit,
+        ?bool &$limited = null,
     ): Collection {
-        if (! Schema::hasTable('integration_events')) {
+        if (! SchemaCache::hasTable('integration_events')) {
             return collect();
         }
 
@@ -132,6 +147,10 @@ class IntegrationEventHistoryService
             $query->where('occurred_at', '>=', $filters['date_from']);
         }
 
+        if (! empty($filters['before'])) {
+            $query->where('occurred_at', '<', $filters['before']);
+        }
+
         if (! empty($filters['date_to'])) {
             $query->where('occurred_at', '<=', $this->dateToBoundary($filters['date_to']));
         }
@@ -145,11 +164,10 @@ class IntegrationEventHistoryService
             }
         }
 
-        return $query->orderByDesc('occurred_at')
-            ->orderByDesc('id')
-            ->limit($candidateLimit)
-            ->get()
-            ->toBase()
+        $events = $query->orderByDesc('occurred_at')->orderByDesc('id')->limit($candidateLimit)->get();
+        $limited = $limited || $events->count() >= $candidateLimit;
+
+        return $events->take(500)->toBase()
             ->map(function (IntegrationEvent $event) use ($devices, $legacyHardwareMap, $hasCanonicalColumn, $includeEventType): ?array {
                 $deviceId = $hasCanonicalColumn && $event->canonical_device_id !== null
                     ? (int) $event->canonical_device_id
@@ -173,8 +191,9 @@ class IntegrationEventHistoryService
         bool $includeEventType,
         \DateTimeInterface $retentionCutoff,
         int $candidateLimit,
+        ?bool &$limited = null,
     ): Collection {
-        if (! Schema::hasTable('fleet_telemetry_events')) {
+        if (! SchemaCache::hasTable('fleet_telemetry_events')) {
             return collect();
         }
 
@@ -200,6 +219,10 @@ class IntegrationEventHistoryService
             $query->where('occurred_at', '>=', $filters['date_from']);
         }
 
+        if (! empty($filters['before'])) {
+            $query->where('occurred_at', '<', $filters['before']);
+        }
+
         if (! empty($filters['date_to'])) {
             $query->where('occurred_at', '<=', $this->dateToBoundary($filters['date_to']));
         }
@@ -213,11 +236,10 @@ class IntegrationEventHistoryService
             }
         }
 
-        return $query->orderByDesc('occurred_at')
-            ->orderByDesc('id')
-            ->limit($candidateLimit)
-            ->get()
-            ->toBase()
+        $events = $query->orderByDesc('occurred_at')->orderByDesc('id')->limit($candidateLimit)->get();
+        $limited = $limited || $events->count() >= $candidateLimit;
+
+        return $events->take(500)->toBase()
             ->map(function (FleetTelemetryEvent $event) use ($devices, $legacyTrackerMap, $includeEventType): ?array {
                 $deviceId = $event->device_id !== null
                     ? (int) $event->device_id
@@ -278,6 +300,7 @@ class IntegrationEventHistoryService
                 ?? $event->created_at,
             'speed' => $payload['speed'] ?? $payload['speed_kph'] ?? null,
             'battery' => $payload['battery'] ?? $payload['battery_level'] ?? $payload['battery_pct'] ?? null,
+            'accuracy' => $payload['accuracy_m'] ?? $payload['accuracy'] ?? data_get($payload, 'location.accuracy'),
         ];
 
         if ($includeEventType) {
@@ -302,6 +325,7 @@ class IntegrationEventHistoryService
                 ?? $event->created_at,
             'speed' => $event->speed_kph !== null ? (float) $event->speed_kph : null,
             'battery' => $event->battery_pct,
+            'accuracy' => $event->accuracy_m,
         ];
 
         if ($includeEventType) {

@@ -1,0 +1,16 @@
+vite v7.3.6 building client environment for production...
+[plugin @laravel/vite-plugin-wayfinder] Types generated for actions, routes, form variants
+transforming...
+✓ 5382 modules transformed.
+public/build/assets/index-CPOo0-Ki.js                                  317.39 kB │ gzip:  88.18 kB
+public/build/assets/show-Dw5DDCvx.js                                   328.56 kB │ gzip:  98.18 kB
+public/build/assets/show-CD63LPB2.js                                   348.52 kB │ gzip:  98.24 kB
+public/build/assets/vendor-charts-L2lNoQ8P.js                          401.58 kB │ gzip: 116.07 kB
+public/build/assets/app-BJOOmhvi.js                                    514.92 kB │ gzip:  83.25 kB
+public/build/assets/show-sEV_D5JC.js                                   772.69 kB │ gzip: 248.10 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5m 20s

@@ -27,7 +27,7 @@ final class RecoverableTaskAuthorizationException extends RuntimeException
         $validatedReturnTo = self::validatedReturnTo($returnTo);
         if ($validatedReturnTo === null || $validatedReturnTo !== $returnTo) {
             throw new InvalidArgumentException(
-                'Recoverable task authorization requires a validated internal /tasks return URL.',
+                'Recoverable authorization requires a validated internal workspace return URL.',
             );
         }
 
@@ -43,8 +43,10 @@ final class RecoverableTaskAuthorizationException extends RuntimeException
         }
 
         $parts = parse_url($returnTo);
+        $path = is_array($parts) ? ($parts['path'] ?? '') : '';
+        $peopleLocations = preg_match('#^/operations/people-locations(?:/(?:map|people|analytics|alerts|history|settings))?$#D', $path) === 1;
         if (! is_array($parts)
-            || ($parts['path'] ?? null) !== '/tasks'
+            || ($path !== '/tasks' && ! $peopleLocations)
             || isset($parts['scheme'])
             || isset($parts['host'])
             || isset($parts['user'])
@@ -55,9 +57,10 @@ final class RecoverableTaskAuthorizationException extends RuntimeException
 
         parse_str((string) ($parts['query'] ?? ''), $query);
         $validated = [];
+        $keys = $peopleLocations ? ['q', 'population', 'site', 'selected', 'source', 'date', 'cohort', 'sort', 'peopleView', 'chartView', 'alertStatus'] : self::ALLOWED_QUERY_KEYS;
 
         foreach ($query as $key => $value) {
-            if (! in_array($key, self::ALLOWED_QUERY_KEYS, true)) {
+            if (! in_array($key, $keys, true)) {
                 continue;
             }
 
@@ -79,6 +82,6 @@ final class RecoverableTaskAuthorizationException extends RuntimeException
 
         $queryString = http_build_query($validated, '', '&', PHP_QUERY_RFC3986);
 
-        return '/tasks'.($queryString !== '' ? '?'.$queryString : '');
+        return $path.($queryString !== '' ? '?'.$queryString : '');
     }
 }

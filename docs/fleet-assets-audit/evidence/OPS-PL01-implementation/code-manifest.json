@@ -1,0 +1,212 @@
+{
+  "base": "926b4981b0289da08a20baca0995117fb53e413e",
+  "branch": "codex/ops-pl01-implementation",
+  "digest": "8fd11b434ae835f8aa7c21f490460d560fc43f749faa745d79a1097c935cd977",
+  "files": [
+    {
+      "path": "app/Domain/SecurityDevices/Services/PersonalTrackingPrivacyService.php",
+      "sha256": "6c8e70ba78e977db9af2a2cadd3c5162254658e9653c45957080f42436fbf019",
+      "bytes": 20115
+    },
+    {
+      "path": "app/Exceptions/RecoverableTaskAuthorizationException.php",
+      "sha256": "5ed1c0de29b22ec4fd98883dd7cf3931d8cd69c2d15e47a06e717b3a82cae34a",
+      "bytes": 2635
+    },
+    {
+      "path": "app/Http/Controllers/HealthSafety/LoneWorkerController.php",
+      "sha256": "2e209b526a7d0ffcc38dc903477185b813375007be464920c07955feb632884a",
+      "bytes": 78718
+    },
+    {
+      "path": "app/Http/Controllers/Operations/PeopleLocationController.php",
+      "sha256": "1872ececf74ef7672a194eb6173754780246e75dcf7bc5d9bb4bed0f63c86177",
+      "bytes": 8316
+    },
+    {
+      "path": "app/Services/Clients/ClientProfileSectionAccess.php",
+      "sha256": "94e629d4ce5d1c8bd49bcc6b50236d21ad6c87152e28a2104eefdd140feb754c",
+      "bytes": 8012
+    },
+    {
+      "path": "app/Services/ConsentValidationService.php",
+      "sha256": "44e144ca4bbc1d2df7f3ac10b1e39cd0617d6c24bafb5c967eb79ff5c69bb637",
+      "bytes": 24917
+    },
+    {
+      "path": "app/Services/HealthSafety/LoneWorkerSessionAccessService.php",
+      "sha256": "902c6de8b786db4527dcd9668b2e1eeeb001a68f1c866faac81c42cc77321bbc",
+      "bytes": 4206
+    },
+    {
+      "path": "app/Services/Integration/IntegrationEventHistoryService.php",
+      "sha256": "816730fd8572400a89377c6ec10c947ad9fce44d83ea09dbf2e4e1fe590d60d7",
+      "bytes": 15310
+    },
+    {
+      "path": "app/Services/Tracking/PeopleLocationPreferences.php",
+      "sha256": "c203372292ab0c9c9303bb607b37a999c29008c997cb1581387a57950bfaeb88",
+      "bytes": 3044
+    },
+    {
+      "path": "app/Services/Tracking/PeopleLocationService.php",
+      "sha256": "af91e5a629e54b5d92a7160dd39402661da92161d29a7441477a8a21f8ff8c38",
+      "bytes": 25263
+    },
+    {
+      "path": "database/migrations/2026_09_27_230000_add_people_location_export_permission.php",
+      "sha256": "076042cce4645b47fe44712f26b810ce4301e59ed4521b967155d4f19ca0e266",
+      "bytes": 881
+    },
+    {
+      "path": "database/migrations/2026_09_28_010000_add_people_location_history_permission.php",
+      "sha256": "669a434f18db3b059ae1bbccc3f29bc2ca8db78236b6605525dd5c7a18967ec0",
+      "bytes": 890
+    },
+    {
+      "path": "database/migrations/2026_09_28_010100_create_people_location_preferences.php",
+      "sha256": "a34308032f69883b0f3a1547bf23fe90abfce32cf1300bc10d399c244f419e60",
+      "bytes": 644
+    },
+    {
+      "path": "resources/js/components/app-sidebar.tsx",
+      "sha256": "a815689b10e8159e0eda33203b3cde59dafbcc046c995f8776d9395991162c0b",
+      "bytes": 118442
+    },
+    {
+      "path": "resources/js/components/client-location/location-workspace.tsx",
+      "sha256": "74b966c7ac19c67b9a1592fd7bc3f822642e17bcd7a8dbc910d2850756c7b2b4",
+      "bytes": 43680
+    },
+    {
+      "path": "resources/js/components/people-locations/analytics.tsx",
+      "sha256": "03dce0ba8141717538c42256ee450061c104c84a3d5153bf39601418f7142c6e",
+      "bytes": 74776
+    },
+    {
+      "path": "resources/js/components/people-locations/device-evidence.tsx",
+      "sha256": "2f38a8fed78e0b108d637da9323c03f3135b0ed49d32274c10be3d190c672882",
+      "bytes": 4451
+    },
+    {
+      "path": "resources/js/components/people-locations/history-panel.tsx",
+      "sha256": "26b1890708f149033a9f801a79ac051902b94dd2e547c2de957f6264edb60430",
+      "bytes": 17624
+    },
+    {
+      "path": "resources/js/components/people-locations/model.test.ts",
+      "sha256": "1d4f6b9c1ffcad872e24d777a59d4f2a60aec35cdf256cbd2bc07b5831251291",
+      "bytes": 6562
+    },
+    {
+      "path": "resources/js/components/people-locations/model.ts",
+      "sha256": "a1bf8bdf68b77b0bd8c2eba27857deb621bf717e63e93c2d2b13ed4c1cf35f12",
+      "bytes": 11058
+    },
+    {
+      "path": "resources/js/components/people-locations/people-map.tsx",
+      "sha256": "1dea0507dcbf0dc61eb7da198bc4d554b8f1b62b76003c6dd13bc10a78dffdd2",
+      "bytes": 14803
+    },
+    {
+      "path": "resources/js/components/people-locations/people-view.tsx",
+      "sha256": "87c3974a52cf8b068609cc368578b63699f684f30ed01d0dd1578a4053aa38af",
+      "bytes": 11063
+    },
+    {
+      "path": "resources/js/components/people-locations/preferences.tsx",
+      "sha256": "0829f4bd032821d055b7a8a51de7db432cefe5184af5251e361419fe7429a8dc",
+      "bytes": 14435
+    },
+    {
+      "path": "resources/js/components/people-locations/record-picker.tsx",
+      "sha256": "8c04538e46c5ba957ae93e374cbf91ea9c74524a4e94f9a478cfc9eff8aa60c6",
+      "bytes": 3396
+    },
+    {
+      "path": "resources/js/components/people-locations/report-dialog.test.tsx",
+      "sha256": "6e43b158073e35377e2e1763cf865ed54b03a9aff15e5e8f851b405432736a13",
+      "bytes": 5091
+    },
+    {
+      "path": "resources/js/components/people-locations/report-dialog.tsx",
+      "sha256": "516ea5e32a8593a1d722197cdd1fe6162009eb38920adf696b4f538c981387d0",
+      "bytes": 15280
+    },
+    {
+      "path": "resources/js/components/people-locations/request.ts",
+      "sha256": "44660595c0375b3862f7e3647c4f74d0b9f0807b7fb94ca43e019cb7ca5d9313",
+      "bytes": 1267
+    },
+    {
+      "path": "resources/js/components/people-locations/responses.tsx",
+      "sha256": "49d65a6351cfecbed71dac8d953e2aa3a8f92868905072022ed6fecb5f517cf3",
+      "bytes": 6975
+    },
+    {
+      "path": "resources/js/components/people-locations/workspace.css",
+      "sha256": "7b9eeff645fceee8bee75d8af5492f67e0547b4baae558ec44cee65ba91159f3",
+      "bytes": 8230
+    },
+    {
+      "path": "resources/js/components/user-menu-content.tsx",
+      "sha256": "6e3bb5606974dbdbd56a35824b267bae86b7aadcd59f2fcb7ee3e5b1dcc3d049",
+      "bytes": 2509
+    },
+    {
+      "path": "resources/js/pages/control-room/show.tsx",
+      "sha256": "3ae782e26c327f78699c132e6746889a622eda29a2df4ef43c02f0f739f95f93",
+      "bytes": 2933
+    },
+    {
+      "path": "resources/js/pages/operations/people-locations/index.test.tsx",
+      "sha256": "de9094cc70c6144a88bdb67e79a242f65db81a301fa42ed356c1bfb22221bd8f",
+      "bytes": 4344
+    },
+    {
+      "path": "resources/js/pages/operations/people-locations/index.tsx",
+      "sha256": "a53cc8653f0d145d0b0da5be3d68d4eefa5e5f621ea8d45e7ade1c9ca6c4b95a",
+      "bytes": 56294
+    },
+    {
+      "path": "resources/views/pdf/people-location-report.blade.php",
+      "sha256": "fc9232e7cc9293c5a86dfe59d06f547b5cd252dcf3b76f9d0ff01647d69385f6",
+      "bytes": 3717
+    },
+    {
+      "path": "resources/views/pdf/report-styles.blade.php",
+      "sha256": "48ad479b283693b6820422cee1434a8b690f8fd4c843f1d04f6d0e261fcebaf1",
+      "bytes": 3231
+    },
+    {
+      "path": "resources/views/pdf/vehicle-trip-report.blade.php",
+      "sha256": "5c1fe8a21cc86c04764c47c875627318e48746d1c95d2a416c70a21d69d8e143",
+      "bytes": 7423
+    },
+    {
+      "path": "routes/people-locations.php",
+      "sha256": "d65c47c0c5cecd55a00f5bce96f0315bd17c4c52d10075f7519e2d35c2fcb313",
+      "bytes": 744
+    },
+    {
+      "path": "routes/web.php",
+      "sha256": "239876d5e669e50fa4a63c3d2533b4c41b9b64c5a5f245329623fd5c506d822a",
+      "bytes": 44630
+    },
+    {
+      "path": "tests/Feature/Operations/PeopleLocationsTest.php",
+      "sha256": "158a12215b8479fb74709aef0ec00a21ee01841b06b169e7cca2254a6d246516",
+      "bytes": 20706
+    },
+    {
+      "path": "tests/Feature/SecurityDevices/CanonicalIntegrationEventHistoryTest.php",
+      "sha256": "8284a2e19b3f91ef825fae2e33741b5988acb6eee61f59b201df84b13727f4bf",
+      "bytes": 9084
+    },
+    {
+      "path": "tests/Unit/PeopleLocationsReturnUrlTest.php",
+      "sha256": "29e22a39306792716c443d1f2d76937b3e0397d6b798487d78d79f1a6d8e5c2d",
+      "bytes": 1079
+    }
+  ]
+}
