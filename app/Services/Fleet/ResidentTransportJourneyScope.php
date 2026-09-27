@@ -162,7 +162,10 @@ class ResidentTransportJourneyScope
                             $booking->qualifyColumn('asset_id'),
                             "{$transportTable}.asset_id",
                         )
-                        ->whereColumn($booking->qualifyColumn('user_id'), $driverColumn)
+                        ->where(function (Builder $assigned) use ($driverColumn): void {
+                            $assigned->whereColumn('driver_user_id', $driverColumn)
+                                ->orWhere(fn (Builder $legacy) => $legacy->whereNull('driver_user_id')->whereColumn('user_id', $driverColumn));
+                        })
                         ->where(function (Builder $pickup) use ($siteColumn): void {
                             $pickup->whereNull($pickup->qualifyColumn('pickup_site_id'))
                                 ->orWhereColumn($pickup->qualifyColumn('pickup_site_id'), $siteColumn);

@@ -634,6 +634,7 @@ export function VehicleCalendar({
                     ? `Booking ${row.reference ?? `#${row.id}`}`
                     : 'Unavailable period',
             rows: custodyRows(row),
+            action: row.kind === 'booking' && row.transport_request ? { label: 'Open passenger transport', onClick: () => window.location.assign(row.transport_request!.href) } : undefined,
         });
 
     const openEntry = async (entry: Entry) => {
@@ -865,6 +866,10 @@ export function VehicleCalendar({
                 custodyRecord(intent.row);
                 return;
             case 'edit-booking':
+                if (intent.row.transport_request) {
+                    window.location.assign(intent.row.transport_request.planner_href);
+                    return;
+                }
                 setDialog({
                     kind: 'booking',
                     mode: { kind: 'change', row: intent.row },

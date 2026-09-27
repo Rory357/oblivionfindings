@@ -1,0 +1,92 @@
+Synthetic design preview · No operational or clinical record changed
+Page 1
+OBLIVION FINDINGS / TRANSPORT
+Morgan Smith · return record
+DESIGN PREVIEW · Synthetic records · Pacific/Auckland
+TR-1045
+BK-212
+J-1105
+Aurora House
+Status: Return complete
+1 matching record. This export reflects the selected preview scope.
+Transport summary
+Detail
+Recorded value
+Route
+Aurora House → Harbour community centre
+Planned
+28 Sep 2026 11:00 AM – 11:20 AM
+Actual departure
+28 Sep 2026 11:00 AM
+Actual return
+28 Sep 2026 11:20 AM
+Vehicle / driver
+Rimu · Toyota Corolla / Nia Patel
+Passenger return
+Not confirmed
+Medication handoff
+No unresolved source obligation shown
+Vehicle return observations
+Receipt / time
+Actual parties
+Observations
+RC-1107
+28 Sep 2026 11:20 AM
+Nia Patel → Ben Carter
+48248 km; ¾ fuel / charge; keys
+received; equipment received.
+Returned in good condition.
+Keys and site arrangement
+KEY-031 · current vehicle custody: Aurora House · Office key safe · bay A2
+Collect: Aurora House · Office key safe · bay A2. Return to: Aurora House · Office key safe · bay A2
+Responsible driver: Nia Patel. Receiving worker: Ben Carter. Driver collects and returns
+No additional arrangement recorded.
+Current key custody can be newer than this historical journey. A receipt alone does not confirm key-safe placement.
+
+Synthetic design preview · No operational or clinical record changed
+Page 2
+History
+Time / source
+Actor / event
+Detail
+27 Sep 2026 03:00 PM
+TR-1045
+Ava Thompson
+Transport requested
+Time, pickup and authorised transport
+needs recorded.
+28 Sep 2026 08:05 AM
+BK-212
+Mia Chen
+Booking confirmed
+Approval not required: authority
+recorded with the source booking.
+28 Sep 2026 11:00 AM
+CHK-1101
+Nia Patel
+Vehicle check submitted
+Assigned checklist passed.
+28 Sep 2026 11:00 AM
+BK-212
+Nia Patel
+Vehicle checked out
+Keys and equipment: Ben Carter → Nia
+Patel; 48210 km.
+28 Sep 2026 11:00 AM
+J-1105
+Nia Patel
+Journey departed
+Morgan Smith; actual driver Nia Patel.
+28 Sep 2026 11:20 AM
+RC-1107
+Nia Patel
+Return receipt recorded
+RC-1107; 48248 km; keys received;
+equipment received.
+28 Sep 2026 11:20 AM
+KEY-1110
+Ben Carter
+Key storage confirmed
+Aurora House · Office key safe · bay
+A2. Placed into Office key safe bay A2
+after receiving from Nia.

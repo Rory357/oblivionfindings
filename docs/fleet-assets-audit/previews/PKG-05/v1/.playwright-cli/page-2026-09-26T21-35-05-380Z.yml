@@ -1,0 +1,148 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - strong [ref=e4]: DESIGN PREVIEW · PKG-05 v3
+    - generic [ref=e5]: Synthetic records · changes stay in this browser until reload
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - text: View as
+        - combobox "Preview role" [ref=e8]:
+          - option "Ava Thompson · Requester"
+          - option "Mia Chen · Transport allocator" [selected]
+          - option "Rory Williams · Booking approver"
+          - option "Nia Patel · Assigned driver"
+          - option "Sara Wilson · Assigned escort"
+          - option "Ben Carter · Receiving worker"
+      - button "Preview scenarios" [ref=e9] [cursor=pointer]
+  - generic [ref=e10]:
+    - generic [ref=e11]:
+      - text: oblivion
+      - generic [ref=e13]: findings
+    - generic [ref=e14]: Fleet & Assets
+    - generic [ref=e15]:
+      - generic [ref=e19]: Mia Chen
+      - generic [ref=e20]: MC
+  - generic [ref=e21]:
+    - complementary [ref=e22]:
+      - button "My Day" [ref=e23] [cursor=pointer]
+      - button "Sites" [ref=e28] [cursor=pointer]
+      - button "Clients" [ref=e34] [cursor=pointer]
+      - generic [ref=e42]: Fleet & Assets
+      - button "Overview" [ref=e43] [cursor=pointer]
+      - button "Fleet" [ref=e50] [cursor=pointer]
+      - button "Transport" [ref=e56] [cursor=pointer]
+      - button "Assets" [ref=e62] [cursor=pointer]
+      - button "Maintenance" [ref=e67] [cursor=pointer]
+      - button "Maps & boundaries" [ref=e71] [cursor=pointer]
+      - button "Reports" [ref=e76] [cursor=pointer]
+      - button "Settings" [ref=e81] [cursor=pointer]
+    - main [ref=e86]:
+      - generic [ref=e87]:
+        - button "Fleet & Assets" [ref=e88] [cursor=pointer]
+        - generic [ref=e89]: /
+        - button "Transport" [ref=e90] [cursor=pointer]
+        - generic [ref=e91]: /
+        - button "Overview" [ref=e92] [cursor=pointer]
+        - generic [ref=e93]: /
+        - generic [ref=e94]: J-609
+      - generic [ref=e95]:
+        - generic "Page summary and actions" [ref=e96]:
+          - generic [ref=e99]:
+            - generic [ref=e100]:
+              - generic [ref=e107]:
+                - heading "Charlie Brown · journey" [level=1] [ref=e109]
+                - paragraph [ref=e110]: J-609 · Aurora House · Returned · completion due
+              - generic [ref=e111]:
+                - button "Back to Overview" [ref=e112] [cursor=pointer]
+                - button "Record actions" [ref=e116] [cursor=pointer]
+            - generic [ref=e122]:
+              - button "View current stage" [ref=e123] [cursor=pointer]:
+                - generic [ref=e127]: Current stage
+                - generic [ref=e129]: Returned · completion due
+                - generic [ref=e130]: J-609
+              - button "View transport window" [ref=e131] [cursor=pointer]:
+                - generic [ref=e135]: Transport window
+                - generic [ref=e137]: 07:00 AM–08:15 AM
+                - generic [ref=e138]: 28 Sep 2026 · Aurora House
+              - button "View vehicle & driver" [ref=e139] [cursor=pointer]:
+                - generic [ref=e143]: Vehicle & driver
+                - generic [ref=e145]: Koru · Toyota Hiace
+                - generic [ref=e146]: Nia Patel
+              - button "View next person" [ref=e147] [cursor=pointer]:
+                - generic [ref=e151]: Next person
+                - generic [ref=e153]: Sara Wilson
+                - generic [ref=e154]: Resolve medication handoff
+        - generic [ref=e157]:
+          - region "Next step" [ref=e158]:
+            - generic [ref=e162]:
+              - generic [ref=e163]: Next step · Sara Wilson
+              - heading "Resolve medication handoff" [level=2] [ref=e164]
+              - paragraph [ref=e165]: The authorised worker must finish the medication source handoff before the driver can complete this journey.
+              - paragraph [ref=e166]: Waiting on Sara Wilson. You are viewing as Mia Chen.
+          - list "Trip progress" [ref=e167]:
+            - listitem [ref=e168]: Prepare
+            - listitem [ref=e172]: Ready to depart
+            - listitem [ref=e176]: In progress
+            - listitem [ref=e180]:
+              - generic [ref=e181]: "4"
+              - text: Returned
+            - listitem [ref=e182]:
+              - generic [ref=e183]: "5"
+              - text: Completed
+          - generic [ref=e184]:
+            - generic [ref=e185]:
+              - heading "Journey at a glance" [level=2] [ref=e187]
+              - generic [ref=e192]:
+                - generic:
+                  - generic: From
+                  - strong: Aurora House
+                - generic:
+                  - generic: To
+                  - strong: Harbour community centre
+              - paragraph [ref=e195]: Community appointment · 28 Sep 2026
+              - generic [ref=e196]:
+                - generic [ref=e197]:
+                  - generic [ref=e198]: Left
+                  - strong [ref=e199]: 07:00 AM
+                  - generic [ref=e200]: Planned 07:00 AM
+                - generic [ref=e201]:
+                  - generic [ref=e202]: Returned
+                  - strong [ref=e203]: 08:10 AM
+                  - generic [ref=e204]: Expected 08:15 AM
+              - generic [ref=e205]:
+                - generic [ref=e210]:
+                  - strong [ref=e211]: Koru · Toyota Hiace
+                  - generic [ref=e212]: Nia Patel · driver / Sara Wilson · escort
+                - button "BK-209" [ref=e213] [cursor=pointer]
+            - generic [ref=e216]:
+              - heading "What is left to finish?" [level=2] [ref=e218]
+              - generic [ref=e222]:
+                - generic [ref=e227]:
+                  - strong [ref=e228]: Passenger back at site
+                  - generic [ref=e229]: Actual return 08:10 AM
+                - generic [ref=e234]:
+                  - strong [ref=e235]: Passenger accounted for
+                  - generic [ref=e236]: Charlie Brown · return confirmed
+                - generic [ref=e240]:
+                  - strong [ref=e241]: Required handoffs
+                  - generic [ref=e242]: Medication handoff · Sara Wilson
+                - generic [ref=e248]:
+                  - strong [ref=e249]: Journey completion
+                  - generic [ref=e250]: Nia Patel completes after the steps above
+          - generic [ref=e251]:
+            - generic [ref=e255]:
+              - strong [ref=e256]: Vehicle return & items
+              - paragraph [ref=e257]: Return complete · Ben Carter received the return. Shift handover is only needed when custody changes.
+            - button "Open return details" [ref=e258] [cursor=pointer]
+          - group [ref=e259]:
+            - generic "Linked records TR-1047 · BK-209 · J-609" [ref=e260] [cursor=pointer]:
+              - text: Linked records
+              - generic [ref=e261]: TR-1047 · BK-209 · J-609
+          - group [ref=e262]:
+            - generic "History 2 source events" [ref=e263] [cursor=pointer]:
+              - text: History
+              - generic [ref=e264]: 2 source events
+          - group [ref=e265]:
+            - generic "Notes & supporting evidence 0 notes · 0 files" [ref=e266] [cursor=pointer]:
+              - text: Notes & supporting evidence
+              - generic [ref=e267]: 0 notes · 0 files
+        - generic [ref=e268]: PKG-05 v3 · desktop design candidate · example date 28 September 2026 · no operational changes

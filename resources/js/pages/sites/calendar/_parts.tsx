@@ -677,7 +677,7 @@ interface CalendarUI {
      * omitted, a right-click opens the entry like a click does.
      */
     onEntryContext?: (ev: Decorated, e: React.MouseEvent) => void;
-    onMove?: (ev: Decorated, start: Date, end?: Date) => void;
+    onMove?: (ev: Decorated, start: Date, end?: Date, mode?: 'move' | 'resize') => void;
     /** Drill into a single day (Month "+N more" → Day view for that date). */
     onMore?: (d: Date) => void;
 }
@@ -1119,7 +1119,7 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
                     e2.setMinutes(e2.getMinutes() + snap);
                     if (e2 <= s) e2.setTime(s.getTime() + 15 * 60000);
                 }
-                onMove(ev, s, e2);
+                onMove(ev, s, e2, mode);
             } else if (!moved) {
                 onSelect(ev);
             }

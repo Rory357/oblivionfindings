@@ -1,0 +1,1 @@
+import fs from 'node:fs';const p=new URL('./reports.tsx',import.meta.url);let s=fs.readFileSync(p,'utf8').replace('requestLabel,journeyLabel','requestLabel,journeyLabel,bookingLabel');s=s.replace("'Status: '+(kind==='returns'?","'Status: '+(kind==='requests'?requestLabel(r):kind==='bookings'&&r.booking?bookingLabel(r.booking):kind==='returns'?");fs.writeFileSync(p,s);

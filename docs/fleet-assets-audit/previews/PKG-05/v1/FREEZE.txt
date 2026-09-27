@@ -1,0 +1,11 @@
+PKG-05 v1 — Transport allocation and practical handover
+Status: awaiting Stephan's exact design approval; no implementation.
+Frozen: 2026-09-26T11:21:33.519Z
+URL: http://127.0.0.1:4395/#/fleet-assets/transports
+Runtime SHA-256: 7eebde36164679bd80f33ab63a62d2e3b8d6f276643ad5c92ab69d959dc4f07d
+File-set SHA-256: b246918de1d5d9cb8000b6812e406f8ccb118652940713838dff2573b0dafab8
+artifact-manifest.json SHA-256: 70177fa7108a0c2649396f26e47f0dcb20b5dab28911f40ac9c7e9bb6a81c9a2
+Files: 62; screenshots: 31
+Baseline: 4ea64c547ed85a5b7504e59599db351f6eba7deb
+Do not overwrite this candidate after approval; create a new version for requested revisions.
+Authoring helpers, temporary browser snapshots, debug image and mutable server logs are excluded from the approval identity.
