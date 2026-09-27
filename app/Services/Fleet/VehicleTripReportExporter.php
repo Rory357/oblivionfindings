@@ -300,7 +300,7 @@ final class VehicleTripReportExporter
     }
 
     /** @return array{name:string,colour:string,tint:string,logo:?string} */
-    private function branding(): array
+    public function branding(): array
     {
         $settings = AppSetting::query()
             ->whereIn('key', ['branding.name', 'branding.email_header_colour', 'theme.light', 'branding.logo_path'])

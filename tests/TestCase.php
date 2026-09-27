@@ -442,12 +442,11 @@ abstract class TestCase extends BaseTestCase
                 sprintf('--host=%s', $host),
                 sprintf('--port=%s', $port),
                 sprintf('--user=%s', $username),
-                sprintf('--password=%s', $password),
                 $database,
-            ]);
+            ], env: ['MYSQL_PWD' => $password]);
 
             $process->setInput(file_get_contents($schemaPath));
-            $process->setTimeout(300);
+            $process->setTimeout(max(300, min(1800, (int) ($this->environmentValue('MYSQL_TEST_SCHEMA_TIMEOUT') ?? 300))));
             $process->run();
 
             if ($process->isSuccessful()) {
