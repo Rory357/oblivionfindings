@@ -299,13 +299,21 @@ class Pkg02bFleetVehiclesAllSitesTest extends TestCase
         $this->actingAs($central)->get("/fleet-assets/vehicles/{$other->id}")->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('workspace.can.view_maintenance', false)
                 ->where('workspace.service_history', [])
-                ->where('workspace.reminders.0.source.label', 'Maintenance work')
+                ->where('workspace.reminders', [])
                 ->where('workspace.work.can_view', false)
                 ->etc());
         $this->assertStringNotContainsString('Pads replaced', (string) $this->actingAs($central)
             ->get("/fleet-assets/vehicles/{$other->id}")->getContent());
         $this->actingAs($central)->getJson("/fleet-assets/vehicles/{$other->id}/checks")->assertOk()
             ->assertJsonPath('can.view_maintenance', false);
+
+        // The fleet-wide feed must retain the source owner's reminder privacy.
+        $calendarQuery = http_build_query([
+            'start' => now()->toIso8601String(), 'end' => now()->addWeeks(2)->toIso8601String(),
+        ]);
+        $centralEvents = $this->actingAs($central)
+            ->getJson('/fleet-assets/vehicles/fleet-calendar/events?'.$calendarQuery)->assertOk()->json('events');
+        $this->assertStringNotContainsString('Check the brakes again', json_encode($centralEvents));
 
         // At the vehicle's Site the same records are shown.
         $this->actingAs($otherManager)->get("/fleet-assets/vehicles/{$other->id}")->assertOk()
@@ -315,6 +323,9 @@ class Pkg02bFleetVehiclesAllSitesTest extends TestCase
                 ->where('workspace.reminders.0.source.label', fn (string $label): bool => str_contains($label, 'Replace brake pads'))
                 ->where('workspace.work.can_view', true)
                 ->etc());
+        $localEvents = $this->actingAs($otherManager)
+            ->getJson('/fleet-assets/vehicles/fleet-calendar/events?'.$calendarQuery)->assertOk()->json('events');
+        $this->assertStringContainsString('Check the brakes again', json_encode($localEvents));
     }
 
     public function test_the_compliance_page_follows_the_register_scope(): void
