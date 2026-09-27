@@ -85,11 +85,12 @@ class TransportWorkspaceTest extends TestCase
         $asset = Asset::factory()->vehicle()->create(['site_id' => $this->site->id, 'home_site_id' => $this->site->id, 'status' => 'active', 'seating_capacity' => 6]);
         $driver = $this->user($this->site);
         $room = SiteRoom::create(['site_id' => $this->site->id, 'name' => 'Reception key cabinet']);
-        $payload = ['asset_id' => $asset->id, 'purpose' => $row->purpose,
+        $payload = ['asset_id' => $asset->id, 'client_id' => $row->client_id, 'purpose' => $row->purpose,
             'starts_local' => '2026-10-01T09:00', 'ends_local' => '2026-10-01T10:00', 'driver_user_id' => $driver->id,
             'transport_request_id' => $row->id, 'transport_expected_version' => 1, 'pickup_site_id' => $this->site->id, 'return_site_id' => $this->site->id,
             'key_pickup_room_id' => $room->id, 'key_return_room_id' => $room->id, 'key_delivery_arrangement' => 'Driver collects and returns at reception'];
-        $this->actingAs($this->manager)->postJson('/fleet-assets/bookings', [...$payload, 'key_return_room_id' => 999999])->assertNotFound();
+        $this->actingAs($this->manager)->postJson('/fleet-assets/bookings', [...$payload, 'client_id' => null])->assertNotFound();
+        $this->postJson('/fleet-assets/bookings', [...$payload, 'key_return_room_id' => 999999])->assertNotFound();
         $this->assertNull($row->fresh()->fleet_booking_id);
         $key = (string) Str::uuid();
         $response = $this->withHeader('Idempotency-Key', $key)->postJson('/fleet-assets/bookings', $payload)->assertOk();

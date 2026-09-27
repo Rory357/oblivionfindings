@@ -5,6 +5,8 @@ namespace Tests\Feature\FleetAssets;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\FleetVehicleBooking;
+use App\Models\FleetVehicleComplianceRecord;
+use App\Models\FleetVehicleComplianceVersion;
 use App\Models\FleetVehicleReminder;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Models\FleetWorkOrder;
@@ -92,6 +94,7 @@ class Pkg02bFleetVehiclesAllSitesTest extends TestCase
 
         $this->actingAs($central)->get('/fleet-assets/vehicles')->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('hero.total', 2)
+                ->where('assignment_sites', fn ($rows) => collect($rows)->pluck('id')->all() === [$this->site->id])
                 ->where('vehicles.data', function ($rows) use ($own, $other): bool {
                     $rows = collect($rows)->keyBy('id');
 
@@ -127,6 +130,104 @@ class Pkg02bFleetVehiclesAllSitesTest extends TestCase
         // The permission widens Sites, never the action: without a Fleet read it opens nothing.
         $scopeOnly = $this->siteUser($this->site, ['fleet.vehicles.viewAllSites']);
         $this->actingAs($scopeOnly)->get("/fleet-assets/vehicles/{$other->id}")->assertForbidden();
+    }
+
+    public function test_fleet_map_includes_every_permitted_vehicle_and_keeps_restricted_positions_server_side(): void
+    {
+        $central = $this->siteUser($this->site, ['fleet.viewAny', 'fleet.vehicles.viewAllSites']);
+        $local = $this->siteUser($this->site, ['fleet.viewAny']);
+        $zero = $this->vehicle($this->site, 'Zero coordinate van');
+        $private = $this->vehicle($this->site, 'Private trip van');
+        $foreign = $this->vehicle($this->otherSite, 'Other site van');
+        foreach (range(1, 24) as $number) {
+            $this->vehicle($this->site, 'Extra van '.$number);
+        }
+        FleetVehicleStateSnapshot::query()->create([
+            'asset_id' => $zero->id, 'status' => 'online', 'latitude' => 0, 'longitude' => 0,
+            'speed_kph' => 0, 'last_seen_at' => now(),
+        ]);
+        FleetVehicleStateSnapshot::query()->create([
+            'asset_id' => $private->id, 'status' => 'online', 'latitude' => -36.85, 'longitude' => 174.76,
+            'consent_blocked' => true, 'last_seen_at' => now(),
+        ]);
+        FleetVehicleStateSnapshot::query()->create([
+            'asset_id' => $foreign->id, 'status' => 'online', 'latitude' => -36.9, 'longitude' => 174.8,
+            'last_seen_at' => now()->subHour(),
+        ]);
+
+        $rows = collect($this->actingAs($central)->getJson('/fleet-assets/vehicles/fleet-map/data')
+            ->assertOk()->json('vehicles'))->keyBy('id');
+        $this->assertCount(27, $rows); // More than the register's 25-row page.
+        $this->assertEquals(0, $rows[$zero->id]['position']['lat']);
+        $this->assertEquals(0, $rows[$zero->id]['position']['lng']);
+        $this->assertNull($rows[$private->id]['position']['lat']);
+        $this->assertNull($rows[$private->id]['position']['lng']);
+        $this->assertSame('consent', $rows[$private->id]['position']['withheld']);
+        $this->assertNull($rows[$foreign->id]['position']['lat']);
+        $this->assertNull($rows[$foreign->id]['position']['lng']);
+        $this->assertSame('access', $rows[$foreign->id]['position']['withheld']);
+        $this->assertCount(26, $this->actingAs($local)->getJson('/fleet-assets/vehicles/fleet-map/data')->assertOk()->json('vehicles'));
+    }
+
+    public function test_fleet_calendar_projects_foreign_bookings_only_as_busy_and_denies_source_identity(): void
+    {
+        $central = $this->siteUser($this->site, ['fleet.viewAny', 'fleet.vehicles.viewAllSites']);
+        $own = $this->vehicle($this->site, 'Own van');
+        $foreign = $this->vehicle($this->otherSite, 'Foreign van');
+        $driver = $this->siteUser($this->otherSite, ['fleet.viewAny']);
+        $booking = FleetVehicleBooking::query()->create([
+            'asset_id' => $foreign->id, 'user_id' => $driver->id,
+            'purpose' => 'Private hospital journey', 'destination' => 'Private destination',
+            'starts_at' => now()->addHour(), 'ends_at' => now()->addHours(3),
+            'pickup_site_id' => $this->otherSite->id, 'return_site_id' => $this->otherSite->id,
+            'status' => 'approved',
+        ]);
+        $result = $this->actingAs($central)->getJson('/fleet-assets/vehicles/fleet-calendar/events?start=2026-09-24&end=2026-09-26')->assertOk();
+        $busy = collect($result->json('events'))->firstWhere('vehicleId', $foreign->id);
+        $this->assertSame('busy', $busy['kind']);
+        $this->assertSame('Busy', $busy['title']);
+        $this->assertNull($busy['recordId']);
+        $this->assertNull($busy['link']);
+        $this->assertFalse($busy['editable']);
+        $this->assertNotSame('busy:'.$booking->id, $busy['id']);
+        $this->assertStringNotContainsString('Private hospital journey', $result->getContent());
+        $this->assertStringNotContainsString('Private destination', $result->getContent());
+        $this->actingAs($central)->getJson('/fleet-assets/vehicles/fleet-calendar/events?start=2026-01-01&end=2026-12-31')->assertUnprocessable();
+        $this->actingAs($central)->getJson("/fleet-assets/vehicles/{$foreign->id}/calendar/records/booking/{$booking->id}")->assertNotFound();
+    }
+
+    public function test_fleet_calendar_due_entries_have_unique_stable_ids_across_vehicles(): void
+    {
+        $viewer = $this->siteUser($this->site, ['fleet.viewAny']);
+        $vehicles = collect(['Kōwhai van', 'Rimu van'])->map(fn (string $name) =>
+            $this->vehicle($this->site, $name, ['inspection_due_at' => now()->addDay()]));
+        foreach ($vehicles as $vehicle) {
+            $record = FleetVehicleComplianceRecord::query()->create(['asset_id' => $vehicle->id, 'kind' => 'wof']);
+            $version = FleetVehicleComplianceVersion::query()->create([
+                'record_id' => $record->id, 'version' => 1, 'applicability' => 'applicable', 'outcome' => 'pass',
+                'expires_on' => now()->addDay()->toDateString(),
+                'request_key' => 'calendar-identity-'.$vehicle->id, 'request_fingerprint' => str_repeat('a', 64),
+                'content_sha256' => str_repeat('b', 64), 'created_at' => now(),
+            ]);
+            $record->update(['current_version_id' => $version->id]);
+        }
+
+        $query = '?start=2026-09-24&end=2026-09-27';
+        $url = '/fleet-assets/vehicles/fleet-calendar/events'.$query;
+        $events = collect($this->actingAs($viewer)->getJson($url)->assertOk()->json('events'));
+        $this->assertCount(4, $events);
+        $this->assertCount(4, $events->pluck('id')->unique());
+        $this->assertSame($events->pluck('id')->all(), collect($this->getJson($url)->assertOk()->json('events'))->pluck('id')->all());
+        foreach ($vehicles as $vehicle) {
+            $entries = $events->where('vehicleId', $vehicle->id);
+            $this->assertEqualsCanonicalizing(['check', 'compliance'], $entries->pluck('kind')->all());
+            foreach ($entries as $entry) {
+                $this->assertStringStartsWith('vehicle:'.$vehicle->id.':', $entry['id']);
+            }
+            // Individual source calendars retain their own stable identities.
+            $source = collect($this->getJson('/fleet-assets/vehicles/'.$vehicle->id.'/calendar/events'.$query)->assertOk()->json('events'));
+            $this->assertEqualsCanonicalizing(['check-due', 'compliance:wof'], $source->pluck('id')->all());
+        }
     }
 
     public function test_the_vehicles_own_records_can_be_kept_across_sites(): void
@@ -234,13 +335,21 @@ class Pkg02bFleetVehiclesAllSitesTest extends TestCase
         $this->actingAs($central)->get("/fleet-assets/vehicles/{$other->id}")->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('workspace.can.view_maintenance', false)
                 ->where('workspace.service_history', [])
-                ->where('workspace.reminders.0.source.label', 'Maintenance work')
+                ->where('workspace.reminders', [])
                 ->where('workspace.work.can_view', false)
                 ->etc());
         $this->assertStringNotContainsString('Pads replaced', (string) $this->actingAs($central)
             ->get("/fleet-assets/vehicles/{$other->id}")->getContent());
         $this->actingAs($central)->getJson("/fleet-assets/vehicles/{$other->id}/checks")->assertOk()
             ->assertJsonPath('can.view_maintenance', false);
+
+        // The fleet-wide feed must retain the source owner's reminder privacy.
+        $calendarQuery = http_build_query([
+            'start' => now()->toIso8601String(), 'end' => now()->addWeeks(2)->toIso8601String(),
+        ]);
+        $centralEvents = $this->actingAs($central)
+            ->getJson('/fleet-assets/vehicles/fleet-calendar/events?'.$calendarQuery)->assertOk()->json('events');
+        $this->assertStringNotContainsString('Check the brakes again', json_encode($centralEvents));
 
         // At the vehicle's Site the same records are shown.
         $this->actingAs($otherManager)->get("/fleet-assets/vehicles/{$other->id}")->assertOk()
@@ -250,6 +359,9 @@ class Pkg02bFleetVehiclesAllSitesTest extends TestCase
                 ->where('workspace.reminders.0.source.label', fn (string $label): bool => str_contains($label, 'Replace brake pads'))
                 ->where('workspace.work.can_view', true)
                 ->etc());
+        $localEvents = $this->actingAs($otherManager)
+            ->getJson('/fleet-assets/vehicles/fleet-calendar/events?'.$calendarQuery)->assertOk()->json('events');
+        $this->assertStringContainsString('Check the brakes again', json_encode($localEvents));
     }
 
     public function test_the_compliance_page_follows_the_register_scope(): void
@@ -286,6 +398,30 @@ class Pkg02bFleetVehiclesAllSitesTest extends TestCase
         $this->assertContains('fleet.settings.manage', $this->roleKeys('fleet_manager'));
         $this->assertContains('fleet.settings.manage', $this->roleKeys('admin'));
         $this->assertNotContains('fleet.settings.manage', $this->roleKeys('coordinator'));
+    }
+
+    public function test_fleet_calendar_accepts_six_local_weeks_across_autumn_daylight_saving(): void
+    {
+        $viewer = $this->siteUser($this->site, ['fleet.viewAny']);
+        $this->actingAs($viewer)->getJson('/fleet-assets/vehicles/fleet-calendar/events?start=2026-03-30&end=2026-05-11')->assertOk();
+        $this->actingAs($viewer)->getJson('/fleet-assets/vehicles/fleet-calendar/events?start=2026-03-30&end=2026-05-12')->assertUnprocessable();
+    }
+
+    public function test_fleet_calendar_keeps_auckland_midnight_and_record_versions(): void
+    {
+        $viewer = $this->siteUser($this->site, ['fleet.viewAny', 'fleet.manage']);
+        $vehicle = $this->vehicle($this->site, 'Overnight van');
+        $booking = FleetVehicleBooking::query()->create([
+            'asset_id' => $vehicle->id, 'user_id' => $viewer->id, 'purpose' => 'Early trip',
+            'starts_at' => Carbon::parse('2026-09-24 00:15', 'Pacific/Auckland')->utc(),
+            'ends_at' => Carbon::parse('2026-09-24 01:15', 'Pacific/Auckland')->utc(),
+            'status' => 'approved', 'lock_version' => 3,
+        ]);
+        $events = $this->actingAs($viewer)->getJson('/fleet-assets/vehicles/fleet-calendar/events?start=2026-09-24&end=2026-09-25')->assertOk()->json('events');
+        $event = collect($events)->firstWhere('recordId', $booking->id);
+        $this->assertNotNull($event);
+        $this->assertSame(3, $event['version']);
+        $this->assertTrue($event['editable']);
     }
 
     /** @return list<string> */
