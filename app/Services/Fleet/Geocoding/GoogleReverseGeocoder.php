@@ -9,7 +9,7 @@ class GoogleReverseGeocoder implements ReverseGeocoder
 {
     public function reverseGeocode(float $lat, float $lng, ?int $assetId = null): ?string
     {
-        $apiKey = config('fleet.maps.api_key');
+        $apiKey = config('fleet.maps.google_server_key');
         if (! $apiKey) {
             return null;
         }
@@ -34,7 +34,7 @@ class GoogleReverseGeocoder implements ReverseGeocoder
             return is_string($address) && trim($address) !== '' ? trim($address) : null;
         } catch (\Throwable $e) {
             Log::warning('Google reverse geocode exception', [
-                'error' => $e->getMessage(),
+                'error_category' => class_basename($e),
             ]);
 
             return null;

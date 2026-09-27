@@ -3,6 +3,7 @@
 namespace App\Notifications\Fleet;
 
 use App\Models\FleetVehicleBooking;
+use App\Services\Fleet\FleetNotificationPreferences;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -17,7 +18,7 @@ class FleetBookingRejectedNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        return app(FleetNotificationPreferences::class)->channels($notifiable, 'fleet.booking_decisions');
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -27,10 +28,10 @@ class FleetBookingRejectedNotification extends Notification
 
         return (new MailMessage)
             ->subject("Vehicle Booking Rejected: {$vehicleName}")
-            ->greeting('Kia ora ' . ($notifiable->name ?? 'there') . ',')
+            ->greeting('Kia ora '.($notifiable->name ?? 'there').',')
             ->line("Your booking for **{$vehicleName}** has been rejected.")
             ->line("**Reason:** {$reason}")
-            ->action('View Booking', url('/fleet-assets/bookings/' . $this->booking->id))
+            ->action('View Booking', url('/fleet-assets/bookings/'.$this->booking->id))
             ->line('Please contact the fleet manager if you have questions.');
     }
 

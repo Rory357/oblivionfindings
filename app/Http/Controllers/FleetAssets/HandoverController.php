@@ -8,6 +8,7 @@ use App\Models\FleetShiftHandover;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Fleet\FleetOptionalNotice;
 use App\Services\Fleet\MaintenanceFingerprint;
 use App\Services\Fleet\VehicleBookingAccessService;
 use App\Services\UserSiteAccessService;
@@ -317,6 +318,8 @@ class HandoverController extends Controller
                 'incoming_user_id' => $incomingUserId,
             ]);
 
+            FleetOptionalNotice::afterCommit($incomingUserId, 'fleet.handover_updates', $handover->id);
+
             return $handover;
         }, 3);
 
@@ -397,6 +400,8 @@ class HandoverController extends Controller
                 'accepted_by' => $actor->id,
             ]);
 
+            FleetOptionalNotice::afterCommit((int) $lockedHandover->outgoing_user_id, 'fleet.handover_updates', $lockedHandover->id);
+
             return true;
         }, 3);
 
@@ -436,6 +441,8 @@ class HandoverController extends Controller
                 'reason' => $data['dispute_reason'],
             ]);
 
+            FleetOptionalNotice::afterCommit((int) $lockedHandover->outgoing_user_id, 'fleet.handover_updates', $lockedHandover->id);
+
             return true;
         }, 3);
 
@@ -443,7 +450,7 @@ class HandoverController extends Controller
             return back()->with('error', 'This handover has already been processed.');
         }
 
-        return back()->with('success', 'Handover disputed. Management has been notified.');
+        return back()->with('success', 'Handover disputed. Your response has been recorded.');
     }
 
     /**

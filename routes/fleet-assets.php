@@ -23,12 +23,14 @@ use App\Http\Controllers\FleetAssets\KeyController;
 use App\Http\Controllers\FleetAssets\LiveMapController;
 use App\Http\Controllers\FleetAssets\MaintenanceAttachmentController;
 use App\Http\Controllers\FleetAssets\MaintenanceDashboardController;
+use App\Http\Controllers\FleetAssets\MapCapabilityController;
 use App\Http\Controllers\FleetAssets\MileageController;
 use App\Http\Controllers\FleetAssets\OutingController;
 use App\Http\Controllers\FleetAssets\ReportController;
 use App\Http\Controllers\FleetAssets\ResidentTrackingController;
 use App\Http\Controllers\FleetAssets\ResidentTransportController;
 use App\Http\Controllers\FleetAssets\ServiceScheduleController;
+use App\Http\Controllers\FleetAssets\SettingsNotificationController;
 use App\Http\Controllers\FleetAssets\TransportWorkspaceController;
 use App\Http\Controllers\FleetAssets\VehicleAlertController;
 use App\Http\Controllers\FleetAssets\VehicleBookingController;
@@ -47,8 +49,8 @@ use App\Http\Controllers\FleetAssets\VehicleServiceScheduleController;
 use App\Http\Controllers\FleetAssets\VehicleTripHistoryController;
 use App\Http\Controllers\FleetAssets\WanderingAlertController;
 use App\Http\Controllers\FleetAssets\WorkOrderController;
+use App\Http\Controllers\FleetAssets\WorkspaceSettingsController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     Route::middleware('permission:assets.viewAny|assets.viewAssigned')->prefix('asset-register')->group(function () {
@@ -299,7 +301,17 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
 
     // Settings
     Route::middleware('permission:fleet.viewAny|assets.viewAny')->group(function () {
-        Route::get('/settings/notifications', fn () => Inertia::render('fleet-assets/settings/notifications'))->name('fleet-assets.settings.notifications');
+        Route::get('/settings', [WorkspaceSettingsController::class, 'index'])->name('fleet-assets.settings.index');
+        Route::get('/settings/notifications', [WorkspaceSettingsController::class, 'index'])->name('fleet-assets.settings.notifications');
+        Route::get('/settings/notification-preferences', [SettingsNotificationController::class, 'show']);
+        Route::put('/settings/notification-preferences', [SettingsNotificationController::class, 'update']);
+        Route::get('/settings/notification-checks', [SettingsNotificationController::class, 'checks']);
+        Route::post('/settings/notification-checks', [SettingsNotificationController::class, 'check'])->middleware('throttle:10,1');
+        Route::get('/settings/maps', [WorkspaceSettingsController::class, 'maps']);
+        Route::put('/settings/maps', [WorkspaceSettingsController::class, 'updateMaps'])->middleware('permission:fleet.settings.manage');
+        Route::get('/settings/tracking-devices', [WorkspaceSettingsController::class, 'devices']);
+        Route::get('/settings/history', [WorkspaceSettingsController::class, 'history']);
+        Route::post('/settings/map-capabilities/{capability}', MapCapabilityController::class)->whereIn('capability', ['places', 'geocoding', 'routes'])->middleware('throttle:30,1');
     });
 
     // Drivers

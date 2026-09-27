@@ -5,8 +5,12 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\RoleNotificationPreference;
+use App\Models\User;
 use App\Models\UserNotificationPreference;
+use App\Services\AuditLogger;
+use App\Services\Fleet\FleetNotificationPreferences;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -30,6 +34,8 @@ class NotificationPreferencesController extends Controller
             ->whereIn('role_id', $roleIds)
             ->get(['role_id', 'key', 'enabled', 'channel_inapp', 'channel_email', 'channel_push']);
 
+        $fleet = app(FleetNotificationPreferences::class)->snapshot($user);
+
         return inertia('settings/notifications', [
             'groups' => $groups,
             'delivery' => [
@@ -39,25 +45,29 @@ class NotificationPreferencesController extends Controller
                 'notification_sounds_enabled' => (bool) ($user->notification_sounds_enabled ?? true),
                 'email_digest_frequency' => $user->email_digest_frequency ?? 'instant',
             ],
-            'userPrefs' => $userPrefs->map(fn($p) => [
+            'userPrefs' => $userPrefs->toBase()->map(fn ($p) => [
                 'enabled' => (bool) $p->enabled,
                 'inapp' => (bool) $p->channel_inapp,
                 'email' => (bool) $p->channel_email,
                 'push' => (bool) $p->channel_push,
-            ])->all(),
-            'roleDefaults' => $rolePrefs->groupBy('key')->map(function ($items) {
+            ])->merge(collect($fleet['events'])->filter(fn ($event) => $userPrefs->has($event['key']))->mapWithKeys(fn ($event) => [$event['key'] => [
+                'enabled' => $event['effective']['inapp'] || $event['effective']['email'],
+                ...$event['effective'], 'push' => false,
+            ]]))->all(),
+            'roleDefaults' => $rolePrefs->toBase()->groupBy('key')->map(function ($items) {
                 // Any role enables => enabled, otherwise disabled.
-                $enabled = $items->contains(fn($p) => (bool) $p->enabled === true);
-                $inapp = $items->contains(fn($p) => (bool) $p->channel_inapp === true);
-                $email = $items->contains(fn($p) => (bool) $p->channel_email === true);
-                $push = $items->contains(fn($p) => (bool) $p->channel_push === true);
+                $enabled = $items->contains(fn ($p) => (bool) $p->enabled === true);
+                $inapp = $items->contains(fn ($p) => (bool) $p->channel_inapp === true);
+                $email = $items->contains(fn ($p) => (bool) $p->channel_email === true);
+                $push = $items->contains(fn ($p) => (bool) $p->channel_push === true);
+
                 return [
                     'enabled' => $enabled,
                     'inapp' => $inapp,
                     'email' => $email,
                     'push' => $push,
                 ];
-            })->all(),
+            })->merge(collect($fleet['events'])->mapWithKeys(fn ($event) => [$event['key'] => ['enabled' => $event['defaults']['inapp'] || $event['defaults']['email'], ...$event['defaults'], 'push' => false]]))->all(),
             'canManageRoleDefaults' => (bool) ($user->canDo('settings.access.manage')),
         ]);
     }
@@ -73,19 +83,29 @@ class NotificationPreferencesController extends Controller
 
         $prefs = (array) $data['prefs'];
 
-        foreach ($prefs as $key => $channels) {
-            $channels = $this->normalizeChannels($channels, 'prefs.' . $key);
+        DB::transaction(function () use ($user, $prefs, $request) {
+            User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $fleetService = app(FleetNotificationPreferences::class);
+            $before = $fleetService->snapshot($user);
+            foreach ($prefs as $key => $channels) {
+                $channels = $this->normalizeChannels($channels, 'prefs.'.$key);
 
-            UserNotificationPreference::updateOrCreate([
-                'user_id' => $user->id,
-                'key' => (string) $key,
-            ], [
-                'enabled' => $channels['enabled'],
-                'channel_inapp' => $channels['inapp'],
-                'channel_email' => $channels['email'],
-                'channel_push' => $channels['push'],
-            ]);
-        }
+                UserNotificationPreference::updateOrCreate([
+                    'user_id' => $user->id,
+                    'key' => (string) $key,
+                ], [
+                    'enabled' => $channels['enabled'],
+                    'channel_inapp' => $channels['inapp'],
+                    'channel_email' => $channels['email'],
+                    'channel_push' => $channels['push'],
+                    'channel_overrides' => null,
+                ]);
+            }
+            $after = $fleetService->snapshot($user);
+            if ($before['revision'] !== $after['revision']) {
+                AuditLogger::logOrFail('fleet.settings.notifications.updated', $user, ['actor_id' => $user->id, 'before' => $before['overrides'], 'after' => $after['overrides']], $request);
+            }
+        });
 
         return redirect()->back()->with('success', 'Notification preferences updated.');
     }
@@ -136,7 +156,7 @@ class NotificationPreferencesController extends Controller
         foreach ($roles as $role) {
             $row = [];
             foreach ($allKeys as $key) {
-                $pref = $existing->firstWhere(fn($p) => (int) $p->role_id === (int) $role->id && $p->key === $key);
+                $pref = $existing->firstWhere(fn ($p) => (int) $p->role_id === (int) $role->id && $p->key === $key);
                 // Default true/inapp if unset.
                 $row[$key] = $pref ? [
                     'enabled' => (bool) $pref->enabled,
@@ -146,7 +166,7 @@ class NotificationPreferencesController extends Controller
                 ] : [
                     'enabled' => true,
                     'inapp' => true,
-                    'email' => false,
+                    'email' => FleetNotificationPreferences::EVENTS[$key]['email'] ?? false,
                     'push' => false,
                 ];
             }
@@ -172,9 +192,11 @@ class NotificationPreferencesController extends Controller
         $matrix = (array) $data['matrix'];
 
         foreach ($matrix as $roleId => $prefs) {
-            if (!is_array($prefs)) continue;
+            if (! is_array($prefs)) {
+                continue;
+            }
             foreach ($prefs as $key => $channels) {
-                $channels = $this->normalizeChannels($channels, 'matrix.' . $roleId . '.' . $key);
+                $channels = $this->normalizeChannels($channels, 'matrix.'.$roleId.'.'.$key);
 
                 RoleNotificationPreference::updateOrCreate([
                     'role_id' => (int) $roleId,
@@ -221,7 +243,7 @@ class NotificationPreferencesController extends Controller
         if ($validator->fails()) {
             $messages = [];
             foreach ($validator->errors()->messages() as $field => $fieldMessages) {
-                $messages[$errorKey . '.' . $field] = $fieldMessages;
+                $messages[$errorKey.'.'.$field] = $fieldMessages;
             }
 
             throw ValidationException::withMessages($messages);

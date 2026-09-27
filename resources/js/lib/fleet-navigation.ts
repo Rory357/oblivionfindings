@@ -4,8 +4,8 @@ import {
     LayoutGrid,
     Map,
     Package,
-    Truck,
     Route,
+    Truck,
     Wrench,
     type LucideIcon,
 } from 'lucide-react';
@@ -139,19 +139,25 @@ export const FLEET_WORKSPACES: FleetWorkspace[] = [
         icon: Route,
         landings: ['/fleet-assets/transports/overview'],
         groups: [
-            { label: 'Transport workspace', links: [
-                link('Overview', 'transports/overview'),
-                link('Requests & approvals', 'transports/requests'),
-                link('Planner', 'transports/planner'),
-                link('Calendar', 'transports/calendar'),
-                link('Journeys', 'transports/journeys'),
-                link('Returns & handovers', 'transports/returns'),
-            ] },
-            { label: 'Connected records', links: [
-                link('All journey records', 'transports'),
-                link('Outings', 'outings'),
-                link('Medication transit', 'transports/medications'),
-            ] },
+            {
+                label: 'Transport workspace',
+                links: [
+                    link('Overview', 'transports/overview'),
+                    link('Requests & approvals', 'transports/requests'),
+                    link('Planner', 'transports/planner'),
+                    link('Calendar', 'transports/calendar'),
+                    link('Journeys', 'transports/journeys'),
+                    link('Returns & handovers', 'transports/returns'),
+                ],
+            },
+            {
+                label: 'Connected records',
+                links: [
+                    link('All journey records', 'transports'),
+                    link('Outings', 'outings'),
+                    link('Medication transit', 'transports/medications'),
+                ],
+            },
         ],
     },
     {
@@ -299,11 +305,20 @@ export const FLEET_WORKSPACES: FleetWorkspace[] = [
         key: 'settings',
         label: 'Settings',
         icon: Bell,
-        landings: ['/fleet-assets/settings/notifications'],
+        landings: [
+            '/fleet-assets/settings',
+            '/fleet-assets/settings/notifications',
+        ],
         groups: [
             {
-                label: 'Notifications',
-                links: [link('Notifications', 'settings/notifications')],
+                label: 'Settings',
+                links: [
+                    link('Maps', 'settings#maps'),
+                    link('Tracking & data', 'settings#tracking'),
+                    link('Notifications', 'settings/notifications'),
+                    link('Setup', 'settings#setup'),
+                    link('Change history', 'settings#history'),
+                ],
             },
         ],
     },

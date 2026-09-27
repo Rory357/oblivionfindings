@@ -27,6 +27,8 @@ return [
         'client_location_address_lookup_enabled' => env('CLIENT_LOCATION_ADDRESS_LOOKUP_ENABLED', false),
         'client_location_geocoder_url' => env('CLIENT_LOCATION_GEOCODER_URL', 'http://127.0.0.1:8088'),
         'api_key' => env('GOOGLE_MAPS_API_KEY'),
+        // A separate server-restricted credential; never exposed through Inertia.
+        'google_server_key' => env('GOOGLE_MAPS_SERVER_API_KEY'),
         'reverse_geocode_enabled' => env('FLEET_REVERSE_GEOCODE_ENABLED', false),
         'reverse_geocode_provider' => env('FLEET_REVERSE_GEOCODE_PROVIDER', 'google'),
         'reverse_geocode_timeout_seconds' => env('FLEET_REVERSE_GEOCODE_TIMEOUT_SECONDS', 6),
