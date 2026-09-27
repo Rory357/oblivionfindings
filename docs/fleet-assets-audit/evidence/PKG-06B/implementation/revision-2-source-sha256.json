@@ -1,0 +1,322 @@
+{
+  "publishedBase": "554425e8dddd1b71bca0e81b6d5ddaf9d8f6459f",
+  "approvedCandidate": "cb8320e623ffc972f7d9d9a420f8b59a2a430188",
+  "sourceFiles": 76,
+  "hashBasis": "Git index blobs (LF source)",
+  "approvedSourceUnchanged": true,
+  "publishedSuccessorFilesIdentical": [
+    "resources/js/components/fleet-assets/vehicle-workspace/booking-request.test.tsx",
+    "resources/js/components/fleet-assets/vehicle-workspace/booking-vehicle-picker.tsx",
+    "resources/js/components/fleet-assets/vehicle-workspace/booking-wizard.css",
+    "resources/js/components/fleet-assets/vehicle-workspace/booking-wizard.tsx",
+    "resources/js/components/fleet-assets/vehicle-workspace/evidence-upload.ts",
+    "resources/js/components/fleet-assets/vehicle-workspace/studio.css",
+    "resources/js/pages/fleet-assets/vehicles/index.tsx"
+  ],
+  "files": [
+    {
+      "path": ".gitattributes",
+      "sha256": "38162a9b802d8500ff181e6570029ae4656b9897eb777e2a3cbaa4d808247c4d"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "42a3c05888def6ecef7199ed3fd961c2ee769d8510aad2f0b8f3d4520142ce9d"
+    },
+    {
+      "path": "DESIGN.md",
+      "sha256": "dbf4a4448ba0d999e0cd17b6c794c2fd7ce493826bd7e114e95f6fba50f47113"
+    },
+    {
+      "path": "app/Http/Controllers/AssetDocumentController.php",
+      "sha256": "686e8f07fc8ed1e7732cc163c20a25e621ad5175f27d5c0e46a6173b2a6e5136"
+    },
+    {
+      "path": "app/Http/Controllers/AssetProfileController.php",
+      "sha256": "8d8ea0095813efdcac4a19561e9b4c091fb6b54dc0835db3b4b1d31e6e91fb6a"
+    },
+    {
+      "path": "app/Http/Controllers/AssetQrController.php",
+      "sha256": "c3c42b21e4da48b87eb0b416e79b3f7dcfb194bd83286e34b9a437fea3ad5f77"
+    },
+    {
+      "path": "app/Http/Controllers/AssetScanEventController.php",
+      "sha256": "7df2655bb8c0cfdd1797f28ad6823ad68ba86a3155951cccfe1f7fd51d52a1bf"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/AssetController.php",
+      "sha256": "24f26f139c98d23eed8ffcf19bd48ff8b0651cc1c9e0160a0f555d27aad1adfe"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/AssetLabelController.php",
+      "sha256": "b74acd1902fe83e704691c84a48df87ea9432789db020c2fa9652504d3b0abf1"
+    },
+    {
+      "path": "app/Models/Asset.php",
+      "sha256": "d138896f5f05718685b3ef63d34546dc5c1ac8df58134127ae4e1d884ea30923"
+    },
+    {
+      "path": "app/Models/AssetCustodyMovement.php",
+      "sha256": "f3165505215cd37f50458f7b81161bbcfa76fe37f27f32a92dcaeed3ce3f8d6d"
+    },
+    {
+      "path": "app/Models/AssetKitItem.php",
+      "sha256": "0b7a74affb0ef9368502173989b77fabfb844d85595852365207e6f6fc4f3e31"
+    },
+    {
+      "path": "app/Models/AssetProfileEvent.php",
+      "sha256": "4ef516f345a96586c1f1de29a3b7efda65d921ca3447e34a8d6196bb447ff4e9"
+    },
+    {
+      "path": "app/Models/FleetFinanceReviewRequest.php",
+      "sha256": "118534c0e8ef3c19f4b2c679cfeb9e88137d552dc77e39ed6b7fb86bccbb51fa"
+    },
+    {
+      "path": "app/Services/Assets/AssetAssignmentService.php",
+      "sha256": "6fcd6b0de3f71c2f4d91ca0e9a8650a75dd7c531d6edbba2d45d42f6b2bcf2d2"
+    },
+    {
+      "path": "app/Services/Assets/AssetDocumentService.php",
+      "sha256": "95d4f57f32594fbc2619095981e30b08ed9f071a7d6d2aa1d6215ce07fac65ac"
+    },
+    {
+      "path": "app/Services/Assets/AssetLabelExporter.php",
+      "sha256": "2cd0a95e22c5250abecc5bb813c63769e76b75cd68ea478bfbd7b26e905099a2"
+    },
+    {
+      "path": "app/Services/Assets/AssetLifecycleService.php",
+      "sha256": "b34a1f3dfe1ee1c5ab95e59919d0a1c813fef8446c735459bbff030efd9c7de3"
+    },
+    {
+      "path": "app/Services/Assets/AssetMutationIntegrityService.php",
+      "sha256": "2b386ea55783ae58f0120c370f498a2950d3c0515630367e9b85ca741222dd89"
+    },
+    {
+      "path": "app/Services/Assets/AssetProfilePresenter.php",
+      "sha256": "cc22a767a69f500df7f71a391c29abd3cf0548148fcfe5990ffad65b56b1ee11"
+    },
+    {
+      "path": "app/Services/Assets/AssetProfileService.php",
+      "sha256": "68f908679d8e2a75ef18b9606bc81c1dfe81de5de3e27c2a82b10c63ec26bc48"
+    },
+    {
+      "path": "app/Services/Assets/AssetProfileSources.php",
+      "sha256": "9ae869251ca148a1d309bfe84e4d55812f6259cf84132a144429a98783610180"
+    },
+    {
+      "path": "app/Services/Assets/AssetQrLabelService.php",
+      "sha256": "66208c152208cc8ae4c275df8671804b2f321111ae67b3c65043883bf3c4e654"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceAttachmentService.php",
+      "sha256": "35864890f3f0d354f8fb63de431f83db94234baeb7f8db908be4df1fa6adddd7"
+    },
+    {
+      "path": "app/Services/Fleet/VehicleFinanceReviewQueue.php",
+      "sha256": "4d1191230980c6ce271e19d3c451603c25dc3edc577c03279a7659be51385789"
+    },
+    {
+      "path": "app/Services/Fleet/VehicleFinanceService.php",
+      "sha256": "0a915117ef0c5668a420542d1223f224ae7cdaa60af73419df3693da7d6e2af1"
+    },
+    {
+      "path": "app/Support/SchemaCache.php",
+      "sha256": "0dd0b68bb8d3fc8b649ca46e2da032f9e7708405bb129c40401adc9f017ac5be"
+    },
+    {
+      "path": "database/migrations/2026_09_27_120000_add_asset_profile_custody_history.php",
+      "sha256": "788bc9d3886c25b5289b731f9c7cfceae85f47e98ed6e75808993bbbd459941d"
+    },
+    {
+      "path": "database/migrations/2026_09_27_120000_create_asset_register_workflows.php",
+      "sha256": "067e81d39586f5c842d05ee1df4ca74527ac14052bab8edbf47da78f9c601fdf"
+    },
+    {
+      "path": "database/migrations/2026_09_27_130000_create_asset_label_batches.php",
+      "sha256": "f0ef9777fefd6682bcf0c0320224bf553fa89dfd7dcf0160a92313e5f419445e"
+    },
+    {
+      "path": "design_styles/FILE_PREVIEW_STYLE_GUIDE.md",
+      "sha256": "4cc1a821b7f032cf2a26acac7531b710af07c9dfa1b2baed7058fb92c53349ff"
+    },
+    {
+      "path": "design_styles/POPUP_STYLE_GUIDE.md",
+      "sha256": "c9de50bfc00874987e17f9d2b30b4a509431ae318359fa31dc5f98f9fcf90b1b"
+    },
+    {
+      "path": "eslint.config.js",
+      "sha256": "7d8b3fa8bf2870c7ef8b839749dc155bc0171ef7299f6bc15c34b032617e6ead"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "973f16c939797395e07399cb19d01d600c01df2f063549eda59c776cc5c136d9"
+    },
+    {
+      "path": "package.json",
+      "sha256": "0e89eec487a46ee20a1305ae6c681fc976b58ceff89c7de60b918be5a1b9369a"
+    },
+    {
+      "path": "resources/css/maintenance-date-time.css",
+      "sha256": "a52a7b7676539cd8acdb4ec56ba025ab01b610df4b663478c08ccdc398e656a7"
+    },
+    {
+      "path": "resources/js/components/assets/profile/action-dialog.test.tsx",
+      "sha256": "49a2f64ceb7416dc1a1e0155f323acdde3d1724a6324106414e7af8268505aa0"
+    },
+    {
+      "path": "resources/js/components/assets/profile/action-dialog.tsx",
+      "sha256": "7b8fa17b28fa20d0d462d6ac69736373cefdca699a751cb5156db06f7f888329"
+    },
+    {
+      "path": "resources/js/components/assets/profile/check-dialog.tsx",
+      "sha256": "a7a9ada8beea5bbc9cc0847fc16e4d8f5463afb7af64c4f42f3527f7b1e190b0"
+    },
+    {
+      "path": "resources/js/components/assets/profile/custody-view.test.tsx",
+      "sha256": "3443339c6e620fd6924cf6c774a0a1a01f3a5c1813f1e2ce43992479ec2bde5f"
+    },
+    {
+      "path": "resources/js/components/assets/profile/custody-view.tsx",
+      "sha256": "f2bc525e5e94910255dd2b9cdb36a8d29a7ab1c762e53051fd61b0e728e85254"
+    },
+    {
+      "path": "resources/js/components/assets/profile/document-library.test.tsx",
+      "sha256": "cfacd78a377bf1e0cb80b5465857ce3fd27b4f11332460a03db5b3060d3bc273"
+    },
+    {
+      "path": "resources/js/components/assets/profile/document-library.tsx",
+      "sha256": "dafd20e20ac056a0cdfeb6a3c29fcd385c688a66ebbe3f726c378830588df2f3"
+    },
+    {
+      "path": "resources/js/components/assets/profile/finance-review-dialog.test.tsx",
+      "sha256": "029ed86cd1c4f3ed88b75be081dc7f56bc5aa86f491230a2bfa21d2a139a272f"
+    },
+    {
+      "path": "resources/js/components/assets/profile/finance-review-dialog.tsx",
+      "sha256": "5c8f29784a214b9dc98b73efbfd40a8fb10ccd74e1d55afcf7c83167c0871a41"
+    },
+    {
+      "path": "resources/js/components/assets/profile/finance-view.tsx",
+      "sha256": "df9c5c49010e5549407df35e86415dabfc7e9f91929e2d797d8928019f59c553"
+    },
+    {
+      "path": "resources/js/components/assets/profile/identity-view.tsx",
+      "sha256": "7163bd667129e90f02468d77a447a9665bb5267fbfb3f3e6122fa785a8579ea8"
+    },
+    {
+      "path": "resources/js/components/assets/profile/latest-check.ts",
+      "sha256": "faec2427ae68122263b69d9261ae3417c7ecfcddf520dd69a47826323d111358"
+    },
+    {
+      "path": "resources/js/components/assets/profile/presentation.tsx",
+      "sha256": "976c8c07d3770319e551be8b9aeb8a5a660f4e1b0f4e3b68b7f45d08f1006c8c"
+    },
+    {
+      "path": "resources/js/components/assets/profile/profile.css",
+      "sha256": "f54241b4d2f3c0e28190bf1216df740a6a42f9e9f253eeb22bd5fbe226d9d15a"
+    },
+    {
+      "path": "resources/js/components/assets/profile/qr-dialog.tsx",
+      "sha256": "0d0ed141b23006400794cdc3eba29eb86a69e9b28827bd755c957c1ffc96a595"
+    },
+    {
+      "path": "resources/js/components/assets/profile/record-picker.tsx",
+      "sha256": "d2ad8e62c45e2fa4b7b8e7ce9aefc887aa95856a926c61557748afbbb746d0f2"
+    },
+    {
+      "path": "resources/js/components/assets/profile/source-panels.tsx",
+      "sha256": "be36a420d1914a79715e8fe7bb3bdfe8258e1d8dcff5fb8ca64bfc93d2ebb1b8"
+    },
+    {
+      "path": "resources/js/components/assets/profile/summary-view.tsx",
+      "sha256": "f201ae453e8242d43462cb23de18482589cfe6f8aecabc69bb410e84dc57bd49"
+    },
+    {
+      "path": "resources/js/components/assets/profile/types.ts",
+      "sha256": "db65f9854b6d3eff0122185539bea94f3f384e1bd6d8fd929264e4539bb16d0a"
+    },
+    {
+      "path": "resources/js/components/assets/profile/workspace.tsx",
+      "sha256": "3a61d3e6ca6f2169d9493ab500012b9498f36db25d5ef15bfaa14eb677be9f67"
+    },
+    {
+      "path": "resources/js/components/files/file-preview-dialog.test.tsx",
+      "sha256": "d49a37e381a05289a1133c283c0cdae0eceeed1b444b43b8a3c5b19f96c5a0ae"
+    },
+    {
+      "path": "resources/js/components/files/file-preview-dialog.tsx",
+      "sha256": "99a42ca07249ae992b281c2ada59f48a957a4291d1e7d9d9b2d47da6318e4090"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/date-picker.test.tsx",
+      "sha256": "ce7e5fd957500ce39f28bb458ff5e665d3fb9df59b1c21d7c513442fdc91ff2d"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/date-picker.tsx",
+      "sha256": "c53524229373424fce7f89750569050d75e858e385af11555c70df62a1792e1d"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/vehicle-workspace/record-command.ts",
+      "sha256": "e841c428c112fb41eab370e161efbd03ca2751a2eda7b2442527f819edfd14db"
+    },
+    {
+      "path": "resources/js/lib/finance-sections.ts",
+      "sha256": "750cecb42bfa4a7f4d0dc73a7a30b78ae5b1c5972bd31bb2467f00abd484b77b"
+    },
+    {
+      "path": "resources/js/pages/finance/vehicle-reviews/_dialogs.tsx",
+      "sha256": "55d16248d5c3053c851441e89da5532c6650dd634fd687a48b14b2553314b164"
+    },
+    {
+      "path": "resources/js/pages/finance/vehicle-reviews/index.tsx",
+      "sha256": "d9516a7aaf1af7bcfb5da9f67c73bf2a62361f167b5da781c390fcfa0a42a8a3"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/assets/components/asset-wizard-dialog.tsx",
+      "sha256": "ec864d339e73c7bb099fd97c033aa9062198fc97894087e2c81b92a56ab451ad"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/assets/labels.tsx",
+      "sha256": "1eb1e611396a98b8db589d2993589f2b7f292c5095db1e507b828e62731cb5cb"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/assets/register/labels.test.tsx",
+      "sha256": "3360c3ef1fe18b2c7ff2239d11bf93a50f10b37eb12091481786ca65e7705836"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/assets/register/labels.tsx",
+      "sha256": "70a9d952bac5f0f49d7e3efb23ae5343908f8d90a4a5c7340f463354096d42f9"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/assets/show.tsx",
+      "sha256": "d9eaa9372d5a27a8c0a0290b1de527060e1e0b2ff47161e429f14cf3440c81ef"
+    },
+    {
+      "path": "resources/views/assets/qr-labels.blade.php",
+      "sha256": "38d27a710a96d66d709133e6461b3c6b45a7f576a2f3e61cbc3ee684baf0b505"
+    },
+    {
+      "path": "resources/views/pdf/asset-labels.blade.php",
+      "sha256": "1e59586dea7c5ef63c57be915c2175c6d4b52bba7450c225a3c9172dba55df39"
+    },
+    {
+      "path": "routes/assets.php",
+      "sha256": "a96ca2bc682ed525bf55e2958c69999bd16cfac878c7e6896a1f1915eece883d"
+    },
+    {
+      "path": "routes/fleet-assets.php",
+      "sha256": "7e60640ec5982b8072c008fb8bef6fa0527c033ccf49bc66b161ff408608e9dc"
+    },
+    {
+      "path": "tests/Feature/FleetAssets/AssetRegisterWorkflowTest.php",
+      "sha256": "d2775af1b65c09331aa6efd649535b5b9685e0bb6f7d6192de31251ef96c7366"
+    },
+    {
+      "path": "tests/Feature/FleetAssets/Pkg02bLegacyAssetDocumentRoutesTest.php",
+      "sha256": "3ffbdf9596ae83729cd3369226a130133ca743568be63dc9859b9e0dda614ccc"
+    },
+    {
+      "path": "tests/Feature/FleetAssets/Pkg06bAssetProfileTest.php",
+      "sha256": "d9ec8c4feeaec1bd600129935cf50210dc986a666f697d05714fecf698e1f196"
+    }
+  ]
+}
