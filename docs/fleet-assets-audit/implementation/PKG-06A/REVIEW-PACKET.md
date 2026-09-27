@@ -2,6 +2,8 @@
 
 Prepared on 27 September 2026 in worktree `6421`, branch `codex/assets-register-implementation`.
 
+This original candidate received Changes requested from Main. [Revision 2](REVISION-2.md) records the three corrections and the newer published-main base. Original logs and manifests in this directory remain historical; use `revision-2/` for the successor's exact verification.
+
 ## Authorization and scope
 
 Stephan explicitly requested publication to local main and GitHub main, and deferred phone testing. Main requested an exact reconciled candidate for its substantive technical review and serial publication slot. This packet does not claim integration approval or publication. Automatic Maintenance task creation remains outside this candidate.
@@ -52,4 +54,4 @@ Preview host: `http://127.0.0.1:8774/fleet-assets/assets`, served from worktree 
 - Phone/device testing is explicitly deferred by the user. Physical camera, USB scanner and label-printer hardware remain unverified; keyboard input and QR-image decoding were tested.
 - Follow-up owners/notes are saved evidence. This candidate does not automatically create or resolve Maintenance work.
 - Coverage is historical room coverage, excludes selected-item counts, and is not a declaration of current custody or safety.
-- Production migration, deployment, final integrated smoke test and publication are Main's next steps after its approval and serial integration slot.
+- The owning PKG-06A Designer retains integration execution after Main records approval and confirms the serial slot. Main is the technical reviewer/coordinator. Operational migrations and deployment are separate from Git publication and have not been performed here.

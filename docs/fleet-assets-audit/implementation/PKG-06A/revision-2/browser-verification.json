@@ -1,0 +1,20 @@
+{
+  "SourceCommit": "c962e0db1e3b14ed56777d4cc678911b6daf5787",
+  "PublishedMainBase": "49e0be5b1c1716aeb4e681529bb71fdce2a7abc0",
+  "SourceWorktree": "6421",
+  "Host": "http://127.0.0.1:8774",
+  "SyntheticData": true,
+  "Theme": "dark",
+  "CapturedAt": "2026-09-27T04:36:58.1363638Z",
+  "AssetsEntryObserved": "/build/assets/index-1ArLwLIW.js",
+  "BuildManifestSHA256": "38093a3559ea60dce8fa31f4d8f08764043c25cbf0d73660c69ad102f5dcfca6",
+  "PublicHotPresent": false,
+  "BrowserWarningsAndErrors": [],
+  "DialogCountAfterClose": 0,
+  "Screenshots": [
+    "inventory.png",
+    "stocktake-hub.png",
+    "completed-stocktake.png"
+  ],
+  "PhoneTesting": "Deferred by user"
+}
