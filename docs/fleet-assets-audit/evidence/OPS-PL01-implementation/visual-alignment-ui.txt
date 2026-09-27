@@ -1,0 +1,8 @@
+
+ RUN  v4.1.5 C:/Users/steph/.codex/worktrees/people-locations-implementation/oblivionfindings
+
+
+ Test Files  3 passed (3)
+      Tests  16 passed (16)
+   Start at  07:46:19
+   Duration  37.08s (transform 924ms, setup 4.39s, import 39.85s, tests 744ms, environment 31.90s)

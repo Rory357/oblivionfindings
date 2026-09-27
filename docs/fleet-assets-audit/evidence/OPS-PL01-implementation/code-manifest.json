@@ -1,7 +1,7 @@
 {
   "base": "926b4981b0289da08a20baca0995117fb53e413e",
   "branch": "codex/ops-pl01-implementation",
-  "digest": "b58f80f71b4ac2c185973f93dd05be892afdd95023e5bbaa9b90e468f4f23556",
+  "digest": "d0fd136de600f8746a9e950b77e0aaf30cf94dd1b7ddf7ec128ff8a777098d79",
   "files": [
     {
       "path": "app/Domain/SecurityDevices/Services/PersonalTrackingPrivacyService.php",
@@ -100,8 +100,8 @@
     },
     {
       "path": "resources/js/components/people-locations/history-panel.tsx",
-      "sha256": "c624767bc10ff21188459e2941bfae6f148396178b3967fc1329ef1a344a6e3a",
-      "bytes": 17631
+      "sha256": "ec03fc0183c85d84e84822339990e05406ee27240d6e42ab4dd251c0d55fed62",
+      "bytes": 17686
     },
     {
       "path": "resources/js/components/people-locations/model.test.ts",
@@ -130,8 +130,8 @@
     },
     {
       "path": "resources/js/components/people-locations/record-picker.tsx",
-      "sha256": "8c04538e46c5ba957ae93e374cbf91ea9c74524a4e94f9a478cfc9eff8aa60c6",
-      "bytes": 3396
+      "sha256": "1770493423c079905ca133912daacdd9051dbafd1ae01f5e700287eca4f8aa95",
+      "bytes": 4510
     },
     {
       "path": "resources/js/components/people-locations/report-dialog.test.tsx",
@@ -155,8 +155,8 @@
     },
     {
       "path": "resources/js/components/people-locations/workspace.css",
-      "sha256": "7b9eeff645fceee8bee75d8af5492f67e0547b4baae558ec44cee65ba91159f3",
-      "bytes": 8230
+      "sha256": "e7a2fe02f8e8f0784cd38f4fe4d499fb30cf11e617ca1646a469bf118af07cdf",
+      "bytes": 8885
     },
     {
       "path": "resources/js/components/user-menu-content.tsx",
@@ -175,8 +175,8 @@
     },
     {
       "path": "resources/js/pages/operations/people-locations/index.tsx",
-      "sha256": "a53cc8653f0d145d0b0da5be3d68d4eefa5e5f621ea8d45e7ade1c9ca6c4b95a",
-      "bytes": 56294
+      "sha256": "761eeab512e33b64d81be7ed69a9cbbbb94cf59ad50e156dc9f6817f71514744",
+      "bytes": 59109
     },
     {
       "path": "resources/views/app.blade.php",

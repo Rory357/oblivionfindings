@@ -378,12 +378,16 @@ function WorkspacePage({
                     title: 'People Locations',
                     href: '/operations/people-locations',
                 },
+                {
+                    title: tabs.find((tab) => tab.key === view)?.label ?? 'Map',
+                    href: `/operations/people-locations/${view}`,
+                },
             ]}
         >
             <Head title="People Locations" />
             <div className="flex min-w-0 flex-col gap-5">
                 <PageHeader
-                    icon={MapPin}
+                    icon={Users}
                     title="People Locations"
                     subline={
                         snapshot
@@ -481,120 +485,160 @@ function WorkspacePage({
                         </>
                     }
                     filters={
-                        <>
-                            <PageHeaderFilterSelect
-                                label="Population"
-                                value={snapshot?.filters.population ?? 'both'}
-                                allValue="both"
-                                options={[
-                                    { value: 'both', label: 'Both' },
-                                    { value: 'clients', label: 'Clients' },
-                                    ...(snapshot?.staffAvailable
-                                        ? [{ value: 'staff', label: 'Staff' }]
-                                        : []),
-                                ]}
-                                onChange={(population) =>
-                                    go(view, {
-                                        population,
-                                        selected: '',
-                                        source: '',
-                                    })
-                                }
-                            />
-                            <PageHeaderFilterSelect
-                                label="Site"
-                                value={snapshot?.filters.site ?? 'all'}
-                                options={[
-                                    {
-                                        value: 'all',
-                                        label: 'All permitted sites',
-                                    },
-                                    ...(snapshot?.sites ?? []).map((s) => ({
-                                        value: String(s.id),
-                                        label: s.name,
-                                    })),
-                                ]}
-                                onChange={(site) =>
-                                    go(view, { site, selected: '', source: '' })
-                                }
-                            />
-                            <PageHeaderFilterSelect
-                                label="Evidence"
-                                value={cohort}
-                                options={[
-                                    {
-                                        value: 'all',
-                                        label: 'All evidence states',
-                                    },
-                                    {
-                                        value: 'position:recent',
-                                        label: 'Recent position',
-                                    },
-                                    {
-                                        value: 'position:stale',
-                                        label: 'Stale position',
-                                    },
-                                    {
-                                        value: 'position:unknown',
-                                        label: 'Position unavailable',
-                                    },
-                                    ...(cohort !== 'all' &&
-                                    !cohort.startsWith('position:')
-                                        ? [
-                                              {
-                                                  value: cohort,
-                                                  label: cohort.replace(
-                                                      ':',
-                                                      ' · ',
-                                                  ),
-                                              },
-                                          ]
-                                        : []),
-                                ]}
-                                onChange={(cohort) => go(view, { cohort })}
-                            />
-                            <PageHeaderFilterSelect
-                                label="Sort"
-                                value={sort}
-                                allValue="name"
-                                options={[
-                                    { value: 'name', label: 'Name' },
-                                    {
-                                        value: 'position',
-                                        label: 'Latest position',
-                                    },
-                                    {
-                                        value: 'battery',
-                                        label: 'Lowest battery',
-                                    },
-                                    {
-                                        value: 'attention',
-                                        label: 'Source attention',
-                                    },
-                                ]}
-                                onChange={(sort) => go(view, { sort })}
-                            />
-                            {view === 'people' && (
+                        <fieldset
+                            className="pl-workspace-filters"
+                            disabled={!snapshot}
+                            aria-label="People location filters"
+                        >
+                            <span className="text-[11px] leading-snug text-primary-foreground/80">
+                                Permitted records only
+                            </span>
+                            <div className="pl-workspace-filter-controls">
                                 <PageHeaderViewToggle
-                                    value={peopleView}
-                                    onChange={(peopleView) =>
-                                        go(view, { peopleView })
+                                    ariaLabel="Population"
+                                    value={
+                                        snapshot?.filters.population ?? 'both'
                                     }
                                     options={[
-                                        {
-                                            value: 'cards',
-                                            label: 'Cards',
-                                            icon: LayoutGrid,
-                                        },
-                                        {
-                                            value: 'list',
-                                            label: 'List',
-                                            icon: List,
-                                        },
+                                        { value: 'clients', label: 'Clients' },
+                                        ...(snapshot?.staffAvailable
+                                            ? [
+                                                  {
+                                                      value: 'staff',
+                                                      label: 'Staff',
+                                                  },
+                                              ]
+                                            : []),
+                                        { value: 'both', label: 'Both' },
                                     ]}
+                                    onChange={(population) =>
+                                        go(view, {
+                                            population,
+                                            selected: '',
+                                            source: '',
+                                        })
+                                    }
                                 />
-                            )}
-                        </>
+                                <RecordPicker
+                                    variant="header"
+                                    label="Site"
+                                    value={snapshot?.filters.site ?? 'all'}
+                                    active={Boolean(
+                                        snapshot &&
+                                        snapshot.filters.site !== 'all',
+                                    )}
+                                    options={[
+                                        {
+                                            value: 'all',
+                                            label: 'All permitted sites',
+                                        },
+                                        ...(snapshot?.sites ?? []).map(
+                                            (site) => ({
+                                                value: String(site.id),
+                                                label: site.name,
+                                            }),
+                                        ),
+                                    ]}
+                                    onChange={(site) =>
+                                        go(view, {
+                                            site,
+                                            selected: '',
+                                            source: '',
+                                        })
+                                    }
+                                />
+                                <RecordPicker
+                                    variant="header"
+                                    label="Evidence"
+                                    value={cohort}
+                                    active={cohort !== 'all'}
+                                    options={[
+                                        {
+                                            value: 'all',
+                                            label: 'All evidence states',
+                                        },
+                                        {
+                                            value: 'position:recent',
+                                            label: 'Recent position',
+                                        },
+                                        {
+                                            value: 'position:stale',
+                                            label: 'Stale position',
+                                        },
+                                        {
+                                            value: 'position:unknown',
+                                            label: 'Position unavailable',
+                                        },
+                                        ...(![
+                                            'all',
+                                            'position:recent',
+                                            'position:stale',
+                                            'position:unknown',
+                                        ].includes(cohort)
+                                            ? [
+                                                  {
+                                                      value: cohort,
+                                                      label: cohortLabel(
+                                                          cohort,
+                                                          snapshot?.sites,
+                                                      ),
+                                                  },
+                                              ]
+                                            : []),
+                                    ]}
+                                    onChange={(cohort) => go(view, { cohort })}
+                                />
+                                <div className="pl-ins-filter-label">
+                                    <span>Sort</span>
+                                    <RecordPicker
+                                        variant="header"
+                                        label="Sort"
+                                        value={sort}
+                                        active={sort !== 'name'}
+                                        options={[
+                                            {
+                                                value: 'name',
+                                                label: 'Name A–Z',
+                                            },
+                                            {
+                                                value: 'position',
+                                                label: 'Latest position',
+                                            },
+                                            {
+                                                value: 'battery',
+                                                label: 'Lowest battery',
+                                            },
+                                            {
+                                                value: 'attention',
+                                                label: 'Source attention',
+                                            },
+                                        ]}
+                                        onChange={(sort) => go(view, { sort })}
+                                    />
+                                </div>
+                                {view === 'people' && (
+                                    <PageHeaderViewToggle
+                                        ariaLabel="People display"
+                                        value={peopleView}
+                                        onChange={(peopleView) =>
+                                            go(view, { peopleView })
+                                        }
+                                        options={[
+                                            {
+                                                value: 'cards',
+                                                label: 'Cards',
+                                                icon: LayoutGrid,
+                                            },
+                                            {
+                                                value: 'list',
+                                                label: 'List',
+                                                icon: List,
+                                            },
+                                        ]}
+                                    />
+                                )}
+                            </div>
+                        </fieldset>
                     }
                     rail={
                         <PageHeaderRail

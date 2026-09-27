@@ -132,13 +132,13 @@ function EvidenceTimeline({ history }: { history: History }) {
     );
     const selected = events.find((e) => e.id === selectedId) ?? events[0];
     return (
-        <div className="grid grid-cols-[minmax(0,1fr)_330px] gap-5">
+        <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_330px]">
             <HistoricalMap
                 events={events}
                 selected={selected}
                 onSelect={setSelectedId}
             />
-            <div className="space-y-3">
+            <div className="min-w-0 space-y-3">
                 <h3 className="font-semibold">Observation timeline</h3>
                 <div
                     role="region"
@@ -260,7 +260,7 @@ export function HistoryPanel({
                 ) : history ? (
                     <>
                         <div className="flex flex-wrap items-end justify-between gap-4">
-                            <div className="min-w-80">
+                            <div className="w-full min-w-0 sm:w-80">
                                 <RecordPicker
                                     label="Report window"
                                     value={String(history.journey?.id ?? 'day')}
@@ -358,7 +358,7 @@ export function HistoryPanel({
                                         {time(j.accountedAt)} · {j.status}
                                     </p>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                     <Button
                                         variant="outline"
                                         onClick={() => onJourney(String(j.id))}

@@ -1,8 +1,8 @@
 # People Locations — implementation and audit closure
 
-14 original audit findings addressed. Main closed T-PL01-01, T-PL01-02 and T-PL01-03 on the previous revision. T-PL01-05 is corrected for renewed review ([branding packet](BRAND-VALUES.md)); T-PL01-04 still needs actual 125% browser zoom verification. Main integration remains pending. See [the correction packet](CORRECTIONS.md).
+14 original audit findings addressed. Main closed T-PL01-01, T-PL01-02, T-PL01-03 and T-PL01-05 on `419e4c89`. The latest [visual-alignment packet](VISUAL-ALIGNMENT.md) restores visible header selections and corrects mobile History layout gaps for renewed review. T-PL01-04 still needs actual 125% browser zoom verification. Main integration remains pending.
 
-Branch: `codex/ops-pl01-implementation`. Integrated base: `926b4981b0289da08a20baca0995117fb53e413e`. Source manifest: `b58f80f71b4ac2c185973f93dd05be892afdd95023e5bbaa9b90e468f4f23556`.
+Branch: `codex/ops-pl01-implementation`. Integrated base: `926b4981b0289da08a20baca0995117fb53e413e`. Source manifest: `d0fd136de600f8746a9e950b77e0aaf30cf94dd1b7ddf7ec128ff8a777098d79`.
 
 Local preview: http://127.0.0.1:8776/operations/people-locations/analytics?selected=c1
 

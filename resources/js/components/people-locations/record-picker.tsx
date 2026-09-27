@@ -1,3 +1,4 @@
+import { PageHeaderFilterButton } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import {
     Command,
@@ -11,7 +12,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { Check, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useState } from 'react';
 
 export function RecordPicker({
@@ -20,8 +21,12 @@ export function RecordPicker({
     options,
     onChange,
     disabled = false,
+    variant = 'form',
+    active = false,
 }: {
     disabled?: boolean;
+    variant?: 'form' | 'header';
+    active?: boolean;
     label: string;
     value: string;
     options: { value: string; label: string; description?: string }[];
@@ -32,23 +37,44 @@ export function RecordPicker({
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
-                <Button
-                    disabled={disabled}
-                    variant="outline"
-                    role="combobox"
-                    aria-label={label}
-                    aria-expanded={open}
-                    className="w-full justify-between text-left"
-                >
-                    <span className="truncate">
-                        {selected?.label ?? `Choose ${label.toLowerCase()}`}
-                    </span>
-                    <ChevronsUpDown className="size-4 shrink-0" />
-                </Button>
+                {variant === 'header' ? (
+                    <PageHeaderFilterButton
+                        disabled={disabled}
+                        active={active}
+                        role="combobox"
+                        aria-label={label}
+                        aria-expanded={open}
+                        title={selected?.label}
+                        className="max-w-full"
+                    >
+                        <span className="max-w-48 truncate">
+                            {selected?.label ?? `Choose ${label.toLowerCase()}`}
+                        </span>
+                        <ChevronDown className="size-3 shrink-0 opacity-70" />
+                    </PageHeaderFilterButton>
+                ) : (
+                    <Button
+                        disabled={disabled}
+                        variant="outline"
+                        role="combobox"
+                        aria-label={label}
+                        aria-expanded={open}
+                        className="w-full justify-between text-left"
+                    >
+                        <span className="truncate">
+                            {selected?.label ?? `Choose ${label.toLowerCase()}`}
+                        </span>
+                        <ChevronsUpDown className="size-4 shrink-0" />
+                    </Button>
+                )}
             </PopoverTrigger>
             <PopoverContent
                 align="start"
-                className="w-[var(--radix-popover-trigger-width)] max-w-[90vw] min-w-72 p-0"
+                className={
+                    variant === 'header'
+                        ? 'w-72 max-w-[90vw] p-0'
+                        : 'w-[var(--radix-popover-trigger-width)] max-w-[90vw] min-w-72 p-0'
+                }
             >
                 <Command>
                     <CommandInput
