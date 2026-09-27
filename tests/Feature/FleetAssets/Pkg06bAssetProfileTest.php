@@ -101,6 +101,30 @@ class Pkg06bAssetProfileTest extends TestCase
         $this->assertSame(1, AssetKitItem::where('asset_id', $this->asset->id)->count());
     }
 
+    public function test_profile_uses_canonical_assignment_receipts_and_requires_explicit_attestation(): void
+    {
+        $recipient = $this->user([$this->origin]);
+        $assignment = $this->command('assign', ['assignee_type' => 'staff', 'assignee_id' => $recipient->id])->assertOk()->json('assignment_id');
+        $options = $this->actingAs($this->manager)->getJson('/assets/'.$this->asset->id.'/profile-options?kind=assignees')->assertOk()->json('options');
+        $this->assertContains('staff:'.$recipient->id, array_column($options, 'id'));
+        $this->command('confirm_assignment_receipt', ['assignment_id' => $assignment])->assertUnprocessable();
+        $this->command('confirm_assignment_receipt', ['assignment_id' => $assignment, 'verified_received' => false])->assertUnprocessable();
+        $version = $this->asset->fresh()->asset_profile_version;
+        $payload = ['action' => 'confirm_assignment_receipt', 'assignment_id' => $assignment, 'verified_received' => true, 'reason' => 'Checked actual handover', 'request_key' => (string) Str::uuid(), 'expected_version' => $version];
+        $url = '/assets/'.$this->asset->id.'/profile-actions';
+        $first = $this->postJson($url, $payload)->assertOk();
+        $this->postJson($url, $payload)->assertOk()->assertExactJson($first->json());
+        $record = $this->asset->assignments()->findOrFail($assignment);
+        $this->assertNotNull($record->receipt_confirmed_at);
+        $this->assertSame($this->manager->id, $record->receipt_confirmed_by_user_id);
+        $this->assertSame('Checked actual handover', $record->receipt_note);
+        $this->assertGreaterThan($version, $this->asset->fresh()->asset_profile_version);
+        $this->assertSame($this->origin->id, $this->asset->fresh()->site_id);
+        $this->assertSame(0, AssetCustodyMovement::where('asset_id', $this->asset->id)->count());
+        $this->assertSame(1, AssetProfileEvent::where('asset_id', $this->asset->id)->where('action', 'confirm_assignment_receipt')->count());
+        $this->postJson($url, [...$payload, 'reason' => 'Changed retry'])->assertConflict();
+    }
+
     public function test_linked_components_move_only_with_an_acknowledged_kit_receipt(): void
     {
         $component = Asset::factory()->forSite($this->origin)->create(['category' => 'equipment', 'status' => 'active', 'home_site_id' => $this->origin->id, 'client_id' => null]);
@@ -274,6 +298,7 @@ class Pkg06bAssetProfileTest extends TestCase
         $foreign = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
         $second->forceFill(['site_id' => $foreign->id])->save();
         $this->actingAs($this->manager)->get($url.'/'.$id.'/pdf')->assertNotFound();
+        $this->postJson($url, $payload)->assertNotFound();
     }
 
     public function test_viewers_cannot_create_missing_qr_identity_and_expired_batches_cannot_download(): void
@@ -288,6 +313,7 @@ class Pkg06bAssetProfileTest extends TestCase
         $this->assertNotNull($this->asset->fresh()->qr_token);
         AssetLabelBatch::whereKey($id)->update(['expires_at' => now()->subMinute()]);
         $this->get($url.'/'.$id.'/pdf')->assertGone();
+        $this->postJson($url, $payload)->assertGone();
     }
 
     public function test_label_workspace_filters_canonical_lifecycle_without_leaking_other_sites(): void

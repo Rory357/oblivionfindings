@@ -233,6 +233,10 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('asset')
             ->whereNumber('assignment')
             ->name('assets.assignments.release');
+        Route::post('/assets/{asset}/assignments/{assignment}/confirm-receipt', [AssetAssignmentController::class, 'confirmReceipt'])
+            ->whereNumber('asset')
+            ->whereNumber('assignment')
+            ->name('assets.assignments.confirm-receipt');
     });
 
     Route::middleware('permission:assets.geofences.manage')->group(function () {

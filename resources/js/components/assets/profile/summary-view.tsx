@@ -45,7 +45,7 @@ export function AssetSummaryView({
     const latestReceipt = data.movements.find(
         (item) => item.state === 'acknowledged',
     );
-    const assignment = asset.assignments.find((item) => !item.returned_at);
+    const assignment = asset.current_assignment;
     const lastCheck = latestAssetCheck(data);
     const work = data.work.find(
         (item) => !['completed', 'cancelled'].includes(item.status),

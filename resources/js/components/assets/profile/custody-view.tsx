@@ -39,7 +39,7 @@ export function AssetCustodyView({
     ) => void;
     onKit: () => void;
 }) {
-    const assignment = asset.assignments.find((item) => !item.returned_at);
+    const assignment = asset.current_assignment;
     const pending = data.movements.find((item) =>
         ['pending_receipt', 'incomplete', 'disputed'].includes(item.state),
     );
@@ -57,7 +57,9 @@ export function AssetCustodyView({
     const confirmed =
         current?.state === 'acknowledged'
             ? current.received_by
-            : assignment?.assignee?.name;
+            : assignment?.receipt_confirmed_at
+              ? assignment.assignee?.name
+              : null;
     const transferAction = canManage && (
         <Button
             disabled={!!pending}
@@ -170,6 +172,49 @@ export function AssetCustodyView({
                                 <Fact label="Confirmed custodian">
                                     {confirmed || 'No confirmed custodian'}
                                 </Fact>
+                                {assignment && (
+                                    <Fact label="Assignment receipt">
+                                        {assignment.receipt_confirmed_at ? (
+                                            <span>
+                                                Verified{' '}
+                                                {formatDateTime(
+                                                    assignment.receipt_confirmed_at,
+                                                )}
+                                                {assignment.receipt_confirmed_by
+                                                    ? ` · ${assignment.receipt_confirmed_by}`
+                                                    : ''}
+                                                {assignment.receipt_note
+                                                    ? ` · ${assignment.receipt_note}`
+                                                    : ''}
+                                            </span>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <p>
+                                                    Receipt has not been
+                                                    verified.
+                                                </p>
+                                                {canManage &&
+                                                    assignment.recipient_visible &&
+                                                    new Date(
+                                                        assignment.assigned_at,
+                                                    ) <= new Date() && (
+                                                        <TextAction
+                                                            onClick={() =>
+                                                                onAction(
+                                                                    'confirm_assignment_receipt',
+                                                                    undefined,
+                                                                    assignment.id,
+                                                                )
+                                                            }
+                                                        >
+                                                            Verify assignment
+                                                            receipt
+                                                        </TextAction>
+                                                    )}
+                                            </div>
+                                        )}
+                                    </Fact>
+                                )}
                                 <Fact label="Movement purpose">
                                     {current
                                         ? `${human(current.kind)} · ${current.reason || 'No reason recorded'}`
@@ -358,6 +403,9 @@ export function AssetCustodyView({
                                         ? formatDateTime(item.returned_at)
                                         : 'Current'}
                                     {item.purpose ? ` · ${item.purpose}` : ''}
+                                    {item.receipt_confirmed_at
+                                        ? ` · Receipt verified ${formatDateTime(item.receipt_confirmed_at)}`
+                                        : ' · Receipt not verified'}
                                 </p>
                             ))
                         ) : (

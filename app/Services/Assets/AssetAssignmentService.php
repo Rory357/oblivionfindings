@@ -100,6 +100,57 @@ final class AssetAssignmentService
         }, 3);
     }
 
+    public function confirmReceipt(User $actor, Asset $asset, AssetAssignment $assignment, ?string $note): AssetAssignment
+    {
+        return DB::transaction(function () use ($actor, $asset, $assignment, $note): AssetAssignment {
+            $asset = $this->access->assignableAsset($actor, (int) $asset->getKey(), true) ?? abort(404);
+            abort_unless($actor->can('manageAssignments', $asset), 403);
+            $siteIds = $this->assetSiteIds($asset);
+            abort_unless($siteIds !== [] && array_intersect($siteIds, $this->access->accessibleSiteIds($actor)) !== [], 404);
+
+            $assignment = AssetAssignment::query()
+                ->where('asset_id', $asset->id)
+                ->whereKey($assignment->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($assignment->released_at !== null) {
+                throw ValidationException::withMessages([
+                    'assignment' => 'A released assignment cannot have its receipt confirmed.',
+                ]);
+            }
+            if ($assignment->assigned_at === null || $assignment->assigned_at->isFuture()) {
+                throw ValidationException::withMessages([
+                    'assignment' => 'A future assignment cannot have its receipt confirmed.',
+                ]);
+            }
+            // A repeated confirmation is a read of the original attestation.
+            // Never replace its actor, time or note, or write a second audit.
+            if ($assignment->receipt_confirmed_at !== null) {
+                return $assignment;
+            }
+
+            // A historical link to a moved or inaccessible recipient is not
+            // enough evidence for a new receipt attestation.
+            $this->assertTarget($actor, (string) $assignment->assignee_type, (int) $assignment->assignee_id, $siteIds);
+
+            $assignment->update([
+                'receipt_confirmed_at' => now(),
+                'receipt_confirmed_by_user_id' => $actor->id,
+                'receipt_note' => $note,
+            ]);
+            AuditLogger::logOrFail('assets.assignment.receipt_confirmed', $asset, [
+                'assignment_id' => $assignment->id,
+                'confirmed_by_user_id' => $actor->id,
+            ]);
+            if ($asset->getRawOriginal('asset_profile_version') !== null) {
+                $asset->forceFill(['asset_profile_version' => (int) $asset->asset_profile_version + 1])->save();
+            }
+
+            return $assignment->fresh();
+        }, 3);
+    }
+
     /** @param list<int> $assetSiteIds */
     private function assertTarget(User $actor, string $type, int $id, array $assetSiteIds): void
     {

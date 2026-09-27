@@ -155,7 +155,7 @@ export type ProfileWorkspace = {
     qr: { image: string; svg: string; download: string; label: string } | null;
     room: string | null;
 };
-export type Option = { id: number; name: string };
+export type Option = { id: number | string; name: string };
 export type ProfileAction =
     | 'ownership'
     | 'dispatch'
@@ -168,6 +168,7 @@ export type ProfileAction =
     | 'kit_remove'
     | 'retire'
     | 'assign'
+    | 'confirm_assignment_receipt'
     | 'set_photo'
     | 'remove_photo'
     | 'generate_qr'

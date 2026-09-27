@@ -83,6 +83,49 @@ describe('Asset receipt dialog', () => {
         expect(await screen.findByText('Receipt recorded')).toBeVisible();
     });
 
+    it('requires explicit assignment receipt attestation before calling the canonical command', async () => {
+        const fetcher = vi
+            .fn()
+            .mockResolvedValue(
+                new Response(
+                    JSON.stringify({ message: 'Assignment receipt verified' }),
+                    { status: 200 },
+                ),
+            );
+        vi.stubGlobal('fetch', fetcher);
+        render(
+            <AssetActionDialog
+                action="confirm_assignment_receipt"
+                assetId={104}
+                assetName="Transfer hoist"
+                workspace={workspace}
+                sites={[]}
+                itemId={23}
+                onClose={vi.fn()}
+                onSaved={vi.fn()}
+            />,
+        );
+        fireEvent.change(screen.getByRole('textbox', { name: /Reason/ }), {
+            target: { value: 'Checked handover' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+            'Confirm that assignment receipt has been verified',
+        );
+        expect(fetcher).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('checkbox', { name: /I verified/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Verify assignment receipt' }),
+        );
+        await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+        expect(JSON.parse(fetcher.mock.calls[0][1].body)).toMatchObject({
+            action: 'confirm_assignment_receipt',
+            assignment_id: 23,
+            verified_received: true,
+        });
+    });
+
     it('keeps an uncertain save locked and retries the exact same submission', async () => {
         const fetcher = vi
             .fn()

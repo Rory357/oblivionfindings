@@ -130,7 +130,12 @@ export function AssetProfileWorkspace({
     useEffect(() => {
         const read = () => {
             const hash = new URLSearchParams(window.location.hash.slice(1));
-            const requested = hash.get('view');
+            const requested =
+                hash.get('view') ||
+                (new URLSearchParams(window.location.search).get('tab') ===
+                'assignments'
+                    ? 'custody'
+                    : null);
             const next =
                 requested === 'components'
                     ? 'kit'
@@ -187,7 +192,7 @@ export function AssetProfileWorkspace({
         ...data.documents,
         ...(data.sources?.source_files ?? []),
     ];
-    const assignment = asset.assignments?.find((item) => !item.returned_at),
+    const assignment = asset.current_assignment,
         currentDocs = allDocuments.filter(
             (file) => file.current && !file.archived,
         ),

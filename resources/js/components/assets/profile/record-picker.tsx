@@ -25,7 +25,7 @@ export function AssetRecordPicker({
     invalid,
 }: {
     assetId: number;
-    kind: 'staff' | 'rooms' | 'components' | 'owners';
+    kind: 'staff' | 'rooms' | 'components' | 'owners' | 'assignees';
     siteId?: string;
     value: string;
     onChange: (value: string, name: string) => void;

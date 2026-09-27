@@ -18,7 +18,7 @@
         .crumb { font-size: 8pt; color: #625d73; }
         .page-foot { position: fixed; bottom: -11mm; left: 0; right: 0; height: 7mm; border-top: .4pt solid #dcdae3; padding-top: 1.5mm; font-size: 7pt; color: #625d73; }
         .page-foot table { width: 100%; border-collapse: collapse; }
-        .page-number:after { content: counter(page) " / " counter(pages); }
+        .page-number:after { content: "Page " counter(page); }
         h1 { font-size: 19pt; margin: 0 0 1mm; }
         h2 { font-size: 13pt; margin: 0 0 1mm; }
         h3 { font-size: 10pt; margin: 5mm 0 2mm; }
@@ -36,7 +36,7 @@
         .route-to { color: #625d73; }
         .notes { margin-top: 5mm; }
         .notes p { margin: 0 0 1.5mm; font-size: 8pt; color: #3d384d; }
-        .trip { page-break-inside: avoid; margin-top: 7mm; }
+        .trip { page-break-inside: auto; margin-top: 7mm; }
         .trip.new-page { page-break-before: always; margin-top: 0; }
         table.facts { width: 100%; border-collapse: collapse; margin-top: 3mm; }
         table.facts td { width: 25%; border: .4pt solid #e3e1ea; padding: 2mm 2.5mm; vertical-align: top; }
@@ -157,7 +157,8 @@
                 <div class="legend">
                     <span class="dot" style="background:#15803d;"></span> Start ·
                     <span class="dot" style="background:#b91c1c;"></span> End ·
-                    Recorded positions joined in time order{{ $trip['partial'] ? ', dashed where coverage is partial' : '' }}. This sketch is not a map and the lines are not verified roads.
+                    Recorded positions joined in time order{{ $trip['partial'] ? ', dashed where coverage is partial' : '' }}. Lines are not verified roads.
+                    <br>{{ $trip['map_note'] }}
                 </div>
             @else
                 <div class="legend">No recorded positions to sketch for this trip.</div>
@@ -168,7 +169,10 @@
             <h3>Journey events</h3>
             @if (count($trip['events']))
                 <table class="data">
-                    <thead><tr><th style="width: 15mm;">Time</th><th style="width: 38mm;">Event</th><th>Details</th><th style="width: 45mm;">Location</th></tr></thead>
+                    <thead>
+                    <tr><th colspan="4">{{ $brand['name'] }} · {{ $trip['reference'] }} · {{ $vehicle_line }}</th></tr>
+                    <tr><th style="width: 15mm;">Time</th><th style="width: 38mm;">Event</th><th>Details</th><th style="width: 45mm;">Location</th></tr>
+                    </thead>
                     <tbody>
                     @foreach ($trip['events'] as $event)
                         <tr>

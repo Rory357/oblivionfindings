@@ -84,7 +84,10 @@ class AssetLabelController extends Controller
             User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
             if ($batch = AssetLabelBatch::where('request_id', $data['request_id'])->first()) {
                 abort_unless($batch->created_by_user_id === $request->user()->id, 404);
-                abort_unless($batch->asset_ids === $data['asset_ids'] && $batch->layout == [...$layout, 'columns' => $columns, 'rows' => $rows], 409, 'This request was already used for a different selection or layout.');
+                $originalLayout = ['paper' => 'a4', 'logo' => true, ...$batch->layout];
+                abort_unless($batch->asset_ids === $data['asset_ids'] && $originalLayout == [...$layout, 'columns' => $columns, 'rows' => $rows], 409, 'This request was already used for a different selection or layout.');
+                abort_if($batch->expires_at->isPast(), 410, 'This label batch expired. Generate a new batch from the current register.');
+                abort_unless($this->access->accessibleAssets($request->user())->whereKey($batch->asset_ids)->count() === count($batch->asset_ids), 404);
 
                 return $batch;
             }

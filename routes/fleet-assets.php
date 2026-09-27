@@ -127,6 +127,8 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     Route::middleware('permission:fleet.manage|fleet.maintenance.manage')->group(function () {
         Route::post('/vehicles/{asset}/appointments', [VehicleCalendarController::class, 'scheduleAppointment'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.appointments.store');
+        Route::post('/vehicles/{asset}/appointments/undo', [VehicleCalendarController::class, 'undoAppointment'])
+            ->whereNumber('asset')->name('fleet-assets.vehicles.appointments.undo');
     });
 
     // PKG-02B vehicle calendar: unavailable periods.
@@ -221,6 +223,8 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
             ->whereNumber('asset')->name('fleet-assets.vehicles.reminders.store');
         Route::put('/vehicles/{asset}/reminders/{reminder}', [VehicleReminderController::class, 'update'])
             ->whereNumber(['asset', 'reminder'])->name('fleet-assets.vehicles.reminders.update');
+        Route::post('/vehicles/{asset}/reminders/{reminder}/undo', [VehicleReminderController::class, 'undo'])
+            ->whereNumber(['asset', 'reminder'])->name('fleet-assets.vehicles.reminders.undo');
         Route::post('/vehicles/{asset}/reminders/{reminder}/{action}', [VehicleReminderController::class, 'act'])
             ->whereNumber(['asset', 'reminder'])->whereIn('action', ['acknowledge', 'complete', 'pause', 'resume', 'snooze'])
             ->name('fleet-assets.vehicles.reminders.act');

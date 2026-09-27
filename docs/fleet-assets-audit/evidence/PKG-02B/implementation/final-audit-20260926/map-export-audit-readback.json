@@ -1,0 +1,56 @@
+[
+    {
+        "id": 4335,
+        "action": "fleet.trip_history.exported",
+        "meta": {
+            "to": "2026-09-24",
+            "from": "2026-09-23",
+            "event": "all",
+            "trips": 2,
+            "driver": "unassigned",
+            "format": "spreadsheet",
+            "asset_id": 7,
+            "searched": false,
+            "route_images": [
+                {
+                    "kind": "local_osm_street_map",
+                    "trips": 2,
+                    "dataset": {
+                        "date": "2026-09-23",
+                        "label": "New Zealand",
+                        "sha256": "8a40e14d71fd3c9522646117209d0ea403cba10fc549ab3e77b09fa84b581ad4"
+                    }
+                }
+            ],
+            "excluded_personal": 0,
+            "excluded_without_consent": 0
+        }
+    },
+    {
+        "id": 4334,
+        "action": "fleet.trip_history.exported",
+        "meta": {
+            "to": "2026-09-24",
+            "from": "2026-09-23",
+            "event": "all",
+            "trips": 2,
+            "driver": "unassigned",
+            "format": "pdf",
+            "asset_id": 7,
+            "searched": false,
+            "route_images": [
+                {
+                    "kind": "local_osm_street_map",
+                    "trips": 2,
+                    "dataset": {
+                        "date": "2026-09-23",
+                        "label": "New Zealand",
+                        "sha256": "8a40e14d71fd3c9522646117209d0ea403cba10fc549ab3e77b09fa84b581ad4"
+                    }
+                }
+            ],
+            "excluded_personal": 0,
+            "excluded_without_consent": 0
+        }
+    }
+]

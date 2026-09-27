@@ -31,6 +31,16 @@ class AssetProfileController extends Controller
         if ($site) {
             abort_unless(in_array($site, $access->accessibleSiteIds($request->user()), true), 404);
         }
+        if ($kind === 'assignees') {
+            $sites = collect([$asset->site_id, $asset->home_site_id, $asset->client?->site_id])->filter()->map(fn ($id) => (int) $id)->unique()->values();
+            abort_unless($sites->count() === 1 && in_array($sites[0], $access->accessibleSiteIds($request->user()), true), 404);
+            $site = $sites[0];
+            $options = $access->assignableStaffAtSite($request->user(), $site, $search)->map(fn ($person) => ['id' => 'staff:'.$person->id, 'name' => $person->name.' · Staff'])
+                ->concat($access->assignableClientsAtSite($request->user(), $site, $search)->map(fn ($person) => ['id' => 'client:'.$person->id, 'name' => trim($person->first_name.' '.$person->last_name).' · Client']))
+                ->concat($access->assignableWhanauAtSite($request->user(), $site, $search)->map(fn ($person) => ['id' => 'whanau:'.$person->id, 'name' => $person->name.' · Whānau']));
+
+            return response()->json(['options' => $options->values()]);
+        }
         $options = match ($kind) {
             'owners' => $access->assignableClients($request->user(), $search)->filter(fn ($client) => (int) $client->site_id === (int) $asset->site_id)->map(fn ($client) => ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)])->values(),
             'staff' => $access->assignableStaff($request->user())->when($site, fn ($query) => $query->whereHas('hrEmployeeProfile', fn ($profile) => $profile->where(fn ($placement) => $placement->where('primary_site_id', $site)->orWhereJsonContains('secondary_site_ids', $site))))->where('name', 'like', '%'.$search.'%')->orderBy('name')->limit(50)->get(['id', 'name']),
@@ -46,16 +56,19 @@ class AssetProfileController extends Controller
     {
         $this->authorize('view', $asset);
         $data = $request->validate([
-            'action' => ['required', 'in:dispatch,receive,return,cancel_movement,exception,kit_add,kit_remove,verify_location,retire,assign,release,check,set_photo,remove_photo,generate_qr,ownership'],
+            'action' => ['required', 'in:dispatch,receive,return,cancel_movement,exception,kit_add,kit_remove,verify_location,retire,assign,release,confirm_assignment_receipt,check,set_photo,remove_photo,generate_qr,ownership'],
+            'assignee_type' => ['nullable', 'in:staff,client,whanau'],
+            'assignee_id' => ['required_with:assignee_type', 'nullable', 'integer', 'min:1'],
+            'verified_received' => ['required_if:action,confirm_assignment_receipt', 'accepted_if:action,confirm_assignment_receipt'],
             'owner_type' => ['required_if:action,ownership', 'nullable', 'in:site,client'],
             'owner_id' => ['required_if:action,ownership', 'nullable', 'integer', 'min:1'],
             'document_id' => ['required_if:action,set_photo', 'nullable', 'integer', 'min:1'],
             'condition' => ['nullable', 'in:good,worn,damaged,unknown'],
             'result' => ['required_if:action,check', 'nullable', 'in:pass,fail,needs_followup'],
             'next_due_at' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:today'],
-            'assignment_id' => ['required_if:action,release', 'nullable', 'integer', 'min:1'],
+            'assignment_id' => ['required_if:action,release,confirm_assignment_receipt', 'nullable', 'integer', 'min:1'],
             'request_key' => ['required', 'string', 'min:8', 'max:80'],
-            'expected_version' => ['required', 'integer', 'min:1'], 'reason' => ['required', 'string', 'max:2000', 'not_regex:/^\s*$/'],
+            'expected_version' => ['required', 'integer', 'min:1'], 'reason' => ['required', 'string', 'max:'.($request->input('action') === 'confirm_assignment_receipt' ? '500' : '2000'), 'not_regex:/^\s*$/'],
             'kind' => ['nullable', 'in:transfer,loan'], 'movement_id' => ['nullable', 'integer', 'min:1'],
             'destination_site_id' => ['nullable', 'integer', 'min:1'], 'destination_room_id' => ['nullable', 'integer', 'min:1'],
             'recipient_user_id' => ['nullable', 'integer', 'min:1'], 'return_due_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:today'],

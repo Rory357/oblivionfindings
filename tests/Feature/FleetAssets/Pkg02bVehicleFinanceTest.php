@@ -9,8 +9,10 @@ use App\Domain\Finance\Models\FinPurchaseOrder;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
+use App\Models\AssetDocument;
 use App\Models\FleetFinanceReviewRequest;
 use App\Models\FleetVehicleFinanceLink;
+use App\Models\FleetVehicleReminder;
 use App\Models\FleetWorkOrder;
 use App\Models\Permission;
 use App\Models\Site;
@@ -18,9 +20,12 @@ use App\Models\User;
 use App\Services\Files\MalwareScanDisposition;
 use App\Services\Files\MalwareScanner;
 use App\Services\Files\MalwareScanResult;
+use App\Services\Fleet\VehicleCalendarService;
 use App\Services\Fleet\VehicleFinancePresenter;
 use App\Services\Fleet\VehicleWorkspacePresenter;
+use App\Services\Sites\Calendar\Providers\FleetVehicleReminderObligationProvider;
 use App\Services\Tasks\TaskAggregator;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -389,8 +394,48 @@ class Pkg02bVehicleFinanceTest extends TestCase
         $this->actingAs($assetViewer)->get("/assets/{$vehicle->id}/documents/{$upload['id']}/download")->assertNotFound();
         $this->actingAs($manager)->get("/assets/{$vehicle->id}/documents/{$upload['id']}/download")->assertOk();
 
-        // Once Finance has decided, no more files can be added.
+        // Managing asset files does not grant access to a linked Finance record.
+        $documentManager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage', 'assets.viewAny', 'assets.documents.manage']);
+        $setId = AssetDocument::query()->findOrFail($upload['id'])->document_set_id;
+        $fileUrl = "/fleet-assets/vehicles/{$vehicle->id}/document-files/{$upload['id']}";
+        $details = ['category' => 'Purchase approval', 'document_date' => '2026-09-23', 'reason' => 'Change evidence details', 'expected_version' => 1];
+        $this->actingAs($documentManager)->post($documents, [
+            ...$details, 'source_type' => 'finance_review_request', 'source_id' => $request['id'],
+            'request_key' => 'finance-files-denied', 'files' => [$this->pdf('denied.pdf')],
+        ], ['Accept' => 'application/json'])->assertNotFound();
+        $this->actingAs($documentManager)->putJson("{$documents}/{$setId}", $details, ['Idempotency-Key' => 'finance-edit-denied'])->assertNotFound();
+        $this->actingAs($documentManager)->post("{$documents}/{$setId}/revisions", [
+            ...$details, 'request_key' => 'finance-replace-denied', 'files' => [$this->pdf('replacement.pdf')],
+        ], ['Accept' => 'application/json'])->assertNotFound();
+        $this->actingAs($documentManager)->postJson("{$fileUrl}/archive", ['reason' => 'Remove evidence'], ['Idempotency-Key' => 'finance-archive-denied'])->assertNotFound();
+        $this->actingAs($documentManager)->postJson("{$fileUrl}/retry")->assertNotFound();
+
+        // A follow-up cannot disclose the same restricted evidence through another surface.
+        $reminder = FleetVehicleReminder::query()->create([
+            'asset_id' => $vehicle->id, 'title' => 'Private quote follow-up', 'action_text' => 'Confidential invoice query',
+            'source_type' => 'document_set', 'source_id' => $setId, 'due_at' => now()->addDay(),
+            'state' => 'scheduled', 'repeat_months' => 0, 'lock_version' => 1, 'owner_user_id' => $manager->id,
+            'created_by_user_id' => $manager->id, 'request_key' => 'private-finance-reminder', 'request_fingerprint' => str_repeat('a', 64),
+        ]);
+        foreach ([[$manager, true], [$documentManager, false]] as [$viewer, $visible]) {
+            $this->actingAs($viewer);
+            $workspace = app(VehicleWorkspacePresenter::class)->present($viewer, $vehicle, false);
+            $this->assertSame($visible, collect($workspace['reminders'])->contains('id', $reminder->id));
+            $events = app(VehicleCalendarService::class)->events($viewer, $vehicle,
+                CarbonImmutable::now(), CarbonImmutable::now()->addDays(3));
+            $this->assertSame($visible, collect($events)->contains('id', 'reminder:'.$reminder->id));
+            $this->assertSame($visible, collect((new TaskAggregator)->itemsFor($viewer, []))->contains('id', 'fleet_vehicle_reminder-'.$reminder->id));
+            $siteEvents = (new FleetVehicleReminderObligationProvider)->obligations(
+                [$this->site->id], Carbon::now(), Carbon::now()->addDays(3));
+            $this->assertSame($visible, collect($siteEvents)->contains('id', 'fleet-reminder-'.$reminder->id));
+        }
+        $this->actingAs($documentManager)->postJson("/fleet-assets/vehicles/{$vehicle->id}/reminders/{$reminder->id}/acknowledge",
+            ['note' => 'Guess the private source', 'expected_version' => 1], ['Idempotency-Key' => 'private-reminder-denied'])->assertNotFound();
+
+        // Once Finance has decided, its original supporting evidence stays intact.
         FleetFinanceReviewRequest::query()->whereKey($request['id'])->update(['status' => 'resolved']);
+        $this->actingAs($manager)->putJson("{$documents}/{$setId}", $details, ['Idempotency-Key' => 'finance-edit-closed'])->assertUnprocessable()->assertJsonValidationErrors('source_id');
+        $this->actingAs($manager)->postJson("{$fileUrl}/archive", ['reason' => 'Remove evidence'], ['Idempotency-Key' => 'finance-archive-closed'])->assertUnprocessable()->assertJsonValidationErrors('source_id');
         $this->actingAs($manager)->post($documents, [
             'category' => 'Purchase approval', 'document_date' => '2026-09-23', 'reason' => 'Late file',
             'source_type' => 'finance_review_request', 'source_id' => $request['id'], 'request_key' => 'frq-files-late',

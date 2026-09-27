@@ -5,6 +5,7 @@ import {
 } from '@/components/fleet-assets/vehicle-workspace/record-command';
 import { VehicleSearchSelect as SearchSelect } from '@/components/fleet-assets/vehicle-workspace/search-select';
 import { WorkspaceWizard } from '@/components/fleet-assets/vehicle-workspace/wizard-kit';
+import { formatDateOnly } from '@/lib/datetime';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,6 +43,7 @@ const TITLES: Record<ProfileAction, string> = {
     kit_remove: 'Remove kit item',
     retire: 'Retire asset',
     assign: 'Assign responsibility',
+    confirm_assignment_receipt: 'Verify assignment receipt',
     release: 'Release responsibility',
     set_photo: 'Choose profile photo',
     remove_photo: 'Remove profile photo',
@@ -99,6 +101,7 @@ export function AssetActionDialog({
         [due, setDue] = useState(''),
         [outcome, setOutcome] = useState('acknowledged'),
         [received, setReceived] = useState<number[]>([]),
+        [verifiedReceived, setVerifiedReceived] = useState(false),
         [name, setName] = useState(''),
         [component, setComponent] = useState(''),
         [photo, setPhoto] = useState(''),
@@ -108,6 +111,10 @@ export function AssetActionDialog({
         [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
     const moving = action === 'dispatch' || action === 'return';
     const validate = () => {
+        if (action === 'confirm_assignment_receipt' && !verifiedReceived) {
+            setError('Confirm that assignment receipt has been verified.');
+            return false;
+        }
         if (action === 'ownership' && !owner) {
             setError('Choose the recorded owner.');
             return false;
@@ -146,6 +153,15 @@ export function AssetActionDialog({
         }
         const payload = {
             action,
+            ...(action === 'assign'
+                ? {
+                      assignee_type: person.split(':')[0],
+                      assignee_id: Number(person.split(':')[1]),
+                  }
+                : {}),
+            ...(action === 'confirm_assignment_receipt'
+                ? { verified_received: verifiedReceived }
+                : {}),
             ...(action === 'ownership'
                 ? { owner_type: ownerType, owner_id: Number(owner) }
                 : {}),
@@ -155,7 +171,7 @@ export function AssetActionDialog({
             kind,
             destination_site_id: site ? Number(site) : null,
             destination_room_id: room ? Number(room) : null,
-            recipient_user_id: person ? Number(person) : null,
+            recipient_user_id: moving && person ? Number(person) : null,
             return_due_on:
                 action === 'dispatch' && kind === 'loan' ? due || null : null,
             document_id: photo ? Number(photo) : null,
@@ -165,7 +181,11 @@ export function AssetActionDialog({
             name: name || null,
             component_asset_id: component ? Number(component) : null,
             kit_item_id: itemId,
-            assignment_id: action === 'release' ? itemId : null,
+            assignment_id: ['release', 'confirm_assignment_receipt'].includes(
+                action,
+            )
+                ? itemId
+                : null,
             location: location || null,
         };
         const saved = await command.submit(
@@ -202,6 +222,7 @@ export function AssetActionDialog({
                     due ||
                     photo ||
                     received.length ||
+                    verifiedReceived ||
                     outcome !== 'acknowledged' ||
                     kind !== 'transfer'
                 )
@@ -301,7 +322,9 @@ export function AssetActionDialog({
                             </Label>
                             <AssetRecordPicker
                                 assetId={assetId}
-                                kind="staff"
+                                kind={
+                                    action === 'assign' ? 'assignees' : 'staff'
+                                }
                                 siteId={moving ? site : undefined}
                                 invalid={!!error && !person}
                                 value={person}
@@ -330,6 +353,22 @@ export function AssetActionDialog({
                                 A due date does not confirm actual return.
                             </p>
                         </>
+                    )}
+                    {action === 'confirm_assignment_receipt' && (
+                        <label className="flex items-start gap-3 rounded-md border p-4">
+                            <input
+                                type="checkbox"
+                                checked={verifiedReceived}
+                                onChange={(event) =>
+                                    setVerifiedReceived(event.target.checked)
+                                }
+                            />
+                            <span>
+                                I verified that the assigned person received
+                                this asset. This does not acknowledge a kit
+                                movement or release a Maintenance hold.
+                            </span>
+                        </label>
                     )}
                     {action === 'receive' && (
                         <>
@@ -588,12 +627,20 @@ export function AssetActionDialog({
                         onChange={(event) => setReason(event.target.value)}
                         required
                         aria-invalid={!!error && !reason.trim()}
-                        maxLength={2000}
+                        maxLength={
+                            action === 'confirm_assignment_receipt' ? 500 : 2000
+                        }
                     />
                 </fieldset>
             ) : (
                 <ReviewCard title={TITLES[action]} icon={UserRound}>
                     <ReviewRow label="Asset" value={assetName} />
+                    {action === 'confirm_assignment_receipt' && (
+                        <ReviewRow
+                            label="Assignment receipt"
+                            value={`Verified · Assignment #${itemId}`}
+                        />
+                    )}
                     {action === 'ownership' && (
                         <ReviewRow label="Recorded owner" value={ownerName} />
                     )}
@@ -613,7 +660,7 @@ export function AssetActionDialog({
                             {due && (
                                 <ReviewRow
                                     label="Expected return"
-                                    value={due}
+                                    value={formatDateOnly(due)}
                                 />
                             )}
                         </>

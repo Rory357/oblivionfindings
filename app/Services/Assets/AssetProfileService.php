@@ -33,7 +33,7 @@ final class AssetProfileService
             abort_if(Asset::vehicles()->whereKey($asset->id)->exists(), 409, 'Use the canonical vehicle profile for this asset.');
             $action = $data['action'];
             Gate::forUser($actor)->authorize(match ($action) {
-                'dispatch', 'receive', 'return', 'cancel_movement', 'exception', 'assign', 'release' => 'manageAssignments',
+                'dispatch', 'receive', 'return', 'cancel_movement', 'exception', 'assign', 'release', 'confirm_assignment_receipt' => 'manageAssignments',
                 'retire' => 'delete', 'verify_location' => 'recordScan', 'check' => 'recordInspection', 'ownership' => 'manageOwnership', default => 'update',
             }, $asset);
             $prior = AssetProfileEvent::where('asset_id', $asset->id)->where('request_key', $data['request_key'])->first();
@@ -52,7 +52,7 @@ final class AssetProfileService
                 'kit_remove' => $this->removeKit($asset, $data),
                 'verify_location' => $this->verifyLocation($actor, $asset, $data),
                 'retire' => $this->retire($actor, $asset),
-                'assign', 'release' => $this->responsibility($actor, $asset, $data),
+                'assign', 'release', 'confirm_assignment_receipt' => $this->responsibility($actor, $asset, $data),
                 'check' => $this->check($actor, $asset, $data),
                 'set_photo', 'remove_photo' => $this->photo($actor, $asset, $data),
                 'generate_qr' => $this->qr($asset),
@@ -122,9 +122,14 @@ final class AssetProfileService
     {
         $service = app(AssetAssignmentService::class);
         if ($data['action'] === 'assign') {
-            $assignment = $service->assign($actor, $asset, ['assignee_type' => 'staff', 'assignee_id' => $data['recipient_user_id'] ?? 0, 'purpose' => $data['reason']]);
+            $assignment = $service->assign($actor, $asset, ['assignee_type' => $data['assignee_type'] ?? 'staff', 'assignee_id' => $data['assignee_id'] ?? $data['recipient_user_id'] ?? 0, 'purpose' => $data['reason']]);
         } else {
             $assignment = $asset->assignments()->whereKey($data['assignment_id'] ?? 0)->firstOrFail();
+            if ($data['action'] === 'confirm_assignment_receipt') {
+                $service->confirmReceipt($actor, $asset, $assignment, $data['reason']);
+
+                return ['assignment_id' => $assignment->id, 'message' => 'Assignment receipt verified. Placement, kit receipts and Maintenance holds remain unchanged.'];
+            }
             $service->release($actor, $asset, $assignment);
         }
 

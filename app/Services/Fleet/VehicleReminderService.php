@@ -38,6 +38,46 @@ class VehicleReminderService
         return $actor->canDo('fleet.manage');
     }
 
+    /** Compensate the exact latest edit, including a formerly overdue reminder. */
+    public function undo(User $actor, int $assetId, int $reminderId, int $eventId, int $expectedVersion, string $requestKey): FleetVehicleReminder
+    {
+        return DB::transaction(function () use ($actor, $assetId, $reminderId, $eventId, $expectedVersion, $requestKey): FleetVehicleReminder {
+            [$current, $asset] = $this->resolve($actor, $assetId);
+            self::assertKey($requestKey);
+            $reminder = $this->lockReminder($current, $asset, $reminderId);
+            $fingerprint = MaintenanceFingerprint::of(['actor' => $current->id, 'reminder' => $reminderId, 'undo_event' => $eventId]);
+            if ($replay = $this->replay($reminder, $requestKey, $fingerprint)) {
+                return $replay;
+            }
+            $event = FleetVehicleReminderEvent::query()->where('reminder_id', $reminderId)->orderByDesc('id')->first();
+            abort_unless($event && (int) $event->id === $eventId && (int) $reminder->lock_version === $expectedVersion, 409,
+                'This reminder changed again. Reload before making another change.');
+            abort_unless((int) $event->actor_user_id === (int) $current->id, 403);
+            abort_unless(in_array($event->action, ['updated', 'snooze'], true) && is_array($event->before_json), 409);
+            $previous = $event->before_json;
+            $changes = $event->action === 'snooze'
+                ? ['due_at' => $previous['due_at'], 'state' => $previous['state']]
+                : array_intersect_key($previous, array_flip(['title', 'action_text', 'state', 'due_at', 'repeat_months',
+                    'owner_user_id', 'backup_user_id', 'source_type', 'source_id']));
+            if ($event->action === 'updated') {
+                $this->assertSourceVisible($current, $asset, $changes);
+                foreach (['owner_user_id', 'backup_user_id'] as $field) {
+                    if (! empty($changes[$field]) && ! $this->staff->isCandidate($asset, (int) $changes[$field])) {
+                        throw ValidationException::withMessages(['note' => 'The previous owner is no longer available. Edit the reminder instead.']);
+                    }
+                }
+                if (($changes['source_type'] ?? 'vehicle') !== 'vehicle' && ! $this->sourceBelongs($asset, $changes['source_type'], (int) $changes['source_id'])) {
+                    abort(409);
+                }
+            }
+            $before = $this->snapshot($reminder);
+            $reminder->forceFill($changes + ['lock_version' => $reminder->lock_version + 1])->save();
+            $this->event($reminder, $current, 'undo', 'Undid reminder change '.$eventId, $before, $this->snapshot($reminder), $requestKey, $fingerprint);
+
+            return $reminder;
+        }, 3);
+    }
+
     /** @param array<string,mixed> $data */
     public function create(User $actor, int $assetId, array $data, string $requestKey): FleetVehicleReminder
     {
@@ -47,11 +87,13 @@ class VehicleReminderService
             $fingerprint = MaintenanceFingerprint::of(['actor' => (int) $current->id, 'asset' => (int) $asset->id, 'data' => $data]);
             $prior = FleetVehicleReminder::query()->where('asset_id', $asset->id)->where('request_key', $requestKey)->first();
             if ($prior) {
+                $this->lockReminder($current, $asset, $prior->id);
                 abort_unless(hash_equals((string) $prior->request_fingerprint, $fingerprint), 409, 'This request was already used for a different reminder.');
 
                 return $prior;
             }
             $values = $this->validated($asset, $data, null);
+            $this->assertSourceVisible($current, $asset, $values);
             $reminder = FleetVehicleReminder::query()->create([
                 ...$values,
                 'asset_id' => $asset->id,
@@ -73,7 +115,7 @@ class VehicleReminderService
         return DB::transaction(function () use ($actor, $assetId, $reminderId, $data, $expectedVersion, $requestKey): FleetVehicleReminder {
             [$current, $asset] = $this->resolve($actor, $assetId);
             self::assertKey($requestKey);
-            $reminder = $this->lockReminder($asset, $reminderId);
+            $reminder = $this->lockReminder($current, $asset, $reminderId);
             $fingerprint = MaintenanceFingerprint::of(['actor' => (int) $current->id, 'reminder' => $reminderId, 'data' => $data]);
             if ($replay = $this->replay($reminder, $requestKey, $fingerprint)) {
                 return $replay;
@@ -83,6 +125,7 @@ class VehicleReminderService
                 throw ValidationException::withMessages(['reason' => 'Record the reason for this change.']);
             }
             $values = $this->validated($asset, $data, $reminder);
+            $this->assertSourceVisible($current, $asset, $values);
             $before = $this->snapshot($reminder);
             $timingChanged = ! $reminder->due_at->equalTo($values['due_at']);
             $reminder->forceFill([
@@ -104,7 +147,7 @@ class VehicleReminderService
         return DB::transaction(function () use ($actor, $assetId, $reminderId, $action, $note, $expectedVersion, $requestKey, $remindLocal, $remindOffset): FleetVehicleReminder {
             [$current, $asset] = $this->resolve($actor, $assetId);
             self::assertKey($requestKey);
-            $reminder = $this->lockReminder($asset, $reminderId);
+            $reminder = $this->lockReminder($current, $asset, $reminderId);
             $fingerprint = MaintenanceFingerprint::of(['actor' => (int) $current->id, 'reminder' => $reminderId, 'action' => $action,
                 'note' => trim($note), 'remind_local' => $action === 'snooze' ? $remindLocal : null]);
             if ($replay = $this->replay($reminder, $requestKey, $fingerprint)) {
@@ -267,6 +310,18 @@ class VehicleReminderService
         ];
     }
 
+    private function assertSourceVisible(User $actor, Asset $asset, array $values): void
+    {
+        if (($values['source_type'] ?? null) === 'document_set') {
+            $set = AssetDocumentSet::query()->where('asset_id', $asset->id)->find($values['source_id']);
+            abort_unless($set && app(VehicleDocumentService::class)->sourceVisible($actor, $asset, $set->source_type, $set->source_id), 404);
+        }
+        if (($values['source_type'] ?? null) === 'work_order') {
+            $access = app(MaintenanceAccessService::class);
+            abort_unless($access->canRead($actor) && in_array((int) $asset->site_id, $access->approvedSiteIds($actor), true), 404);
+        }
+    }
+
     private function sourceBelongs(Asset $asset, string $type, int $id): bool
     {
         return $id > 0 && match ($type) {
@@ -299,9 +354,9 @@ class VehicleReminderService
         return [$current, $asset];
     }
 
-    private function lockReminder(Asset $asset, int $reminderId): FleetVehicleReminder
+    private function lockReminder(User $actor, Asset $asset, int $reminderId): FleetVehicleReminder
     {
-        return FleetVehicleReminder::query()->whereKey($reminderId)->where('asset_id', $asset->id)->lockForUpdate()->first() ?? abort(404);
+        return app(VehicleReminderAccess::class)->scope(FleetVehicleReminder::query(), $actor)->whereKey($reminderId)->where('asset_id', $asset->id)->lockForUpdate()->first() ?? abort(404);
     }
 
     private function replay(FleetVehicleReminder $reminder, string $requestKey, string $fingerprint): ?FleetVehicleReminder
@@ -319,7 +374,7 @@ class VehicleReminderService
     private function snapshot(FleetVehicleReminder $reminder): array
     {
         return [
-            'title' => $reminder->title, 'state' => $reminder->state, 'due_at' => $reminder->due_at?->toIso8601String(),
+            'title' => $reminder->title, 'action_text' => $reminder->action_text, 'state' => $reminder->state, 'due_at' => $reminder->due_at?->toIso8601String(),
             'repeat_months' => $reminder->repeat_months, 'owner_user_id' => $reminder->owner_user_id,
             'backup_user_id' => $reminder->backup_user_id, 'source_type' => $reminder->source_type, 'source_id' => $reminder->source_id,
         ];
