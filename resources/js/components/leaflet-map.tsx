@@ -547,8 +547,6 @@ export function OpenStreetMap({
     polyline,
     polylineOptions,
     geofences = [],
-    height = 400,
-    className,
     clustering = false,
     clusterThreshold = 20,
     darkMode,
@@ -939,7 +937,9 @@ export function OpenStreetMap({
                     typeof ResizeObserver !== 'undefined'
                 ) {
                     resizeObserverRef.current = new ResizeObserver(() =>
-                        mapRef.current?.invalidateSize({ pan: false }),
+                        // Leaflet's default pan compensates for the changed
+                        // pixel centre; pan:false shifts the geographic view.
+                        mapRef.current?.invalidateSize({ animate: false }),
                     );
                     resizeObserverRef.current.observe(containerRef.current);
                 }
@@ -1088,22 +1088,12 @@ export function OpenStreetMap({
         };
     }, []);
 
-    const heightStyle = typeof height === 'number' ? `${height}px` : height;
-
     return (
         <div
-            className={cn(
-                'grayscale-map relative w-full overflow-hidden rounded-lg border border-border',
-                className,
-            )}
-            style={{ zIndex: 0, isolation: 'isolate' }}
-        >
-            <div
-                ref={containerRef}
-                className="w-full"
-                style={{ height: heightStyle }}
-            />
-        </div>
+            ref={containerRef}
+            className="grayscale-map h-full w-full"
+            style={{ height: '100%' }}
+        />
     );
 }
 
@@ -1159,44 +1149,61 @@ export default function LeafletMap(props: LeafletMapProps) {
         onProviderChange?.(google ? 'google' : 'osm');
     }, [google, onProviderChange]);
     return (
-        <div className="relative">
-            {google ? (
-                <GoogleMap
-                    {...props}
-                    preserveViewport={hadViewport}
-                    markers={
-                        props.googleResults?.markers
-                            ? [
-                                  ...(props.markers ?? []),
-                                  ...props.googleResults.markers,
-                              ]
-                            : props.markers
-                    }
-                    polyline={
-                        props.googleResults?.polyline?.length
-                            ? props.googleResults.polyline
-                            : props.polyline
-                    }
-                    apiKey={provider!.apiKey!}
-                    center={viewport.center}
-                    zoom={viewport.zoom}
-                    onViewport={onViewport}
-                    onFailure={() => setFailedRevision(provider!.revision)}
-                />
-            ) : (
-                <OpenStreetMap
-                    {...props}
-                    preserveViewport={hadViewport}
-                    center={viewport.center}
-                    zoom={viewport.zoom}
-                    onViewport={onViewport}
-                />
+        <div
+            data-map-frame
+            className={cn(
+                'relative flex min-h-0 w-full flex-col overflow-hidden rounded-lg border border-border',
+                props.className,
             )}
+            style={{
+                height: props.height ?? 400,
+                zIndex: 0,
+                isolation: 'isolate',
+            }}
+        >
+            {/* The frame owns the caller's height and border. Its remaining
+                space is definite for either provider, including 100% callers. */}
+            <div data-map-viewport className="relative min-h-0 flex-1">
+                {google ? (
+                    <GoogleMap
+                        {...props}
+                        height="100%"
+                        className="h-full w-full"
+                        preserveViewport={hadViewport}
+                        markers={
+                            props.googleResults?.markers
+                                ? [
+                                      ...(props.markers ?? []),
+                                      ...props.googleResults.markers,
+                                  ]
+                                : props.markers
+                        }
+                        polyline={
+                            props.googleResults?.polyline?.length
+                                ? props.googleResults.polyline
+                                : props.polyline
+                        }
+                        apiKey={provider!.apiKey!}
+                        center={viewport.center}
+                        zoom={viewport.zoom}
+                        onViewport={onViewport}
+                        onFailure={() => setFailedRevision(provider!.revision)}
+                    />
+                ) : (
+                    <OpenStreetMap
+                        {...props}
+                        preserveViewport={hadViewport}
+                        center={viewport.center}
+                        zoom={viewport.zoom}
+                        onViewport={onViewport}
+                    />
+                )}
+            </div>
             {provider?.provider === 'google' &&
                 failedRevision === provider.revision && (
                     <div
                         role="status"
-                        className="text-caption flex items-center justify-between gap-2 border-t bg-card p-2"
+                        className="text-caption flex max-h-[50%] shrink-0 items-center justify-between gap-2 overflow-auto border-t bg-card p-2"
                     >
                         <span>
                             Google Maps is unavailable. Showing OSM. Check the
@@ -1205,6 +1212,7 @@ export default function LeafletMap(props: LeafletMapProps) {
                         <Button
                             variant="outline"
                             size="sm"
+                            className="shrink-0"
                             onClick={() => window.location.reload()}
                         >
                             Reload map

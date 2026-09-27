@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-27T13:21:35.1835850Z",
+  "checkedAt": "2026-09-27T14:15:02.264Z",
   "base": "926b4981b0289da08a20baca0995117fb53e413e",
   "mainHead": "926b4981b0289da08a20baca0995117fb53e413e",
   "branch": "codex/pkg08-settings-implementation",
@@ -28,7 +28,7 @@
     "config/fleet.php": "b4639a374ca718c1c1ccfe10cf546d780210af80d9d329e2251d3108bfddb9aa",
     "config/notification_events.php": "2faaadaa966987dd009e17143e2ec541acaf1c3a120f3c87108b1c8fdadaa5f7",
     "database/migrations/2026_09_28_000100_add_notification_channel_overrides.php": "51faa929190812c4b9a018f2dcd1dbba98e3b141943f22c5a190a218f2c6ca81",
-    "resources/js/components/leaflet-map.tsx": "105d0483da6ff393e5f7257e4c62b5790b3460b70d1e6216ac3e553c6e5f0ac6",
+    "resources/js/components/leaflet-map.tsx": "aa74b466c687340ba9472a1ab65db2ea2b09eb04f5471bacac9c3c25608ff5da",
     "resources/js/components/maps/google-map.test.tsx": "62c265b5dff2137950d474c571e0f1d59e42c099d832c975b64731d8caad1cae",
     "resources/js/components/maps/google-map.tsx": "dcb3afc4107623c6eed48d2682a224dabbaeba82981a8aac83c627c0dada994d",
     "resources/js/components/maps/google-sdk.test.ts": "eee057b0f855b2be9278d1b35bb855f526cb7bfda5b9f7741c85626a5a13c54b",
@@ -92,5 +92,6 @@
   "protectedBlade": {
     "implementation": "1a4a6140ff2c2f222e4ad46f74cd347b5a4582c02345702beba93412059621bc",
     "main": "1a4a6140ff2c2f222e4ad46f74cd347b5a4582c02345702beba93412059621bc"
-  }
+  },
+  "reviewParent": "322b4ebfdaf4a242d9bd705b5a6f958ca973f8ee"
 }

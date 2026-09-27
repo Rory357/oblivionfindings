@@ -1,0 +1,53 @@
+{
+  "checkedAt": "2026-09-27T14:15:02.264Z",
+  "finding": "T08-02",
+  "status": "Blocked: actual non-100% page zoom unverified",
+  "required": "Genuine programme 125% desktop page zoom, filled notification preview/review, map configuration, nested discard/conflict controls, keyboard focus and restoration",
+  "attempts": [
+    {
+      "browser": "Codex in-app browser",
+      "action": "Control_L+plus on isolated Settings",
+      "before": {
+        "innerWidth": 1280,
+        "innerHeight": 720,
+        "outerWidth": 1920,
+        "outerHeight": 1032,
+        "dpr": 1,
+        "visualScale": 1
+      },
+      "after": {
+        "innerWidth": 1280,
+        "innerHeight": 720,
+        "outerWidth": 1920,
+        "outerHeight": 1032,
+        "dpr": 1,
+        "visualScale": 1
+      },
+      "result": "No observable zoom change; capabilities expose visibility and viewport only"
+    },
+    {
+      "browser": "Chrome",
+      "action": "Control_L+plus on newly opened localhost 8794 login tab; no credentials entered",
+      "before": {
+        "innerWidth": 2752,
+        "innerHeight": 1044,
+        "outerWidth": 3440,
+        "outerHeight": 1392,
+        "dpr": 1.25,
+        "visualScale": 1
+      },
+      "after": {
+        "innerWidth": 2752,
+        "innerHeight": 1044,
+        "outerWidth": 3440,
+        "outerHeight": 1392,
+        "dpr": 1.25,
+        "visualScale": 1
+      },
+      "result": "No observable zoom change; only viewport capability. Baseline DPR is OS scaling, not page zoom. Own tab closed"
+    }
+  ],
+  "limitations": "Native computer APIs disabled. No raw CDP, browser internals, browser-settings automation, CSS zoom or DPR emulation used. No zoom pass inferred from resizing.",
+  "existingSetupRequest": "People Locations owner retains existing user-assisted genuine 125% setup request; no duplicate question sent. Await supported/manual setup before claiming T08-02 complete.",
+  "integration": "No integration or acceptance claim"
+}
