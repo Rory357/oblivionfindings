@@ -381,6 +381,12 @@ final class GeofenceController extends Controller
     {
         $query = FleetSignal::query()->whereIn('asset_id', $this->boundaries->resources($actor)->whereNull('client_id')->select('assets.id'))
             ->whereIn('geofence_id', $this->boundaries->permitted($actor)->select('asset_geofences.id'))
+            // Filter before rows, pagination, totals and follow-up links. A retained
+            // signal alone is not permission to reveal its location evidence.
+            ->whereHas('sourceEvent', fn ($q) => $q->where('consent_blocked', false)
+                ->whereColumn('fleet_telemetry_events.asset_id', 'fleet_signals.asset_id')
+                ->whereColumn('fleet_telemetry_events.occurred_at', 'fleet_signals.occurred_at')
+                ->whereNotNull('latitude')->whereNotNull('longitude'))
             ->whereDoesntHave('trip', fn ($q) => $q->where('is_personal', true)->orWhere('consent_blocked', true))
             ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('fleet_trips')
                 ->whereColumn('fleet_trips.asset_id', 'fleet_signals.asset_id')

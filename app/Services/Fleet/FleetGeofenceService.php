@@ -5,6 +5,7 @@ namespace App\Services\Fleet;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\FleetGeofenceState;
+use App\Models\FleetTelemetryEvent;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
@@ -12,8 +13,15 @@ class FleetGeofenceService
 {
     public function __construct(protected FleetSignalService $signals) {}
 
-    public function evaluate(Asset $asset, float $lat, float $lon, CarbonInterface $occurredAt): void
+    public function evaluate(Asset $asset, float $lat, float $lon, CarbonInterface $occurredAt, ?FleetTelemetryEvent $sourceEvent = null): void
     {
+        // Never infer a historical source from the latest position or a matching timestamp.
+        $sourceEventId = $sourceEvent?->exists && (int) $sourceEvent->asset_id === (int) $asset->id
+            && $sourceEvent->occurred_at?->getTimestamp() === $occurredAt->getTimestamp()
+            && $sourceEvent->latitude !== null && $sourceEvent->longitude !== null
+            && abs((float) $sourceEvent->latitude - $lat) < 0.0000001
+            && abs((float) $sourceEvent->longitude - $lon) < 0.0000001
+            ? $sourceEvent->id : null;
         $geofences = AssetGeofence::query()
             ->where('is_active', true)
             ->where(function ($query) use ($asset) {
@@ -24,7 +32,7 @@ class FleetGeofenceService
             ->get();
 
         foreach ($geofences as $geofence) {
-            DB::transaction(function () use ($asset, $geofence, $lat, $lon, $occurredAt) {
+            DB::transaction(function () use ($asset, $geofence, $lat, $lon, $occurredAt, $sourceEventId) {
                 // Serialise against canonical edits and retirement, then recheck the link.
                 $geofence = AssetGeofence::query()->whereKey($geofence->id)->lockForUpdate()->first();
                 if (! $geofence || ! $geofence->is_active || $geofence->retired_at
@@ -60,6 +68,7 @@ class FleetGeofenceService
                             'asset_id' => $asset->id,
                             'geofence_id' => $geofence->id,
                             'signal_type' => 'geofence.enter',
+                            'source_event_id' => $sourceEventId,
                             'severity_hint' => 'low',
                             'occurred_at' => $occurredAt,
                             'payload' => [
@@ -76,6 +85,7 @@ class FleetGeofenceService
                             'asset_id' => $asset->id,
                             'geofence_id' => $geofence->id,
                             'signal_type' => 'geofence.breach',
+                            'source_event_id' => $sourceEventId,
                             'severity_hint' => $geofence->breach_type === 'hard' ? 'high' : 'medium',
                             'occurred_at' => $occurredAt,
                             'payload' => [
@@ -102,6 +112,7 @@ class FleetGeofenceService
                             'asset_id' => $asset->id,
                             'geofence_id' => $geofence->id,
                             'signal_type' => 'geofence.dwell',
+                            'source_event_id' => $sourceEventId,
                             'severity_hint' => 'low',
                             'occurred_at' => $occurredAt,
                             'idempotency_key' => $idempotency,

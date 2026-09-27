@@ -150,6 +150,50 @@ class Pkg07BoundariesTest extends TestCase
         $this->getJson($base.'/'.$handoff['token'])->assertForbidden();
     }
 
+    public function test_vehicle_selection_removes_a_missing_boundary_and_retains_snapshot_and_audit(): void
+    {
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $user = $this->user($site);
+        $vehicle = Asset::factory()->vehicle()->forSite($site)->create(['client_id' => null]);
+        $geometry = ['type' => 'circle', 'center' => ['lat' => -41.29, 'lng' => 174.77], 'radius_m' => 180];
+        $assignment = FleetVehicleGeofenceAssignment::create(['asset_id' => $vehicle->id, 'geofence_id' => null,
+            'label' => 'Retained former boundary', 'origin' => 'linked', 'geometry_hash' => str_repeat('a', 64),
+            'geometry_snapshot' => $geometry, 'monitoring' => 'inactive', 'state' => 'active', 'lock_version' => 1,
+            'created_by_user_id' => $user->id, 'updated_by_user_id' => $user->id]);
+        $before = AssetGeofence::count();
+        $location = $this->actingAs($user)->getJson('/fleet-assets/vehicles/'.$vehicle->id.'/location')->assertOk();
+        $payload = ['keep_assignment_ids' => [], 'add_geofence_ids' => [], 'expected_version' => $location->json('geofences.version')];
+        $this->putJson('/fleet-assets/vehicles/'.$vehicle->id.'/geofences/selection', $payload)->assertOk();
+        $removed = $assignment->fresh();
+        $this->assertSame('removed', $removed->state);
+        $this->assertNull($removed->geofence_id);
+        $this->assertSame($geometry, $removed->geometry_snapshot);
+        $this->assertSame(2, $removed->lock_version);
+        $this->assertSame($before, AssetGeofence::count());
+        $version = DB::table('boundary_rule_versions')->where('assignment_id', $assignment->id)->sole();
+        $snapshot = json_decode($version->snapshot, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertNull($version->boundary_id);
+        $this->assertEquals($user->id, $version->actor_id);
+        $this->assertSame($geometry, $snapshot['geometry_snapshot']);
+        $this->assertSame('removed', $snapshot['state']);
+        $this->assertNotEmpty($snapshot['removed_at']);
+        $this->assertSame($user->id, $snapshot['removed_by_user_id']);
+        $this->assertSame($removed->removal_reason, $snapshot['removal_reason']);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'fleet.boundary.rule.saved', 'user_id' => $user->id,
+            'auditable_type' => $assignment->getMorphClass(), 'auditable_id' => $assignment->id]);
+        // A retry is harmless and must not add a second removal history row.
+        $this->putJson('/fleet-assets/vehicles/'.$vehicle->id.'/geofences/selection', $payload)->assertOk();
+        $this->assertSame(1, DB::table('boundary_rule_versions')->where('assignment_id', $assignment->id)->count());
+        $migration = require database_path('migrations/2026_09_27_000300_retain_boundary_event_and_rule_provenance.php');
+        try {
+            $migration->down();
+            $this->fail('A rollback must not discard retained missing-boundary history.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Boundary provenance exists. Preserve it and use a forward migration.', $exception->getMessage());
+        }
+        $this->assertDatabaseHas('boundary_rule_versions', ['assignment_id' => $assignment->id, 'boundary_id' => null]);
+    }
+
     public function test_protected_geometry_and_public_geocoding_cannot_be_bypassed(): void
     {
         $site = Site::factory()->create(['is_active' => true]);

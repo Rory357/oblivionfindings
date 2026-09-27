@@ -191,6 +191,7 @@ class FleetSignalService
                 ['idempotency_key' => $idempotencyKey],
                 [
                     'asset_id' => $payload['asset_id'],
+                    'source_event_id' => $payload['source_event_id'] ?? null,
                     'asset_tracker_id' => $payload['asset_tracker_id'] ?? null,
                     'device_id' => $payload['device_id'] ?? null,
                     'geofence_id' => $payload['geofence_id'] ?? null,

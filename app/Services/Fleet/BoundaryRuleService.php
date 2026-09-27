@@ -158,7 +158,7 @@ final class BoundaryRuleService
     public function record(Assignment $r, User $actor, string $reason): void
     {
         DB::table('boundary_rule_versions')->insert(['assignment_id' => $r->id, 'boundary_id' => $r->geofence_id,
-            'revision' => $r->lock_version, 'snapshot' => json_encode($r->only(['id', 'geofence_id', 'label', 'purpose', 'response_proposal', 'schedule', 'policy_proposal', 'geometry_hash', 'geometry_snapshot', 'monitoring', 'state', 'lock_version']), JSON_THROW_ON_ERROR),
+            'revision' => $r->lock_version, 'snapshot' => json_encode($r->only(['id', 'asset_id', 'geofence_id', 'label', 'origin', 'purpose', 'response_proposal', 'schedule', 'policy_proposal', 'geometry_hash', 'geometry_snapshot', 'monitoring', 'state', 'lock_version', 'removed_at', 'removed_by_user_id', 'removal_reason']), JSON_THROW_ON_ERROR),
             'actor_id' => $actor->id, 'reason' => $reason, 'recorded_at' => now()]);
         AuditLogger::logOrFail('fleet.boundary.rule.saved', $r, ['actor_id' => $actor->id, 'revision' => $r->lock_version]);
     }
