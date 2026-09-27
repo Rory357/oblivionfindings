@@ -30,7 +30,7 @@ Repair the shared component's sizing contract for fixed and percentage heights, 
 
 ## T08-02 — P2 verification gap: Settings browser zoom is not evidenced
 
-Revision10 Section16 requires browser zoom within the supported desktop matrix, separately from keyboard/focus and desktop resizing. The submitted `browser-verification.json` covers ordinary1440×1000/1366×768/1280×800 windows and acknowledges People Locations' separate125% check, but supplies no actual page-zoom evidence for this Settings package. Main's own1280×720 preview check below is also ordinary-window evidence.
+Revision10 Section15 requires browser zoom within the supported desktop matrix, separately from keyboard/focus and desktop resizing. The submitted `browser-verification.json` covers ordinary1440×1000/1366×768/1280×800 windows and acknowledges People Locations' separate125% check, but supplies no actual page-zoom evidence for this Settings package. Main's own1280×720 preview check below is also ordinary-window evidence.
 
 Complete actual non-100% desktop browser zoom for this candidate, using the programme's125% check where supported, including filled notification preview/review, map configuration and nested discard/conflict controls. Record the real browser zoom and reachable fields/footer/close actions, keyboard focus and restoration. Viewport resizing, operating-system scaling and DPR are not substitutes. This is a missing required check, not a claim that Settings fails at zoom. Keep the existing People Locations user-assisted setup request with its owner; reuse already available setup where applicable, avoid duplicate questions and do not bypass browser-tool policy. No mobile scope or external accessibility certification is added.
 

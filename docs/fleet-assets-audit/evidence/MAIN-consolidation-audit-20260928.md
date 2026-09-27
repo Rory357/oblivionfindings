@@ -2,6 +2,8 @@
 
 Owner: MAIN ASTRA. Status: in progress; no new integration approval or publication.
 
+**Latest handback checkpoint:** programme documentation985488e27aa99bf2fd9fffd227f34025ba15a296 is verified on local/GitHub main; no application package was merged in this continuation. Reports is now frozen at50716b9cca0473ee4082e329ce6ff1347833f714. Main verifies49 source hashes and the bounded fixture diff; owner6 cases/136 assertions pass with production privacy guards unchanged. [Reports review revision3](PKG-09B-main-technical-review.md) closes the two P1s, authenticated-shell gap and stale-fixture failures. [Serial integration preflight](MAIN-consolidation-integration-preflight.md) incorporates all three remaining owners' read-only packets and the required People/Reports shared-reader reconciliation. All four Designers remain pinned and frozen; no app writer/publication slot is released. The actual125% acceptance amendment remains unanswered. Hosted checks for the documentation commit were observed in progress (bootstrap36359550446,lint36359550397,visual36359550404,tests36359550418); no green-CI claim.
+
 ## Current continuation — explicit local and GitHub publication scope
 
 Stephan now explicitly requests all approved work finished, committed and merged to local and GitHub main. The earlier PKG-03/OPS-PL01 local-only destinations are superseded. Main rechecked authoritative remote926b4981b0289da08a20baca0995117fb53e413e. No application merge has occurred.

@@ -1,6 +1,14 @@
 # PKG-09B — Main technical review
 
-Owner: MAIN ASTRA. Revision: 2. Updated: 2026-09-28. **Privacy and authenticated-shell findings closed on correction; final verification pending. Not yet approved for integration.**
+Owner: MAIN ASTRA. Revision: 3. Updated: 2026-09-28. **Privacy, authenticated-shell and stale-fixture findings closed; actual zoom gate remains. Not yet approved for integration.**
+
+## Frozen successor — 50716b9cca0473ee4082e329ce6ff1347833f714
+
+Main independently reviewed the exact nine-file successor diff: the only executable change is one success-fixture consent name, from Asset Location Tracking (Safety) to the production-required Personal Tracker (Wandering Risk). Production privacy guards and all48 previously reviewed application/test files remain unchanged. Main verifies all49 current manifest paths against working files and committed blobs with no mismatches/undeclared source; `PKG-09B-main-fixture-source-verification.json` retains this result.
+
+Main parsed the new owner JUnit: **6 cases/136 assertions,zero failures/errors/skips,257.983seconds**. The four former HTTP failures, generic-consent denial and consent-withdrawal coverage pass. The packet preserves the prior failure evidence and records exact disposable-database cleanup. Main judges the original failures to be stale success fixtures rather than a production guard regression; the bounded correction closes this verification gap without weakening access. Owner's latest deduplicated scoped result is48 passing cases/838 assertions across the recorded runs, not a new whole-repository pass.
+
+Base926b4981 remains the reviewed application baseline. Current local/GitHub985488e27aa99bf2fd9fffd227f34025ba15a296 adds programme documentation only; Main verifies no app/test delta. Reports is now frozen. Integration with the unpublished People Locations candidate has four known shared-file conflicts and must retain both reviewed contracts; see `MAIN-consolidation-integration-preflight.md`. T09B-03 genuine125% remains unverified and the explicit acceptance amendment remains pending. No publication slot or final acceptance is granted by this review.
 
 ## Correction review — ba2e0aeec341ff68dedbfafd4fb4d64642e8bd5b
 
