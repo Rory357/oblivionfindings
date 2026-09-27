@@ -14,8 +14,10 @@ import {
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
     PageHeaderRail,
     PageHeaderSearch,
+    PageHeaderStatusChip,
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,7 +37,10 @@ import {
     Car,
     ChevronLeft,
     ChevronRight,
+    CircleHelp,
+    Clock3,
     Database,
+    Info,
     Layers,
     LayoutDashboard,
     List,
@@ -45,6 +50,7 @@ import {
     Package,
     RefreshCw,
     RotateCcw,
+    Search,
     ShieldAlert,
     Wrench,
     X,
@@ -672,34 +678,18 @@ function MapPanel({
                     <h2>Vehicles &amp; assets on the map</h2>
                     <p>Last reported locations · approved Sites only</p>
                 </div>
-                <div className="fo-head-actions">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                            setList('all');
-                            setSelected(null);
-                        }}
-                    >
-                        <List className="size-4" /> List {visible.length}
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setExpanded(!expanded)}
-                        aria-label={
-                            expanded ? 'Exit full screen map' : 'Expand map'
-                        }
-                    >
-                        {expanded ? (
-                            <Minimize2 className="size-4" />
-                        ) : (
-                            <Maximize2 className="size-4" />
-                        )}
-                    </Button>
-                </div>
             </div>
             <div className="fo-map-toolbar">
+                <label className="fo-map-search">
+                    <Search size={16} />
+                    <input
+                        type="search"
+                        aria-label="Search map resources"
+                        placeholder="Find a vehicle or asset…"
+                        value={mapQuery}
+                        onChange={(event) => setMapQuery(event.target.value)}
+                    />
+                </label>
                 <div className="fo-segmented" aria-label="Map resource type">
                     {[
                         ['all', 'All'],
@@ -728,22 +718,22 @@ function MapPanel({
                         </button>
                     ))}
                 </div>
-                <input
-                    type="search"
-                    className="fo-map-search"
-                    aria-label="Search map resources"
-                    placeholder="Find on map"
-                    value={mapQuery}
-                    onChange={(event) => setMapQuery(event.target.value)}
-                />
+                <button
+                    className={`fo-stale-toggle fo-group-toggle ${groupNearby ? 'active' : ''}`}
+                    aria-pressed={groupNearby}
+                    onClick={() => setGroupNearby(!groupNearby)}
+                >
+                    <Layers size={14} /> Group nearby
+                </button>
                 <button
                     className={`fo-stale-toggle ${freshness === 'stale' ? 'active' : ''}`}
+                    title="Show last-known tracker locations"
                     aria-pressed={freshness === 'stale'}
                     onClick={() =>
                         onFreshness(freshness === 'stale' ? 'all' : 'stale')
                     }
                 >
-                    Last-known tracker ·{' '}
+                    <Clock3 size={14} /> Stale{' '}
                     {
                         known.filter(
                             (item) =>
@@ -752,21 +742,40 @@ function MapPanel({
                         ).length
                     }
                 </button>
-                <button
-                    className={`fo-stale-toggle fo-group-toggle ${groupNearby ? 'active' : ''}`}
-                    aria-pressed={groupNearby}
-                    onClick={() => setGroupNearby(!groupNearby)}
-                >
-                    <Layers size={14} /> Group nearby
-                </button>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label="Reset map view"
-                    onClick={() => setMapKey((key) => key + 1)}
-                >
-                    <RotateCcw size={15} />
-                </Button>
+                <div className="fo-head-actions">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                            setList('all');
+                            setSelected(null);
+                        }}
+                    >
+                        <List className="size-4" /> List
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label="Reset map view"
+                        onClick={() => setMapKey((key) => key + 1)}
+                    >
+                        <RotateCcw size={15} />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setExpanded(!expanded)}
+                        aria-label={
+                            expanded ? 'Exit full screen map' : 'Expand map'
+                        }
+                    >
+                        {expanded ? (
+                            <Minimize2 className="size-4" />
+                        ) : (
+                            <Maximize2 className="size-4" />
+                        )}
+                    </Button>
+                </div>
             </div>
             <div className="fo-map-canvas">
                 <LeafletMap
@@ -805,9 +814,13 @@ function MapPanel({
                 )}
             </div>
             <div className="fo-map-summary">
-                <span>{plotted.length} mapped</span>
+                <span>
+                    <MapPin size={14} /> <strong>{plotted.length}</strong>{' '}
+                    mapped
+                </span>
                 <button onClick={() => setList('unknown')}>
-                    {unknown.length} without a location <ArrowRight size={13} />
+                    <CircleHelp size={14} /> {unknown.length} without a location{' '}
+                    <ArrowRight size={13} />
                 </button>
             </div>
             <div className="fo-map-sources">
@@ -1058,6 +1071,7 @@ export default function FleetAssetsDashboard({ overview, saved_views }: Props) {
     const [dataOpen, setDataOpen] = useState(false);
     const [chartOpen, setChartOpen] = useState(false);
     const [saveOpen, setSaveOpen] = useState(false);
+    const [savedViewsOpen, setSavedViewsOpen] = useState(false);
     const [saveName, setSaveName] = useState('');
     const [renameFrom, setRenameFrom] = useState<string | null>(null);
     const [saveError, setSaveError] = useState('');
@@ -1510,47 +1524,52 @@ export default function FleetAssetsDashboard({ overview, saved_views }: Props) {
             <PageShell>
                 <div className="fleet-overview">
                     <PageHeader
-                        icon={LayoutDashboard}
+                        icon={Car}
                         title="Fleet & Assets"
-                        subline={summary}
+                        titleChip={
+                            <PageHeaderStatusChip variant="neutral">
+                                Overview
+                            </PageHeaderStatusChip>
+                        }
+                        subline="Find vehicles, follow up work and plan ahead"
                         actions={
                             <>
                                 <PageHeaderSearch
                                     value={filters.q}
                                     onChange={(q) => update({ q })}
-                                    placeholder="Search resources and work"
+                                    placeholder="Find records…"
                                 />
                                 <PageHeaderGlassButton
-                                    icon={Bookmark}
-                                    disabled={savingViews}
-                                    onClick={() => {
-                                        setRenameFrom(null);
-                                        setSaveName('');
-                                        setSaveOpen(true);
-                                    }}
-                                >
-                                    Save view
-                                </PageHeaderGlassButton>
-                                <PageHeaderGlassButton
-                                    icon={Database}
-                                    onClick={() => setDataOpen(true)}
-                                >
-                                    Data status
-                                </PageHeaderGlassButton>
+                                    icon={RefreshCw}
+                                    aria-label="Refresh overview"
+                                    disabled={refreshing}
+                                    onClick={refresh}
+                                />
+                                {overview.can.fleet && (
+                                    <PageHeaderPrimaryButton
+                                        onClick={() =>
+                                            router.visit(
+                                                '/fleet-assets/vehicles',
+                                            )
+                                        }
+                                    >
+                                        View fleet{' '}
+                                        <ArrowRight className="size-4" />
+                                    </PageHeaderPrimaryButton>
+                                )}
                             </>
                         }
                         meters={
                             <>
                                 <PageHeaderMeterBlock
                                     label="Needs attention"
-                                    tone={needsAttention ? 'critical' : 'brand'}
                                     onClick={() => openView('attention')}
                                 >
                                     <PageHeaderMeterBig>
                                         {needsAttention}
                                     </PageHeaderMeterBig>
                                     <PageHeaderMeterCaption>
-                                        Returns and open work
+                                        Work needing action
                                     </PageHeaderMeterCaption>
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
@@ -1588,7 +1607,6 @@ export default function FleetAssetsDashboard({ overview, saved_views }: Props) {
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
                                     label="Receipt to confirm"
-                                    tone="warning"
                                     onClick={openReceipts}
                                 >
                                     <PageHeaderMeterBig>
@@ -1601,7 +1619,7 @@ export default function FleetAssetsDashboard({ overview, saved_views }: Props) {
                                         {overview.receipts.state === 'loaded'
                                             ? receiptCount === null
                                                 ? 'Updating selected scope…'
-                                                : 'Active assignments awaiting verification'
+                                                : 'Equipment receipt unconfirmed'
                                             : overview.receipts.state ===
                                                 'no_access'
                                               ? 'Assignment access required'
@@ -1612,6 +1630,9 @@ export default function FleetAssetsDashboard({ overview, saved_views }: Props) {
                         }
                         filters={
                             <>
+                                <span className="fo-approved-scope">
+                                    Approved Sites only
+                                </span>
                                 <PageHeaderFilterSelect
                                     label="All approved Sites"
                                     value={filters.site}
@@ -1641,6 +1662,13 @@ export default function FleetAssetsDashboard({ overview, saved_views }: Props) {
                                         })
                                     }
                                 />
+                                <PageHeaderGlassButton
+                                    className="fo-saved-trigger"
+                                    icon={Bookmark}
+                                    onClick={() => setSavedViewsOpen(true)}
+                                >
+                                    Saved views {saved.length || ''}
+                                </PageHeaderGlassButton>
                             </>
                         }
                         rail={
@@ -1654,14 +1682,11 @@ export default function FleetAssetsDashboard({ overview, saved_views }: Props) {
                                     {
                                         key: 'attention',
                                         label: 'Needs attention',
-                                        count: attention.length,
-                                        alert: true,
                                         icon: ShieldAlert,
                                     },
                                     {
                                         key: 'upcoming',
                                         label: 'Coming up',
-                                        count: agendaForPeriod.length,
                                         icon: CalendarDays,
                                     },
                                     {
@@ -1676,12 +1701,13 @@ export default function FleetAssetsDashboard({ overview, saved_views }: Props) {
                             />
                         }
                     />
-                    <div className="fo-footer fo-observation">
+                    <div className="fo-footer fo-observation" title={summary}>
                         <span>
-                            Observed {formatDateTime(overview.as_of)} · {zone}
+                            <Clock3 size={14} /> Observed{' '}
+                            {formatDateTime(overview.as_of)} · {zone}
                         </span>
                         <button onClick={() => setDataOpen(true)}>
-                            Data status <ArrowRight className="size-3" />
+                            <Database className="size-3" /> Data status
                         </button>
                     </div>
                     {(filters.q || filters.site !== 'all') && (
@@ -1701,124 +1727,165 @@ export default function FleetAssetsDashboard({ overview, saved_views }: Props) {
                             </Button>
                         </div>
                     )}
-                    {(saved.length > 0 ||
-                        undo ||
-                        legacyNeedsImport ||
-                        viewMessage) && (
-                        <div className="fo-saved">
-                            <span>
-                                <Bookmark className="size-3.5" /> Saved views
-                            </span>
-                            {importableLegacy.length > 0 && (
-                                <button
-                                    disabled={savingViews}
-                                    onClick={() =>
-                                        persist([...saved, ...importableLegacy])
-                                    }
-                                >
-                                    Import {importableLegacy.length} view
-                                    {importableLegacy.length === 1
-                                        ? ''
-                                        : 's'}{' '}
-                                    from this browser
-                                </button>
+                    <Dialog
+                        open={savedViewsOpen}
+                        onOpenChange={setSavedViewsOpen}
+                    >
+                        <DialogContent className="fleet-overview fo-dialog">
+                            <DialogHeader>
+                                <DialogTitle>Saved views</DialogTitle>
+                                <DialogDescription>
+                                    Save the current filters to your account, or
+                                    open a saved view.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <Button
+                                variant="outline"
+                                disabled={savingViews}
+                                onClick={() => {
+                                    setRenameFrom(null);
+                                    setSaveName('');
+                                    setSaveOpen(true);
+                                }}
+                            >
+                                <Bookmark className="size-4" /> Save current
+                                view
+                            </Button>
+                            {saved.length === 0 && (
+                                <p className="fo-note">
+                                    No saved views yet. Save your current
+                                    filters to find them here next time.
+                                </p>
                             )}
-                            {legacyNeedsImport &&
-                                importableLegacy.length === 0 && (
-                                    <span>
-                                        Remove a saved view to make room for
-                                        browser views.
-                                    </span>
+                            <div className="fo-saved fo-saved-dialog">
+                                <span>
+                                    <Bookmark className="size-3.5" /> Saved
+                                    views
+                                </span>
+                                {importableLegacy.length > 0 && (
+                                    <button
+                                        disabled={savingViews}
+                                        onClick={() =>
+                                            persist([
+                                                ...saved,
+                                                ...importableLegacy,
+                                            ])
+                                        }
+                                    >
+                                        Import {importableLegacy.length} view
+                                        {importableLegacy.length === 1
+                                            ? ''
+                                            : 's'}{' '}
+                                        from this browser
+                                    </button>
                                 )}
-                            {saved.map((item) => (
-                                <div key={item.name} className="fo-saved-item">
+                                {legacyNeedsImport &&
+                                    importableLegacy.length === 0 && (
+                                        <span>
+                                            Remove a saved view to make room for
+                                            browser views.
+                                        </span>
+                                    )}
+                                {saved.map((item) => (
+                                    <div
+                                        key={item.name}
+                                        className="fo-saved-item"
+                                    >
+                                        <button
+                                            disabled={savingViews}
+                                            onClick={() => {
+                                                const validated = {
+                                                    ...DEFAULT,
+                                                    ...normalizeOverviewFilters(
+                                                        item.filters,
+                                                        DEFAULT,
+                                                    ),
+                                                    site: overview.sites.some(
+                                                        (site) =>
+                                                            String(site.id) ===
+                                                            item.filters.site,
+                                                    )
+                                                        ? item.filters.site
+                                                        : 'all',
+                                                };
+                                                update(validated);
+                                                setSavedViewsOpen(false);
+                                            }}
+                                        >
+                                            {item.name}
+                                        </button>
+                                        <EntityKebab
+                                            label={`Actions for ${item.name}`}
+                                            actions={
+                                                savingViews
+                                                    ? []
+                                                    : [
+                                                          {
+                                                              label: 'Update with current filters',
+                                                              onClick: () =>
+                                                                  persist(
+                                                                      saved.map(
+                                                                          (
+                                                                              view,
+                                                                          ) =>
+                                                                              view.name ===
+                                                                              item.name
+                                                                                  ? {
+                                                                                        ...view,
+                                                                                        filters,
+                                                                                    }
+                                                                                  : view,
+                                                                      ),
+                                                                  ),
+                                                          },
+                                                          {
+                                                              label: 'Rename',
+                                                              onClick: () => {
+                                                                  setRenameFrom(
+                                                                      item.name,
+                                                                  );
+                                                                  setSaveName(
+                                                                      item.name,
+                                                                  );
+                                                                  setSaveOpen(
+                                                                      true,
+                                                                  );
+                                                              },
+                                                          },
+                                                          {
+                                                              label: 'Remove',
+                                                              onClick: () =>
+                                                                  persist(
+                                                                      saved.filter(
+                                                                          (
+                                                                              view,
+                                                                          ) =>
+                                                                              view !==
+                                                                              item,
+                                                                      ),
+                                                                  ),
+                                                          },
+                                                      ]
+                                            }
+                                        />
+                                    </div>
+                                ))}
+                                {undo && (
                                     <button
                                         disabled={savingViews}
                                         onClick={() => {
-                                            const validated = {
-                                                ...DEFAULT,
-                                                ...normalizeOverviewFilters(
-                                                    item.filters,
-                                                    DEFAULT,
-                                                ),
-                                                site: overview.sites.some(
-                                                    (site) =>
-                                                        String(site.id) ===
-                                                        item.filters.site,
-                                                )
-                                                    ? item.filters.site
-                                                    : 'all',
-                                            };
-                                            update(validated);
+                                            persist(undo, () => setUndo(null));
                                         }}
                                     >
-                                        {item.name}
+                                        Undo last change
                                     </button>
-                                    <EntityKebab
-                                        label={`Actions for ${item.name}`}
-                                        actions={
-                                            savingViews
-                                                ? []
-                                                : [
-                                                      {
-                                                          label: 'Update with current filters',
-                                                          onClick: () =>
-                                                              persist(
-                                                                  saved.map(
-                                                                      (view) =>
-                                                                          view.name ===
-                                                                          item.name
-                                                                              ? {
-                                                                                    ...view,
-                                                                                    filters,
-                                                                                }
-                                                                              : view,
-                                                                  ),
-                                                              ),
-                                                      },
-                                                      {
-                                                          label: 'Rename',
-                                                          onClick: () => {
-                                                              setRenameFrom(
-                                                                  item.name,
-                                                              );
-                                                              setSaveName(
-                                                                  item.name,
-                                                              );
-                                                              setSaveOpen(true);
-                                                          },
-                                                      },
-                                                      {
-                                                          label: 'Remove',
-                                                          onClick: () =>
-                                                              persist(
-                                                                  saved.filter(
-                                                                      (view) =>
-                                                                          view !==
-                                                                          item,
-                                                                  ),
-                                                              ),
-                                                      },
-                                                  ]
-                                        }
-                                    />
-                                </div>
-                            ))}
-                            {undo && (
-                                <button
-                                    disabled={savingViews}
-                                    onClick={() => {
-                                        persist(undo, () => setUndo(null));
-                                    }}
-                                >
-                                    Undo last change
-                                </button>
-                            )}
-                            {viewMessage && (
-                                <span role="status">{viewMessage}</span>
-                            )}
-                        </div>
-                    )}
+                                )}
+                                {viewMessage && (
+                                    <span role="status">{viewMessage}</span>
+                                )}
+                            </div>
+                        </DialogContent>
+                    </Dialog>
                     {filters.view === 'overview' && (
                         <>
                             <section
@@ -1956,7 +2023,7 @@ export default function FleetAssetsDashboard({ overview, saved_views }: Props) {
                                             aria-label="About vehicle availability"
                                             onClick={() => setDataOpen(true)}
                                         >
-                                            <Database size={17} />
+                                            <Info size={17} />
                                         </button>
                                     </div>
                                     <AvailabilityDonut

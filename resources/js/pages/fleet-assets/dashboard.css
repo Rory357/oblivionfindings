@@ -1,6 +1,6 @@
 .fleet-overview {
     display: grid;
-    gap: 18px;
+    gap: 20px;
     padding-bottom: 30px;
 }
 .fleet-overview .eh-header {
@@ -28,12 +28,50 @@
     min-width: 0;
     border: 1px solid var(--border);
     background: var(--card);
-    border-radius: 16px;
-    box-shadow: 0 12px 32px -28px rgba(18, 25, 56, 0.55);
+    border-radius: 14px;
+    box-shadow: 0 1px 3px
+        color-mix(in oklch, var(--foreground), transparent 92%);
     padding: 20px;
 }
 .fleet-overview .fo-map-panel {
     position: relative;
+    padding: 0;
+}
+.fleet-overview .fo-map-panel > .fo-section-head {
+    padding: 18px 20px 12px;
+    margin-bottom: 0;
+}
+.fleet-overview .fo-map-toolbar {
+    padding: 0 16px 14px;
+    margin-bottom: 0;
+}
+.fleet-overview .fo-map-toolbar .fo-segmented {
+    border: 1px solid var(--border);
+    flex: none;
+}
+.fleet-overview .fo-map-toolbar .fo-segmented button {
+    min-height: 36px;
+    padding-inline: 9px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+.fleet-overview .fo-map-toolbar .fo-segmented button.active {
+    color: var(--foreground);
+}
+.fleet-overview .fo-map-toolbar .fo-stale-toggle {
+    min-height: 40px;
+    font-size: 11px;
+    border-color: transparent;
+    padding-inline: 7px;
+    white-space: nowrap;
+}
+.fleet-overview .fo-map-toolbar .fo-head-actions {
+    gap: 3px;
+}
+.fleet-overview .fo-map-toolbar .fo-head-actions button {
+    min-height: 40px;
+    padding-inline: 7px;
+    font-size: 11px;
 }
 .fleet-overview .fo-section-head {
     display: flex;
@@ -81,6 +119,9 @@
     gap: 8px;
     margin-bottom: 12px;
 }
+.fleet-overview .fo-map-toolbar {
+    margin-bottom: 0;
+}
 .fleet-overview .fo-segmented {
     display: inline-flex;
     gap: 2px;
@@ -121,6 +162,9 @@
     font-size: 12px;
 }
 .fleet-overview .fo-map-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     width: min(170px, 100%);
     border: 1px solid var(--border);
     background: var(--background);
@@ -130,8 +174,20 @@
     font-size: 12px;
     outline: none;
 }
-.fleet-overview .fo-map-search:focus-visible {
+.fleet-overview .fo-map-search:focus-within {
     box-shadow: 0 0 0 2px var(--ring);
+}
+.fleet-overview .fo-map-search input {
+    border: 0;
+    outline: none;
+    min-width: 0;
+    width: 100%;
+    background: transparent;
+    color: var(--foreground);
+}
+.fleet-overview .fo-map-search > svg {
+    color: var(--muted-foreground);
+    flex: none;
 }
 .fleet-overview .fo-stale-toggle.active {
     border-color: var(--status-warning);
@@ -156,13 +212,17 @@
 .fleet-overview .fo-map-canvas {
     height: 470px;
     overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    border-block: 1px solid var(--border);
+    border-radius: 0;
     position: relative;
     background: var(--muted);
 }
 .fleet-overview .fo-map-canvas > div:first-child {
     height: 100%;
+    border-radius: 0 !important;
+}
+.fleet-overview .leaflet-marker-cluster > div {
+    background: var(--primary) !important;
 }
 .fleet-overview .fo-map-canvas .leaflet-tile-pane {
     filter: grayscale(1) saturate(0) contrast(0.88) brightness(1.04);
@@ -715,8 +775,7 @@
     }
 }
 @media (max-width: 750px) {
-    .fleet-overview .fo-card,
-    .fleet-overview .fo-map-panel {
+    .fleet-overview .fo-card {
         padding: 15px;
     }
     .fleet-overview .fo-side-col {
@@ -747,14 +806,24 @@
 /* Approved v9 composition: priorities, full-width map, work beside availability. */
 .fleet-overview .fo-operations-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-columns: minmax(0, 1fr) 320px;
     gap: 20px;
     align-items: start;
 }
 .fleet-overview .fo-operations-work {
     display: grid;
-    gap: 24px;
+    gap: 20px;
     min-width: 0;
+}
+.fleet-overview .fo-operations-work > section {
+    min-width: 0;
+}
+.fleet-overview .fo-operations-work .fo-agenda-row {
+    gap: 10px;
+    padding: 12px 14px;
+}
+.fleet-overview .fo-operations-work .fo-agenda-row > .fo-row-icon {
+    display: none;
 }
 .fleet-overview .fo-section-head h2 {
     font-size: 16px;
@@ -818,7 +887,7 @@
     width: 210px;
     height: 210px;
     position: relative;
-    margin: 0 auto 8px;
+    margin: -5px auto 0;
 }
 .fleet-overview .fo-donut-centre {
     position: absolute;
@@ -865,7 +934,7 @@
     text-align: left;
     padding: 8px;
     border-radius: 8px;
-    min-height: 52px;
+    min-height: 44px;
 }
 .fleet-overview .fo-availability-legend button:hover,
 .fleet-overview .fo-availability-legend .is-highlighted {
@@ -1167,7 +1236,17 @@
     justify-content: space-between;
     gap: 12px;
     font-size: 12px;
-    margin-top: 12px;
+    padding: 12px 18px 7px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.fleet-overview .fo-map-summary > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.fleet-overview .fo-map-summary > span > svg {
+    color: var(--primary);
 }
 .fleet-overview .fo-map-summary button {
     display: inline-flex;
@@ -1181,7 +1260,64 @@
     flex-wrap: wrap;
     font-size: 10px;
     color: var(--muted-foreground);
-    margin-top: 10px;
+    padding: 0 18px;
+}
+.fleet-overview .fo-map-panel > .fo-note {
+    padding: 0 18px 14px;
+    font-size: 10px;
+}
+.fleet-overview .fo-map-sources span:first-child > svg {
+    color: var(--primary);
+}
+.fleet-overview .fo-map-sources span:nth-child(2) > svg {
+    color: var(--chart-2);
+}
+.fleet-overview .fo-map-sources span:nth-child(3) > svg {
+    color: var(--status-warning);
+}
+.fleet-overview .fo-approved-scope {
+    margin-right: auto;
+    font-size: 11px;
+    color: var(--primary-foreground);
+    opacity: 0.75;
+}
+.fleet-overview .fo-saved-trigger {
+    height: 28px;
+    font-size: 12px;
+    padding-inline: 10px;
+    border-radius: 8px;
+}
+.fleet-overview .fo-observation {
+    min-height: 20px;
+}
+.fleet-overview .fo-observation > span,
+.fleet-overview .fo-observation > button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.fleet-overview .fo-saved-dialog {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    max-height: 50dvh;
+    overflow-y: auto;
+}
+.fleet-overview .fo-saved-dialog .fo-saved-item {
+    justify-content: space-between;
+}
+.fleet-overview .fo-saved-dialog .fo-saved-item > button:first-child {
+    flex: 1;
+    text-align: left;
+    min-height: 44px;
+}
+@media (max-width: 1280px) {
+    .fleet-overview .fo-operations-grid {
+        grid-template-columns: minmax(0, 1fr) 300px;
+    }
+    .fleet-overview .fo-map-canvas {
+        height: 480px;
+    }
 }
 .fleet-overview .fo-map-sources span {
     display: flex;
