@@ -52,17 +52,19 @@ final class VehicleGeofenceService
     {
         $siteIds = $this->access->accessibleSiteIds($user);
 
-        return AssetGeofence::query()->where(function (Builder $scope) use ($siteIds, $user, $vehicle): void {
-            if ($siteIds === []) {
-                $scope->whereRaw('1 = 0');
-            } else {
-                $scope->whereIn('site_id', $siteIds);
-            }
-            // Vehicle-owned boundaries without a Site follow their vehicle's access.
-            $scope->orWhere(fn (Builder $owned) => $owned->whereNull('site_id')->where(fn (Builder $vehicles) => $vehicles
-                ->where('asset_id', $vehicle->getKey())
-                ->orWhereIn('asset_id', $this->access->siteScopedVehiclesForFleet($user)->select('assets.id'))));
-        });
+        return AssetGeofence::query()->whereNull('retired_at')
+            ->where(fn (Builder $uses) => $uses->whereNull('permitted_uses')->orWhereJsonContains('permitted_uses', 'Vehicles'))
+            ->where(function (Builder $scope) use ($siteIds, $user, $vehicle): void {
+                if ($siteIds === []) {
+                    $scope->whereRaw('1 = 0');
+                } else {
+                    $scope->whereIn('site_id', $siteIds);
+                }
+                // Vehicle-owned boundaries without a Site follow their vehicle's access.
+                $scope->orWhere(fn (Builder $owned) => $owned->whereNull('site_id')->where(fn (Builder $vehicles) => $vehicles
+                    ->where('asset_id', $vehicle->getKey())
+                    ->orWhereIn('asset_id', $this->access->siteScopedVehiclesForFleet($user)->select('assets.id'))));
+            });
     }
 
     /**
@@ -212,6 +214,7 @@ final class VehicleGeofenceService
                     'lock_version' => $assignment->lock_version + 1,
                 ])->save();
                 $removedIds[] = $assignment->id;
+                app(BoundaryRuleService::class)->record($assignment, $current, 'Removed from the vehicle’s geofence selection.');
             }
             $addedIds = [];
             foreach ($add as $geofenceId) {
@@ -230,6 +233,7 @@ final class VehicleGeofenceService
                     'updated_by_user_id' => $current->id,
                 ]);
                 $addedIds[] = $assignment->id;
+                app(BoundaryRuleService::class)->record($assignment, $current, 'Linked from the vehicle’s geofence selection.');
             }
             AuditLogger::logOrFail('fleet.vehicle.geofence.selection', $vehicle, [
                 'asset_id' => $vehicle->id,
@@ -326,6 +330,7 @@ final class VehicleGeofenceService
                 'schedule' => $values['schedule'],
                 'monitoring' => 'inactive',
             ]);
+            app(BoundaryRuleService::class)->record($assignment, $current, 'Inactive rule created from the vehicle profile.');
 
             return $assignment;
         }, 3);
@@ -355,6 +360,8 @@ final class VehicleGeofenceService
             $vehicle = $this->vehicle($current, $assetId, true);
             $assignment = FleetVehicleGeofenceAssignment::query()->where('asset_id', $vehicle->id)
                 ->whereKey($assignmentId)->lockForUpdate()->first() ?? abort(404);
+            abort_if($assignment->policy_proposal !== null, 409,
+                'This assignment has expanded timing and response settings. Edit it in Maps & boundaries to retain the full proposal.');
             abort_unless($assignment->state === FleetVehicleGeofenceAssignment::STATE_ACTIVE, 409,
                 'This geofence is no longer linked to the vehicle. Reload the map.');
             $fence = $assignment->geofence_id === null ? null
@@ -430,6 +437,7 @@ final class VehicleGeofenceService
                 'after' => $this->auditState($assignment),
                 'monitoring' => 'inactive',
             ]);
+            app(BoundaryRuleService::class)->record($assignment, $current, 'Inactive rule updated from the vehicle profile.');
 
             return $assignment;
         }, 3);
@@ -471,6 +479,7 @@ final class VehicleGeofenceService
             'schedule' => $assignment->schedule,
             'monitoring' => $monitoring,
             'lock_version' => (int) $assignment->lock_version,
+            'workspace_href' => $assignment->policy_proposal !== null ? '/fleet-assets/geofences?tab=rules&rule='.$assignment->id : null,
             'saved_at' => $assignment->updated_at?->toIso8601String(),
             'saved_by' => $assignment->updatedBy?->name ?? $assignment->createdBy?->name,
         ];
@@ -548,6 +557,13 @@ final class VehicleGeofenceService
             'is_active' => false,
         ]);
         $fence->refresh();
+        if ($copiedFrom !== null) {
+            // Older profile assignments retained a geometry hash, not an integer
+            // source revision. Preserve that lineage without inventing a version.
+            $fence->forceFill(['copy_source' => ['id' => $copiedFrom, 'revision' => null,
+                'geometry_version' => null, 'geometry_hash' => MaintenanceFingerprint::of($copiedGeometry ?? [])]])->save();
+        }
+        app(BoundaryService::class)->record($fence, $actor, 'Created from the vehicle profile. Monitoring remains inactive.', 'created');
         AuditLogger::logOrFail('fleet.geofence.create', $fence, [
             'site_id' => $owner['id'],
             'name' => $name,

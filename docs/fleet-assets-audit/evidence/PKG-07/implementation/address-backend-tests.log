@@ -1,0 +1,22 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\806c\oblivionfindings\phpunit.xml
+
+......                                                              6 / 6 (100%)
+   PASS  Tests\Feature\FleetAssets\Pkg07BoundariesTest
+  ✓ versioned writes are scoped retry safe and keep original evidence                                            6.87s
+  ✓ scale search rule proposals and dependency checks share the canonical register                               1.08s
+  ✓ client handoff is opaque and rechecks consent and source versions                                            2.22s
+  ✓ protected geometry and public geocoding cannot be bypassed                                                   0.46s
+  ✓ submitted public address search returns coordinates caches results and requires management access            1.37s
+  ✓ schedule windows and rule retry retain only valid reviewed proposals                                         0.55s
+
+  Tests:    6 passed (111 assertions)
+  Duration: 16.77s
+
+
+
+Time: 00:13.046, Memory: 86.00 MB
+
+OK (6 tests, 111 assertions)

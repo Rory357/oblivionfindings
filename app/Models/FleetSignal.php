@@ -11,6 +11,7 @@ class FleetSignal extends Model
 {
     protected $fillable = [
         'asset_id',
+        'source_event_id',
         'asset_tracker_id',
         'device_id',
         'geofence_id',
@@ -36,6 +37,11 @@ class FleetSignal extends Model
     public function tracker(): BelongsTo
     {
         return $this->belongsTo(AssetTracker::class, 'asset_tracker_id');
+    }
+
+    public function sourceEvent(): BelongsTo
+    {
+        return $this->belongsTo(FleetTelemetryEvent::class, 'source_event_id');
     }
 
     public function device(): BelongsTo

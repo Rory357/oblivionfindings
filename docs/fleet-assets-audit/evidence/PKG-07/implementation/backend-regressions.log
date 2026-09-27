@@ -1,0 +1,91 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\806c\oblivionfindings\phpunit.xml
+
+.....
+  .....FFF...⨯⨯⨯.................................                                    30 / 30 (100%)........
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\Sites\SiteGeofenceTest > site boundary creation stays inactive and completes geometry readi…
+  Expected response status code [201, 301, 302, 303, 307, 308] but received 404.
+Failed asserting that false is true.
+
+  at tests\Feature\Sites\SiteGeofenceTest.php:54
+     50▕ test('site boundary creation stays inactive and completes geometry readiness', function () {
+     51▕     $user = siteGeofenceTestUser();
+     52▕     $site = Site::factory()->create(['is_active' => true]);
+     53▕     $data = siteBoundaryPayload($site);
+  ➜  54▕     $this->actingAs($user)->post("/sites/{$site->id}/geofence", $data)->assertRedirect();
+     55▕     $boundary = AssetGeofence::where('site_id', $site->id)->firstOrFail();
+     56▕     expect($boundary->is_active)->toBeFalse()->and($boundary->scope)->toBe('site');
+     57▕     $this->assertDatabaseCount('asset_geofence_assignments', 0);
+     58▕     $this->assertDatabaseCount('boundary_versions', 1);
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\Sites\SiteGeofenceTest > explicit site boundary edits preserve purpose settings and reject…
+  Expected response status code [201, 301, 302, 303, 307, 308] but received 404.
+Failed asserting that false is true.
+
+  at tests\Feature\Sites\SiteGeofenceTest.php:71
+     67▕     $boundary = AssetGeofence::create(['site_id' => $site->id, 'name' => 'Second area', 'type' => 'circle', 'scope' => 'vehicle', 'shape' => siteGeofenceCircleShape(), 'is_active' => false, 'breach_type' => 'enter', 'alert_config' => ['priority' => 'high'], 'time_rules' => ['weekdays' => [1]]]);
+     68▕     $asset = Asset::factory()->forSite($site)->create();
+     69▕     $boundary->assignedAssets()->attach($asset->id);
+     70▕     $data = [...siteBoundaryPayload($site), 'name' => 'Renamed second area', 'expected_revision' => 1];
+  ➜  71▕     $this->actingAs($user)->put("/sites/{$site->id}/geofence/{$boundary->id}", $data)->assertRedirect();
+     72▕     $boundary->refresh();
+     73▕     expect($first->fresh()->name)->toBe('First area')->and($boundary->name)->toBe('Renamed second area')
+     74▕         ->and($boundary->breach_type)->toBe('enter')->and($boundary->alert_config)->toBe(['priority' => 'high'])
+     75▕         ->and($boundary->time_rules)->toBe(['weekdays' => [1]]);
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\Sites\SiteGeofenceTest > site retirement retains evidence and blocks linked dependencies wi…
+  Expected response status code [201, 301, 302, 303, 307, 308] but received 404.
+Failed asserting that false is true.
+
+  at tests\Feature\Sites\SiteGeofenceTest.php:85
+     81▕ test('site retirement retains evidence and blocks linked dependencies without fake crossings', function () {
+     82▕     $user = siteGeofenceTestUser();
+     83▕     $site = Site::factory()->create();
+     84▕     $asset = Asset::factory()->forSite($site)->create();
+  ➜  85▕     $this->actingAs($user)->post("/sites/{$site->id}/geofence", siteBoundaryPayload($site))->assertRedirect();
+     86▕     $boundary = AssetGeofence::where('site_id', $site->id)->firstOrFail();
+     87▕     $boundary->assignedAssets()->attach($asset->id);
+     88▕     $this->deleteJson("/sites/{$site->id}/geofence/{$boundary->id}", ['expected_revision' => 1, 'reason' => 'Unused area'])->assertConflict();
+     89▕     $this->postJson("/fleet-assets/geofences/{$boundary->id}/legacy-links", ['expected_revision' => 1, 'reason' => 'Remove unused legacy links', 'action' => 'unlink'])->assertOk();
+
+
+  Tests:    3 failed, 27 passed (429 assertions)
+  Duration: 2416.54s
+
+
+
+Time: 40:10.969, Memory: 132.00 MB
+
+There were 3 failures:
+
+1) P\Tests\Feature\Sites\SiteGeofenceTest::__pest_evaluable_site_boundary_creation_stays_inactive_and_completes_geometry_readiness
+Expected response status code [201, 301, 302, 303, 307, 308] but received 404.
+Failed asserting that false is true.
+
+C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:201
+C:\Users\steph\.codex\worktrees\806c\oblivionfindings\tests\Feature\Sites\SiteGeofenceTest.php:54
+
+2) P\Tests\Feature\Sites\SiteGeofenceTest::__pest_evaluable_explicit_site_boundary_edits_preserve_purpose_settings_and_reject_stale_writes
+Expected response status code [201, 301, 302, 303, 307, 308] but received 404.
+Failed asserting that false is true.
+
+C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:201
+C:\Users\steph\.codex\worktrees\806c\oblivionfindings\tests\Feature\Sites\SiteGeofenceTest.php:71
+
+3) P\Tests\Feature\Sites\SiteGeofenceTest::__pest_evaluable_site_retirement_retains_evidence_and_blocks_linked_dependencies_without_fake_crossings
+Expected response status code [201, 301, 302, 303, 307, 308] but received 404.
+Failed asserting that false is true.
+
+C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:201
+C:\Users\steph\.codex\worktrees\806c\oblivionfindings\tests\Feature\Sites\SiteGeofenceTest.php:85
+
+FAILURES!
+Tests: 30, Assertions: 429, Failures: 3.
