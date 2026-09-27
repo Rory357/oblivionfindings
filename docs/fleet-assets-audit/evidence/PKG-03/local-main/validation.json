@@ -1,6 +1,6 @@
 {
-  "candidate": "20281ab99d4f7cb6db01e823cebe84eac5c6c2e9",
-  "base": "ba5bff2e8b6c22796369443f1cdac918039950dd",
+  "candidate": "063ab0fc111208ce22c6abf7e5822bd138a7f296",
+  "base": "49e0be5b1c1716aeb4e681529bb71fdce2a7abc0",
   "localMainIntegrated": false,
   "remotePushed": false,
   "deployed": false,
@@ -36,5 +36,19 @@
     "operationalRecordsUsed": false
   },
   "frozenFiles": 311,
-  "frozenFilesChanged": 0
+  "frozenFilesChanged": 0,
+  "reconciliation": {
+    "source": "063ab0fc111208ce22c6abf7e5822bd138a7f296",
+    "changedManifestFiles": 2,
+    "frontendTests": 74,
+    "frontendFiles": 10,
+    "typescriptExit": 0,
+    "eslintExit": 0,
+    "backendCases": 90,
+    "backendAssertions": 2009,
+    "backendFailures": 1,
+    "pkg03CasesPassing": 76,
+    "failure": "Published Transport allocation test omits required client_id; reported to Main",
+    "browserAndBuildEvidenceSource": "20281ab99d4f7cb6db01e823cebe84eac5c6c2e9"
+  }
 }

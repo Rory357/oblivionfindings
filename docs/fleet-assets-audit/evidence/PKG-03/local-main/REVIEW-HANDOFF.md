@@ -5,13 +5,19 @@ Stephan's direct request: “can you let main know can you get this on main loca
 ## Exact candidate
 
 - Branch: `codex/pkg03-local-main`.
-- Candidate application/tests: `20281ab99d4f7cb6db01e823cebe84eac5c6c2e9`.
-- Actual integration base: `ba5bff2e8b6c22796369443f1cdac918039950dd`.
+- Candidate application/tests: `063ab0fc111208ce22c6abf7e5822bd138a7f296`.
+- Actual integration base: `49e0be5b1c1716aeb4e681529bb71fdce2a7abc0`, the Transport successor now on Main. The earlier `ba5bff2e8` verification remains historical evidence.
 - Original implementation: `feca8ad57`; reconciliation merge: `7afb83403`; test reconciliation: `c7d6b3cdc`; final service-race harness correction: `20281ab99`.
 - `source-manifest.json` contains the exact 72 changed source/test/build files and their working-file SHA-256 values. Later evidence-only commits do not change these source hashes.
 - Application ownership remains one organisation, roles, approved sites and canonical record privacy. No new tenancy boundary.
 
 ## Reconciliation
+
+The successor merges published Transport commit `49e0be5b1` into the existing PKG-03 branch without importing unapproved PKG-04/06 work. One content conflict in `wizard-kit.tsx` retains both optional contracts: Transport's `freeNavigation` (default false) and PKG-03's `discardDescription`. Section navigation retains Transport's opt-in behavior; Continue and Submit retain their validation. PKG-03's 44-pixel mobile actions and discard copy are preserved. The route file auto-merges Transport's additions and PKG-03's cost source route. Only these two of the 72 PKG-03 manifest files changed; `reconcile-49e-source-changes.json` records their before/after hashes. Finance and Maintenance service logic and regression tests did not change in this reconciliation.
+
+After reconciliation, 74 UI cases across ten files pass (the seven PKG-03 files plus Transport models, calendar actions and shared navigation). Full TypeScript and the merged wizard's ESLint pass. See the `reconcile-49e-*` logs for this successor's checks. The signed-in browser and production build evidence below were captured on `20281ab99` before the Transport merge; they are not presented as a fresh successor browser/build run.
+
+The combined backend run has 90 cases / 2,009 assertions, with one failure and no errors/skips. All 76 PKG-03 cases pass, including both concurrent decision tests. The imported Transport allocation test omits `client_id` in its valid payload at `TransportWorkspaceTest.php:88`, while published `VehicleBookingController.php:419` now requires that identifier to match the transport request. It therefore returns 404 at the test's success assertion on line 95. Both files are unchanged from `49e0be5b1`; this published-base test mismatch has been reported to Main for its existing Transport owner. The combined run is retained as failed evidence, not represented as a green run or a new PKG-03 implementation defect.
 
 Four content conflicts were resolved. `VehicleDocumentService` keeps Main's source-aware authorisation before replay and PKG-03's immutable Finance evidence check for a new mutation. The shared command hook retains the original method, URL, body and idempotency key after an uncertain response. Both multipart regression tests were retained. Finance test imports were combined. Main's newer Maintenance transition, navigation, route and test-harness changes are retained; the shared `TestCase.php` is unchanged from Main.
 
@@ -32,7 +38,7 @@ The first integrated backend run and subsequent startup-only failure are retaine
 
 ## Signed-in actual application check
 
-The actual Laravel application and compiled production components run at `http://127.0.0.1:8772` from dcf0, using only `oblivion_findings_pkg03_browser_dcf0_20260927`. Normal Fortify sign-in and session/CSRF processing are used with a synthetic reviewer. There are no Inertia response fixtures, layout substitutions or authentication bypass routes.
+The actual Laravel application and compiled production components were verified at `http://127.0.0.1:8772` from dcf0, using only `oblivion_findings_pkg03_browser_dcf0_20260927`. Normal Fortify sign-in and session/CSRF processing were used with a synthetic reviewer. There were no Inertia response fixtures, layout substitutions or authentication bypass routes. The verification server and its three temporary tabs are now closed; the dedicated synthetic database, public manifest and private quote directory have been removed. Reusable verification source is retained in `signed-in-verifier.zip`.
 
 Verified through the browser:
 

@@ -217,7 +217,7 @@
   },
   {
     "path": "resources/js/components/fleet-assets/vehicle-workspace/wizard-kit.tsx",
-    "sha256": "9B5E7849C14D33DC80786BCAA458B54FDB8D1A42B56B2604789CF2D517757226"
+    "sha256": "F4DF05F5B6313C39C03970D52839E50D87A771099FF22A4677F838FBD0E915B0"
   },
   {
     "path": "resources/js/pages/finance/bills/Index.tsx",
@@ -265,7 +265,7 @@
   },
   {
     "path": "routes/fleet-assets.php",
-    "sha256": "B8529EA5F8C2745693955B8D5A58ECE9299212DD3DD5B682290D4CDAA0F10832"
+    "sha256": "47DEC8339A71A09AD87FEDB6E709CFB5774020415002C2F93CF272E8E26BB82D"
   },
   {
     "path": "tests/Feature/Finance/BillApprovalSnapshotTest.php",
