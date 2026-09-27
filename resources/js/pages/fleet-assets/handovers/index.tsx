@@ -81,6 +81,8 @@ type WizardPayload = {
     vehicles: WizardVehicle[];
     users: UserOption[];
     current_user_id: number;
+    booking_id?: number | null;
+    asset_id?: number | null;
 };
 
 type PaginatedHandovers = {
@@ -237,6 +239,8 @@ type DamageNote = {
 };
 
 type FormData = {
+    request_key: string;
+    booking_id: number | null;
     asset_id: string;
     incoming_user_id: string;
     odometer_km: string;
@@ -278,7 +282,9 @@ function HandoverWizard({
     const [stepIndex, setStepIndex] = useState(0);
 
     const form = useForm<FormData>({
-        asset_id: '',
+        request_key: crypto.randomUUID(),
+        booking_id: payload.booking_id || null,
+        asset_id: payload.asset_id ? String(payload.asset_id) : '',
         incoming_user_id: '',
         odometer_km: '',
         fuel_level: 'full',

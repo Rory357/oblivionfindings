@@ -4,6 +4,7 @@ namespace App\Services\Fleet;
 
 use App\Models\Client;
 use App\Models\ClientMedication;
+use App\Models\ClientTransportBooking;
 use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetResidentTransport;
 use App\Models\FleetResidentTransportEvent;
@@ -285,6 +286,11 @@ class ResidentTransportJourneyService
                 abort_unless($asset->status === 'active', 404);
 
                 $booking = $this->resolveBooking($actor, $data, $asset->id, $site->id);
+                $transportRequest = $booking ? ClientTransportBooking::where('fleet_booking_id', $booking->id)->lockForUpdate()->first() : null;
+                if ($transportRequest) {
+                    abort_unless((int) $transportRequest->client_id === (int) $resident->id, 409,
+                        'The linked transport request must have the same passenger.');
+                }
                 $this->assertShiftWindowAndDriver($actor, $shift, $data);
 
                 $medications = $this->resolveMedicationPayloads(
@@ -333,6 +339,14 @@ class ResidentTransportJourneyService
                     ];
                 }
 
+                if ($transportRequest) {
+                    abort_unless($booking->status === 'checked_out', 409,
+                        'Complete the Fleet checkout before starting the linked journey.');
+                    // Replays above keep their original result after return; new journeys need an unused request link.
+                    abort_if($transportRequest->journey()->exists(), 409,
+                        'This request already has an actual journey. Open its existing journey record.');
+                }
+
                 $snapshot = $shift
                     ? $this->snapshots->snapshotForShift($shift, $actor)
                     : $this->snapshots->snapshotForClient(
@@ -351,6 +365,7 @@ class ResidentTransportJourneyService
                     'driver_user_id' => $actor->id,
                     'resident_id' => $resident->id,
                     'resident_name' => $this->residentName($resident),
+                    'transport_request_id' => $transportRequest?->id,
                     'transport_type' => $data['transport_type'],
                     'pickup_location' => ($data['pickup_location'] ?? null) ?: $shift?->location,
                     'dropoff_location' => $data['dropoff_location'] ?? null,
@@ -487,6 +502,10 @@ class ResidentTransportJourneyService
                 throw new ConflictHttpException('This transport has already been completed or is no longer active.');
             }
 
+            if ($transport->transport_request_id && (! $transport->arrived_at || ! $transport->passengers_accounted_at)) {
+                throw ValidationException::withMessages(['transport' => 'Record arrival and confirm every passenger is accounted for before completing this journey.']);
+            }
+
             $allLogs = FleetMedicationTransitLog::query()->where('transport_id', $transport->id)->count();
             $scopedLogsQuery = FleetMedicationTransitLog::query()->where('transport_id', $transport->id);
             $this->scope->applyMedicationTransitScope($scopedLogsQuery, $actor);
@@ -514,7 +533,7 @@ class ResidentTransportJourneyService
 
             $transport->forceFill([
                 'status' => 'completed',
-                'arrived_at' => $data['arrived_at'] ?? now(),
+                'arrived_at' => $transport->transport_request_id ? $transport->arrived_at : ($data['arrived_at'] ?? now()),
                 'notes' => $data['notes'] ?? $transport->notes,
                 'version' => ((int) $transport->version) + 1,
             ])->save();
@@ -1376,7 +1395,8 @@ class ResidentTransportJourneyService
         return FleetVehicleBooking::query()
             ->whereKey((int) $data['booking_id'])
             ->where('asset_id', $assetId)
-            ->where('user_id', $actor->id)
+            ->where(fn (Builder $driver) => $driver->where('driver_user_id', $actor->id)
+                ->orWhere(fn (Builder $legacy) => $legacy->whereNull('driver_user_id')->where('user_id', $actor->id)))
             ->where(function (Builder $pickup) use ($siteId): void {
                 $pickup->whereNull('pickup_site_id')->orWhere('pickup_site_id', $siteId);
             })

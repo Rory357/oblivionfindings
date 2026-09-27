@@ -17,6 +17,7 @@ class FleetResidentTransport extends Model
         'asset_id',
         'journey_uuid',
         'booking_id',
+        'transport_request_id', 'passengers_accounted_at', 'passengers_accounted_by',
         'shift_id',
         'site_id',
         'service_context_id',
@@ -46,6 +47,7 @@ class FleetResidentTransport extends Model
     protected $casts = [
         'departed_at' => 'datetime',
         'arrived_at' => 'datetime',
+        'passengers_accounted_at' => 'datetime',
         'passengers_count' => 'integer',
         'review_required' => 'boolean',
         'review_flagged_at' => 'datetime',

@@ -1,0 +1,133 @@
+{
+  "baseline": "4ea64c547ed85a5b7504e59599db351f6eba7deb",
+  "inputs": [
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\lib\\utils.ts",
+      "sha256": "b08a18240aa7920bbf717c7055eadefa9af65c7e8e3ca79405636badcd5984bb"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\ui\\tooltip.tsx",
+      "sha256": "ec0e4cd4f31ae0d2fb34b3220eb879591d25224a2358b99d9e4a9426eaccc4eb"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\ui\\avatar.tsx",
+      "sha256": "e637ab3522c01631eac2e456588ef301314e2bb7940ebf7cd96e698a868d47bc"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\ui\\overlay-focus-return.tsx",
+      "sha256": "eff96459e2116ecc9493ed8960aa660b6fe85fb8b01f62eb47320ec75c4975ae"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\ui\\dialog.tsx",
+      "sha256": "b0e74ef729fbf4bdbc918f7abc08a19486435013451088b9a6248d1039f55dc6"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\ui\\popover.tsx",
+      "sha256": "00702c92103d2bf0752fac030c9fc6f671c55a5732534a6fc306df618f30e652"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\lib\\status-colors.ts",
+      "sha256": "45bd2d542b87970ae10ce7e1dde8ee3ba13be0f18d20ac0816f3e9d1df661294"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\ui\\status-badge.tsx",
+      "sha256": "d1d83d69c9f091a1dea57b7f7312f794097f2a8278dd70d7ba14a288d459c130"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\page\\page-header.tsx",
+      "sha256": "fbd198fe142bf1dc2321878bc924c9a8baa1eed6b0add0cc7e28a40e70f01427"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\ui\\card.tsx",
+      "sha256": "117ccee128241aba7db9cf9dba94b43f9ebafda920965b425fe8d093c1a174a6"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\ui\\checkbox.tsx",
+      "sha256": "cc1ca217298d1338473c462c3789a32c4b01668828bdcba983b3b460c1f5790d"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\ui\\dropdown-menu.tsx",
+      "sha256": "20fb391990bb612d0ceb1fd535596c772ecfa389ee543fc629852f46347dba1e"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\lists\\entity-menu.tsx",
+      "sha256": "73ef3dfecf6cac04969e5576b7a8e7ada157160e7f0ab47bf4ce0fd4c0ebea3b"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\lists\\entity-table.tsx",
+      "sha256": "f401231e5da1775c7da0bdd53c25e18ad83371d81d5fa809aad0d7f7a7da8996"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\lists\\entity-cells.tsx",
+      "sha256": "c53b85e767f430eda03e6d03022754180d752ad93182b19b716695ff559b501f"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\lib\\datetime.ts",
+      "sha256": "d558321f11b5e545c6b8e1eff6347e1c088cf725a32d0ee38438a3b219baec60"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\ui\\button.tsx",
+      "sha256": "e8ae39c3616c4aaf689014c4eb9de6235e5e4ff16e581c2be2e970cd36191cc1"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\fleet-assets\\maintenance\\time-picker.tsx",
+      "sha256": "cd92205033cae16ecfa8f59436f6e2f02c9c14b1ffa5e8443091bc88135dfadd"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\ui\\input.tsx",
+      "sha256": "17da6ceadd3932f8c4269c34e29fcdad73e490bff5bcf76b6c57d47656631695"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\ui\\command.tsx",
+      "sha256": "ecb3830ccd643fd8871367333cfa2d2b45c057619d0bc47dd972c9c7e873aa14"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\docs\\fleet-assets-audit\\previews\\PKG-05\\v2\\ui.tsx",
+      "sha256": "ebcd501c1938ba030762a1eb48d761282aa5b4813163d4cdaded7a252f26a4f8"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\ui\\textarea.tsx",
+      "sha256": "c056203b55f60e10fb32ce811d6d2ffbaa3188d3ed8d674eb32678d55065e7a4"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\ui\\file-dropzone.tsx",
+      "sha256": "f74b8a5e4ffe239c55b736199bc27a35617c2a423217aef1b134065be7284ede"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\wizard\\shell.tsx",
+      "sha256": "a8ea265daa622fa839a6c714188118b6605e4f6a21ed900cf57d71dc7a552c7e"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\hr\\leave-calendar-range.tsx",
+      "sha256": "cac7e3a14857159ef67f1248ae20cf1b3744dfa270598362ba11ec2bec8c0c08"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\fleet-assets\\maintenance\\date-picker.tsx",
+      "sha256": "462557d79a15aaf512d6c61d03a53db9d2dc54de633df614a9a13ee76b170b8f"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\js\\components\\fleet-assets\\maintenance\\date-time-field.tsx",
+      "sha256": "e31c726e8b7296a2feb5ed986044ce48255151247135ff3518b52baf10b97b05"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\docs\\fleet-assets-audit\\previews\\PKG-05\\v2\\domain.ts",
+      "sha256": "8798b49f3a3f7ad4f4e77eb3be86a21282b609922225ab4fe2693b1024039c55"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\docs\\fleet-assets-audit\\previews\\PKG-05\\v2\\forms.tsx",
+      "sha256": "9ba25272246094a6b8aca1a01ceef33290d2551c4e3b1a2c335e201393b4142f"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\docs\\fleet-assets-audit\\previews\\PKG-05\\v2\\app.tsx",
+      "sha256": "8360df9d51961c23a5ccc5592791c0a75615ae1f11df69ecdbe675665330c090"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\css\\maintenance-date-time.css",
+      "sha256": "1eeb18e92ac20a7a2fc0d99d235414b8905307e3372e7cad4a14ac500b8d0bfe"
+    },
+    {
+      "path": "C:\\Users\\steph\\.codex\\worktrees\\b9b9\\oblivionfindings\\resources\\css\\app.css",
+      "sha256": "4fe49b94d074dde840d79d0813adeba3759dff243956bbfa404325bd00df149a"
+    }
+  ]
+}

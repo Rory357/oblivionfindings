@@ -32,8 +32,14 @@ import {
 import { useState } from 'react';
 
 type Props = {
-    maintenance_impacts: Array<{ id: number; followup_state: string; restriction_state: string;
-        work_order_id: number; reference_number: string | null }>;
+    transport?: { href: string | null } | null;
+    maintenance_impacts: Array<{
+        id: number;
+        followup_state: string;
+        restriction_state: string;
+        work_order_id: number;
+        reference_number: string | null;
+    }>;
     booking: {
         id: number;
         reference_number?: string | null;
@@ -85,12 +91,17 @@ const statusBannerColors: Record<string, string> = {
 
 const statusSteps = ['pending', 'approved', 'checked_out', 'returned'];
 
-export default function BookingShow({ booking, can, maintenance_impacts }: Props) {
+export default function BookingShow({
+    booking,
+    can,
+    maintenance_impacts,
+    transport,
+}: Props) {
     const fleetReturn = fleetReturnFromLocation();
     const b = booking ?? ({} as Props['booking']);
-    const canManage = can.manage;
+    const canManage = can.manage && !transport;
     // Approvers without full fleet management still decide pending requests.
-    const canApprove = can.approve ?? can.manage;
+    const canApprove = (can.approve ?? can.manage) && !transport;
     const checkoutForm = useForm({ odometer_out: '' });
     const returnForm = useForm({
         odometer_in: '',
@@ -146,14 +157,47 @@ export default function BookingShow({ booking, can, maintenance_impacts }: Props
                     </div>
                 </div>
 
-                {maintenance_impacts.length > 0 && <div role="status" className="rounded-lg border border-status-warning/40 bg-status-warning-bg px-5 py-4 text-sm">
-                    <strong>Maintenance follow-up recorded for this booking</strong>
-                    <p className="mt-1">The booking has not been moved or cancelled. Check its current approval and vehicle readiness before use.</p>
-                    {maintenance_impacts.map((impact) => <p key={impact.id} className="mt-2">
-                        {impact.reference_number ?? `Work ${impact.work_order_id}`} · {impact.restriction_state === 'active' ? 'Hold active' : 'Hold released'} · {impact.followup_state === 'reviewed' ? 'Follow-up reviewed' : 'Follow-up needed'}
-                        {can.view_maintenance && <> · <Link className="text-primary underline" href={`/fleet-assets/maintenance/work-orders/${impact.work_order_id}`}>View maintenance work</Link></>}
-                    </p>)}
-                </div>}
+                {maintenance_impacts.length > 0 && (
+                    <div
+                        role="status"
+                        className="rounded-lg border border-status-warning/40 bg-status-warning-bg px-5 py-4 text-sm"
+                    >
+                        <strong>
+                            Maintenance follow-up recorded for this booking
+                        </strong>
+                        <p className="mt-1">
+                            The booking has not been moved or cancelled. Check
+                            its current approval and vehicle readiness before
+                            use.
+                        </p>
+                        {maintenance_impacts.map((impact) => (
+                            <p key={impact.id} className="mt-2">
+                                {impact.reference_number ??
+                                    `Work ${impact.work_order_id}`}{' '}
+                                ·{' '}
+                                {impact.restriction_state === 'active'
+                                    ? 'Hold active'
+                                    : 'Hold released'}{' '}
+                                ·{' '}
+                                {impact.followup_state === 'reviewed'
+                                    ? 'Follow-up reviewed'
+                                    : 'Follow-up needed'}
+                                {can.view_maintenance && (
+                                    <>
+                                        {' '}
+                                        ·{' '}
+                                        <Link
+                                            className="text-primary underline"
+                                            href={`/fleet-assets/maintenance/work-orders/${impact.work_order_id}`}
+                                        >
+                                            View maintenance work
+                                        </Link>
+                                    </>
+                                )}
+                            </p>
+                        ))}
+                    </div>
+                )}
 
                 {/* Status Timeline */}
                 <Card>
@@ -442,6 +486,35 @@ export default function BookingShow({ booking, can, maintenance_impacts }: Props
 
                 {/* Action Buttons - More Prominent */}
                 <div className="space-y-4">
+                    {transport && (
+                        <Card>
+                            <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
+                                <div>
+                                    <h3 className="font-semibold">
+                                        Transport booking actions
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground">
+                                        Review approval, vehicle checkout,
+                                        return and cancellation with the current
+                                        passenger and key arrangements.
+                                    </p>
+                                </div>
+                                {transport.href ? (
+                                    <Button asChild>
+                                        <Link href={transport.href}>
+                                            Manage transport booking
+                                        </Link>
+                                    </Button>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">
+                                        These actions require access to the
+                                        linked Transport record. Contact the
+                                        transport coordinator.
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
                     {/* Pending: Approve / Reject */}
                     {canApprove && b.status === 'pending' && (
                         <Card className="border-2 border-status-warning/30 dark:border-status-warning/30">
@@ -657,6 +730,7 @@ export default function BookingShow({ booking, can, maintenance_impacts }: Props
                             </Button>
                         )}
                     {!canManage &&
+                        !transport &&
                         ['pending', 'approved', 'checked_out'].includes(
                             b.status ?? '',
                         ) && (

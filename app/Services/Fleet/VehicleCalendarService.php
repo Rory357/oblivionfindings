@@ -5,6 +5,7 @@ namespace App\Services\Fleet;
 use App\Models\Asset;
 use App\Models\AssetDocument;
 use App\Models\AssetDocumentSet;
+use App\Models\ClientTransportBooking;
 use App\Models\FleetKeyLog;
 use App\Models\FleetServiceSchedule;
 use App\Models\FleetVehicleBooking;
@@ -638,15 +639,22 @@ class VehicleCalendarService
             : collect();
         $manage = $viewer->canDo('fleet.manage');
         $approve = $viewer->canDo('fleet.bookings.approve') || $manage;
+        $linkedIds = ClientTransportBooking::whereIn('fleet_booking_id', $shown->pluck('id'))->pluck('fleet_booking_id')->all();
+        $transport = app(TransportRequestService::class)->query($viewer)->whereIn('fleet_booking_id', $shown->pluck('id'))->get()->keyBy('fleet_booking_id');
 
-        return $shown->map(function (FleetVehicleBooking $booking) use ($viewer, $history, $keys, $files, $asset, $manage, $approve, $uploads): array {
+        return $shown->map(function (FleetVehicleBooking $booking) use ($viewer, $history, $keys, $files, $asset, $manage, $approve, $uploads, $linkedIds, $transport): array {
             $status = $booking->status;
+            $request = $transport->get($booking->id);
+            $day = $booking->starts_at->copy()->timezone(self::ZONE)->toDateString();
             $selfIndependent = $booking->approval_route !== 'not_required' && (int) $booking->user_id === (int) $viewer->id;
 
             return [
                 'kind' => 'booking',
                 'id' => (int) $booking->id,
                 'reference' => $booking->reference_number,
+                'transport_request' => $request ? ['id' => (int) $request->id,
+                    'href' => '/fleet-assets/transports/requests/'.$request->id,
+                    'planner_href' => '/fleet-assets/transports/planner?queue=planned&selected='.$request->id.'&from='.$day.'&to='.$day] : null,
                 'purpose' => $booking->purpose,
                 'destination' => $booking->destination,
                 'passengers' => $booking->passengers,
@@ -683,18 +691,31 @@ class VehicleCalendarService
                 'files' => $this->fileRows($asset, $files->get($booking->id)),
                 'can' => [
                     'edit' => in_array($status, ['pending', 'approved'], true)
+                        && (! in_array($booking->id, $linkedIds, true) || ($request && $manage))
                         && ($manage || ((int) $booking->user_id === (int) $viewer->id && $status === 'pending')),
-                    'approve' => $status === 'pending' && $approve && ! $selfIndependent,
-                    'decline' => $status === 'pending' && $approve,
-                    'checkout' => $status === 'approved' && $manage,
-                    'return' => $status === 'checked_out' && $manage,
-                    'cancel' => in_array($status, ['pending', 'approved', 'checked_out'], true) && $manage,
+                    ...$this->bookingDecisions($viewer, $booking),
                     // Evidence rules follow the vehicle documents endpoint: document
                     // managers, or the requester or an approver of this booking.
                     'upload' => $uploads || $approve || (int) $booking->user_id === (int) $viewer->id,
                 ],
             ];
         })->values()->all();
+    }
+
+    /** Canonical source affordances shared by the vehicle and transport workspaces. */
+    public function bookingDecisions(User $viewer, FleetVehicleBooking $booking): array
+    {
+        $manage = $viewer->canDo('fleet.manage');
+        $approve = $viewer->canDo('fleet.bookings.approve') || $manage;
+        $selfIndependent = $booking->approval_route !== 'not_required' && (int) $booking->user_id === (int) $viewer->id;
+
+        return [
+            'approve' => $booking->status === 'pending' && $approve && ! $selfIndependent,
+            'decline' => $booking->status === 'pending' && $approve,
+            'checkout' => $booking->status === 'approved' && $manage,
+            'return' => $booking->status === 'checked_out' && $manage,
+            'cancel' => in_array($booking->status, ['pending', 'approved', 'checked_out'], true) && $manage,
+        ];
     }
 
     /**

@@ -28,7 +28,7 @@ export function AddEvidenceDialog({
     onClose,
     onSaved,
 }: {
-    vehicle: VehicleProfile;
+    vehicle: Pick<VehicleProfile, 'id' | 'name'>;
     title: string;
     category: string;
     sourceType: EvidenceSource;

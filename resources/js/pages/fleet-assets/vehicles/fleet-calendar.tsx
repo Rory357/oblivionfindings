@@ -348,6 +348,7 @@ export function FleetCalendar({
         decorated: Decorated,
         proposedDate: Date,
         proposedEnd?: Date,
+        mode?: 'move' | 'resize',
         intent?: {
             kind: 'move' | 'resize';
             startLocal: string;
@@ -366,7 +367,7 @@ export function FleetCalendar({
             return;
         setMoveNotice('');
         setMoveChoices(null);
-        if (intent?.kind === 'resize' || (!intent && proposedEnd)) {
+        if (mode === 'resize' || (!mode && !intent && proposedEnd)) {
             onEdit(event, {
                 start: intent?.startLocal ?? calendarLocal(proposedDate),
                 end: intent?.endLocal ?? calendarLocal(proposedEnd!),

@@ -685,6 +685,7 @@ interface CalendarUI {
         ev: Decorated,
         start: Date,
         end?: Date,
+        mode?: 'move' | 'resize',
         intent?: {
             kind: 'move' | 'resize';
             startLocal: string;
@@ -1176,7 +1177,7 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
                 let endLocal = wallShift(ev._end ?? ev._start, snap);
                 if (mode === 'resize' && endLocal <= startLocal)
                     endLocal = wallShift(ev._start, 15);
-                onMove(ev, s, e2, {
+                onMove(ev, s, e2, mode, {
                     kind: mode,
                     startLocal,
                     endLocal,

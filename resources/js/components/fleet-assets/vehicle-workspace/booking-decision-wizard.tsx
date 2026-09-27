@@ -207,7 +207,7 @@ export function BookingDecisionWizard({
             url += '/cancel';
             body = { reason: notes };
         }
-        const result = await command.submit(url, body);
+        const result = await command.submit(url, { ...body, expected_version: row.lock_version });
         if (!result) return;
         setSavedText(
             typeof result.message === 'string' ? result.message : 'Saved.',
