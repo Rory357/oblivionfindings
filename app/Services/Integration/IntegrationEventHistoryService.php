@@ -32,14 +32,14 @@ class IntegrationEventHistoryService
      * device and intersect the period with assignment, purpose and retention.
      * The interactive map reader deliberately keeps its separate 500-row limit.
      */
-    public function reportForDevice(Device $device, array $filters, int $retentionDays, array $watermark): LazyCollection
+    public function reportForDevice(Device $device, array $filters, int $retentionDays, array $watermark, ?\Closure $observe = null): LazyCollection
     {
         $devices = collect([$device])->keyBy('id');
         $cutoff = now()->subDays(max(1, $retentionDays));
 
-        return LazyCollection::make(function () use ($devices, $filters, $cutoff, $watermark) {
-            yield from $this->integrationEventLocationsForDevices($devices, $filters, true, $cutoff, 500, (int) $watermark['integration_events']);
-            yield from $this->fleetTelemetryLocationsForDevices($devices, $filters, true, $cutoff, 500, (int) $watermark['fleet_telemetry_events']);
+        return LazyCollection::make(function () use ($devices, $filters, $cutoff, $watermark, $observe) {
+            yield from $this->integrationEventLocationsForDevices($devices, $filters, true, $cutoff, 500, (int) $watermark['integration_events'], $observe);
+            yield from $this->fleetTelemetryLocationsForDevices($devices, $filters, true, $cutoff, 500, (int) $watermark['fleet_telemetry_events'], $observe);
         });
     }
 
@@ -120,6 +120,7 @@ class IntegrationEventHistoryService
         \DateTimeInterface $retentionCutoff,
         int $candidateLimit,
         ?int $watermark = null,
+        ?\Closure $observe = null,
     ): Collection|LazyCollection {
         if (! Schema::hasTable('integration_events')) {
             return collect();
@@ -178,7 +179,7 @@ class IntegrationEventHistoryService
             : $query->where('id', '<=', $watermark)->lazyById(500);
 
         return $events
-            ->map(function (IntegrationEvent $event) use ($devices, $legacyHardwareMap, $hasCanonicalColumn, $includeEventType): ?array {
+            ->map(function (IntegrationEvent $event) use ($devices, $legacyHardwareMap, $hasCanonicalColumn, $includeEventType, $observe): ?array {
                 $deviceId = $hasCanonicalColumn && $event->canonical_device_id !== null
                     ? (int) $event->canonical_device_id
                     : $legacyHardwareMap->get($event->hardware_id);
@@ -187,6 +188,10 @@ class IntegrationEventHistoryService
                 }
 
                 $location = $this->mapLocationEvent($event, $includeEventType);
+
+                if ($location !== null && $observe) {
+                    $observe($event);
+                }
 
                 return $location === null ? null : ['device_id' => $deviceId, 'source' => 'integration_events', 'source_id' => $event->id, ...$location];
             })
@@ -202,6 +207,7 @@ class IntegrationEventHistoryService
         \DateTimeInterface $retentionCutoff,
         int $candidateLimit,
         ?int $watermark = null,
+        ?\Closure $observe = null,
     ): Collection|LazyCollection {
         if (! Schema::hasTable('fleet_telemetry_events')) {
             return collect();
@@ -247,7 +253,7 @@ class IntegrationEventHistoryService
             : $query->where('id', '<=', $watermark)->lazyById(500);
 
         return $events
-            ->map(function (FleetTelemetryEvent $event) use ($devices, $legacyTrackerMap, $includeEventType): ?array {
+            ->map(function (FleetTelemetryEvent $event) use ($devices, $legacyTrackerMap, $includeEventType, $observe): ?array {
                 $deviceId = $event->device_id !== null
                     ? (int) $event->device_id
                     : $legacyTrackerMap->get($event->asset_tracker_id);
@@ -257,6 +263,10 @@ class IntegrationEventHistoryService
 
                 if (! $this->validCoordinates($event->latitude, $event->longitude)) {
                     return null;
+                }
+
+                if ($observe) {
+                    $observe($event);
                 }
 
                 return ['device_id' => $deviceId, 'source' => 'fleet_telemetry_events', 'source_id' => $event->id, ...$this->mapFleetTelemetryEvent($event, $includeEventType)];

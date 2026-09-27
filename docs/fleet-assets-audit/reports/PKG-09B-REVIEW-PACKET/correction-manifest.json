@@ -1,0 +1,518 @@
+{
+  "package": "PKG-09B",
+  "recordedAt": "2026-09-27T22:58:44.577Z",
+  "branch": "codex/fleet-personal-reports",
+  "parent": "e4bb17b56405a748072bf83e8c30af323822e0bc",
+  "base": "926b4981b0289da08a20baca0995117fb53e413e",
+  "candidateIdentity": "The commit containing this manifest; exact correction SHA is supplied in the handback.",
+  "checksumMeaning": "Source worktreeSha256 and evidence sha256 identify copied worktree bytes. normalizedLfSha256 is provided for text files to permit Git line-ending normalization. Binary evidence uses its raw SHA-256.",
+  "correctionApplicationAndTestFiles": [
+    "app/Services/Integration/IntegrationEventHistoryService.php",
+    "app/Services/Reporting/FleetSupplementalReports.php",
+    "app/Services/Reporting/PersonalReportEvidence.php",
+    "app/Services/Reporting/ReportAccess.php",
+    "app/Services/Reporting/ReportRuns.php",
+    "app/Services/Reporting/ReportSourceReader.php",
+    "app/Services/Reporting/ReportSourceEvidence.php",
+    "config/operational-reports.php",
+    "resources/js/pages/reporting/workspace.tsx",
+    "tests/Feature/Reporting/OperationalReportPrivacyTest.php"
+  ],
+  "completeApplicationAndTestFiles": [
+    {
+      "path": "app/Console/Commands/RunOperationalReportSchedules.php",
+      "bytes": 2996,
+      "worktreeSha256": "a15eae96cc4beaa434b2b7daa8903c2bc22f014b0529fa8601ebaafb1deb8eea",
+      "normalizedLfSha256": "a15eae96cc4beaa434b2b7daa8903c2bc22f014b0529fa8601ebaafb1deb8eea"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/PersonalTrackingLocationExportService.php",
+      "bytes": 4520,
+      "worktreeSha256": "1447b943de9456783c8d48c5462a5dfb3fbe0f8302ac6a38622d2301555cbd92",
+      "normalizedLfSha256": "1447b943de9456783c8d48c5462a5dfb3fbe0f8302ac6a38622d2301555cbd92"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php",
+      "bytes": 67121,
+      "worktreeSha256": "05450dc3b02cbb58e36cbd6735b6bbf331f91d6f5996dfb6630214e539110e81",
+      "normalizedLfSha256": "05450dc3b02cbb58e36cbd6735b6bbf331f91d6f5996dfb6630214e539110e81"
+    },
+    {
+      "path": "app/Http/Controllers/HealthSafety/LoneWorkerController.php",
+      "bytes": 75021,
+      "worktreeSha256": "dcb42b4aad56f389961dc8bb78c414e43a81ecd27ebb82b704a067c8a723917c",
+      "normalizedLfSha256": "dcb42b4aad56f389961dc8bb78c414e43a81ecd27ebb82b704a067c8a723917c"
+    },
+    {
+      "path": "app/Http/Controllers/OperationalReportController.php",
+      "bytes": 13783,
+      "worktreeSha256": "66dd3a5711a11b7d0897cff4eae7e6da9d26b83571d009af80ef7777b2c41ae2",
+      "normalizedLfSha256": "66dd3a5711a11b7d0897cff4eae7e6da9d26b83571d009af80ef7777b2c41ae2"
+    },
+    {
+      "path": "app/Jobs/GenerateOperationalReport.php",
+      "bytes": 1312,
+      "worktreeSha256": "74be09c8d6a2b5293260bd961219f7502b44b5e11b5f22a592bc6a48fe424f07",
+      "normalizedLfSha256": "74be09c8d6a2b5293260bd961219f7502b44b5e11b5f22a592bc6a48fe424f07"
+    },
+    {
+      "path": "app/Models/OperationalReport.php",
+      "bytes": 367,
+      "worktreeSha256": "304f74dbc5e413a46aed8b821d17cd89ef2de8c3616d3bd5e6b5f003a009dd23",
+      "normalizedLfSha256": "304f74dbc5e413a46aed8b821d17cd89ef2de8c3616d3bd5e6b5f003a009dd23"
+    },
+    {
+      "path": "app/Models/OperationalReportRun.php",
+      "bytes": 424,
+      "worktreeSha256": "2e1e413684465f925cd10564a791284687cfea4408f0cf0706ceeb85cb87a0ff",
+      "normalizedLfSha256": "2e1e413684465f925cd10564a791284687cfea4408f0cf0706ceeb85cb87a0ff"
+    },
+    {
+      "path": "app/Models/OperationalReportSubscription.php",
+      "bytes": 338,
+      "worktreeSha256": "4a35872b8f462639c6acbf7ceab73fe03125c318ef82ca4e8c97804378b0a1cc",
+      "normalizedLfSha256": "4a35872b8f462639c6acbf7ceab73fe03125c318ef82ca4e8c97804378b0a1cc"
+    },
+    {
+      "path": "app/Models/OperationalReportVersion.php",
+      "bytes": 301,
+      "worktreeSha256": "f8f1057841c7a1a0da33452c5c678958ca2afe61cd04db95b3837a4daffeb8d3",
+      "normalizedLfSha256": "f8f1057841c7a1a0da33452c5c678958ca2afe61cd04db95b3837a4daffeb8d3"
+    },
+    {
+      "path": "app/Notifications/OperationalReportReady.php",
+      "bytes": 794,
+      "worktreeSha256": "c060f37d66692aed39bd29e838273c1c17095f7bd9e7731ee64a12f012d1fdce",
+      "normalizedLfSha256": "c060f37d66692aed39bd29e838273c1c17095f7bd9e7731ee64a12f012d1fdce"
+    },
+    {
+      "path": "app/Services/Assets/BrandedWorkbook.php",
+      "bytes": 8921,
+      "worktreeSha256": "39c2bde7d1765382e3f4e33da87aab0c116a1b8e9919d8ee84f0121c0cc405df",
+      "normalizedLfSha256": "39c2bde7d1765382e3f4e33da87aab0c116a1b8e9919d8ee84f0121c0cc405df"
+    },
+    {
+      "path": "app/Services/Fleet/VehicleBookingAccessService.php",
+      "bytes": 4876,
+      "worktreeSha256": "97bf37322a504ffa10a753655a44a22e6ca4a08575c73261e2e6eaa1f8f40e31",
+      "normalizedLfSha256": "97bf37322a504ffa10a753655a44a22e6ca4a08575c73261e2e6eaa1f8f40e31"
+    },
+    {
+      "path": "app/Services/HealthSafety/LoneWorkerSessionScope.php",
+      "bytes": 7733,
+      "worktreeSha256": "d102f74c16ea14bc35d8cea41b7d92735a2beedd52e8563e2a203ee0e9ca07b1",
+      "normalizedLfSha256": "d102f74c16ea14bc35d8cea41b7d92735a2beedd52e8563e2a203ee0e9ca07b1"
+    },
+    {
+      "path": "app/Services/Integration/IntegrationEventHistoryService.php",
+      "bytes": 16930,
+      "worktreeSha256": "63d1bf9ad7896d41337e4fd8c42772309df8bc7dcdfedfdaef3623e355ca98f3",
+      "normalizedLfSha256": "63d1bf9ad7896d41337e4fd8c42772309df8bc7dcdfedfdaef3623e355ca98f3"
+    },
+    {
+      "path": "app/Services/Reporting/FleetSupplementalReports.php",
+      "bytes": 9598,
+      "worktreeSha256": "44153cbb2cfbf3937d29283aa15a234fcc01ff086d3a36fdb43e8548df270176",
+      "normalizedLfSha256": "44153cbb2cfbf3937d29283aa15a234fcc01ff086d3a36fdb43e8548df270176"
+    },
+    {
+      "path": "app/Services/Reporting/PersonalReportEvidence.php",
+      "bytes": 5989,
+      "worktreeSha256": "93765a6d66bc8d10ea5f7a3a082b6be0ff3f520cb72d6fcbe47951962ba66595",
+      "normalizedLfSha256": "93765a6d66bc8d10ea5f7a3a082b6be0ff3f520cb72d6fcbe47951962ba66595"
+    },
+    {
+      "path": "app/Services/Reporting/ReportAccess.php",
+      "bytes": 7321,
+      "worktreeSha256": "1489fee917c1c9a55ff03f763d053aa1d8d2a1c4db3afffd3620da5416bc9066",
+      "normalizedLfSha256": "1489fee917c1c9a55ff03f763d053aa1d8d2a1c4db3afffd3620da5416bc9066"
+    },
+    {
+      "path": "app/Services/Reporting/ReportDefinition.php",
+      "bytes": 8146,
+      "worktreeSha256": "39e17f32aaee93443dcb661baf2a7d4d4c62e8c61be575f31038e23568115dd2",
+      "normalizedLfSha256": "39e17f32aaee93443dcb661baf2a7d4d4c62e8c61be575f31038e23568115dd2"
+    },
+    {
+      "path": "app/Services/Reporting/ReportEngine.php",
+      "bytes": 9349,
+      "worktreeSha256": "5dda375241010931deb33dbe121c23e51c131133e880cbf080f224a5a4ca6bac",
+      "normalizedLfSha256": "5dda375241010931deb33dbe121c23e51c131133e880cbf080f224a5a4ca6bac"
+    },
+    {
+      "path": "app/Services/Reporting/ReportExporter.php",
+      "bytes": 5033,
+      "worktreeSha256": "5135943ffc3e17223b4053dc85f8660d410f0845a5370323644a5828df81756a",
+      "normalizedLfSha256": "5135943ffc3e17223b4053dc85f8660d410f0845a5370323644a5828df81756a"
+    },
+    {
+      "path": "app/Services/Reporting/ReportFormula.php",
+      "bytes": 2735,
+      "worktreeSha256": "bb7410e627bfbc601723a1107988c246bff1ec6d57335310519d72b4f8680282",
+      "normalizedLfSha256": "bb7410e627bfbc601723a1107988c246bff1ec6d57335310519d72b4f8680282"
+    },
+    {
+      "path": "app/Services/Reporting/ReportRuns.php",
+      "bytes": 6908,
+      "worktreeSha256": "0f966a199f67a8fe440a3ef88e637c955e43536abee2b2c7187c226a15947685",
+      "normalizedLfSha256": "0f966a199f67a8fe440a3ef88e637c955e43536abee2b2c7187c226a15947685"
+    },
+    {
+      "path": "app/Services/Reporting/ReportSourceEvidence.php",
+      "bytes": 7149,
+      "worktreeSha256": "63363d466bac49e206e23a14134d780056129ac05e5de784ddbf1a647f319639",
+      "normalizedLfSha256": "63363d466bac49e206e23a14134d780056129ac05e5de784ddbf1a647f319639"
+    },
+    {
+      "path": "app/Services/Reporting/ReportSourceReader.php",
+      "bytes": 20423,
+      "worktreeSha256": "87547b2931337660fe61a30b6aa8af328b7d04c84f2ea67f627fc0d2f80df7bd",
+      "normalizedLfSha256": "87547b2931337660fe61a30b6aa8af328b7d04c84f2ea67f627fc0d2f80df7bd"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationHistoryService.php",
+      "bytes": 7382,
+      "worktreeSha256": "49413d484c20277e1da0b568d775b9e50fde2d870b2aa5f48257b05d9ccdddc5",
+      "normalizedLfSha256": "49413d484c20277e1da0b568d775b9e50fde2d870b2aa5f48257b05d9ccdddc5"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationReportWindow.php",
+      "bytes": 2284,
+      "worktreeSha256": "204f95b398f6e3f223119073c7031a34a8ad6142f17c113b9f2874113b170663",
+      "normalizedLfSha256": "204f95b398f6e3f223119073c7031a34a8ad6142f17c113b9f2874113b170663"
+    },
+    {
+      "path": "config/operational-reports.php",
+      "bytes": 50801,
+      "worktreeSha256": "26e906ebc792e65552d142b1b4f5fee607b84fdd09bd621425d8cb72c6628d3a",
+      "normalizedLfSha256": "26e906ebc792e65552d142b1b4f5fee607b84fdd09bd621425d8cb72c6628d3a"
+    },
+    {
+      "path": "database/migrations/2026_09_27_230000_create_operational_reporting_tables.php",
+      "bytes": 3340,
+      "worktreeSha256": "1f1e5e3bd43bd88fabb5993e7f7a06fdef521fdfbb30b87438e1d5ed2d2ab8cc",
+      "normalizedLfSha256": "1f1e5e3bd43bd88fabb5993e7f7a06fdef521fdfbb30b87438e1d5ed2d2ab8cc"
+    },
+    {
+      "path": "database/seeders/RbacSeeder.php",
+      "bytes": 93386,
+      "worktreeSha256": "dd254c22a4269d2b5750ce6f5d5fc6e7bfa27141b997f5f7668d57871833d9a3",
+      "normalizedLfSha256": "dd254c22a4269d2b5750ce6f5d5fc6e7bfa27141b997f5f7668d57871833d9a3"
+    },
+    {
+      "path": "resources/css/report-studio.css",
+      "bytes": 8811,
+      "worktreeSha256": "dcfaeb037305599e42955054274f93676a86166da4342436bc60b1975d3ae4c0",
+      "normalizedLfSha256": "dcfaeb037305599e42955054274f93676a86166da4342436bc60b1975d3ae4c0"
+    },
+    {
+      "path": "resources/js/components/client-location/location-workspace.tsx",
+      "bytes": 43626,
+      "worktreeSha256": "cd25dbdb27e93b7cba1885897105db0bc25153697dc721a16d1bf60828783222",
+      "normalizedLfSha256": "cd25dbdb27e93b7cba1885897105db0bc25153697dc721a16d1bf60828783222"
+    },
+    {
+      "path": "resources/js/components/lists/entity-table.tsx",
+      "bytes": 16494,
+      "worktreeSha256": "828845f58168f2da1db12e360796068cbef1a2c56a520618770ae517e951c68b",
+      "normalizedLfSha256": "828845f58168f2da1db12e360796068cbef1a2c56a520618770ae517e951c68b"
+    },
+    {
+      "path": "resources/js/components/page/page-header.tsx",
+      "bytes": 60419,
+      "worktreeSha256": "99caf1ea485e6fe62c5e326395b77cf268ef328275b07e9fcc9949d4953a149c",
+      "normalizedLfSha256": "99caf1ea485e6fe62c5e326395b77cf268ef328275b07e9fcc9949d4953a149c"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/reports/index.tsx",
+      "bytes": 53626,
+      "worktreeSha256": "530da1ae9c60b8e58c85528dbf543949a0960da9cb2f9d358a006de2dfb9a201",
+      "normalizedLfSha256": "530da1ae9c60b8e58c85528dbf543949a0960da9cb2f9d358a006de2dfb9a201"
+    },
+    {
+      "path": "resources/js/pages/health-safety/lone-workers/index.tsx",
+      "bytes": 51527,
+      "worktreeSha256": "20e81b71ef1e72071772abc8332de14ddb06e4a3aea153436397fa8d03e246d2",
+      "normalizedLfSha256": "20e81b71ef1e72071772abc8332de14ddb06e4a3aea153436397fa8d03e246d2"
+    },
+    {
+      "path": "resources/js/pages/my-day/index.tsx",
+      "bytes": 76620,
+      "worktreeSha256": "91b642541cecad717d0d5d754f7bc340a961417c7c5a9faabfd873f4be68ab5d",
+      "normalizedLfSha256": "91b642541cecad717d0d5d754f7bc340a961417c7c5a9faabfd873f4be68ab5d"
+    },
+    {
+      "path": "resources/js/pages/reporting/_dialogs.tsx",
+      "bytes": 2070,
+      "worktreeSha256": "759c3127840cb6fbece5d024192139ac70415936d4930c2ac8c1b0f418b5ad04",
+      "normalizedLfSha256": "759c3127840cb6fbece5d024192139ac70415936d4930c2ac8c1b0f418b5ad04"
+    },
+    {
+      "path": "resources/js/pages/reporting/model.ts",
+      "bytes": 9930,
+      "worktreeSha256": "0ba9ad3bda35d4d37cde629462884b1bda344cc30795d79541ab778933547e65",
+      "normalizedLfSha256": "0ba9ad3bda35d4d37cde629462884b1bda344cc30795d79541ab778933547e65"
+    },
+    {
+      "path": "resources/js/pages/reporting/studio-controls.tsx",
+      "bytes": 19247,
+      "worktreeSha256": "c0d5886b39ff3ce6fcba5230f25f7c50a473cf5488090ca767780dde5698a1e9",
+      "normalizedLfSha256": "c0d5886b39ff3ce6fcba5230f25f7c50a473cf5488090ca767780dde5698a1e9"
+    },
+    {
+      "path": "resources/js/pages/reporting/studio-library.tsx",
+      "bytes": 7819,
+      "worktreeSha256": "4207993fc5d112d6327ce0fb05bfa7b1045debdcd05544daef2c99c70aaecdf4",
+      "normalizedLfSha256": "4207993fc5d112d6327ce0fb05bfa7b1045debdcd05544daef2c99c70aaecdf4"
+    },
+    {
+      "path": "resources/js/pages/reporting/workspace.tsx",
+      "bytes": 189922,
+      "worktreeSha256": "300e3f5c13a4f49ae9da9ff02cf1413171436ae395f5fca2e18b61c511256749",
+      "normalizedLfSha256": "300e3f5c13a4f49ae9da9ff02cf1413171436ae395f5fca2e18b61c511256749"
+    },
+    {
+      "path": "resources/views/pdf/operational-report.blade.php",
+      "bytes": 2508,
+      "worktreeSha256": "23d4315d938db435635a9453d204910ecc57e0af95db77c3c926ff788421e1c7",
+      "normalizedLfSha256": "23d4315d938db435635a9453d204910ecc57e0af95db77c3c926ff788421e1c7"
+    },
+    {
+      "path": "routes/console.php",
+      "bytes": 33219,
+      "worktreeSha256": "22b083f18c615d0f35013521cc766d66daf2d256a129c922c5b7c8fbc93fd499",
+      "normalizedLfSha256": "22b083f18c615d0f35013521cc766d66daf2d256a129c922c5b7c8fbc93fd499"
+    },
+    {
+      "path": "routes/operational-reports.php",
+      "bytes": 2172,
+      "worktreeSha256": "80339e3628ee7ba8192056941355624fbb28791818d0f24318e58331e25c8696",
+      "normalizedLfSha256": "80339e3628ee7ba8192056941355624fbb28791818d0f24318e58331e25c8696"
+    },
+    {
+      "path": "routes/web.php",
+      "bytes": 44634,
+      "worktreeSha256": "f9abb10a37972bbeaf459eb6308b3dbcf75c88e66a297ef4ee715d5d62865e61",
+      "normalizedLfSha256": "f9abb10a37972bbeaf459eb6308b3dbcf75c88e66a297ef4ee715d5d62865e61"
+    },
+    {
+      "path": "tests/Feature/Reporting/OperationalReportPrivacyTest.php",
+      "bytes": 21930,
+      "worktreeSha256": "fa0a2ce84477efb261f34d19488a2773a33f791c9f8956527fe5d1c59c81fb7a",
+      "normalizedLfSha256": "fa0a2ce84477efb261f34d19488a2773a33f791c9f8956527fe5d1c59c81fb7a"
+    },
+    {
+      "path": "tests/Feature/Reporting/OperationalReportsTest.php",
+      "bytes": 35452,
+      "worktreeSha256": "d6481a89c155f007a605b437896f22837ae549392d7b61e7f36e99b93f7bc8dd",
+      "normalizedLfSha256": "d6481a89c155f007a605b437896f22837ae549392d7b61e7f36e99b93f7bc8dd"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-builder-populated-final-1366.png",
+      "bytes": 182430,
+      "sha256": "ed0fed6ecf4fbf2f24827cfa0cb733f8a58761aac3da63b1600c4e37d1855873"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-builder-mobile.png",
+      "bytes": 74747,
+      "sha256": "f87396af86fa518e943e34a46fc8d50a6211d43cf5f63fbf9758c242e5a0ef55"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-calendar-mobile.png",
+      "bytes": 48001,
+      "sha256": "f980b7fad71935cfe29cd9756c8f7503e36854613370f486fe9168219dea4317"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-client-report-1366.png",
+      "bytes": 175636,
+      "sha256": "4672a61f7a99702fcc1c2c5419330fa08e3f284b633e396a6ba5a9f39eebed4a"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-export-mobile.png",
+      "bytes": 53690,
+      "sha256": "62f76198569c5d851d729768414d26bf91a97fac832b4761051d578d9e028195"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-grouped-filters-1366.png",
+      "bytes": 178770,
+      "sha256": "36f2f8dc1267210fcfdd90a48daa4926ee8dd26a377c1fd1019ddb53a6fa1a65"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-library-mobile-final.png",
+      "bytes": 110782,
+      "sha256": "867c72439fd2cafaa5dbe8db8fa48e54027e1f13e434e560523f0e6584bfd118"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-pivot-1366.png",
+      "bytes": 123105,
+      "sha256": "956dd07de35b384a25933bd8a37d32d09d576f463708d29d0777560728644935"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-source-evidence-mobile.png",
+      "bytes": 30718,
+      "sha256": "e6d309d7d82a56f4babfa52594f7dbe4a0293fc8599890b33137165714406f04"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-staff-report-1366.png",
+      "bytes": 176916,
+      "sha256": "e82fa73df4997e7a5ae7f2ff326eeed1b062a7982ef49af09e5f93428ef0f479"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-stale-export-1366.png",
+      "bytes": 137627,
+      "sha256": "d52946a0f1e5062fc9e9237e71d8dbbfb3ec767ae3bad55d770fe569dba3e527"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/mockup-builder-1366.png",
+      "bytes": 156398,
+      "sha256": "4f2a55d893505e7038da7bc926a060ddfab71fa5d164e74941f4eeb7839a65de"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-report.csv",
+      "bytes": 251,
+      "sha256": "426b2a21be4fd7644a4d3c6c56e10edc12762633f41d1092a8e8ce8b2a072da7",
+      "normalizedLfSha256": "426b2a21be4fd7644a4d3c6c56e10edc12762633f41d1092a8e8ce8b2a072da7"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-report.json",
+      "bytes": 12667,
+      "sha256": "4f30274921ce6c8951231632e9ade37e44af5322d278219176d9a691887481f5",
+      "normalizedLfSha256": "4f30274921ce6c8951231632e9ade37e44af5322d278219176d9a691887481f5"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-report.pdf",
+      "bytes": 28999,
+      "sha256": "bfb6a71001224e659be3754436af62d34f5c3247b8728746d629ec155c2c841f"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-report.xlsx",
+      "bytes": 5328,
+      "sha256": "a3b49f18470ab9325a2b6f883fcf7f86a8d7e9771d4f63015e6f740920960d46"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/browser-checks.json",
+      "bytes": 85668,
+      "sha256": "13cbc593902d8bf35b517c68890501f749dee8d1741bd786f4a3d574e254686f",
+      "normalizedLfSha256": "13cbc593902d8bf35b517c68890501f749dee8d1741bd786f4a3d574e254686f"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/browser-inventory.md",
+      "bytes": 1019,
+      "sha256": "2e067a0dd0fe99b91a51c7e8668df79420eb47e0a763aaa47b3e8e7c5c534426",
+      "normalizedLfSha256": "2e067a0dd0fe99b91a51c7e8668df79420eb47e0a763aaa47b3e8e7c5c534426"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/build-identity.json",
+      "bytes": 790,
+      "sha256": "924d5aa8a43369a2f62a0e7eb5a97e8ff1545dc38a199feaeeac5467a5f44f8e",
+      "normalizedLfSha256": "924d5aa8a43369a2f62a0e7eb5a97e8ff1545dc38a199feaeeac5467a5f44f8e"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/database-cleanup.log",
+      "bytes": 103,
+      "sha256": "e7f4858fd4d135b2889d132dd68c370beb2a54aed283706ce50d8014a985a396",
+      "normalizedLfSha256": "1129eebfd2027711b539fc41ab0d7e9cf79739dee74b98a2a5824e1515edadcd"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/eslint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalizedLfSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/types.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "normalizedLfSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/pint.log",
+      "bytes": 35,
+      "sha256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1",
+      "normalizedLfSha256": "9fa3c401d4d7dcf9d616a4e847f09d73bafe2397e5f1b5b77531e2516436ed5a"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/production-build.log",
+      "bytes": 172902,
+      "sha256": "e2161ec2e3c6620107323abf725757b24f6068aae3d4bd2e264dde9beda5e7b5",
+      "normalizedLfSha256": "12edd35bcb15c1d9f4c493bc5b88b33990cd064ecbae00e2fde22e1e4237d136"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/privacy-tests.log",
+      "bytes": 353,
+      "sha256": "c6af30ccadd7b14e2d21acf5711560d7ab7029702295c56868a6090da7862cb1",
+      "normalizedLfSha256": "bd54363696540aae9660d50a119f9c215a7d3af9144fb9942bb28764fc83be96"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/privacy-tests.xml",
+      "bytes": 17742,
+      "sha256": "dc36caa3d328b7f71243dd79b5f13cc1fa23e1b891453bfdc4a52ff4e9cf51e6",
+      "normalizedLfSha256": "dc36caa3d328b7f71243dd79b5f13cc1fa23e1b891453bfdc4a52ff4e9cf51e6"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/final-tests.log",
+      "bytes": 6319,
+      "sha256": "9367af5a8bcf49be2cf7eb80851cd829f15b1c628a69a4fdba89e9ff8eb917bf",
+      "normalizedLfSha256": "f7b168ba52676cccb3226398c95d15000f97e805c954b6ea1570df63b6980c4b"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/final-tests.xml",
+      "bytes": 26585,
+      "sha256": "ada1d914f8212894ddc1c6f58af6210d055b98848e7406834464a8b09766948a",
+      "normalizedLfSha256": "ada1d914f8212894ddc1c6f58af6210d055b98848e7406834464a8b09766948a"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/payload-test.log",
+      "bytes": 350,
+      "sha256": "4995c4de1dd3588e5d77db18052f7f1ec6455730c26973bc0e8f338460a54aab",
+      "normalizedLfSha256": "1ac1b16fc8368f4c8760c79b89b5b002114ea393bad4086517bb8f917d7a6ea0"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/payload-test.xml",
+      "bytes": 769,
+      "sha256": "8b59ae2e0abc83a888bc23d05d388bbdb609c4dde883a2f076c4b16b1ff9bc11",
+      "normalizedLfSha256": "8b59ae2e0abc83a888bc23d05d388bbdb609c4dde883a2f076c4b16b1ff9bc11"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/resource-tests.log",
+      "bytes": 352,
+      "sha256": "e222687a28313aa8bd6cd60ea22698257450f77167ba152a49e6d10b07b78e70",
+      "normalizedLfSha256": "69c4498883b2f3fe9f36b4f512609dfe67b6792b3b763e93d86b41bae7069517"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/resource-tests.xml",
+      "bytes": 3731,
+      "sha256": "7a9bfe52a506e496b60346ab97391829fe8b505b1f01090006e0d019c6609679",
+      "normalizedLfSha256": "7a9bfe52a506e496b60346ab97391829fe8b505b1f01090006e0d019c6609679"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/test-summary.json",
+      "bytes": 723,
+      "sha256": "6d1d4262d10e5783ada4307622e8f83a532acebcd63ef8d036241fc1a571c706",
+      "normalizedLfSha256": "8af3e32ffade2bf99a580cdd1be4076afa0ef3f7c052a706e1b2f32216cfb85a"
+    }
+  ],
+  "validation": {
+    "unique_cases": 47,
+    "passing_cases": 43,
+    "passing_assertions": 796,
+    "known_baseline_failures": [
+      "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_resident_tracking_history_reads_canonical_integration_event_identity",
+      "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_portal_location_history_reads_canonical_integration_event_identity",
+      "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_client_location_history_keeps_narrow_fallback_for_unbackfilled_legacy_rows",
+      "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_client_location_history_reads_canonical_integration_event_identity"
+    ]
+  },
+  "openGates": [
+    "Genuine browser zoom at 125%",
+    "Four known canonical-history HTTP 403 baseline failures during combined acceptance"
+  ],
+  "excluded": [
+    "Credentials, session cookies and MFA secrets",
+    "Preview runtime helpers and preview logs",
+    "Generated production build",
+    "Operating data and unowned source changes"
+  ]
+}

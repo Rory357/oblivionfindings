@@ -877,7 +877,7 @@ export function ReportWorkspace(props: Props) {
                 filters={
                     tab !== 'builder' ? (
                         <>
-                            <span className="text-caption text-primary-foreground/80">
+                            <span className="text-xs text-primary-foreground/80">
                                 Pacific/Auckland
                             </span>
                             <div className="ml-auto flex flex-wrap gap-2">

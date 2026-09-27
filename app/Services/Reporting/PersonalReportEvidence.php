@@ -16,7 +16,7 @@ use Carbon\CarbonImmutable;
 /** Read canonical retained evidence; never replay signal projection or start collection. */
 final class PersonalReportEvidence
 {
-    public function clientAlert(ControlRoomAlert $alert, DeviceAssignment $assignment, CarbonImmutable $from, CarbonImmutable $to): bool
+    public function clientAlert(ControlRoomAlert $alert, DeviceAssignment $assignment, CarbonImmutable $from, CarbonImmutable $to, ReportSourceEvidence $evidence): bool
     {
         $origin = $alert->originSignal;
         if (! $origin || (int) $origin->client_id !== (int) $assignment->assignable_id || (int) $origin->site_id !== (int) $assignment->custody_site_id
@@ -28,15 +28,16 @@ final class PersonalReportEvidence
             return false;
         }
         $fleet = FleetSignal::find($fleetId);
-        $event = $fleet ? $this->event($fleet, $assignment, $from, $to) : null;
+        $event = $fleet ? $this->event($fleet, $assignment, $from, $to, $evidence) : null;
         if (! $fleet || ! $event) {
             return false;
         }
+        $evidence->record($fleet);
         if (isset($fleet->payload['assignment_id']) && (int) $fleet->payload['assignment_id'] !== (int) $assignment->id) {
             return false;
         }
         if ($fleet->signal_type === 'resident.zone_breach') {
-            return $this->zone($fleet, $assignment, $from, $to) !== null;
+            return $this->zone($fleet, $assignment, $from, $to, $evidence) !== null;
         }
         if ($fleet->signal_type === 'resident.fall_detected') {
             return $event->event_type === 'fall_detected' && (int) data_get($fleet->payload, 'assignment_id') === (int) $assignment->id;
@@ -45,9 +46,9 @@ final class PersonalReportEvidence
         return in_array($fleet->signal_type, ['sos', 'panic', 'resident.sos'], true) && in_array($event->event_type, ['sos', 'panic'], true);
     }
 
-    public function zone(FleetSignal $signal, DeviceAssignment $assignment, CarbonImmutable $from, CarbonImmutable $to): ?array
+    public function zone(FleetSignal $signal, DeviceAssignment $assignment, CarbonImmutable $from, CarbonImmutable $to, ReportSourceEvidence $evidence): ?array
     {
-        $event = $this->event($signal, $assignment, $from, $to);
+        $event = $this->event($signal, $assignment, $from, $to, $evidence);
         $monitor = ClientGeofenceMonitor::find(data_get($signal->payload, 'client_zone_monitor_id'));
         if (! $event || ! $monitor || (int) $monitor->assignment_id !== (int) $assignment->id || (int) $monitor->consent_id !== (int) $assignment->consent_id
             || $event->occurred_at->lt($monitor->started_at) || ($monitor->ended_at && $event->occurred_at->gte($monitor->ended_at))) {
@@ -59,13 +60,17 @@ final class PersonalReportEvidence
             return null;
         }
 
+        foreach ([$signal, $monitor, $rule, $version] as $record) {
+            $evidence->record($record);
+        }
+
         return ['reference' => 'fleet_signal:'.$signal->id, 'date' => $event->occurred_at->setTimezone('Pacific/Auckland')->toDateString(),
             'resource' => $assignment->device->name, 'site' => null, 'status' => 'Reported zone breach', 'observed_at' => $event->occurred_at->toISOString(),
             'received_at' => $event->received_at?->toISOString(), 'event_type' => $signal->signal_type, 'rule_id' => (string) $rule->id,
             'geometry_version' => (string) $version->id, 'accuracy' => $event->accuracy_m];
     }
 
-    public function staffAlert(ControlRoomAlert $alert, LoneWorkerSession $session): bool
+    public function staffAlert(ControlRoomAlert $alert, LoneWorkerSession $session, ReportSourceEvidence $evidence): bool
     {
         $origin = $alert->originSignal;
         $normalized = data_get($alert->context, 'normalized_data');
@@ -84,10 +89,12 @@ final class PersonalReportEvidence
             }
         }
 
+        $evidence->record($session);
+
         return true;
     }
 
-    private function event(FleetSignal $signal, DeviceAssignment $assignment, CarbonImmutable $from, CarbonImmutable $to): ?FleetTelemetryEvent
+    private function event(FleetSignal $signal, DeviceAssignment $assignment, CarbonImmutable $from, CarbonImmutable $to, ReportSourceEvidence $evidence): ?FleetTelemetryEvent
     {
         if ((int) $signal->device_id !== (int) $assignment->device_id) {
             return null;
@@ -97,6 +104,8 @@ final class PersonalReportEvidence
         if (! $event || (int) $event->asset_id !== (int) $signal->asset_id || ! $event->occurred_at->equalTo($signal->occurred_at)) {
             return null;
         }
+
+        $evidence->record($event);
 
         return $event;
     }

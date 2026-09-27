@@ -16,24 +16,27 @@ use Illuminate\Support\Collection;
 
 final class FleetSupplementalReports
 {
-    public function read(string $source, array $context, CarbonImmutable $from, CarbonImmutable $to, array &$watermark): array
+    public function read(string $source, array $context, CarbonImmutable $from, CarbonImmutable $to, array &$watermark, ReportSourceEvidence $provenance): array
     {
         $assets = Asset::whereIn('id', $context['asset_ids'])->with('site', 'homeSite')->get()->keyBy('id');
+        foreach ($assets as $asset) {
+            $provenance->record($asset);
+        }
         $rows = [];
         if ($source === 'resource_costs') {
-            $bills = $this->all($this->bills($context, $from, $to)->whereHas('journal', fn ($q) => $q->where('status', 'posted')->whereNull('reversed_by_journal_id')), $watermark);
-            $watermark['fleet_trips'] = (int) FleetTrip::max('id');
-            $watermark['fleet_fuel_logs'] = (int) FleetFuelLog::max('id');
-            $trips = FleetTrip::where('id', '<=', $watermark['fleet_trips'])->whereIn('asset_id', $assets->keys())->whereBetween('started_at', [$from, $to])->where('is_personal', false)->where('consent_blocked', false)
-                ->selectRaw('asset_id, SUM(CASE WHEN distance_km > 0 THEN distance_km ELSE NULL END) as distance, SUM(CASE WHEN distance_km IS NULL OR distance_km <= 0 THEN 1 ELSE 0 END) as missing')->groupBy('asset_id')->get()->keyBy('asset_id');
-            $fuel = FleetFuelLog::where('id', '<=', $watermark['fleet_fuel_logs'])->whereIn('asset_id', $assets->keys())->whereBetween('logged_at', [$from, $to])->selectRaw('asset_id, SUM(total_cost) as cost')->groupBy('asset_id')->pluck('cost', 'asset_id');
+            $bills = $this->all($this->bills($context, $from, $to)->with('journal')->whereHas('journal', fn ($q) => $q->where('status', 'posted')->whereNull('reversed_by_journal_id')), $watermark, $provenance);
+            $trips = $this->all(FleetTrip::whereIn('asset_id', $assets->keys())->whereBetween('started_at', [$from, $to])->where('is_personal', false)->where('consent_blocked', false), $watermark, $provenance)->groupBy('asset_id');
+            $fuel = $this->all(FleetFuelLog::whereIn('asset_id', $assets->keys())->whereBetween('logged_at', [$from, $to]), $watermark, $provenance)->groupBy('asset_id');
             foreach ($assets as $asset) {
                 $documents = $bills->where('asset_id', $asset->id);
                 $cost = $documents->isEmpty() ? null : (float) $documents->sum('total_amount');
-                $distance = isset($trips[$asset->id]) && $trips[$asset->id]->distance !== null ? (float) $trips[$asset->id]->distance : null;
+                $journeys = $trips->get($asset->id, collect());
+                $knownDistances = $journeys->filter(fn ($trip) => $trip->distance_km !== null && $trip->distance_km > 0);
+                $distance = $knownDistances->isEmpty() ? null : (float) $knownDistances->sum('distance_km');
+                $knownFuel = $fuel->get($asset->id, collect())->whereNotNull('total_cost');
                 $rows[] = $this->base('asset-'.$asset->id, $asset, $to, 'Period summary') + [
-                    'posted_cost' => $cost, 'distance' => $distance, 'missing_distance' => (int) ($trips[$asset->id]->missing ?? 0),
-                    'cost_per_km' => $cost !== null && $distance > 0 ? $cost / $distance : null, 'fuel_cost' => isset($fuel[$asset->id]) ? (float) $fuel[$asset->id] : null,
+                    'posted_cost' => $cost, 'distance' => $distance, 'missing_distance' => $journeys->count() - $knownDistances->count(),
+                    'cost_per_km' => $cost !== null && $distance > 0 ? $cost / $distance : null, 'fuel_cost' => $knownFuel->isEmpty() ? null : (float) $knownFuel->sum('total_cost'),
                 ];
             }
 
@@ -44,7 +47,7 @@ final class FleetSupplementalReports
             $model->setTable('fleet_maintenance_restrictions');
             $query = $model->newQuery()->whereIn('asset_id', $assets->keys())->where('created_at', '<=', $to)
                 ->where(fn ($q) => $q->whereNull('released_at')->orWhere('released_at', '>=', $from));
-            $items = $this->all($query, $watermark);
+            $items = $this->all($query, $watermark, $provenance);
             foreach ($assets as $asset) {
                 $evidence = $items->where('asset_id', $asset->id);
                 $intervals = [];
@@ -76,7 +79,7 @@ final class FleetSupplementalReports
                 ->whereBetween('counted_at', [$from, $to])->whereNotExists(function ($q) use ($assets) {
                     $q->selectRaw('1')->from('asset_stocktake_asset_refs')->whereColumn('asset_stocktake_asset_refs.asset_stocktake_id', 'asset_stocktakes.id')->whereNotIn('asset_id', $assets->keys());
                 });
-            foreach ($this->all($query, $watermark) as $count) {
+            foreach ($this->all($query, $watermark, $provenance) as $count) {
                 $data = app(AssetStocktakeService::class)->present($count);
                 $entries = collect($data['entries']);
                 $rows[] = ['reference' => 'ST-'.$count->id, 'date' => $count->counted_at->setTimezone('Pacific/Auckland')->toDateString(), 'resource' => $count->title, 'site' => $count->scope['site'] ?? null, 'status' => $count->status,
@@ -92,7 +95,7 @@ final class FleetSupplementalReports
             'custody' => AssetCustodyMovement::whereIn('asset_id', $assets->keys())->whereIn('origin_site_id', $context['site_ids'])->whereIn('destination_site_id', $context['site_ids'])->whereBetween('dispatched_at', [$from, $to]),
             'finance_bills' => $this->bills($context, $from, $to)->with('journal'),
         };
-        foreach ($this->all($query, $watermark) as $item) {
+        foreach ($this->all($query, $watermark, $provenance) as $item) {
             $asset = $assets->get($item->asset_id);
             if (! $asset) {
                 continue;
@@ -118,13 +121,14 @@ final class FleetSupplementalReports
             ->whereExists(fn ($q) => $q->selectRaw('1')->from('assets')->whereColumn('assets.id', 'fin_bills.asset_id')->whereColumn('assets.site_id', 'fin_bills.site_id'));
     }
 
-    private function all(Builder $query, array &$watermark): Collection
+    private function all(Builder $query, array &$watermark, ReportSourceEvidence $provenance): Collection
     {
         $max = (int) (clone $query)->max($query->qualifyColumn('id'));
         $watermark[$query->getModel()->getTable()] = $max;
         $rows = collect();
         foreach ($query->where($query->qualifyColumn('id'), '<=', $max)->lazyById(500) as $row) {
             abort_if($rows->count() >= 100000, 422, 'Too many source rows. Choose a narrower scope.');
+            $provenance->record($row);
             $rows->push($row);
         }
 
@@ -148,14 +152,14 @@ final class FleetSupplementalReports
         [$start,$end] = array_shift($intervals);
         foreach ($intervals as [$nextStart,$nextEnd]) {
             if ($nextStart <= $end) {
-                $end = max($end,$nextEnd);
+                $end = max($end, $nextEnd);
 
                 continue;
             }
-            $total += max(0,$end - $start);
+            $total += max(0, $end - $start);
             [$start,$end] = [$nextStart, $nextEnd];
         }
 
-        return $total + max(0,$end - $start);
+        return $total + max(0, $end - $start);
     }
 }

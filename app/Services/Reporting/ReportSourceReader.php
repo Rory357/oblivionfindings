@@ -12,6 +12,7 @@ use App\Models\FleetTrip;
 use App\Models\FleetWorkOrder;
 use App\Models\LoneWorkerSession;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\Fleet\TransportRequestService;
 use App\Services\Fleet\VehicleBookingAccessService;
 use App\Services\HealthSafety\LoneWorkerSessionScope;
@@ -33,11 +34,12 @@ final class ReportSourceReader
         $to = CarbonImmutable::parse($definition['date_to'], 'Pacific/Auckland')->endOfDay()->utc()->min(CarbonImmutable::now());
         $source = $definition['source'];
         $watermark = ['captured_at' => now()->toISOString()];
+        $evidence = new ReportSourceEvidence;
         $rows = [];
         $authority = [];
         $retentionExpires = null;
         if (in_array($source, ['obligations', 'custody', 'stocktakes', 'downtime', 'finance_bills', 'resource_costs'])) {
-            $rows = app(FleetSupplementalReports::class)->read($source, $context, $from, $to, $watermark);
+            $rows = app(FleetSupplementalReports::class)->read($source, $context, $from, $to, $watermark, $evidence);
         } elseif ($context['domain'] === 'fleet') {
             [$query, $dateField] = match ($source) {
                 'journeys' => [FleetTrip::query()->whereIn('asset_id', $context['asset_ids'])->where('is_personal', false)->where('consent_blocked', false), 'started_at'],
@@ -56,7 +58,7 @@ final class ReportSourceReader
             if ($source !== 'resources' && $source !== 'demand') {
                 $query->with('asset.site', 'asset.homeSite');
             }
-            $rows = $this->queryRows($query, $watermark, function ($item) use ($source, $to) {
+            $rows = $this->queryRows($query, $watermark, $evidence, function ($item) use ($source, $to) {
                 $asset = $source === 'resources' ? $item : ($source === 'demand' ? $item->fleetBooking?->asset : $item->asset);
                 $at = match ($source) {
                     'journeys' => $item->started_at, 'bookings' => $item->starts_at, 'costs' => $item->logged_at, 'demand' => $item->scheduled_at, 'resources' => now(), default => $item->created_at
@@ -69,11 +71,13 @@ final class ReportSourceReader
                     'maintenance' => ['waiting_reason' => $item->waiting_reason, 'age_days' => max(0, CarbonImmutable::parse($item->created_at)->diffInDays($item->completed_at ? min(CarbonImmutable::parse($item->completed_at), $to) : $to)), 'completed_at' => $item->completed_at?->toISOString()],
                     'costs' => ['cost' => $this->number($item->total_cost), 'litres' => $this->number($item->quantity_litres), 'cost_stage' => 'Recorded fuel log'],
                     'demand' => ['seats' => $item->required_seats, 'wheelchair' => $item->wheelchair_required ? 'Required' : 'Not required', 'escort' => $item->escort_required ? 'Required' : 'Not required', 'reason' => null],
-                    'resources' => ['last_contact' => ($item->fleetState && ! $item->fleetState->consent_blocked && ! $item->fleetState->lastTrip?->is_personal) ? $item->fleetState->last_seen_at?->toISOString() : null, 'distance' => $this->number($item->odometer_km), 'tracking' => ($item->fleetState?->last_seen_at && ! $item->fleetState->consent_blocked && ! $item->fleetState->lastTrip?->is_personal) ? 'Contact recorded' : 'Unknown'],
+                    'resources' => ['last_contact' => ($item->fleetState && ! $item->fleetState->consent_blocked && ! $item->fleetState->lastTrip?->is_personal && ! $item->fleetState->lastTrip?->consent_blocked) ? $item->fleetState->last_seen_at?->toISOString() : null, 'distance' => $this->number($item->odometer_km), 'tracking' => ($item->fleetState?->last_seen_at && ! $item->fleetState->consent_blocked && ! $item->fleetState->lastTrip?->is_personal && ! $item->fleetState->lastTrip?->consent_blocked) ? 'Contact recorded' : 'Unknown'],
                 };
             });
         } elseif ($context['domain'] === 'client') {
             $assignment = $context['assignment'];
+            $evidence->record($assignment->withoutRelations());
+            $evidence->record($assignment->device->withoutRelations());
             ['from' => $from, 'to' => $to] = app(ClientLocationReportWindow::class)->resolve($assignment, $definition, 31);
             if ($from <= $to) {
                 if ($source === 'client_authority') {
@@ -82,15 +86,15 @@ final class ReportSourceReader
                         'collection_started_at' => $assignment->collection_started_at->toISOString(), 'retention_days' => $assignment->retention_days,
                     ]];
                 } elseif ($source === 'client_alerts') {
-                    $query = ControlRoomAlert::query()->where('client_id', $context['client']->id)
+                    $query = app(ControlRoomAlertAccessService::class)->applyReadableScope(ControlRoomAlert::query(), $context['actor'])->where('client_id', $context['client']->id)
                         ->where('site_id', $assignment->custody_site_id)->with('originSignal')
                         ->whereBetween('triggered_at', [$from->utc(), $to->utc()]);
-                    $rows = $this->queryRows($query, $watermark, fn ($a) => app(PersonalReportEvidence::class)->clientAlert($a, $assignment, $from, $to) ? $this->alert($a) : null);
+                    $rows = $this->queryRows($query, $watermark, $evidence, fn ($a) => app(PersonalReportEvidence::class)->clientAlert($a, $assignment, $from, $to, $evidence) ? $this->alert($a) : null);
                 } elseif ($source === 'client_zones') {
                     $query = FleetSignal::where('device_id', $assignment->device_id)->where('signal_type', 'resident.zone_breach')->whereBetween('occurred_at', [$from, $to]);
-                    $rows = $this->queryRows($query, $watermark, fn ($signal) => app(PersonalReportEvidence::class)->zone($signal, $assignment, $from, $to));
+                    $rows = $this->queryRows($query, $watermark, $evidence, fn ($signal) => app(PersonalReportEvidence::class)->zone($signal, $assignment, $from, $to, $evidence));
                 } else {
-                    $rows = $this->deviceRows($assignment, $from, $to, $source === 'client_locations', $source === 'client_zones', $watermark);
+                    $rows = $this->deviceRows($assignment, $from, $to, $source === 'client_locations', $source === 'client_zones', $watermark, $evidence);
                 }
             }
             $retentionExpires = $this->retentionExpiry($rows, (int) $assignment->retention_days);
@@ -103,10 +107,10 @@ final class ReportSourceReader
             }
             if ($source === 'staff_alerts') {
                 $allowed = $sessions->get()->keyBy('id');
-                $query = ControlRoomAlert::query()->where('source', 'lone_worker')->with('originSignal')->whereBetween('triggered_at', [$from, $to])->whereIn('site_id', $context['site_ids']);
-                $rows = $this->queryRows($query, $watermark, function ($alert) use ($allowed) {
+                $query = app(ControlRoomAlertAccessService::class)->applyReadableScope(ControlRoomAlert::query(), $context['actor'])->where('source', 'lone_worker')->with('originSignal')->whereBetween('triggered_at', [$from, $to])->whereIn('site_id', $context['site_ids']);
+                $rows = $this->queryRows($query, $watermark, $evidence, function ($alert) use ($allowed, $evidence) {
                     $session = $allowed->get(data_get($alert->context, 'normalized_data.lone_worker_session_id'));
-                    if (! $session || ! app(PersonalReportEvidence::class)->staffAlert($alert, $session) || (int) data_get($alert->context, 'normalized_data.worker_user_id') !== (int) $session->user_id
+                    if (! $session || ! app(PersonalReportEvidence::class)->staffAlert($alert, $session, $evidence) || (int) data_get($alert->context, 'normalized_data.worker_user_id') !== (int) $session->user_id
                         || (int) $alert->site_id !== (int) $session->site_id || (int) $alert->client_id !== (int) $session->client_id) {
                         return null;
                     }
@@ -114,8 +118,8 @@ final class ReportSourceReader
                     return $this->alert($alert);
                 });
             } else {
-                $sessions->whereBetween('started_at', [$from, $to])->with('user:id,name', 'site:id,name')->withCount('checkIns');
-                $rows = $this->queryRows($sessions, $watermark, fn ($s) => $this->base($s, $s->started_at, $source === 'my_safety' ? 'My session' : ($s->user?->name ?? 'Safety session '.$s->id), $source === 'my_safety' ? null : $s->site?->name) + [
+                $sessions->whereBetween('started_at', [$from, $to])->with('user:id,name', 'site:id,name')->with('checkIns')->withCount('checkIns');
+                $rows = $this->queryRows($sessions, $watermark, $evidence, fn ($s) => $this->base($s, $s->started_at, $source === 'my_safety' ? 'My session' : ($s->user?->name ?? 'Safety session '.$s->id), $source === 'my_safety' ? null : $s->site?->name) + [
                     'started_at' => $s->started_at?->toISOString(), 'ended_at' => $s->ended_at?->toISOString(),
                     'expected_end_at' => $s->expected_end_at?->toISOString(), 'interval_minutes' => $s->check_in_interval_minutes,
                     'check_ins' => $s->check_ins_count, 'duration' => $this->interval($s->started_at, $s->ended_at, 60),
@@ -140,8 +144,10 @@ final class ReportSourceReader
                 $conflict = DeviceAssignment::query()->where('device_id', $assignment->device_id)->where('id', '!=', $assignment->id)
                     ->where('assigned_at', '<=', $aTo)->where(fn ($q) => $q->whereNull('released_at')->orWhere('released_at', '>', $aFrom))->exists();
                 abort_if($conflict, 422, 'A tracker has overlapping assignment evidence. Resolve the assignment before reporting.');
+                $evidence->record($assignment->withoutRelations());
+                $evidence->record($assignment->device->withoutRelations());
                 $authority[$assignment->id] = hash('sha256', json_encode($assignment->getAttributes(), JSON_THROW_ON_ERROR));
-                $observations = $this->deviceRows($assignment, $aFrom, $aTo, $source === 'staff_locations', false, $watermark);
+                $observations = $this->deviceRows($assignment, $aFrom, $aTo, $source === 'staff_locations', false, $watermark, $evidence);
                 $expires = $this->retentionExpiry($observations, (int) $assignment->retention_days);
                 if ($expires && (! $retentionExpires || $expires < $retentionExpires)) {
                     $retentionExpires = $expires;
@@ -167,12 +173,12 @@ final class ReportSourceReader
         }
 
         return ['rows' => $rows, 'fingerprint' => $context['fingerprint'], 'assignment_fingerprints' => $authority, 'watermark' => $watermark,
-            'retention_expires_at' => $retentionExpires?->toISOString(),
+            'retention_expires_at' => $retentionExpires?->toISOString(), 'evidence' => $evidence->snapshot(),
             'window' => ['from' => $from->toISOString(), 'to' => $to->toISOString(), 'timezone' => 'Pacific/Auckland'],
             'coverage' => 'Complete rows that passed source identity and current authority checks. Unverifiable records are excluded; observation continuity is not guaranteed.'];
     }
 
-    private function queryRows(Builder $query, array &$watermark, callable $map): array
+    private function queryRows(Builder $query, array &$watermark, ReportSourceEvidence $evidence, callable $map): array
     {
         $max = (int) (clone $query)->max($query->qualifyColumn('id'));
         $watermark[$query->getModel()->getTable()] = $max;
@@ -180,6 +186,7 @@ final class ReportSourceReader
         $scanned = 0;
         foreach ($query->where($query->qualifyColumn('id'), '<=', $max)->lazyById(500) as $item) {
             abort_if(++$scanned > self::MAX_ROWS, 422, 'This report exceeds 100,000 source rows. Choose a shorter period; no partial result was created.');
+            $evidence->record($item);
             $row = $map($item);
             if ($row !== null) {
                 $rows[] = $row;
@@ -189,13 +196,13 @@ final class ReportSourceReader
         return $rows;
     }
 
-    private function deviceRows(DeviceAssignment $assignment, CarbonImmutable $from, CarbonImmutable $to, bool $locations, bool $zones, array &$watermark): array
+    private function deviceRows(DeviceAssignment $assignment, CarbonImmutable $from, CarbonImmutable $to, bool $locations, bool $zones, array &$watermark, ReportSourceEvidence $evidence): array
     {
         if ($locations) {
             $history = app(IntegrationEventHistoryService::class);
             $watermark += $history->reportWatermark();
             $rows = [];
-            foreach ($history->reportForDevice($assignment->device, ['date_from' => $from->utc()->toDateTimeString(), 'date_to' => $to->utc()->toDateTimeString()], $assignment->retention_days, $watermark) as $point) {
+            foreach ($history->reportForDevice($assignment->device, ['date_from' => $from->utc()->toDateTimeString(), 'date_to' => $to->utc()->toDateTimeString()], $assignment->retention_days, $watermark, fn ($record) => $evidence->record($record)) as $point) {
                 abort_if(count($rows) >= self::MAX_ROWS, 422, 'Too many observations. Choose a shorter period.');
                 $rows[] = ['reference' => $point['source'].':'.$point['source_id'], 'date' => CarbonImmutable::parse($point['timestamp'])->setTimezone('Pacific/Auckland')->toDateString(),
                     'resource' => $assignment->device->name, 'site' => null, 'status' => 'Observed',
@@ -215,7 +222,7 @@ final class ReportSourceReader
             $query->whereIn('event_type', ['geofence_enter', 'geofence_exit', 'boundary_enter', 'boundary_exit']);
         }
 
-        return $this->queryRows($query, $watermark, function ($e) use ($assignment) {
+        return $this->queryRows($query, $watermark, $evidence, function ($e) use ($assignment) {
             $charging = data_get($e->raw_payload, 'charging_status');
 
             return $this->base($e, $e->occurred_at, $assignment->device->name, null) + [

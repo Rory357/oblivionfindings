@@ -669,7 +669,7 @@ return json_decode(<<<'JSON'
         }
       },
       "note": "Canonical Control Room lifecycle. Unresolved alerts are excluded from completed-response averages.",
-      "permission": "controlRoom.viewAny"
+      "permission": null
     },
     "client_authority": {
       "label": "Current client tracking authority",
@@ -861,7 +861,7 @@ return json_decode(<<<'JSON'
         }
       },
       "note": "Only canonical lone-worker alerts linked to an authorised session. Legacy alerts are not added.",
-      "permission": "controlRoom.viewAny"
+      "permission": null
     },
     "staff_locations": {
       "label": "Session location observations",

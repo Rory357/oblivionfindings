@@ -7,6 +7,7 @@ use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Client;
 use App\Models\LoneWorkerSession;
 use App\Models\User;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\Fleet\FleetTripSiteScope;
 use App\Services\Fleet\VehicleFinanceService;
 use App\Services\HealthSafety\LoneWorkerSessionScope;
@@ -38,6 +39,9 @@ final class ReportAccess
                 'self' => true,
                 default => false,
             };
+            if (in_array($key, ['client_alerts', 'staff_alerts'], true)) {
+                $allowed = $allowed && app(ControlRoomAlertAccessService::class)->canRead($actor);
+            }
             if ($key === 'demand') {
                 $allowed = $allowed && ($actor->canDo('fleet.viewAny') || $actor->canDo('assets.viewAny'));
             }

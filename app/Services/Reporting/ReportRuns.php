@@ -49,6 +49,7 @@ final class ReportRuns
                 $previous['date_to'] = CarbonImmutable::parse($definition['date_from'])->subDay()->toDateString();
                 $previous['date_from'] = CarbonImmutable::parse($definition['date_from'])->subDays($days)->toDateString();
                 $previousSource = $this->reader->read($actor, $previous);
+                $source['comparison_evidence'] = $previousSource['evidence'];
                 $source['assignment_fingerprints'] += $previousSource['assignment_fingerprints'];
                 $expiries = array_filter([$source['retention_expires_at'], $previousSource['retention_expires_at']]);
                 $source['retention_expires_at'] = $expiries ? min($expiries) : null;
@@ -57,6 +58,7 @@ final class ReportRuns
             }
             unset($source['rows']);
             $this->access->recheck($actor, $definition, $source['fingerprint']);
+            $this->assertEvidence($actor, $source, $definition);
             $payload = ['source' => $source, 'result' => $result, 'comparison' => $comparison, 'generated_at' => now()->toISOString(), 'definition_hash' => hash('sha256', json_encode($definition))];
             AuditLogger::logOrFail('reports.run.generated', $actor, ['run_id' => $run->id, 'actor_id' => $actor->id, 'source' => $definition['source'], 'row_count' => $result['row_count'], 'definition_hash' => $payload['definition_hash']]);
             DB::transaction(function () use ($run, $payload) {
@@ -89,12 +91,23 @@ final class ReportRuns
         // Retention advances between generation and download. Never serve an expired point.
         abort_if(isset($payload['source']['retention_expires_at']) && CarbonImmutable::parse($payload['source']['retention_expires_at'])->lte(now()), 410, 'The report has crossed its retention boundary. Run it again.');
 
+        $this->assertEvidence($actor, $payload['source'], $run->definition);
+
         return $payload;
+    }
+
+    private function assertEvidence(User $actor, array $source, array $definition): void
+    {
+        $actor = $this->access->actor($actor);
+        ReportSourceEvidence::assertCurrent($actor, $source['evidence'] ?? null);
+        if ($definition['comparison']) {
+            ReportSourceEvidence::assertCurrent($actor, $source['comparison_evidence'] ?? null);
+        }
     }
 
     public static function publicSource(array $source): array
     {
-        unset($source['fingerprint'],$source['assignment_fingerprints']);
+        unset($source['fingerprint'], $source['assignment_fingerprints'], $source['evidence'], $source['comparison_evidence']);
         $watermark = $source['watermark'];
         $source['watermark'] = ['captured_at' => $watermark['captured_at'] ?? null, 'snapshot_id' => hash_hmac('sha256', json_encode($watermark, JSON_THROW_ON_ERROR), (string) config('app.key'))];
 

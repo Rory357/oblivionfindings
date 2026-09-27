@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Tests\Feature\Reporting\OperationalReportPrivacyTest" file="C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\tests\Feature\Reporting\OperationalReportPrivacyTest.php" tests="1" assertions="21" errors="0" failures="0" skipped="0" time="251.899096">
+    <testcase name="test_canonical_integration_payload_remains_part_of_current_evidence" file="C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\tests\Feature\Reporting\OperationalReportPrivacyTest.php" line="368" class="Tests\Feature\Reporting\OperationalReportPrivacyTest" classname="Tests.Feature.Reporting.OperationalReportPrivacyTest" assertions="21" time="251.899096"/>
+  </testsuite>
+</testsuites>
