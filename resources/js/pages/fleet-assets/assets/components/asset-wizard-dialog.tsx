@@ -52,6 +52,8 @@ import {
     Wrench,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { api, type Option } from '../register/api';
+import { SearchPicker } from '../register/controls';
 
 /* ------------------------------------------------------------------ */
 /*  Props + local shapes                                               */
@@ -353,6 +355,31 @@ export function AssetWizardDialog({
     const [processing, setProcessing] = useState(false);
     const [done, setDone] = useState(false);
     const [createdId, setCreatedId] = useState<number | null>(null);
+    const [canonicalRoom, setCanonicalRoom] = useState('');
+    const [canonicalRooms, setCanonicalRooms] = useState<Option[]>([]);
+    useEffect(() => {
+        setCanonicalRoom('');
+        if (isEdit || !open || !data.site_id) {
+            setCanonicalRooms([]);
+            return;
+        }
+        const controller = new AbortController();
+        void api<Option[]>(
+            `/rooms?site_id=${data.site_id}`,
+            'GET',
+            undefined,
+            controller.signal,
+        )
+            .then(setCanonicalRooms)
+            .catch((error) => {
+                if (error.name !== 'AbortError')
+                    setErrors((previous) => ({
+                        ...previous,
+                        site_room_id: error.message,
+                    }));
+            });
+        return () => controller.abort();
+    }, [data.site_id, isEdit, open]);
 
     const cur = STEPS[stepIndex];
     const stepKey = cur.key as StepKey;
@@ -452,6 +479,9 @@ export function AssetWizardDialog({
         setProcessing(true);
 
         const payload = {
+            ...(!isEdit
+                ? { site_room_id: canonicalRoom ? Number(canonicalRoom) : null }
+                : {}),
             name: data.name,
             asset_tag: nn(data.asset_tag),
             category: nn(data.category),
@@ -639,6 +669,32 @@ export function AssetWizardDialog({
                         onClientChange={handleClientChange}
                     />
                 ) : null}
+                {stepKey === 'location' && !isEdit && (
+                    <div className="mt-4">
+                        <SearchPicker
+                            label="Assigned room"
+                            options={canonicalRooms}
+                            value={canonicalRoom}
+                            onChange={setCanonicalRoom}
+                            empty="No room assigned"
+                            disabled={!data.site_id}
+                        />
+                        {errors.site_room_id && (
+                            <p
+                                role="alert"
+                                className="mt-1 text-xs text-status-critical"
+                            >
+                                {errors.site_room_id}
+                            </p>
+                        )}
+                    </div>
+                )}
+                {stepKey === 'location' && isEdit && (
+                    <p className="mt-4 text-sm text-muted-foreground">
+                        Changing the site or client clears the assigned room if
+                        it belongs to a different site.
+                    </p>
+                )}
                 {stepKey === 'compliance' ? (
                     <StepCompliance data={data} set={set} errors={errors} />
                 ) : null}
@@ -807,7 +863,9 @@ function StepDetails({ data, set, errors }: StepProps) {
                         <Field
                             label="Odometer"
                             hint="recorded on the vehicle"
-                            error={errors.odometer_km ?? errors.vehicle_evidence}
+                            error={
+                                errors.odometer_km ?? errors.vehicle_evidence
+                            }
                         >
                             <p className="text-subtle py-2">
                                 {data.odometer_km
@@ -949,21 +1007,26 @@ function StepCompliance({ data, set, errors }: StepProps) {
             <div className="grid gap-4">
                 {data.category === 'vehicle' ? (
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <SubHead icon={Car}>Registration, WoF, CoF and RUC</SubHead>
+                        <SubHead icon={Car}>
+                            Registration, WoF, CoF and RUC
+                        </SubHead>
                         <InfoCard icon={Info}>
                             {data.registration_expires_at ||
                             data.wof_expires_at ||
                             data.cof_expires_at ? (
                                 <>
                                     Last recorded: registration{' '}
-                                    {data.registration_expires_at || 'not recorded'}
-                                    , WoF {data.wof_expires_at || 'not recorded'},
-                                    CoF {data.cof_expires_at || 'not recorded'}.{' '}
+                                    {data.registration_expires_at ||
+                                        'not recorded'}
+                                    , WoF{' '}
+                                    {data.wof_expires_at || 'not recorded'}, CoF{' '}
+                                    {data.cof_expires_at || 'not recorded'}
+                                    .{' '}
                                 </>
                             ) : null}
                             These are recorded with their evidence on the
-                            vehicle&apos;s Service &amp; compliance tab, so every
-                            change keeps its source and history.
+                            vehicle&apos;s Service &amp; compliance tab, so
+                            every change keeps its source and history.
                             {errors.vehicle_evidence ? (
                                 <span className="mt-1 block font-medium text-destructive">
                                     {errors.vehicle_evidence}

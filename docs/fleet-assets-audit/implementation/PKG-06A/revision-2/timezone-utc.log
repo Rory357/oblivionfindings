@@ -1,0 +1,12 @@
+
+ RUN  v4.1.5 <worktree>
+
+ ✓ resources/js/pages/fleet-assets/assets/register/api.test.ts > shows the worker date and time across daylight saving and UTC date boundaries 28ms
+ ✓ resources/js/pages/fleet-assets/assets/register/api.test.ts > rejects a sign-in page returned in place of an exported report 3ms
+ ✓ resources/js/pages/fleet-assets/assets/register/api.test.ts > sends register commands to the mounted route with CSRF protection 8ms
+ ✓ resources/js/pages/fleet-assets/assets/register/api.test.ts > preserves canonical inventory routes and reports a lost session 1ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  04:29:27
+   Duration  17.37s (transform 113ms, setup 2.19s, import 93ms, tests 41ms, environment 14.33s)

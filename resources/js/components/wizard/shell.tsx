@@ -40,6 +40,7 @@ export function WizardShell({
     stepIndex,
     onStepClick,
     headerLabel,
+    sequential = true,
     pct,
     pctLabel = 'Completeness',
     railExtra,
@@ -69,6 +70,8 @@ export function WizardShell({
      *  their rail entries are SECTIONS, not sequential steps, so "Step 1 of 7"
      *  reads wrong; a pane title or section name goes here instead. */
     headerLabel?: string;
+    /** Detail viewers have sections rather than sequential completion steps. */
+    sequential?: boolean;
     pct?: number | null;
     pctLabel?: string;
     /** Extra rail content pinned below the steps (e.g. a live clinical card). */
@@ -125,7 +128,7 @@ export function WizardShell({
 
                             {steps.map((s, i) => {
                                 const active = i === stepIndex;
-                                const complete = i < stepIndex;
+                                const complete = sequential && i < stepIndex;
                                 const Icon = s.icon;
                                 return (
                                     <button
@@ -246,17 +249,19 @@ export function WizardShell({
                                 </button>
                             </header>
 
-                            <div
-                                data-wizard-region="progress"
-                                className="h-[3px] shrink-0 bg-muted"
-                            >
+                            {sequential && (
                                 <div
-                                    className="h-full bg-primary transition-[width] duration-300"
-                                    style={{
-                                        width: `${((stepIndex + 1) / steps.length) * 100}%`,
-                                    }}
-                                />
-                            </div>
+                                    data-wizard-region="progress"
+                                    className="h-[3px] shrink-0 bg-muted"
+                                >
+                                    <div
+                                        className="h-full bg-primary transition-[width] duration-300"
+                                        style={{
+                                            width: `${((stepIndex + 1) / steps.length) * 100}%`,
+                                        }}
+                                    />
+                                </div>
+                            )}
 
                             <div
                                 data-wizard-region="body"
@@ -270,7 +275,7 @@ export function WizardShell({
                                 className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/30 px-5 py-3.5"
                             >
                                 <div>{footerStart}</div>
-                                <div className="flex items-center gap-2.5">
+                                <div className="flex min-w-0 flex-wrap items-center justify-end gap-2.5">
                                     {footerEnd}
                                 </div>
                             </footer>

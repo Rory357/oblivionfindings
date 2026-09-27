@@ -9,11 +9,15 @@ use App\Models\Asset;
 use App\Models\AssetAssignment;
 use App\Models\AssetCategory;
 use App\Models\AssetDocument;
+use App\Models\AssetImportBatch;
+use App\Models\AssetLabelBatch;
 use App\Models\Client;
 use App\Models\ClientEmergencyContact;
 use App\Models\Site;
+use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\Assets\AssetMutationIntegrityService;
+use App\Services\Assets\AssetStocktakeService;
 use App\Services\AuditLogger;
 use App\Services\Fleet\VehicleLegacyEvidenceGuard;
 use Illuminate\Http\Request;
@@ -127,16 +131,19 @@ class AssetController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         $this->authorize('viewAny', Asset::class);
+        $request->validate(['category' => 'nullable|string|max:120', 'status' => 'nullable|string|max:40', 'search' => 'nullable|string|max:255',
+            'site_id' => 'nullable|integer|min:1', 'site_room_id' => 'nullable|integer|min:1', 'ownership' => 'nullable|in:client,organisation,unknown',
+            'view' => 'nullable|in:inventory,attention,stocktake,imports,labels,archived', 'workflow_status' => 'nullable|string|max:24']);
         $hasFleetFields = $this->hasFleetFields();
 
-        $eagerLoads = ['site:id,name', 'categoryRef:id,name,slug'];
+        $eagerLoads = ['site:id,name', 'canonicalRoom:id,site_id,name', 'categoryRef:id,name,slug'];
         if ($hasFleetFields) {
             $eagerLoads[] = 'homeSite';
         }
 
         $accessibleAssets = $this->deviceAccess->accessibleAssets($user);
         $query = (clone $accessibleAssets)
-            ->with($eagerLoads);
+            ->with($eagerLoads)->withMax('inspections', 'inspected_at')->with(['ownerships' => fn ($q) => $q->whereNull('effective_to')->where('effective_from', '<=', now())->latest('effective_from')]);
         $sites = $this->deviceAccess->accessibleSites($user)
             ->orderBy('name')
             ->get(['id', 'name']);
@@ -156,12 +163,34 @@ class AssetController extends Controller
             $query->where('status', $request->input('status'));
         }
 
+        $view = $request->string('view', 'inventory')->toString();
+        if ($view === 'archived') {
+            $query->where('status', 'retired');
+        } elseif (! $request->filled('status')) {
+            $query->where('status', '!=', 'retired');
+        }
+        if ($view === 'attention') {
+            $query->where(fn ($q) => $q->where('status', 'out_of_service')->orWhere('inspection_due_at', '<=', now()->addDays(30))->orWhere('maintenance_due_at', '<=', now()->addDays(30)));
+        }
+        if ($request->input('ownership') === 'client') {
+            $query->whereHas('ownerships', fn ($q) => $q->whereNull('effective_to')->where('effective_from', '<=', now())->where('owner_type', 'client'));
+        } elseif ($request->input('ownership') === 'organisation') {
+            $query->whereHas('ownerships', fn ($q) => $q->whereNull('effective_to')->where('effective_from', '<=', now())->where('owner_type', 'site'));
+        } elseif ($request->input('ownership') === 'unknown') {
+            $query->whereDoesntHave('ownerships', fn ($q) => $q->whereNull('effective_to')->where('effective_from', '<=', now()));
+        }
+
         // Site filter
         $siteFilterId = null;
         if ($request->filled('site_id')) {
             $siteFilterId = $request->integer('site_id');
             abort_unless($siteFilterId > 0 && $accessibleSiteIds->contains($siteFilterId), 404);
             $query->where('site_id', $siteFilterId);
+        }
+        if ($request->filled('site_room_id')) {
+            $room = SiteRoom::whereIn('site_id', $accessibleSiteIds)->findOrFail($request->integer('site_room_id'));
+            abort_if($siteFilterId && $room->site_id !== $siteFilterId, 404);
+            $query->where('site_room_id', $room->id);
         }
 
         // Search
@@ -174,6 +203,13 @@ class AssetController extends Controller
             });
         }
 
+        if ($request->boolean('selection')) {
+            $ids = (clone $query)->orderBy('id')->limit(201)->pluck('id');
+            abort_if($ids->count() > 200, 422, 'Narrow the filters to 200 assets or fewer for a label batch.');
+
+            return response()->json(['ids' => $ids]);
+        }
+
         // CSV export follows the same canonical authorization and requested
         // filter scope as the paginated register.
         if ($request->input('export') === 'csv') {
@@ -181,11 +217,11 @@ class AssetController extends Controller
 
             return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
-                $this->putCsv($handle, ['Name', 'Asset Tag', 'Category', 'Status', 'Site', 'Manufacturer', 'Model', 'Serial Number']);
+                $this->putCsv($handle, ['Name', 'Asset Tag', 'Category', 'Status', 'Site', 'Room', 'Manufacturer', 'Model', 'Serial Number']);
                 foreach ($exportQuery->lazy(200) as $a) {
                     $this->putCsv($handle, [
                         $a->name, $a->asset_tag, $a->category, $a->status,
-                        $a->site?->name ?? '', $a->manufacturer, $a->model, $a->serial_number,
+                        $a->site?->name ?? '', $a->canonicalRoom?->name ?? '', $a->manufacturer, $a->model, $a->serial_number,
                     ]);
                 }
                 fclose($handle);
@@ -243,7 +279,14 @@ class AssetController extends Controller
             $createdAssetId = null;
         }
 
+        // Navigation totals are from the same authorised asset scope, before
+        // result filters. Never count a site's unrestricted asset relation.
+        $locationAssets = (clone $accessibleAssets)->when($view === 'archived', fn ($q) => $q->where('status', 'retired'), fn ($q) => $q->where('status', '!=', 'retired'));
+        $siteCounts = (clone $locationAssets)->selectRaw('site_id, COUNT(*) as aggregate')->groupBy('site_id')->pluck('aggregate', 'site_id');
+        $roomCounts = $siteFilterId ? (clone $locationAssets)->where('site_id', $siteFilterId)->selectRaw('site_room_id, COUNT(*) as aggregate')->groupBy('site_room_id')->pluck('aggregate', 'site_room_id') : collect();
+
         return Inertia::render('fleet-assets/assets/index', [
+            'workflow_metrics' => $this->workflowMetrics($user, $view),
             'hero' => [
                 'total' => $heroTotal,
                 'active' => $heroActive,
@@ -262,6 +305,12 @@ class AssetController extends Controller
                         'slug' => $a->categoryRef->slug,
                     ] : null,
                     'status' => $a->status,
+                    'room' => $a->canonicalRoom ? ['id' => $a->canonicalRoom->id, 'name' => $a->canonicalRoom->name] : null,
+                    'location_note' => $a->location,
+                    'ownership' => $a->ownerships->first()?->owner_type ?? 'unknown',
+                    'inspection_due_at' => $a->inspection_due_at,
+                    'maintenance_due_at' => $a->maintenance_due_at,
+                    'last_inspected_at' => $a->inspections_max_inspected_at,
                     'site' => $a->site ? ['id' => $a->site->id, 'name' => $a->site->name] : null,
                     'home_site' => $hasFleetFields
                         && $a->homeSite
@@ -283,17 +332,62 @@ class AssetController extends Controller
                     'total' => $assets->total(),
                 ],
             ],
-            'sites' => $sites,
+            'sites' => $sites->map(fn ($site) => ['id' => $site->id, 'name' => $site->name, 'asset_count' => (int) $siteCounts->get($site->id, 0)]),
+            'rooms' => $siteFilterId ? SiteRoom::where('site_id', $siteFilterId)->orderBy('name')->get(['id', 'name'])->map(fn ($room) => ['id' => $room->id, 'name' => $room->name, 'asset_count' => (int) $roomCounts->get($room->id, 0)]) : [],
+            'staff' => $this->deviceAccess->assignableStaff($user)->orderBy('name')->limit(500)->get(['id', 'name']),
+            'register_permissions' => ['create' => $user->canDo('assets.create'), 'count' => $user->canDo('assets.scan.record')],
             'clients' => $clients,
             'prefill' => $prefill,
             // Set by the modal store() redirect so the wizard success pane can
             // link straight to the newly created asset.
             'created_asset_id' => $createdAssetId,
             'filters' => [
-                ...$request->only(['category', 'status', 'search']),
+                ...$request->only(['category', 'status', 'search', 'site_room_id', 'view', 'ownership', 'workflow_status']),
                 'site_id' => $siteFilterId,
             ],
         ]);
+    }
+
+    public function rooms(Request $request)
+    {
+        $this->authorize('viewAny', Asset::class);
+        $site = $this->deviceAccess->accessibleSites($request->user())->findOrFail($request->integer('site_id'));
+
+        return SiteRoom::where('site_id', $site->id)->orderBy('name')->get(['id', 'name']);
+    }
+
+    private function workflowMetrics(User $user, string $view): array
+    {
+        if ($view === 'stocktake') {
+            $query = app(AssetStocktakeService::class)->visibleQuery($user);
+
+            return [
+                ['label' => 'Open counts', 'value' => (clone $query)->where('status', 'draft')->count(), 'caption' => 'saved counts ready to resume', 'status' => 'draft'],
+                ['label' => 'Counts with follow-ups', 'value' => (clone $query)->where('status', 'completed')->where(fn ($q) => $q->whereJsonContains('entries', ['result' => 'missing'])->orWhereJsonContains('entries', ['expected' => false])->orWhereJsonContains('entries', ['changed' => true]))->count(), 'caption' => 'review the recorded differences', 'status' => 'followups'],
+                ['label' => 'Finished counts', 'value' => (clone $query)->where('status', 'completed')->count(), 'caption' => 'original answers and reports retained', 'status' => 'completed'],
+                ['label' => 'Sites with counts', 'value' => (clone $query)->where('status', 'completed')->distinct()->count('site_id'), 'caption' => 'view historical room coverage', 'status' => 'coverage'],
+            ];
+        }
+        if ($view === 'imports' && $user->canDo('assets.create')) {
+            $query = AssetImportBatch::where('created_by_user_id', $user->id);
+
+            return [
+                ['label' => 'Your imports', 'value' => (clone $query)->count(), 'caption' => 'saved batches', 'status' => ''],
+                ['label' => 'Partial imports', 'value' => (clone $query)->where('status', 'partial')->count(), 'caption' => 'review unfinished rows', 'status' => 'partial'],
+                ['label' => 'Completed', 'value' => (clone $query)->where('status', 'completed')->count(), 'caption' => 'all rows imported', 'status' => 'completed'],
+            ];
+        }
+        if ($view === 'labels') {
+            $query = AssetLabelBatch::where('created_by_user_id', $user->id);
+
+            return [
+                ['label' => 'Your label batches', 'value' => (clone $query)->count(), 'caption' => 'saved layouts and selections', 'status' => ''],
+                ['label' => 'Ready', 'value' => (clone $query)->where('status', 'ready')->where('expires_at', '>', now())->count(), 'caption' => 'available to download', 'status' => 'ready'],
+                ['label' => 'Needs retry', 'value' => (clone $query)->where('status', 'failed')->count(), 'caption' => 'generation did not finish', 'status' => 'failed'],
+            ];
+        }
+
+        return [];
     }
 
     public function show(Request $request, Asset $asset)
@@ -636,6 +730,7 @@ class AssetController extends Controller
             'category' => ['nullable', 'string', 'max:120'],
             'asset_category_id' => ['nullable', 'integer', 'exists:asset_categories,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'site_room_id' => ['nullable', 'integer'],
             'home_site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
             'asset_tag' => ['nullable', 'string', 'max:100'],
@@ -679,6 +774,9 @@ class AssetController extends Controller
 
         $asset = DB::transaction(function () use ($user, $data): Asset {
             $data = $this->authorisePlacement($user, $data, true);
+            if (! empty($data['site_room_id'])) {
+                SiteRoom::where('site_id', $data['site_id'])->findOrFail($data['site_room_id']);
+            }
             $asset = Asset::query()->create($data);
             AuditLogger::logOrFail('assets.create', $asset, [
                 'asset_id' => $asset->id,
@@ -723,6 +821,7 @@ class AssetController extends Controller
             'category' => ['nullable', 'string', 'max:120'],
             'asset_category_id' => ['nullable', 'integer', 'exists:asset_categories,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'site_room_id' => ['sometimes', 'nullable', 'integer'],
             'home_site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
             'asset_tag' => ['nullable', 'string', 'max:100'],
@@ -764,12 +863,19 @@ class AssetController extends Controller
             $data = $this->authorisePlacement($user, $data, true);
             $this->mutationIntegrity->assertOrdinaryStatusUpdate($locked, $data['status'] ?? null);
             $this->mutationIntegrity->assertPlacementChangeAllowed($locked, $data);
-            $before = $locked->only(['site_id', 'home_site_id', 'client_id', 'status']);
+            if (array_key_exists('site_room_id', $data)) {
+                if ($data['site_room_id'] !== null) {
+                    SiteRoom::where('site_id', $data['site_id'])->lockForUpdate()->findOrFail($data['site_room_id']);
+                }
+            } elseif ((int) $locked->site_id !== (int) $data['site_id']) {
+                $data['site_room_id'] = null;
+            }
+            $before = $locked->only(['site_id', 'site_room_id', 'home_site_id', 'client_id', 'status']);
             $locked->update($data);
             AuditLogger::logOrFail('assets.update', $locked, [
                 'asset_id' => $locked->id,
                 'before' => $before,
-                'after' => $locked->only(['site_id', 'home_site_id', 'client_id', 'status']),
+                'after' => $locked->only(['site_id', 'site_room_id', 'home_site_id', 'client_id', 'status']),
             ]);
 
             return $locked->fresh();

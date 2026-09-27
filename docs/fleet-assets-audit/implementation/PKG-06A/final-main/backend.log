@@ -1,0 +1,57 @@
+
+   PASS  Tests\Feature\FleetAssets\AssetRegisterWorkflowTest
+  ✓ location directory and checklist use only permitted assets                                                  87.22s
+  ✓ coverage excludes selected item counts and followups recheck access                                          0.39s
+  ✓ count is durable versioned immutable and does not change assignment                                          0.28s
+  ✓ scan resolves existing identity rejects foreign urls and requires extra confirmation                         0.31s
+  ✓ duplicate command is idempotent and undo keeps evidence                                                      0.23s
+  ✓ missing and changed items require review and owner                                                           0.35s
+  ✓ hidden site and asset records are denied and permission revocation blocks writes                             0.26s
+  ✓ completed report is real pdf and typed xlsx                                                                  1.73s
+  ✓ csv validation partial import and retry do not duplicate assets                                              0.30s
+  ✓ newly conflicting import row can be retried without repeating successes                                      0.27s
+  ✓ empty count requires attestation and records it                                                              0.20s
+  ✓ read access does not grant counting or import permission                                                     0.27s
+  ✓ canonical room filter and registration cannot cross sites                                                    0.21s
+  ✓ label exports preserve tokens and revalidate download scope                                                  1.17s
+  ✓ label replay requires the original selection and layout                                                      0.25s
+  ✓ print permission does not grant permission to create a missing qr identity                                   0.21s
+  ✓ undone extra history remains access scoped in lists resume and exports                                       0.50s
+  ✓ legacy history references are backfilled without rewriting evidence                                          0.32s
+  ✓ revoked extra site access also hides retained count history                                                  0.34s
+  ✓ report time matches the worker zone regression in the register                                               0.23s
+  ✓ ordinary edit preserves same site room and reconciles destination room                                       0.26s
+  ✓ imported room is cleared on a client derived site move                                                       0.40s
+
+   PASS  Tests\Feature\FleetAssets\TransportWorkspaceTest
+  ✓ request assessment retry and stale edit preserve history                                                     1.22s
+  ✓ all views and search conceal foreign requests and direct ids                                                 1.30s
+  ✓ allocation is atomic and changes keep the booking identity                                                   1.36s
+  ✓ assigned driver can see linked journey when requester is different and completion requires passenger accoun… 0.90s
+  ✓ return receipts and key storage are independent replay safe observations                                     1.12s
+  ✓ a changed fleet window moves the transport between date scopes                                               0.75s
+  ✓ escort capacity is validated before request creation                                                         0.71s
+  ✓ site filter values are parsed and scoped                                                                     1.19s
+  ✓ calendar scope matches all visible days for direct links                                                     0.92s
+  ✓ passenger journey completion preserves the separate vehicle return                                           1.13s
+  ✓ booking linked shift handover retries do not create duplicate custody records                                0.73s
+  ✓ linked booking source page hands actions to current transport record                                         0.81s
+  ✓ time only move and reviewed undo preserve canonical booking fields                                           1.00s
+  ✓ linked source commands keep retry version and key requirements                                               0.95s
+
+   PASS  Tests\Feature\FleetAssets\Pkg02bFleetVehiclesAllSitesTest
+  ✓ the seeder and the grant migration give admin and the fleet manager role central oversight                   0.66s
+  ✓ the register daily check and profile show every vehicle to central oversight only                            0.95s
+  ✓ fleet map includes every permitted vehicle and keeps restricted positions server side                        0.82s
+  ✓ fleet calendar projects foreign bookings only as busy and denies source identity                             0.69s
+  ✓ fleet calendar due entries have unique stable ids across vehicles                                            0.79s
+  ✓ the vehicles own records can be kept across sites                                                            0.80s
+  ✓ bookings trips locations drivers and finance keep their own site rules                                       0.83s
+  ✓ maintenance work stays with the vehicles site                                                                0.91s
+  ✓ the compliance page follows the register scope                                                               0.69s
+  ✓ the fleet settings grant migration gives admin and the fleet manager role the permission                     0.64s
+  ✓ fleet calendar accepts six local weeks across autumn daylight saving                                         0.82s
+  ✓ fleet calendar keeps auckland midnight and record versions                                                   0.69s
+
+  Tests:    48 passed (1097 assertions)
+  Duration: 120.35s
