@@ -28,6 +28,7 @@ import {
     BookingVehiclePicker,
     type BookingVehicle,
 } from './booking-vehicle-picker';
+import './booking-wizard.css';
 import type {
     BookingRow,
     CalendarDriver,
@@ -36,7 +37,6 @@ import type {
 } from './calendar-types';
 import { uploadSummary, useEvidenceUpload } from './evidence-upload';
 import { isJsonObject, useVehicleRecordCommand } from './record-command';
-import './studio.css';
 import {
     fieldProps,
     StagedFilesField,
