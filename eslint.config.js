@@ -211,6 +211,8 @@ export default [
             'playwright-report/**',
             'test-results/**',
             'tailwind.config.js',
+            // Immutable Transport design evidence is verified by its frozen manifests.
+            'docs/fleet-assets-audit/previews/PKG-05/**',
             // Claude Code agent worktrees: each is a full repo checkout so
             // recursing into them duplicates lint work for every parallel
             // session and overflows ESLint's stylish formatter on machines
