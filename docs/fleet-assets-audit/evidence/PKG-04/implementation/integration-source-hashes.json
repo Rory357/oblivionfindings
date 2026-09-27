@@ -1,0 +1,146 @@
+[
+  {
+    "path": "app/Http/Controllers/FleetAssets/VehicleCalendarController.php",
+    "sha256": "9C1E5549D0BB2C31BBAF621442B7F68168C7913F6CC98A7F544DECB15E123986"
+  },
+  {
+    "path": "app/Http/Controllers/FleetAssets/VehicleController.php",
+    "sha256": "0B2D4756EE06592D7E80DFC6BFB38D04756E50CDF3DFB48CD1837E39216960DA"
+  },
+  {
+    "path": "app/Services/Fleet/VehicleCalendarService.php",
+    "sha256": "08CF8B9631370D898D638F77DE5C00AE96712BCEAC1EEC2D746C8ED8033CCD0D"
+  },
+  {
+    "path": "app/Services/Fleet/VehicleLocationService.php",
+    "sha256": "81FCE4CCE3C5D2206EDB0C0664EE2DCFC55D8B8F4D294B65BECA4774184E9B26"
+  },
+  {
+    "path": "resources/css/app.css",
+    "sha256": "0261D18C51972104C66D0C19F1AD2C3BC454293552A42C423BE396247C7EB77F"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/booking-time.test.ts",
+    "sha256": "D4212809F07F914F8151A1A51970496982A90AB0E538F1917B732E17315247FC"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/booking-time.ts",
+    "sha256": "52A4545FA165CBD42AE8F483B8C75AEB4D62C24A19E92316D9078136ED661DE9"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/booking-wizard.tsx",
+    "sha256": "4B0B853F83CF6AFD2327952E95C871D23F984E6FEE6A8276D127F0006AD387B1"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/vehicle-header.tsx",
+    "sha256": "B1B1C76A6300EA5793D896393AE8D92C7A94E36EF643B0D607EDFB5DEE2688A0"
+  },
+  {
+    "path": "resources/js/components/lists/entity-card.tsx",
+    "sha256": "8BCC703FE4E03DF6F192FCDD10CE5B22C88C586B9ADD0477F5A9A5EE27D97106"
+  },
+  {
+    "path": "resources/js/components/page/page-header.tsx",
+    "sha256": "84DD2BD9452A0AE681947F00B6A55607F36E8CC3DAF92582985B20B381886C3C"
+  },
+  {
+    "path": "resources/js/lib/fleet-return.test.ts",
+    "sha256": "F20446866E027F223CFE194576EB6BEEFA311AEB365C917EDC8E534EC2E0A198"
+  },
+  {
+    "path": "resources/js/lib/fleet-return.ts",
+    "sha256": "1DBE072FFF86E279686FF9B90EE52E27A555CBA2740758C639BA4543D642F6EE"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/bookings/show.tsx",
+    "sha256": "74EC3C4AEF0A95B2986C0F0853D9869C05273C9E9AE2D94D5E2325B83801851D"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+    "sha256": "50C35B9C68C6608E564B1BC688FC16676EDB52A3CC093DA7A6CCFBECAFD29B7A"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/calendar-export.test.ts",
+    "sha256": "60636F88B010C50A4AE6B17B5E825E523563914569CE1C2FD206D0CBDF6A7C17"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/calendar-export.ts",
+    "sha256": "92F126E5933FF9B0820F2C05AA9632A81CE1BFCB1482C9BF1EB16FC8CE699E1D"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/calendar-range.tsx",
+    "sha256": "EC592D7AC994BBDF019F6E7A21CB272B167D6A325CA171A8243F810B527E443A"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts",
+    "sha256": "F1E81E5D8FB04E276F664F1885455BD2C9157C96CA78DCBE8951CA8D2DFBC720"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/calendar-time.ts",
+    "sha256": "8231171E2FB0807FEC2216848D70945E0903FCCCC5E9C8F7A7E7CA8858EC73D7"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/fleet-calendar.tsx",
+    "sha256": "AB0D7083E89007D7313A87153A93F7144573328CE7549E48F80718A448875858"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/fleet-header.tsx",
+    "sha256": "BDF34A1356E2907A3DF3D1D7C6362D2B12BAFB022502BA6070911C52F0EBB9A7"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/fleet-map.css",
+    "sha256": "48D993AD30A113768D8DB204673D4D57C2FEB392AD975D92934F6E21D07C20C1"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/fleet-map.test.ts",
+    "sha256": "436E30B8B928E2279906A5342F0372E7FAEEE57353018FFB0E5EEE9EB735A229"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/fleet-map.tsx",
+    "sha256": "9A6FC591F275FFCF8B56ADD99C9CECA1A2ED3835F72104BDBE946CC935990010"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/index.test.tsx",
+    "sha256": "3936C29039367E76594256B40B77CD90CFB434999E7104BE19DA110FC19C0D80"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/index.tsx",
+    "sha256": "D6057A1E2B1A289C9497F03CB495D878568B43D4E95D0386E74AD75CD1B43664"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/register-evidence.test.ts",
+    "sha256": "F470A98CD885D442FB8F4E22774427F50F8D468BB0F75B23F383B0058115F067"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/register-evidence.ts",
+    "sha256": "8971805F3F1D4FE5B9678996E2E20F2F07249641D010EC745D822CFC55753E55"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/show.tsx",
+    "sha256": "8F903314151171F585CB7CB324A218B85E90B01540AC14EB38A11EE28C503E79"
+  },
+  {
+    "path": "resources/js/pages/sites/calendar/_parts.tsx",
+    "sha256": "960CDEE20EB553C63815486DE560DA395AFC4F6374C1A66C5D8E9E8D45CAB982"
+  },
+  {
+    "path": "resources/js/pages/sites/calendar/protected-press.test.ts",
+    "sha256": "E292FBCC561630314E75964CEC92D9B47A1968A5E0B071AE10F2CA7E7F255A3C"
+  },
+  {
+    "path": "resources/js/pages/sites/calendar/protected-press.ts",
+    "sha256": "5BC105BF87776A64ADEBE0F57940959E44F261AAA9A5218EEFC2A9D39C814231"
+  },
+  {
+    "path": "routes/fleet-assets.php",
+    "sha256": "58624408F29403A59781609818B7952F9261210F2E96E4AE3BEBB3DA8B2F1770"
+  },
+  {
+    "path": "tests/Feature/FleetAssets/Pkg02bFleetVehiclesAllSitesTest.php",
+    "sha256": "A3132BC3FBACE0409D87B519307E88A59FDB95656D4AA972A88206B67416DBCA"
+  },
+  {
+    "path": "tests/Feature/FleetAssets/TransportWorkspaceTest.php",
+    "sha256": "375CF24E97D463505F06533A93E5EF064E966879105AF84BE700F7B4B040E051"
+  }
+]

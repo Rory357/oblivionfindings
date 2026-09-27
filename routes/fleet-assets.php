@@ -72,6 +72,8 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     // Vehicles — read (reuses fleet permissions)
     Route::middleware('permission:fleet.viewAny')->group(function () {
         Route::get('/vehicles', [VehicleController::class, 'index'])->name('fleet-assets.vehicles.index');
+        Route::get('/vehicles/fleet-calendar/events', [VehicleCalendarController::class, 'fleetEvents'])->name('fleet-assets.vehicles.fleet-calendar.events');
+        Route::get('/vehicles/fleet-map/data', [VehicleCalendarController::class, 'fleetMap'])->name('fleet-assets.vehicles.fleet-map.data');
         Route::get('/vehicles/{asset}', [VehicleController::class, 'show'])->whereNumber('asset')->name('fleet-assets.vehicles.show');
         Route::get('/vehicles/{asset}/alerts-config', [VehicleController::class, 'alertsConfig'])->whereNumber('asset')->name('fleet-assets.vehicles.alerts-config');
         Route::get('/trips', [VehicleController::class, 'trips'])->name('fleet-assets.trips.index');
