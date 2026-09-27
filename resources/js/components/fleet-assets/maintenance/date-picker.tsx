@@ -18,6 +18,7 @@ export function DatePicker({
   onChange,
   invalid,
   describedBy,
+  trigger,
 }: {
   id: string;
   label: string;
@@ -25,6 +26,7 @@ export function DatePicker({
   onChange: (value: string) => void;
   invalid?: boolean;
   describedBy?: string;
+  trigger?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -36,6 +38,7 @@ export function DatePicker({
   return (
     <Popover open={open} onOpenChange={changeOpen}>
       <PopoverTrigger asChild>
+        {trigger ?? (
         <Button
           id={id}
           variant="outline"
@@ -53,6 +56,7 @@ export function DatePicker({
           </span>
           <ChevronDown className="size-4" />
         </Button>
+        )}
       </PopoverTrigger>
       <PopoverContent
         className="date-picker-popover"

@@ -1,0 +1,277 @@
+{
+  "auditedAt": "2026-09-26T11:37:07.5849452Z",
+  "candidate": "PKG-05 v1",
+  "runtimeSha256": "7eebde36164679bd80f33ab63a62d2e3b8d6f276643ad5c92ab69d959dc4f07d",
+  "frozenFilesChecked": 62,
+  "frozenFileMismatches": 0,
+  "findings": 16,
+  "approvalBlockingFindings": 5,
+  "browserProbes": 17,
+  "probeResults": [
+    {
+      "id": "A01-bypass-allocation",
+      "confirmed": true,
+      "result": "Unassessed/unallocated request reached Checkout recorded and In use; BK-208/J-608 appear although no resources were allocated."
+    },
+    {
+      "id": "A02-exception-overwrites-dispute",
+      "confirmed": true,
+      "acknowledgeAvailable": true,
+      "result": "Assigning reconciliation removes disputed status and re-enables acknowledgement without resolution."
+    },
+    {
+      "id": "A03-discard-retains-selection",
+      "confirmed": true,
+      "selection": "Koru · Toyota Hiace\nOFV-014 · KRU482 · Aurora House · wheelchair position"
+    },
+    {
+      "id": "A04-changed-client-site-support",
+      "confirmed": true,
+      "headerJordan": true,
+      "stillEscortRequested": true,
+      "stillAuroraLink": true,
+      "result": "Selected Kōwhai/Jordan/no escort, but pickup/return point and Site context still Aurora and occupancy copy still assumes escort/wheelchair."
+    },
+    {
+      "id": "A05-cancelled-progress",
+      "confirmed": true,
+      "states": [
+        {
+          "label": "Request",
+          "className": "workflow-item done"
+        },
+        {
+          "label": "Assess",
+          "className": "workflow-item done"
+        },
+        {
+          "label": "Allocate",
+          "className": "workflow-item done"
+        },
+        {
+          "label": "Travel",
+          "className": "workflow-item done"
+        },
+        {
+          "label": "5Return",
+          "className": "workflow-item current"
+        }
+      ],
+      "result": "Cancellation before assessment marks earlier stages done and Return current."
+    },
+    {
+      "id": "A06-allocated-cancellation-list",
+      "confirmed": true,
+      "row": "Library visit\nTR-1042 · Alex Morgan\n28 Sep 2026 · 09:30 AM\nAurora House\nAllocated\nMC\nMia Chen\nOpen linked journey"
+    },
+    {
+      "id": "A07-exception-without-handover",
+      "confirmed": true,
+      "result": "Owned exception creates apparent pending recipient handover with no return receipt or sent handover."
+    },
+    {
+      "id": "A08-search-on-journey",
+      "confirmed": true,
+      "result": "Detail-page search changes shared query but does not search or filter the visible record."
+    },
+    {
+      "id": "J01-journey-hierarchy",
+      "panels": [
+        "Journey plan",
+        "Departure and return",
+        "Passengers and medication logistics",
+        "Notes · 0",
+        "Linked records"
+      ],
+      "geometry": [
+        {
+          "title": "Journey plan",
+          "top": 584.140625,
+          "height": 531.09375
+        },
+        {
+          "title": "Departure and return",
+          "top": 1135.234375,
+          "height": 383.875
+        },
+        {
+          "title": "Passengers and medication logistics",
+          "top": 1539.109375,
+          "height": 319.6875
+        },
+        {
+          "title": "Notes · 0",
+          "top": 1878.796875,
+          "height": 110.59375
+        },
+        {
+          "title": "Record return",
+          "top": 497.140625,
+          "height": 411.96875
+        },
+        {
+          "title": "Linked records",
+          "top": 929.109375,
+          "height": 370.5
+        }
+      ],
+      "result": "Actual passenger/medication work appears below repeated request summary and vehicle details."
+    },
+    {
+      "id": "J02-completion-offscreen",
+      "completionBox": {
+        "x": 1084.390625,
+        "y": 1985.890625,
+        "width": 127.1875,
+        "height": 31.5
+      },
+      "viewportHeight": 1000,
+      "primary": "NEXT ACTION\nHand over to next shift\n\nKeep custody with the recorded holder until receipt and handover are acknowledged.\n\nHand over to next shift\nMC\nMia Chen\n\nRequest owner · site coordinator\n\nNext action target: Mon 28 Sep, 12:45 PM\n\nExample owner and due target. Escalation routing needs approved configuration.",
+      "result": "Completion is below the fold while the prominent action requires next-shift handover."
+    },
+    {
+      "id": "J03-return-before-departure",
+      "confirmed": true,
+      "result": "25 Sep return accepted for the 28 Sep journey; chronological consistency is not checked."
+    },
+    {
+      "id": "J04-replay-changed-payload",
+      "confirmed": true,
+      "result": "Original RC-311 recovery uses changed draft odometer 48999 instead of the original 48248; no immutable receipt snapshot."
+    },
+    {
+      "id": "J05-history-leaks-into-new-request",
+      "confirmed": true,
+      "result": "New TR-1044 inherits TR-1042 notes and history."
+    },
+    {
+      "id": "J06-missing-information-dead-end",
+      "dialog": "TR-1043 · Community garden\n\nBounded source handoff · synthetic records · original workspace ownership preserved.\n\nSupport needs not yet confirmed\nEli Thompson owns confirmation of the time window, support needs and escort requirement. Do not allocate against unknown suitability.\nAwaiting information\nSource\nTR-1043 · Kōwhai House\nNext action\nConfirm practical support needs with requester\nDue target\n28 Sep · 8:45 AM · example target\nReturn to transport\nClose",
+      "result": "Needs-information row has explanation only, no request/amendment/resolution action."
+    },
+    {
+      "id": "J07-filter-cycle-no-menu",
+      "menus": 0,
+      "nextSite": "Aurora only",
+      "result": "Chevron-labelled site filter cycles values instead of opening choices."
+    },
+    {
+      "id": "J08-direct-unknown-record",
+      "heading": "Library visit · journey",
+      "showsJ608": true,
+      "result": "Unknown journey URL renders the active fixture instead of not-found."
+    },
+    {
+      "id": "P01-denied-linked-maintenance",
+      "linkedRecordExposed": true,
+      "dialog": "Maintenance · /fleet-assets/maintenance/work-orders\n\nBounded source handoff · synthetic records · original workspace ownership preserved.\n\nRestriction retained\nCanonical Maintenance report\nRecord\nM-318\nSource\nCHK-441 · Koru / OFV-014\nIssue\nRamp does not latch securely.\nOwner\nConfigured Maintenance coordinator\nNext action\nAssessment, repair and applicable retest\nIndependent release\nNot recorded\nRepair completion is not release\nSafety release, physical custody and financial approval remain separate. A duplicate report retry returns M-318.\nCheck existing link\nReturn to transport\nClose"
+    }
+  ],
+  "auditFiles": [
+    {
+      "path": "audit-behaviour.js",
+      "bytes": 6712,
+      "sha256": "1a3cd8a3ecb3c9b39c842b7ac59c43afe3988e3751b4b5fe5c171d01635d6e3d"
+    },
+    {
+      "path": "audit-journey.js",
+      "bytes": 6090,
+      "sha256": "6bbe9781c9f3c1c7fea20c918dc79bcb474acc94c8e683d95f5909014a4bcd43"
+    },
+    {
+      "path": "audit-privacy.js",
+      "bytes": 728,
+      "sha256": "d194467a88db7a835dffcbfe0aa4065054b1b1fbf150b6d367cc0bcb7c12841c"
+    },
+    {
+      "path": "AUDIT.md",
+      "bytes": 26564,
+      "sha256": "eb0f98f8e107a07784bae93c94a0c27042f2cf1bc4c88bb1217d1600ddd28fc0"
+    },
+    {
+      "path": "behaviour-results.log",
+      "bytes": 8344,
+      "sha256": "5ac264ff1c3079563d5e254a36e37e67d98942b8e47e5dd6a24950df98ae3729"
+    },
+    {
+      "path": "journey-results.log",
+      "bytes": 8315,
+      "sha256": "b0e8a7a810e09917d4abc7d34cdb8b1f866e6d96d636ad9ca27ee13329014ef5"
+    },
+    {
+      "path": "privacy-results.log",
+      "bytes": 1388,
+      "sha256": "1c53565f20eb0fe573e2aa24514dc920b2f5b9029c0d15184dc0aa5f3e48b310"
+    },
+    {
+      "path": "screenshots/A01-checkout-without-allocation.png",
+      "bytes": 103430,
+      "sha256": "79fb1e1c788873c0ab9bc64e3131c30398b28ccaa5b65e3c51b6a492c1e860a8"
+    },
+    {
+      "path": "screenshots/A02-dispute-became-pending.png",
+      "bytes": 229067,
+      "sha256": "74549196bb4cdbad2bc81027623765eba87590b74d5d95164b018f484871557a"
+    },
+    {
+      "path": "screenshots/A03-discarded-allocation-retained.png",
+      "bytes": 150063,
+      "sha256": "d227143c8e092823a74c6793a8f1867697aaa59fafe713a01b17420e3eafa717"
+    },
+    {
+      "path": "screenshots/A04-stale-context-after-new-request.png",
+      "bytes": 260396,
+      "sha256": "e09896febe3d2030cda54dd5f947022bb069f62a0d0dad4d51a9f08dff3fb06a"
+    },
+    {
+      "path": "screenshots/A05-cancelled-before-travel-progress.png",
+      "bytes": 225791,
+      "sha256": "c60fc3719746f22cc4c614674b0fe18ad43a0fe1bee97dc3fae0e51c449ab09e"
+    },
+    {
+      "path": "screenshots/A06-cancelled-request-listed-allocated.png",
+      "bytes": 237212,
+      "sha256": "ecc503154f5431855b9f016eec58b4cc4fb4ab009adc8352a3ac1f041a61541f"
+    },
+    {
+      "path": "screenshots/A07-acknowledgement-with-no-handover.png",
+      "bytes": 227421,
+      "sha256": "e239f12968bf04b9e839eb378932b9fc9a003574c9bf5597b27647d59c6a7579"
+    },
+    {
+      "path": "screenshots/J01-journey-full.png",
+      "bytes": 319623,
+      "sha256": "c59e5deba2e544e733cc5164a6f64cfe163a4c90b75e16930a88c89a26146d73"
+    },
+    {
+      "path": "screenshots/J02-returned-journey-full.png",
+      "bytes": 329945,
+      "sha256": "4df3025b5a54ccae38565fb4fc65483f215c064a9baebb15d265cfebae027eae"
+    },
+    {
+      "path": "screenshots/J03-return-before-departure-accepted.png",
+      "bytes": 129318,
+      "sha256": "4870d288e86e082677a7ec52bee8e577b4323fe0c7c60b7fe4d93119c05bd000"
+    },
+    {
+      "path": "screenshots/J04-original-receipt-mutated.png",
+      "bytes": 109125,
+      "sha256": "3f0c96b65a7e1594308e3b63a7f5c6aa99e1528622223f1323e9f2aa5c9c7e29"
+    },
+    {
+      "path": "screenshots/J05-new-request-inherits-old-note.png",
+      "bytes": 269663,
+      "sha256": "a1f294540362f09625ea4a88a4e55a5e029468b0a7304c5465e0fd038259ca12"
+    },
+    {
+      "path": "screenshots/P01-denied-linked-maintenance.png",
+      "bytes": 105681,
+      "sha256": "9a245b963605a5fd19f40501794d86011307da7781179e95435fed78eb799043"
+    },
+    {
+      "path": "start.yml",
+      "bytes": 10696,
+      "sha256": "1d65818279525de13f615e818fa40df08968a061b56e21a39030ae1af8544d9e"
+    }
+  ]
+}

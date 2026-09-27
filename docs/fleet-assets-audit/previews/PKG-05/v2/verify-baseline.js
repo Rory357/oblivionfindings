@@ -1,0 +1,37 @@
+async (page) => {
+ const results=[]; const root='C:/Users/steph/.codex/worktrees/b9b9/oblivionfindings/docs/fleet-assets-audit/previews/PKG-05/v2/';
+ await page.bringToFront();await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:1440,height:1000});page.setDefaultTimeout(7000);
+ await page.goto('http://127.0.0.1:4396/#/fleet-assets/transports/overview');await page.reload();
+ await page.screenshot({path:root+'baseline-overview.png',fullPage:true});
+ const choose=async(label,name)=>{await page.getByRole('combobox',{name:label,exact:true}).click();await page.getByRole('option').filter({hasText:name}).click()};
+ const role=async v=>page.getByRole('combobox',{name:'Preview role'}).selectOption(v);
+ const shot=async name=>page.screenshot({path:root+'baseline-'+name+'.png',fullPage:true});
+ const check=async(name,ok,detail='')=>{results.push({name,pass:!!ok,detail});if(!ok)throw Error(name)};
+ await page.getByRole('button',{name:/Alex Morgan Needs assessment/}).click();
+ await page.getByRole('button',{name:'Assess transport need',exact:true}).click();
+ await page.getByLabel('Assessment and confirmed needs').fill('Transfer support and appointment end confirmed. Three occupants, wheelchair position, escort and restraints kit required.');
+ await page.getByRole('button',{name:'Save assessment',exact:true}).click();
+ await page.getByRole('button',{name:'Allocate resources',exact:true}).click();
+ await choose('Vehicle','Koru');await choose('Driver','Nia Patel');await choose('Escort','Sara Wilson');
+ await page.getByRole('button',{name:'Save proposed allocation',exact:true}).click();
+ await check('Request stays separate; booking pending',(await page.locator('main').innerText()).includes('Awaiting booking approval'));
+ await role('approver');await page.getByRole('button',{name:'Review booking approval',exact:true}).click();
+ await page.getByLabel('I reviewed the current booking and readiness result').check();await page.getByRole('button',{name:'Confirm booking decision',exact:true}).click();
+ await role('driver');await page.getByRole('button',{name:'Open departure preparation',exact:true}).click();
+ await page.getByRole('button',{name:'Complete vehicle check',exact:true}).click();await page.getByLabel('Check observation').fill('Required source check passed; restraints kit present.');await page.getByRole('button',{name:'Submit vehicle check',exact:true}).click();
+ await page.getByRole('button',{name:'Collect keys & equipment',exact:true}).click();await choose('Actual giver','Ben Carter');await page.getByLabel('Keys physically received', {exact:true}).check();await page.getByLabel('Required equipment physically received',{exact:true}).check();await page.getByRole('button',{name:'Record checkout',exact:true}).click();
+ await page.getByRole('button',{name:'Record departure',exact:true}).click();await page.getByLabel('Passenger list confirmed for departure').check();await page.getByRole('dialog').getByRole('button',{name:'Record departure',exact:true}).click();
+ await check('Actual journey exists after driver departure',(await page.locator('main').innerText()).includes('Actual journey'));
+ await shot('departed');
+ // Open the newly created actual journey through its linked record.
+ await page.locator('.source-row').filter({hasText:'Actual journey'}).getByRole('button',{name:'Open',exact:true}).click();
+ await page.getByRole('button',{name:'Record return',exact:true}).click();await choose('Actual receiver','Ben Carter');await page.getByLabel('Keys received by named worker').check();await page.getByLabel('All expected equipment received').check();await page.getByLabel('Return condition',{exact:true}).fill('No new damage. Keys and kit returned to Ben.');await page.getByRole('button',{name:'Save return receipt',exact:true}).click();
+ await page.getByRole('button',{name:'Confirm passenger return',exact:true}).click();await page.getByLabel('Passenger has returned and is accounted for').check();await page.getByRole('dialog').getByRole('button',{name:'Confirm passenger return',exact:true}).click();
+ await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(80);const complete=page.getByRole('button',{name:'Complete journey',exact:true});const box=await complete.boundingBox();await check('Completion available above fold',box&&box.y<800,box);
+ await shot('ready-to-complete');await complete.click();await page.getByRole('dialog').getByRole('button',{name:'Complete journey',exact:true}).click();
+ await check('Journey completes without shift handover',(await page.locator('main').innerText()).includes('Completed'));
+ await shot('completed');
+ await page.getByRole('button',{name:'Preview scenarios'}).click();await page.getByRole('button',{name:'Reset all synthetic records'}).click();
+ for(const [tab,name] of [['Requests & approvals','requests'],['Planner','planner'],['Journeys','journeys'],['Returns & handovers','returns']]){await page.getByRole('tab',{name:tab,exact:true}).click();await shot(name)}
+ return {results,completed:true};
+}

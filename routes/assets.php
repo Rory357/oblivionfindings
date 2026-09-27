@@ -1,21 +1,23 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AssetAssignmentController;
 use App\Http\Controllers\AssetController;
+use App\Http\Controllers\AssetDocumentController;
+use App\Http\Controllers\AssetGeofenceController;
 use App\Http\Controllers\AssetInspectionController;
 use App\Http\Controllers\AssetMaintenanceController;
-use App\Http\Controllers\AssetDocumentController;
-use App\Http\Controllers\AssetQrController;
-use App\Http\Controllers\AssetTelemetryIngestController;
-use App\Http\Controllers\AssetScanEventController;
 use App\Http\Controllers\AssetOwnershipController;
-use App\Http\Controllers\AssetAssignmentController;
-use App\Http\Controllers\AssetGeofenceController;
-use App\Http\Controllers\SiteController;
-use App\Http\Controllers\Sites\SiteProfileController;
+use App\Http\Controllers\AssetQrController;
+use App\Http\Controllers\AssetScanEventController;
+use App\Http\Controllers\AssetTelemetryIngestController;
 use App\Http\Controllers\SiteClientController;
 use App\Http\Controllers\SiteContactController;
+use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SiteDocumentController;
+use App\Http\Controllers\Sites\SiteGeocodingController;
+use App\Http\Controllers\Sites\SiteNoteController;
+use App\Http\Controllers\Sites\SiteProfileController;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Asset Management Routes
@@ -75,16 +77,16 @@ Route::middleware(['auth'])->group(function () {
             ->name('sites.active.update');
 
         // Site notes (multi-note log)
-        Route::post('/sites/{site}/notes', [\App\Http\Controllers\Sites\SiteNoteController::class, 'store'])
+        Route::post('/sites/{site}/notes', [SiteNoteController::class, 'store'])
             ->whereNumber('site')
             ->name('sites.notes.store');
-        Route::delete('/sites/{site}/notes/{note}', [\App\Http\Controllers\Sites\SiteNoteController::class, 'destroy'])
+        Route::delete('/sites/{site}/notes/{note}', [SiteNoteController::class, 'destroy'])
             ->whereNumber('site')
             ->whereNumber('note')
             ->name('sites.notes.destroy');
 
         // Address autocomplete (Nominatim proxy)
-        Route::get('/sites/geocode/search', [\App\Http\Controllers\Sites\SiteGeocodingController::class, 'search'])
+        Route::get('/sites/geocode/search', [SiteGeocodingController::class, 'search'])
             ->name('sites.geocode.search');
 
         // Site clients (place existing or unlink; creation stays in clients.store)
@@ -218,6 +220,10 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('asset')
             ->whereNumber('assignment')
             ->name('assets.assignments.release');
+        Route::post('/assets/{asset}/assignments/{assignment}/confirm-receipt', [AssetAssignmentController::class, 'confirmReceipt'])
+            ->whereNumber('asset')
+            ->whereNumber('assignment')
+            ->name('assets.assignments.confirm-receipt');
     });
 
     Route::middleware('permission:assets.geofences.manage')->group(function () {

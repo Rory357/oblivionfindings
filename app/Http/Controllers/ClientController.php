@@ -3398,16 +3398,22 @@ class ClientController extends Controller
             : collect();
 
         // Client-scoped transport bookings (Book transport workflow)
+        $transportViewer = auth()->user();
+        $workspaceIds = $transportViewer && ($transportViewer->canDo('fleet.viewAny') || $transportViewer->canDo('assets.viewAny'))
+            ? app(\App\Services\Fleet\TransportRequestService::class)->query($transportViewer)->where('client_id', $client->id)->pluck('id')->all()
+            : [];
         $bookings = SchemaCache::hasTable('client_transport_bookings')
             ? ClientTransportBooking::query()
                 ->where('client_id', $client->id)
                 ->whereIn('status', ['requested', 'confirmed'])
-                ->with('driver:id,name')
+                ->with('driver:id,name')->withCount('events')
                 ->orderBy('scheduled_at')
                 ->limit(20)
                 ->get()
                 ->map(fn ($b) => [
                     'id' => $b->id,
+                    'workspace_url' => in_array($b->id, $workspaceIds, true) ? '/fleet-assets/transports/requests/'.$b->id : null,
+                    'can_remove' => ! $b->fleet_booking_id && ! $b->assessed_at && $b->events_count === 0,
                     'purpose' => $b->purpose,
                     'destination' => $b->destination,
                     'scheduled_at' => optional($b->scheduled_at)->toISOString(),

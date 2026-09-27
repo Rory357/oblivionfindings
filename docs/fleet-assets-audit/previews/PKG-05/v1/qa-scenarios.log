@@ -1,0 +1,31 @@
+### Result
+["Empty queue visible","Loading queue visible","Queue load failed visible","Queue failure recovers with filters retained","Denied direct route omits record name, passenger and destination","Limited passenger labels omitted and hidden names not searchable","Stale allocation retains selection and recovers by explicit recheck","Conflicting allocation remains awaiting allocation without substituting a vehicle","Lost allocation response recovers original BK-208 and J-608","Directory load failure recovers without auto-selecting","Missing policy blocks allocation","Missing resources block allocation"]
+### Ran Playwright code
+```js
+await (async (page)=>{
+ await page.bringToFront();await page.emulateMedia({reducedMotion:'reduce'});
+ page.setDefaultTimeout(10000);
+ const out=[],b=n=>page.getByRole('button',{name:n,exact:true});
+ const visible=async t=>{await page.getByText(t,{exact:false}).first().waitFor({state:'visible',timeout:5000})};
+ const shot=async n=>{await page.waitForTimeout(400);await page.screenshot({path:'screenshots/'+n+'.png',fullPage:false})};
+ const scenario=async n=>{await page.goto('http://127.0.0.1:4395/');await b('Preview scenarios').click();await b(n).click();await page.waitForTimeout(500);await visible(n)};
+ const allocate=async()=>{await b('Allocate resources').click();await page.getByRole('combobox',{name:'Vehicle',exact:true}).click();if(await b('Retry search').isVisible())await b('Retry search').click();await page.getByRole('option',{name:/Koru/}).click();await b('Continue').click();await page.getByRole('combobox',{name:'Driver',exact:true}).click();await page.getByRole('option',{name:/Nia Patel/}).click();await page.getByRole('combobox',{name:'Escort',exact:true}).click();await page.getByRole('option',{name:/Sara Wilson/}).click();await page.getByRole('checkbox',{name:/Requested wheelchair securement kit/}).check();await b('Continue').click()};
+ await page.goto('http://127.0.0.1:4395/');await page.setViewportSize({width:1440,height:1000});
+ for(const s of ['Empty queue','Loading queue','Queue load failed']){await scenario(s);await shot('state-'+s.toLowerCase().replaceAll(' ','-'));out.push(s+' visible');if(s==='Queue load failed'){await b('Retry loading').click();await visible('Transport requests');out.push('Queue failure recovers with filters retained')}}
+ await scenario('Access denied');await page.goto('http://127.0.0.1:4395/#/fleet-assets/transports/requests/TR-1042');await visible('This transport record is not available');
+ let text=await page.locator('body').innerText();if(text.includes('Alex Morgan')||text.includes('Library visit')||text.includes('Takapuna'))throw Error('Denied record label leak');await shot('09-direct-record-denied');out.push('Denied direct route omits record name, passenger and destination');
+ await scenario('Limited passenger context');text=await page.locator('body').innerText();if(text.includes('Alex Morgan')||text.includes('Jordan Lee'))throw Error('Limited passenger name leak');
+ await page.getByRole('searchbox').fill('Alex Morgan');await visible('No requests match this view');await b('Clear filters').click();out.push('Limited passenger labels omitted and hidden names not searchable');
+ await scenario('Stale allocation');await allocate();await b('Allocate and link').click();await visible('assessment is out of date');await shot('10-stale-allocation');await b('Refresh availability').click();await b('Allocate and link').click();await visible('Resources allocated and linked');await b('Open linked booking').click();out.push('Stale allocation retains selection and recovers by explicit recheck');
+ await scenario('Allocation conflict');await allocate();await b('Allocate and link').click();await visible('No booking or journey was created');await b('Refresh availability').click();await visible('vehicle remains busy');await shot('11-allocation-conflict');await b('Close').click();await b('Keep draft and close').click();out.push('Conflicting allocation remains awaiting allocation without substituting a vehicle');
+ await scenario('Allocation response lost');await allocate();await b('Allocate and link').click();await visible('response was interrupted');await b('Check original allocation attempt').click();await visible('Resources allocated and linked');await b('Open linked booking').click();out.push('Lost allocation response recovers original BK-208 and J-608');
+ await scenario('Search load failed');await allocate();await shot('12-search-recovered-selection');await b('Close').click();await b('Keep draft and close').click();out.push('Directory load failure recovers without auto-selecting');
+ await scenario('No policy configured');await allocate();await b('Allocate and link').click();await visible('Allocation needs configuration');await shot('13-unconfigured-allocation');await b('Close').click();await b('Keep draft and close').click();out.push('Missing policy blocks allocation');
+ await scenario('Missing driver / escort');await b('Allocate resources').click();await b('Review allocation Check before recording').click();await b('Allocate and link').click();await visible('Choose a suitable vehicle, driver and escort');await b('Close').click();out.push('Missing resources block allocation');
+ return out;
+}
+)(page);
+```
+### Page
+- Page URL: http://127.0.0.1:4395/#/fleet-assets/transports/requests/TR-1042
+- Page Title: Transport · PKG-05 v1 design preview

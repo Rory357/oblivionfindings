@@ -447,9 +447,11 @@ abstract class TestCase extends BaseTestCase
             ]);
 
             $process->setInput(file_get_contents($schemaPath));
-            // Large local schema imports can exceed five minutes on Windows.
-            // Keep the existing default; slow machines can opt into a longer cold boot.
-            $process->setTimeout(max(30, (int) ($this->environmentValue('MYSQL_TEST_SCHEMA_TIMEOUT') ?? 300)));
+            // The shared local MySQL server may be importing other isolated
+            // schemas at the same time. Keep the normal five-minute limit,
+            // with an explicit opt-in for suites running under that load.
+            $timeout = (int) ($this->environmentValue('MYSQL_TEST_SCHEMA_TIMEOUT') ?? 300);
+            $process->setTimeout(max(300, min(1800, $timeout)));
             $process->run();
 
             if ($process->isSuccessful()) {

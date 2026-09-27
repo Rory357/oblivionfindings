@@ -28,6 +28,7 @@ export function VehicleSearchSelect({
     value,
     options,
     onChange,
+    onSearchChange,
     onAdd,
     disabled,
     invalid,
@@ -38,6 +39,7 @@ export function VehicleSearchSelect({
     value: string;
     options: VehicleSelectOption[];
     onChange: (value: string) => void;
+    onSearchChange?: (query: string) => void;
     onAdd?: (proposedLabel: string) => void;
     disabled?: boolean;
     invalid?: boolean;
@@ -52,7 +54,10 @@ export function VehicleSearchSelect({
             open={open}
             onOpenChange={(next) => {
                 setOpen(next);
-                if (!next) setQuery('');
+                if (!next) {
+                    setQuery('');
+                    onSearchChange?.('');
+                }
             }}
         >
             <PopoverTrigger asChild>
@@ -85,7 +90,10 @@ export function VehicleSearchSelect({
                     <CommandInput
                         placeholder={`Search ${label.toLowerCase()}…`}
                         value={query}
-                        onValueChange={setQuery}
+                        onValueChange={(next) => {
+                            setQuery(next);
+                            onSearchChange?.(next);
+                        }}
                     />
                     <CommandList>
                         <CommandEmpty>No matching choices.</CommandEmpty>
@@ -98,6 +106,7 @@ export function VehicleSearchSelect({
                                         onChange(option.value);
                                         setOpen(false);
                                         setQuery('');
+                                        onSearchChange?.('');
                                     }}
                                 >
                                     <div className="min-w-0 flex-1">

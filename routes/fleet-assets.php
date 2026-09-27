@@ -26,6 +26,7 @@ use App\Http\Controllers\FleetAssets\ReportController;
 use App\Http\Controllers\FleetAssets\ResidentTrackingController;
 use App\Http\Controllers\FleetAssets\ResidentTransportController;
 use App\Http\Controllers\FleetAssets\ServiceScheduleController;
+use App\Http\Controllers\FleetAssets\TransportWorkspaceController;
 use App\Http\Controllers\FleetAssets\VehicleAlertController;
 use App\Http\Controllers\FleetAssets\VehicleBookingController;
 use App\Http\Controllers\FleetAssets\VehicleCalendarController;
@@ -521,6 +522,12 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
 
     // Resident Transports (view & create)
     Route::middleware('permission:fleet.viewAny|assets.viewAny')->group(function () {
+        Route::get('/transports/workspace/options', [TransportWorkspaceController::class, 'options'])->name('fleet-assets.transports.workspace.options');
+        Route::get('/transports/workspace/export', [TransportWorkspaceController::class, 'export'])->name('fleet-assets.transports.workspace.export');
+        Route::post('/transports/requests', [TransportWorkspaceController::class, 'store'])->name('fleet-assets.transports.requests.store');
+        Route::get('/transports/requests/{transportRequest}', [TransportWorkspaceController::class, 'show'])->whereNumber('transportRequest')->name('fleet-assets.transports.requests.show');
+        Route::post('/transports/requests/{transportRequest}/commands', [TransportWorkspaceController::class, 'command'])->whereNumber('transportRequest')->name('fleet-assets.transports.requests.command');
+        Route::get('/transports/{view}', [TransportWorkspaceController::class, 'index'])->whereIn('view', ['overview', 'requests', 'planner', 'calendar', 'journeys', 'returns'])->name('fleet-assets.transports.workspace');
         Route::get('/transports', [ResidentTransportController::class, 'index'])->name('fleet-assets.transports.index');
         Route::get('/transports/medications', [ResidentTransportController::class, 'medicationIndex'])->name('fleet-assets.transports.medications');
         Route::get('/transports/create', [ResidentTransportController::class, 'create'])->name('fleet-assets.transports.create');

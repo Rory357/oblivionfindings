@@ -30,17 +30,35 @@ class AssetController extends Controller
         private readonly AssetMutationIntegrityService $mutationIntegrity,
     ) {}
 
-    private function mapAssetAssignment(AssetAssignment $assignment): array
+    private function mapAssetAssignment(AssetAssignment $assignment, User $viewer, ?int $assetSiteId): array
     {
+        $canReadRecipient = $assetSiteId !== null && match ($assignment->assignee_type) {
+            'staff' => $this->deviceAccess->canReadStaffAtSite($viewer, (int) $assignment->assignee_id, $assetSiteId),
+            'client' => $this->deviceAccess->canReadClientAtSite($viewer, (int) $assignment->assignee_id, $assetSiteId),
+            'whanau' => ($clientId = ClientEmergencyContact::query()->whereKey($assignment->assignee_id)->value('client_id'))
+                && $this->deviceAccess->canReadClientAtSite($viewer, (int) $clientId, $assetSiteId),
+            default => false,
+        };
+        $confirmerId = (int) ($assignment->receipt_confirmed_by_user_id ?? 0);
+        $canReadConfirmer = $assetSiteId !== null && $confirmerId > 0
+            && ($confirmerId === (int) $viewer->id
+                || $this->deviceAccess->canReadStaffAtSite($viewer, $confirmerId, $assetSiteId));
+
         return [
             'id' => $assignment->id,
             'assignee' => [
-                'id' => $assignment->assignee_id,
-                'name' => $this->resolveAssignmentAssigneeName($assignment),
+                'id' => $canReadRecipient ? $assignment->assignee_id : null,
+                'name' => $canReadRecipient ? $this->resolveAssignmentAssigneeName($assignment) : 'Recipient details restricted',
             ],
             'assigned_at' => optional($assignment->assigned_at)->toISOString(),
             'returned_at' => optional($assignment->released_at)->toISOString(),
-            'purpose' => $assignment->purpose,
+            'receipt_confirmed_at' => optional($assignment->receipt_confirmed_at)->toISOString(),
+            'receipt_confirmed_by' => $assignment->receipt_confirmed_at
+                ? ($canReadConfirmer ? User::query()->whereKey($confirmerId)->value('name') : 'Staff details restricted')
+                : null,
+            'recipient_visible' => $canReadRecipient,
+            'receipt_note' => $canReadRecipient ? $assignment->receipt_note : null,
+            'purpose' => $canReadRecipient ? $assignment->purpose : null,
         ];
     }
 
@@ -294,7 +312,7 @@ class AssetController extends Controller
 
         $eagerLoads = [
             'site:id,name',
-            'client:id,first_name,last_name',
+            'client:id,first_name,last_name,site_id',
             'inspections' => fn ($q) => $q->latest()->limit(20)->with('inspectedBy:id,name'),
             'maintenanceLogs' => fn ($q) => $q->latest()->limit(20),
             'documents',
@@ -389,7 +407,28 @@ class AssetController extends Controller
         }
 
         $timeline = $timeline->sortByDesc('date')->values()->take(50);
-        $currentAssignment = $asset->assignments->first(fn ($assignment) => $assignment->released_at === null);
+        // A long assignment history can exceed the bounded history list.
+        $currentAssignment = $asset->assignments()->whereNull('released_at')->latest()->first();
+        $canManageAssignments = (bool) $user->can('manageAssignments', $asset);
+        $assignmentSiteIds = collect([$asset->site_id, $asset->home_site_id, $asset->client?->site_id])
+            ->filter(fn ($id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id): int => (int) $id)->unique()->values();
+        $assignmentSiteId = $assignmentSiteIds->count() === 1
+            && in_array($assignmentSiteIds->first(), $accessibleSiteIds, true)
+                ? $assignmentSiteIds->first() : null;
+        $searchInput = $request->query('assignment_search');
+        $assignmentSearch = is_string($searchInput) ? mb_substr(trim($searchInput), 0, 80) : '';
+        $assignmentTargets = collect();
+        if ($canManageAssignments && $assignmentSiteId !== null) {
+            $assignmentTargets = $this->deviceAccess->assignableStaffAtSite($user, $assignmentSiteId, $assignmentSearch)
+                ->map(fn (User $staff): array => ['type' => 'staff', 'id' => (int) $staff->id, 'name' => $staff->name]);
+            $assignmentTargets = $assignmentTargets->concat($this->deviceAccess->assignableClientsAtSite($user, $assignmentSiteId, $assignmentSearch)
+                ->map(fn (Client $client): array => ['type' => 'client', 'id' => (int) $client->id,
+                    'name' => trim(($client->first_name ?? '').' '.($client->last_name ?? ''))]));
+            $assignmentTargets = $assignmentTargets->concat($this->deviceAccess->assignableWhanauAtSite($user, $assignmentSiteId, $assignmentSearch)
+                ->map(fn (ClientEmergencyContact $contact): array => ['type' => 'whanau', 'id' => (int) $contact->id,
+                    'name' => $contact->name]));
+        }
 
         // Federation: the HR-register wrapper (if any) so the fleet page can
         // point back at /hr/assets/{id} — link only for hr.assets.view holders.
@@ -505,8 +544,8 @@ class AssetController extends Controller
                 'type' => $g->type,
                 'is_active' => $g->is_active,
             ])->values(),
-            'current_assignment' => $currentAssignment ? $this->mapAssetAssignment($currentAssignment) : null,
-            'assignments' => $asset->assignments->map(fn ($a) => $this->mapAssetAssignment($a))->values(),
+            'current_assignment' => $currentAssignment ? $this->mapAssetAssignment($currentAssignment, $user, $assignmentSiteId) : null,
+            'assignments' => $asset->assignments->map(fn ($a) => $this->mapAssetAssignment($a, $user, $assignmentSiteId))->values(),
             'ownerships' => $asset->ownerships->map(fn ($o) => [
                 'id' => $o->id,
                 'owner_type' => $o->owner_type ?? null,
@@ -552,12 +591,14 @@ class AssetController extends Controller
                     ->where('asset_id', $asset->id)->where('state', 'active')->count()
                 : 0,
             'timeline' => $timeline,
+            'can_manage_assignments' => $canManageAssignments && $assignmentSiteId !== null,
+            'assignment_targets' => $assignmentTargets->values(),
             // Edit wizard (AssetWizardDialog) option lists — mirrors index/create.
             'sites' => $this->deviceAccess->accessibleSites($user)
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'clients' => $this->deviceAccess->assignableClients($user),
-            'hr_asset' => $hrAsset ? [
+            'hr_asset' => $user->canDo('hr.assets.view') && $hrAsset ? [
                 'id' => $hrAsset->id,
                 'asset_tag' => $hrAsset->asset_tag,
                 'status' => $hrAsset->status,

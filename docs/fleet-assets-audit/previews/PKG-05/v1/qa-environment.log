@@ -1,0 +1,17 @@
+### Result
+{"zoomAttempt":{"before":{"width":1440,"height":1000,"dpr":1,"viewportScale":1,"scroll":1440},"after":{"width":1440,"height":1000,"dpr":1,"viewportScale":1,"scroll":1440},"verified":false},"normalMotion":[{"state":"open","opacity":"1","animations":[]}],"pageErrors":[],"requests":[{"method":"GET","url":"http://127.0.0.1:4395/"},{"method":"GET","url":"http://127.0.0.1:4395/dist/app.css"},{"method":"GET","url":"http://127.0.0.1:4395/preview.css"},{"method":"GET","url":"http://127.0.0.1:4395/dist/app.js"}]}
+### Ran Playwright code
+```js
+await (async(page)=>{
+ await page.bringToFront();await page.setViewportSize({width:1440,height:1000});await page.goto('http://127.0.0.1:4395/');
+ const errors=[],requests=[];page.on('pageerror',e=>errors.push(String(e)));page.on('request',r=>requests.push({method:r.method(),url:r.url()}));
+ const measure=()=>page.evaluate(()=>({width:innerWidth,height:innerHeight,dpr:devicePixelRatio,viewportScale:visualViewport.scale,scroll:document.documentElement.scrollWidth}));
+ const before=await measure();await page.keyboard.press('Control+Equal');await page.keyboard.press('Control+Equal');await page.waitForTimeout(200);const after=await measure();await page.keyboard.press('Control+0');
+ await page.emulateMedia({reducedMotion:'no-preference'});await page.getByRole('button',{name:'Request transport',exact:true}).first().click();await page.waitForTimeout(500);
+ const animations=await page.evaluate(()=>[...document.querySelectorAll('[role=dialog]')].map(e=>({state:e.getAttribute('data-state'),opacity:getComputedStyle(e).opacity,animations:e.getAnimations().map(a=>({state:a.playState,time:a.currentTime}))})));
+ await page.screenshot({path:'screenshots/19-normal-motion-request.png',animations:'disabled'});
+ await page.emulateMedia({reducedMotion:'reduce'});await page.goto('http://127.0.0.1:4395/');
+ return {zoomAttempt:{before,after,verified:after.width!==before.width||after.dpr!==before.dpr},normalMotion:animations,pageErrors:errors,requests};
+}
+)(page);
+```

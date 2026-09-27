@@ -1,0 +1,14 @@
+{
+    "extends": "./tsconfig.json",
+    "include": [
+        "resources/js/pages/fleet-assets/transports/workspace.tsx",
+        "resources/js/pages/fleet-assets/transports/record.tsx",
+        "resources/js/components/fleet-assets/transport/**/*.ts",
+        "resources/js/components/fleet-assets/transport/**/*.tsx",
+        "resources/js/types/**/*.d.ts",
+        "resources/js/components/fleet-assets/vehicle-workspace/vehicle-calendar.tsx",
+        "resources/js/pages/fleet-assets/handovers/index.tsx",
+        "resources/js/pages/fleet-assets/bookings/show.tsx"
+    ],
+    "exclude": ["resources/js/actions/**/*"]
+}

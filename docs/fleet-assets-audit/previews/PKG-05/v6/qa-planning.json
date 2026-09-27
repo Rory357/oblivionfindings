@@ -1,0 +1,92 @@
+{
+  "results": [
+    {
+      "name": "P01 Suitable free resources pass",
+      "pass": true
+    },
+    {
+      "name": "P02 Overdue vehicle is not released by its scheduled end",
+      "pass": true
+    },
+    {
+      "name": "P03 Overdue crew requires a recorded return",
+      "pass": true
+    },
+    {
+      "name": "P04 Scheduled return boundary does not attest release",
+      "pass": true
+    },
+    {
+      "name": "P05 Overlapping confirmed reservation blocks chosen vehicle",
+      "pass": true
+    },
+    {
+      "name": "P06 Adjacent confirmed windows do not overlap",
+      "pass": true
+    },
+    {
+      "name": "P07 Same booking is excluded during rescheduling",
+      "pass": true
+    },
+    {
+      "name": "P08 Out-of-site vehicle is unsuitable",
+      "pass": true
+    },
+    {
+      "name": "P09 Wheelchair needs cannot use standard seating",
+      "pass": true
+    },
+    {
+      "name": "P10 Occupancy includes everyone",
+      "pass": true
+    },
+    {
+      "name": "P11 Required escort is enforced",
+      "pass": true
+    },
+    {
+      "name": "P12 Required equipment is enforced",
+      "pass": true
+    },
+    {
+      "name": "P13 Invalid date is rejected",
+      "pass": true
+    },
+    {
+      "name": "P14 Reversed time is rejected",
+      "pass": true
+    },
+    {
+      "name": "P15 Source expired blocks saving",
+      "pass": true
+    },
+    {
+      "name": "P15 Source unknown blocks saving",
+      "pass": true
+    },
+    {
+      "name": "P15 Source conflict blocks saving",
+      "pass": true
+    },
+    {
+      "name": "P16 Driver eligibility is scoped to the request site",
+      "pass": true
+    },
+    {
+      "name": "P17 Editing resources invalidates availability",
+      "pass": true
+    },
+    {
+      "name": "P18 Concurrent Fleet change invalidates availability",
+      "pass": true
+    },
+    {
+      "name": "P19 Source-state change invalidates availability",
+      "pass": true
+    },
+    {
+      "name": "P20 Request version change invalidates availability",
+      "pass": true
+    }
+  ]
+}
