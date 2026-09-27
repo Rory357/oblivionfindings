@@ -1,0 +1,71 @@
+{
+  "date": "2026-09-27",
+  "verified_source_commit": "95941585470b56d2f0ec9d8c3f0d31f192087785",
+  "reviewed_predecessor": "1d3dae3b19b115b0ff3a18f1e1d4e7805a40a91c",
+  "published_base": "b05702d7208c88d9cffb9c092df23d3b02300b1e",
+  "source_paths_against_base": 73,
+  "changed_source_paths_since_review": 10,
+  "source_manifest": "source-hashes.json",
+  "findings": {
+    "T07-01": "Independently closed by Main; no TypeScript or test inclusion change in this correction.",
+    "T07-02": "Explicit originating observation, current consent and same asset/time checks apply before rows, counts and follow-up projections. Missing source is withheld; permitted older history is preserved.",
+    "T07-03": "Nullable absent boundary reference retains assignment geometry, removal snapshot and transactional audit; existing Vehicle Location removal and retry succeed."
+  },
+  "checks": [
+    {
+      "command": "php docs/fleet-assets-audit/evidence/PKG-07/implementation/run-tests.php --bootstrap docs/fleet-assets-audit/evidence/PKG-07/implementation/preview-privacy-bootstrap.php tests/Feature/FleetAssets/Pkg07BoundariesTest.php tests/Feature/FleetAssets/Pkg07MapPrivacyTest.php tests/Feature/Sites/SiteGeofenceTest.php",
+      "exit_code": 0,
+      "tests": 17,
+      "assertions": 248,
+      "log": "t07-02-03-backend-final.log"
+    },
+    {
+      "command": "php docs/fleet-assets-audit/evidence/PKG-07/implementation/run-tests.php --bootstrap docs/fleet-assets-audit/evidence/PKG-07/implementation/preview-privacy-bootstrap.php tests/Feature/FleetTelemetryIngestTest.php --filter test_geofence_signal_emitted_when_outside",
+      "exit_code": 0,
+      "tests": 1,
+      "assertions": 3,
+      "log": "t07-02-03-ingest.log"
+    },
+    {
+      "command": "php vendor/bin/pint <changed PHP paths>",
+      "exit_code": 0,
+      "logs": ["t07-02-03-pint.log", "t07-02-03-pint-final.log"]
+    },
+    {
+      "command": "git diff origin/main --check",
+      "exit_code": 0
+    }
+  ],
+  "test_isolation": "Rollback-only transactions against synthetic oblivion_findings_pkg07_preview; no schema reset. Queue dispatch faked for ingest regression; no worker started.",
+  "migration": {
+    "file": "2026_09_27_000300_retain_boundary_event_and_rule_provenance.php",
+    "database": "oblivion_findings_pkg07_preview",
+    "only_named_forward_migration_applied": true,
+    "existing_evidence_checksums_unchanged": true,
+    "proof": "t07-02-03-preview-migration.json",
+    "historical_source_backfill": false,
+    "operational_migration": false
+  },
+  "carried_forward_checks": {
+    "provenance": "t07-01-results.json; Main independently accepted full repository tsc and 46 UI tests on reviewed predecessor.",
+    "frontend_source_dependencies_typescript_configuration_unchanged": true,
+    "full_repository_tsc": "Prior exit 0, not rerun for PHP-only correction.",
+    "frontend_tests": "Prior 46 tests / 10 files, not rerun for PHP-only correction.",
+    "eslint": "Prior 34 files, zero errors/warnings, not rerun for PHP-only correction.",
+    "build": "Prior exit 0 in 5m25s; manifest unchanged, not rebuilt.",
+    "build_manifest_sha256": "0ED86EEA3B6D0333C7BD189C558EA7722A4B61924334C35847BE934C56DDBB58"
+  },
+  "browser": {
+    "url": "http://127.0.0.1:4426/fleet-assets/geofences?layout=list&page=1&selected=130&status=available&tab=map",
+    "boundaries_displayed": 127,
+    "selected_boundary": 130,
+    "errors": [],
+    "network_idle_wait": "Initial wait timed out; subsequent state inspection confirmed settled map, visible geometry and enabled Refresh.",
+    "screenshot": "t07-02-03-map.png",
+    "original_user_draft_untouched": true,
+    "boundaries_saved_or_modified": 0
+  },
+  "actual_main_mutated": false,
+  "github_push": false,
+  "technical_approval_and_slot": "pending Main review of this exact successor"
+}

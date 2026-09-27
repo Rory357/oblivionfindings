@@ -1,5 +1,7 @@
 # PKG-07 implementation verification
 
+**Latest Main review corrections:** `REVIEW-CORRECTIONS.md` records T07-02 source-observation privacy and T07-03 missing-boundary removal at source `95941585470b56d2f0ec9d8c3f0d31f192087785`. Final affected backend QA passes 18 tests / 251 assertions across the scoped suite and ingest regression. The forward migration preserves all existing synthetic preview evidence by checksum. Main independently closed T07-01; its accepted frontend/typecheck/build results below carry forward unchanged, rather than being represented as rerun for these PHP-only fixes. Main review and the serial publication slot remain pending.
+
 Verified 27 September 2026 in the isolated `806c` checkout, branch `codex/pkg07-maps-boundaries`. This is local implementation evidence, not a production deployment or monitoring activation.
 
 **Subsequent visual alignment:** see `PARITY.md` for the direct v9 comparison, the restored two-column map and history dependency panel, updated header controls, final build/browser evidence, seven enhanced backend tests (141 assertions), and the latest People Locations v5 design inspection. The earlier three-column map screenshot and People Locations v2 references below describe the earlier verification pass, not the final layout or latest design state.

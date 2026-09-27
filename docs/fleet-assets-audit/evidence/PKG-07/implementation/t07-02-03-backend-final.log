@@ -1,0 +1,37 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\806c\oblivionfindings\phpunit.xml
+
+.......
+   PASS  Tests\Feature\FleetAssets\Pkg07BoundariesTest
+  ✓ versioned writes are scoped retry safe and keep original evidence                                            1.26s
+  ✓ scale search rule proposals and dependency checks share the canonical register                               0.67s
+  ✓ client handoff is opaque and rechecks consent and source versions                                            1.27s
+  ✓ vehicle selection removes a missing boundary and retains snapshot and audit                                  0.29s
+  ✓ protected geometry and public geocoding cannot be bypassed                                                   0.29s
+  ✓ submitted public address search returns coordinates caches results and requires management access            0.30s
+  ✓ schedule windows and rule retry retain only valid reviewed proposals                                         0.48s
+....
+   PASS  Tests\Feature\FleetAssets\Pkg07MapPrivacyTest
+  ✓ directory and history withhold private vehicle evidence even without a trip link                             1.22s
+  ✓ event visibility uses its exact source and keeps unrelated permitted history                                 0.64s
+  ✓ geofence evaluator retains the source for entry dwell and breach                                             0.25s
+  ✓ asset positions require observations from the current unambiguous pairing                                    0.69s
+......                                                 17 / 17 (100%)
+   PASS  Tests\Feature\Sites\SiteGeofenceTest
+  ✓ site boundary creation stays inactive and completes geometry readiness                                       0.93s
+  ✓ explicit site boundary edits preserve purpose settings and reject stale writes                               0.89s
+  ✓ site retirement retains evidence and blocks linked dependencies without fake crossings                       1.03s
+  ✓ assigned site geofence is evaluated for assigned fleet assets                                                0.61s
+  ✓ geofence containment treats invalid or incomplete shapes as outside                                          0.48s
+  ✓ site geofence routes require geofence management permission                                                  0.58s
+
+  Tests:    17 passed (248 assertions)
+  Duration: 12.17s
+
+
+
+Time: 00:11.893, Memory: 112.00 MB
+
+OK (17 tests, 248 assertions)

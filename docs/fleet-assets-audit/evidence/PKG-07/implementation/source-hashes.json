@@ -17,7 +17,7 @@
   },
   {
     "path": "app/Http/Controllers/FleetAssets/GeofenceController.php",
-    "sha256": "21C09E92C4C7D6C44164BA5128D67813393D90D754FA2546212174938286E27E"
+    "sha256": "D1B1BBEF760FAF921BEF986430B40FF70D3197811CBFDE38BDE3DDBF3263D919"
   },
   {
     "path": "app/Http/Controllers/FleetAssets/LiveMapController.php",
@@ -52,12 +52,16 @@
     "sha256": "82356B941706D467E5FA82387ED412D63805DD233131AD5C152E2D478B7B784D"
   },
   {
+    "path": "app/Models/FleetSignal.php",
+    "sha256": "AC2CCE0C29A5D35963E7AD675732F286C7105F55AD10955A8BCB91EB069C4779"
+  },
+  {
     "path": "app/Models/FleetVehicleGeofenceAssignment.php",
     "sha256": "1003F48F1E1796CF1BD9A3C37678609B76BC491E038C7723212BB46E8DAAF2B6"
   },
   {
     "path": "app/Services/Fleet/BoundaryRuleService.php",
-    "sha256": "79D72576778E1EE005EA8052131F803322338078302D1DD74B29F31CDF82BA8C"
+    "sha256": "E675DC4D69E221515EF6CDABBF836BE785AE0A0ED211F433ACB69C7A03740DAE"
   },
   {
     "path": "app/Services/Fleet/BoundaryService.php",
@@ -65,7 +69,15 @@
   },
   {
     "path": "app/Services/Fleet/FleetGeofenceService.php",
-    "sha256": "52A7C8E903EC81FC9981A30B07B719FEC6596D4052F59CC42CED50E590238019"
+    "sha256": "756F4ABF2BF1928E9010C57F04C1573E7D196FB22FC83AD411F5ED1C94FD0F8F"
+  },
+  {
+    "path": "app/Services/Fleet/FleetSignalService.php",
+    "sha256": "C57E7004644AA2F6A779905506ABCAD116906A8D2BB155AE5E2B171AE43A3952"
+  },
+  {
+    "path": "app/Services/Fleet/FleetTelemetryIngestService.php",
+    "sha256": "E0E32FD68CC810AD4E1C10FD5EA4E4035C897EB5A6E30591ED79012C4BB72383"
   },
   {
     "path": "app/Services/Fleet/VehicleGeofenceService.php",
@@ -106,6 +118,10 @@
   {
     "path": "database/migrations/2026_09_27_000200_retain_client_boundary_provenance.php",
     "sha256": "C17A4D230B2F29CA5E2AFB024024CECD44CBDA6A5B96CAD7929173413175BDA3"
+  },
+  {
+    "path": "database/migrations/2026_09_27_000300_retain_boundary_event_and_rule_provenance.php",
+    "sha256": "45322E3F1E1A3BE5C960AAE86279CCFFB25B08BD485D28578C28DD4EB7A3E8FA"
   },
   {
     "path": "resources/js/components/client-location/boundary-handoff.tsx",
@@ -261,11 +277,15 @@
   },
   {
     "path": "tests/Feature/FleetAssets/Pkg07BoundariesTest.php",
-    "sha256": "95A1DE93C05DB7692DE83507E45A5E0A3D165747B1EDDB7479087B0AD0E49860"
+    "sha256": "027656B56692D504167DD1192B8FA5E384E7F0830DBF6182BBD0664F807F1044"
   },
   {
     "path": "tests/Feature/FleetAssets/Pkg07MapPrivacyTest.php",
-    "sha256": "14D266213B61FA03BB08362A13D5E5D620D9DACFB75573E2F18BED99BF1182BB"
+    "sha256": "5D89B95D17BF021297FE2D37912574CE33CA1130E82C0B91C84E4F2ACF17DA37"
+  },
+  {
+    "path": "tests/Feature/FleetTelemetryIngestTest.php",
+    "sha256": "2D39B6907061E684558C035E58F1AF00608435333A55C6953817FA9760773E81"
   },
   {
     "path": "tests/Feature/Sites/SiteGeofenceTest.php",
