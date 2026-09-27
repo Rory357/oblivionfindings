@@ -151,7 +151,7 @@ export function TripExportDialog({
             const response = await fetch(
                 `${tripHistoryUrl(vehicle.id, `/export/${format}`)}?${query({
                     events: events ? 1 : 0,
-                    maps: format === 'pdf' && maps ? 1 : 0,
+                    maps: maps ? 1 : 0,
                 })}`,
                 {
                     credentials: 'same-origin',
@@ -171,7 +171,7 @@ export function TripExportDialog({
                 href: URL.createObjectURL(blob),
                 filename: dispositionFilename(
                     response.headers.get('Content-Disposition'),
-                    `vehicle-trips-${from}-to-${to}.${format === 'pdf' ? 'pdf' : 'xls'}`,
+                    `vehicle-trips-${from}-to-${to}.${format === 'pdf' ? 'pdf' : 'xlsx'}`,
                 ),
                 count,
             });
@@ -220,7 +220,7 @@ export function TripExportDialog({
                         >
                             <FileText aria-hidden="true" />
                             <strong>PDF report</strong>
-                            <small>Summary, route sketches & trip pages</small>
+                            <small>Summary, journey maps & trip pages</small>
                         </button>
                         {/* eslint-disable-next-line no-restricted-syntax -- Format tile picker from the approved design; a selector card. */}
                         <button
@@ -260,17 +260,16 @@ export function TripExportDialog({
                         </label>
                     </fieldset>
                     <div className="report-options">
-                        <label data-disabled={format !== 'pdf'}>
+                        <label>
                             <Checkbox
-                                checked={format === 'pdf' && maps}
-                                disabled={!!busy || format !== 'pdf'}
+                                checked={maps}
+                                disabled={!!busy}
                                 onCheckedChange={(value) =>
                                     change(() => setMaps(value === true))
                                 }
                             />
                             <ImageIcon size={16} aria-hidden="true" /> Include
-                            route sketches of recorded positions
-                            {format !== 'pdf' && ' (PDF only)'}
+                            journey maps and recorded positions
                         </label>
                         <label>
                             <Checkbox
@@ -295,8 +294,8 @@ export function TripExportDialog({
                         </strong>
                         <p>
                             Uses the current trip filters, across all pages.
-                            Includes your organisation&apos;s name and brand
-                            colour, coverage and source notes. Dates are
+                            Includes your organisation&apos;s logo, name and
+                            brand colour, coverage and source notes. Dates are
                             inclusive, in Pacific/Auckland time.
                             {scope.state === 'ready' &&
                             scope.personal + scope.restricted > 0
@@ -336,9 +335,9 @@ export function TripExportDialog({
                     )}
                     <small className="text-caption">
                         Reports are generated on this server from the trips you
-                        can see. Route sketches are drawn from recorded
-                        positions only; no map imagery or location data is sent
-                        to another service.
+                        can see. Street maps use locally installed OpenStreetMap
+                        data. Areas without map data are labelled as route
+                        sketches. Trip locations stay on this server.
                     </small>
                 </div>
                 <DialogFooter className="border-t p-4">

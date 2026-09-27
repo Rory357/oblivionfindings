@@ -2,6 +2,12 @@ import { InertiaLinkProps } from '@inertiajs/react';
 import { LucideIcon } from 'lucide-react';
 
 export interface AuthPermissions {
+    fleet?: {
+        viewAny?: boolean;
+        reportsView?: boolean;
+        driverSessionsManage?: boolean;
+        signalsView?: boolean;
+    };
     sites?: {
         viewAny?: boolean;
         create?: boolean;

@@ -1,0 +1,30 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\storage\pkg02b-audit\phpunit.xml
+
+..............                                                    14 / 14 (100%)
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleTripHistoryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mtrip history is concealed outside the viewers sites and needs fleet view[39m[90m                                  [39m [90m245.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdriver names from other sites are not shown[39m[90m                                                                 [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist filters by auckland day search driver and event type[39m[90m                                                   [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe list reads the latest days and at most a year and says so[39m[90m                                               [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe list reads at most the latest trips while exports keep their own limits[39m[90m                                 [39m [90m1.43s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtrip detail reads behaviour from the recorded telemetry[39m[90m                                                     [39m [90m0.65s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpersonal and restricted trips are listed without their places or route[39m[90m                                      [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfirming a driver needs authority a site candidate and is audited[39m[90m                                         [39m [90m1.05s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleting a trip never erases its driver confirmation or event reviews[39m[90m                                       [39m [90m0.80s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexports are scoped branded sanitised and audited[39m[90m                                                            [39m [90m1.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexcel duration totals recalculate from recorded seconds without per trip rounding[39m[90m                           [39m [90m0.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocal street maps are embedded in both formats with dataset audit and privacy[39m[90m                               [39m [90m1.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdriving metrics count queclink harsh reports and speed episodes[39m[90m                                             [39m [90m0.63s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtrip builder records maximum speed for the trips list[39m[90m                                                       [39m [90m0.64s[39m  
+
+  [90mTests:[39m    [32;1m14 passed[39;22m[90m (401 assertions)[39m
+  [90mDuration:[39m [39m256.69s[39m
+
+
+
+Time: 04:16.414, Memory: 160.00 MB
+
+[30;42mOK (14 tests, 401 assertions)[0m

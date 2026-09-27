@@ -1,0 +1,252 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\storage\pkg02b-audit\phpunit.xml
+
+.......
+   WARN  Tests\Feature\FleetAssets\Pkg02bFleetSignalSourceProvisioningTest
+  ! the migration provisions the active fleet source when it is missing → file_get_contents(C:\Users\steph\.c… 258.70s  
+  ! running the migration again changes nothing → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-fina… 0.66s  
+  ! an existing source is left exactly as it was with data set "switched off by an admin" → file_get_contents(C… 1.72s  
+  ! an existing source is left exactly as it was with data set "paused for maintenance" → file_get_contents(C:</>… 0.61s  
+  ! an existing source is left exactly as it was with data set "active and renamed by an admin" → file_get_cont… 0.87s  
+  ! rolling back keeps the source → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivi… 0.58s  
+  ! a vehicle event sent from the profile reaches control room through the migrated source → file_get_contents(… 4.04s  
+.......
+   WARN  Tests\Feature\FleetAssets\Pkg02bFleetVehiclesAllSitesTest
+  ! the seeder and the grant migration give admin and the fleet manager role central oversight → file_get_conte… 0.66s  
+  ! the register daily check and profile show every vehicle to central oversight only → file_get_contents(C:\Us… 2.17s  
+  ! the vehicles own records can be kept across sites → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02… 0.88s  
+  ! bookings trips locations drivers and finance keep their own site rules → file_get_contents(C:\Users\steph\.… 0.91s  
+  ! maintenance work stays with the vehicles site → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-fi… 0.79s  
+  ! the compliance page follows the register scope → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-f… 0.64s  
+  ! the fleet settings grant migration gives admin and the fleet manager role the permission → file_get_content… 0.57s  
+.......
+   WARN  Tests\Feature\FleetAssets\Pkg02bLegacyAssetDocumentRoutesTest
+  ! the register download refuses vehicle files that have not passed their virus check → file_get_contents(C:</>… 13.58s  
+  ! clean vehicle files open from the register through the vehicle profile download → file_get_contents(C:\User… 0.87s  
+  ! finance review evidence opens from the register only for finance viewers → file_get_contents(C:\Users\steph… 2.21s  
+  ! the register cannot delete files the vehicle profile keeps → file_get_contents(C:\Users\steph\.codex\worktr… 9.40s  
+  ! the register refuses new vehicle uploads → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-a… 0.61s  
+  ! other assets keep register upload download and delete → file_get_contents(C:\Users\steph\.codex\worktrees\p… 0.63s  
+  ! the register lists vehicle documents without source owned evidence → file_get_contents(C:\Users\steph\.code… 1.00s  
+...
+   WARN  Tests\Feature\FleetAssets\Pkg02bMileageFeedTest
+  ! reconciling keeps the dashboard reading and plans from the tracker when enabled → file_get_contents(C:\User… 0.86s  
+  ! reconciling needs a manager and a current tracker sample → file_get_contents(C:\Users\steph\.codex\worktree… 0.69s  
+  ! pausing turns automatic planning off with a reason → file_get_contents(C:\Users\steph\.codex\worktrees\pkg0… 0.67s  
+.......
+   WARN  Tests\Feature\FleetAssets\Pkg02bObligationRemindersTest
+  ! due obligations are delivered once to their owner → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02… 0.67s  
+  ! a delivery without an owner fails visibly and can be retried → file_get_contents(C:\Users\steph\.codex\work… 0.73s  
+  ! the owner acknowledges without completing the obligation → file_get_contents(C:\Users\steph\.codex\worktree… 0.68s  
+  ! ruc is reminded by distance from the recorded odometer → file_get_contents(C:\Users\steph\.codex\worktrees</>… 0.55s  
+  ! a request key cant be reused for a different acknowledgement or action → file_get_contents(C:\Users\steph\.… 0.62s  
+  ! the vehicle check is reminded to its owner like other obligations → file_get_contents(C:\Users\steph\.codex… 0.75s  
+  ! a vehicle check reminder without an owner fails and is retried to the new owner → file_get_contents(C:\User… 0.62s  
+.................
+   WARN  Tests\Feature\FleetAssets\Pkg02bVehicleCalendarTest
+  ! the feed shows permitted bookings and only busy time for others → file_get_contents(C:\Users\steph\.codex\w… 0.74s  
+  ! unavailable periods are idempotent versioned and block bookings → file_get_contents(C:\Users\steph\.codex\w… 0.81s  
+  ! a booking change rechecks conflicts and versions → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b… 0.75s  
+  ! service appointments plan reschedule overrun and cancel with one vehicle hold → file_get_contents(C:\Users</>… 0.83s  
+  ! snoozing a reminder only moves it later → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-au… 0.65s  
+  ! evidence can be kept with a booking or unavailable period of this vehicle only → file_get_contents(C:\Users… 0.68s  
+  ! the summary describes the restriction its linked work and release authority → file_get_contents(C:\Users\st… 0.73s  
+  ! active restrictions span the window and estimates carry their appointment → file_get_contents(C:\Users\step… 0.68s  
+  ! a booking or period outside the summary lists opens as its record → file_get_contents(C:\Users\steph\.codex… 0.81s  
+  ! a linked appointment reuses open work from the same due item → file_get_contents(C:\Users\steph\.codex\work… 0.85s  
+  ! a period an appointment holds is managed through the appointment → file_get_contents(C:\Users\steph\.codex</>… 0.77s  
+  ! a cancelled period can be restored while its time is still free → file_get_contents(C:\Users\steph\.codex\w… 0.88s  
+  ! reversible changes can be put back through their own endpoints → file_get_contents(C:\Users\steph\.codex\wo… 0.70s  
+  ! a return with a concern opens linked maintenance work once → file_get_contents(C:\Users\steph\.codex\worktr… 0.77s  
+  ! a return concern without maintenance routing still returns the vehicle → file_get_contents(C:\Users\steph\.… 0.80s  
+  ! periods are busy time outside the viewers sites and appointment details follow maintenance access → file_ge… 0.82s  
+  ! a stale booking change is refused instead of being lost → file_get_contents(C:\Users\steph\.codex\worktrees… 0.75s  
+........
+   WARN  Tests\Feature\FleetAssets\Pkg02bVehicleChecksTest
+  ! the checks read model follows vehicle access → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-fin… 0.70s  
+  ! a check is recorded through the maintenance rules against its exact version → file_get_contents(C:\Users\st… 0.80s  
+  ! required evidence is kept with the check as private vehicle documents → file_get_contents(C:\Users\steph\.c… 0.79s  
+  ! changing a checklist publishes a new version and keeps earlier checks → file_get_contents(C:\Users\steph\.c… 0.93s  
+  ! the check requirement sets the checklist owner and due date → file_get_contents(C:\Users\steph\.codex\workt… 0.71s  
+  ! amendments are attributed and keep the original check → file_get_contents(C:\Users\steph\.codex\worktrees\p… 0.70s  
+  ! a report from a check keeps it as the source and needs approved routing → file_get_contents(C:\Users\steph</>… 0.77s  
+  ! daily checks stay within the persons fleet sites → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b… 0.65s  
+.......  63 / 175 ( 36%)
+
+   WARN  Tests\Feature\FleetAssets\Pkg02bVehicleDrivingAlertsTest
+  ! driving insights follow the trip site rule and withhold private trips → file_get_contents(C:\Users\steph\.c… 1.14s  
+  ! event reviews are idempotent version checked audited and recalculate the trip score → file_get_contents(C:</>… 1.04s  
+  ! a published scoring policy versions the weights and gates a persons score → file_get_contents(C:\Users\step… 1.05s  
+  ! manual speed limits need a second reviewer and evidence before an evaluation uses them → file_get_contents(… 1.10s  
+  ! the draft response plan is versioned and owned by site staff → file_get_contents(C:\Users\steph\.codex\work… 0.82s  
+  ! a recorded overspeed reaches control room and its response links maintenance and a follow up → file_get_con… 1.80s  
+  ! an undelivered vehicle signal is retried through recovery and private reports keep no trip or place → file_… 1.01s  
+...........
+   WARN  Tests\Feature\FleetAssets\Pkg02bVehicleFinanceTest
+  ! the finance view is concealed without finance access → file_get_contents(C:\Users\steph\.codex\worktrees\pk… 0.79s  
+  ! linked records combine finance and vehicle links without double counting → file_get_contents(C:\Users\steph… 0.65s  
+  ! linking needs fleet management finance access a reason and the vehicles scope → file_get_contents(C:\Users</>… 0.89s  
+  ! unlinking keeps the finance record and needs a reason → file_get_contents(C:\Users\steph\.codex\worktrees\p… 0.87s  
+  ! linkable search is scoped to the vehicle and finance access → file_get_contents(C:\Users\steph\.codex\workt… 0.73s  
+  ! review requests are idempotent scoped and refuse open duplicates → file_get_contents(C:\Users\steph\.codex</>… 0.88s  
+  ! review request files are private and open only for finance viewers → file_get_contents(C:\Users\steph\.code… 0.93s  
+  ! only finance decides a review request → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audi… 0.82s  
+  ! the person who asked for a review cannot decide it → file_get_contents(C:\Users\steph\.codex\worktrees\pkg0… 0.73s  
+  ! finance decides review requests in finance without fleet access → file_get_contents(C:\Users\steph\.codex\w… 1.39s  
+  ! open review requests reach finance in all tasks → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-… 0.77s  
+........
+   WARN  Tests\Feature\FleetAssets\Pkg02bVehicleMapTest
+  ! location shows the reported state and recent trip ends within the viewers sites → file_get_contents(C:\User… 0.73s  
+  ! positions during a personal trip or without consent are withheld → file_get_contents(C:\Users\steph\.codex</>… 0.72s  
+  ! selecting existing geofences links them inactive and replays safely → file_get_contents(C:\Users\steph\.cod… 0.87s  
+  ! the wizard creates an inactive shared boundary owned by the vehicle site → file_get_contents(C:\Users\steph… 0.80s  
+  ! managing an assignment is versioned reviews changed sources and waits for paused monitoring → file_get_cont… 1.08s  
+  ! the catalogue lists permitted boundaries and marks fleet links → file_get_contents(C:\Users\steph\.codex\wo… 0.66s  
+  ! telemetry needs the vehicle technology view and withholds private samples → file_get_contents(C:\Users\step… 1.67s  
+  ! withheld telemetry keeps the row and device health but no driving events → file_get_contents(C:\Users\steph… 0.87s  
+................
+   WARN  Tests\Feature\FleetAssets\Pkg02bVehicleReadinessTest
+  ! compliance evidence needs manage permission and conceals foreign or missing vehicles → file_get_contents(C:… 0.66s  
+  ! compliance versions are retained and stale or conflicting retries are refused → file_get_contents(C:\Users</>… 0.66s  
+  ! compliance assessments validate their evidence without inventing any → file_get_contents(C:\Users\steph\.co… 0.68s  
+  ! a requirement is marked not required with a reason as an audited version and can be required again → file_g… 0.70s  
+  ! the register expiry date follows the current version only → file_get_contents(C:\Users\steph\.codex\worktre… 0.58s  
+  ! readiness names every unassessed requirement and becomes ready with valid evidence → file_get_contents(C:\U… 0.61s  
+  ! b01 an unresolved applicable assessment blocks confirmation approval and checkout → file_get_contents(C:\Us… 0.76s  
+  ! b02 recorded ruc coverage applies to observed and checkout readings alike → file_get_contents(C:\Users\step… 0.74s  
+  ! expiry uses the auckland local date and the end of the use → file_get_contents(C:\Users\steph\.codex\worktr… 0.62s  
+  ! odometer readings are retained corrected in place and never future dated → file_get_contents(C:\Users\steph… 0.68s  
+  ! approval not required confirms only with authority readiness and acknowledgement → file_get_contents(C:\Use… 0.89s  
+  ! self approval is refused only on the independent approval route → file_get_contents(C:\Users\steph\.codex\w… 0.70s  
+  ! overlapping requests are refused while readiness problems leave the request pending → file_get_contents(C:</>… 0.70s  
+  ! custody under another booking blocks only overlapping use → file_get_contents(C:\Users\steph\.codex\worktre… 0.62s  
+  ! return reading cannot be lower than the checkout reading → file_get_contents(C:\Users\steph\.codex\worktree… 0.73s  
+  ! legacy vehicle fields are refused only when they would change the evidence → file_get_contents(C:\Users\ste… 0.60s  
+............
+   WARN  Tests\Feature\FleetAssets\Pkg02bVehicleTripHistoryTest
+  ! trip history is concealed outside the viewers sites and needs fleet view → file_get_contents(C:\Users\steph… 0.72s  
+  ! driver names from other sites are not shown → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-fina… 0.59s  
+  ! list filters by auckland day search driver and event type → file_get_contents(C:\Users\steph\.codex\worktre… 0.91s  
+  ! the list reads the latest days and at most a year and says so → file_get_contents(C:\Users\steph\.codex\wor… 0.69s  
+  ! the list reads at most the latest trips while exports keep their own limits → file_get_contents(C:\Users\st… 1.42s  
+  ! trip detail reads behaviour from the recorded telemetry → file_get_contents(C:\Users\steph\.codex\worktrees… 0.62s  
+  ! personal and restricted trips are listed without their places or route → file_get_contents(C:\Users\steph\.… 0.66s  
+  ! confirming a driver needs authority a site candidate and is audited → file_get_contents(C:\Users\steph\.cod… 0.85s  
+  ! deleting a trip never erases its driver confirmation or event reviews → file_get_contents(C:\Users\steph\.c… 0.89s  
+  ! exports are scoped branded sanitised and audited → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b… 2.73s  
+  ! driving metrics count queclink harsh reports and speed episodes → file_get_contents(C:\Users\steph\.codex\w… 0.77s  
+  ! trip builder records maximum speed for the trips list → file_get_contents(C:\Users\steph\.codex\worktrees\p… 0.70s  
+...........
+   WARN  Tests\Feature\FleetAssets\Pkg02bVehicleWorkspaceTest
+  ! workspace page presents scoped vehicle data and permissions → file_get_contents(C:\Users\steph\.codex\workt… 0.80s  
+  ! vehicle details need a reason and the current version → file_get_contents(C:\Users\steph\.codex\worktrees\p… 2.50s  
+  ! documents are private and only clean files become available → file_get_contents(C:\Users\steph\.codex\workt… 2.08s  
+  ! forged oversized and empty files are refused before anything is recorded → file_get_contents(C:\Users\steph… 0.67s  
+  ! replacing files keeps the set its renewal reminder and the previous files until clean → file_get_contents(C… 0.90s  
+  ! documents need document authority and conceal other vehicles files → file_get_contents(C:\Users\steph\.code… 0.84s  
+  ! reminders keep their identity and completing one never completes its obligation → file_get_contents(C:\User… 0.85s  
+  ! reminders reach all tasks and the site calendar for permitted readers → file_get_contents(C:\Users\steph\.c… 0.69s  
+  ! service schedules use calendar months and move on from the actual service → file_get_contents(C:\Users\step… 0.82s  
+  ! the legacy schedules list only shows accessible vehicles → file_get_contents(C:\Users\steph\.codex\worktree… 0.64s  
+  ! catalogue additions are deduplicated and need management access → file_get_contents(C:\Users\steph\.codex\w… 0.71s  
+F
+   FAIL  Tests\Feature\FleetAssets\Pkg02bWorkspaceRollbackTest
+  ⨯ PKG-02B migrations roll back only while empty and never discard vehicle records                              0.21s  
+.... 126 / 175 ( 72%)
+............
+   WARN  Tests\Feature\FleetAssets\Pkg01CheckAssessmentTest
+  ! an independent manager releases a check that no approved rule covers → file_get_contents(C:\Users\steph\.co… 0.68s  
+  ! the recorder may release their own check only when it recorded no issue and no rule applied → file_get_cont… 0.82s  
+  ! a reason and confirmation are required and nothing is kept without them → file_get_contents(C:\Users\steph</>… 0.70s  
+  ! only maintenance managers at the vehicles site can assess → file_get_contents(C:\Users\steph\.codex\worktre… 0.90s  
+  ! a retry returns the same decision and a changed retry or second decision conflicts → file_get_contents(C:\U… 0.72s  
+  ! a check failed by an approved rule keeps the repair retest and release path → file_get_contents(C:\Users\st… 0.68s  
+  ! a check maintenance placed a hold for is released only by independent release → file_get_contents(C:\Users</>… 0.79s  
+  ! retests passed advisory and already released checks have nothing to assess → file_get_contents(C:\Users\ste… 0.75s  
+  ! the release readiness gate applies before a check is released → file_get_contents(C:\Users\steph\.codex\wor… 0.66s  
+  ! other maintenance holds keep the vehicle unavailable → file_get_contents(C:\Users\steph\.codex\worktrees\pk… 0.65s  
+  ! a booking the check stopped can be approved once it is released → file_get_contents(C:\Users\steph\.codex\w… 4.11s  
+  ! an assessed check recorded after a retest no longer prevents release → file_get_contents(C:\Users\steph\.co… 0.77s  
+  ! a legacy daily check without a submission time never blocks release → file_get_contents(C:\Users\steph\.cod… 0.65s  
+  ! the decision is visible on the check the vehicle and its linked work → file_get_contents(C:\Users\steph\.co… 0.80s  
+  ! check assessments roll back only while empty → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-fin… 0.67s  
+  ! the vehicle lock orders a release against a new hold and a waiting booking decision → file_get_contents(C:… 11.19s  
+.....................
+   WARN  Tests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest
+  ! queue and related-work search retain identity while undated work stays outside All Tasks → file_get_content… 0.33s  
+  ! Finance projection conceals a bill whose canonical asset or site has changed → file_get_contents(C:\Users\s… 0.18s  
+  ! Auckland local minutes reject daylight gaps and require an offset for repeated minutes → file_get_contents(… 0.12s  
+  ! approved configuration versions route, rule and reviewer decisions without default grants → file_get_conten… 1.04s  
+  ! custody receipt access follows the latest exact recipient and approved site → file_get_contents(C:\Users\st… 0.24s  
+  ! a restriction flags existing bookings once and retains an owned follow-up → file_get_contents(C:\Users\step… 0.18s  
+  ! report identity preserves both submissions and requires approved site routing → file_get_contents(C:\Users</>… 0.22s  
+  ! report-only HTTP entry and search stay narrow while selected recipient can accept → file_get_contents(C:\Us… 0.41s  
+  ! checks keep unknown provenance and only an unchanged exact approved version can pass → file_get_contents(C:… 0.19s  
+  ! approved advisory check failures do not create a booking block while unknown provenance remains unassessed…  0.13s  
+  ! required evidence cannot be bypassed by NA or a client claim and a saved private file can satisfy it → file… 0.31s  
+  ! single transitions guard completion, replay identity and handover acknowledgement → file_get_contents(C:\Us… 0.25s  
+  ! triage deadlines and provider responses retain exact Auckland source times → file_get_contents(C:\Users\ste… 0.16s  
+  ! release requires an independent category-granted reviewer, current passing retest and custody → file_get_co… 6.47s  
+  ! a completed held repair can recover a new rule and enabled committed effects deliver once → file_get_conten… 2.12s  
+  ! an overlapping booking decision waits for the asset lock and sees a newly committed hold → file_get_content… 2.69s  
+  ! Designer review: work detail uses permitted projections for custody fleet and Finance readers → file_get_co… 0.25s  
+  ! Designer review: actual default administrator seeding withholds safety configuration authority → file_get_c… 0.58s  
+  ! Designer review: authored template configures and records standalone check evidence without inventing work…  0.41s  
+  ! Designer review: Outing booking waits for the asset lock and a hold leaves no partial outing → file_get_con… 2.75s  
+  ! Designer review: two completed jobs clear only their own holds while the asset remains unavailable → file_g… 0.28s  
+.......
+   WARN  Tests\Feature\FleetAssets\DailyCheckRecordsTest
+  ! a daily check is a submitted record against the exact checklist version → file_get_contents(C:\Users\steph</>… 0.65s  
+  ! checking again adds a record and leaves earlier checks unchanged → file_get_contents(C:\Users\steph\.codex</>… 0.69s  
+  ! the daily checks page counts the auckland day → file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-fi… 0.66s  
+  ! daily checks never block bookings while vehicle checks still do → file_get_contents(C:\Users\steph\.codex\w… 0.65s  
+  ! daily checks are listed with the vehicles recent checks → file_get_contents(C:\Users\steph\.codex\worktrees… 0.72s  
+  ! the daily checklist is only recorded from the daily checks page → file_get_contents(C:\Users\steph\.codex\w… 0.70s  
+  ! a daily check after the retest does not hold up the release → file_get_contents(C:\Users\steph\.codex\workt… 0.69s  
+.........               175 / 175 (100%)
+   WARN  Tests\Feature\FleetAssets\VehicleBookingSitePrivacyTest
+  ! register export counts calendar and every picker are scoped when filters are omitted → file_get_contents(C:… 0.72s  
+  ! selected vehicle conflicts status and availability conceal foreign and missing assets → file_get_contents(C… 0.74s  
+  ! foreign booking and missing booking direct ids are concealed identically → file_get_contents(C:\Users\steph… 0.61s  
+  ! store conceals foreign asset client and site ids without booking or audit effects → file_get_contents(C:\Us… 0.79s  
+  ! secondary site store is allowed and client advisory input is not persisted → file_get_contents(C:\Users\ste… 0.66s  
+  ! every foreign mutation is concealed before status payload audit or notification effects → file_get_contents… 0.70s  
+  ! global site scope never replaces the exact booking action → file_get_contents(C:\Users\steph\.codex\worktre… 0.74s  
+  ! exact lifecycle action permissions use canonical site scope without incidental read permission → file_get_c… 0.81s  
+  ! same site lifecycle replay and competing stale transition have one effect → file_get_contents(C:\Users\step… 3.91s  
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\FleetAssets\Pkg02bWorkspaceRollbackTest > PKG-02B migrations roll back only while empty and…   
+  Failed asserting that 'oblivion_findings_pkg02b_final_test_11824' matches PCRE pattern "/^oblivion_findings_(?:pkg01_2375_test|pkg02b_5b0a_test|codex_test)_11824$/".
+
+  at tests\Feature\FleetAssets\Pkg02bWorkspaceRollbackTest.php:11
+      7▕ use Illuminate\Support\Facades\Schema;
+      8▕ 
+      9▕ test('PKG-02B migrations roll back only while empty and never discard vehicle records', function () {
+     10▕     expect(app()->environment())->toBe('testing');
+  ➜  11▕     expect(DB::connection()->getDatabaseName())->toMatch('/^oblivion_findings_(?:pkg01_2375_test|pkg02b_5b0a_test|codex_test)_'.preg_quote((string) getmypid(), '/').'$/');
+     12▕     // DDL runs only in this process-owned disposable schema, outside the
+     13▕     // RefreshDatabase transaction. No shared or browser database is touched.
+     14▕     while (DB::transactionLevel() > 0) {
+     15▕         DB::rollBack();
+
+  1   tests\Feature\FleetAssets\Pkg02bWorkspaceRollbackTest.php:11
+
+
+  Tests:    1 failed, 174 warnings (3875 assertions)
+  Duration: 449.75s
+
+
+
+Time: 07:26.676, Memory: 248.00 MB
+
+There was 1 failure:
+
+1) P\Tests\Feature\FleetAssets\Pkg02bWorkspaceRollbackTest::__pest_evaluable_PKG_02B_migrations_roll_back_only_while_empty_and_never_discard_vehicle_records
+Failed asserting that 'oblivion_findings_pkg02b_final_test_11824' matches PCRE pattern "/^oblivion_findings_(?:pkg01_2375_test|pkg02b_5b0a_test|codex_test)_11824$/".
+
+C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\tests\Feature\FleetAssets\Pkg02bWorkspaceRollbackTest.php:11
+
+FAILURES!
+Tests: 175, Assertions: 3875, Failures: 1.

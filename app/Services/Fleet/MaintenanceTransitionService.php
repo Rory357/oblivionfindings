@@ -217,7 +217,16 @@ class MaintenanceTransitionService
                         $source = DB::table('fleet_checklist_runs')
                             ->where('id', (int) $payload['source_run_id'])
                             ->where('asset_id', $asset->id)
-                            ->where('work_order_id', $order->id)->first();
+                            ->where(function ($query) use ($order): void {
+                                $query->where('work_order_id', $order->id)
+                                    ->orWhereExists(function ($report) use ($order): void {
+                                        $report->selectRaw('1')->from('fleet_maintenance_reports')
+                                            ->where('work_order_id', $order->id)
+                                            ->where('source_type', 'fleet_checklist_run')
+                                            ->whereColumn('source_id', 'fleet_checklist_runs.id')
+                                            ->whereColumn('asset_id', 'fleet_checklist_runs.asset_id');
+                                    });
+                            })->first();
                         abort_unless($source && $source->outcome !== 'passed', 404);
                         $checkRunId = (int) $source->id;
                     }

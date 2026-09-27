@@ -1,0 +1,101 @@
+{
+  "focusRecovery": {
+    "focus": true,
+    "label": "Operating records pages",
+    "tag": "BUTTON",
+    "text": "Operating records"
+  },
+  "roleChecks": [
+    {
+      "role": "assigned",
+      "links": [
+        {
+          "href": "/fleet-assets",
+          "label": "Overview"
+        },
+        {
+          "href": "/fleet-assets/assets",
+          "label": "Assets"
+        },
+        {
+          "href": "/fleet-assets/daily-check",
+          "label": "Maintenance"
+        },
+        {
+          "href": "/fleet-assets/map",
+          "label": "Maps & boundaries"
+        }
+      ],
+      "tracking": 0
+    },
+    {
+      "role": "assets",
+      "links": [
+        {
+          "href": "/fleet-assets",
+          "label": "Overview"
+        },
+        {
+          "href": "/fleet-assets/bookings",
+          "label": "Fleet"
+        },
+        {
+          "href": "/fleet-assets/assets",
+          "label": "Assets"
+        },
+        {
+          "href": "/fleet-assets/maintenance/work-orders",
+          "label": "Maintenance"
+        },
+        {
+          "href": "/fleet-assets/map",
+          "label": "Maps & boundaries"
+        },
+        {
+          "href": "/fleet-assets/mileage",
+          "label": "Reports"
+        },
+        {
+          "href": "/fleet-assets/settings/notifications",
+          "label": "Settings"
+        }
+      ],
+      "tracking": 0
+    },
+    {
+      "role": "no-telemetry",
+      "links": [
+        {
+          "href": "/fleet-assets",
+          "label": "Overview"
+        },
+        {
+          "href": "/fleet-assets/vehicles",
+          "label": "Fleet"
+        },
+        {
+          "href": "/fleet-assets/maintenance/work-orders",
+          "label": "Maintenance"
+        },
+        {
+          "href": "/fleet-assets/map",
+          "label": "Maps & boundaries"
+        },
+        {
+          "href": "/fleet-assets/reports",
+          "label": "Reports"
+        },
+        {
+          "href": "/fleet-assets/settings/notifications",
+          "label": "Settings"
+        }
+      ],
+      "tracking": 0
+    },
+    {
+      "role": "staff",
+      "links": [],
+      "tracking": 0
+    }
+  ]
+}

@@ -12,7 +12,8 @@ export type AlertStatus =
     | 'resolved'
     | 'closed'
     | 'dismissed'
-    | 'delivery_failed';
+    | 'delivery_failed'
+    | 'delivery_pending';
 
 export type TriageDecision =
     | 'maintenance'

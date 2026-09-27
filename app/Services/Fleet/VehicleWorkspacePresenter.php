@@ -57,6 +57,9 @@ class VehicleWorkspacePresenter
         // Files follow the asset register's rule, or central fleet oversight
         // for the vehicle's own records (VehicleDocumentService::canView).
         $documents = $can['view_documents'] ? $this->documents($asset) : [];
+        $documents = array_values(array_filter($documents, fn (array $set): bool => $this->files->sourceVisible(
+            $viewer, $asset, $set['source']['type'] ?? null, $set['source']['id'] ?? null,
+        )));
         // Service and RUC planning may use the calibrated tracker distance; readiness never does.
         // Tracker figures are separately permissioned, so other viewers plan from recorded readings.
         $currentReading = $assessment->odometerObservationId
@@ -71,7 +74,7 @@ class VehicleWorkspacePresenter
             'odometer' => $this->odometerData($asset, $assessment, $canViewTechnology, $documents),
             'schedules' => $schedules,
             'service_history' => $this->serviceHistory($asset, $can['view_maintenance']),
-            'reminders' => $this->reminders($asset, $can['view_maintenance']),
+            'reminders' => $this->reminders($viewer, $asset, $can['view_maintenance']),
             'obligation_reminders' => $this->obligationReminders->forVehicle($viewer, $asset, $planning['planning_km']),
             'mileage_feed' => $this->mileageFeed->present($viewer, $asset, $currentReading, $assessment->trackerEstimate, $canViewTechnology),
             'documents' => array_values(array_filter($documents, fn (array $set): bool => $set['source'] === null)),
@@ -390,33 +393,33 @@ class VehicleWorkspacePresenter
             ->groupBy('source_id')->selectRaw('source_id, COUNT(*) as files')->pluck('files', 'source_id');
         $completions = $completions->map(fn (array $row): array => $row + ['files' => (int) ($completionFiles[$row['id']] ?? 0), 'awaiting_release' => false]);
         $work = $work->map(fn (FleetWorkOrder $order): array => [
-                'key' => 'work-'.$order->id,
-                'kind' => 'work',
-                'id' => $order->id,
-                'title' => $order->title ?: 'Maintenance work',
-                'date' => ($order->completed_at ?? $order->updated_at)?->setTimezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
-                'odometer_km' => null,
-                'status' => $order->status,
-                'provider' => $providers[$order->id] ?? null,
-                'evidence_reference' => null,
-                'notes' => $order->status === 'cancelled'
-                    ? ($cancelReasons[$order->id] ?? $order->completion_notes)
-                    : $order->completion_notes,
-                'reference' => $order->reference_number,
-                'work_order_id' => $order->id,
-                'recorded_by' => null,
-                'files' => (int) ($workFiles[$order->id] ?? 0),
-                'awaiting_release' => $order->status === 'completed' && in_array((int) $order->id, $awaiting, true),
-            ]);
+            'key' => 'work-'.$order->id,
+            'kind' => 'work',
+            'id' => $order->id,
+            'title' => $order->title ?: 'Maintenance work',
+            'date' => ($order->completed_at ?? $order->updated_at)?->setTimezone(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
+            'odometer_km' => null,
+            'status' => $order->status,
+            'provider' => $providers[$order->id] ?? null,
+            'evidence_reference' => null,
+            'notes' => $order->status === 'cancelled'
+                ? ($cancelReasons[$order->id] ?? $order->completion_notes)
+                : $order->completion_notes,
+            'reference' => $order->reference_number,
+            'work_order_id' => $order->id,
+            'recorded_by' => null,
+            'files' => (int) ($workFiles[$order->id] ?? 0),
+            'awaiting_release' => $order->status === 'completed' && in_array((int) $order->id, $awaiting, true),
+        ]);
 
         return $completions->concat($work)->sortByDesc(fn (array $row): string => ($row['date'] ?? '').'#'.$row['key'])
             ->take(self::HISTORY)->values()->all();
     }
 
     /** @return list<array<string,mixed>> */
-    private function reminders(Asset $asset, bool $readsMaintenance): array
+    private function reminders(User $viewer, Asset $asset, bool $readsMaintenance): array
     {
-        $reminders = FleetVehicleReminder::query()->where('asset_id', $asset->id)
+        $reminders = app(VehicleReminderAccess::class)->scope(FleetVehicleReminder::query(), $viewer)->where('asset_id', $asset->id)
             ->with(['owner:id,name', 'backup:id,name', 'events' => fn ($events) => $events->with('actor:id,name')->orderByDesc('id')->limit(10)])
             ->orderByRaw("FIELD(state, 'scheduled', 'acknowledged', 'paused', 'completed')")->orderBy('due_at')->limit(100)->get();
         $labels = $this->sourceLabels($asset, $reminders, $readsMaintenance);
@@ -666,6 +669,7 @@ class VehicleWorkspacePresenter
         if (! Schema::hasTable('fleet_checklist_runs')) {
             return ['latest' => null, 'latest_daily' => null, 'next_due_at' => $asset->inspection_due_at?->toDateString()];
         }
+
         return [
             'latest' => $this->latestCheck($asset, false),
             'latest_daily' => $this->latestCheck($asset, true),

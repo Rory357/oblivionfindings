@@ -68,8 +68,9 @@ export function useVehicleRecordCommand<T>(
                 pending.current?.method !== method)
         ) {
             const body = data instanceof FormData ? new FormData() : signature;
-            if (body instanceof FormData && data instanceof FormData)
+            if (body instanceof FormData && data instanceof FormData) {
                 data.forEach((value, key) => body.append(key, value));
+            }
             pending.current = {
                 key: crypto.randomUUID(),
                 signature,

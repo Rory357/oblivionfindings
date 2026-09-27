@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 
 test('PKG-02B migrations roll back only while empty and never discard vehicle records', function () {
     expect(app()->environment())->toBe('testing');
-    expect(DB::connection()->getDatabaseName())->toMatch('/^oblivion_findings_(?:pkg01_2375_test|pkg02b_5b0a_test|codex_test)_'.preg_quote((string) getmypid(), '/').'$/');
+    expect(DB::connection()->getDatabaseName())->toMatch('/^oblivion_findings_(?:pkg01_2375_test|pkg02b_5b0a_test|pkg02b_final_test|codex_test)_'.preg_quote((string) getmypid(), '/').'$/');
     // DDL runs only in this process-owned disposable schema, outside the
     // RefreshDatabase transaction. No shared or browser database is touched.
     while (DB::transactionLevel() > 0) {
@@ -17,6 +17,7 @@ test('PKG-02B migrations roll back only while empty and never discard vehicle re
     // Every PKG-02B migration after I1, in the order they run; a rollback
     // undoes them in reverse, as `migrate:rollback` would.
     $paths = glob(database_path('migrations/2026_09_23_*_pkg02b_*.php')) ?: [];
+    $paths[] = database_path('migrations/2026_09_26_000100_pkg02b_appointment_command_receipts.php');
     sort($paths);
     expect(count($paths))->toBeGreaterThanOrEqual(8);
     $migrations = array_map(fn (string $path) => require $path, $paths);

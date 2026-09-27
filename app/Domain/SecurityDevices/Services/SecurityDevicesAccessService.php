@@ -9,6 +9,7 @@ use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\Client;
+use App\Models\ClientEmergencyContact;
 use App\Models\LocationHardware;
 use App\Models\Site;
 use App\Models\SiteRoom;
@@ -215,6 +216,25 @@ class SecurityDevicesAccessService
         return $query->first();
     }
 
+    /** @return Collection<int, User> */
+    public function assignableStaffAtSite(User $user, int $siteId, ?string $search = null): Collection
+    {
+        $search = trim((string) $search);
+
+        return $this->assignableStaff($user)
+            ->whereHas('hrEmployeeProfile', fn (Builder $profile): Builder => $this->applyCurrentStaffSiteScope($profile, [$siteId]))
+            ->when($search !== '', fn (Builder $query): Builder => $query->where('name', 'like', "%{$search}%"))
+            ->orderBy('name')->orderBy('id')->limit(self::ASSIGNMENT_PICKER_LIMIT)
+            ->get(['id', 'name'])->values();
+    }
+
+    public function canReadStaffAtSite(User $user, int $staffId, int $siteId): bool
+    {
+        return $this->assignableStaff($user)->whereKey($staffId)
+            ->whereHas('hrEmployeeProfile', fn (Builder $profile): Builder => $this->applyCurrentStaffSiteScope($profile, [$siteId]))
+            ->exists();
+    }
+
     public function assignableClients(User $user, ?string $search = null, ?int $selectedId = null): Collection
     {
         $search = trim((string) $search);
@@ -252,6 +272,48 @@ class SecurityDevicesAccessService
         return $client instanceof Client && $this->clientIsVisible($user, $client)
             ? $client
             : null;
+    }
+
+    /** Site and search are applied before the bounded, privacy-checked result. */
+    public function assignableClientsAtSite(User $user, int $siteId, ?string $search = null): Collection
+    {
+        $search = trim((string) $search);
+
+        return $this->assignableClientQuery($user)->where('site_id', $siteId)
+            ->when($search !== '', fn (Builder $query): Builder => $query->where(function (Builder $name) use ($search): void {
+                $name->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%");
+            }))
+            ->orderBy('first_name')->orderBy('last_name')->orderBy('id')
+            ->cursor()->filter(fn (Client $client): bool => $this->clientIsVisible($user, $client))
+            ->take(self::ASSIGNMENT_PICKER_LIMIT)->collect()->values();
+    }
+
+    public function canReadClientAtSite(User $user, int $clientId, int $siteId): bool
+    {
+        $client = $this->assignableClient($user, $clientId);
+
+        return $client instanceof Client && (int) $client->site_id === $siteId;
+    }
+
+    /** @return Collection<int, ClientEmergencyContact> */
+    public function assignableWhanauAtSite(User $user, int $siteId, ?string $search = null): Collection
+    {
+        $search = trim((string) $search);
+        $readableClients = [];
+
+        return ClientEmergencyContact::query()
+            ->whereHas('client', fn (Builder $client): Builder => $client
+                ->where('status', 'active')->where('site_id', $siteId)
+                ->whereHas('site', fn (Builder $site): Builder => $this->applyOperationalSiteScope($site)))
+            ->when($search !== '', fn (Builder $query): Builder => $query->where('name', 'like', "%{$search}%"))
+            ->orderBy('name')->orderBy('id')
+            ->cursor()->filter(function (ClientEmergencyContact $contact) use ($user, $siteId, &$readableClients): bool {
+                $clientId = (int) $contact->client_id;
+
+                return $readableClients[$clientId] ??= $this->canReadClientAtSite($user, $clientId, $siteId);
+            })
+            ->take(self::ASSIGNMENT_PICKER_LIMIT)->collect()->values();
     }
 
     /** @return list<int> */

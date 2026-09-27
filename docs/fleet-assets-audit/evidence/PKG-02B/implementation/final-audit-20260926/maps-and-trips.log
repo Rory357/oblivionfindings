@@ -1,0 +1,35 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\storage\pkg02b-audit\phpunit.xml
+
+....
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\Maps\OsmReportMapTest[39m
+  [32;1m✓[39;22m[90m [39m[90minstalled map renders streets with local provenance and attribution[39m[90m                                         [39m [90m0.17s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmissing coverage and broken metadata never claim a street map[39m[90m                                               [39m [90m0.13s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfailed install keeps the previous dataset and its identity[39m[90m                                                  [39m [90m0.18s[39m  
+  [32;1m✓[39;22m[90m [39m[90mgeometry reads xy and rejects truncation wrong srs and excessive counts[39m
+.............                                                 17 / 17 (100%)
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleTripHistoryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mtrip history is concealed outside the viewers sites and needs fleet view[39m[90m                                  [39m [90m261.43s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdriver names from other sites are not shown[39m[90m                                                                 [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist filters by auckland day search driver and event type[39m[90m                                                   [39m [90m1.00s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe list reads the latest days and at most a year and says so[39m[90m                                               [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe list reads at most the latest trips while exports keep their own limits[39m[90m                                 [39m [90m1.45s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtrip detail reads behaviour from the recorded telemetry[39m[90m                                                     [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpersonal and restricted trips are listed without their places or route[39m[90m                                      [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfirming a driver needs authority a site candidate and is audited[39m[90m                                         [39m [90m0.96s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleting a trip never erases its driver confirmation or event reviews[39m[90m                                       [39m [90m0.98s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexports are scoped branded sanitised and audited[39m[90m                                                            [39m [90m3.52s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlocal street maps are embedded in both formats with dataset audit and privacy[39m[90m                               [39m [90m1.27s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdriving metrics count queclink harsh reports and speed episodes[39m[90m                                             [39m [90m0.61s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtrip builder records maximum speed for the trips list[39m[90m                                                       [39m [90m0.93s[39m  
+
+  [90mTests:[39m    [32;1m17 passed[39;22m[90m (353 assertions)[39m
+  [90mDuration:[39m [39m276.79s[39m
+
+
+
+Time: 04:35.412, Memory: 162.00 MB
+
+[30;42mOK (17 tests, 353 assertions)[0m
