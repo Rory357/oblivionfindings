@@ -20,7 +20,7 @@ class AssetAssignmentController extends Controller
         $data = $request->validate([
             'assignee_type' => ['required', 'in:staff,client,whanau'],
             'assignee_id' => ['required', 'integer'],
-            'purpose' => ['nullable', 'string'],
+            'purpose' => ['nullable', 'string', 'max:255'],
             'assigned_at' => ['nullable', 'date', 'before_or_equal:now'],
         ]);
 
@@ -36,5 +36,18 @@ class AssetAssignmentController extends Controller
         $this->assignments->release($request->user(), $asset, $assignment);
 
         return back()->with('success', 'Assignment released.');
+    }
+
+    public function confirmReceipt(Request $request, Asset $asset, AssetAssignment $assignment)
+    {
+        $this->authorize('manageAssignments', $asset);
+        $data = $request->validate([
+            'receipt_note' => ['nullable', 'string', 'max:500'],
+            'verified_received' => ['required', 'accepted'],
+        ]);
+
+        $this->assignments->confirmReceipt($request->user(), $asset, $assignment, $data['receipt_note'] ?? null);
+
+        return back()->with('success', 'Receipt verification recorded.');
     }
 }

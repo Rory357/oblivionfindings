@@ -50,6 +50,80 @@ class Pkg02bVehicleCalendarTest extends TestCase
         $this->foreignSite = Site::factory()->create(['name' => 'Rimu House']);
     }
 
+    public function test_appointment_commands_refuse_stale_edits_and_changed_retries_and_undo_only_the_exact_plan(): void
+    {
+        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.maintenance.manage']);
+        $vehicle = $this->vehicle($this->site);
+        $order = $this->workOrder($vehicle, $manager, 'Audit appointment');
+        $url = "/fleet-assets/vehicles/{$vehicle->id}/appointments";
+        $plan = ['work_order_id' => $order->id, 'expected_version' => (int) $order->version,
+            'provider_name' => 'Synthetic garage', 'unavailable' => true,
+            'starts_local' => '2026-09-24T09:00', 'ends_local' => '2026-09-24T11:00',
+            'notes' => 'Recorded appointment purpose.', 'request_key' => 'audit-appointment-plan'];
+        $first = $this->actingAs($manager)->postJson($url, $plan)->assertOk()->json();
+        $this->actingAs($manager)->postJson($url, $plan)->assertOk();
+        foreach ([['notes' => 'A different purpose'], ['unavailable' => false], ['provider_reference' => 'Different confirmation']] as $change) {
+            $this->actingAs($manager)->postJson($url, $change + $plan)->assertStatus(409);
+        }
+        $this->assertSame(1, DB::table('fleet_vehicle_appointment_commands')->count());
+        $this->actingAs($manager)->postJson($url, ['request_key' => 'audit-appointment-stale'] + $plan)->assertStatus(409);
+        $missing = $plan;
+        unset($missing['expected_version']);
+        $this->actingAs($manager)->postJson($url, ['request_key' => 'audit-appointment-missing'] + $missing)
+            ->assertUnprocessable()->assertJsonValidationErrors('expected_version');
+
+        $moved = $this->actingAs($manager)->postJson($url, ['expected_version' => $first['work_order']['version'],
+            'starts_local' => '2026-09-25T10:00', 'ends_local' => '2026-09-25T12:00',
+            'request_key' => 'audit-appointment-move'] + $plan)->assertOk()->json();
+        $this->assertNotNull($moved['undo']);
+        $undo = $moved['undo'] + ['request_key' => 'audit-appointment-undo'];
+        $this->actingAs($manager)->postJson($url.'/undo', $undo)->assertOk();
+        $version = $order->fresh()->version;
+        $this->actingAs($manager)->postJson($url.'/undo', $undo)->assertOk();
+        $this->assertSame($version, $order->fresh()->version);
+        $held = FleetVehicleUnavailablePeriod::query()->where('work_order_id', $order->id)->where('state', 'active')->sole();
+        $this->assertSame('2026-09-24 09:00', $held->starts_at->setTimezone('Pacific/Auckland')->format('Y-m-d H:i'));
+        $this->actingAs($manager)->postJson($url.'/undo', ['request_key' => 'audit-appointment-late-undo'] + $moved['undo'])->assertStatus(409);
+        $this->assertSame($version, $order->fresh()->version);
+
+        $migration = require database_path('migrations/2026_09_26_000100_pkg02b_appointment_command_receipts.php');
+        try {
+            $migration->down();
+            $this->fail('Appointment evidence was discarded.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Appointment command evidence must be retained.', $exception->getMessage());
+        }
+    }
+
+    public function test_snooze_undo_restores_an_overdue_time_without_overwriting_a_later_change(): void
+    {
+        $manager = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage']);
+        $other = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage']);
+        $vehicle = $this->vehicle($this->site);
+        $reminder = FleetVehicleReminder::query()->create(['asset_id' => $vehicle->id, 'title' => 'Check renewal',
+            'action_text' => 'Read the original evidence.', 'source_type' => 'vehicle',
+            'due_at' => now()->subDay(), 'owner_user_id' => $manager->id, 'state' => 'acknowledged', 'lock_version' => 1]);
+        $previous = $reminder->due_at->toIso8601String();
+        $url = "/fleet-assets/vehicles/{$vehicle->id}/reminders/{$reminder->id}";
+        $snooze = ['note' => 'Owner requested another day.', 'remind_local' => '2026-09-25T09:00',
+            'expected_version' => 1, 'request_key' => 'audit-reminder-snooze'];
+        $result = $this->actingAs($manager)->postJson($url.'/snooze', $snooze)->assertOk()->json();
+        $this->actingAs($other)->postJson($url.'/undo', $result['undo'] + ['request_key' => 'audit-foreign-undo'])->assertForbidden();
+        $undo = $result['undo'] + ['request_key' => 'audit-reminder-undo'];
+        $this->actingAs($manager)->postJson($url.'/undo', $undo)->assertOk();
+        $this->actingAs($manager)->postJson($url.'/undo', $undo)->assertOk();
+        $this->assertSame($previous, $reminder->fresh()->due_at->toIso8601String());
+        $this->assertSame('acknowledged', $reminder->fresh()->state);
+        $this->assertSame(3, $reminder->fresh()->lock_version);
+
+        $result = $this->actingAs($manager)->postJson($url.'/snooze', ['expected_version' => 3,
+            'request_key' => 'audit-reminder-snooze-two'] + $snooze)->assertOk()->json();
+        $this->actingAs($manager)->postJson($url.'/pause', ['expected_version' => 4,
+            'note' => 'Changed after the snooze.', 'request_key' => 'audit-reminder-pause'])->assertOk();
+        $this->actingAs($manager)->postJson($url.'/undo', $result['undo'] + ['request_key' => 'audit-reminder-stale-undo'])->assertStatus(409);
+        $this->assertSame('paused', $reminder->fresh()->state);
+    }
+
     public function test_the_feed_shows_permitted_bookings_and_only_busy_time_for_others(): void
     {
         $manager = $this->siteUser([$this->site, $this->foreignSite], ['fleet.viewAny', 'fleet.manage']);
@@ -170,7 +244,7 @@ class Pkg02bVehicleCalendarTest extends TestCase
             'title' => 'Routine service', 'category' => 'vehicle', 'priority' => 'medium', 'status' => 'open',
         ]);
         $url = "/fleet-assets/vehicles/{$vehicle->id}/appointments";
-        $plan = ['work_order_id' => $order->id, 'provider_name' => 'Hutt Valley Motors', 'unavailable' => true,
+        $plan = ['work_order_id' => $order->id, 'expected_version' => (int) $order->fresh()->version, 'provider_name' => 'Hutt Valley Motors', 'unavailable' => true,
             'starts_local' => '2026-09-24T09:00', 'ends_local' => '2026-09-24T11:00', 'notes' => 'Annual service.'];
 
         $this->actingAs($reader)->postJson($url, $plan + ['request_key' => 'appt-reader'])->assertForbidden();
@@ -185,7 +259,7 @@ class Pkg02bVehicleCalendarTest extends TestCase
         $this->assertNotNull($events->firstWhere('id', 'unavailable:'.$held->id));
 
         // Rescheduling moves the same hold.
-        $reschedule = ['operation' => 'plan', 'starts_local' => '2026-09-25T10:00',
+        $reschedule = ['expected_version' => (int) $order->fresh()->version, 'operation' => 'plan', 'starts_local' => '2026-09-25T10:00',
             'ends_local' => '2026-09-25T12:00', 'change_reason' => 'Garage moved us.'] + $plan + ['request_key' => 'appointment-2'];
         $this->actingAs($manager)->postJson($url, $reschedule)->assertOk();
         $this->assertSame('2026-09-24 22:00', $held->fresh()->starts_at->utc()->format('Y-m-d H:i'));
@@ -195,7 +269,7 @@ class Pkg02bVehicleCalendarTest extends TestCase
         $this->assertSame($moved, $held->fresh()->lock_version);
 
         // An overrun keeps the start and needs a later end and a reason.
-        $overrun = ['operation' => 'overrun', 'starts_local' => '2026-09-25T10:00', 'ends_local' => '2026-09-25T11:00',
+        $overrun = ['expected_version' => (int) $order->fresh()->version, 'operation' => 'overrun', 'starts_local' => '2026-09-25T10:00', 'ends_local' => '2026-09-25T11:00',
             'change_reason' => 'Parts arrived late.'] + $plan;
         $this->actingAs($manager)->postJson($url, $overrun + ['request_key' => 'appointment-3'])
             ->assertUnprocessable()->assertJsonValidationErrors('ends_local');
@@ -209,9 +283,9 @@ class Pkg02bVehicleCalendarTest extends TestCase
         $this->assertSame($extended, $held->fresh()->lock_version);
 
         // Cancelling records the provider cancellation and releases the hold; the work stays open.
-        $this->actingAs($manager)->postJson($url, ['operation' => 'cancel', 'work_order_id' => $order->id, 'request_key' => 'appointment-6'])
+        $this->actingAs($manager)->postJson($url, ['operation' => 'cancel', 'work_order_id' => $order->id, 'expected_version' => (int) $order->fresh()->version, 'request_key' => 'appointment-6'])
             ->assertUnprocessable()->assertJsonValidationErrors('change_reason');
-        $cancel = ['operation' => 'cancel', 'work_order_id' => $order->id,
+        $cancel = ['operation' => 'cancel', 'work_order_id' => $order->id, 'expected_version' => (int) $order->fresh()->version,
             'change_reason' => 'Provider closed for the day.', 'request_key' => 'appointment-7'];
         $this->actingAs($manager)->postJson($url, $cancel)->assertOk();
         // A retried cancel is the same cancel, not "no appointment to cancel".
@@ -223,7 +297,7 @@ class Pkg02bVehicleCalendarTest extends TestCase
         $events = collect($this->feed($manager, $vehicle));
         $this->assertNull($events->firstWhere('id', 'appointment:'.$order->id));
         $this->assertNull($events->firstWhere('id', 'unavailable:'.$held->id));
-        $this->actingAs($manager)->postJson($url, ['operation' => 'cancel', 'work_order_id' => $order->id,
+        $this->actingAs($manager)->postJson($url, ['operation' => 'cancel', 'work_order_id' => $order->id, 'expected_version' => (int) $order->fresh()->version,
             'change_reason' => 'Again.', 'request_key' => 'appointment-8'])->assertUnprocessable()->assertJsonValidationErrors('work_order_id');
     }
 
@@ -339,7 +413,7 @@ class Pkg02bVehicleCalendarTest extends TestCase
         $unplanned = $this->workOrder($vehicle, $manager, 'Tyre check');
         $unplannedEstimate = $this->report($unplanned, $manager, ['estimated_start_date' => '2026-09-28', 'estimated_end_date' => '2026-09-28']);
         $this->actingAs($manager)->postJson("/fleet-assets/vehicles/{$vehicle->id}/appointments", [
-            'work_order_id' => $planned->id, 'provider_name' => 'Hutt Valley Motors', 'unavailable' => true,
+            'work_order_id' => $planned->id, 'expected_version' => (int) $planned->fresh()->version, 'provider_name' => 'Hutt Valley Motors', 'unavailable' => true,
             'starts_local' => '2026-09-24T09:00', 'ends_local' => '2026-09-24T11:00', 'notes' => 'Annual service.',
             'request_key' => 'appointment-estimate',
         ])->assertOk();
@@ -377,7 +451,7 @@ class Pkg02bVehicleCalendarTest extends TestCase
         // A cancelled appointment is no longer carried by its estimate.
         $this->actingAs($manager)->postJson("/fleet-assets/vehicles/{$vehicle->id}/appointments", [
             'operation' => 'cancel', 'work_order_id' => $planned->id, 'change_reason' => 'Provider closed.',
-            'request_key' => 'appointment-estimate-cancel',
+            'request_key' => 'appointment-estimate-cancel', 'expected_version' => (int) $planned->fresh()->version,
         ])->assertOk();
         $this->assertNull(collect($this->feed($manager, $vehicle))->firstWhere('id', 'estimate:'.$plannedEstimate)['meta']);
     }
@@ -472,7 +546,7 @@ class Pkg02bVehicleCalendarTest extends TestCase
             ->assertStatus(409);
         // Planning the same due item again plans on its open work and moves the hold.
         $this->actingAs($manager)->postJson($url, ['starts_local' => '2026-09-25T09:00', 'ends_local' => '2026-09-25T11:00',
-            'request_key' => 'linked-2'] + $plan)->assertOk()->assertJsonPath('work_order_id', $work->id);
+            'work_order_id' => $work->id, 'expected_version' => (int) $work->fresh()->version, 'request_key' => 'linked-2'] + $plan)->assertOk()->assertJsonPath('work_order_id', $work->id);
         $this->assertSame(1, FleetWorkOrder::query()->count());
         $this->assertSame(1, DB::table('fleet_maintenance_reports')->count());
         $hold = FleetVehicleUnavailablePeriod::query()->where('work_order_id', $work->id)->sole();
@@ -485,10 +559,10 @@ class Pkg02bVehicleCalendarTest extends TestCase
 
         // A chosen record must be the due item's linked work.
         $manual = $this->workOrder($vehicle, $manager, 'Brake noise');
-        $this->actingAs($manager)->postJson($url, ['work_order_id' => $manual->id, 'request_key' => 'linked-3'] + $plan)
+        $this->actingAs($manager)->postJson($url, ['work_order_id' => $manual->id, 'expected_version' => (int) $manual->fresh()->version, 'request_key' => 'linked-3'] + $plan)
             ->assertUnprocessable()->assertJsonValidationErrors('work_order_id');
         $this->actingAs($manager)->postJson($url, ['work_order_id' => $work->id, 'starts_local' => '2026-09-26T09:00',
-            'ends_local' => '2026-09-26T11:00', 'request_key' => 'linked-4'] + $plan)->assertOk()
+            'ends_local' => '2026-09-26T11:00', 'expected_version' => (int) $work->fresh()->version, 'request_key' => 'linked-4'] + $plan)->assertOk()
             ->assertJsonPath('work_order_id', $work->id);
 
         // Another due item gets its own work.
@@ -503,7 +577,7 @@ class Pkg02bVehicleCalendarTest extends TestCase
         // A due item is linked only when planning.
         $this->actingAs($manager)->postJson($url, ['operation' => 'cancel', 'work_order_id' => $work->id,
             'change_reason' => 'Provider closed.', 'source_type' => 'service_schedule', 'source_id' => $schedule->id,
-            'request_key' => 'linked-6'])->assertUnprocessable()->assertJsonValidationErrors('source_type');
+            'request_key' => 'linked-6', 'expected_version' => (int) $work->fresh()->version])->assertUnprocessable()->assertJsonValidationErrors('source_type');
     }
 
     public function test_a_period_an_appointment_holds_is_managed_through_the_appointment(): void
@@ -512,7 +586,7 @@ class Pkg02bVehicleCalendarTest extends TestCase
         $vehicle = $this->vehicle($this->site);
         $order = $this->workOrder($vehicle, $manager, 'Routine service');
         $url = "/fleet-assets/vehicles/{$vehicle->id}";
-        $plan = ['work_order_id' => $order->id, 'provider_name' => 'Hutt Valley Motors', 'unavailable' => true,
+        $plan = ['work_order_id' => $order->id, 'expected_version' => (int) $order->fresh()->version, 'provider_name' => 'Hutt Valley Motors', 'unavailable' => true,
             'starts_local' => '2026-09-24T09:00', 'ends_local' => '2026-09-24T11:00', 'notes' => 'Annual service.'];
         $this->actingAs($manager)->postJson("{$url}/appointments", $plan + ['request_key' => 'held-plan'])->assertOk();
         $held = FleetVehicleUnavailablePeriod::query()->where('work_order_id', $order->id)->sole();
@@ -531,9 +605,9 @@ class Pkg02bVehicleCalendarTest extends TestCase
 
         // The appointment still moves and releases its own hold.
         $this->actingAs($manager)->postJson("{$url}/appointments", ['starts_local' => '2026-09-25T10:00', 'ends_local' => '2026-09-25T12:00',
-            'change_reason' => 'Garage moved us.', 'request_key' => 'held-move'] + $plan)->assertOk();
+            'expected_version' => (int) $order->fresh()->version, 'change_reason' => 'Garage moved us.', 'request_key' => 'held-move'] + $plan)->assertOk();
         $this->assertSame('2026-09-24 22:00', $held->fresh()->starts_at->utc()->format('Y-m-d H:i'));
-        $this->actingAs($manager)->postJson("{$url}/appointments", ['operation' => 'cancel', 'work_order_id' => $order->id,
+        $this->actingAs($manager)->postJson("{$url}/appointments", ['operation' => 'cancel', 'work_order_id' => $order->id, 'expected_version' => (int) $order->fresh()->version,
             'change_reason' => 'Provider closed.', 'request_key' => 'held-cancel'])->assertOk();
         $this->assertSame('cancelled', $held->fresh()->state);
         // A released hold isn't restored from the calendar either.
@@ -726,7 +800,7 @@ class Pkg02bVehicleCalendarTest extends TestCase
         $vehicle = $this->vehicle($this->site);
         $order = $this->workOrder($vehicle, $maintenance, 'Routine service');
         $this->actingAs($maintenance)->postJson("/fleet-assets/vehicles/{$vehicle->id}/appointments", [
-            'work_order_id' => $order->id, 'provider_name' => 'Hutt Valley Motors', 'unavailable' => true,
+            'work_order_id' => $order->id, 'expected_version' => (int) $order->fresh()->version, 'provider_name' => 'Hutt Valley Motors', 'unavailable' => true,
             'starts_local' => '2026-09-24T09:00', 'ends_local' => '2026-09-24T11:00', 'notes' => 'Annual service.',
             'request_key' => 'privacy-appointment',
         ])->assertOk();

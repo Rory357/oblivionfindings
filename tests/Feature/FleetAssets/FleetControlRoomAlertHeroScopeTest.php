@@ -42,6 +42,21 @@ class FleetControlRoomAlertHeroScopeTest extends TestCase
         $this->assertFleetHeroAlertCounts($manager, 2);
     }
 
+    public function test_canonical_vehicle_signals_appear_in_fleet_alerts_without_widening_site_access(): void
+    {
+        [$local, $foreign] = [Site::factory()->create(), Site::factory()->create()];
+        $viewer = $this->siteScopedUser($local, ['fleet.viewAny', 'assets.viewAny']);
+        $visible = ControlRoomAlert::factory()->open()->create([
+            'source' => 'queclink_fleet', 'alert_type' => 'Vehicle overspeed', 'site_id' => $local->id,
+        ]);
+        ControlRoomAlert::factory()->open()->create([
+            'source' => 'queclink_fleet', 'alert_type' => 'Vehicle overspeed', 'site_id' => $foreign->id,
+        ]);
+        $this->actingAs($viewer)->get('/fleet-assets/alerts')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('hero.unresolved', 1)
+                ->has('control_room_alerts.data', 1)->where('control_room_alerts.data.0.id', $visible->id));
+    }
+
     private function assertFleetHeroAlertCounts(User $user, int $expected): void
     {
         foreach ([

@@ -20,6 +20,7 @@ use App\Services\Fleet\FleetDrivingMetricsService;
 use App\Services\Fleet\FleetTripService;
 use App\Services\Fleet\VehicleTripHistoryService;
 use App\Services\Fleet\VehicleTripReportExporter;
+use App\Services\Maps\OsmReportDataset;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\QueryException;
@@ -29,6 +30,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\ReportMapFixture;
 use Tests\TestCase;
 
 /**
@@ -53,6 +55,7 @@ class Pkg02bVehicleTripHistoryTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->travelTo(Carbon::parse('2026-09-22 09:30:00', self::ZONE)->utc());
         config([
+            'report_maps.directory' => storage_path('framework/testing/no-installed-report-map'),
             'fleet.behaviour.speeding_kph' => 60,
             'fleet.trip.coverage_gap_seconds' => 120,
             'fleet.behaviour.score_min_coverage_pct' => 90,
@@ -544,16 +547,37 @@ class Pkg02bVehicleTripHistoryTest extends TestCase
 
         $excel = $this->actingAs($viewer)->get("{$base}/excel?from=2026-09-19&to=2026-09-21");
         $excel->assertOk();
-        $this->assertStringStartsWith('application/vnd.ms-excel', (string) $excel->headers->get('Content-Type'));
-        $this->assertStringContainsString('kwh014-trips-2026-09-19-to-2026-09-21.xls', (string) $excel->headers->get('Content-Disposition'));
-        $sheet = $excel->streamedContent();
-        $this->assertStringContainsString('<Workbook', $sheet);
+        $this->assertStringStartsWith('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', (string) $excel->headers->get('Content-Type'));
+        $this->assertStringContainsString('kwh014-trips-2026-09-19-to-2026-09-21.xlsx', (string) $excel->headers->get('Content-Disposition'));
+        $archive = tempnam(sys_get_temp_dir(), 'trip-export-test-');
+        file_put_contents($archive, $excel->getContent());
+        $zip = new \ZipArchive;
+        try {
+            $this->assertTrue($zip->open($archive));
+            $this->assertNotFalse($zip->locateName('xl/media/image4-1.png'));
+            $this->assertStringStartsWith("\x89PNG", $zip->getFromName('xl/media/image4-1.png'));
+            $sheet = '';
+            for ($entry = 0; $entry < $zip->numFiles; $entry++) {
+                $name = $zip->getNameIndex($entry);
+                if (str_ends_with($name, '.xml') || str_ends_with($name, '.rels')) {
+                    $part = $zip->getFromIndex($entry);
+                    $document = new \DOMDocument;
+                    $this->assertTrue($document->loadXML($part, LIBXML_NONET), $name);
+                    $sheet .= $part;
+                }
+            }
+            $zip->close();
+        } finally {
+            unlink($archive);
+        }
+        $this->assertStringContainsString('Journey sketches', $sheet);
         $this->assertStringContainsString('Kōwhai van', $sheet);
         $this->assertStringContainsString('Kōwhai House', $sheet);
         $this->assertStringContainsString('Trip #'.$business->id, $sheet);
-        // The leading apostrophe (escaped as &apos; in XML) keeps the text literal.
-        $this->assertStringContainsString('<Data ss:Type="String">&apos;=HYPERLINK(', $sheet);
-        $this->assertStringNotContainsString('<Data ss:Type="String">=HYPERLINK', $sheet);
+        // Native inline strings remain literal, even when they start with '='.
+        $this->assertStringContainsString('t="inlineStr"><is><t xml:space="preserve">=HYPERLINK(', $sheet);
+        $this->assertStringNotContainsString('<f>HYPERLINK', $sheet);
+        $this->assertStringContainsString('<f>SUM(I8:I8)</f>', $sheet);
         $this->assertStringNotContainsString('PERSONAL ONLY', $sheet);
         $this->assertStringNotContainsString('Trip #'.$personal->id, $sheet);
         $this->assertStringContainsString('Over fleet speed threshold', $sheet);
@@ -588,6 +612,127 @@ class Pkg02bVehicleTripHistoryTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('range');
         $this->actingAs($viewer)->getJson("{$base}/csv?from=2026-09-19&to=2026-09-21")->assertNotFound();
         $this->actingAs($outsider)->getJson("{$base}/pdf?from=2026-09-19&to=2026-09-21")->assertNotFound();
+    }
+
+    public function test_excel_duration_totals_recalculate_from_recorded_seconds_without_per_trip_rounding(): void
+    {
+        $viewer = $this->siteUser([$this->site], ['fleet.viewAny']);
+        $service = app(VehicleTripHistoryService::class);
+        $exporter = app(VehicleTripReportExporter::class);
+        // Upward, downward and mixed rounding previously changed the sum on open.
+        foreach ([[40, 40], [20, 20], [29, 31, 61]] as $durations) {
+            $vehicle = $this->vehicle($this->site);
+            foreach ($durations as $index => $seconds) {
+                $start = '2026-09-21 '.sprintf('%02d:00', 8 + $index);
+                $this->trip($vehicle, $start, 1, [
+                    'ended_at' => $this->local($start)->addSeconds($seconds),
+                    'duration_s' => $seconds,
+                ]);
+            }
+            $report = $service->exportReport($viewer, $service->vehicle($viewer, $vehicle->id),
+                $service->filters(['from' => '2026-09-21', 'to' => '2026-09-21']), 200, false, false);
+            $data = $exporter->viewData($report, 'Test Viewer');
+            $seconds = array_sum($durations);
+            $this->assertSame($seconds, $report['totals']['duration_s']);
+            $this->assertSame($seconds, $data['totals']['duration_seconds']);
+            // The shared PDF presentation keeps its existing whole-minute labels.
+            $this->assertSame((int) round($seconds / 60), $data['totals']['minutes']);
+            $this->assertSame(round($seconds / 60).' min', $data['totals']['duration_label']);
+            foreach ($report['trips'] as $index => $trip) {
+                $this->assertSame((int) round($trip['duration_s'] / 60), $data['trips'][$index]['minutes']);
+            }
+            $html = $exporter->html($report, 'Test Viewer');
+            $this->assertStringContainsString($data['totals']['duration_label'], $html);
+            $this->assertStringNotContainsString('fractional minutes', $html);
+
+            $response = $this->actingAs($viewer)->get("/fleet-assets/vehicles/{$vehicle->id}/trip-history/export/excel?from=2026-09-21&to=2026-09-21&maps=0&events=0");
+            $response->assertOk();
+            $archive = tempnam(sys_get_temp_dir(), 'trip-duration-test-');
+            file_put_contents($archive, $response->getContent());
+            $zip = new \ZipArchive;
+            try {
+                $this->assertTrue($zip->open($archive));
+                $sheet = new \DOMDocument;
+                $this->assertTrue($sheet->loadXML($zip->getFromName('xl/worksheets/sheet1.xml'), LIBXML_NONET));
+                $xpath = new \DOMXPath($sheet);
+                $xpath->registerNamespace('s', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+                $sum = 0.0;
+                foreach ($report['trips'] as $index => $trip) {
+                    $row = $index + 8;
+                    $value = (float) $xpath->evaluate("string(//s:c[@r='J{$row}']/s:v)");
+                    $this->assertEqualsWithDelta($trip['duration_s'], $value * 60, 0.00000001);
+                    $this->assertSame('4', $xpath->evaluate("string(//s:c[@r='J{$row}']/@s)"));
+                    $sum += $value;
+                }
+                $lastRow = count($durations) + 7;
+                $totalRow = $lastRow + 1;
+                $formula = $xpath->evaluate("string(//s:c[@r='J{$totalRow}']/s:f)");
+                $cached = (float) $xpath->evaluate("string(//s:c[@r='J{$totalRow}']/s:v)");
+                $this->assertSame("SUM(J8:J{$lastRow})", $formula);
+                $this->assertEqualsWithDelta($seconds, $sum * 60, 0.00000001);
+                $this->assertEqualsWithDelta($seconds, $cached * 60, 0.00000001);
+                $this->assertEqualsWithDelta($sum, $cached, 0.0000000001);
+                $this->assertSame('4', $xpath->evaluate("string(//s:c[@r='J{$totalRow}']/@s)"));
+                $styles = simplexml_load_string($zip->getFromName('xl/styles.xml'), options: LIBXML_NONET);
+                $this->assertSame('2', (string) $styles->cellXfs->xf[4]['numFmtId']); // Built-in 0.00 display only.
+                $this->assertStringContainsString('totals use the unrounded values', $zip->getFromName('xl/worksheets/sheet2.xml'));
+                $zip->close();
+            } finally {
+                unlink($archive);
+            }
+        }
+    }
+
+    public function test_local_street_maps_are_embedded_in_both_formats_with_dataset_audit_and_privacy(): void
+    {
+        $directory = sys_get_temp_dir().'/oblivion-export-map-'.bin2hex(random_bytes(8));
+        mkdir($directory);
+        try {
+            $source = ReportMapFixture::create($directory);
+            $sha = hash_file('sha256', $source);
+            app(OsmReportDataset::class)->install($source, $directory.'/installed', 'Synthetic export fixture', '2026-09-23', $sha);
+            config(['report_maps.directory' => $directory.'/installed']);
+            $viewer = $this->siteUser([$this->site], ['fleet.viewAny']);
+            $outsider = $this->siteUser([$this->foreignSite], ['fleet.viewAny']);
+            $vehicle = $this->vehicle($this->site);
+            $this->trip($vehicle, '2026-09-21 08:00', 12);
+            $this->regularSamples($vehicle, '2026-09-21 08:00', 12);
+            $this->trip($vehicle, '2026-09-20 12:00', 30, ['is_personal' => true, 'start_address' => 'PRIVATE LOCATION']);
+            $url = "/fleet-assets/vehicles/{$vehicle->id}/trip-history/export";
+            $service = app(VehicleTripHistoryService::class);
+            $report = $service->exportReport($viewer, $service->vehicle($viewer, $vehicle->id),
+                $service->filters(['from' => '2026-09-19', 'to' => '2026-09-21']), 200, true, true);
+            $html = app(VehicleTripReportExporter::class)->html($report, 'Test Viewer');
+            $this->assertStringContainsString('data:image/png;base64,', $html);
+            $this->assertStringContainsString('OpenStreetMap contributors', $html);
+            $this->assertStringNotContainsString('PRIVATE LOCATION', $html);
+            $this->assertStringNotContainsString('sketch only', $html);
+            $this->actingAs($viewer)->get("{$url}/pdf?from=2026-09-19&to=2026-09-21")->assertOk();
+            $excel = $this->actingAs($viewer)->get("{$url}/excel?from=2026-09-19&to=2026-09-21")->assertOk();
+            $path = $directory.'/report.xlsx';
+            file_put_contents($path, $excel->getContent());
+            $zip = new \ZipArchive;
+            $zip->open($path);
+            $this->assertStringContainsString('Journey maps', $zip->getFromName('xl/workbook.xml'));
+            $this->assertStringContainsString('OpenStreetMap', $zip->getFromName('xl/worksheets/sheet4.xml'));
+            $size = getimagesizefromstring($zip->getFromName('xl/media/image4-1.png'));
+            $this->assertSame([1040, 440], [$size[0], $size[1]]);
+            $zip->close();
+            $audit = AuditLog::query()->where('action', 'fleet.trip_history.exported')->latest('id')->firstOrFail();
+            $this->assertSame('local_osm_street_map', $audit->meta['route_images'][0]['kind']);
+            $this->assertSame($sha, $audit->meta['route_images'][0]['dataset']['sha256']);
+            $this->assertSame(1, $audit->meta['route_images'][0]['trips']);
+            $this->actingAs($outsider)->getJson("{$url}/pdf?from=2026-09-19&to=2026-09-21")->assertNotFound();
+            $this->actingAs($viewer)->get("{$url}/excel?from=2026-09-19&to=2026-09-21&maps=0")->assertOk();
+            $audit = AuditLog::query()->where('action', 'fleet.trip_history.exported')->latest('id')->firstOrFail();
+            $this->assertSame([], $audit->meta['route_images']);
+        } finally {
+            $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
+            foreach ($files as $file) {
+                $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
+            }
+            rmdir($directory);
+        }
     }
 
     public function test_driving_metrics_count_queclink_harsh_reports_and_speed_episodes(): void

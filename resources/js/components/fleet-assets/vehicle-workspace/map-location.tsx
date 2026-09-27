@@ -730,8 +730,8 @@ export function VehicleLocationPanel({
                     </div>
                     <p className="studio-footnote">
                         One shared geofence record can be selected from vehicle,
-                        client, site or house maps. Geofences linked here stay
-                        inactive until monitoring is set up separately.
+                        client, site or house maps. Linking a boundary does not
+                        change its monitoring settings.
                     </p>
                     <Button
                         variant="ghost"
@@ -915,7 +915,7 @@ export function VehicleLocationPanel({
                         ],
                         [
                             'Automatic alerts',
-                            'Geofences linked here are inactive; monitoring is a separate action',
+                            'Linking a boundary does not enable monitoring; check its separate monitoring settings',
                         ],
                     ]}
                     onClose={() => setDialog(null)}

@@ -67,8 +67,12 @@ type LeafletMapProps = {
     height?: number | string;
     className?: string;
     clustering?: boolean;
+    /** Keep legacy map behaviour by default; dense overview maps can cluster earlier. */
+    clusterThreshold?: number;
     darkMode?: boolean;
     onMarkerClick?: (id: string | number) => void;
+    /** Use the caller's detail panel instead of Leaflet's popup on a pin. */
+    showMarkerPopups?: boolean;
     onMapClick?: (latlng: { lat: number; lng: number }) => void;
     /** Fit the view to the polyline (or the markers) once the map loads. */
     autoFit?: boolean;
@@ -290,8 +294,36 @@ function createLeafletMarker(
             fillOpacity: 1,
         });
     }
-    return leaflet.marker([marker.lat, marker.lng], {
+    const layer = leaflet.marker([marker.lat, marker.lng], {
         icon: createDivIcon(leaflet, marker),
+        alt: marker.title || 'Map resource',
+    });
+    bindMarkerLabel(layer, marker.title || 'Map resource');
+    return layer;
+}
+
+/** DivIcon pins need an explicit name; Leaflet's alt option only labels img icons. */
+function bindMarkerLabel(layer: any, label: string) {
+    layer.on('add', () => {
+        const element = layer.getElement?.();
+        element?.setAttribute('role', 'button');
+        element?.setAttribute('aria-label', label);
+    });
+}
+
+function bindKeyboardSelect(
+    layer: any,
+    id: string | number,
+    select: (id: string | number) => void,
+) {
+    layer.on('add', () => {
+        layer
+            .getElement?.()
+            ?.addEventListener('keydown', (event: KeyboardEvent) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                select(id);
+            });
     });
 }
 
@@ -321,16 +353,32 @@ function bindMarkerContext(
     handler: HandlerRef<MapContextPoint>,
 ) {
     if (!handler.current) return;
-    layer.on('contextmenu', (e: any) => {
-        // Stop Leaflet passing the event on to the map's own handler.
-        leaflet.DomEvent.stopPropagation(e);
-        if (e.originalEvent) leaflet.DomEvent.preventDefault(e.originalEvent);
-        handler.current?.({
-            lat: marker.lat,
-            lng: marker.lng,
-            x: e.originalEvent?.clientX ?? 0,
-            y: e.originalEvent?.clientY ?? 0,
-            markerId: marker.id,
+    layer.on('add', () => {
+        const element = layer.getElement?.();
+        if (!element) return;
+        const open = (x: number, y: number) =>
+            handler.current?.({
+                lat: marker.lat,
+                lng: marker.lng,
+                x,
+                y,
+                markerId: marker.id,
+            });
+        element.addEventListener('contextmenu', (event: MouseEvent) => {
+            leaflet.DomEvent.preventDefault(event);
+            leaflet.DomEvent.stopPropagation(event);
+            open(event.clientX, event.clientY);
+        });
+        element.addEventListener('keydown', (event: KeyboardEvent) => {
+            if (
+                event.key !== 'ContextMenu' &&
+                !(event.shiftKey && event.key === 'F10')
+            )
+                return;
+            event.preventDefault();
+            event.stopPropagation();
+            const rect = element.getBoundingClientRect();
+            open(rect.left + rect.width / 2, rect.top + rect.height / 2);
         });
     });
 }
@@ -351,10 +399,6 @@ type ClusterGroup = {
 };
 
 function clusterMarkers(markers: MapMarker[], zoom: number): ClusterGroup[] {
-    if (markers.length <= 20) {
-        return markers.map((m) => ({ lat: m.lat, lng: m.lng, markers: [m] }));
-    }
-
     // Grid cell size shrinks as zoom increases
     const gridSize = 360 / Math.pow(2, zoom);
     const buckets: Record<string, ClusterGroup> = {};
@@ -492,8 +536,10 @@ export default function LeafletMap({
     height = 400,
     className,
     clustering = false,
+    clusterThreshold = 20,
     darkMode,
     onMarkerClick,
+    showMarkerPopups = true,
     onMapClick,
     autoFit = false,
     fitMarkers = true,
@@ -529,7 +575,9 @@ export default function LeafletMap({
     const propsRef = useRef({
         markers,
         onMarkerClick,
+        showMarkerPopups,
         clustering,
+        clusterThreshold,
         polyline,
         polylineOptions,
         geofences,
@@ -541,7 +589,9 @@ export default function LeafletMap({
     propsRef.current = {
         markers,
         onMarkerClick,
+        showMarkerPopups,
         clustering,
+        clusterThreshold,
         polyline,
         polylineOptions,
         geofences,
@@ -564,23 +614,32 @@ export default function LeafletMap({
 
     function renderMarkers() {
         if (!markersLayerRef.current || !L) return;
-        const { markers, onMarkerClick, clustering, zoom } = propsRef.current;
+        const {
+            markers,
+            onMarkerClick,
+            showMarkerPopups,
+            clustering,
+            clusterThreshold,
+            zoom,
+        } = propsRef.current;
         markersLayerRef.current.clearLayers();
         const map = mapRef.current;
         const currentZoom = map?.getZoom() ?? zoom;
 
-        if (clustering && markers.length > 20) {
+        if (clustering && markers.length > clusterThreshold) {
             const clusters = clusterMarkers(markers, currentZoom);
 
             clusters.forEach((group) => {
                 if (group.markers.length === 1) {
                     const m = group.markers[0];
                     const leafletMarker = createLeafletMarker(L!, m);
-                    if (m.popup || m.title) {
+                    if (showMarkerPopups && (m.popup || m.title)) {
                         leafletMarker.bindPopup(mapMarkerPopupHtml(m));
                     }
                     if (onMarkerClick)
                         leafletMarker.on('click', () => onMarkerClick(m.id));
+                    if (onMarkerClick && !showMarkerPopups)
+                        bindKeyboardSelect(leafletMarker, m.id, onMarkerClick);
                     bindStatsTooltip(leafletMarker, m);
                     bindMarkerContext(L!, leafletMarker, m, onContextRef);
                     markersLayerRef.current.addLayer(leafletMarker);
@@ -591,15 +650,22 @@ export default function LeafletMap({
                     );
                     const clusterMarker = L!.marker([group.lat, group.lng], {
                         icon: clusterIcon,
+                        alt: `${group.markers.length} nearby map pins. Zoom in or use the resource list to choose one`,
                     });
-                    clusterMarker.on('click', () => {
+                    bindMarkerLabel(
+                        clusterMarker,
+                        `${group.markers.length} nearby map pins. Zoom in or use the resource list to choose one`,
+                    );
+                    const openCluster = () => {
                         const bounds = L!.latLngBounds(
                             group.markers.map(
                                 (m) => [m.lat, m.lng] as [number, number],
                             ),
                         );
                         map?.fitBounds(bounds, { padding: [40, 40] });
-                    });
+                    };
+                    clusterMarker.on('click', openCluster);
+                    bindKeyboardSelect(clusterMarker, 'cluster', openCluster);
                     markersLayerRef.current.addLayer(clusterMarker);
                 }
             });
@@ -607,12 +673,14 @@ export default function LeafletMap({
             markers.forEach((m) => {
                 const leafletMarker = createLeafletMarker(L!, m);
 
-                if (m.popup || m.title) {
+                if (showMarkerPopups && (m.popup || m.title)) {
                     leafletMarker.bindPopup(mapMarkerPopupHtml(m));
                 }
 
                 if (onMarkerClick)
                     leafletMarker.on('click', () => onMarkerClick(m.id));
+                if (onMarkerClick && !showMarkerPopups)
+                    bindKeyboardSelect(leafletMarker, m.id, onMarkerClick);
                 bindStatsTooltip(leafletMarker, m);
                 bindMarkerContext(L!, leafletMarker, m, onContextRef);
                 markersLayerRef.current.addLayer(leafletMarker);
@@ -621,13 +689,14 @@ export default function LeafletMap({
     }
 
     // Auto-fit bounds to all markers. Intentionally skipped when clustering
-    // is active with >20 markers (matches pre-refactor behaviour) and when
+    // is active above its threshold and when
     // called from the zoomend handler.
     function fitBoundsToMarkers() {
         if (!L || !mapRef.current) return;
-        const { markers, clustering, fitMarkers } = propsRef.current;
+        const { markers, clustering, clusterThreshold, fitMarkers } =
+            propsRef.current;
         if (!fitMarkers) return;
-        if (clustering && markers.length > 20) return;
+        if (clustering && markers.length > clusterThreshold) return;
         if (markers.length <= 1) return;
         const bounds = L.latLngBounds(
             markers.map((m) => [m.lat, m.lng] as [number, number]),
@@ -736,7 +805,7 @@ export default function LeafletMap({
 
     // Idempotently attach the zoomend listener used to re-cluster on zoom.
     syncClusterZoomListenerRef.current = () => {
-        const { markers, clustering } = propsRef.current;
+        const { markers, clustering, clusterThreshold } = propsRef.current;
         const map = mapRef.current;
         if (!map) return;
 
@@ -744,7 +813,7 @@ export default function LeafletMap({
             map.off('zoomend', clusterZoomHandlerRef.current);
             clusterZoomHandlerRef.current = null;
         }
-        if (clustering && markers.length > 20) {
+        if (clustering && markers.length > clusterThreshold) {
             const handler = () => renderMarkers();
             map.on('zoomend', handler);
             clusterZoomHandlerRef.current = handler;
@@ -932,7 +1001,14 @@ export default function LeafletMap({
         renderMarkers();
         fitBoundsToMarkers();
         syncClusterZoomListenerRef.current();
-    }, [markers, onMarkerClick, clustering, zoom]);
+    }, [
+        markers,
+        onMarkerClick,
+        showMarkerPopups,
+        clustering,
+        clusterThreshold,
+        zoom,
+    ]);
 
     // Re-render polyline when polyline-related props change
     useEffect(() => {

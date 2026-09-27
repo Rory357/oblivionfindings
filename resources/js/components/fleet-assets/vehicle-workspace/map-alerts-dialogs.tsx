@@ -325,12 +325,20 @@ export function DeliveryFailureDialog({
 }) {
     const command = useVehicleRecordCommand(isJsonObject);
     const [result, setResult] = useState('');
+    const [delivery, setDelivery] = useState(item.delivery);
+    const pending = delivery === 'pending' || delivery === 'processing';
+    const received = delivery === 'sent';
     const retry = async () => {
         const response = await command.submit(
             `/fleet-assets/vehicles/${workspace.vehicle.id}/alerts/signals/${item.signal_id}/retry`,
             { expected_attempts: item.attempts ?? 0 },
         );
         if (response) {
+            setDelivery(
+                typeof response.delivery === 'string'
+                    ? response.delivery
+                    : item.delivery,
+            );
             setResult(
                 typeof response.message === 'string'
                     ? response.message
@@ -343,7 +351,7 @@ export function DeliveryFailureDialog({
     return (
         <InsightModal
             title={item.kind}
-            description={`${item.reference} · Control Room delivery failed`}
+            description={`${item.reference} · ${received ? 'Control Room delivery received' : pending ? 'Waiting for Control Room receipt' : 'Control Room delivery failed'}`}
             icon={ShieldAlert}
             size="detail"
             onClose={onClose}
@@ -353,7 +361,7 @@ export function DeliveryFailureDialog({
                     <Button variant="outline" onClick={onClose}>
                         Back to vehicle alerts
                     </Button>
-                    {!result && (
+                    {!result && !pending && !received && (
                         <Button
                             disabled={
                                 !canRetry ||
@@ -374,7 +382,17 @@ export function DeliveryFailureDialog({
             }
         >
             <div className="control-room-summary">
-                <StatusBadge variant="critical">Delivery failed</StatusBadge>
+                <StatusBadge
+                    variant={
+                        received ? 'success' : pending ? 'info' : 'critical'
+                    }
+                >
+                    {received
+                        ? 'Received'
+                        : pending
+                          ? 'Waiting for Control Room'
+                          : 'Delivery failed'}
+                </StatusBadge>
                 <strong>
                     {item.attempts ?? 0} delivery{' '}
                     {item.attempts === 1 ? 'attempt' : 'attempts'}
@@ -388,9 +406,13 @@ export function DeliveryFailureDialog({
                 <ModalRow
                     label="Delivery"
                     value={
-                        item.delivery === 'unroutable'
-                            ? 'Control Room could not route it: its site or signal source needs attention'
-                            : 'Control Room did not confirm receipt'
+                        received
+                            ? 'Control Room confirmed delivery. Return to the queue for its response record.'
+                            : pending
+                              ? 'Queued for processing. Receipt has not yet been confirmed.'
+                              : delivery === 'unroutable'
+                                ? 'Control Room could not route it: its site or signal source needs attention'
+                                : 'Control Room did not confirm receipt'
                     }
                 />
                 <ModalRow label="Source record" value={item.reference} />
@@ -404,11 +426,11 @@ export function DeliveryFailureDialog({
                 }
                 tone={result ? 'info' : command.message ? 'warning' : 'info'}
             >
-                {result
-                    ? undefined
+                {pending
+                    ? 'The delivery worker must process this signal before Control Room can respond. It stays in the vehicle queue until delivery succeeds.'
                     : 'Retrying sends the same signal identity again, so Control Room still opens one response for it.'}
             </StudioNotice>
-            {!canRetry && (
+            {!canRetry && !pending && !received && (
                 <p className="vehicle-insight-text text-caption">
                     Retrying a delivery needs Control Room alert management
                     access.

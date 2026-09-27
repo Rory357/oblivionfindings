@@ -446,7 +446,11 @@ abstract class TestCase extends BaseTestCase
             ], env: ['MYSQL_PWD' => $password]);
 
             $process->setInput(file_get_contents($schemaPath));
-            $process->setTimeout(max(300, min(1800, (int) ($this->environmentValue('MYSQL_TEST_SCHEMA_TIMEOUT') ?? 300))));
+            // The shared local MySQL server may be importing other isolated
+            // schemas at the same time. Keep the normal five-minute limit,
+            // with an explicit opt-in for suites running under that load.
+            $timeout = (int) ($this->environmentValue('MYSQL_TEST_SCHEMA_TIMEOUT') ?? 300);
+            $process->setTimeout(max(300, min(1800, $timeout)));
             $process->run();
 
             if ($process->isSuccessful()) {

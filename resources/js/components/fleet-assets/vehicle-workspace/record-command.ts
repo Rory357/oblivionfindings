@@ -1,7 +1,13 @@
 import { useRef, useState } from 'react';
 
 type FieldErrors = Record<string, string>;
-type PendingCommand = { key: string; signature: string; url: string };
+type PendingCommand = {
+    key: string;
+    signature: string;
+    url: string;
+    method: 'POST' | 'PUT' | 'DELETE';
+    body: string | FormData;
+};
 type CommandOptions = { method?: 'POST' | 'PUT' | 'DELETE' };
 
 /** A stable identity for a payload, including staged files, so a retry reuses its key. */
@@ -57,22 +63,33 @@ export function useVehicleRecordCommand<T>(
         if (
             !uncertain &&
             (pending.current?.signature !== signature ||
-                pending.current?.url !== url)
+                pending.current?.url !== url ||
+                pending.current?.method !== (options.method ?? 'POST'))
         ) {
-            pending.current = { key: crypto.randomUUID(), signature, url };
+            const body = data instanceof FormData ? new FormData() : signature;
+            if (body instanceof FormData && data instanceof FormData) {
+                data.forEach((value, key) => body.append(key, value));
+            }
+            pending.current = {
+                key: crypto.randomUUID(),
+                signature,
+                url,
+                body,
+                method: options.method ?? 'POST',
+            };
         }
         const command = pending.current;
         if (!command) return null;
-        const isForm = data instanceof FormData;
+        const isForm = command.body instanceof FormData;
         // An uncertain retry resends the original body, whatever the caller now holds.
-        const body = isForm ? data : uncertain ? command.signature : signature;
+        const body = command.body;
         busy.current = true;
         setProcessing(true);
         setErrors({});
         setMessage('');
         try {
             const response = await fetch(command.url, {
-                method: options.method ?? 'POST',
+                method: command.method,
                 credentials: 'same-origin',
                 cache: 'no-store',
                 headers: {
