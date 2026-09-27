@@ -63,6 +63,10 @@ class VehicleCalendarController extends Controller
                     $item['link'] = null;
                     $item['editable'] = false;
                 }
+                // Source IDs are unique only inside a vehicle calendar (for
+                // example check-due and compliance:wof). Shared calendar keys
+                // must remain unique when several vehicles have the same due date.
+                $item['id'] = 'vehicle:'.$vehicle->id.':'.$item['id'];
                 $item['vehicleId'] = (int) $vehicle->id;
                 $events[] = $item;
             }

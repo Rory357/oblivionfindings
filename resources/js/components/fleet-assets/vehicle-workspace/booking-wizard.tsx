@@ -49,6 +49,8 @@ export type BookingWizardMode =
           row: BookingRow;
           proposedStartLocal?: string;
           proposedEndLocal?: string;
+          proposedStartOffset?: string;
+          proposedEndOffset?: string;
       }
     | { kind: 'block'; startLocal?: string }
     | { kind: 'change-block'; row: UnavailableRow };
@@ -174,15 +176,19 @@ export function BookingWizard({
             start,
             end,
             starts_offset:
-                (booking || period) &&
-                !(mode.kind === 'change' && mode.proposedStartLocal)
-                    ? bookingOffset((booking ?? period)!.starts_at)
-                    : '',
+                mode.kind === 'change' && mode.proposedStartOffset
+                    ? mode.proposedStartOffset
+                    : (booking || period) &&
+                        !(mode.kind === 'change' && mode.proposedStartLocal)
+                      ? bookingOffset((booking ?? period)!.starts_at)
+                      : '',
             ends_offset:
-                (booking || period) &&
-                !(mode.kind === 'change' && mode.proposedEndLocal)
-                    ? bookingOffset((booking ?? period)!.ends_at)
-                    : '',
+                mode.kind === 'change' && mode.proposedEndOffset
+                    ? mode.proposedEndOffset
+                    : (booking || period) &&
+                        !(mode.kind === 'change' && mode.proposedEndLocal)
+                      ? bookingOffset((booking ?? period)!.ends_at)
+                      : '',
             driver_user_id:
                 booking?.driver?.id ??
                 (auth.user?.id as number | undefined) ??

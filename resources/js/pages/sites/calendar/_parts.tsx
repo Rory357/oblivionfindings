@@ -681,7 +681,16 @@ interface CalendarUI {
      * omitted, a right-click opens the entry like a click does.
      */
     onEntryContext?: (ev: Decorated, e: React.MouseEvent) => void;
-    onMove?: (ev: Decorated, start: Date, end?: Date) => void;
+    onMove?: (
+        ev: Decorated,
+        start: Date,
+        end?: Date,
+        intent?: {
+            kind: 'move' | 'resize';
+            startLocal: string;
+            endLocal: string;
+        },
+    ) => void;
     /** Drill into a single day (Month "+N more" → Day view for that date). */
     onMore?: (d: Date) => void;
 }
@@ -1145,7 +1154,33 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
                     e2.setMinutes(e2.getMinutes() + snap);
                     if (e2 <= s) e2.setTime(s.getTime() + 15 * 60000);
                 }
-                onMove(ev, s, e2);
+                // Retain the requested wall time even if the browser's Date
+                // normalises a skipped DST hour. Consumers can then validate it.
+                const wallShift = (date: Date, minutes: number) =>
+                    new Date(
+                        Date.UTC(
+                            date.getFullYear(),
+                            date.getMonth(),
+                            date.getDate(),
+                            date.getHours(),
+                            date.getMinutes(),
+                        ) +
+                            minutes * 60000,
+                    )
+                        .toISOString()
+                        .slice(0, 16);
+                const startLocal = wallShift(
+                    ev._start,
+                    mode === 'move' ? snap : 0,
+                );
+                let endLocal = wallShift(ev._end ?? ev._start, snap);
+                if (mode === 'resize' && endLocal <= startLocal)
+                    endLocal = wallShift(ev._start, 15);
+                onMove(ev, s, e2, {
+                    kind: mode,
+                    startLocal,
+                    endLocal,
+                });
             } else if (!moved) {
                 onSelect(ev);
             }

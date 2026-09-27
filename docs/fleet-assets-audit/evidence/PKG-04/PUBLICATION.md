@@ -29,3 +29,14 @@ Final browser logs are `implementation/integration-browser-{layout,regression,pr
 Main's exact-candidate technical decision is requested before the local-main fast-forward and remote push. Existing dirty Main records must be preserved. This candidate adds no migration, deployment command or operational activation.
 
 GitHub main's pre-existing test run [36290861559](https://github.com/Rory357/oblivionfindings/actions/runs/36290861559), on base `ba5bff2e8`, is failing across the broader repository (including Compliance and Control Room). This predates PKG-04 publication; full CI is not claimed green. Deployment, operational acceptance and large-fleet load verification remain separate from the completed desktop implementation and targeted integration checks.
+
+## Main review corrections
+
+Main requested two bounded corrections to historical candidate `25b1a8f18`. Both are implemented by the same owner; main remains unchanged until the renewed exact-candidate decision.
+
+- **T04-01:** Fleet aggregate IDs are now namespaced by vehicle after private busy-ID redaction. The canonical per-vehicle IDs, record IDs and source links remain intact. The regression creates same-date WoF and check reminders for two vehicles, verifies four unique stable aggregate IDs across refresh, and verifies unchanged individual-source IDs.
+- **T04-02:** Pure moves use elapsed canonical duration and resolve the proposed Auckland start before calculating the end instant. Month and timed-grid moves share this conversion; resize retains its separate intent. Timed-grid intent carries the requested wall time even when the browser would normalise a skipped hour. Repeated starts require an explicit first/second occurrence choice; nonexistent starts are rejected. Derived start/end offsets reach the existing reviewed booking wizard, including repeated end times. Manual changes, source versions, reason, authoritative save and reviewed Undo remain under the canonical workflow.
+- The reported 2027 autumn example now proposes 01:30–04:30 on 5 April, preserving 180 minutes. The actual corrected callback was executed from and onto both transitions under UTC and Auckland; the helper regression also covers both repeated occurrences and skipped-time denial. These are recorded in `implementation/review-fixes-callback.log` and `implementation/browser/dst-callback-results.json`.
+- Updated automated results: **91 frontend tests / 15 files passed; 45 backend tests / 811 assertions passed; full TypeScript clean; strict changed-file ESLint clean; production build passed in 4m 3s**. No additional schema or permission change was made.
+
+The final reviewed UI evidence is recorded in the `review-fixes-*.log` files and `browser/dst-ui-results.json`. Future DST UI dates are explicitly simulated in the real built application; those tests do not save. Separate real canonical save/Undo regression checks the dedicated synthetic booking and restores its original times.

@@ -5,6 +5,8 @@ namespace Tests\Feature\FleetAssets;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\FleetVehicleBooking;
+use App\Models\FleetVehicleComplianceRecord;
+use App\Models\FleetVehicleComplianceVersion;
 use App\Models\FleetVehicleReminder;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Models\FleetWorkOrder;
@@ -192,6 +194,40 @@ class Pkg02bFleetVehiclesAllSitesTest extends TestCase
         $this->assertStringNotContainsString('Private destination', $result->getContent());
         $this->actingAs($central)->getJson('/fleet-assets/vehicles/fleet-calendar/events?start=2026-01-01&end=2026-12-31')->assertUnprocessable();
         $this->actingAs($central)->getJson("/fleet-assets/vehicles/{$foreign->id}/calendar/records/booking/{$booking->id}")->assertNotFound();
+    }
+
+    public function test_fleet_calendar_due_entries_have_unique_stable_ids_across_vehicles(): void
+    {
+        $viewer = $this->siteUser($this->site, ['fleet.viewAny']);
+        $vehicles = collect(['Kōwhai van', 'Rimu van'])->map(fn (string $name) =>
+            $this->vehicle($this->site, $name, ['inspection_due_at' => now()->addDay()]));
+        foreach ($vehicles as $vehicle) {
+            $record = FleetVehicleComplianceRecord::query()->create(['asset_id' => $vehicle->id, 'kind' => 'wof']);
+            $version = FleetVehicleComplianceVersion::query()->create([
+                'record_id' => $record->id, 'version' => 1, 'applicability' => 'applicable', 'outcome' => 'pass',
+                'expires_on' => now()->addDay()->toDateString(),
+                'request_key' => 'calendar-identity-'.$vehicle->id, 'request_fingerprint' => str_repeat('a', 64),
+                'content_sha256' => str_repeat('b', 64), 'created_at' => now(),
+            ]);
+            $record->update(['current_version_id' => $version->id]);
+        }
+
+        $query = '?start=2026-09-24&end=2026-09-27';
+        $url = '/fleet-assets/vehicles/fleet-calendar/events'.$query;
+        $events = collect($this->actingAs($viewer)->getJson($url)->assertOk()->json('events'));
+        $this->assertCount(4, $events);
+        $this->assertCount(4, $events->pluck('id')->unique());
+        $this->assertSame($events->pluck('id')->all(), collect($this->getJson($url)->assertOk()->json('events'))->pluck('id')->all());
+        foreach ($vehicles as $vehicle) {
+            $entries = $events->where('vehicleId', $vehicle->id);
+            $this->assertEqualsCanonicalizing(['check', 'compliance'], $entries->pluck('kind')->all());
+            foreach ($entries as $entry) {
+                $this->assertStringStartsWith('vehicle:'.$vehicle->id.':', $entry['id']);
+            }
+            // Individual source calendars retain their own stable identities.
+            $source = collect($this->getJson('/fleet-assets/vehicles/'.$vehicle->id.'/calendar/events'.$query)->assertOk()->json('events'));
+            $this->assertEqualsCanonicalizing(['check-due', 'compliance:wof'], $source->pluck('id')->all());
+        }
     }
 
     public function test_the_vehicles_own_records_can_be_kept_across_sites(): void

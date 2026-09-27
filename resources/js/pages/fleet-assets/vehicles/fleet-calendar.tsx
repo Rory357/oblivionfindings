@@ -1,3 +1,4 @@
+import { bookingOffset } from '@/components/fleet-assets/vehicle-workspace/booking-time';
 import { addLocalMinutes } from '@/components/fleet-assets/vehicle-workspace/booking-wizard';
 import type {
     BookingRow,
@@ -55,7 +56,12 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { calendarCsv } from './calendar-export';
 import { CalendarRange } from './calendar-range';
-import { calendarDate, calendarLocal } from './calendar-time';
+import {
+    calendarDate,
+    calendarLocal,
+    calendarMoveChoices,
+    type CalendarTimeProposal,
+} from './calendar-time';
 import { FleetHeaderSlot, type FleetHeaderTargets } from './fleet-header';
 
 export type FleetCalendarVehicle = {
@@ -142,10 +148,7 @@ export function FleetCalendar({
     onDay?: (date: string) => void;
     onVehicle: (id: number | null) => void;
     onRequest: (vehicleId: number | null, start?: string, end?: string) => void;
-    onEdit: (
-        event: FleetEvent,
-        proposal?: { start: string; end: string },
-    ) => void;
+    onEdit: (event: FleetEvent, proposal?: CalendarTimeProposal) => void;
     onProfile: (id: number) => void;
     headerTargets?: FleetHeaderTargets;
     onView?: (view: CalView) => void;
@@ -173,6 +176,11 @@ export function FleetCalendar({
         );
     });
     const [selected, setSelected] = useState<FleetEvent | null>(null);
+    const [moveNotice, setMoveNotice] = useState('');
+    const [moveChoices, setMoveChoices] = useState<{
+        event: FleetEvent;
+        choices: CalendarTimeProposal[];
+    } | null>(null);
     const [bookingDetails, setBookingDetails] = useState<BookingRow | null>(
         null,
     );
@@ -214,6 +222,8 @@ export function FleetCalendar({
         setLoading(true);
         setError('');
         setSelected(null);
+        setMoveNotice('');
+        setMoveChoices(null);
         setMenu(null);
         try {
             const params = new URLSearchParams({
@@ -338,32 +348,53 @@ export function FleetCalendar({
         decorated: Decorated,
         proposedDate: Date,
         proposedEnd?: Date,
+        intent?: {
+            kind: 'move' | 'resize';
+            startLocal: string;
+            endLocal: string;
+        },
     ) => {
         if (!canChange) return;
         const event = eventByKey(decorated);
-        if (!event || event.kind !== 'booking' || !event.editable || !event.end)
-            return;
-        let startLocal: string;
-        let endLocal: string;
-        if (proposedEnd) {
-            startLocal = calendarLocal(proposedDate);
-            endLocal = calendarLocal(proposedEnd);
-        } else {
-            const oldStart = toDatetimeLocal(event.start);
-            const oldEnd = toDatetimeLocal(event.end);
-            const wallMinutes =
-                (new Date(`${oldEnd}:00Z`).getTime() -
-                    new Date(`${oldStart}:00Z`).getTime()) /
-                60000;
-            startLocal = `${keyDate(proposedDate)}T${oldStart.slice(11)}`;
-            endLocal = addLocalMinutes(startLocal, wallMinutes);
-        }
         if (
-            startLocal === toDatetimeLocal(event.start) &&
-            endLocal === toDatetimeLocal(event.end)
+            !event ||
+            event.kind !== 'booking' ||
+            !event.editable ||
+            !event.start ||
+            !event.end
         )
             return;
-        onEdit(event, { start: startLocal, end: endLocal });
+        setMoveNotice('');
+        setMoveChoices(null);
+        if (intent?.kind === 'resize' || (!intent && proposedEnd)) {
+            onEdit(event, {
+                start: intent?.startLocal ?? calendarLocal(proposedDate),
+                end: intent?.endLocal ?? calendarLocal(proposedEnd!),
+                startOffset: bookingOffset(event.start),
+            });
+            return;
+        }
+        const startLocal =
+            intent?.startLocal ??
+            `${keyDate(proposedDate)}T${toDatetimeLocal(event.start).slice(11)}`;
+        const choices = calendarMoveChoices(event.start, event.end, startLocal);
+        if (!choices.length) {
+            setMoveNotice(
+                'Cannot move to that Auckland time. It does not exist during the daylight-saving change, or the source duration is invalid. Choose another time.',
+            );
+            return;
+        }
+        if (choices.length > 1) {
+            setMoveChoices({ event, choices });
+            return;
+        }
+        const proposal = choices[0];
+        if (
+            Date.parse(`${proposal.start}:00${proposal.startOffset}`) ===
+            Date.parse(event.start)
+        )
+            return;
+        onEdit(event, proposal);
     };
     const shift = (direction: number) => {
         if (view === 'day') return onDate(keyDate(addDays(navDate, direction)));
@@ -584,6 +615,11 @@ export function FleetCalendar({
                     Recheck before requesting or changing a booking.
                 </p>
             )}
+            {moveNotice && (
+                <p role="alert" className="text-sm text-status-warning">
+                    {moveNotice}
+                </p>
+            )}
             <p className="text-caption flex items-center gap-2 rounded-lg border bg-card p-3">
                 <Lock className="size-4" />A lock means Cannot move. In-use and
                 restricted entries can be inspected by a short click or keyboard
@@ -703,6 +739,41 @@ export function FleetCalendar({
                 reservation, restriction or actual return may change after this
                 snapshot; every request and edit is checked again when saved.
             </p>
+            <Dialog
+                open={!!moveChoices}
+                onOpenChange={(open) => {
+                    if (!open) setMoveChoices(null);
+                }}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>
+                            Choose the repeated Auckland time
+                        </DialogTitle>
+                        <DialogDescription>
+                            {moveChoices?.choices[0].start.replace('T', ' ')}{' '}
+                            occurs twice as daylight saving ends. Choose the
+                            occurrence; the booking keeps its elapsed duration
+                            and opens for review.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {moveChoices?.choices.map((choice, index) => (
+                        <Button
+                            key={choice.startOffset}
+                            variant="outline"
+                            disabled={!canChange}
+                            onClick={() => {
+                                const event = moveChoices.event;
+                                setMoveChoices(null);
+                                if (canChange) onEdit(event, choice);
+                            }}
+                        >
+                            {index === 0 ? 'First' : 'Second'} occurrence (UTC
+                            {choice.startOffset})
+                        </Button>
+                    ))}
+                </DialogContent>
+            </Dialog>
             <Dialog
                 open={!!selected}
                 onOpenChange={(open) => {

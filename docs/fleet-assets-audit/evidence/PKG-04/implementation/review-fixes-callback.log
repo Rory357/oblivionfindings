@@ -1,0 +1,1 @@
+PASS: actual FleetCalendar move callback preserves elapsed duration from/onto autumn and spring changes in UTC and Auckland

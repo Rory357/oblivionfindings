@@ -281,7 +281,12 @@ export default function VehiclesIndex({
         start?: string,
         end?: string,
         event?: Pick<FleetEvent, 'kind' | 'recordId' | 'version'>,
-        proposal?: { start: string; end: string },
+        proposal?: {
+            start: string;
+            end: string;
+            startOffset?: string;
+            endOffset?: string;
+        },
     ) => {
         workflowRequest.current?.abort();
         const controller = new AbortController();
@@ -346,6 +351,8 @@ export default function VehiclesIndex({
                     row: result.row,
                     proposedStartLocal: proposal?.start,
                     proposedEndLocal: proposal?.end,
+                    proposedStartOffset: proposal?.startOffset,
+                    proposedEndOffset: proposal?.endOffset,
                 };
             } else {
                 if (!summary.can.request)
