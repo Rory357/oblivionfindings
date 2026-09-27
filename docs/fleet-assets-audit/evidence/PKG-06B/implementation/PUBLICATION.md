@@ -46,6 +46,8 @@ The expanded fresh backend run (`current-main-backend.xml`) passed the 49 Asset 
 
 ## Local-only verification state
 
+Final review packet: `MAIN-REVIEW.md`. Main's later `a6b9fae6a` commit changes only Transport lint packaging/documentation and is included; verified runtime code remains unchanged. PKG-06B uses the same narrow packaging approach for its frozen previews and versioned evidence, with `lint-scope.json` proving production components and tests remain subject to lint.
+
 `phpunit.pkg06b.xml`, `storage/framework/pkg06b-browser.json`, `storage/framework/pkg06b-dev-hot.txt`, dependencies and compiled build output are deliberately excluded from the commit. The local XML contains this machine's test-database configuration; no database password is included in the publication. The adjacent helper scripts use an explicitly identified synthetic database and do not supply credentials themselves. Preserve the running loopback preview/fixture while review depends on it.
 
 Production migrations/configuration, malware scanner activation, deployment and physical label printer/scanner calibration remain separate release work. No live database change is included in this publication request.
