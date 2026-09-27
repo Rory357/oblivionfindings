@@ -1,5 +1,7 @@
 # PKG-06A — Main review corrections
 
+Main subsequently closed these findings. The final reconciliation with published Fleet is recorded in [FINAL-MAIN-RECONCILIATION.md](FINAL-MAIN-RECONCILIATION.md); this document preserves the correction candidate's own evidence.
+
 This successor addresses Main's three findings against candidate `80731cf56b4f8224769afaa91573ad1c1e8240dd`. The original review packet and logs describe that earlier candidate and remain as historical evidence. Current source, actual published-main base and results are recorded in the revision-2 evidence manifest and final handoff.
 
 Application correction commit: `d8c7cf90d`. Exact frozen application/source merge: `c962e0db1e3b14ed56777d4cc678911b6daf5787`. Actual fetched published-main base: `49e0be5b1c1716aeb4e681529bb71fdce2a7abc0` (approved Transport publication). The merge was conflict-free and did not read from local `main` or import PKG-03 local-only work. Subsequent review evidence commits do not alter application source.
