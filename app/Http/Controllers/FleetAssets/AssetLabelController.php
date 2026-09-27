@@ -55,7 +55,7 @@ class AssetLabelController extends Controller
     {
         $this->authorize('viewAny', Asset::class);
         $data = $request->validate(['request_id' => 'required|uuid', 'asset_ids' => 'required|array|min:1|max:200', 'asset_ids.*' => 'required|integer|distinct',
-            'layout' => 'required|array:width,height,margin,gap,copies,start,paper,logo', 'layout.width' => 'required|numeric|min:50|max:190', 'layout.height' => 'required|numeric|min:46|max:277',
+            'layout' => 'required|array:width,height,margin,gap,copies,start,paper,logo', 'layout.width' => 'required|numeric|min:40|max:190', 'layout.height' => 'required|numeric|min:40|max:277',
             'layout.paper' => 'sometimes|in:a4,label', 'layout.logo' => 'sometimes|boolean',
             'layout.margin' => 'required|numeric|min:0|max:30', 'layout.gap' => 'required|numeric|min:0|max:15',
             'layout.copies' => 'required|integer|min:1|max:20', 'layout.start' => 'required|integer|min:1|max:100']);
@@ -91,6 +91,9 @@ class AssetLabelController extends Controller
 
                 return $batch;
             }
+            // Existing A4 batches retain their original size and retry contract.
+            // New labels need enough space for branding, the QR quiet zone and identity.
+            abort_if($layout['width'] < 50 || $layout['height'] < 46, 422, 'Use labels at least 50 mm wide and 46 mm high.');
             $assets = $this->access->accessibleAssets($request->user())->whereKey($data['asset_ids'])->orderBy('id')->lockForUpdate()->get();
             abort_unless($assets->count() === count($data['asset_ids']), 404);
             foreach ($assets as $asset) {

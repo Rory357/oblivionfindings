@@ -19,6 +19,7 @@ use App\Models\FleetFinanceReviewRequest;
 use App\Models\FleetWorkOrder;
 use App\Models\Permission;
 use App\Models\Site;
+use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\Assets\AssetProfileSources;
 use App\Services\Files\MalwareScanDisposition;
@@ -325,6 +326,40 @@ class Pkg06bAssetProfileTest extends TestCase
             ->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
             ->component('fleet-assets/assets/labels')->where('assets.total', 1)
             ->where('assets.data.0.id', $visible->id)->has('matching', 1));
+    }
+
+    public function test_published_label_history_replays_its_original_layout_but_new_batches_use_the_shared_minimum(): void
+    {
+        $url = '/fleet-assets/asset-register/labels';
+        $layout = ['width' => 60, 'height' => 45, 'margin' => 10, 'gap' => 3, 'copies' => 1, 'start' => 1];
+        $batch = AssetLabelBatch::create(['request_id' => (string) Str::uuid(), 'created_by_user_id' => $this->manager->id,
+            'asset_ids' => [$this->asset->id], 'layout' => [...$layout, 'columns' => 3, 'rows' => 5],
+            'downloads' => [['at' => now()->toISOString(), 'format' => 'pdf', 'status' => 'generated']], 'expires_at' => now()->addDay()]);
+        $payload = ['request_id' => $batch->request_id, 'asset_ids' => [$this->asset->id], 'layout' => $layout];
+        $this->actingAs($this->manager)->postJson($url, $payload)->assertOk()->assertJsonPath('id', $batch->id);
+        $this->postJson($url, [...$payload, 'request_id' => (string) Str::uuid()])->assertUnprocessable();
+        $this->postJson($url, [...$payload, 'layout' => [...$layout, 'height' => 50]])->assertConflict();
+        $this->get($url.'/'.$batch->id.'/pdf')->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->assertCount(2, $batch->fresh()->downloads);
+        $this->assertSame(45, $batch->fresh()->layout['height']);
+        $this->assertDatabaseCount('asset_label_batches', 1);
+    }
+
+    public function test_pending_receipt_blocks_register_room_edits_and_rechecks_the_destination_room(): void
+    {
+        $originRoom = SiteRoom::create(['site_id' => $this->origin->id, 'name' => 'Origin equipment room']);
+        $destinationRoom = SiteRoom::create(['site_id' => $this->destination->id, 'name' => 'Destination equipment room']);
+        $recipient = $this->user([$this->destination]);
+        $move = $this->command('dispatch', ['destination_site_id' => $this->destination->id, 'destination_room_id' => $destinationRoom->id, 'recipient_user_id' => $recipient->id])->assertOk()->json('movement_id');
+        $this->actingAs($this->manager)->putJson('/fleet-assets/assets/'.$this->asset->id, ['name' => $this->asset->name, 'site_id' => $this->origin->id, 'site_room_id' => $originRoom->id, 'status' => 'active', 'risk_level' => 'low'])->assertUnprocessable()->assertJsonValidationErrors('site_room_id');
+        $this->assertNull($this->asset->fresh()->site_room_id);
+        $destinationRoom->update(['site_id' => $this->origin->id]);
+        $this->command('receive', ['movement_id' => $move, 'outcome' => 'acknowledged', 'received_kit' => []])->assertNotFound();
+        $this->assertSame($this->origin->id, $this->asset->fresh()->site_id);
+        $this->assertSame('pending_receipt', AssetCustodyMovement::findOrFail($move)->state);
+        $destinationRoom->update(['site_id' => $this->destination->id]);
+        $this->command('receive', ['movement_id' => $move, 'outcome' => 'acknowledged', 'received_kit' => []])->assertOk();
+        $this->assertSame($destinationRoom->id, $this->asset->fresh()->site_room_id);
     }
 
     public function test_ownership_requires_its_permission_and_preserves_canonical_placement(): void

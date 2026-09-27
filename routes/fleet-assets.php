@@ -3,7 +3,9 @@
 use App\Http\Controllers\Fleet\FleetTripController;
 use App\Http\Controllers\FleetAssets\AlertController;
 use App\Http\Controllers\FleetAssets\AssetController;
+use App\Http\Controllers\FleetAssets\AssetImportController;
 use App\Http\Controllers\FleetAssets\AssetLabelController;
+use App\Http\Controllers\FleetAssets\AssetStocktakeController;
 use App\Http\Controllers\FleetAssets\ChecklistController;
 use App\Http\Controllers\FleetAssets\CommunityAccessController;
 use App\Http\Controllers\FleetAssets\ComplianceController;
@@ -51,6 +53,18 @@ use Inertia\Inertia;
 Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     Route::middleware('permission:assets.viewAny|assets.viewAssigned')->prefix('asset-register')->group(function () {
         Route::get('/labels/workspace', [AssetLabelController::class, 'workspace'])->name('fleet-assets.asset-labels.workspace');
+        Route::get('/rooms', [AssetController::class, 'rooms']);
+        Route::get('/stocktakes', [AssetStocktakeController::class, 'index']);
+        Route::get('/stocktake-checklist', [AssetStocktakeController::class, 'checklist']);
+        Route::post('/stocktakes', [AssetStocktakeController::class, 'store']);
+        Route::get('/stocktakes/{stocktake}', [AssetStocktakeController::class, 'show'])->whereNumber('stocktake');
+        Route::patch('/stocktakes/{stocktake}', [AssetStocktakeController::class, 'update'])->whereNumber('stocktake');
+        Route::post('/stocktakes/{stocktake}/resolve', [AssetStocktakeController::class, 'resolve'])->whereNumber('stocktake');
+        Route::get('/stocktakes/{stocktake}/export/{format}', [AssetStocktakeController::class, 'export'])->whereNumber('stocktake');
+        Route::get('/imports', [AssetImportController::class, 'index']);
+        Route::post('/imports', [AssetImportController::class, 'store']);
+        Route::get('/imports/{batch}', [AssetImportController::class, 'show'])->whereNumber('batch');
+        Route::patch('/imports/{batch}', [AssetImportController::class, 'update'])->whereNumber('batch');
         Route::get('/labels', [AssetLabelController::class, 'index']);
         Route::post('/labels', [AssetLabelController::class, 'store']);
         Route::get('/labels/{batch}/{format}', [AssetLabelController::class, 'download'])->whereNumber('batch');

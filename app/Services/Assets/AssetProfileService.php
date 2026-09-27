@@ -186,9 +186,13 @@ final class AssetProfileService
             throw ValidationException::withMessages(['received_kit' => 'Confirm every kit item or record an incomplete receipt.']);
         }
         if ($outcome === 'acknowledged') {
+            // A room may have changed since dispatch; revalidate its canonical site at receipt.
+            $room = $movement->destination_room_id
+                ? SiteRoom::where('site_id', $movement->destination_site_id)->whereKey($movement->destination_room_id)->lockForUpdate()->firstOrFail()
+                : null;
             $this->integrity->assertPlacementChangeAllowed($asset, ['site_id' => $movement->destination_site_id, 'home_site_id' => $asset->home_site_id === null ? null : $movement->destination_site_id]);
             $components = $this->movableComponents($actor, $asset, $movement->kit_snapshot, (int) $movement->destination_site_id);
-            $asset->forceFill(['site_id' => $movement->destination_site_id, 'home_site_id' => $asset->home_site_id === null ? null : $movement->destination_site_id, 'site_room_id' => $movement->destination_room_id, 'room_id' => null, 'location' => $movement->destination_room_id ? SiteRoom::whereKey($movement->destination_room_id)->value('name') : null])->save();
+            $asset->forceFill(['site_id' => $movement->destination_site_id, 'home_site_id' => $asset->home_site_id === null ? null : $movement->destination_site_id, 'site_room_id' => $room?->id, 'room_id' => null, 'location' => $room?->name])->save();
             foreach ($components as $component) {
                 $component->forceFill(['site_id' => $asset->site_id, 'home_site_id' => $component->home_site_id === null ? null : $asset->site_id, 'site_room_id' => $asset->site_room_id, 'room_id' => null, 'location' => $asset->location, 'asset_profile_version' => (int) $component->asset_profile_version + 1, 'updated_by_user_id' => $actor->id])->save();
                 AssetProfileEvent::create(['asset_id' => $component->id, 'actor_user_id' => $actor->id, 'action' => 'kit_receipt', 'request_key' => hash('sha256', $data['request_key'].':component:'.$component->id), 'fingerprint' => hash('sha256', json_encode($data, JSON_THROW_ON_ERROR)), 'payload' => ['message' => 'Actual receipt acknowledged with the parent kit. Maintenance restrictions remain unchanged.', 'parent_asset_id' => $asset->id, 'recorded_site_id' => $asset->site_id, 'reason' => $data['reason']], 'occurred_at' => now()]);

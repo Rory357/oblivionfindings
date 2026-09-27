@@ -32,7 +32,7 @@ final class SchemaCache
             'schema-cache:'.self::stamp().':tables',
             // Listing every database can block this request behind unrelated DDL
             // and report tables that do not belong to this application.
-            fn (): array => Schema::getTableListing(schema: Schema::getCurrentSchemaName(), schemaQualified: false),
+            fn (): array => Schema::getTableListing(Schema::getCurrentSchemaName(), schemaQualified: false),
         )), true);
 
         return isset(self::$tables[strtolower($table)]);

@@ -53,6 +53,8 @@ import {
     Wrench,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { api, type Option } from '../register/api';
+import { SearchPicker } from '../register/controls';
 
 /* ------------------------------------------------------------------ */
 /*  Props + local shapes                                               */
@@ -355,6 +357,31 @@ export function AssetWizardDialog({
     const [processing, setProcessing] = useState(false);
     const [done, setDone] = useState(false);
     const [createdId, setCreatedId] = useState<number | null>(null);
+    const [canonicalRoom, setCanonicalRoom] = useState('');
+    const [canonicalRooms, setCanonicalRooms] = useState<Option[]>([]);
+    useEffect(() => {
+        setCanonicalRoom('');
+        if (isEdit || !open || !data.site_id) {
+            setCanonicalRooms([]);
+            return;
+        }
+        const controller = new AbortController();
+        void api<Option[]>(
+            `/rooms?site_id=${data.site_id}`,
+            'GET',
+            undefined,
+            controller.signal,
+        )
+            .then(setCanonicalRooms)
+            .catch((error) => {
+                if (error.name !== 'AbortError')
+                    setErrors((previous) => ({
+                        ...previous,
+                        site_room_id: error.message,
+                    }));
+            });
+        return () => controller.abort();
+    }, [data.site_id, isEdit, open]);
 
     const cur = STEPS[stepIndex];
     const stepKey = cur.key as StepKey;
@@ -455,6 +482,9 @@ export function AssetWizardDialog({
 
         const payload = {
             expected_version: asset?.asset_profile_version,
+            ...(!isEdit
+                ? { site_room_id: canonicalRoom ? Number(canonicalRoom) : null }
+                : {}),
             name: data.name,
             asset_tag: nn(data.asset_tag),
             category: nn(data.category),
@@ -642,6 +672,32 @@ export function AssetWizardDialog({
                         onClientChange={handleClientChange}
                     />
                 ) : null}
+                {stepKey === 'location' && !isEdit && (
+                    <div className="mt-4">
+                        <SearchPicker
+                            label="Assigned room"
+                            options={canonicalRooms}
+                            value={canonicalRoom}
+                            onChange={setCanonicalRoom}
+                            empty="No room assigned"
+                            disabled={!data.site_id}
+                        />
+                        {errors.site_room_id && (
+                            <p
+                                role="alert"
+                                className="mt-1 text-xs text-status-critical"
+                            >
+                                {errors.site_room_id}
+                            </p>
+                        )}
+                    </div>
+                )}
+                {stepKey === 'location' && isEdit && (
+                    <p className="mt-4 text-sm text-muted-foreground">
+                        Changing the site or client clears the assigned room if
+                        it belongs to a different site.
+                    </p>
+                )}
                 {stepKey === 'compliance' ? (
                     <StepCompliance data={data} set={set} errors={errors} />
                 ) : null}

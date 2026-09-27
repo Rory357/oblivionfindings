@@ -83,6 +83,7 @@
         "concurrently": "^9.2.3",
         "globals": "^15.14.0",
         "input-otp": "^1.4.2",
+        "jsqr": "^1.4.0",
         "laravel-vite-plugin": "^2.0",
         "leaflet": "^1.9.4",
         "lucide-react": "^0.475.0",

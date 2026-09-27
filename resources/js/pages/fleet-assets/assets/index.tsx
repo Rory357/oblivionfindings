@@ -1,56 +1,85 @@
-import { FleetEmptyState } from '@/components/fleet-empty-state';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+/* eslint-disable no-restricted-syntax -- Custom connected tabs, location selectors and directory rows follow the approved workspace composition; standard actions use Button. */
+import { EntityCard } from '@/components/lists/entity-card';
+import { EntityTable } from '@/components/lists/entity-table';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageHeaderViewToggle,
+} from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { TabsRoot as Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { useIsMobile } from '@/hooks/use-mobile';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
-    AssetWizardDialog,
-    type AssetWizardPrefill,
-} from '@/pages/fleet-assets/assets/components/asset-wizard-dialog';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
-import { Head, Link, router } from '@inertiajs/react';
-import {
+    Archive,
+    ClipboardCheck,
     Download,
+    FileUp,
+    LayoutGrid,
+    List,
     LockKeyhole,
     MapPin,
     Package,
     Plus,
-    Search,
+    QrCode,
+    ShieldCheck,
+    TriangleAlert,
     Wifi,
+    X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import {
+    AssetWizardDialog,
+    type AssetWizardPrefill,
+} from './components/asset-wizard-dialog';
+import { api, type Option } from './register/api';
+import { ErrorNotice, Paging } from './register/controls';
+import { Imports } from './register/imports';
+import { Labels } from './register/labels';
+import {
+    LocationNavigator,
+    type LocationOption,
+} from './register/location-navigator';
+import { Stocktakes } from './register/stocktakes';
+import './register/workspace.css';
 
 type Asset = {
     id: number;
     name: string;
-    asset_tag: string;
-    category: string;
+    asset_tag: string | null;
+    category: string | null;
     status: string;
-    category_ref: { id: number; name: string; slug: string } | null;
-    site: { id: number; name: string } | null;
-    home_site: { id: number; name: string } | null;
-    manufacturer: string | null;
-    model: string | null;
+    site: Option | null;
+    room: Option | null;
+    location_note?: string | null;
+    ownership: string;
     serial_number: string | null;
     tracker_count: number | null;
+    last_inspected_at?: string | null;
+    inspection_due_at?: string | null;
+    maintenance_due_at?: string | null;
 };
-
+type Filters = {
+    category?: string;
+    status?: string;
+    site_id?: string | number;
+    site_room_id?: string | number;
+    search?: string;
+    view?: string;
+    ownership?: string;
+    workflow_status?: string;
+};
 type Props = {
     hero: {
         total: number;
@@ -60,409 +89,842 @@ type Props = {
     };
     assets: {
         data: Asset[];
-        links: Array<{ url: string | null; label: string; active: boolean }>;
-        meta: {
-            current_page: number;
-            last_page: number;
-            total: number;
-        };
+        meta: { current_page: number; last_page: number; total: number };
     };
-    filters: {
-        category: string;
-        status: string;
-        site_id: string;
-        search: string;
-    };
-    sites: Array<{ id: number; name: string }>;
-    categories: string[];
-    clients?: Array<{
+    filters: Filters;
+    sites: LocationOption[];
+    rooms: LocationOption[];
+    staff: Option[];
+    register_permissions: { create: boolean; count: boolean };
+    clients?: {
         id: number;
         first_name: string;
         last_name: string;
         site_id?: number | null;
-    }>;
+    }[];
     prefill?: AssetWizardPrefill | null;
-    created_asset_id?: number | null;
+    workflow_metrics?: {
+        label: string;
+        value: number;
+        caption: string;
+        status: string;
+    }[];
 };
 
 export function AssetTechnologySummary({ count }: { count: number | null }) {
-    if (count === null) {
-        return (
-            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                <LockKeyhole className="h-3 w-3" />
-                Technology restricted
-            </span>
-        );
-    }
-
     return (
         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-            <Wifi
-                className={`h-3 w-3 ${count > 0 ? 'text-status-success' : 'text-muted-foreground'}`}
-            />
-            {count > 0
-                ? `${count} linked ${count === 1 ? 'device' : 'devices'}`
-                : 'No linked devices'}
+            {count === null ? (
+                <LockKeyhole className="size-3" />
+            ) : (
+                <Wifi className="size-3" />
+            )}
+            {count === null
+                ? 'Device details restricted'
+                : `${count} linked ${count === 1 ? 'device' : 'devices'}`}
         </span>
     );
 }
-
-function statusVariant(
-    status: string,
-): 'default' | 'secondary' | 'destructive' | 'outline' {
-    switch (status) {
-        case 'active':
-            return 'default';
-        case 'out_of_service':
-            return 'destructive';
-        case 'retired':
-            return 'secondary';
-        default:
-            return 'outline';
-    }
-}
-
-function categoryColor(category: string): string {
-    switch (category) {
-        case 'vehicle':
-            return 'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info';
-        case 'equipment':
-            return 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning';
-        case 'property':
-            return 'bg-primary/10 text-primary dark:bg-primary dark:text-primary/70';
-        default:
-            return 'bg-muted text-foreground dark:bg-muted dark:text-muted-foreground';
-    }
-}
+const tabs = [
+    { key: 'inventory', label: 'Inventory', icon: Package },
+    { key: 'attention', label: 'Needs attention', icon: TriangleAlert },
+    { key: 'stocktake', label: 'Stocktake', icon: ClipboardCheck },
+    { key: 'imports', label: 'Imports', icon: FileUp },
+    { key: 'labels', label: 'QR labels', icon: QrCode },
+    { key: 'archived', label: 'Archived', icon: Archive },
+];
+const info: Record<string, [string, string]> = {
+    inventory: [
+        'Assets',
+        'Find equipment, follow its assigned location and keep every source connected.',
+    ],
+    attention: [
+        'Assets needing attention',
+        'Review service and inspection needs before putting equipment into use.',
+    ],
+    stocktake: [
+        'Stocktake',
+        'Choose a room, scan its assets, then review what needs follow-up.',
+    ],
+    imports: [
+        'Import inventory',
+        'Bring existing inventory into the register with a checked, recoverable import.',
+    ],
+    labels: [
+        'Asset QR labels',
+        'Create durable labels that open the same asset throughout its life.',
+    ],
+    archived: [
+        'Archived assets',
+        'Retired records remain available for history and reference.',
+    ],
+};
 
 export default function AssetsIndex({
+    workflow_metrics = [],
     hero,
     assets,
-    filters,
-    sites,
-    categories,
+    filters = {},
+    sites = [],
+    rooms = [],
+    staff = [],
+    register_permissions: permissions = { create: false, count: false },
     clients,
     prefill,
 }: Props) {
-    const [search, setSearch] = useState(filters.search ?? '');
-
-    // /fleet-assets/assets/create now redirects here with ?new=1 — open the
-    // create wizard on mount (the hero action links to the same shim).
+    const view = tabs.some((t) => t.key === filters.view)
+        ? filters.view!
+        : 'inventory';
+    const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
+    const mobile = useIsMobile();
+    const [directoryOpen, setDirectoryOpen] = useState(false);
+    const [newCount, setNewCount] = useState(0);
+    const [search, setSearch] = useState(filters.search || '');
+    const [cards, setCards] = useState(false);
+    const [selected, setSelected] = useState<Set<number>>(new Set());
+    const [error, setError] = useState('');
     const [wizardOpen, setWizardOpen] = useState(
         () =>
             typeof window !== 'undefined' &&
-            new URLSearchParams(window.location.search).has('new'),
+            new URLSearchParams(location.search).get('new') === '1',
     );
-
-    const closeWizard = () => {
-        setWizardOpen(false);
-        // Strip the shim params so a refresh doesn't reopen the wizard.
-        if (typeof window !== 'undefined') {
-            const url = new URL(window.location.href);
-            url.searchParams.delete('new');
-            url.searchParams.delete('created');
-            window.history.replaceState({}, '', url);
-        }
-    };
-
-    const allAssets = assets?.data ?? [];
-
-    const applyFilters = (newFilters: Partial<typeof filters>) => {
+    useEffect(() => setSearch(filters.search || ''), [filters.search]);
+    useEffect(() => {
+        if (search === (filters.search || '')) return;
+        const timer = window.setTimeout(
+            () =>
+                router.get(
+                    '/fleet-assets/assets',
+                    { ...filters, search, page: 1 },
+                    { preserveState: true, preserveScroll: true },
+                ),
+            350,
+        );
+        return () => window.clearTimeout(timer);
+    }, [search, filters]);
+    const inventory = ['inventory', 'attention', 'archived'].includes(view);
+    function apply(next: Record<string, string | number>) {
         router.get(
             '/fleet-assets/assets',
-            {
-                ...filters,
-                ...newFilters,
-                page: 1,
-            },
-            { preserveState: true },
+            { ...filters, page: 1, ...next },
+            { preserveState: true, preserveScroll: true },
         );
-    };
-
-    const handleSearch = () => {
-        applyFilters({ search });
-    };
-
+    }
+    function navigate(next: string) {
+        apply({
+            view: next,
+            workflow_status: '',
+            ...(next === 'archived' ? { status: '' } : {}),
+        });
+    }
+    function toggle(id: number, checked: boolean) {
+        setSelected((previous) => {
+            const next = new Set(previous);
+            if (checked) next.add(id);
+            else next.delete(id);
+            return next;
+        });
+    }
+    const actions = (asset: Asset) => [
+        {
+            label: 'Open asset profile',
+            icon: Package,
+            onClick: () => router.visit(`/fleet-assets/assets/${asset.id}`),
+        },
+        {
+            label: 'Create QR label',
+            icon: QrCode,
+            onClick: () => {
+                setSelected(new Set([asset.id]));
+                navigate('labels');
+            },
+        },
+    ];
+    const rows = assets?.data || [];
+    const outsidePage = [...selected].filter(
+        (id) => !rows.some((r) => r.id === id),
+    ).length;
+    const query = new URLSearchParams(
+        Object.entries(filters)
+            .filter(([, v]) => v !== null && v !== undefined && v !== '')
+            .map(([k, v]) => [k, String(v)]),
+    );
+    const metrics = [
+        {
+            label: 'Inventory',
+            value: hero.total,
+            caption: 'permitted assets, including retired',
+            filter: { view: 'inventory', status: '' },
+        },
+        {
+            label: 'Active',
+            value: hero.active,
+            caption: 'active records',
+            filter: { view: 'inventory', status: 'active' },
+        },
+        {
+            label: 'Out of service',
+            value: hero.maintenance,
+            caption: 'review before use',
+            filter: { view: 'attention', status: 'out_of_service' },
+        },
+        {
+            label: 'Inspections due',
+            value: hero.inspections_due,
+            caption: 'within 30 days',
+            filter: { view: 'attention', status: '' },
+        },
+    ];
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Assets', href: '/fleet-assets/assets' },
             ]}
         >
-            <Head title="Assets" />
-            <PageShell>
-                <HeroShell>
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={Package} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Asset register · live
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Assets
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Manage all organisational assets including
-                                vehicles, equipment, and property.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
-                                href="/fleet-assets/assets"
-                                label="Total assets"
-                                value={fmt(hero.total)}
-                                caption="all registered"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/assets?status=active"
-                                label="Active"
-                                value={fmt(hero.active)}
-                                caption="currently in use"
-                                tone={hero.active > 0 ? 'success' : 'neutral'}
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/assets?status=out_of_service"
-                                label="In maintenance"
-                                value={fmt(hero.maintenance)}
-                                caption="out of service"
-                                tone={
-                                    hero.maintenance > 0 ? 'warning' : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/inspections"
-                                label="Inspections due"
-                                value={fmt(hero.inspections_due)}
-                                caption="within 30 days"
-                                tone={
-                                    hero.inspections_due > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                            />
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <FleetHeroAction
-                            href="/fleet-assets/assets?new=1"
-                            icon={Plus}
-                            emphasis
-                        >
-                            New asset
-                        </FleetHeroAction>
-                        <FleetHeroAction
-                            href="/fleet-assets/assets?export=csv"
-                            icon={Download}
-                            external
-                        >
-                            Export CSV
-                        </FleetHeroAction>
-                        <FleetHeroAction
-                            href="/fleet-assets/asset-register/labels/workspace"
-                            icon={Download}
-                        >
-                            QR labels
-                        </FleetHeroAction>
-                    </div>
-                </HeroShell>
-
-                {/* Category Tabs */}
-                <Tabs
-                    value={filters.category || 'all'}
-                    onValueChange={(value) =>
-                        applyFilters({ category: value === 'all' ? '' : value })
+            <Head title={info[view][0]} />
+            <div className="assets-register-workspace">
+                <PageHeader
+                    icon={
+                        view === 'stocktake'
+                            ? ClipboardCheck
+                            : view === 'imports'
+                              ? FileUp
+                              : view === 'labels'
+                                ? QrCode
+                                : Package
                     }
-                >
-                    <TabsList className="h-8">
-                        <TabsTrigger value="all" className="px-3 py-1 text-xs">
-                            All
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="vehicle"
-                            className="px-3 py-1 text-xs"
-                        >
-                            Vehicles
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="equipment"
-                            className="px-3 py-1 text-xs"
-                        >
-                            Equipment
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="property"
-                            className="px-3 py-1 text-xs"
-                        >
-                            Property
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="other"
-                            className="px-3 py-1 text-xs"
-                        >
-                            Other
-                        </TabsTrigger>
-                    </TabsList>
-                </Tabs>
-
-                {/* Filters Row */}
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <div className="relative flex-1 sm:max-w-xs">
-                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            placeholder="Search assets..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            onKeyDown={(e) =>
-                                e.key === 'Enter' && handleSearch()
-                            }
-                            className="pl-9"
-                        />
-                    </div>
-                    <Select
-                        value={filters.status || 'all'}
-                        onValueChange={(value) =>
-                            applyFilters({
-                                status: value === 'all' ? '' : value,
-                            })
-                        }
-                    >
-                        <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All statuses</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="out_of_service">
-                                Out of Service
-                            </SelectItem>
-                            <SelectItem value="retired">Retired</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Select
-                        value={filters.site_id || 'all'}
-                        onValueChange={(value) =>
-                            applyFilters({
-                                site_id: value === 'all' ? '' : value,
-                            })
-                        }
-                    >
-                        <SelectTrigger className="w-44">
-                            <SelectValue placeholder="Site" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All sites</SelectItem>
-                            {(sites ?? []).map((site) => (
-                                <SelectItem
-                                    key={site.id}
-                                    value={String(site.id)}
+                    title={info[view][0]}
+                    titleChip={
+                        <PageHeaderStatusChip variant="neutral">
+                            {inventory ? 'Site inventory' : 'Assets'}
+                        </PageHeaderStatusChip>
+                    }
+                    subline={info[view][1]}
+                    actions={
+                        <>
+                            {inventory && (
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={setSearch}
+                                    placeholder="Search asset, tag, serial…"
+                                />
+                            )}
+                            {permissions.create && inventory && (
+                                <PageHeaderPrimaryButton
+                                    onClick={() => setWizardOpen(true)}
                                 >
-                                    {site.name}
-                                </SelectItem>
+                                    <Plus className="size-4" />
+                                    Register asset
+                                </PageHeaderPrimaryButton>
+                            )}
+                            {view === 'stocktake' && permissions.count && (
+                                <PageHeaderPrimaryButton
+                                    onClick={() => setNewCount((n) => n + 1)}
+                                >
+                                    <Plus className="size-4" />
+                                    New stocktake
+                                </PageHeaderPrimaryButton>
+                            )}
+                        </>
+                    }
+                    meters={
+                        <>
+                            {(workflow_metrics.length
+                                ? workflow_metrics.map((metric) => ({
+                                      ...metric,
+                                      filter: {
+                                          view,
+                                          workflow_status: metric.status,
+                                      },
+                                  }))
+                                : metrics
+                            ).map((metric) => (
+                                <PageHeaderMeterBlock
+                                    key={metric.label}
+                                    label={metric.label}
+                                    onClick={() =>
+                                        apply({
+                                            ...metric.filter,
+                                            category: '',
+                                            site_id: '',
+                                            site_room_id: '',
+                                            search: '',
+                                            ownership: '',
+                                        })
+                                    }
+                                >
+                                    <PageHeaderMeterBig>
+                                        {metric.value}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {metric.caption}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
                             ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                {/* Asset Tile Grid */}
-                {allAssets.length ? (
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {allAssets.map((asset) => (
-                            <Link
-                                key={asset.id}
-                                href={`/fleet-assets/assets/${asset.id}`}
-                                className="group flex flex-col rounded-lg border p-4 transition-all hover:bg-muted/50 hover:shadow-md"
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <span className="text-sm font-semibold">
-                                                {asset.name}
-                                            </span>
-                                            {asset.asset_tag && (
-                                                <Badge
-                                                    variant="outline"
-                                                    className="font-mono text-xs"
-                                                >
-                                                    {asset.asset_tag}
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        {asset.manufacturer && (
-                                            <p className="mt-0.5 text-xs text-muted-foreground">
-                                                {asset.manufacturer}
-                                                {asset.model
-                                                    ? ` ${asset.model}`
-                                                    : ''}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <Badge
-                                        variant={statusVariant(asset.status)}
-                                        className="shrink-0"
+                        </>
+                    }
+                    filters={
+                        <>
+                            <span className="asset-scope-hint">
+                                <ShieldCheck className="size-3" />
+                                {sites.length} permitted sites ·{' '}
+                                {inventory
+                                    ? sites.find(
+                                          (s) =>
+                                              String(s.id) ===
+                                              String(filters.site_id),
+                                      )?.name || 'All locations'
+                                    : view === 'stocktake'
+                                      ? 'Count history is separate from inventory filters'
+                                      : 'Permitted records only'}
+                            </span>
+                            {inventory ? (
+                                <>
+                                    <PageHeaderGlassButton
+                                        className="asset-header-location"
+                                        onClick={() => setDirectoryOpen(true)}
                                     >
-                                        {asset.status.replace(/_/g, ' ')}
-                                    </Badge>
-                                </div>
-                                <div className="mt-3 flex flex-wrap items-center gap-2">
-                                    <span
-                                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${categoryColor(asset.category)}`}
-                                    >
-                                        {asset.category}
-                                    </span>
-                                    {asset.site && (
-                                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                            <MapPin className="h-3 w-3" />
-                                            {asset.site.name}
-                                        </span>
-                                    )}
-                                    <AssetTechnologySummary
-                                        count={asset.tracker_count}
+                                        <MapPin className="size-3" />
+                                        {filters.site_id
+                                            ? 'Change site'
+                                            : 'Choose site'}
+                                    </PageHeaderGlassButton>
+                                    <PageHeaderFilterSelect
+                                        label="All categories"
+                                        allValue=""
+                                        value={filters.category || ''}
+                                        onChange={(category) =>
+                                            apply({ category })
+                                        }
+                                        options={[
+                                            {
+                                                value: 'equipment',
+                                                label: 'Equipment',
+                                            },
+                                            {
+                                                value: 'vehicle',
+                                                label: 'Vehicle',
+                                            },
+                                            {
+                                                value: 'property',
+                                                label: 'Property',
+                                            },
+                                            { value: 'other', label: 'Other' },
+                                        ]}
                                     />
-                                </div>
-                                {asset.serial_number && (
-                                    <p className="mt-2 text-[10px] text-muted-foreground">
-                                        S/N: {asset.serial_number}
-                                    </p>
-                                )}
-                            </Link>
-                        ))}
-                    </div>
-                ) : (
-                    <FleetEmptyState
-                        icon={Package}
-                        title="No assets found"
-                        description="Add assets to start tracking."
-                        actionLabel="Create Asset"
-                        actionHref="/fleet-assets/assets?new=1"
+                                    <PageHeaderFilterSelect
+                                        label="All ownership"
+                                        allValue=""
+                                        value={filters.ownership || ''}
+                                        onChange={(ownership) =>
+                                            apply({ ownership })
+                                        }
+                                        options={[
+                                            {
+                                                value: 'organisation',
+                                                label: 'Organisation',
+                                            },
+                                            {
+                                                value: 'client',
+                                                label: 'Client-owned',
+                                            },
+                                            {
+                                                value: 'unknown',
+                                                label: 'Not recorded',
+                                            },
+                                        ]}
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="All statuses"
+                                        allValue=""
+                                        value={filters.status || ''}
+                                        onChange={(status) => apply({ status })}
+                                        options={
+                                            view === 'archived'
+                                                ? [
+                                                      {
+                                                          value: 'retired',
+                                                          label: 'Retired',
+                                                      },
+                                                  ]
+                                                : [
+                                                      {
+                                                          value: 'active',
+                                                          label: 'Active',
+                                                      },
+                                                      {
+                                                          value: 'out_of_service',
+                                                          label: 'Out of service',
+                                                      },
+                                                  ]
+                                        }
+                                    />
+                                    <PageHeaderViewToggle
+                                        ariaLabel="Inventory view"
+                                        value={cards ? 'cards' : 'list'}
+                                        onChange={(value) =>
+                                            setCards(value === 'cards')
+                                        }
+                                        options={[
+                                            {
+                                                value: 'list',
+                                                label: 'List',
+                                                icon: List,
+                                            },
+                                            {
+                                                value: 'cards',
+                                                label: 'Cards',
+                                                icon: LayoutGrid,
+                                            },
+                                        ]}
+                                    />
+                                    {(filters.site_id ||
+                                        filters.search ||
+                                        filters.category ||
+                                        filters.ownership ||
+                                        filters.status) && (
+                                        <div className="asset-active-filters">
+                                            <span>Filtered by</span>
+                                            {filters.site_id && (
+                                                <button
+                                                    onClick={() =>
+                                                        apply({
+                                                            site_id: '',
+                                                            site_room_id: '',
+                                                        })
+                                                    }
+                                                >
+                                                    {
+                                                        sites.find(
+                                                            (s) =>
+                                                                String(s.id) ===
+                                                                String(
+                                                                    filters.site_id,
+                                                                ),
+                                                        )?.name
+                                                    }
+                                                    {filters.site_room_id
+                                                        ? ` · ${rooms.find((r) => String(r.id) === String(filters.site_room_id))?.name || 'Room'}`
+                                                        : ''}
+                                                    <X className="size-3" />
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() =>
+                                                    apply({
+                                                        site_id: '',
+                                                        site_room_id: '',
+                                                        category: '',
+                                                        ownership: '',
+                                                        status: '',
+                                                        search: '',
+                                                    })
+                                                }
+                                            >
+                                                Reset all{' '}
+                                                <X className="size-3" />
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <PageHeaderGlassButton
+                                    onClick={() => navigate('inventory')}
+                                >
+                                    Return to inventory
+                                </PageHeaderGlassButton>
+                            )}
+                        </>
+                    }
+                    rail={
+                        <PageHeaderRail
+                            items={tabs.filter(
+                                (t) =>
+                                    t.key !== 'imports' || permissions.create,
+                            )}
+                            value={view}
+                            onSelect={navigate}
+                        />
+                    }
+                />
+                <ErrorNotice message={error} />
+                {view === 'stocktake' ? (
+                    <Stocktakes
+                        newCountRequest={newCount}
+                        onNewHandled={() => setNewCount(0)}
+                        initialStatus={filters.workflow_status || ''}
+                        sites={sites}
+                        staff={staff}
+                        canCount={permissions.count}
+                        initialSite={String(filters.site_id || '')}
+                        initialRoom={String(filters.site_room_id || '')}
+                        selected={[...selected]}
                     />
-                )}
-
-                {/* Pagination */}
-                {(assets?.meta?.last_page ?? 1) > 1 && (
-                    <div className="flex items-center justify-center gap-1">
-                        {(assets?.links ?? []).map((link, i) => (
-                            <Button
-                                key={i}
-                                variant={link.active ? 'default' : 'outline'}
-                                size="sm"
-                                disabled={!link.url}
-                                onClick={() => link.url && router.get(link.url)}
-                                dangerouslySetInnerHTML={{ __html: link.label }}
+                ) : view === 'imports' ? (
+                    permissions.create ? (
+                        <Imports
+                            sites={sites}
+                            status={filters.workflow_status || ''}
+                        />
+                    ) : (
+                        <p>You do not have permission to import assets.</p>
+                    )
+                ) : view === 'labels' ? (
+                    <Labels
+                        status={filters.workflow_status || ''}
+                        selected={[...selected]}
+                        onInventory={() => navigate('inventory')}
+                        onClear={() => setSelected(new Set())}
+                    />
+                ) : (
+                    <>
+                        <div className="asset-inventory-layout">
+                            <LocationNavigator
+                                sites={sites}
+                                rooms={rooms}
+                                site={String(filters.site_id || '')}
+                                room={String(filters.site_room_id || '')}
+                                onSite={(site_id) =>
+                                    apply({ site_id, site_room_id: '' })
+                                }
+                                onRoom={(site_room_id) =>
+                                    apply({ site_room_id })
+                                }
+                                open={directoryOpen}
+                                onOpenChange={setDirectoryOpen}
+                                userId={auth.user.id}
+                                archived={view === 'archived'}
                             />
-                        ))}
-                    </div>
-                )}
+                            <section className="asset-inventory-results">
+                                <div className="asset-results-heading">
+                                    <div>
+                                        <h2 className="text-section-title">
+                                            {view === 'archived'
+                                                ? 'Archived inventory'
+                                                : view === 'attention'
+                                                  ? 'Assets needing attention'
+                                                  : sites.find(
+                                                        (s) =>
+                                                            String(s.id) ===
+                                                            String(
+                                                                filters.site_id,
+                                                            ),
+                                                    )?.name ||
+                                                    'Inventory across your sites'}
+                                            {filters.site_room_id
+                                                ? ` · ${rooms.find((r) => String(r.id) === String(filters.site_room_id))?.name || 'Room'}`
+                                                : ''}
+                                        </h2>
+                                        <p>
+                                            {assets.meta.total} matching records
+                                            · assigned inventory
+                                        </p>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                            window.location.href = `/fleet-assets/assets?${query}&export=csv`;
+                                        }}
+                                    >
+                                        <Download className="size-3" />
+                                        Export CSV
+                                    </Button>
+                                </div>
 
+                                <div className="asset-selection-toolbar">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() =>
+                                                setSelected(
+                                                    (previous) =>
+                                                        new Set([
+                                                            ...previous,
+                                                            ...rows.map(
+                                                                (r) => r.id,
+                                                            ),
+                                                        ]),
+                                                )
+                                            }
+                                        >
+                                            Select this page
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                setError('');
+                                                void api<{ ids: number[] }>(
+                                                    `/fleet-assets/assets?${query}&selection=1`,
+                                                )
+                                                    .then((data) =>
+                                                        setSelected(
+                                                            new Set(data.ids),
+                                                        ),
+                                                    )
+                                                    .catch((e) =>
+                                                        setError(e.message),
+                                                    );
+                                            }}
+                                        >
+                                            Select all matching
+                                        </Button>
+                                        <span className="text-xs text-muted-foreground">
+                                            {assets.meta.total} results
+                                        </span>
+                                    </div>
+                                    {selected.size > 0 && (
+                                        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/5 p-2">
+                                            <strong className="text-sm">
+                                                {selected.size} selected
+                                            </strong>
+                                            {outsidePage > 0 && (
+                                                <span className="text-xs text-muted-foreground">
+                                                    ({outsidePage} outside this
+                                                    page)
+                                                </span>
+                                            )}
+                                            <Button
+                                                variant="outline"
+                                                onClick={() =>
+                                                    navigate('labels')
+                                                }
+                                            >
+                                                <QrCode />
+                                                QR labels
+                                            </Button>
+                                            {permissions.count && (
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        navigate('stocktake')
+                                                    }
+                                                >
+                                                    <ClipboardCheck />
+                                                    Stocktake
+                                                </Button>
+                                            )}
+                                            <Button
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    setSelected(new Set())
+                                                }
+                                            >
+                                                Clear
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                                {!rows.length ? (
+                                    <Card
+                                        unstyled
+                                        className="rounded-xl border border-dashed bg-card p-10 text-center"
+                                    >
+                                        <Package className="mx-auto mb-3 size-10 text-primary" />
+                                        <h2 className="font-semibold">
+                                            No assets match this view
+                                        </h2>
+                                        <p className="mt-2 text-sm text-muted-foreground">
+                                            Try another location or clear the
+                                            filters.
+                                        </p>
+                                    </Card>
+                                ) : cards || mobile ? (
+                                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                        {rows.map((asset) => (
+                                            <EntityCard
+                                                key={asset.id}
+                                                meridian={
+                                                    asset.status ===
+                                                    'out_of_service'
+                                                        ? 'warning'
+                                                        : 'success'
+                                                }
+                                                icon={Package}
+                                                name={asset.name}
+                                                subline={`${asset.asset_tag || 'No tag'} · ${asset.category || 'Uncategorised'}`}
+                                                href={`/fleet-assets/assets/${asset.id}`}
+                                                actions={actions(asset)}
+                                                selection={{
+                                                    checked: selected.has(
+                                                        asset.id,
+                                                    ),
+                                                    label: `Select ${asset.name}`,
+                                                    onToggle: (checked) =>
+                                                        toggle(
+                                                            asset.id,
+                                                            checked,
+                                                        ),
+                                                }}
+                                                chips={
+                                                    <StatusBadge
+                                                        status={asset.status}
+                                                    />
+                                                }
+                                                footer={{
+                                                    primary:
+                                                        asset.site?.name ||
+                                                        'No assigned site',
+                                                    secondary:
+                                                        asset.room?.name ||
+                                                        (asset.location_note
+                                                            ? `Location note: ${asset.location_note}`
+                                                            : 'No assigned room'),
+                                                }}
+                                                alerts={
+                                                    <AssetTechnologySummary
+                                                        count={
+                                                            asset.tracker_count
+                                                        }
+                                                    />
+                                                }
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <EntityTable
+                                        identityLabel="Asset / identity"
+                                        identityWidth="1.35fr"
+                                        minWidth={850}
+                                        rows={rows}
+                                        rowKey={(asset) => asset.id}
+                                        identity={(asset) => ({
+                                            icon: Package,
+                                            name: asset.name,
+                                            subline: `${asset.asset_tag || 'No tag'} · ${asset.serial_number || 'No serial number'}`,
+                                        })}
+                                        columns={[
+                                            {
+                                                key: 'location',
+                                                label: 'Assigned location',
+                                                width: '1.05fr',
+                                                cell: (asset) => (
+                                                    <div>
+                                                        <p>
+                                                            {asset.site?.name ||
+                                                                'No assigned site'}
+                                                        </p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {asset.room?.name ||
+                                                                (asset.location_note
+                                                                    ? `Location note: ${asset.location_note}`
+                                                                    : 'No assigned room')}
+                                                        </p>
+                                                    </div>
+                                                ),
+                                            },
+                                            {
+                                                key: 'status',
+                                                label: 'Status & work',
+                                                width: '1fr',
+                                                cell: (asset) => (
+                                                    <div className="space-y-1">
+                                                        <StatusBadge
+                                                            status={
+                                                                asset.status
+                                                            }
+                                                        />
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {asset.inspection_due_at
+                                                                ? `Inspection due ${formatDateOnly(asset.inspection_due_at)}`
+                                                                : asset.maintenance_due_at
+                                                                  ? `Maintenance due ${formatDateOnly(asset.maintenance_due_at)}`
+                                                                  : 'No scheduled work'}
+                                                        </p>
+                                                    </div>
+                                                ),
+                                            },
+                                            {
+                                                key: 'ownership',
+                                                label: 'Responsibility',
+                                                width: '1fr',
+                                                cell: (asset) => (
+                                                    <div>
+                                                        <p>
+                                                            {asset.ownership ===
+                                                            'site'
+                                                                ? 'Organisation'
+                                                                : asset.ownership ===
+                                                                    'client'
+                                                                  ? 'Client-owned'
+                                                                  : 'Not recorded'}
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-muted-foreground capitalize">
+                                                            {asset.category ||
+                                                                'Category not recorded'}
+                                                        </p>
+                                                    </div>
+                                                ),
+                                            },
+                                            {
+                                                key: 'verification',
+                                                label: 'Last inspection',
+                                                width: '1fr',
+                                                cell: (asset) => (
+                                                    <div>
+                                                        <p>
+                                                            {asset.last_inspected_at
+                                                                ? formatDateOnly(
+                                                                      asset.last_inspected_at,
+                                                                  )
+                                                                : 'Not recorded'}
+                                                        </p>
+                                                        <p className="mt-1 text-xs text-muted-foreground">
+                                                            {asset.last_inspected_at
+                                                                ? 'Dated inspection'
+                                                                : 'No inspection evidence'}
+                                                        </p>
+                                                    </div>
+                                                ),
+                                            },
+                                        ]}
+                                        hrefFor={(asset) =>
+                                            `/fleet-assets/assets/${asset.id}`
+                                        }
+                                        actionsFor={actions}
+                                        selection={{
+                                            keys: selected,
+                                            labelFor: (asset) =>
+                                                `Select ${asset.name}`,
+                                            onToggle: (asset, checked) =>
+                                                toggle(asset.id, checked),
+                                        }}
+                                    />
+                                )}
+                                <Paging
+                                    page={assets.meta.current_page}
+                                    last={assets.meta.last_page}
+                                    total={assets.meta.total}
+                                    onChange={(page) => apply({ page })}
+                                />
+                                <p className="asset-evidence-note">
+                                    <ShieldCheck className="size-4" />A room
+                                    assignment or QR read does not confirm
+                                    current custody or safe use. Open the asset
+                                    profile for its full record.
+                                </p>
+                            </section>
+                        </div>
+                    </>
+                )}
                 <AssetWizardDialog
                     open={wizardOpen}
-                    onClose={closeWizard}
-                    sites={sites ?? []}
+                    onClose={() => {
+                        setWizardOpen(false);
+                        const url = new URL(location.href);
+                        url.searchParams.delete('new');
+                        url.searchParams.delete('created');
+                        history.replaceState(null, '', url);
+                    }}
+                    sites={sites}
                     clients={clients}
                     prefill={prefill}
                 />
-            </PageShell>
+            </div>
         </AppLayout>
     );
 }
