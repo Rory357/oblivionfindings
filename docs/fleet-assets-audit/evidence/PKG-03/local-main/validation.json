@@ -1,0 +1,40 @@
+{
+  "candidate": "20281ab99d4f7cb6db01e823cebe84eac5c6c2e9",
+  "base": "ba5bff2e8b6c22796369443f1cdac918039950dd",
+  "localMainIntegrated": false,
+  "remotePushed": false,
+  "deployed": false,
+  "frontend": {
+    "tests": 36,
+    "files": 7,
+    "pint": 0,
+    "typescript": 0,
+    "exitCode": 0,
+    "build": 0,
+    "eslint": 0,
+    "modules": 5371
+  },
+  "backend": {
+    "tests": 76,
+    "skipped": 0,
+    "schemaCache": "Table structure and migration ledger only; per-process isolated test database",
+    "failures": 0,
+    "exitCode": 0,
+    "warnings": 72,
+    "errors": 0,
+    "assertions": 1399
+  },
+  "browser": {
+    "reviewSelfDecisionBlocked": true,
+    "realLaravel": true,
+    "liveScannerVerified": false,
+    "url": "http://127.0.0.1:8772",
+    "productionBuild": true,
+    "paidAmount": "0.00",
+    "realFortifyLogin": true,
+    "fixtureTransport": false,
+    "operationalRecordsUsed": false
+  },
+  "frozenFiles": 311,
+  "frozenFilesChanged": 0
+}

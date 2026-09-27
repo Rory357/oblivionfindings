@@ -53,7 +53,7 @@ All 311 files recorded by the v1–v9 freeze manifests retain their hashes. The 
 
 ## Release prerequisites and limits
 
-This work has not been deployed, merged or pushed. Deployment must install the updated lockfile and build assets, apply `2026_09_27_000100_complete_finance_review_workflow.php`, and restart long-lived queue workers. PDF.js requires Node 22.13+ or 24+ for installation/build.
+Local-main integration is being prepared under Stephan's explicit request; the exact status is recorded in `evidence/PKG-03/local-main/`. This work has not been remotely pushed or deployed. Deployment must install the updated lockfile and build assets, apply `2026_09_27_000100_complete_finance_review_workflow.php`, and restart long-lived queue workers. PDF.js requires Node 22.13+ or 24+ for installation/build.
 
 The existing scheduler must run every minute and a queue worker must consume `DeliverFinanceReviewNotice`. The registered `finance:review-notices` command recovers pending delivery; `finance:review-reminders` records due reminders at 08:30 Pacific/Auckland. Delivery rechecks permissions and site access. No emails or external messages are introduced.
 
@@ -89,3 +89,9 @@ A subsequent visual comparison corrected the initial completion claim. The final
 Verification covers 32 UI tests, full TypeScript, scoped ESLint/Pint, a fresh production build and browser checks of the actual components with synthetic fixtures. The final backend run exercised 72 cases with 1,365 assertions and one worker-startup error; both concurrency cases passed on focused rerun with 13 assertions. The complete results and screenshots are under `evidence/PKG-03/mockup-implementation/`. The frozen mockups remain unchanged. Signed-in staging acceptance, deployment and production-scale validation remain release work.
 
 The completion pass extends the UI coverage to 35 cases and adds four pure cost-summary unit tests (five assertions). TypeScript, scoped lint/style checks and the 5,366-module production client build pass. All 311 frozen files remain unchanged. The `completion-*` logs and `*-application-*.png` screenshots record the latest verification. The real local Herd host refused connections, so signed-in acceptance remains explicitly pending a running local/staging URL; no production deployment or load-test result is claimed.
+
+## Local-main integration verification
+
+The subsequent reconciled candidate passes 36 UI tests and a complete 76-case backend run with 1,399 assertions and no failures/errors; environment warnings remain. TypeScript, scoped lint/style and a fresh 5,371-module client build pass. The CLI concurrency workers now set actor context without invoking interactive login listeners, and both races pass in the complete run. Main's current evidence-source denial contract is retained and tested for unchanged files and decision evidence.
+
+The previous signed-in local verification gap is now addressed at a dedicated loopback Laravel instance with a disposable synthetic database and the compiled production components. Normal login, a persisted note, protected PDF preview, bill approval and receipt, balanced journal/source links, independent unpaid/open outcomes, self-review denial and phone-width fit were verified. Target-environment scanner, queue/scheduler, storage, monitoring and scale checks remain release work. The exact candidate, base, source hashes, test logs and screenshots are in `evidence/PKG-03/local-main/REVIEW-HANDOFF.md`.

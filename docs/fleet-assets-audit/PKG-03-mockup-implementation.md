@@ -18,7 +18,12 @@ One operating organisation. Keep the existing application shell, routes, source 
 - [x] Browser verification of actual production components and backend permission/recovery checks; record any unverified signed-in/staging boundaries explicitly.
 - [x] Match the work Cost & evidence header to the mockup's Estimate / Committed / Invoice / Posted / Paid summary.
 - [x] Verify complete pages in the actual application shell against the frozen mockup, including responsive and dark-theme presentation.
-- [ ] Signed-in acceptance against a running application and its real service configuration.
+- [x] Focused signed-in acceptance through real Laravel endpoints using an isolated synthetic database and compiled production components.
+- [ ] Target release environment configuration, scanner/worker/storage acceptance and production-scale validation.
+
+## Local-main preparation — 27 September 2026
+
+The later integration pass reconciles current Main, passes 36 frontend tests and a complete 76-case backend run (1,399 assertions, no failures/errors, environment warnings retained). It also closes the earlier signed-in local browser gap: real Fortify login, saved work note, protected PDF, bill approval, retained receipt, balanced journal, source navigation and self-review denial were verified against a disposable synthetic database. Payment remains separate and no operational records were used. Exact source, conflict resolutions, screenshots, harness and limits are in `evidence/PKG-03/local-main/REVIEW-HANDOFF.md`. The earlier evidence below remains historical; target-environment service acceptance is still outstanding.
 
 ## Completion pass — 27 September 2026
 
