@@ -83,6 +83,7 @@ export type ReviewRequest = {
     history_next_before: number | null;
     own_request: boolean;
     can_decide: boolean;
+    can_request_changes?: boolean;
 };
 
 export const vehicleLabel = (request: ReviewRequest) =>
@@ -281,10 +282,15 @@ function ReviewRequestBody({
             >
                 {step === 0 && (
                     <div className="space-y-4">
-                        <p><strong>Review requested:</strong> {request.note ?? 'No note recorded.'}</p>
+                        <p>
+                            <strong>Review requested:</strong>{' '}
+                            {request.note ?? 'No note recorded.'}
+                        </p>
                         {request.vehicle.url && (
                             <Button variant="outline" asChild>
-                                <a href={request.vehicle.url}>Open source profile</a>
+                                <a href={request.vehicle.url}>
+                                    Open source profile
+                                </a>
                             </Button>
                         )}
                         <p>
@@ -471,7 +477,11 @@ function ReviewRequestBody({
                                             'Explain why and record the next step.',
                                         icon: XCircle,
                                     },
-                                ]}
+                                ].filter(
+                                    (option) =>
+                                        option.key !== 'changes_requested' ||
+                                        request.can_request_changes !== false,
+                                )}
                             />
                             <div>
                                 <Label htmlFor="finance-decision-note">

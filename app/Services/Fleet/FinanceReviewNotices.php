@@ -7,6 +7,7 @@ use App\Models\FleetFinanceReviewRequest;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 /** Transactional delivery intent, recovered by the scheduler after worker or process failure. */
@@ -64,8 +65,17 @@ final class FinanceReviewNotices
                     ->when(! $requesterNotice && $request->assigned_to_user_id, fn ($q) => $q->whereKey($request->assigned_to_user_id))
                     ->chunkById(100, function ($users) use ($notice, $request, $finance, $requesterNotice): void {
                         foreach ($users as $user) {
+                            $profileUrl = '/fleet-assets/vehicles/'.$request->asset_id.'?view=finance';
                             if ($requesterNotice) {
-                                $allowed = $finance->canView($user) && app(SecurityDevicesAccessService::class)->fleetVehicle($user, $request->asset_id) !== null;
+                                $access = app(SecurityDevicesAccessService::class);
+                                $vehicle = $access->fleetVehicle($user, $request->asset_id);
+                                $asset = $vehicle ? null : $access->assignableAsset($user, $request->asset_id);
+                                $allowed = $finance->canView($user) && ($vehicle !== null || ($asset !== null
+                                    && Gate::forUser($user)->allows('view', $asset)
+                                    && in_array((int) $asset->site_id, $finance->financeSiteIds($user), true)));
+                                if ($asset !== null) {
+                                    $profileUrl = '/fleet-assets/assets/'.$request->asset_id.'#view=overview&section=finance';
+                                }
                             } else {
                                 $allowed = $user->id !== $request->requested_by_user_id && $finance->canDecide($user)
                                     && ($user->canDo('finance.assets.view') || $user->canDo('finance.ap.view'))
@@ -82,7 +92,7 @@ final class FinanceReviewNotices
                                 'data' => json_encode(['kind' => 'fleet_finance_review_request', 'entity_id' => $request->id,
                                     'title' => $request->reference_number.' · '.ucfirst(str_replace('_', ' ', $notice->kind)),
                                     'body' => $request->typeLabel(),
-                                    'url' => $requesterNotice ? '/fleet-assets/vehicles/'.$request->asset_id.'?view=finance' : '/finance/vehicle-reviews?request='.$request->id]),
+                                    'url' => $requesterNotice ? $profileUrl : '/finance/vehicle-reviews?request='.$request->id]),
                                 'created_at' => now(), 'updated_at' => now(),
                             ]);
                         }

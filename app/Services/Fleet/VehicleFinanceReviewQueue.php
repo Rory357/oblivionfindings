@@ -4,6 +4,7 @@ namespace App\Services\Fleet;
 
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Models\Asset;
 use App\Models\AssetDocument;
 use App\Models\FleetFinanceReviewRequest;
 use App\Models\FleetFinanceReviewRequestEvent;
@@ -143,6 +144,7 @@ class VehicleFinanceReviewQueue
         $files = $this->files($requests);
         $decide = $this->finance->canDecide($viewer);
         $spend = $viewer->canDo('finance.ap.view');
+        $correctableAssetIds = Asset::vehicles()->whereIn('id', $requests->pluck('asset_id'))->pluck('id')->all();
         // The vehicle's own page is linked only for people who can open it.
         $profileUrls = [];
         foreach ($requests->pluck('asset_id')->unique() as $id) {
@@ -153,7 +155,7 @@ class VehicleFinanceReviewQueue
             }
         }
 
-        return $requests->map(function (FleetFinanceReviewRequest $request) use ($viewer, $files, $decide, $spend, $profileUrls): array {
+        return $requests->map(function (FleetFinanceReviewRequest $request) use ($viewer, $files, $decide, $spend, $profileUrls, $correctableAssetIds): array {
             [$label, $tone] = match ($request->status) {
                 'resolved' => ['Resolved', 'success'],
                 'declined' => ['Declined', 'neutral'],
@@ -185,6 +187,7 @@ class VehicleFinanceReviewQueue
                     'url' => $profileUrls[$request->asset_id] ?? null,
                 ],
                 'amount' => $request->amount === null ? null : (float) $request->amount,
+                'can_request_changes' => in_array((int) $request->asset_id, $correctableAssetIds, true),
                 'note' => $request->note,
                 'source' => $restrictedSource
                     ? (VehicleFinanceService::KINDS[$request->source_type] ?? 'Finance record').' · accounts payable access needed'

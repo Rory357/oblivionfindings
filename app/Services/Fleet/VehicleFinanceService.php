@@ -383,6 +383,9 @@ class VehicleFinanceService
             }
             abort_unless($request->lock_version === $expectedVersion, 409, 'This review request changed while you were deciding. Reload before saving.');
             abort_unless($request->isOpen(), 409, 'This request is not ready for a Finance decision.');
+            if ($decision === 'changes_requested' && ! Asset::vehicles()->whereKey($asset->id)->exists()) {
+                throw ValidationException::withMessages(['decision' => 'This asset profile supports Resolve or Decline. Record the required next step in your decision note.']);
+            }
             $evidence = app(FinanceReviewEvidence::class);
             if ($evidenceToken !== null) {
                 abort_unless(hash_equals($evidence->token($request), $evidenceToken), 409, 'The supporting evidence changed. Reload and review it again.');

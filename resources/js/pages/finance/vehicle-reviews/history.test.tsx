@@ -115,6 +115,36 @@ it.each([{}, { saved: false }, { saved: 'yes' }])(
     },
 );
 
+it('keeps non-vehicle asset reviews on their supported decisions and source profile', () => {
+    render(
+        <ReviewRequestDialog
+            request={{
+                ...record,
+                status: 'submitted',
+                can_decide: true,
+                can_request_changes: false,
+                vehicle: {
+                    ...record.vehicle,
+                    url: '/fleet-assets/assets/7#view=overview&section=finance',
+                },
+            }}
+            onClose={() => {}}
+        />,
+    );
+    expect(
+        screen.getByRole('link', { name: 'Open source profile' }),
+    ).toHaveAttribute(
+        'href',
+        '/fleet-assets/assets/7#view=overview&section=finance',
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Decision/ }));
+    expect(
+        screen.queryByRole('button', { name: /^Return for correction/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Resolve/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^Decline/ })).toBeEnabled();
+});
+
 it('loads older events on demand, preserves existing history and hides the control at the end', async () => {
     const fetchHistory = vi.fn().mockResolvedValue({
         ok: true,
