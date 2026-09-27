@@ -1,0 +1,630 @@
+{
+  "candidate": "PKG-05 v3",
+  "checkedAt": "2026-09-26T21:50:13.307Z",
+  "url": "http://127.0.0.1:4397/#/fleet-assets/transports/journeys/J-609?from=journeys",
+  "baseline": "4ea64c547ed85a5b7504e59599db351f6eba7deb",
+  "runtimeSha256": "4688d76f86ffedd26e8794043668fdf1f93b7582fc87b3ad4207007d83df425d",
+  "servedSha256": "4688d76f86ffedd26e8794043668fdf1f93b7582fc87b3ad4207007d83df425d",
+  "versionHeader": "v3",
+  "browserAssertions": 77,
+  "domainAssertions": 34,
+  "typeErrors": 0,
+  "suites": [
+    {
+      "script": "verify-interactions.js",
+      "log": "verify-interactions.log",
+      "results": [
+        {
+          "name": "U01 Every Requests banner meter has a value",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U02 Right-click exposes permission-aware request actions",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U03 Kebab and right-click use identical actions",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U04 Row action targets Alex without opening another record",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U05 Request assessment updates the selected row",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U06 Approval action opens the linked source booking",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U07 Source approval changes Taylor only",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U08 Journey banner names the actual blocked-step owner",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U09 Header keyboard context menu opens",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U10 Resolving the source handoff moves the next step to Nia",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U11 Completion is visible above the fold",
+          "pass": true,
+          "detail": "{\"x\":1236.8125,\"y\":392.75,\"width\":141.1875,\"height\":42}"
+        },
+        {
+          "name": "U12 Passenger completion does not create a handover",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U13 Return clearly remains separate and optional",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U14 Planner automatically selects an assessed request",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U15 Unchecked proposal cannot be saved",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U16 Resource check enables saving",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U17 Changing the team invalidates the check",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U18 Switching requests protects a dirty proposal",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U19 Keep editing retains the selected resources",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U20 Planner saves one proposed booking without leaving the workbench",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U21 Changing resources keeps a linked Fleet booking",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "U22 Selecting an unassessed request shows the required prior step",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "bookingUrl": "http://127.0.0.1:4397/#/fleet-assets/transports/bookings/BK-1101?site=all&day=2026-09-28&from=planner",
+      "proposedText": "TR-1050 · AURORA HOUSE\nElliot White\n\nAurora House → Harbour community centre\n\nAwaiting booking approval\nWindow\n01:00 PM–03:00 PM\nSupport\n2 occupants\nVehicle\nRimu · Toyota Corolla\nDriver\nLiam Chen\nReview booking decision\nAn authorised booking approver must review this proposed Fleet booking.\n\nNext person: Authorised booking approver.\n\nChange resources or time\nOpen booking"
+    },
+    {
+      "script": "verify-returns.js",
+      "log": "verify-returns.log",
+      "results": [
+        {
+          "name": "R01 Returns explains actual return, received items and optional handover",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R02 Missing-items meter opens only the matching return",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R03 Actual next receiver replaces generic allocator ownership",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R04 Reconciliation is not offered while items are missing",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R05 Later receipt updates outstanding items without deleting dispute",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R06 Original partial receipt remains unchanged",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R07 Reconciliation closes work and preserves the historical dispute",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R08 Optional handover identifies the incoming decision owner",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R09 Incoming worker can acknowledge a real pending handover",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R10 Handover acknowledgement does not clear medication or complete journey",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R11 Lost response shows recovery instead of false failure",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R12 Changed retry is rejected",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R13 Recovery presents original observations",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R14 Return advances to passenger confirmation without a forced handover",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R15 Cancelling an inline proposal resets the draft",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "R16 Missing source configuration cannot be checked or saved",
+          "pass": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "script": "verify-final.js",
+      "log": "verify-final.log",
+      "results": [
+        {
+          "name": "V-overview Header has meaningful current scope meters",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-overview No page-wide horizontal overflow",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-requests Header has meaningful current scope meters",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-requests No page-wide horizontal overflow",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-planner Header has meaningful current scope meters",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-planner No page-wide horizontal overflow",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-journeys Header has meaningful current scope meters",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-journeys No page-wide horizontal overflow",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-returns Header has meaningful current scope meters",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-returns No page-wide horizontal overflow",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V11 Journey route no longer collides with its heading",
+          "pass": true,
+          "detail": "{\"headerBottom\":634.421875,\"routeTop\":652.421875,\"width\":567.875}"
+        },
+        {
+          "name": "V12 Return banner has working context actions",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-journey-1280 Return action visible without scrolling",
+          "pass": true,
+          "detail": "{\"x\":1110.734375,\"y\":388.40625,\"width\":118.265625,\"height\":42}"
+        },
+        {
+          "name": "V-journey-1280 No page overflow",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-planner-1280 Workbench remains within viewport width",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-journey-1024 Return action visible without scrolling",
+          "pass": true,
+          "detail": "{\"x\":854.734375,\"y\":374.140625,\"width\":118.265625,\"height\":42}"
+        },
+        {
+          "name": "V-journey-1024 No page overflow",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-planner-1024 Workbench remains within viewport width",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-journey-1920 Return action visible without scrolling",
+          "pass": true,
+          "detail": "{\"x\":1739.734375,\"y\":392.75,\"width\":118.265625,\"height\":42}"
+        },
+        {
+          "name": "V-journey-1920 No page overflow",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V-planner-1920 Workbench remains within viewport width",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V22 Assessment meter count matches the queue",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V23 Assessment/information meter matches two requests",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V24 Out-of-site passenger absent from requester queue",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V25 Direct out-of-site link has no passenger data",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V26 Unknown journey does not resolve to another passenger",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V27 Denied view suppresses counts and passenger details",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V28 Stale results have an explicit refresh action",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V29 Stale menu has no mutating actions",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V30 Unconfigured staff authority is explicit and blocks return",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "V31 No runtime page errors",
+          "pass": true,
+          "detail": "[]"
+        },
+        {
+          "name": "V32 Preview requests stay local and read-only",
+          "pass": true,
+          "detail": "[{\"url\":\"http://127.0.0.1:4397/\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/dist/app.css\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/preview.css\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/refinement.css\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/dist/app.js\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/dist/app.css\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/preview.css\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/refinement.css\",\"method\":\"GET\"},{\"url\":\"http://127.0.0.1:4397/dist/app.js\",\"method\":\"GET\"}]"
+        }
+      ],
+      "errors": [],
+      "requests": [
+        {
+          "url": "http://127.0.0.1:4397/",
+          "method": "GET"
+        },
+        {
+          "url": "http://127.0.0.1:4397/dist/app.css",
+          "method": "GET"
+        },
+        {
+          "url": "http://127.0.0.1:4397/preview.css",
+          "method": "GET"
+        },
+        {
+          "url": "http://127.0.0.1:4397/refinement.css",
+          "method": "GET"
+        },
+        {
+          "url": "http://127.0.0.1:4397/dist/app.js",
+          "method": "GET"
+        },
+        {
+          "url": "http://127.0.0.1:4397/",
+          "method": "GET"
+        },
+        {
+          "url": "http://127.0.0.1:4397/dist/app.css",
+          "method": "GET"
+        },
+        {
+          "url": "http://127.0.0.1:4397/preview.css",
+          "method": "GET"
+        },
+        {
+          "url": "http://127.0.0.1:4397/refinement.css",
+          "method": "GET"
+        },
+        {
+          "url": "http://127.0.0.1:4397/dist/app.js",
+          "method": "GET"
+        }
+      ]
+    },
+    {
+      "script": "verify-flow.js",
+      "log": "verify-flow.log",
+      "results": [
+        {
+          "name": "F01 Passed check advances to physical collection",
+          "pass": true
+        },
+        {
+          "name": "F02 Actual collection enables departure",
+          "pass": true
+        },
+        {
+          "name": "F03 Departure opens a distinct actual journey",
+          "pass": true
+        },
+        {
+          "name": "F04 Normal return reaches completion directly",
+          "pass": true
+        },
+        {
+          "name": "F05 Normal journey finishes with no compulsory shift handover",
+          "pass": true
+        },
+        {
+          "name": "F06 Editing from a row updates that request",
+          "pass": true
+        },
+        {
+          "name": "F07 Cancelled booking has no departure or preparation next step",
+          "pass": true
+        }
+      ]
+    }
+  ],
+  "domain": {
+    "scope": "Synthetic preview transition invariants only; no backend, real permission, persistence, delivery or integration validation.",
+    "results": [
+      {
+        "name": "M01 Unassessed allocation rejected atomically",
+        "pass": true
+      },
+      {
+        "name": "M02 Unallocated checkout cannot fabricate booking or journey",
+        "pass": true
+      },
+      {
+        "name": "M03 Failed checkout leaves no fabricated records",
+        "pass": true
+      },
+      {
+        "name": "M04 Out-of-site object denied",
+        "pass": true
+      },
+      {
+        "name": "M05 Denied linked command denied",
+        "pass": true
+      },
+      {
+        "name": "M06 Stale source blocks all mutations",
+        "pass": true
+      },
+      {
+        "name": "M07 Concurrent version change rejected",
+        "pass": true
+      },
+      {
+        "name": "M08 Unknown readiness fails closed",
+        "pass": true
+      },
+      {
+        "name": "M09 Expired availability fails closed",
+        "pass": true
+      },
+      {
+        "name": "M10 Resource conflict fails without partial reservation",
+        "pass": true
+      },
+      {
+        "name": "M11 Unknown/conflict results create no booking",
+        "pass": true
+      },
+      {
+        "name": "M12 Independent self-approval denied",
+        "pass": true
+      },
+      {
+        "name": "M13 Not-required source authority is distinct from independent approval",
+        "pass": true
+      },
+      {
+        "name": "M14 Impossible dates rejected",
+        "pass": true
+      },
+      {
+        "name": "M15 Return before actual departure rejected",
+        "pass": true
+      },
+      {
+        "name": "M16 Odometer below checkout rejected",
+        "pass": true
+      },
+      {
+        "name": "M17 Unconfigured frontline return authority rejected",
+        "pass": true
+      },
+      {
+        "name": "M18 Same operation replays one immutable receipt",
+        "pass": true
+      },
+      {
+        "name": "M19 Changed retry fingerprint rejected",
+        "pass": true
+      },
+      {
+        "name": "M20 Original receipt remains original",
+        "pass": true
+      },
+      {
+        "name": "M21 Missing passenger confirmation blocks completion",
+        "pass": true
+      },
+      {
+        "name": "M22 Outstanding medication prevents completion",
+        "pass": true
+      },
+      {
+        "name": "M23 Driver cannot resolve medication source",
+        "pass": true
+      },
+      {
+        "name": "M24 Passenger completion retains independent restriction",
+        "pass": true
+      },
+      {
+        "name": "M25 Exception does not mutate dispute",
+        "pass": true
+      },
+      {
+        "name": "M26 Already-disputed handover cannot be acknowledged again",
+        "pass": true
+      },
+      {
+        "name": "M27 No handover can be acknowledged if none exists",
+        "pass": true
+      },
+      {
+        "name": "M28 Cancellation does not erase started trip",
+        "pass": true
+      },
+      {
+        "name": "M29 Later receipt preserves original partial return and dispute",
+        "pass": true
+      },
+      {
+        "name": "M30 Reconciled historical dispute is no longer outstanding work",
+        "pass": true
+      },
+      {
+        "name": "M31 String equipment value cannot stand in for physical confirmation",
+        "pass": true
+      },
+      {
+        "name": "M32 Vehicle from another site cannot be allocated",
+        "pass": true
+      },
+      {
+        "name": "M33 Escort role alone cannot resolve another assigned worker’s handoff",
+        "pass": true
+      },
+      {
+        "name": "M34 Escort role alone cannot attest another assigned worker’s passenger return",
+        "pass": true
+      }
+    ]
+  },
+  "types": {
+    "scopedErrors": [],
+    "importedSourceErrors": []
+  },
+  "preservation": [
+    {
+      "version": "v1",
+      "filesChecked": 62,
+      "mismatches": []
+    },
+    {
+      "version": "v2",
+      "filesChecked": 92,
+      "mismatches": []
+    },
+    {
+      "version": "audit-v1",
+      "filesChecked": 21,
+      "mismatches": []
+    }
+  ],
+  "limitations": [
+    "Synthetic browser state only. No API, database, uploads, notifications or clinical record was changed.",
+    "Scoped staff checkout/return authority and canonical record-link/projection contracts still need implementation approval.",
+    "Resource availability is a controlled source simulation, not a live reservation engine.",
+    "Actual browser zoom remains unverified; desktop resizing checked at 1024, 1280, 1440 and 1920 pixels.",
+    "Whole-application/backend security and repository CI were not exercised by these preview tests."
+  ]
+}

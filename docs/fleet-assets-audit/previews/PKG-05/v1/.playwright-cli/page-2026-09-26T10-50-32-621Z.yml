@@ -1,0 +1,192 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - strong [ref=e4]: PKG-05 · v1
+    - generic [ref=e5]: Synthetic design preview · changes stay in this page and reset on reload
+    - button "Preview scenarios" [ref=e6] [cursor=pointer]
+    - generic [ref=e8]: Normal journey
+  - banner [ref=e9]:
+    - generic [ref=e10]:
+      - text: blivion
+      - generic [ref=e12]: Care
+    - generic [ref=e13]: Monday 28 September 2026
+    - button "Search or jump to… Ctrl K" [ref=e14] [cursor=pointer]:
+      - generic [ref=e18]: Search or jump to…
+      - generic [ref=e19]: Ctrl K
+    - generic [ref=e20]:
+      - button "Report incident" [ref=e21] [cursor=pointer]
+      - button "Clock in" [ref=e22] [cursor=pointer]
+      - button "Messages" [ref=e26] [cursor=pointer]
+      - button "Notifications" [ref=e29] [cursor=pointer]
+      - button "Mia Chen account" [ref=e33] [cursor=pointer]: MC
+  - generic [ref=e34]:
+    - navigation "Main navigation" [ref=e35]:
+      - button "My Day" [ref=e36] [cursor=pointer]
+      - button "Overview" [ref=e41] [cursor=pointer]
+      - button "My Calendar" [ref=e48] [cursor=pointer]
+      - button "All Tasks" [ref=e52] [cursor=pointer]
+      - button "Sites & Locations" [ref=e58] [cursor=pointer]
+      - button "Operations" [ref=e64] [cursor=pointer]
+      - button "People & HR" [ref=e71] [cursor=pointer]
+      - button "Fleet & Assets" [ref=e76] [cursor=pointer]
+      - button "Overview" [ref=e85] [cursor=pointer]
+      - button "Fleet" [ref=e86] [cursor=pointer]
+      - button "Assets" [ref=e87] [cursor=pointer]
+      - button "Maintenance" [ref=e88] [cursor=pointer]
+      - button "Maps & boundaries" [ref=e89] [cursor=pointer]
+      - button "Reports" [ref=e90] [cursor=pointer]
+      - button "Settings" [ref=e91] [cursor=pointer]
+      - button "Finance" [ref=e92] [cursor=pointer]
+    - main [ref=e97]:
+      - generic [ref=e98]:
+        - button "Home" [ref=e99] [cursor=pointer]
+        - button "Fleet & Assets" [ref=e102] [cursor=pointer]
+        - button "Fleet" [ref=e105] [cursor=pointer]
+        - button "Transport" [ref=e108] [cursor=pointer]
+      - generic [ref=e109]:
+        - generic [ref=e111]:
+          - generic [ref=e112]:
+            - generic [ref=e113]:
+              - generic [ref=e120]:
+                - generic [ref=e121]:
+                  - heading "Transport" [level=1] [ref=e122]
+                  - generic [ref=e123]: Desktop preview
+                - paragraph [ref=e124]: Requests, journeys and practical handover · approved sites only
+              - generic [ref=e125]:
+                - generic [ref=e126]:
+                  - searchbox "Search transport…" [ref=e127]
+                  - generic [aria-hidden]: /
+                - button "Request transport" [ref=e128] [cursor=pointer]
+            - generic [ref=e131]:
+              - button "View requests shown" [ref=e132] [cursor=pointer]:
+                - generic [ref=e136]: Requests shown
+                - generic [ref=e138]: "5"
+                - generic [ref=e139]: Your approved sites · matching filters
+              - button "View need allocation" [ref=e140] [cursor=pointer]:
+                - generic [ref=e144]: Need allocation
+                - generic [ref=e146]: "2"
+                - generic [ref=e147]: Assessment or information needed
+              - button "View linked journey" [ref=e148] [cursor=pointer]:
+                - generic [ref=e152]: Linked journey
+                - generic [ref=e154]: "0"
+                - generic [ref=e155]: No journey for this request yet
+              - button "View custody to resolve" [ref=e156] [cursor=pointer]:
+                - generic [ref=e160]: Custody to resolve
+                - generic [ref=e162]: "0"
+                - generic [ref=e163]: Observed return and acknowledgement
+            - generic [ref=e164]:
+              - button "All approved sites" [ref=e165] [cursor=pointer]
+              - button "All outcomes" [ref=e172] [cursor=pointer]
+              - button "Card view" [ref=e175] [cursor=pointer]
+          - tablist "Views" [ref=e182]:
+            - tab "Requests" [selected] [ref=e183] [cursor=pointer]
+            - tab "Journeys" [ref=e188] [cursor=pointer]
+            - tab "Returns & handovers" [ref=e194] [cursor=pointer]
+            - tab "Outings" [ref=e199] [cursor=pointer]
+            - button "Find a view" [ref=e206] [cursor=pointer]:
+              - generic [ref=e210]: Find
+        - generic [ref=e211]:
+          - generic [ref=e212]:
+            - generic [ref=e213]:
+              - text: Transport requests
+              - generic [ref=e214]: 5 of 5 matching records shown
+            - generic [ref=e215]: Next action and accountable owner
+          - table [ref=e218]:
+            - row [ref=e219]:
+              - columnheader "Request / passenger" [ref=e220]
+              - columnheader "Window / site" [ref=e221]
+              - columnheader "Status" [ref=e222]
+              - columnheader "Owner" [ref=e223]
+              - columnheader "Next action" [ref=e224]
+              - columnheader "Actions"
+            - row [ref=e225] [cursor=pointer]:
+              - cell "Library visit TR-1042 · Alex Morgan" [ref=e226]:
+                - generic [ref=e232]:
+                  - generic [ref=e233]: Library visit
+                  - generic [ref=e235]: TR-1042 · Alex Morgan
+              - cell "Mon 28 Sep · 9:30 AM Aurora House" [ref=e236]:
+                - generic [ref=e237]:
+                  - strong [ref=e238]: Mon 28 Sep · 9:30 AM
+                  - generic [ref=e239]: Aurora House
+              - cell "Requested" [ref=e240]
+              - cell "MC Mia Chen" [ref=e242]:
+                - generic [ref=e243]:
+                  - generic [ref=e244]: MC
+                  - generic [ref=e245]: Mia Chen
+              - cell "Assess request" [ref=e246]
+              - cell [ref=e248]:
+                - button "Actions for Library visit" [ref=e250]
+            - row [ref=e255] [cursor=pointer]:
+              - cell "Community garden TR-1043 · Jordan Lee" [ref=e256]:
+                - generic [ref=e262]:
+                  - generic [ref=e263]: Community garden
+                  - generic [ref=e265]: TR-1043 · Jordan Lee
+              - cell "Mon 28 Sep · 10:00 AM Kōwhai House" [ref=e266]:
+                - generic [ref=e267]:
+                  - strong [ref=e268]: Mon 28 Sep · 10:00 AM
+                  - generic [ref=e269]: Kōwhai House
+              - cell "Needs information" [ref=e270]
+              - cell "ET Eli Thompson" [ref=e272]:
+                - generic [ref=e273]:
+                  - generic [ref=e274]: ET
+                  - generic [ref=e275]: Eli Thompson
+              - cell "Confirm support needs" [ref=e276]
+              - cell [ref=e278]:
+                - button "Actions for Community garden" [ref=e280]
+            - row [ref=e285] [cursor=pointer]:
+              - cell "Shopping trip TR-1037 · Authorised outing" [ref=e286]:
+                - generic [ref=e292]:
+                  - generic [ref=e293]: Shopping trip
+                  - generic [ref=e295]: TR-1037 · Authorised outing
+              - cell "Mon 28 Sep · 1:00 PM Aurora House" [ref=e296]:
+                - generic [ref=e297]:
+                  - strong [ref=e298]: Mon 28 Sep · 1:00 PM
+                  - generic [ref=e299]: Aurora House
+              - cell "Allocated" [ref=e300]
+              - cell "SW Sara Wilson" [ref=e302]:
+                - generic [ref=e303]:
+                  - generic [ref=e304]: SW
+                  - generic [ref=e305]: Sara Wilson
+              - cell "Open linked booking" [ref=e306]
+              - cell [ref=e308]:
+                - button "Actions for Shopping trip" [ref=e310]
+            - row [ref=e315] [cursor=pointer]:
+              - cell "Community visit TR-1029 · Authorised client" [ref=e316]:
+                - generic [ref=e322]:
+                  - generic [ref=e323]: Community visit
+                  - generic [ref=e325]: TR-1029 · Authorised client
+              - cell "Fri 25 Sep · 2:00 PM Kōwhai House" [ref=e326]:
+                - generic [ref=e327]:
+                  - strong [ref=e328]: Fri 25 Sep · 2:00 PM
+                  - generic [ref=e329]: Kōwhai House
+              - cell "Not fulfilled" [ref=e330]
+              - cell "ET Eli Thompson" [ref=e332]:
+                - generic [ref=e333]:
+                  - generic [ref=e334]: ET
+                  - generic [ref=e335]: Eli Thompson
+              - cell "Review recorded outcome" [ref=e336]
+              - cell [ref=e338]:
+                - button "Actions for Community visit" [ref=e340]
+            - row [ref=e345] [cursor=pointer]:
+              - cell "Library visit TR-1024 · Authorised client" [ref=e346]:
+                - generic [ref=e352]:
+                  - generic [ref=e353]: Library visit
+                  - generic [ref=e355]: TR-1024 · Authorised client
+              - cell "Thu 24 Sep · 9:30 AM Aurora House" [ref=e356]:
+                - generic [ref=e357]:
+                  - strong [ref=e358]: Thu 24 Sep · 9:30 AM
+                  - generic [ref=e359]: Aurora House
+              - cell "Cancelled" [ref=e360]
+              - cell "MC Mia Chen" [ref=e362]:
+                - generic [ref=e363]:
+                  - generic [ref=e364]: MC
+                  - generic [ref=e365]: Mia Chen
+              - cell "View client choice" [ref=e366]
+              - cell [ref=e368]:
+                - button "Actions for Library visit" [ref=e370]
+          - generic [ref=e375]: Counts, search and rows use the same permitted scope. Synthetic records only.
+        - generic [ref=e379]:
+          - generic [ref=e384]:
+            - heading "Start with the person’s transport need" [level=2] [ref=e385]
+            - paragraph [ref=e386]: Record the time, pickup and support needed. Allocate a suitable vehicle and team after assessment.
+          - button "Request transport" [ref=e387] [cursor=pointer]
+        - generic [ref=e388]: PKG-05 / v1 · baseline 4ea64c547 · single operating organisation · synthetic dates, people and records · local preview only

@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+const path=new URL('./app.tsx',import.meta.url);
+let s=fs.readFileSync(path,'utf8');
+s=s.replaceAll("setOriginModal('')","setOrigins([])");
+s=s.replace("setScenario(s);setLab(false);", "setScenario(s);setLab(false);setCloseGuard(false);setDirty(false);");
+s=s.replace("setScenario('Normal journey')}}>Clear filters", "if(scenario==='Empty queue')setScenario('Normal journey')}}>Clear filters");
+s=s.replace("event('Allocated · BK-208 and J-608 linked to TR-1042')", "event('Allocated · BK-208 and J-608 linked to '+activeRequestId)");
+s=s.replaceAll('TR-1042 → BK-208 → J-608 · {label}', '{activeRequestId} → BK-208 → J-608 · {label}');
+s=s.replace('then link BK-208 and J-608 to TR-1042.', 'then link BK-208 and J-608 to {activeRequestId}.');
+s=s.replace('>TR-1042 retains its owner', '>{activeRequestId} retains its owner');
+s=s.replace("'TR-1042 · Library visit'", "activeRequestId+' · '+request.purpose");
+s=s.replace('Library visit · Monday, 9:30 AM</strong>', '{request.purpose} · {localDateTimeLabel(request.start)}</strong>');
+s=s.replace("'Request TR-1042 · resources not assigned'", "'Request '+activeRequestId+' · resources not assigned'");
+s=s.replace("<p>{isTerminal?'The recorded outcome", "<p>{handover==='accepted'&&isHandover?'Custody acknowledgement is retained. Review the journey’s remaining source obligations separately.':isTerminal?'The recorded outcome");
+fs.writeFileSync(path,s);

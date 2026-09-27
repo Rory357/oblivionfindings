@@ -1,0 +1,42 @@
+async(page)=>{
+ const results=[],root='C:/Users/steph/.codex/worktrees/b9b9/oblivionfindings/docs/fleet-assets-audit/previews/PKG-05/v3/';
+ const check=(name,pass,detail='')=>{results.push({name,pass:!!pass,detail});if(!pass)throw Error(name)};
+ const role=async v=>page.getByRole('combobox',{name:'Preview role',exact:true}).selectOption(v);
+ const go=async p=>{await page.goto('http://127.0.0.1:4397/#/fleet-assets/transports/'+p);await page.waitForTimeout(90)};
+ const main=()=>page.locator('main').innerText();
+ const choose=async(label,name)=>{await page.getByRole('combobox',{name:label,exact:true}).click();await page.locator('[cmdk-item][role=option]').filter({hasText:name}).click()};
+ page.setDefaultTimeout(6000);await page.bringToFront();await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:1440,height:1000});
+ await go('returns');await page.reload();await page.getByRole('heading',{name:'Returns & handovers',exact:true}).waitFor();
+ check('R01 Returns explains actual return, received items and optional handover',(await main()).includes('1. Record the return')&&(await main()).includes('2. Confirm received items')&&(await main()).includes('Shift handover · only if needed'));
+ await page.getByRole('button',{name:'View items to receive',exact:true}).click();
+ check('R02 Missing-items meter opens only the matching return',await page.getByRole('row').count()===2&&(await main()).includes('Casey Jones')&&!(await main()).includes('Charlie Brown'));
+ await page.getByRole('row').filter({hasText:'Casey Jones'}).click();
+ check('R03 Actual next receiver replaces generic allocator ownership',(await page.getByRole('region',{name:'Next step',exact:true}).innerText()).includes('Ben Carter'));
+ check('R04 Reconciliation is not offered while items are missing',await page.getByRole('button',{name:'Record reconciliation',exact:true}).count()===0);
+ await role('receiver');await page.getByRole('button',{name:'Receive missing items',exact:true}).first().click();await choose('Actual giver','Nia Patel');await page.getByLabel('Outstanding equipment received',{exact:true}).check();await page.getByLabel('Later receipt observation',{exact:true}).fill('Restraints kit received from Nia and checked against the handover.');await page.getByRole('button',{name:'Record later receipt',exact:true}).click();
+ check('R05 Later receipt updates outstanding items without deleting dispute',(await main()).includes('All expected items have a recorded receipt.')&&(await main()).includes('Disputed'));
+ await page.getByText('Original receipt · RC-310',{exact:true}).click();
+ check('R06 Original partial receipt remains unchanged',(await main()).includes('Equipment missing')&&(await main()).includes('later receipt'));
+ await role('allocator');await page.getByRole('button',{name:'Record reconciliation',exact:true}).first().click();await page.getByLabel('Reconciliation evidence',{exact:true}).fill('Ben’s later receipt confirms the missing restraints kit. Original dispute retained.');await page.getByRole('button',{name:'Save reconciliation',exact:true}).click();
+ check('R07 Reconciliation closes work and preserves the historical dispute',(await main()).includes('Return work complete')&&(await main()).includes('Reconciled. Original dispute retained.'));
+ await page.screenshot({path:root+'verified-reconciled-dispute.png',fullPage:true});
+ await go('returns/TR-1047?from=returns');await role('driver');await page.getByRole('button',{name:'Create shift handover',exact:true}).click();await choose('Incoming worker','Ben Carter');await page.getByLabel('Handover note',{exact:true}).fill('Keys and equipment handed to the incoming shift at Aurora.');await page.getByRole('button',{name:'Send handover',exact:true}).click();
+ check('R08 Optional handover identifies the incoming decision owner',(await page.getByRole('region',{name:'Next step',exact:true}).innerText()).includes('Ben Carter')&&(await main()).includes('Awaiting incoming worker'));
+ await role('receiver');await page.getByRole('button',{name:'Acknowledge handover',exact:true}).first().click();await page.getByLabel('What did you receive?',{exact:true}).fill('Keys and expected equipment checked and received.');await page.getByRole('button',{name:'Acknowledge receipt',exact:true}).click();
+ check('R09 Incoming worker can acknowledge a real pending handover',(await main()).includes('Acknowledged')&&(await main()).includes('Return work complete'));
+ await go('journeys/J-609?from=journeys');check('R10 Handover acknowledgement does not clear medication or complete journey',(await main()).includes('Resolve medication handoff')&&(await main()).includes('Returned · completion due'));
+ // Return uncertainty recovers the original receipt in the redesigned flow.
+ await go('journeys/J-608?from=journeys');await role('driver');await page.getByRole('button',{name:'Preview scenarios'}).click();await page.getByLabel('Simulate a lost return response').check();await page.getByRole('button',{name:'Return to preview'}).click();
+ await page.getByRole('button',{name:'Record return',exact:true}).click();await choose('Actual receiver','Ben Carter');await page.getByLabel('Keys received by named worker').check();await page.getByLabel('All expected equipment received').check();await page.getByLabel('Return condition',{exact:true}).fill('Returned in the same condition.');await page.getByRole('button',{name:'Save return receipt',exact:true}).click();
+ check('R11 Lost response shows recovery instead of false failure',(await page.getByRole('dialog').innerText()).includes('Response not confirmed'));
+ await page.getByLabel('Return odometer (km)',{exact:true}).fill('48999');await page.getByRole('button',{name:'Retry this operation',exact:true}).click();check('R12 Changed retry is rejected',(await page.getByRole('dialog').innerText()).includes('changed observations'));
+ await page.getByRole('button',{name:'Recover original receipt',exact:true}).click();check('R13 Recovery presents original observations',(await page.getByRole('dialog').innerText()).includes('48248 km')&&!(await page.getByRole('dialog').innerText()).includes('48999'));await page.getByRole('button',{name:'Return to journey',exact:true}).click();
+ check('R14 Return advances to passenger confirmation without a forced handover',(await page.getByRole('region',{name:'Next step',exact:true}).innerText()).includes('Confirm passenger return'));
+ // Safe draft recovery in the planner.
+ await go('planner');await page.reload();await choose('Vehicle','Rimu');await choose('Driver','Nia Patel');await page.getByRole('button',{name:'Cancel',exact:true}).click();await page.getByRole('button',{name:'Discard changes',exact:true}).click();
+ check('R15 Cancelling an inline proposal resets the draft',(await page.getByRole('combobox',{name:'Vehicle',exact:true}).innerText()).includes('Choose vehicle')&&await page.getByRole('button',{name:'Save proposed allocation',exact:true}).isDisabled());
+ await page.getByRole('button',{name:'Preview scenarios'}).click();await page.getByRole('combobox',{name:'Fleet availability',exact:true}).selectOption('unknown');await page.getByRole('button',{name:'Return to preview'}).click();await choose('Vehicle','Rimu');await choose('Driver','Nia Patel');await page.getByRole('button',{name:'Check availability',exact:true}).click();
+ check('R16 Missing source configuration cannot be checked or saved',(await main()).includes('readiness configuration is missing')&&await page.getByRole('button',{name:'Save proposed allocation',exact:true}).isDisabled());
+ await page.getByRole('button',{name:'Cancel',exact:true}).click();await page.getByRole('button',{name:'Discard changes',exact:true}).click();
+ return {results};
+}

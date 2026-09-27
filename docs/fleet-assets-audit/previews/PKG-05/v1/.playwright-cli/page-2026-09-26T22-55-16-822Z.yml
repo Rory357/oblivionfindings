@@ -1,0 +1,263 @@
+- generic [ref=f36e2]:
+  - generic [ref=f36e3]:
+    - strong [ref=f36e4]: DESIGN PREVIEW · PKG-05 v5
+    - generic [ref=f36e5]: Synthetic records · changes stay in this browser until reload
+    - generic [ref=f36e6]:
+      - generic [ref=f36e7]:
+        - text: View as
+        - combobox "Preview role" [ref=f36e8]:
+          - option "Ava Thompson · Requester"
+          - option "Mia Chen · Transport allocator" [selected]
+          - option "Rory Williams · Booking approver"
+          - option "Nia Patel · Assigned driver"
+          - option "Sara Wilson · Assigned escort"
+          - option "Ben Carter · Receiving worker"
+      - button "Preview scenarios" [ref=f36e9] [cursor=pointer]
+  - generic [ref=f36e10]:
+    - generic [ref=f36e11]:
+      - text: oblivion
+      - generic [ref=f36e13]: findings
+    - generic [ref=f36e14]: Fleet & Assets
+    - generic [ref=f36e15]:
+      - generic [ref=f36e19]: Mia Chen
+      - generic [ref=f36e20]: MC
+  - generic [ref=f36e21]:
+    - complementary [ref=f36e22]:
+      - button "My Day" [ref=f36e23] [cursor=pointer]
+      - button "Sites" [ref=f36e28] [cursor=pointer]
+      - button "Clients" [ref=f36e34] [cursor=pointer]
+      - generic [ref=f36e42]: Fleet & Assets
+      - button "Overview" [ref=f36e43] [cursor=pointer]
+      - button "Fleet" [ref=f36e50] [cursor=pointer]
+      - button "Transport" [ref=f36e56] [cursor=pointer]
+      - button "Assets" [ref=f36e62] [cursor=pointer]
+      - button "Maintenance" [ref=f36e67] [cursor=pointer]
+      - button "Maps & boundaries" [ref=f36e71] [cursor=pointer]
+      - button "Reports" [ref=f36e76] [cursor=pointer]
+      - button "Settings" [ref=f36e81] [cursor=pointer]
+    - main [ref=f36e86]:
+      - generic [ref=f36e87]:
+        - button "Fleet & Assets" [ref=f36e88] [cursor=pointer]
+        - generic [ref=f36e89]: /
+        - button "Transport" [ref=f36e90] [cursor=pointer]
+      - generic [ref=f36e91]:
+        - generic "Page summary and actions" [ref=f36e92]:
+          - generic [ref=f36e94]:
+            - generic [ref=f36e95]:
+              - generic [ref=f36e96]:
+                - generic [ref=f36e103]:
+                  - heading "Planner" [level=1] [ref=f36e105]
+                  - paragraph [ref=f36e106]: Build a transport plan · review it together · send for a decision
+                - generic [ref=f36e107]:
+                  - generic [ref=f36e108]:
+                    - searchbox "Search planner" [ref=f36e109]
+                    - generic [aria-hidden]: /
+                  - button "Request transport" [ref=f36e110] [cursor=pointer]
+                  - button "Workspace actions" [ref=f36e113] [cursor=pointer]
+              - generic [ref=f36e119]:
+                - button "View ready to plan" [ref=f36e120] [cursor=pointer]:
+                  - generic [ref=f36e124]: Ready to plan
+                  - generic [ref=f36e126]: "1"
+                  - generic [ref=f36e127]: Assessed requests
+                - button "View assessment first" [ref=f36e128] [cursor=pointer]:
+                  - generic [ref=f36e132]: Assessment first
+                  - generic [ref=f36e134]: "2"
+                  - generic [ref=f36e135]: Resolve the request details
+                - button "View proposed bookings" [ref=f36e136] [cursor=pointer]:
+                  - generic [ref=f36e140]: Proposed bookings
+                  - generic [ref=f36e142]: "1"
+                  - generic [ref=f36e143]: Awaiting a source decision
+                - button "View ready to prepare" [ref=f36e144] [cursor=pointer]:
+                  - generic [ref=f36e148]: Ready to prepare
+                  - generic [ref=f36e150]: "1"
+                  - generic [ref=f36e151]: Assigned driver acts next
+              - generic [ref=f36e153]:
+                - generic [ref=f36e154]:
+                  - text: Site
+                  - combobox "Site filter" [ref=f36e155]:
+                    - option "All permitted sites" [selected]
+                    - option "Aurora House"
+                    - option "Kōwhai House"
+                - generic [ref=f36e156]:
+                  - text: Date
+                  - combobox "Date filter" [ref=f36e157]:
+                    - option "Mon 28 September" [selected]
+                    - option "Tue 29 September"
+                    - option "All dates"
+                - generic [ref=f36e158]: Pacific/Auckland · Example time 10:35 am
+            - tablist "Views" [ref=f36e160]:
+              - tab "Overview" [ref=f36e161] [cursor=pointer]
+              - tab "Requests & approvals" [ref=f36e168] [cursor=pointer]
+              - tab "Planner" [selected] [ref=f36e173] [cursor=pointer]
+              - tab "Journeys" [ref=f36e177] [cursor=pointer]
+              - tab "Returns & handovers" [ref=f36e183] [cursor=pointer]
+              - button "Find a view" [ref=f36e188] [cursor=pointer]:
+                - generic [ref=f36e192]: Find
+        - generic [ref=f36e193]:
+          - generic [ref=f36e194]:
+            - generic [ref=f36e195]:
+              - text: Transport planning
+              - heading "Build a clear plan for every trip" [level=2] [ref=f36e196]
+              - paragraph [ref=f36e197]: Start with a request. Choose the time, vehicle and people. Check the whole plan before saving.
+            - button "View transport calendar" [ref=f36e198] [cursor=pointer]
+          - generic [ref=f36e199]:
+            - complementary "Transport requests to plan" [ref=f36e200]:
+              - generic [ref=f36e201]:
+                - heading "Choose a request" [level=3] [ref=f36e202]
+                - generic [ref=f36e203]: "5"
+              - paragraph [ref=f36e204]: 1 ready to plan · 2 need a response
+              - group "Planner request filter" [ref=f36e205]:
+                - button "All" [pressed] [ref=f36e206] [cursor=pointer]
+                - button "Ready" [ref=f36e207] [cursor=pointer]
+                - button "Planned" [ref=f36e208] [cursor=pointer]
+              - button "Elliot White 01:00 PM Harbour community centre Ready to plan TR-1050" [pressed] [ref=f36e209] [cursor=pointer]:
+                - generic [ref=f36e210]:
+                  - strong [ref=f36e211]: Elliot White
+                  - time [ref=f36e212]: 01:00 PM
+                - generic [ref=f36e213]: Harbour community centre
+                - generic [ref=f36e214]: Ready to plan
+                - generic [ref=f36e215]: TR-1050
+              - button "Alex Morgan 11:30 AM Harbour Physiotherapy Assessment needed TR-1042" [ref=f36e218] [cursor=pointer]:
+                - generic [ref=f36e219]:
+                  - strong [ref=f36e220]: Alex Morgan
+                  - time [ref=f36e221]: 11:30 AM
+                - generic [ref=f36e222]: Harbour Physiotherapy
+                - generic [ref=f36e223]: Assessment needed
+                - generic [ref=f36e224]: TR-1042
+              - button "Jordan Lee 12:00 PM Library Waiting for information TR-1043" [ref=f36e227] [cursor=pointer]:
+                - generic [ref=f36e228]:
+                  - strong [ref=f36e229]: Jordan Lee
+                  - time [ref=f36e230]: 12:00 PM
+                - generic [ref=f36e231]: Library
+                - generic [ref=f36e232]: Waiting for information
+                - generic [ref=f36e233]: TR-1043
+              - button "Taylor Green 10:45 AM Harbour community centre Awaiting booking decision TR-1044" [ref=f36e236] [cursor=pointer]:
+                - generic [ref=f36e237]:
+                  - strong [ref=f36e238]: Taylor Green
+                  - time [ref=f36e239]: 10:45 AM
+                - generic [ref=f36e240]: Harbour community centre
+                - generic [ref=f36e241]: Awaiting booking decision
+                - generic [ref=f36e242]: TR-1044
+              - button "Morgan Smith 11:00 AM Harbour community centre Confirmed TR-1045" [ref=f36e245] [cursor=pointer]:
+                - generic [ref=f36e246]:
+                  - strong [ref=f36e247]: Morgan Smith
+                  - time [ref=f36e248]: 11:00 AM
+                - generic [ref=f36e249]: Harbour community centre
+                - generic [ref=f36e250]: Confirmed
+                - generic [ref=f36e251]: TR-1045
+              - paragraph [ref=f36e258]: Saved plans use the same bookings shown in Fleet.
+            - region "Transport plan builder" [ref=f36e259]:
+              - generic [ref=f36e260]:
+                - generic [ref=f36e261]:
+                  - generic [ref=f36e262]: TR-1050 · Aurora House
+                  - heading "Elliot White" [level=2] [ref=f36e263]
+                  - paragraph [ref=f36e264]: Community appointment
+                - button "Open request" [ref=f36e265] [cursor=pointer]
+              - navigation "Build a transport plan" [ref=f36e266]:
+                - button "1 Journey & time Where and when" [ref=f36e267] [cursor=pointer]:
+                  - generic [ref=f36e268]: "1"
+                  - generic [ref=f36e269]:
+                    - strong [ref=f36e270]: Journey & time
+                    - generic [ref=f36e271]: Where and when
+                - button "2 Vehicle & team Choose what is needed" [ref=f36e274] [cursor=pointer]:
+                  - generic [ref=f36e275]: "2"
+                  - generic [ref=f36e276]:
+                    - strong [ref=f36e277]: Vehicle & team
+                    - generic [ref=f36e278]: Choose what is needed
+                - button "3 Review & save Check the whole plan" [ref=f36e281] [cursor=pointer]:
+                  - generic [ref=f36e282]: "3"
+                  - generic [ref=f36e283]:
+                    - strong [ref=f36e284]: Review & save
+                    - generic [ref=f36e285]: Check the whole plan
+              - generic [ref=f36e286]:
+                - generic [ref=f36e287]:
+                  - generic [ref=f36e288]:
+                    - generic [ref=f36e289]: Step 1 of 3
+                    - heading "Where and when is the trip?" [level=3] [ref=f36e290]
+                    - paragraph [ref=f36e291]: The request provides the route and support needs. Set the full time window for the booking.
+                  - group [ref=f36e292]:
+                    - generic [ref=f36e293]:
+                      - generic [ref=f36e296]:
+                        - generic [ref=f36e297]: Pickup
+                        - strong [ref=f36e298]: Aurora House
+                      - generic [ref=f36e303]:
+                        - generic [ref=f36e304]: Destination
+                        - strong [ref=f36e305]: Harbour community centre
+                      - paragraph [ref=f36e306]: Expected back at Aurora House
+                    - generic [ref=f36e310]:
+                      - group "Departure Pacific/Auckland" [ref=f36e311]:
+                        - generic [ref=f36e313]:
+                          - generic [ref=f36e314]:
+                            - generic [ref=f36e315]: Departure date
+                            - 'button "Departure date: 28 Sep 2026" [ref=f36e316] [cursor=pointer]':
+                              - generic [ref=f36e318]:
+                                - strong [ref=f36e319]: 28 Sep 2026
+                                - generic [ref=f36e320]: Choose a day on the calendar
+                          - generic [ref=f36e321]:
+                            - generic [ref=f36e322]: Departure time
+                            - 'button "Departure time: 01:00 PM" [ref=f36e323] [cursor=pointer]':
+                              - generic [ref=f36e325]:
+                                - strong [ref=f36e326]: 01:00 PM
+                                - generic [ref=f36e327]: Choose on the clock or type a time
+                        - 'button "Departure: Clear date and time" [ref=f36e328] [cursor=pointer]': Clear date and time
+                      - group "Expected return Pacific/Auckland" [ref=f36e329]:
+                        - generic [ref=f36e331]:
+                          - generic [ref=f36e332]:
+                            - generic [ref=f36e333]: Expected return date
+                            - 'button "Expected return date: 28 Sep 2026" [ref=f36e334] [cursor=pointer]':
+                              - generic [ref=f36e336]:
+                                - strong [ref=f36e337]: 28 Sep 2026
+                                - generic [ref=f36e338]: Choose a day on the calendar
+                          - generic [ref=f36e339]:
+                            - generic [ref=f36e340]: Expected return time
+                            - 'button "Expected return time: 03:00 PM" [ref=f36e341] [cursor=pointer]':
+                              - generic [ref=f36e343]:
+                                - strong [ref=f36e344]: 03:00 PM
+                                - generic [ref=f36e345]: Choose on the clock or type a time
+                        - 'button "Expected return: Clear date and time" [ref=f36e346] [cursor=pointer]': Clear date and time
+                    - generic [ref=f36e347]:
+                      - heading "Plan for these needs" [level=4] [ref=f36e348]
+                      - generic [ref=f36e349]:
+                        - generic [ref=f36e350]: 2 people, including driver
+                        - generic [ref=f36e356]: Standard seating
+                      - paragraph [ref=f36e361]: Assessment complete. Allocate a vehicle and driver.
+                  - generic [ref=f36e362]:
+                    - generic [ref=f36e363]: No booking changes yet
+                    - button "Choose vehicle & team" [ref=f36e364] [cursor=pointer]
+                - complementary "Live transport plan" [ref=f36e365]:
+                  - generic [ref=f36e366]:
+                    - heading "Your transport plan" [level=3] [ref=f36e371]
+                    - generic [ref=f36e372]: Draft
+                  - generic [ref=f36e373]:
+                    - strong [ref=f36e374]: Elliot White
+                    - generic [ref=f36e375]: 28 Sep 2026
+                  - generic [ref=f36e376]:
+                    - generic [ref=f36e379]:
+                      - generic [ref=f36e380]: 01:00 PM · departure
+                      - strong [ref=f36e381]: Aurora House
+                    - generic [ref=f36e386]:
+                      - generic [ref=f36e387]: Travelling to
+                      - strong [ref=f36e388]: Harbour community centre
+                    - generic [ref=f36e393]:
+                      - generic [ref=f36e394]: 03:00 PM · expected return
+                      - strong [ref=f36e395]: Aurora House
+                  - generic [ref=f36e396]: 2h booking window
+                  - generic [ref=f36e400]:
+                    - button "Vehicle Choose vehicle" [ref=f36e401] [cursor=pointer]:
+                      - generic [ref=f36e406]:
+                        - generic [ref=f36e407]: Vehicle
+                        - strong [ref=f36e408]: Choose vehicle
+                    - button "Driver Choose driver" [ref=f36e411] [cursor=pointer]:
+                      - generic [ref=f36e417]:
+                        - generic [ref=f36e418]: Driver
+                        - strong [ref=f36e419]: Choose driver
+                    - button "Equipment No additional equipment" [ref=f36e422] [cursor=pointer]:
+                      - generic [ref=f36e427]:
+                        - generic [ref=f36e428]: Equipment
+                        - strong [ref=f36e429]: No additional equipment
+                  - paragraph [ref=f36e436]: Key collection and return are arranged on the linked booking once the vehicle is chosen.
+                  - generic [ref=f36e437]:
+                    - button "Keep draft" [ref=f36e438] [cursor=pointer]
+                    - button "Reset" [ref=f36e439] [cursor=pointer]
+                    - status [ref=f36e440]: Changes are not yet saved to a booking. Reload clears preview drafts.
+        - generic [ref=f36e441]: PKG-05 v5 · desktop design candidate · example date 28 September 2026 · no operational changes

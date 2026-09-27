@@ -70,6 +70,7 @@ export type CalendarFile = {
 };
 
 export type BookingRow = {
+    transport_request?: { id: number; href: string; planner_href: string } | null;
     kind: 'booking';
     id: number;
     reference: string | null;

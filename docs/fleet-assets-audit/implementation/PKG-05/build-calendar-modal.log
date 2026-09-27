@@ -1,0 +1,5 @@
+
+> build
+> vite build --outDir storage/framework/testing/pkg05-build
+
+vite v7.3.6 building client environment for production...

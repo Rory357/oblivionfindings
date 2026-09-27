@@ -1,0 +1,129 @@
+{
+  "scope": "Synthetic preview transition invariants only; no backend, real permission, persistence, delivery or integration validation.",
+  "results": [
+    {
+      "name": "M01 Unassessed allocation rejected atomically",
+      "pass": true
+    },
+    {
+      "name": "M02 Unallocated checkout cannot fabricate booking or journey",
+      "pass": true
+    },
+    {
+      "name": "M03 Failed checkout leaves no fabricated records",
+      "pass": true
+    },
+    {
+      "name": "M04 Out-of-site object denied",
+      "pass": true
+    },
+    {
+      "name": "M05 Denied linked command denied",
+      "pass": true
+    },
+    {
+      "name": "M06 Stale source blocks all mutations",
+      "pass": true
+    },
+    {
+      "name": "M07 Concurrent version change rejected",
+      "pass": true
+    },
+    {
+      "name": "M08 Unknown readiness fails closed",
+      "pass": true
+    },
+    {
+      "name": "M09 Expired availability fails closed",
+      "pass": true
+    },
+    {
+      "name": "M10 Resource conflict fails without partial reservation",
+      "pass": true
+    },
+    {
+      "name": "M11 Unknown/conflict results create no booking",
+      "pass": true
+    },
+    {
+      "name": "M12 Independent self-approval denied",
+      "pass": true
+    },
+    {
+      "name": "M13 Not-required source authority is distinct from independent approval",
+      "pass": true
+    },
+    {
+      "name": "M14 Impossible dates rejected",
+      "pass": true
+    },
+    {
+      "name": "M15 Return before actual departure rejected",
+      "pass": true
+    },
+    {
+      "name": "M16 Odometer below checkout rejected",
+      "pass": true
+    },
+    {
+      "name": "M17 Unconfigured frontline return authority rejected",
+      "pass": true
+    },
+    {
+      "name": "M18 Same operation replays one immutable receipt",
+      "pass": true
+    },
+    {
+      "name": "M19 Changed retry fingerprint rejected",
+      "pass": true
+    },
+    {
+      "name": "M20 Original receipt remains original",
+      "pass": true
+    },
+    {
+      "name": "M21 Missing passenger confirmation blocks completion",
+      "pass": true
+    },
+    {
+      "name": "M22 Outstanding medication prevents completion",
+      "pass": true
+    },
+    {
+      "name": "M23 Driver cannot resolve medication source",
+      "pass": true
+    },
+    {
+      "name": "M24 Passenger completion retains independent restriction",
+      "pass": true
+    },
+    {
+      "name": "M25 Exception does not mutate dispute",
+      "pass": true
+    },
+    {
+      "name": "M26 Already-disputed handover cannot be acknowledged again",
+      "pass": true
+    },
+    {
+      "name": "M27 No handover can be acknowledged if none exists",
+      "pass": true
+    },
+    {
+      "name": "M28 Cancellation does not erase started trip",
+      "pass": true
+    },
+    {
+      "name": "M29 Later receipt preserves original partial return and dispute",
+      "pass": true
+    },
+    {
+      "name": "M30 Reconciled historical dispute is no longer outstanding work",
+      "pass": true
+    },
+    {
+      "name": "M31 String equipment value cannot stand in for physical confirmation",
+      "pass": true
+    }
+  ]
+}
