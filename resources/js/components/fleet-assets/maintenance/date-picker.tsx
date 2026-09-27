@@ -30,7 +30,8 @@ export function DatePicker({
   trigger?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const placement = usePickerPlacement(open, 390);
+  const pickerTrigger = useRef<HTMLButtonElement>(null);
+  const pickerSide = usePickerPlacement(open, 390, pickerTrigger);
   const [draft, setDraft] = useState(value);
   const calendar = useRef<HTMLDivElement>(null);
   const changeOpen = (next: boolean) => {
@@ -39,7 +40,7 @@ export function DatePicker({
   };
   return (
     <Popover open={open} onOpenChange={changeOpen}>
-      <PopoverTrigger ref={placement.trigger} asChild>
+      <PopoverTrigger ref={pickerTrigger} asChild>
         {trigger ?? (
         <Button
           id={id}
@@ -62,8 +63,8 @@ export function DatePicker({
       </PopoverTrigger>
       <PopoverContent
         className="date-picker-popover"
-        side={placement.side}
-        align={placement.align}
+        side={pickerSide}
+        align={pickerSide === "bottom" ? "start" : "center"}
         collisionPadding={16}
         sideOffset={8}
         aria-label={`${label} picker`}

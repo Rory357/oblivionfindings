@@ -32,7 +32,8 @@ export function TimePicker({
   describedBy?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const placement = usePickerPlacement(open, 346);
+  const pickerTrigger = useRef<HTMLButtonElement>(null);
+  const pickerSide = usePickerPlacement(open, 346, pickerTrigger);
   const [hour, setHour] = useState("09");
   const [minute, setMinute] = useState("00");
   const [period, setPeriod] = useState("AM");
@@ -94,7 +95,7 @@ export function TimePicker({
   const handY = 128 - Math.cos(angle) * 96;
   return (
     <Popover open={open} onOpenChange={changeOpen}>
-      <PopoverTrigger ref={placement.trigger} asChild>
+      <PopoverTrigger ref={pickerTrigger} asChild>
         <Button
           id={id}
           variant="outline"
@@ -115,8 +116,8 @@ export function TimePicker({
       </PopoverTrigger>
       <PopoverContent
         className="time-picker-popover"
-        side={placement.side}
-        align={placement.align}
+        side={pickerSide}
+        align={pickerSide === "bottom" ? "start" : "center"}
         collisionPadding={16}
         sideOffset={8}
         aria-label={`${label} picker`}

@@ -1,8 +1,11 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useState, type RefObject } from 'react';
 
 /** Keep the full picker beside the field only when either side has room. */
-export function usePickerPlacement(open: boolean, width: number) {
-    const trigger = useRef<HTMLButtonElement>(null);
+export function usePickerPlacement(
+    open: boolean,
+    width: number,
+    trigger: RefObject<HTMLButtonElement | null>,
+) {
     const [side, setSide] = useState<'right' | 'bottom'>('bottom');
 
     useLayoutEffect(() => {
@@ -18,11 +21,7 @@ export function usePickerPlacement(open: boolean, width: number) {
         place();
         window.addEventListener('resize', place);
         return () => window.removeEventListener('resize', place);
-    }, [open, width]);
+    }, [open, width, trigger]);
 
-    return {
-        trigger,
-        side,
-        align: side === 'bottom' ? ('start' as const) : ('center' as const),
-    };
+    return side;
 }
