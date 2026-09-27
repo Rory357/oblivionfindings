@@ -6,6 +6,7 @@ use App\Domain\Finance\Models\FinBillLine;
 use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Finance\Services\AccountsPayableService;
+use App\Domain\Finance\Services\BillApprovalSnapshot;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Models\SpendApproval;
 use App\Domain\Governance\Models\SpendApprovalDecision;
@@ -102,6 +103,7 @@ function sag_billPayload(FinBill $bill, ?int $approvalId): array
     $line = $bill->lines()->sole();
 
     return [
+        'site_id' => $bill->site_id,
         'vendor_id' => $bill->vendor_id,
         'vendor_reference' => $bill->vendor_reference,
         'bill_date' => $bill->bill_date->toDateString(),
@@ -229,6 +231,7 @@ it('bounds the bill approval picker by exact governance action and canonical Sit
         'finance.ap.manage',
         'governance.spend.view',
         'governance.spend.viewAllSites',
+        'finance.payments.manageAllSites',
     ]);
     $this->actingAs($global)->get('/finance/bills')
         ->assertOk()
@@ -279,7 +282,7 @@ it('allows explicit global Site scope only with both finance and governance acti
     $site = Site::factory()->create(['name' => 'Global Link Site']);
     $bill = sag_draftBill($site);
     $approval = sag_governedApproval($bill, $site);
-    $scopeWithoutView = sag_actor(null, ['finance.ap.view', 'finance.ap.manage', 'governance.spend.viewAllSites']);
+    $scopeWithoutView = sag_actor(null, ['finance.ap.view', 'finance.ap.manage', 'governance.spend.viewAllSites', 'finance.payments.manageAllSites']);
 
     $this->actingAs($scopeWithoutView)
         ->put("/finance/bills/{$bill->id}", sag_billPayload($bill, $approval->id))
@@ -291,6 +294,7 @@ it('allows explicit global Site scope only with both finance and governance acti
         'finance.ap.manage',
         'governance.spend.view',
         'governance.spend.viewAllSites',
+        'finance.payments.manageAllSites',
     ]);
     $this->actingAs($global)
         ->put("/finance/bills/{$bill->id}", sag_billPayload($bill, $approval->id))
@@ -315,6 +319,23 @@ it('posts only against independently decided current exact bill evidence', funct
     $debits = $journal->lines->reduce(fn (string $total, $line) => bcadd($total, (string) $line->debit, 2), '0');
     $credits = $journal->lines->reduce(fn (string $total, $line) => bcadd($total, (string) $line->credit, 2), '0');
     expect($debits)->toBe('15000.00')->and($credits)->toBe('15000.00');
+});
+
+it('recovers a completed approval after governance evidence expires but still checks current bill access', function (): void {
+    $site = Site::factory()->create();
+    $bill = sag_draftBill($site);
+    $approval = sag_governedApproval($bill, $site);
+    $actor = sag_actor($site, ['finance.ap.view', 'finance.ap.manage', 'governance.spend.view']);
+    app(AccountsPayableService::class)->updateBill($bill, sag_billPayload($bill, $approval->id), $actor);
+    $payload = ['approval_snapshot' => BillApprovalSnapshot::token($bill->fresh())];
+    $receipt = $this->actingAs($actor)->postJson("/finance/bills/{$bill->id}/approve", $payload)->assertOk()->json('receipt');
+    $approval->update(['valid_until' => today()->subDay()]);
+    $governance = Permission::where('key', 'governance.spend.view')->firstOrFail();
+    $actor->permissionOverrides()->syncWithoutDetaching([$governance->id => ['allowed' => false]]);
+    expect($this->actingAs($actor->fresh())->postJson("/finance/bills/{$bill->id}/approve", $payload)->assertOk()->json('receipt'))->toEqual($receipt);
+    $manage = Permission::where('key', 'finance.ap.manage')->firstOrFail();
+    $actor->permissionOverrides()->syncWithoutDetaching([$manage->id => ['allowed' => false]]);
+    $this->actingAs($actor->fresh())->postJson("/finance/bills/{$bill->id}/approve", $payload)->assertForbidden();
 });
 
 it('rejects missing approval foreign action and source or evidence tamper without posting', function (string $case): void {

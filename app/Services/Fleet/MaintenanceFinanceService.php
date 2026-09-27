@@ -19,27 +19,29 @@ class MaintenanceFinanceService
 
         try {
             return DB::transaction(function () use ($actor, $preview, $workOrderId, $billId): object {
-            $currentActor = User::query()->findOrFail($actor->id);
-            abort_unless($this->access->canManage($currentActor)
-                && $currentActor->canDo('finance.ap.view'), 403);
-            $asset = $this->access->asset($currentActor, (int) $preview->asset_id, true);
-            $order = FleetWorkOrder::query()->whereKey($workOrderId)
-                ->where('asset_id', $asset->id)->lockForUpdate()->firstOrFail();
-            $bill = FinBill::query()->whereKey($billId)->lockForUpdate()->firstOrFail();
-            abort_unless((int) $bill->site_id === (int) $asset->site_id
-                && (int) $bill->asset_id === (int) $asset->id, 404);
+                $currentActor = User::query()->findOrFail($actor->id);
+                abort_unless($this->access->canManage($currentActor)
+                    && $currentActor->canDo('finance.ap.view'), 403);
+                $asset = $this->access->asset($currentActor, (int) $preview->asset_id, true);
+                $order = FleetWorkOrder::query()->whereKey($workOrderId)
+                    ->where('asset_id', $asset->id)->lockForUpdate()->firstOrFail();
+                $bill = FinBill::query()->whereKey($billId)->lockForUpdate()->firstOrFail();
+                abort_unless($currentActor->can('view', $bill), 404);
+                abort_unless((int) $bill->site_id === (int) $asset->site_id
+                    && (int) $bill->asset_id === (int) $asset->id, 404);
 
-            $prior = DB::table('fleet_maintenance_fin_bill_links')->where('fin_bill_id', $bill->id)->first();
-            if ($prior) {
-                abort_unless((int) $prior->work_order_id === (int) $order->id, 409);
-                return $prior;
-            }
-            $id = DB::table('fleet_maintenance_fin_bill_links')->insertGetId([
-                'work_order_id' => $order->id, 'fin_bill_id' => $bill->id,
-                'linked_by_user_id' => $currentActor->id, 'created_at' => now(),
-            ]);
+                $prior = DB::table('fleet_maintenance_fin_bill_links')->where('fin_bill_id', $bill->id)->first();
+                if ($prior) {
+                    abort_unless((int) $prior->work_order_id === (int) $order->id, 409);
 
-            return DB::table('fleet_maintenance_fin_bill_links')->where('id', $id)->first();
+                    return $prior;
+                }
+                $id = DB::table('fleet_maintenance_fin_bill_links')->insertGetId([
+                    'work_order_id' => $order->id, 'fin_bill_id' => $bill->id,
+                    'linked_by_user_id' => $currentActor->id, 'created_at' => now(),
+                ]);
+
+                return DB::table('fleet_maintenance_fin_bill_links')->where('id', $id)->first();
             }, 3);
         } catch (QueryException $error) {
             if ((int) ($error->errorInfo[1] ?? 0) === 1062) {
@@ -60,7 +62,7 @@ class MaintenanceFinanceService
             ->orderBy('link.id')
             ->get(['bill.id', 'bill.site_id', 'bill.asset_id', 'bill.bill_number', 'bill.status', 'bill.total_amount',
                 'bill.approved_at', 'bill.journal_id', 'bill.deleted_at']);
-        $financeReader = $actor->canDo('finance.ap.view');
+        $financeReader = app(MaintenanceCostPresenter::class)->canView($actor, (int) $asset->site_id);
 
         return $rows->map(static function ($bill) use ($financeReader, $asset): array {
             if (! $bill->id || $bill->deleted_at
@@ -68,17 +70,18 @@ class MaintenanceFinanceService
                 || (int) $bill->asset_id !== (int) $asset->id) {
                 return ['status' => 'reconciliation_required'];
             }
+
             return $financeReader ? [
-            'id' => (int) $bill->id,
-            'reference' => $bill->bill_number,
-            'status' => $bill->status,
-            'total_amount' => $bill->total_amount,
-            'approved_at' => $bill->approved_at,
-            'journal_id' => $bill->journal_id,
-        ] : [
-            'status' => $bill->status,
-            'approved' => $bill->approved_at !== null,
-        ];
+                'id' => (int) $bill->id,
+                'reference' => $bill->bill_number,
+                'status' => $bill->status,
+                'total_amount' => $bill->total_amount,
+                'approved_at' => $bill->approved_at,
+                'journal_id' => $bill->journal_id,
+            ] : [
+                'status' => $bill->status,
+                'approved' => $bill->approved_at !== null,
+            ];
         })->all();
     }
 }

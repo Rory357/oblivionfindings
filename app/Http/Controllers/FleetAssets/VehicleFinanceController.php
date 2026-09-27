@@ -55,18 +55,27 @@ class VehicleFinanceController extends Controller
     public function storeRequest(Request $request, Asset $asset): JsonResponse
     {
         $created = $this->finance->createRequest($this->actor($request), (int) $asset->getKey(),
-            $request->only(['request_type', 'source', 'amount', 'note', 'existing_document_id']), $this->key($request));
+            $request->only(['request_type', 'source', 'amount', 'note', 'existing_document_id', 'expected_file_count']), $this->key($request));
 
         return response()->json(['request' => $this->requestDto($created)]);
     }
 
     public function decide(Request $request, Asset $asset, int $reviewRequest): JsonResponse
     {
+        $request->validate(['evidence_token' => ['required', 'string', 'size:64']]);
         $decided = $this->finance->decide($this->actor($request), (int) $asset->getKey(), $reviewRequest,
             (string) $request->input('decision', ''), (string) $request->input('note', ''),
-            (int) $request->input('expected_version'), $this->key($request));
+            (int) $request->input('expected_version'), $this->key($request), (string) $request->input('evidence_token'));
 
         return response()->json(['request' => $this->requestDto($decided)]);
+    }
+
+    public function submitEvidence(Request $request, Asset $asset, int $reviewRequest): JsonResponse
+    {
+        $submitted = $this->finance->submitEvidence($this->actor($request), $asset->id, $reviewRequest,
+            $request->integer('expected_version'), (string) $request->input('note', ''), $this->key($request));
+
+        return response()->json(['request' => $this->requestDto($submitted)]);
     }
 
     private function actor(Request $request): User

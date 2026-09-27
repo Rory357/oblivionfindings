@@ -1,4 +1,5 @@
 import PageShell from '@/components/page-shell';
+import { RecordBatchWizard, type BatchRecord } from '@/components/finance/record-batch-wizard';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import {
     PageHeader, PageHeaderGlassButton, PageHeaderMeterBig,
@@ -18,6 +19,7 @@ import { ClipboardCheck, LayoutGrid, List, Plus, ShieldAlert, Wrench } from 'luc
 import { useEffect, useState } from 'react';
 
 type WorkOrder = {
+    version: number;
     id: number; reference_number: string | null; title: string;
     status: string; priority: string; next_action: string | null;
     waiting_reason: string | null; active_hold: boolean;
@@ -57,10 +59,15 @@ export default function WorkOrdersIndex({
     prefill_asset_id, prefill_checklist_run_id, prefill_existing_work_order_id, prefill_corrects_report_id,
 }: Props) {
     const [wizardOpen, setWizardOpen] = useState(false);
+    const [selected, setSelected] = useState<Set<number>>(new Set());
+    const [batch, setBatch] = useState<BatchRecord[] | null>(null);
     const [layout, setLayout] = useState<'table' | 'cards'>('table');
     const [search, setSearch] = useState(filters.q ?? '');
     const view: QueueView = filters.view ?? 'all';
     const data = work_orders.data ?? [];
+    const selectedWork = data.filter(work => selected.has(work.id) && !['completed', 'cancelled'].includes(work.status));
+    const toggle = (id: number) => setSelected(current=>{const next=new Set(current);if(next.has(id))next.delete(id);else if(next.size<25)next.add(id);return next;});
+    const startBatch = () => setBatch(selectedWork.map(work=>({id:work.id,label:work.reference_number ?? `WO-${work.id}`,href:`/fleet-assets/maintenance/work-orders/${work.id}`,url:`/fleet-assets/maintenance/work-orders/${work.id}`,method:'PUT',body:{operation:'complete',version:work.version},detail:<><p>{work.title} · {work.asset?.name} · {work.asset?.site_name}</p><p>{human(work.status)} · {work.active_hold?'Active safety hold — completing work does not release it':'No active hold recorded'}</p><p>{queueNextAction(work)}</p></>})));
     useEffect(() => {
         if (new URLSearchParams(window.location.search).get('new') === '1') setWizardOpen(true);
     }, []);
@@ -137,6 +144,7 @@ export default function WorkOrdersIndex({
                     <p className="text-sm text-muted-foreground">{work_orders.meta.total} {work_orders.meta.total === 1 ? 'record' : 'records'} shown</p></div>
                 <p className="text-xs text-muted-foreground">Work-order references also appear in All Tasks</p>
             </div>
+            {can.manage && <div className="mt-3 flex items-center gap-3"><Button variant="outline" disabled={!selectedWork.length} onClick={startBatch}>Complete selected ({selectedWork.length})</Button><span className="text-xs text-muted-foreground">Up to 25 records on this page. Repair and release requirements are checked for each record.</span></div>}
             {data.length === 0 ? <Card className="mt-4"><CardContent className="p-6">
                 <FleetEmptyState icon={search ? Wrench : ClipboardCheck}
                     title={search ? 'No work matches your search' : 'No work in this view'}
@@ -149,13 +157,14 @@ export default function WorkOrdersIndex({
                 <Card className="mt-4 max-w-full overflow-x-auto" data-fleet-narrow-strategy="horizontal-scroll">
                     <table className="w-full min-w-[960px] text-sm">
                         <thead className="bg-muted/50 text-xs text-muted-foreground">
-                            <tr><th className="px-4 py-3 text-left">Work / source</th>
+                            <tr>{can.manage && <th className="px-4 py-3 text-left">Select</th>}<th className="px-4 py-3 text-left">Work / source</th>
                                 <th className="px-4 py-3 text-left">Asset / site</th>
                                 <th className="px-4 py-3 text-left">State / restriction</th>
                                 <th className="px-4 py-3 text-left">Owner</th>
                                 <th className="px-4 py-3 text-left">Next action / target</th></tr>
                         </thead>
                         <tbody>{data.map((work) => <tr key={work.id} className="border-t align-top hover:bg-muted/30">
+                            {can.manage && <td className="px-4 py-3"><input type="checkbox" aria-label={`Select ${work.reference_number ?? `WO-${work.id}`}`} disabled={['completed','cancelled'].includes(work.status) || (!selected.has(work.id) && selected.size>=25)} checked={selected.has(work.id)} onChange={()=>toggle(work.id)}/></td>}
                             <td className="px-4 py-3"><Link href={`${base}/${work.id}`}
                                 className="font-semibold text-primary hover:underline">{work.title}</Link>
                                 <span className="block text-xs text-muted-foreground">{work.reference_number ?? `WO-${work.id}`} · Report retained</span></td>
@@ -175,6 +184,7 @@ export default function WorkOrdersIndex({
                 </Card> :
                 <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.map((work) =>
                     <Card key={work.id} className="min-w-0"><CardContent className="p-4">
+                        {can.manage && !['completed','cancelled'].includes(work.status) && <label className="mb-3 flex min-h-10 items-center gap-2 text-xs"><input type="checkbox" checked={selected.has(work.id)} disabled={!selected.has(work.id) && selected.size>=25} onChange={()=>toggle(work.id)}/>Select {work.reference_number ?? `WO-${work.id}`}</label>}
                         <div className="flex items-start justify-between gap-2">
                             <Link href={`${base}/${work.id}`} className="font-semibold text-primary hover:underline">
                                 {work.title}</Link><Badge variant="outline">{human(work.status)}</Badge>
@@ -198,6 +208,7 @@ export default function WorkOrdersIndex({
                 prefillAssetId={prefill_asset_id} prefillChecklistRunId={prefill_checklist_run_id}
                 prefillExistingWorkOrderId={prefill_existing_work_order_id}
                 prefillCorrectsReportId={prefill_corrects_report_id} />
+            {batch && <RecordBatchWizard title="Complete selected work" description="Work completion is checked separately for each record. It does not release a safety hold, resolve a Finance review, approve a bill or record payment." records={batch} action="Complete selected work" onClose={()=>{setBatch(null);setSelected(new Set());router.reload();}} />}
         </PageShell>
     </AppLayout>;
 }

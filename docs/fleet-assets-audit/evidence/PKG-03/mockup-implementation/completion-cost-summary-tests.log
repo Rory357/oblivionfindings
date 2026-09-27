@@ -1,0 +1,10 @@
+
+   PASS  Tests\Unit\FleetAssets\MaintenanceCostSummaryTest
+  ✓ it deduplicates commitments and keeps invoice, posting and payment separate with decimal precision           0.79s  
+  ✓ it excludes cancelled invoices, unapproved orders and reversed postings
+  ✓ it does not present partial accessible amounts as complete totals
+  ✓ it distinguishes absent records from zero amounts
+
+  Tests:    4 passed (5 assertions)
+  Duration: 6.24s
+

@@ -1,6 +1,7 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { useForm } from '@inertiajs/react';
 import { FileText, ListChecks, Plus, ReceiptText, Trash2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +51,7 @@ export type EditableBillLine = {
     funding_stream_id?: number | string | null;
 };
 export type EditableBill = {
+    site_id?: number | null;
     id: number;
     vendor_id: number | string;
     vendor_reference: string | null;
@@ -142,6 +144,7 @@ export function NewBillDialog({
     open,
     onClose,
     vendors,
+    sites = [],
     accounts,
     spendApprovals = [],
     purchaseOrders = [],
@@ -152,6 +155,7 @@ export function NewBillDialog({
     open: boolean;
     onClose: () => void;
     vendors: VendorOption[];
+    sites?: { id: number; name: string }[];
     accounts: AccountOption[];
     /** Approved governance spend approvals available to link (optional). */
     spendApprovals?: SpendApprovalOption[];
@@ -164,11 +168,13 @@ export function NewBillDialog({
     /** When provided, the wizard opens in EDIT mode (prefilled, PUTs the update). */
     bill?: EditableBill | null;
 }) {
+    const [discard, setDiscard] = useState(false);
     const isEdit = !!bill;
     const wizard = useWizard(STEPS.length);
     const { index, goTo, next, back, isFirst, isLast, reset } = wizard;
 
     const form = useForm<{
+        site_id: string;
         vendor_id: string;
         vendor_reference: string;
         bill_date: string;
@@ -180,6 +186,7 @@ export function NewBillDialog({
     }>(
         bill
             ? {
+                  site_id: String(bill.site_id ?? ''),
                   vendor_id: String(bill.vendor_id ?? ''),
                   vendor_reference: bill.vendor_reference ?? '',
                   bill_date: String(bill.bill_date).slice(0, 10),
@@ -198,6 +205,7 @@ export function NewBillDialog({
                       : [emptyLine()],
               }
             : {
+                  site_id: sites.length === 1 ? String(sites[0].id) : '',
                   vendor_id: '',
                   vendor_reference: '',
                   bill_date: today(),
@@ -294,7 +302,7 @@ export function NewBillDialog({
 
     const vendorName =
         vendors.find((v) => String(v.id) === data.vendor_id)?.name ?? '—';
-    const detailsValid = !!data.vendor_id;
+    const detailsValid = !!data.vendor_id && !!data.site_id;
     const linesValid =
         data.lines.every(
             (l) =>
@@ -304,11 +312,18 @@ export function NewBillDialog({
                 Number(l.quantity) > 0,
         ) && totals.subtotal > 0;
 
-    const close = () => {
+    const finishClose = () => {
+        if (processing) return;
         reset();
         form.reset();
         form.clearErrors();
         onClose();
+    };
+
+    const close = () => {
+        if (processing) return;
+        if (form.isDirty) setDiscard(true);
+        else finishClose();
     };
 
     const submit = () => {
@@ -331,7 +346,7 @@ export function NewBillDialog({
         }));
         const opts = {
             preserveScroll: true,
-            onSuccess: () => close(),
+            onSuccess: () => finishClose(),
             onError: () => goTo(0),
         };
         if (isEdit && bill) {
@@ -342,487 +357,545 @@ export function NewBillDialog({
     };
 
     return (
-        <WizardShell
-            open={open}
-            onClose={close}
-            title={isEdit ? 'Edit bill' : 'New bill'}
-            description={
-                isEdit
-                    ? 'Update this draft accounts-payable bill'
-                    : 'Record a draft accounts-payable bill'
-            }
-            railIcon={ReceiptText}
-            railTitle={isEdit ? 'Edit Bill' : 'New Bill'}
-            railSub="Accounts payable"
-            steps={STEPS}
-            stepIndex={index}
-            onStepClick={goTo}
-            pct={
-                linesValid
-                    ? 100
-                    : Math.min(
-                          90,
-                          data.lines.filter((l) => l.description).length * 30,
-                      )
-            }
-            pctLabel="Total"
-            footerStart={
-                <span className="text-[13px] text-muted-foreground">
-                    Total{' '}
-                    <span className="font-semibold text-foreground">
-                        {money(totals.total)}
+        <>
+            <WizardShell
+                open={open}
+                onClose={close}
+                title={isEdit ? 'Edit bill' : 'New bill'}
+                description={
+                    isEdit
+                        ? 'Update this draft accounts-payable bill'
+                        : 'Record a draft accounts-payable bill'
+                }
+                railIcon={ReceiptText}
+                railTitle={isEdit ? 'Edit Bill' : 'New Bill'}
+                railSub="Accounts payable"
+                steps={STEPS}
+                stepIndex={index}
+                onStepClick={(step) => {
+                    if (!processing) goTo(step);
+                }}
+                pct={
+                    linesValid
+                        ? 100
+                        : Math.min(
+                              90,
+                              data.lines.filter((l) => l.description).length *
+                                  30,
+                          )
+                }
+                pctLabel="Total"
+                footerStart={
+                    <span className="text-[13px] text-muted-foreground">
+                        Total{' '}
+                        <span className="font-semibold text-foreground">
+                            {money(totals.total)}
+                        </span>
+                        <span className="ml-1">
+                            (incl. {money(totals.gst)} GST)
+                        </span>
                     </span>
-                    <span className="ml-1">
-                        (incl. {money(totals.gst)} GST)
-                    </span>
-                </span>
-            }
-            footerEnd={
-                <>
-                    {!isFirst && (
+                }
+                footerEnd={
+                    <>
+                        {!isFirst && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={back}
+                                disabled={processing}
+                            >
+                                Back
+                            </Button>
+                        )}
+                        {!isLast && (
+                            <Button
+                                type="button"
+                                onClick={next}
+                                disabled={
+                                    (index === 0 && !detailsValid) ||
+                                    (index === 1 && !linesValid)
+                                }
+                            >
+                                Continue
+                            </Button>
+                        )}
+                        {isLast && (
+                            <Button
+                                type="button"
+                                onClick={submit}
+                                disabled={
+                                    processing || !detailsValid || !linesValid
+                                }
+                            >
+                                {isEdit ? 'Save changes' : 'Create bill'}
+                            </Button>
+                        )}
+                    </>
+                }
+            >
+                {index === 0 && (
+                    <div>
+                        <StepHead
+                            icon={FileText}
+                            title="Bill details"
+                            blurb="Which vendor, and the key dates."
+                        />
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <Field label="Site" required error={errors.site_id}>
+                                <SelectInput
+                                    value={data.site_id}
+                                    onChange={(value) =>
+                                        setData('site_id', value)
+                                    }
+                                    placeholder="Choose an approved Site"
+                                    options={sites.map((site) => ({
+                                        value: String(site.id),
+                                        label: site.name,
+                                    }))}
+                                />
+                            </Field>
+                            <Field
+                                label="Vendor"
+                                span
+                                required
+                                error={errors.vendor_id}
+                            >
+                                <SelectInput
+                                    value={data.vendor_id}
+                                    onChange={(v) =>
+                                        setData((d) => ({
+                                            ...d,
+                                            vendor_id: v,
+                                            // A PO belongs to one vendor — switching
+                                            // vendors can't keep the old link.
+                                            purchase_order_id:
+                                                d.vendor_id === v
+                                                    ? d.purchase_order_id
+                                                    : '',
+                                        }))
+                                    }
+                                    placeholder="Select vendor"
+                                    options={vendorOptions}
+                                />
+                            </Field>
+                            <Field
+                                label="Bill date"
+                                required
+                                error={errors.bill_date}
+                            >
+                                <Input
+                                    type="date"
+                                    value={data.bill_date}
+                                    onChange={(e) =>
+                                        setData('bill_date', e.target.value)
+                                    }
+                                />
+                            </Field>
+                            <Field
+                                label="Due date"
+                                required
+                                error={errors.due_date}
+                            >
+                                <Input
+                                    type="date"
+                                    value={data.due_date}
+                                    onChange={(e) =>
+                                        setData('due_date', e.target.value)
+                                    }
+                                />
+                            </Field>
+                            <Field
+                                label="Vendor reference"
+                                hint="optional"
+                                error={errors.vendor_reference}
+                            >
+                                <Input
+                                    value={data.vendor_reference}
+                                    onChange={(e) =>
+                                        setData(
+                                            'vendor_reference',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="e.g. their invoice #"
+                                />
+                            </Field>
+                            <Field
+                                label="Notes"
+                                hint="optional"
+                                error={errors.notes}
+                            >
+                                <Textarea
+                                    rows={1}
+                                    value={data.notes}
+                                    onChange={(e) =>
+                                        setData('notes', e.target.value)
+                                    }
+                                />
+                            </Field>
+                            {purchaseOrders.length > 0 && (
+                                <Field
+                                    label="Purchase order"
+                                    span
+                                    hint="optional — bill against an approved PO"
+                                    error={errors.purchase_order_id}
+                                >
+                                    <SelectInput
+                                        value={data.purchase_order_id}
+                                        onChange={(v) =>
+                                            setData(
+                                                'purchase_order_id',
+                                                v === NO_VALUE ? '' : v,
+                                            )
+                                        }
+                                        placeholder="No purchase order"
+                                        options={purchaseOrderOptions}
+                                    />
+                                    {data.vendor_id &&
+                                    vendorPurchaseOrders.length === 0 ? (
+                                        <p className="mt-1 text-[12px] text-muted-foreground">
+                                            This vendor has no approved purchase
+                                            orders to bill against.
+                                        </p>
+                                    ) : null}
+                                </Field>
+                            )}
+                            {spendApprovals.length > 0 && (
+                                <Field
+                                    label="Spend approval"
+                                    span
+                                    hint="optional — link a governance sign-off"
+                                    error={errors.spend_approval_id}
+                                >
+                                    <SelectInput
+                                        value={data.spend_approval_id}
+                                        onChange={(v) =>
+                                            setData(
+                                                'spend_approval_id',
+                                                v === NO_VALUE ? '' : v,
+                                            )
+                                        }
+                                        placeholder="No spend approval"
+                                        options={spendApprovalOptions}
+                                    />
+                                    <p className="mt-1 text-[12px] text-muted-foreground">
+                                        Large bills may require an approved
+                                        spend approval before they can be
+                                        approved.
+                                    </p>
+                                </Field>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {index === 1 && (
+                    <div>
+                        <StepHead
+                            icon={ReceiptText}
+                            title="Line items"
+                            blurb="Each line posts to an expense account. GST is added per line."
+                        />
+                        {typeof errors.lines === 'string' && (
+                            <FieldErr>{errors.lines}</FieldErr>
+                        )}
+                        <div className="space-y-3">
+                            {data.lines.map((line, i) => {
+                                const net =
+                                    Number(line.quantity || 0) *
+                                    Number(line.unit_price || 0);
+                                return (
+                                    // eslint-disable-next-line no-restricted-syntax -- per-line field-group panel, not a content card
+                                    <div
+                                        key={i}
+                                        className="rounded-xl border border-border bg-card/60 p-3"
+                                    >
+                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                            <Field
+                                                label="Description"
+                                                span
+                                                required
+                                                error={
+                                                    errors[
+                                                        `lines.${i}.description` as keyof typeof errors
+                                                    ] as string | undefined
+                                                }
+                                            >
+                                                <Input
+                                                    value={line.description}
+                                                    onChange={(e) =>
+                                                        updateLine(
+                                                            i,
+                                                            'description',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="e.g. Cleaning supplies"
+                                                />
+                                            </Field>
+                                            <Field
+                                                label="Expense account"
+                                                span
+                                                required
+                                                error={
+                                                    errors[
+                                                        `lines.${i}.account_id` as keyof typeof errors
+                                                    ] as string | undefined
+                                                }
+                                            >
+                                                <SelectInput
+                                                    value={line.account_id}
+                                                    onChange={(v) =>
+                                                        updateLine(
+                                                            i,
+                                                            'account_id',
+                                                            v,
+                                                        )
+                                                    }
+                                                    placeholder="Select account"
+                                                    options={accountOptions}
+                                                />
+                                            </Field>
+                                            <Field label="Quantity" required>
+                                                <Input
+                                                    type="number"
+                                                    min="0.01"
+                                                    step="0.01"
+                                                    value={line.quantity}
+                                                    onChange={(e) =>
+                                                        updateLine(
+                                                            i,
+                                                            'quantity',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </Field>
+                                            <Field
+                                                label="Unit price (ex GST)"
+                                                required
+                                            >
+                                                <AmountField
+                                                    value={line.unit_price}
+                                                    onValueChange={(v) =>
+                                                        updateLine(
+                                                            i,
+                                                            'unit_price',
+                                                            v,
+                                                        )
+                                                    }
+                                                    aria-label={`Line ${i + 1} unit price`}
+                                                />
+                                            </Field>
+                                            <Field label="Tax">
+                                                <SelectInput
+                                                    value={line.gst_rate}
+                                                    onChange={(v) =>
+                                                        updateLine(
+                                                            i,
+                                                            'gst_rate',
+                                                            v,
+                                                        )
+                                                    }
+                                                    placeholder="GST 15%"
+                                                    options={gstOptions}
+                                                />
+                                            </Field>
+                                            <Field label="Line net">
+                                                <div className="flex h-9 items-center px-1 text-sm font-medium tabular-nums">
+                                                    {money(net)}
+                                                </div>
+                                            </Field>
+                                            {costCentres.length > 0 && (
+                                                <Field
+                                                    label="Cost centre"
+                                                    hint="optional"
+                                                >
+                                                    <SelectInput
+                                                        value={
+                                                            line.cost_centre_id
+                                                        }
+                                                        onChange={(v) =>
+                                                            updateLine(
+                                                                i,
+                                                                'cost_centre_id',
+                                                                v === NO_VALUE
+                                                                    ? ''
+                                                                    : v,
+                                                            )
+                                                        }
+                                                        placeholder="None"
+                                                        options={
+                                                            costCentreOptions
+                                                        }
+                                                        ariaLabel={`Line ${i + 1} cost centre`}
+                                                    />
+                                                </Field>
+                                            )}
+                                            {fundingStreams.length > 0 && (
+                                                <Field
+                                                    label="Funding stream"
+                                                    hint="optional"
+                                                >
+                                                    <SelectInput
+                                                        value={
+                                                            line.funding_stream_id
+                                                        }
+                                                        onChange={(v) =>
+                                                            updateLine(
+                                                                i,
+                                                                'funding_stream_id',
+                                                                v === NO_VALUE
+                                                                    ? ''
+                                                                    : v,
+                                                            )
+                                                        }
+                                                        placeholder="None"
+                                                        options={
+                                                            fundingStreamOptions
+                                                        }
+                                                        ariaLabel={`Line ${i + 1} funding stream`}
+                                                    />
+                                                </Field>
+                                            )}
+                                        </div>
+                                        <div className="mt-2 flex justify-end">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => removeLine(i)}
+                                                disabled={
+                                                    data.lines.length <= 1
+                                                }
+                                                className="text-muted-foreground hover:text-status-critical"
+                                            >
+                                                <Trash2 className="mr-1 h-4 w-4" />{' '}
+                                                Remove line
+                                            </Button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={back}
-                            disabled={processing}
+                            size="sm"
+                            onClick={addLine}
+                            className="mt-3"
                         >
-                            Back
+                            <Plus className="mr-1 h-4 w-4" /> Add line
                         </Button>
-                    )}
-                    {!isLast && (
-                        <Button
-                            type="button"
-                            onClick={next}
-                            disabled={
-                                (index === 0 && !detailsValid) ||
-                                (index === 1 && !linesValid)
+                        {/* eslint-disable-next-line no-restricted-syntax -- totals summary panel, not a content card */}
+                        <div className="mt-4 space-y-1 rounded-xl border border-border bg-card/60 p-3 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">
+                                    Subtotal
+                                </span>
+                                <span className="tabular-nums">
+                                    {money(totals.subtotal)}
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">
+                                    GST
+                                </span>
+                                <span className="tabular-nums">
+                                    {money(totals.gst)}
+                                </span>
+                            </div>
+                            <div className="flex justify-between border-t pt-1 font-semibold">
+                                <span>Total (NZD)</span>
+                                <span className="tabular-nums">
+                                    {money(totals.total)}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {index === 2 && (
+                    <div>
+                        <StepHead
+                            icon={ListChecks}
+                            title={isEdit ? 'Review & save' : 'Review & create'}
+                            blurb={
+                                isEdit
+                                    ? 'Updates this draft bill.'
+                                    : 'Creates a draft bill you can then approve.'
                             }
-                        >
-                            Continue
-                        </Button>
-                    )}
-                    {isLast && (
-                        <Button
-                            type="button"
-                            onClick={submit}
-                            disabled={
-                                processing || !detailsValid || !linesValid
-                            }
-                        >
-                            {isEdit ? 'Save changes' : 'Create bill'}
-                        </Button>
-                    )}
-                </>
-            }
-        >
-            {index === 0 && (
-                <div>
-                    <StepHead
-                        icon={FileText}
-                        title="Bill details"
-                        blurb="Which vendor, and the key dates."
-                    />
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field
-                            label="Vendor"
-                            span
-                            required
-                            error={errors.vendor_id}
-                        >
-                            <SelectInput
-                                value={data.vendor_id}
-                                onChange={(v) =>
-                                    setData((d) => ({
-                                        ...d,
-                                        vendor_id: v,
-                                        // A PO belongs to one vendor — switching
-                                        // vendors can't keep the old link.
-                                        purchase_order_id:
-                                            d.vendor_id === v
-                                                ? d.purchase_order_id
-                                                : '',
-                                    }))
+                        />
+                        <ReviewCard icon={FileText} title="Bill">
+                            <ReviewRow label="Vendor" value={vendorName} />
+                            <ReviewRow
+                                label="Site"
+                                value={
+                                    sites.find(
+                                        (site) =>
+                                            String(site.id) === data.site_id,
+                                    )?.name ?? 'Choose a Site'
                                 }
-                                placeholder="Select vendor"
-                                options={vendorOptions}
                             />
-                        </Field>
-                        <Field
-                            label="Bill date"
-                            required
-                            error={errors.bill_date}
-                        >
-                            <Input
-                                type="date"
+                            {data.vendor_reference && (
+                                <ReviewRow
+                                    label="Vendor reference"
+                                    value={data.vendor_reference}
+                                />
+                            )}
+                            <ReviewRow
+                                label="Bill date"
                                 value={data.bill_date}
-                                onChange={(e) =>
-                                    setData('bill_date', e.target.value)
-                                }
                             />
-                        </Field>
-                        <Field
-                            label="Due date"
-                            required
-                            error={errors.due_date}
-                        >
-                            <Input
-                                type="date"
-                                value={data.due_date}
-                                onChange={(e) =>
-                                    setData('due_date', e.target.value)
-                                }
-                            />
-                        </Field>
-                        <Field
-                            label="Vendor reference"
-                            hint="optional"
-                            error={errors.vendor_reference}
-                        >
-                            <Input
-                                value={data.vendor_reference}
-                                onChange={(e) =>
-                                    setData('vendor_reference', e.target.value)
-                                }
-                                placeholder="e.g. their invoice #"
-                            />
-                        </Field>
-                        <Field
-                            label="Notes"
-                            hint="optional"
-                            error={errors.notes}
-                        >
-                            <Textarea
-                                rows={1}
-                                value={data.notes}
-                                onChange={(e) =>
-                                    setData('notes', e.target.value)
-                                }
-                            />
-                        </Field>
-                        {purchaseOrders.length > 0 && (
-                            <Field
-                                label="Purchase order"
-                                span
-                                hint="optional — bill against an approved PO"
-                                error={errors.purchase_order_id}
-                            >
-                                <SelectInput
-                                    value={data.purchase_order_id}
-                                    onChange={(v) =>
-                                        setData(
-                                            'purchase_order_id',
-                                            v === NO_VALUE ? '' : v,
-                                        )
-                                    }
-                                    placeholder="No purchase order"
-                                    options={purchaseOrderOptions}
+                            <ReviewRow label="Due date" value={data.due_date} />
+                            {selectedPurchaseOrder && (
+                                <ReviewRow
+                                    label="Purchase order"
+                                    value={selectedPurchaseOrder.po_number}
                                 />
-                                {data.vendor_id &&
-                                vendorPurchaseOrders.length === 0 ? (
-                                    <p className="mt-1 text-[12px] text-muted-foreground">
-                                        This vendor has no approved purchase
-                                        orders to bill against.
-                                    </p>
-                                ) : null}
-                            </Field>
-                        )}
-                        {spendApprovals.length > 0 && (
-                            <Field
-                                label="Spend approval"
-                                span
-                                hint="optional — link a governance sign-off"
-                                error={errors.spend_approval_id}
-                            >
-                                <SelectInput
-                                    value={data.spend_approval_id}
-                                    onChange={(v) =>
-                                        setData(
-                                            'spend_approval_id',
-                                            v === NO_VALUE ? '' : v,
-                                        )
-                                    }
-                                    placeholder="No spend approval"
-                                    options={spendApprovalOptions}
+                            )}
+                            {selectedApproval && (
+                                <ReviewRow
+                                    label="Spend approval"
+                                    value={`${selectedApproval.reference ? `${selectedApproval.reference} · ` : ''}${selectedApproval.title ?? 'Approval'}`}
                                 />
-                                <p className="mt-1 text-[12px] text-muted-foreground">
-                                    Large bills may require an approved spend
-                                    approval before they can be approved.
-                                </p>
-                            </Field>
+                            )}
+                            <ReviewRow
+                                label="Lines"
+                                value={String(data.lines.length)}
+                            />
+                            <ReviewRow
+                                label="Subtotal"
+                                value={money(totals.subtotal)}
+                            />
+                            <ReviewRow label="GST" value={money(totals.gst)} />
+                            <ReviewRow
+                                label="Total (NZD)"
+                                value={money(totals.total)}
+                            />
+                        </ReviewCard>
+                        {processing && (
+                            <p className="mt-3 text-[13px] text-muted-foreground">
+                                {isEdit ? 'Saving…' : 'Creating…'}
+                            </p>
                         )}
                     </div>
-                </div>
-            )}
-
-            {index === 1 && (
-                <div>
-                    <StepHead
-                        icon={ReceiptText}
-                        title="Line items"
-                        blurb="Each line posts to an expense account. GST is added per line."
-                    />
-                    {typeof errors.lines === 'string' && (
-                        <FieldErr>{errors.lines}</FieldErr>
-                    )}
-                    <div className="space-y-3">
-                        {data.lines.map((line, i) => {
-                            const net =
-                                Number(line.quantity || 0) *
-                                Number(line.unit_price || 0);
-                            return (
-                                // eslint-disable-next-line no-restricted-syntax -- per-line field-group panel, not a content card
-                                <div
-                                    key={i}
-                                    className="rounded-xl border border-border bg-card/60 p-3"
-                                >
-                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                        <Field
-                                            label="Description"
-                                            span
-                                            required
-                                            error={
-                                                errors[
-                                                    `lines.${i}.description` as keyof typeof errors
-                                                ] as string | undefined
-                                            }
-                                        >
-                                            <Input
-                                                value={line.description}
-                                                onChange={(e) =>
-                                                    updateLine(
-                                                        i,
-                                                        'description',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="e.g. Cleaning supplies"
-                                            />
-                                        </Field>
-                                        <Field
-                                            label="Expense account"
-                                            span
-                                            required
-                                            error={
-                                                errors[
-                                                    `lines.${i}.account_id` as keyof typeof errors
-                                                ] as string | undefined
-                                            }
-                                        >
-                                            <SelectInput
-                                                value={line.account_id}
-                                                onChange={(v) =>
-                                                    updateLine(
-                                                        i,
-                                                        'account_id',
-                                                        v,
-                                                    )
-                                                }
-                                                placeholder="Select account"
-                                                options={accountOptions}
-                                            />
-                                        </Field>
-                                        <Field label="Quantity" required>
-                                            <Input
-                                                type="number"
-                                                min="0.01"
-                                                step="0.01"
-                                                value={line.quantity}
-                                                onChange={(e) =>
-                                                    updateLine(
-                                                        i,
-                                                        'quantity',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </Field>
-                                        <Field
-                                            label="Unit price (ex GST)"
-                                            required
-                                        >
-                                            <AmountField
-                                                value={line.unit_price}
-                                                onValueChange={(v) =>
-                                                    updateLine(
-                                                        i,
-                                                        'unit_price',
-                                                        v,
-                                                    )
-                                                }
-                                                aria-label={`Line ${i + 1} unit price`}
-                                            />
-                                        </Field>
-                                        <Field label="Tax">
-                                            <SelectInput
-                                                value={line.gst_rate}
-                                                onChange={(v) =>
-                                                    updateLine(i, 'gst_rate', v)
-                                                }
-                                                placeholder="GST 15%"
-                                                options={gstOptions}
-                                            />
-                                        </Field>
-                                        <Field label="Line net">
-                                            <div className="flex h-9 items-center px-1 text-sm font-medium tabular-nums">
-                                                {money(net)}
-                                            </div>
-                                        </Field>
-                                        {costCentres.length > 0 && (
-                                            <Field
-                                                label="Cost centre"
-                                                hint="optional"
-                                            >
-                                                <SelectInput
-                                                    value={line.cost_centre_id}
-                                                    onChange={(v) =>
-                                                        updateLine(
-                                                            i,
-                                                            'cost_centre_id',
-                                                            v === NO_VALUE
-                                                                ? ''
-                                                                : v,
-                                                        )
-                                                    }
-                                                    placeholder="None"
-                                                    options={costCentreOptions}
-                                                    ariaLabel={`Line ${i + 1} cost centre`}
-                                                />
-                                            </Field>
-                                        )}
-                                        {fundingStreams.length > 0 && (
-                                            <Field
-                                                label="Funding stream"
-                                                hint="optional"
-                                            >
-                                                <SelectInput
-                                                    value={
-                                                        line.funding_stream_id
-                                                    }
-                                                    onChange={(v) =>
-                                                        updateLine(
-                                                            i,
-                                                            'funding_stream_id',
-                                                            v === NO_VALUE
-                                                                ? ''
-                                                                : v,
-                                                        )
-                                                    }
-                                                    placeholder="None"
-                                                    options={
-                                                        fundingStreamOptions
-                                                    }
-                                                    ariaLabel={`Line ${i + 1} funding stream`}
-                                                />
-                                            </Field>
-                                        )}
-                                    </div>
-                                    <div className="mt-2 flex justify-end">
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => removeLine(i)}
-                                            disabled={data.lines.length <= 1}
-                                            className="text-muted-foreground hover:text-status-critical"
-                                        >
-                                            <Trash2 className="mr-1 h-4 w-4" />{' '}
-                                            Remove line
-                                        </Button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={addLine}
-                        className="mt-3"
-                    >
-                        <Plus className="mr-1 h-4 w-4" /> Add line
-                    </Button>
-                    {/* eslint-disable-next-line no-restricted-syntax -- totals summary panel, not a content card */}
-                    <div className="mt-4 space-y-1 rounded-xl border border-border bg-card/60 p-3 text-sm">
-                        <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                                Subtotal
-                            </span>
-                            <span className="tabular-nums">
-                                {money(totals.subtotal)}
-                            </span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-muted-foreground">GST</span>
-                            <span className="tabular-nums">
-                                {money(totals.gst)}
-                            </span>
-                        </div>
-                        <div className="flex justify-between border-t pt-1 font-semibold">
-                            <span>Total (NZD)</span>
-                            <span className="tabular-nums">
-                                {money(totals.total)}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {index === 2 && (
-                <div>
-                    <StepHead
-                        icon={ListChecks}
-                        title={isEdit ? 'Review & save' : 'Review & create'}
-                        blurb={
-                            isEdit
-                                ? 'Updates this draft bill.'
-                                : 'Creates a draft bill you can then approve.'
-                        }
-                    />
-                    <ReviewCard icon={FileText} title="Bill">
-                        <ReviewRow label="Vendor" value={vendorName} />
-                        {data.vendor_reference && (
-                            <ReviewRow
-                                label="Vendor reference"
-                                value={data.vendor_reference}
-                            />
-                        )}
-                        <ReviewRow label="Bill date" value={data.bill_date} />
-                        <ReviewRow label="Due date" value={data.due_date} />
-                        {selectedPurchaseOrder && (
-                            <ReviewRow
-                                label="Purchase order"
-                                value={selectedPurchaseOrder.po_number}
-                            />
-                        )}
-                        {selectedApproval && (
-                            <ReviewRow
-                                label="Spend approval"
-                                value={`${selectedApproval.reference ? `${selectedApproval.reference} · ` : ''}${selectedApproval.title ?? 'Approval'}`}
-                            />
-                        )}
-                        <ReviewRow
-                            label="Lines"
-                            value={String(data.lines.length)}
-                        />
-                        <ReviewRow
-                            label="Subtotal"
-                            value={money(totals.subtotal)}
-                        />
-                        <ReviewRow label="GST" value={money(totals.gst)} />
-                        <ReviewRow
-                            label="Total (NZD)"
-                            value={money(totals.total)}
-                        />
-                    </ReviewCard>
-                    {processing && (
-                        <p className="mt-3 text-[13px] text-muted-foreground">
-                            {isEdit ? 'Saving…' : 'Creating…'}
-                        </p>
-                    )}
-                </div>
-            )}
-        </WizardShell>
+                )}
+            </WizardShell>
+            <ConfirmDialog
+                open={discard}
+                onClose={() => setDiscard(false)}
+                onConfirm={() => {
+                    setDiscard(false);
+                    finishClose();
+                }}
+                title="Discard bill changes?"
+                description="Your unsaved bill entries will be removed."
+                confirmText="Discard draft"
+                cancelText="Keep editing"
+            />
+        </>
     );
 }
 

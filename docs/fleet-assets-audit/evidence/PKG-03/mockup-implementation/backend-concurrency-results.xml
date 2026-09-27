@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Tests\Feature\Finance\BillApprovalSnapshotTest" file="tests\Feature\Finance\BillApprovalSnapshotTest.php" tests="2" assertions="13" errors="0" failures="0" skipped="0" time="19.767010">
+    <testsuite name="it serializes independent approval and cancellation workers without duplicate or contradictory posting" tests="2" assertions="13" errors="0" failures="0" skipped="0" time="19.767010">
+      <testcase name="it serializes independent approval and cancellation workers without duplicate or contradictory posting with data set &quot;('cancel')&quot;" file="tests\Feature\Finance\BillApprovalSnapshotTest.php::it serializes independent approval and cancellation workers without duplicate or contradictory posting with data set &quot;('cancel')&quot;" class="Tests\Feature\Finance\BillApprovalSnapshotTest" classname="Tests.Feature.Finance.BillApprovalSnapshotTest" assertions="7" time="10.181436"/>
+      <testcase name="it serializes independent approval and cancellation workers without duplicate or contradictory posting with data set &quot;('approve')&quot;" file="tests\Feature\Finance\BillApprovalSnapshotTest.php::it serializes independent approval and cancellation workers without duplicate or contradictory posting with data set &quot;('approve')&quot;" class="Tests\Feature\Finance\BillApprovalSnapshotTest" classname="Tests.Feature.Finance.BillApprovalSnapshotTest" assertions="6" time="9.585574"/>
+    </testsuite>
+  </testsuite>
+</testsuites>

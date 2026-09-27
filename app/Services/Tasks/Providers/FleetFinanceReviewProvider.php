@@ -37,7 +37,7 @@ class FleetFinanceReviewProvider implements SiteScopedTaskProvider, TaskProvider
     public function authorizedTasks(User $user, array $filters = []): array
     {
         $query = FleetFinanceReviewRequest::query()
-            ->with(['asset:id,name,site_id', 'asset.site:id,name'])
+            ->with(['asset:id,name,site_id', 'asset.site:id,name', 'assignedTo:id,name'])
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->when(
                 empty($filters['include_done']),
@@ -68,9 +68,9 @@ class FleetFinanceReviewProvider implements SiteScopedTaskProvider, TaskProvider
                     status: (string) $request->status,
                     bucket: $open ? TaskItem::BUCKET_OPEN : TaskItem::BUCKET_DONE,
                     severity: 'medium',
-                    assignee: null,
+                    assignee: $request->assignedTo ? ['id' => $request->assignedTo->id, 'name' => $request->assignedTo->name] : null,
                     site: $vehicle?->site ? ['id' => $vehicle->site->id, 'name' => (string) $vehicle->site->name] : null,
-                    dueAt: null,
+                    dueAt: $request->due_on?->toDateString(),
                     createdAt: optional($request->created_at)->toIso8601String(),
                     link: "/finance/vehicle-reviews?request={$request->id}",
                     type: 'Finance review request',

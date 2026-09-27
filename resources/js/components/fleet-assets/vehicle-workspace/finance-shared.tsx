@@ -3,8 +3,9 @@ import { cn } from '@/lib/utils';
 import { AlertCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { UploadOutcome } from './evidence-upload';
+import { isReviewFilesResponse } from './finance-command-results';
 import type { FinanceReviewRequest } from './finance-types';
-import { isJsonObject, useVehicleRecordCommand } from './record-command';
+import { useVehicleRecordCommand } from './record-command';
 import type { VehicleProfile } from './types';
 import { todayInAuckland } from './workspace-model';
 
@@ -80,7 +81,7 @@ export function requestSourceValue(request: FinanceReviewRequest): string {
  * before they open, and shown only to Finance viewers.
  */
 export function useFinanceEvidenceUpload(vehicleId: number) {
-    const command = useVehicleRecordCommand(isJsonObject);
+    const command = useVehicleRecordCommand(isReviewFilesResponse);
 
     const upload = async (
         files: File[],
@@ -98,10 +99,8 @@ export function useFinanceEvidenceUpload(vehicleId: number) {
             `/fleet-assets/vehicles/${vehicleId}/documents`,
             form,
         );
-        if (!result || !Array.isArray(result.files)) return null;
-        const states = result.files.map((file) =>
-            isJsonObject(file) ? String(file.state) : '',
-        );
+        if (!result) return null;
+        const states = result.files.map((file) => file.state);
 
         return {
             uploaded: states.filter((state) => state === 'available').length,

@@ -1,0 +1,46 @@
+diff --git a/tests/TestCase.php b/.pkg03-parity-TestCase.reusable.php
+index ecf3cf2da..db85d15ad 100644
+--- a/tests/TestCase.php
++++ b/.pkg03-parity-TestCase.reusable.php
+@@ -154,6 +154,18 @@ protected function configureIsolatedTestingDatabase(): void
+             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+         );
+ 
++        if ($this->environmentValue('PKG03_SCHEMA_MODE') === 'ready') {
++            if ($database !== 'oblivion_findings_pkg03_parity_retry_verification') {
++                throw new \RuntimeException('Unexpected reusable test schema.');
++            }
++            $applied = (int) $pdo->query('SELECT COUNT(*) FROM `'.$database.'`.migrations')->fetchColumn();
++            if ($applied !== 1104) {
++                throw new \RuntimeException('Reusable test schema must contain all 1104 migrations.');
++            }
++            static::$isolatedMysqlPrepared = true;
++            static::$isolatedMysqlSchemaLoaded = true;
++            return;
++        }
+         $pdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', $database));
+         $pdo->exec(sprintf('CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', $database));
+ 
+@@ -163,7 +175,7 @@ protected function configureIsolatedTestingDatabase(): void
+ 
+         // Primary safeguard: drop this process's isolated database when the
+         // process exits, so it never leaks into the next run.
+-        $this->registerIsolatedDatabaseCleanup($host, $port, $username, $password, $database);
++        // Task launcher explicitly removes its exact isolated schema after verification.
+ 
+         static::$isolatedMysqlSchemaLoaded = $this->loadSchemaDumpIntoTestingDatabase(
+             host: $host,
+@@ -447,7 +459,7 @@ protected function loadSchemaDumpIntoTestingDatabase(
+             ]);
+ 
+             $process->setInput(file_get_contents($schemaPath));
+-            $process->setTimeout(300);
++            $process->setTimeout(1800);
+             $process->run();
+ 
+             if ($process->isSuccessful()) {
+@@ -601,3 +613,4 @@ protected function resolveClientBinaryFromEnvironment(array $envKeys, string $bi
+         return null;
+     }
+ }
++

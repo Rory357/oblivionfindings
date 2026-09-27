@@ -89,7 +89,7 @@ class VehicleFinancePresenter
             ->with(['requestedBy:id,name', 'decidedBy:id,name', 'events' => fn ($events) => $events->with('actor:id,name')->orderBy('id')])
             ->orderByDesc('id')->limit(self::REQUEST_LIMIT)->get();
         $files = $this->requestFiles($vehicle, $requests, $can['open_documents']);
-        [$records, $total] = $this->records($vehicle, $can, $requests, $files);
+        [$records, $total] = $this->records($vehicle, $can, $requests, $files, $viewer);
         $fixed = array_values(array_filter($records, fn (array $record): bool => $record['type'] === 'fixed_asset' && $record['available']));
         $centre = $this->finance->siteCostCentre($vehicle);
 
@@ -106,7 +106,7 @@ class VehicleFinancePresenter
             'pending_requests' => FleetFinanceReviewRequest::query()->where('asset_id', $vehicle->id)->where('status', 'submitted')->count(),
             'records' => $records,
             'records_total' => $total,
-            'requests' => $requests->map(fn (FleetFinanceReviewRequest $request): array => $this->request($request, $can, $files, (int) $viewer->id))->values()->all(),
+            'requests' => $requests->map(fn (FleetFinanceReviewRequest $request): array => $this->request($request, $can, $files, $viewer))->values()->all(),
             'request_types' => collect(FleetFinanceReviewRequest::TYPES)
                 ->map(fn (string $label, string $value): array => ['value' => $value, 'label' => $label])->values()->all(),
             'sources' => $can['request_review'] ? $this->sources($vehicle, $records) : [],
@@ -146,7 +146,7 @@ class VehicleFinancePresenter
      * @param  array<int, list<array<string,mixed>>>  $files
      * @return array{0: list<array<string,mixed>>, 1: int}
      */
-    private function records(Asset $vehicle, array $can, Collection $requests, array $files): array
+    private function records(Asset $vehicle, array $can, Collection $requests, array $files, User $viewer): array
     {
         $links = FleetVehicleFinanceLink::query()->where('asset_id', $vehicle->id)->whereNull('unlinked_at')
             ->with('linkedBy:id,name')->orderBy('id')->get()
@@ -170,7 +170,12 @@ class VehicleFinancePresenter
         $rows = [];
         foreach ([['fixed_asset', $fixed], ['purchase_order', $orders], ['bill', $bills]] as [$type, $models]) {
             foreach ($models as $model) {
-                $rows[] = $this->row($type, $model, $vehicle, $links->get($type.':'.$model->getKey()), $can, $requests, $files);
+                $recordCan = $can;
+                if ($model instanceof FinBill && ! $viewer->can('view', $model)) {
+                    $recordCan['view_spend'] = false;
+                    $recordCan['link_spend'] = false;
+                }
+                $rows[] = $this->row($type, $model, $vehicle, $links->get($type.':'.$model->getKey()), $recordCan, $requests, $files);
             }
         }
         $found = array_flip(array_map(fn (array $row): string => $row['type'].':'.$row['id'], $rows));
@@ -372,14 +377,21 @@ class VehicleFinancePresenter
      * @param  array<int, list<array<string,mixed>>>  $files
      * @return array<string,mixed>
      */
-    private function request(FleetFinanceReviewRequest $request, array $can, array $files, int $viewerId): array
+    private function request(FleetFinanceReviewRequest $request, array $can, array $files, User $viewer): array
     {
         [$label, $tone] = match ($request->status) {
             'resolved' => ['Resolved', 'success'],
             'declined' => ['Declined', 'neutral'],
+            'preparing' => ['Preparing evidence', 'warning'],
+            'changes_requested' => ['Changes requested', 'warning'],
             default => ['Pending Finance review', 'warning'],
         };
         $restrictedSource = in_array($request->source_type, ['purchase_order', 'bill'], true) && ! $can['view_spend'];
+        $viewerId = (int) $viewer->id;
+        if ($request->source_type === 'bill') {
+            $bill = FinBill::find($request->source_id);
+            $restrictedSource = ! $bill || ! $viewer->can('view', $bill);
+        }
 
         return [
             'id' => $request->id,
@@ -404,6 +416,10 @@ class VehicleFinancePresenter
             'decided_at' => $request->decided_at?->toIso8601String(),
             'decision_note' => $request->decision_note,
             'lock_version' => $request->lock_version,
+            'evidence_token' => app(FinanceReviewEvidence::class)->token($request),
+            'can_submit' => $can['request_review'] && (int) $request->requested_by_user_id === $viewerId && in_array($request->status, ['preparing', 'changes_requested'], true),
+            'due_on' => $request->due_on?->toDateString(),
+            'response_note' => $request->response_note,
             'history' => $request->events->map(fn (FleetFinanceReviewRequestEvent $event): array => [
                 'id' => $event->id,
                 'action' => $event->action,
@@ -411,6 +427,8 @@ class VehicleFinancePresenter
                     'submitted' => 'Submitted to Finance',
                     'resolved' => 'Resolved by Finance',
                     'declined' => 'Declined by Finance',
+                    'preparing' => 'Preparing evidence', 'changes_requested' => 'Returned for correction',
+                    'resubmitted' => 'Response submitted', 'assigned' => 'Reviewer and due date updated',
                     default => 'Updated',
                 },
                 'actor' => $event->actor?->name,
@@ -421,7 +439,7 @@ class VehicleFinancePresenter
             // Someone other than the person who asked decides (VehicleFinanceService::decide).
             'can_decide' => $can['decide'] && $request->isOpen()
                 && (int) $request->requested_by_user_id !== $viewerId,
-            'can_add_files' => $can['attach_files'] && $request->isOpen(),
+            'can_add_files' => $can['attach_files'] && in_array($request->status, ['preparing', 'submitted', 'changes_requested'], true),
         ];
     }
 
@@ -464,6 +482,7 @@ class VehicleFinancePresenter
         return [
             'id' => $file->id,
             'name' => $file->original_name ?: $file->title,
+            'mime' => $file->detected_mime ?: $file->mime_type,
             'state' => $file->state,
             'url' => $canOpen && $file->isOpenable()
                 ? route('fleet-assets.vehicles.documents.file', ['asset' => $vehicle->id, 'document' => $file->id])

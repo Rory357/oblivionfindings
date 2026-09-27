@@ -15,7 +15,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Files\MalwareScanDisposition;
 use App\Services\Files\MalwareScanner;
-use Carbon\CarbonImmutable;
+use App\Services\Files\MalwareScanResult;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Private, versioned vehicle documents. A set is one document made of one or
@@ -153,6 +154,7 @@ class VehicleDocumentService
                 return [$prior, $prior->files()->where('request_key', 'like', $requestKey.':%')->orderBy('id')->get()->all()];
             }
             $this->assertSource($asset, $meta['source_type'], $meta['source_id']);
+            app(FinanceReviewEvidence::class)->changing($asset->id, $meta['source_type'], $meta['source_id']);
             $this->assertSourceWritable($current, $asset, $meta['source_type']);
             $set = AssetDocumentSet::query()->create([
                 'asset_id' => $asset->id, 'category' => $meta['category'], 'reference' => $meta['reference'],
@@ -197,6 +199,7 @@ class VehicleDocumentService
             if ($this->replayed($set, $requestKey, $fingerprint)) {
                 return [$set, $set->files()->where('request_key', 'like', $requestKey.':%')->orderBy('id')->get()->all()];
             }
+            app(FinanceReviewEvidence::class)->changing($asset->id, $set->source_type, $set->source_id);
             abort_unless($set->lock_version === $expectedVersion, 409, 'This document changed while you were editing. Reload before replacing it.');
             abort_if($set->archived_at !== null, 409, 'This document is archived.');
             $revision = (int) $set->files()->max('revision') + 1;
@@ -225,6 +228,7 @@ class VehicleDocumentService
             if ($this->replayed($set, $requestKey, $fingerprint)) {
                 return $set;
             }
+            app(FinanceReviewEvidence::class)->changing($asset->id, $set->source_type, $set->source_id);
             abort_unless($set->lock_version === $expectedVersion, 409, 'This document changed while you were editing. Reload before saving.');
             abort_if($set->archived_at !== null, 409, 'This document is archived.');
             $before = $this->snapshot($set);
@@ -258,6 +262,7 @@ class VehicleDocumentService
             if ($this->replayed($set, $requestKey, $fingerprint)) {
                 return $document;
             }
+            app(FinanceReviewEvidence::class)->changing($asset->id, $document->source_type, $document->source_id);
             abort_if($document->archived_at !== null, 409, 'This file is already archived.');
             abort_if((int) DB::table('assets')->where('id', $asset->id)->value('profile_photo_document_id') === $document->id, 409,
                 'This file is the vehicle photo. Choose another photo first.');
@@ -349,7 +354,7 @@ class VehicleDocumentService
         AuditLogger::log('fleet.vehicle.document.download', $document, ['asset_id' => $assetId]);
         $mime = $document->detected_mime ?: ($document->mime_type ?: 'application/octet-stream');
         $name = self::safeName((string) ($document->original_name ?: 'vehicle-document'));
-        $inline = $inline && str_starts_with($mime, 'image/');
+        $inline = $inline && in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'], true);
 
         return $disk->response($document->storage_path, $name, [
             'Content-Type' => $mime,
@@ -476,7 +481,7 @@ class VehicleDocumentService
             }, 3);
         } catch (\Throwable $exception) {
             $document->forceFill(['state' => 'publication_failed'])->save();
-            if ($exception instanceof \Symfony\Component\HttpKernel\Exception\HttpException) {
+            if ($exception instanceof HttpException) {
                 throw $exception;
             }
 
@@ -484,12 +489,12 @@ class VehicleDocumentService
         }
     }
 
-    private function scan(string $path): \App\Services\Files\MalwareScanResult
+    private function scan(string $path): MalwareScanResult
     {
         try {
             return $this->scanner->scanPath($path, (array) config('it.inbound_mail.malware_scanner', []));
         } catch (\Throwable) {
-            return new \App\Services\Files\MalwareScanResult(MalwareScanDisposition::Unavailable, 'clamav', 'scanner_failed');
+            return new MalwareScanResult(MalwareScanDisposition::Unavailable, 'clamav', 'scanner_failed');
         }
     }
 
@@ -630,7 +635,7 @@ class VehicleDocumentService
                 ->where('asset_id', $asset->id)->exists(),
             // Files can only be added while Finance has not yet decided the request.
             'finance_review_request' => DB::table('fleet_finance_review_requests')->where('id', $id)
-                ->where('asset_id', $asset->id)->where('status', 'submitted')->exists(),
+                ->where('asset_id', $asset->id)->whereIn('status', ['preparing', 'submitted', 'changes_requested'])->exists(),
             'checklist_run' => DB::table('fleet_checklist_runs')->where('id', $id)->where('asset_id', $asset->id)
                 ->whereNotNull('submitted_at')->exists(),
             'speed_limit' => DB::table('fleet_speed_limits')->where('id', $id)->where('asset_id', $asset->id)

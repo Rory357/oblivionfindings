@@ -10,6 +10,7 @@ import type {
     BillPurchaseOrderOption,
     EditableBill,
 } from '@/components/finance/new-bill-dialog';
+import { todayInAuckland } from '@/components/fleet-assets/vehicle-workspace/workspace-model';
 import {
     EntityContextMenu,
     EntityStatusChip,
@@ -78,6 +79,7 @@ interface BillLine {
 interface Bill {
     id: number;
     bill_number: string;
+    site_id: number | null;
     vendor_id: number;
     vendor_reference: string | null;
     vendor: Vendor | null;
@@ -120,6 +122,7 @@ interface Summary {
 }
 
 interface Props extends PageProps {
+    sites: { id: number; name: string }[];
     bills: PaginatedBills;
     vendors: Vendor[];
     filters: Filters;
@@ -175,6 +178,7 @@ export default function BillsIndex({
     filters,
     summary,
     canManage,
+    sites = [],
     accounts,
     spendApprovals,
     purchaseOrders,
@@ -215,16 +219,16 @@ export default function BillsIndex({
 
     const hasFilters = Boolean(
         filters.search ||
-            filters.status ||
-            filters.vendor_id ||
-            filters.date_from ||
-            filters.date_to,
+        filters.status ||
+        filters.vendor_id ||
+        filters.date_from ||
+        filters.date_to,
     );
 
     const isOverdue = (bill: Bill) =>
         bill.status !== 'paid' &&
         bill.status !== 'cancelled' &&
-        new Date(bill.due_date) < new Date();
+        bill.due_date.slice(0, 10) < todayInAuckland();
 
     const ctx = useEntityContextMenu<Bill>();
 
@@ -303,7 +307,7 @@ export default function BillsIndex({
             width: '1.1fr',
             align: 'right',
             cell: (b) => (
-                <span className="tabular-nums text-muted-foreground">
+                <span className="text-muted-foreground tabular-nums">
                     {formatMoney(b.amount_paid)}
                 </span>
             ),
@@ -620,6 +624,7 @@ export default function BillsIndex({
                 <NewBillDialog
                     open={newBillOpen}
                     onClose={() => setNewBillOpen(false)}
+                    sites={sites}
                     vendors={vendors}
                     accounts={accounts}
                     spendApprovals={spendApprovals}
@@ -635,6 +640,7 @@ export default function BillsIndex({
                     open
                     bill={editBill as unknown as EditableBill}
                     onClose={() => setEditBill(null)}
+                    sites={sites}
                     vendors={vendors}
                     accounts={accounts}
                     spendApprovals={spendApprovals}

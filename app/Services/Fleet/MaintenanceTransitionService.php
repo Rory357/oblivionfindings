@@ -2,7 +2,10 @@
 
 namespace App\Services\Fleet;
 
+use App\Domain\Finance\Models\FinCostCentre;
+use App\Domain\Finance\Models\FinVendor;
 use App\Models\Asset;
+use App\Models\AssetDocument;
 use App\Models\FleetChecklistRun;
 use App\Models\FleetWorkOrder;
 use App\Models\User;
@@ -12,6 +15,7 @@ use App\Services\UserSiteAccessService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class MaintenanceTransitionService
@@ -45,6 +49,10 @@ class MaintenanceTransitionService
 
             if (! in_array($operation, ['accept_handover', 'acknowledge_custody', 'release'], true)) {
                 abort_unless($this->access->canManage($currentActor), 403);
+            }
+            if ($operation === 'record_cost_estimate') {
+                abort_unless($currentActor->canDo('finance.ap.view'), 403);
+                abort_unless(app(MaintenanceCostPresenter::class)->canView($currentActor, (int) $asset->site_id), 404);
             }
             if (in_array($operation, ['accept_handover', 'acknowledge_custody'], true)) {
                 $this->siteAccess->assertCanUseCurrentStaffAtSite(
@@ -89,6 +97,34 @@ class MaintenanceTransitionService
             $checkRunId = null;
             $policyVersionId = null;
             switch ($operation) {
+                case 'record_cost_estimate':
+                    $this->requireStatus($order, ['open', 'in_progress', 'on_hold', 'completed']);
+                    Validator::make($payload, [
+                        'vendor_id' => ['required', 'integer', 'exists:fin_vendors,id'],
+                        'quote_reference' => ['required', 'string', 'max:120'],
+                        'amount' => ['required', 'numeric', 'decimal:0,2', 'gt:0', 'max:99999999.99'],
+                        'cost_centre_id' => ['nullable', 'integer', 'exists:fin_cost_centres,id'],
+                        'document_ids' => ['array', 'max:20'], 'document_ids.*' => ['integer', 'distinct'],
+                        'reason' => ['required', 'string', 'max:1000'],
+                    ])->validate();
+                    if (! FinVendor::query()->active()->whereKey($payload['vendor_id'])->exists()) {
+                        throw ValidationException::withMessages(['vendor_id' => 'Choose an active supplier.']);
+                    }
+                    if (! empty($payload['cost_centre_id'])) {
+                        if (! FinCostCentre::query()->active()->whereKey($payload['cost_centre_id'])
+                            ->where(fn ($query) => $query->whereNull('site_id')->orWhere('site_id', $asset->site_id))->exists()) {
+                            throw ValidationException::withMessages(['cost_centre_id' => 'Choose an active cost centre for this Site.']);
+                        }
+                    }
+                    $documentIds = $payload['document_ids'] ?? [];
+                    if ($documentIds !== []) {
+                        abort_unless(app(VehicleDocumentService::class)->canView($currentActor, $asset), 404);
+                        abort_unless(AssetDocument::query()->whereIn('id', $documentIds)->where('asset_id', $asset->id)
+                            ->whereNull('source_type')->whereNull('archived_at')->count() === count($documentIds), 404);
+                    }
+                    // This retained action is the quote revision; actual cost remains owned by Finance.
+                    $order->estimated_cost = $payload['amount'];
+                    break;
                 case 'start':
                     $this->requireStatus($order, ['open', 'on_hold']);
                     $order->status = 'in_progress';
@@ -287,7 +323,7 @@ class MaintenanceTransitionService
                         $currentActor, $order, (int) $asset->site_id, (string) $asset->category,
                     );
                     $payload['restriction_sources'] = $restrictionSources;
-                    if (\App\Models\Asset::vehicles()->whereKey($asset->id)->exists()) {
+                    if (Asset::vehicles()->whereKey($asset->id)->exists()) {
                         $releaseRestrictionIds = array_map(fn (array $source): int => $source['id'], $restrictionSources);
                         $resolvedCheckRunIds = array_values(array_map(
                             fn (array $source): int => (int) $source['source_run_id'],
@@ -638,8 +674,8 @@ class MaintenanceTransitionService
             ->orderByDesc('id')->first();
         if (! $attestation || (int) $attestation->policy_version_id !== $repairPolicy['id']
             || ! DB::table('fleet_maintenance_attachments')
-            ->where('work_order_id', $order->id)
-            ->where('action_id', $attestation->id)->exists()) {
+                ->where('work_order_id', $order->id)
+                ->where('action_id', $attestation->id)->exists()) {
             throw ValidationException::withMessages(['status' => 'Repair attestation and saved service evidence are required before completion.']);
         }
     }

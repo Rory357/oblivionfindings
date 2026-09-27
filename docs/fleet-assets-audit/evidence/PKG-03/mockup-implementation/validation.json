@@ -1,0 +1,132 @@
+{
+  "status": "local mockup implementation and visual alignment verified; signed-in acceptance pending",
+  "verifiedAtUtc": "2026-09-27T03:45:17.945516Z",
+  "frontend": {
+    "uiTests": 35,
+    "uiFiles": 7,
+    "uiExitCode": 0,
+    "typescriptExitCode": 0,
+    "eslintExitCode": 0,
+    "pintExitCode": 0,
+    "productionBuildExitCode": 0,
+    "productionModules": 5366,
+    "productionBuildWarnings": "Existing application chunks exceed 500 kB",
+    "dependencyIsolation": "pdfjs-dist resolved from task-local installation; shared node_modules unchanged"
+  },
+  "browser": {
+    "productionComponents": true,
+    "fixtureTransport": true,
+    "fixtureOuterLayout": false,
+    "realPrivateRecordsChanged": false,
+    "viewports": [
+      1366,
+      1280,
+      390
+    ],
+    "finalConsoleWarningsOrErrors": 0,
+    "flows": [
+      "Work cost-stage header and canonical source links",
+      "Header estimate wizard opens and cancellation restores focus",
+      "Mobile bill layout without page overflow",
+      "Approval wizard with rendered PDF and 44-pixel footer buttons",
+      "Selectable mobile review cards and two-record batch review",
+      "Journal source links and work navigation",
+      "Actual application shell in light and dark themes"
+    ],
+    "signedInAcceptance": false,
+    "liveDeployment": false,
+    "realApplicationEntryPoint": true,
+    "realApplicationShell": true,
+    "realInertiaLibrary": true,
+    "screenshotMode": "Viewport captures; stitched full-page captures are not acceptance evidence",
+    "hostBlocker": "https://oblivionfindings.test refused connections; running local or staging URL requested"
+  },
+  "backend": {
+    "status": "72 unique cases successful across full run and focused concurrency rerun",
+    "files": [
+      "tests/Feature/Finance/BillApprovalSnapshotTest.php",
+      "tests/Feature/Finance/BillSpendApprovalGateTest.php",
+      "tests/Feature/FleetAssets/Pkg02bVehicleFinanceTest.php",
+      "tests/Feature/FleetAssets/Pkg01MaintenanceProtectedSliceTest.php"
+    ],
+    "isolatedMysql": true,
+    "temporarySchemaImportTimeoutSeconds": 1800,
+    "originalTestHarnessRestored": true,
+    "reusableSchema": "oblivion_findings_pkg03_parity_retry_verification",
+    "verifiedUniqueCases": 72,
+    "fullRun": {
+      "tests": 72,
+      "assertions": 1365,
+      "failures": 0,
+      "errors": 1,
+      "exitCode": 2,
+      "error": "Independent approval worker missed startup deadline",
+      "resultFile": "backend-full-results.xml"
+    },
+    "concurrencyRerun": {
+      "tests": 2,
+      "assertions": 13,
+      "failures": 0,
+      "errors": 0,
+      "exitCode": 0,
+      "resultFile": "backend-concurrency-results.xml"
+    },
+    "resultFormat": "JUnit XML; temporary launcher emitted no console summary",
+    "originalTestHarnessSha256": "89872E92712993D42361D9D444A80A92EC5F633EEDFC2179C78447ADF337330F",
+    "costSummaryUnitTests": {
+      "assertions": 5,
+      "failures": 0,
+      "tests": 4,
+      "exitCode": 0,
+      "resultFile": "completion-cost-summary-tests.log"
+    },
+    "integrationRerunInCompletionPass": false
+  },
+  "frozenPreviews": {
+    "files": 311,
+    "versions": "v1-v9",
+    "changed": 0
+  },
+  "cleanup": {
+    "temporaryBrowserTabClosed": true,
+    "viewportOverrideReset": true,
+    "browserServerStopped": true,
+    "abandonedTestSchemaRemoved": true,
+    "temporaryFrontendFilesRemoved": true,
+    "finalDisposableSchemaRemoved": true,
+    "temporaryBackendFilesRemoved": true
+  },
+  "visualParity": {
+    "resolved": [
+      "Work cost-stage summary and header actions",
+      "Actual application shell at desktop and phone widths",
+      "Bill phone-width overflow",
+      "Selectable mobile Finance review cards",
+      "Responsive and dark-theme checks",
+      "Approval PDF preview and mobile wizard footer controls"
+    ],
+    "status": "core layouts and interactions verified locally",
+    "remaining": [
+      "Signed-in acceptance against a running local or staging application"
+    ]
+  },
+  "completionPass": {
+    "failedHostTab": "Unmarked temporary browser tab; browser URL policy prevented explicit close after navigation failed",
+    "consoleLog": "completion-browser-console.json",
+    "primaryScreenshot": "work-application-1366.png",
+    "finalCompiledLogicVerified": [
+      "Confirmed zero-value posted bills",
+      "Mobile review cards and checkbox hit-area styling"
+    ],
+    "verifier": "completion-browser-harness.zip",
+    "sourceManifest": "completion-source-manifest.json",
+    "browserServerStopped": true,
+    "browserTabsClosed": [
+      20,
+      21
+    ],
+    "temporaryFrontendFilesRemoved": true,
+    "frozenManifest": "completion-frozen-verification.json",
+    "viewportOverrideReset": true
+  }
+}

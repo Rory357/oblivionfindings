@@ -1,7 +1,13 @@
 import { useRef, useState } from 'react';
 
 type FieldErrors = Record<string, string>;
-type PendingCommand = { key: string; signature: string; url: string };
+type PendingCommand = {
+    key: string;
+    signature: string;
+    url: string;
+    body: string | FormData;
+    method: 'POST' | 'PUT' | 'DELETE';
+};
 type CommandOptions = { method?: 'POST' | 'PUT' | 'DELETE' };
 
 /** A stable identity for a payload, including staged files, so a retry reuses its key. */
@@ -54,25 +60,36 @@ export function useVehicleRecordCommand<T>(
     ): Promise<T | null> {
         if (busy.current || requiresReload) return null;
         const signature = signatureOf(data);
+        const method = options.method ?? 'POST';
         if (
             !uncertain &&
             (pending.current?.signature !== signature ||
-                pending.current?.url !== url)
+                pending.current?.url !== url ||
+                pending.current?.method !== method)
         ) {
-            pending.current = { key: crypto.randomUUID(), signature, url };
+            const body = data instanceof FormData ? new FormData() : signature;
+            if (body instanceof FormData && data instanceof FormData)
+                data.forEach((value, key) => body.append(key, value));
+            pending.current = {
+                key: crypto.randomUUID(),
+                signature,
+                url,
+                body,
+                method,
+            };
         }
         const command = pending.current;
         if (!command) return null;
-        const isForm = data instanceof FormData;
+        const isForm = command.body instanceof FormData;
         // An uncertain retry resends the original body, whatever the caller now holds.
-        const body = isForm ? data : uncertain ? command.signature : signature;
+        const body = command.body;
         busy.current = true;
         setProcessing(true);
         setErrors({});
         setMessage('');
         try {
             const response = await fetch(command.url, {
-                method: options.method ?? 'POST',
+                method: command.method,
                 credentials: 'same-origin',
                 cache: 'no-store',
                 headers: {
@@ -177,6 +194,10 @@ export const isJsonObject = (
     value: unknown,
 ): value is Record<string, unknown> =>
     !!value && typeof value === 'object' && !Array.isArray(value);
+
+/** A command is confirmed only when the endpoint explicitly acknowledges its save. */
+export const isSavedResponse = (value: unknown): value is { saved: true } =>
+    isJsonObject(value) && value.saved === true;
 
 /**
  * A one-shot JSON write outside a dialog (e.g. Undo from a toast), with the
