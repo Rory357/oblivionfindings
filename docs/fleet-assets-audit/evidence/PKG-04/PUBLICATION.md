@@ -56,3 +56,5 @@ The earlier candidate and base above are historical. Transport was published whi
 - `implementation/integration-source-hashes.json` records the 36 changed application/test files against this published Main base. Temporary browser probes, preview credentials, runtime setup and intermediate failing logs remain local.
 
 Main's renewed exact-candidate technical decision is required before publication; the superseded candidate's review is not treated as approval. The existing broader CI and deployment/operational-acceptance boundaries above still apply.
+
+While the renewed review was being handed off, Main published Transport's lint-packaging correction `a6b9fae6a73516548b02e64c41cf1fc94ce43f01`. The final integration also retains that commit: only its three evidence files and the exclusion of immutable PKG-05 preview files from ESLint differ from the verified `49e0be5b1` base. No application, test, dependency or build configuration changed; the verified application tree and compiled assets remain identical. Strict changed-file ESLint was rerun with the updated exclusion. The final publication base is therefore `a6b9fae6a73516548b02e64c41cf1fc94ce43f01`.
