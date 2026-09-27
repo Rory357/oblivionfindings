@@ -447,10 +447,11 @@ abstract class TestCase extends BaseTestCase
             ]);
 
             $process->setInput(file_get_contents($schemaPath));
-            // A cold Windows database can take longer than five minutes to
-            // create the full schema. Keep the default bounded, with an
-            // explicit test-only override for slow verification hosts.
-            $process->setTimeout(max(300, (int) ($this->environmentValue('MYSQL_TEST_IMPORT_TIMEOUT') ?? 300)));
+            // The shared local MySQL server may be importing other isolated
+            // schemas at the same time. Keep the normal five-minute limit,
+            // with an explicit opt-in for suites running under that load.
+            $timeout = (int) ($this->environmentValue('MYSQL_TEST_SCHEMA_TIMEOUT') ?? 300);
+            $process->setTimeout(max(300, min(1800, $timeout)));
             $process->run();
 
             if ($process->isSuccessful()) {
