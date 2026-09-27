@@ -1,0 +1,1215 @@
+{
+  "pkg05-modal-audit-1366": {
+    "results": [
+      {
+        "label": "Request more information",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Request more information discard",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Add operational note",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Add operational note discard",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Assess transport needs",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Assess transport needs dates",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Assess transport needs needs",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Provide information",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Provide information dates",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Provide information needs",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel transport request",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel transport request review",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel transport request discard",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Decline Fleet booking",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Decline Fleet booking review",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Decline Fleet booking discard",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel Fleet booking",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel Fleet booking review",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel Fleet booking discard",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Check out vehicle",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Check out vehicle review",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Check out vehicle discard",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record departure",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record departure review",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record departure discard",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record vehicle return",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record vehicle return review",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record vehicle return discard",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record passenger arrival",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record passenger arrival review",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record passenger arrival discard",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive missing items",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive missing items review",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive missing items discard",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive and store keys picker",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive and store keys",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive and store keys review",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive and store keys discard",
+        "width": 1366,
+        "height": 768,
+        "footerVisible": true,
+        "bodyReachable": true
+      }
+    ],
+    "consoleErrors": []
+  },
+  "pkg05-modal-audit-1280": {
+    "results": [
+      {
+        "label": "Request more information",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Request more information discard",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Add operational note",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Add operational note discard",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Assess transport needs",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Assess transport needs dates",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Assess transport needs needs",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Provide information",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Provide information dates",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Provide information needs",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel transport request",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel transport request review",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel transport request discard",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Decline Fleet booking",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Decline Fleet booking review",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Decline Fleet booking discard",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel Fleet booking",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel Fleet booking review",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel Fleet booking discard",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Check out vehicle",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Check out vehicle review",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Check out vehicle discard",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record departure",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record departure review",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record departure discard",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record vehicle return",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record vehicle return review",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record vehicle return discard",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record passenger arrival",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record passenger arrival review",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record passenger arrival discard",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive missing items",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive missing items review",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive missing items discard",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive and store keys picker",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive and store keys",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive and store keys review",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive and store keys discard",
+        "width": 1280,
+        "height": 800,
+        "footerVisible": true,
+        "bodyReachable": true
+      }
+    ],
+    "consoleErrors": []
+  },
+  "pkg05-modal-audit-390": {
+    "results": [
+      {
+        "label": "Request more information",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Request more information discard",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Add operational note",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Add operational note discard",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Assess transport needs",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Assess transport needs dates",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Assess transport needs needs",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Provide information",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Provide information dates",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Provide information needs",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel transport request",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel transport request review",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel transport request discard",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Decline Fleet booking",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Decline Fleet booking review",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Decline Fleet booking discard",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel Fleet booking",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel Fleet booking review",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Cancel Fleet booking discard",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Check out vehicle",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Check out vehicle review",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Check out vehicle discard",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record departure",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record departure review",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record departure discard",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record vehicle return",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record vehicle return review",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record vehicle return discard",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record passenger arrival",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record passenger arrival review",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Record passenger arrival discard",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive missing items",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive missing items review",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive missing items discard",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive and store keys picker",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive and store keys",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive and store keys review",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      },
+      {
+        "label": "Receive and store keys discard",
+        "width": 390,
+        "height": 844,
+        "footerVisible": true,
+        "bodyReachable": true
+      }
+    ],
+    "consoleErrors": []
+  },
+  "pkg05-quick-evidence-audit": {
+    "results": [
+      {
+        "label": "Quick view Journey",
+        "width": 1366,
+        "height": 768,
+        "fits": true
+      },
+      {
+        "label": "Quick view Return & keys",
+        "width": 1366,
+        "height": 768,
+        "fits": true
+      },
+      {
+        "label": "Quick view Linked records",
+        "width": 1366,
+        "height": 768,
+        "fits": true
+      },
+      {
+        "label": "Quick view History & notes",
+        "width": 1366,
+        "height": 768,
+        "fits": true
+      },
+      {
+        "label": "Quick view Evidence",
+        "width": 1366,
+        "height": 768,
+        "fits": true
+      },
+      {
+        "label": "Evidence with ten long file names",
+        "width": 1366,
+        "height": 768,
+        "fits": true
+      },
+      {
+        "label": "Quick view Journey",
+        "width": 1280,
+        "height": 800,
+        "fits": true
+      },
+      {
+        "label": "Quick view Return & keys",
+        "width": 1280,
+        "height": 800,
+        "fits": true
+      },
+      {
+        "label": "Quick view Linked records",
+        "width": 1280,
+        "height": 800,
+        "fits": true
+      },
+      {
+        "label": "Quick view History & notes",
+        "width": 1280,
+        "height": 800,
+        "fits": true
+      },
+      {
+        "label": "Quick view Evidence",
+        "width": 1280,
+        "height": 800,
+        "fits": true
+      },
+      {
+        "label": "Evidence with ten long file names",
+        "width": 1280,
+        "height": 800,
+        "fits": true
+      },
+      {
+        "label": "Quick view Journey",
+        "width": 390,
+        "height": 844,
+        "fits": true
+      },
+      {
+        "label": "Quick view Return & keys",
+        "width": 390,
+        "height": 844,
+        "fits": true
+      },
+      {
+        "label": "Quick view Linked records",
+        "width": 390,
+        "height": 844,
+        "fits": true
+      },
+      {
+        "label": "Quick view History & notes",
+        "width": 390,
+        "height": 844,
+        "fits": true
+      },
+      {
+        "label": "Quick view Evidence",
+        "width": 390,
+        "height": 844,
+        "fits": true
+      },
+      {
+        "label": "Evidence with ten long file names",
+        "width": 390,
+        "height": 844,
+        "fits": true
+      }
+    ],
+    "consoleErrors": [],
+    "uploads": 0
+  },
+  "pkg05-date-popovers": [
+    {
+      "field": "Departure date",
+      "width": 1366,
+      "height": 768,
+      "fits": true,
+      "escapeKeepsParent": true
+    },
+    {
+      "field": "Departure time",
+      "width": 1366,
+      "height": 768,
+      "fits": true,
+      "escapeKeepsParent": true
+    },
+    {
+      "field": "Expected return date",
+      "width": 1366,
+      "height": 768,
+      "fits": true,
+      "escapeKeepsParent": true
+    },
+    {
+      "field": "Expected return time",
+      "width": 1366,
+      "height": 768,
+      "fits": true,
+      "escapeKeepsParent": true
+    },
+    {
+      "field": "Departure date",
+      "width": 390,
+      "height": 844,
+      "fits": true,
+      "escapeKeepsParent": true
+    },
+    {
+      "field": "Departure time",
+      "width": 390,
+      "height": 844,
+      "fits": true,
+      "escapeKeepsParent": true
+    },
+    {
+      "field": "Expected return date",
+      "width": 390,
+      "height": 844,
+      "fits": true,
+      "escapeKeepsParent": true
+    },
+    {
+      "field": "Expected return time",
+      "width": 390,
+      "height": 844,
+      "fits": true,
+      "escapeKeepsParent": true
+    }
+  ],
+  "pkg05-date-popovers-tablet": [
+    {
+      "field": "Departure date",
+      "width": 768,
+      "height": 1024,
+      "fits": true,
+      "escapeKeepsParent": true
+    },
+    {
+      "field": "Departure time",
+      "width": 768,
+      "height": 1024,
+      "fits": true,
+      "escapeKeepsParent": true
+    },
+    {
+      "field": "Expected return date",
+      "width": 768,
+      "height": 1024,
+      "fits": true,
+      "escapeKeepsParent": true
+    },
+    {
+      "field": "Expected return time",
+      "width": 768,
+      "height": 1024,
+      "fits": true,
+      "escapeKeepsParent": true
+    },
+    {
+      "field": "Departure date",
+      "width": 1024,
+      "height": 768,
+      "fits": true,
+      "escapeKeepsParent": true
+    },
+    {
+      "field": "Departure time",
+      "width": 1024,
+      "height": 768,
+      "fits": true,
+      "escapeKeepsParent": true
+    },
+    {
+      "field": "Expected return date",
+      "width": 1024,
+      "height": 768,
+      "fits": true,
+      "escapeKeepsParent": true
+    },
+    {
+      "field": "Expected return time",
+      "width": 1024,
+      "height": 768,
+      "fits": true,
+      "escapeKeepsParent": true
+    }
+  ],
+  "pkg05-reschedule-layout": {
+    "results": [
+      {
+        "stage": "New time",
+        "width": 1366,
+        "height": 768,
+        "x": 133,
+        "y": 45.0859375,
+        "right": 1233,
+        "bottom": 722.9140625,
+        "bodyWidth": 850,
+        "bodyScrollWidth": 850,
+        "bodyHeight": 562,
+        "bodyScrollHeight": 562,
+        "footerBottom": 721.9140625
+      },
+      {
+        "stage": "Review change",
+        "width": 1366,
+        "height": 768,
+        "x": 133,
+        "y": 45.0859375,
+        "right": 1233,
+        "bottom": 722.9140625,
+        "bodyWidth": 835,
+        "bodyScrollWidth": 835,
+        "bodyHeight": 562,
+        "bodyScrollHeight": 771,
+        "footerBottom": 721.9140625
+      },
+      {
+        "stage": "New time",
+        "width": 1280,
+        "height": 800,
+        "x": 90,
+        "y": 47,
+        "right": 1190,
+        "bottom": 753,
+        "bodyWidth": 850,
+        "bodyScrollWidth": 850,
+        "bodyHeight": 591,
+        "bodyScrollHeight": 591,
+        "footerBottom": 752
+      },
+      {
+        "stage": "Review change",
+        "width": 1280,
+        "height": 800,
+        "x": 90,
+        "y": 47,
+        "right": 1190,
+        "bottom": 753,
+        "bodyWidth": 835,
+        "bodyScrollWidth": 835,
+        "bodyHeight": 591,
+        "bodyScrollHeight": 771,
+        "footerBottom": 752
+      },
+      {
+        "stage": "New time",
+        "width": 390,
+        "height": 844,
+        "x": 15.6015625,
+        "y": 49.640625,
+        "right": 374.3984375,
+        "bottom": 794.359375,
+        "bodyWidth": 342,
+        "bodyScrollWidth": 342,
+        "bodyHeight": 629,
+        "bodyScrollHeight": 748,
+        "footerBottom": 793.359375
+      },
+      {
+        "stage": "Review change",
+        "width": 390,
+        "height": 844,
+        "x": 15.6015625,
+        "y": 49.640625,
+        "right": 374.3984375,
+        "bottom": 794.359375,
+        "bodyWidth": 342,
+        "bodyScrollWidth": 342,
+        "bodyHeight": 629,
+        "bodyScrollHeight": 1016,
+        "footerBottom": 793.359375
+      }
+    ],
+    "requiredReason": true,
+    "bookingsChanged": 0
+  },
+  "pkg05-location-final-browser": {
+    "savedId": 28,
+    "pickup": "Aurora House · verification · 34002 Walker Loop Apt. 357, East Cleta, North Raleighbury, 25960",
+    "destination": "Auckland Central City Library, 44, Lorne Street, Aotea Arts Quarter, City Centre, Auckland, Waitematā, Auckland, 1010, New Zealand",
+    "emptyStateNavigation": true,
+    "emptyStateCreate": true,
+    "validation": true,
+    "keyboardSiteSelection": true,
+    "mobilePickerBounds": {
+      "x": 38,
+      "y": 518,
+      "width": 343.1875,
+      "height": 211.5
+    },
+    "escapeKeepsParent": true,
+    "consoleErrors": []
+  },
+  "pkg05-route-final-shot": {
+    "filledRouteFits": true,
+    "layout": {
+      "width": 850,
+      "scrollWidth": 850,
+      "height": 562,
+      "scrollHeight": 562
+    }
+  },
+  "pkg05-long-action-layout": {
+    "layoutOnlySimulatedJourneyPhases": true,
+    "sourceWrites": 0,
+    "results": [
+      {
+        "action": "Confirm passengers accounted for",
+        "save": {
+          "x": 132.6875,
+          "y": 748.609375,
+          "width": 227.109375,
+          "height": 31.5
+        },
+        "cancel": {
+          "x": 30.203125,
+          "y": 729.484375,
+          "width": 70.15625,
+          "height": 31.5
+        },
+        "overlap": false
+      },
+      {
+        "action": "Complete passenger journey",
+        "save": {
+          "x": 165.5625,
+          "y": 748.609375,
+          "width": 194.234375,
+          "height": 31.5
+        },
+        "cancel": {
+          "x": 30.203125,
+          "y": 729.484375,
+          "width": 70.15625,
+          "height": 31.5
+        },
+        "overlap": false
+      }
+    ]
+  },
+  "pkg05-mobile-review-probe": [
+    {
+      "tag": "H2",
+      "classes": "text-lg leading-none font-semibold sr-only",
+      "width": 1,
+      "scroll": 132,
+      "text": "Check out vehicle"
+    },
+    {
+      "tag": "P",
+      "classes": "text-muted-foreground text-sm sr-only",
+      "width": 1,
+      "scroll": 323,
+      "text": "Review the current source record and confirm the change."
+    }
+  ]
+}
