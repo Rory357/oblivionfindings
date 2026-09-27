@@ -69,6 +69,7 @@ export function RuleHistory({
                     <ul className="audit-list">
                         {result.data.data.map((e) => (
                             <li key={e.id}>
+                                {/* eslint-disable-next-line no-restricted-syntax -- Full-width timeline event selector with its own grid layout. */}
                                 <button onClick={() => setEntry(e)}>
                                     <span className="audit-time">
                                         {formatDateTime(e.recorded_at)}

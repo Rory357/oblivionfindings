@@ -161,7 +161,7 @@ export function BoundaryWizard({
             setSite(initialSite);
             setSiteDetailsKnown(true);
         }
-    }, [initialSite]);
+    }, [initialSite, site, dirty]);
     const change = (g: Geometry | null) => {
         setUndo((a) => [...a, shape]);
         setRedo([]);

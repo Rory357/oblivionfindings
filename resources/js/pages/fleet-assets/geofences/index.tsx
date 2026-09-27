@@ -161,7 +161,7 @@ export default function MapsBoundaries({
         return () => window.removeEventListener('popstate', onPop);
     }, []);
     useEffect(() => {
-        if (q !== (nav.get('q') ?? '')) go({ q, page: 1 });
+        if (q !== (currentNav.current.get('q') ?? '')) go({ q, page: 1 });
     }, [q]);
     useEffect(() => {
         if (!toast) return;
@@ -194,7 +194,7 @@ export default function MapsBoundaries({
             setWizard({ existing: edit.data.boundary });
             go({ edit: null });
         }
-    }, [edit.data]);
+    }, [edit.data, canManage]);
     const handoffToken = nav.get('handoff') ?? undefined;
     const handoff = useRemote<{ site: SiteOption; ready: boolean }>(
         handoffToken ? base + '/handoffs/' + handoffToken : null,
@@ -1666,6 +1666,7 @@ export default function MapsBoundaries({
                         />
                     )}{' '}
                     {toast && (
+                        // eslint-disable-next-line no-restricted-syntax -- Positioned live-status toast, not a content card.
                         <div
                             role="status"
                             className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-lg border bg-card px-5 py-3 shadow-lg"

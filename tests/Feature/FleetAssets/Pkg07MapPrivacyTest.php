@@ -16,6 +16,7 @@ use App\Models\FleetVehicleStateSnapshot;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Fleet\VehicleLocationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -26,7 +27,7 @@ class Pkg07MapPrivacyTest extends TestCase
 
     private function reader(Site $site): User
     {
-        $user = User::factory()->create(['approved_at' => now(), 'role' => 'support_worker']);
+        $user = User::factory()->create(['email' => 'pkg07-'.Str::uuid().'@example.test', 'approved_at' => now(), 'role' => 'support_worker']);
         HrEmployeeProfile::factory()->create(['user_id' => $user->id, 'primary_site_id' => $site->id,
             'secondary_site_ids' => [], 'start_date' => today()->subYear(), 'end_date' => null, 'is_active' => true]);
         foreach (['fleet.viewAny', 'assets.viewAny', 'assets.telemetry.view'] as $key) {
@@ -51,6 +52,8 @@ class Pkg07MapPrivacyTest extends TestCase
             'latitude' => $event->latitude, 'longitude' => $event->longitude, 'last_seen_at' => $event->occurred_at, 'status' => 'online', 'consent_blocked' => false]);
         $url = '/fleet-assets/geofences/resources?id='.$vehicle->id;
         $this->actingAs($user)->getJson($url)->assertOk()->assertJsonPath('data.0.position.lat', -41.29)->assertJsonPath('data.0.accuracy_m', 15);
+        $locations = app(VehicleLocationService::class);
+        $this->assertSame(-41.29, $locations->lastPermittedPosition($user, $vehicle)['lat']);
         $signal = FleetSignal::create(['asset_id' => $vehicle->id, 'geofence_id' => $boundary->id,
             'signal_type' => 'geofence_enter', 'occurred_at' => $event->occurred_at, 'idempotency_key' => (string) Str::uuid(), 'payload' => []]);
         $eventsUrl = '/fleet-assets/geofences/events?boundary_id='.$boundary->id;
@@ -75,6 +78,7 @@ class Pkg07MapPrivacyTest extends TestCase
         $trip->update(['consent_blocked' => false]);
         $event->update(['consent_blocked' => true]);
         $this->getJson($url)->assertOk()->assertJsonPath('data.0.position', null);
+        $this->assertNull($locations->lastPermittedPosition($user, $vehicle));
         $this->assertDatabaseHas('fleet_signals', ['id' => $signal->id]);
     }
 

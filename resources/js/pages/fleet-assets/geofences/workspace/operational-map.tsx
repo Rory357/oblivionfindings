@@ -21,7 +21,7 @@ import {
     Truck,
     X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { base, query, request, useDebounced } from './api';
 import {
     mapBoundary,
@@ -293,43 +293,46 @@ export function OperationalMap({
           )
         : [];
     const paged = visible.slice((page - 1) * 8, page * 8);
-    const pin = async (r: ResourceRecord) => {
-        const token = generation.current;
-        setSelectedBoundary('');
-        setRecords((rows) => [r, ...rows.filter((x) => x.id !== r.id)]);
-        setSelected(String(r.id));
-        setStatus('');
-        setPage(1);
-        setFocus((n) => n + 1);
-        const missing = r.boundary_ids.filter(
-            (id) => !areas.some((b) => b.id === id),
-        );
-        if (missing.length) {
-            try {
-                const a = await Promise.all(
-                    missing
-                        .slice(0, 30)
-                        .map((id) =>
-                            request<{ boundary: BoundaryRecord }>(
-                                base + '/' + id,
+    const pin = useCallback(
+        async (r: ResourceRecord) => {
+            const token = generation.current;
+            setSelectedBoundary('');
+            setRecords((rows) => [r, ...rows.filter((x) => x.id !== r.id)]);
+            setSelected(String(r.id));
+            setStatus('');
+            setPage(1);
+            setFocus((n) => n + 1);
+            const missing = r.boundary_ids.filter(
+                (id) => !areas.some((b) => b.id === id),
+            );
+            if (missing.length) {
+                try {
+                    const a = await Promise.all(
+                        missing
+                            .slice(0, 30)
+                            .map((id) =>
+                                request<{ boundary: BoundaryRecord }>(
+                                    base + '/' + id,
+                                ),
                             ),
-                        ),
-                );
-                if (token !== generation.current) return;
-                setAreas((old) => [
-                    ...old,
-                    ...a
-                        .map((v) => v.boundary)
-                        .filter((b) => !old.some((x) => x.id === b.id)),
-                ]);
-            } catch {
-                if (token !== generation.current) return;
-                setError(
-                    'Some linked areas could not be loaded. Open the source profile to review them.',
-                );
+                    );
+                    if (token !== generation.current) return;
+                    setAreas((old) => [
+                        ...old,
+                        ...a
+                            .map((v) => v.boundary)
+                            .filter((b) => !old.some((x) => x.id === b.id)),
+                    ]);
+                } catch {
+                    if (token !== generation.current) return;
+                    setError(
+                        'Some linked areas could not be loaded. Open the source profile to review them.',
+                    );
+                }
             }
-        }
-    };
+        },
+        [areas],
+    );
     useEffect(() => {
         if (
             !initialResource ||
@@ -356,7 +359,7 @@ export function OperationalMap({
             .catch((e) => {
                 if (token === generation.current) setError(e.message);
             });
-    }, [initialResource, busy, asOf]);
+    }, [initialResource, busy, asOf, records, pin]);
     useEffect(() => {
         if (
             !initialBoundary ||
@@ -743,6 +746,7 @@ export function OperationalMap({
                                     }
                                     key={r.id}
                                 >
+                                    {/* eslint-disable-next-line no-restricted-syntax -- Resource directory row uses custom icon, text and status columns. */}
                                     <button
                                         onClick={() => {
                                             const raw = records.find(
@@ -846,6 +850,7 @@ export function OperationalMap({
                             <MapPin size={14} />
                             {positionCount} recorded positions
                         </span>
+                        {/* eslint-disable-next-line no-restricted-syntax -- Inline map-legend action matches the adjacent count labels. */}
                         <button
                             onClick={() => {
                                 setStatus('missing');
@@ -973,6 +978,7 @@ export function OperationalMap({
                                                     (x) => x.boundary.id === id,
                                                 )?.state;
                                             return b ? (
+                                                // eslint-disable-next-line no-restricted-syntax -- Linked-area row lays out the name and evidence state.
                                                 <button
                                                     key={id}
                                                     onClick={() => onInspect(b)}

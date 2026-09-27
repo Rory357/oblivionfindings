@@ -8,7 +8,7 @@ import { formatDateTime } from '@/lib/datetime';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Compass, MapPin, Minus, Plus } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Boundary, Rule } from './data';
 import type { MapResource } from './map-data';
@@ -55,6 +55,7 @@ const node = (tag: string, text: string, cls = '') => {
 };
 export function OperationalCanvas(p: Props) {
     const provider = useMapProvider();
+    const initialProvider = useRef(provider);
     const [tileFailure, setTileFailure] = useState(false);
     const ref = useRef<HTMLDivElement>(null),
         map = useRef<L.Map | null>(null),
@@ -62,7 +63,9 @@ export function OperationalCanvas(p: Props) {
         markers = useRef<L.LayerGroup | null>(null),
         backdrop = useRef<L.TileLayer | null>(null),
         latest = useRef(p);
-    latest.current = p;
+    useLayoutEffect(() => {
+        latest.current = p;
+    }, [p]);
     const [camera, setCamera] = useState(0),
         [menu, setMenu] = useState<{
             x: number;
@@ -144,9 +147,9 @@ export function OperationalCanvas(p: Props) {
             scrollWheelZoom: false,
         });
         map.current = m;
-        if (provider.url)
-            backdrop.current = L.tileLayer(provider.url, {
-                attribution: provider.attribution,
+        if (initialProvider.current.url)
+            backdrop.current = L.tileLayer(initialProvider.current.url, {
+                attribution: initialProvider.current.attribution,
                 className: 'bnd-tiles',
             })
                 .on('tileerror', () => setTileFailure(true))
@@ -463,9 +466,13 @@ export function OperationalCanvas(p: Props) {
     useEffect(() => {
         const m = map.current;
         if (!m) return;
+        // Refreshing observations must not reset a user's map camera.
+        const current = latest.current;
         const points: Coordinate[] = [
-            ...p.resources.flatMap((r) => (r.position ? [r.position] : [])),
-            ...p.boundaries.flatMap((b) =>
+            ...current.resources.flatMap((r) =>
+                r.position ? [r.position] : [],
+            ),
+            ...current.boundaries.flatMap((b) =>
                 b.geometry.type === 'circle'
                     ? [
                           {
@@ -508,11 +515,18 @@ export function OperationalCanvas(p: Props) {
     }, [p.fit, scopeKey]);
     useEffect(() => {
         if (!p.focus || !map.current) return;
-        const r = p.resources.find((r) => r.id === p.selectedResource),
-            b = p.boundaries.find((b) => b.id === p.selectedBoundary);
+        const current = latest.current;
+        const r = current.resources.find(
+                (r) => r.id === current.selectedResource,
+            ),
+            b = current.boundaries.find(
+                (b) => b.id === current.selectedBoundary,
+            );
         const c =
             r?.position ??
-            (!p.selectedResource && b ? boundaryCentre(b.geometry) : null);
+            (!current.selectedResource && b
+                ? boundaryCentre(b.geometry)
+                : null);
         if (c) map.current.setView([c.lat, c.lng], 17, { animate: false });
     }, [p.focus]);
     return (

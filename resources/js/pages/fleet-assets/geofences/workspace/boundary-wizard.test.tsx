@@ -20,6 +20,7 @@ const site: SiteOption = {
 };
 vi.mock('./remote-picker', () => ({
     RemotePicker: ({ onSelect }: { onSelect: (s: SiteOption) => void }) => (
+        // eslint-disable-next-line no-restricted-syntax -- Minimal interaction stub for the remote Site picker.
         <button onClick={() => onSelect(site)}>Select test site</button>
     ),
 }));

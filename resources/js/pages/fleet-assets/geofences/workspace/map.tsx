@@ -15,7 +15,7 @@ import {
     Shapes,
     X,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Boundary } from './data';
 
 import { useMapProvider } from './provider';
@@ -53,8 +53,25 @@ export function BoundaryMap({
         map = useRef<L.Map | null>(null),
         overlay = useRef<L.TileLayer | null>(null),
         group = useRef<L.LayerGroup | null>(null);
-    const latest = useRef({ shape, onShape, draw, onSelect });
-    latest.current = { shape, onShape, draw, onSelect };
+    const initialProvider = useRef(provider);
+    const latest = useRef({
+        shape,
+        onShape,
+        draw,
+        onSelect,
+        boundaries,
+        selected,
+    });
+    useLayoutEffect(() => {
+        latest.current = {
+            shape,
+            onShape,
+            draw,
+            onSelect,
+            boundaries,
+            selected,
+        };
+    }, [shape, onShape, draw, onSelect, boundaries, selected]);
     const [menu, setMenu] = useState<{
             x: number;
             y: number;
@@ -73,7 +90,7 @@ export function BoundaryMap({
         };
         window.addEventListener('keydown', key, true);
         return () => window.removeEventListener('keydown', key, true);
-    }, [!!menu]);
+    }, [menu]);
     useEffect(() => {
         if (!menu) return;
         menuRef.current
@@ -97,9 +114,9 @@ export function BoundaryMap({
         });
         map.current = m;
         group.current = L.layerGroup().addTo(m);
-        if (provider.url) {
-            overlay.current = L.tileLayer(provider.url, {
-                attribution: provider.attribution,
+        if (initialProvider.current.url) {
+            overlay.current = L.tileLayer(initialProvider.current.url, {
+                attribution: initialProvider.current.attribution,
                 className: 'bnd-tiles',
             })
                 .on('tileerror', () => setTileFailure(true))
@@ -263,9 +280,12 @@ export function BoundaryMap({
             }
         }
     }, [boundaries, selected, shape, onShape, showLabels]);
+    const boundaryScope = boundaries.map((b) => b.id).join('|');
     useEffect(() => {
         const m = map.current;
         if (!m) return;
+        // Fit is an explicit action or a changed result scope, not each edit.
+        const { shape, boundaries } = latest.current;
         const source = shape ? [shape] : boundaries.map((b) => b.geometry);
         if (source.length) {
             const points: Coordinate[] = source.flatMap((s) =>
@@ -308,8 +328,9 @@ export function BoundaryMap({
                     { padding: [40, 40], maxZoom: 16, animate: false },
                 );
         }
-    }, [fit, boundaries.map((b) => b.id).join('|')]);
+    }, [fit, boundaryScope]);
     useEffect(() => {
+        const { boundaries, selected } = latest.current;
         const b = boundaries.find((b) => b.id === selected);
         if (focus > 0 && b && map.current) {
             const c = boundaryCentre(b.geometry);

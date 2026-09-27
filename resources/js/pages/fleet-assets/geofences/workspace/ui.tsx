@@ -273,6 +273,7 @@ export function ChoiceTiles({
                 tabIndex={error ? -1 : undefined}
             >
                 {options.map((o) => (
+                    // eslint-disable-next-line no-restricted-syntax -- Pressed choice tile with icon, label and help text layout.
                     <button
                         type="button"
                         key={o.value}

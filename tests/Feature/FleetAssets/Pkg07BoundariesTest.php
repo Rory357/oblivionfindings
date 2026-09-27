@@ -22,7 +22,7 @@ class Pkg07BoundariesTest extends TestCase
 
     private function user(Site $site, bool $manage = true): User
     {
-        $u = User::factory()->create(['approved_at' => now(), 'role' => 'support_worker']);
+        $u = User::factory()->create(['email' => 'pkg07-'.Str::uuid().'@example.test', 'approved_at' => now(), 'role' => 'support_worker']);
         HrEmployeeProfile::factory()->create(['user_id' => $u->id, 'primary_site_id' => $site->id,
             'secondary_site_ids' => [], 'is_active' => true, 'start_date' => today()->subYear(), 'end_date' => null]);
         foreach (['fleet.viewAny', 'assets.viewAny', ...($manage ? ['assets.geofences.manage'] : [])] as $key) {

@@ -151,6 +151,7 @@ export function AddressSearch({
                     )}
                     <div className="place-results">
                         {hits.map((h, i) => (
+                            // eslint-disable-next-line no-restricted-syntax -- Multiline place-result selector uses the workspace list layout.
                             <button
                                 type="button"
                                 className="place-result"

@@ -238,7 +238,7 @@ final class VehicleLocationService
             return null;
         }
         $snapshot = FleetVehicleStateSnapshot::query()
-            ->with(['lastEvent:id,occurred_at,received_at,external_power,event_type',
+            ->with(['lastEvent:id,occurred_at,received_at,external_power,event_type,accuracy_m,consent_blocked',
                 'lastTrip:id,is_personal,consent_blocked,started_at,ended_at'])
             ->find($vehicle->getKey());
         if (! $snapshot) {

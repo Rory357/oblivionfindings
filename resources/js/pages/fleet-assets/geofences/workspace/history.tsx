@@ -112,6 +112,7 @@ export function BoundaryHistory({
                     Purpose rule changes
                 </Button>
             </div>
+            {/* eslint-disable-next-line no-restricted-syntax -- Responsive filter toolbar, not a content card. */}
             <div className="bnd-history-filters grid grid-cols-1 gap-4 rounded-xl border bg-card p-5 lg:grid-cols-4">
                 <RemotePicker<BoundaryRecord>
                     label="Boundary history"
@@ -262,6 +263,7 @@ export function BoundaryHistory({
                                             <ul className="audit-list">
                                                 {result.data.data.map((e) => (
                                                     <li key={e.id}>
+                                                        {/* eslint-disable-next-line no-restricted-syntax -- Full-width timeline event selector with its own grid layout. */}
                                                         <button
                                                             onClick={() =>
                                                                 setEntry(e)
@@ -336,6 +338,7 @@ export function BoundaryHistory({
                         ) : dependencies.data?.data.length ? (
                             <div className="divide-y">
                                 {dependencies.data.data.map((r) => (
+                                    // eslint-disable-next-line no-restricted-syntax -- Multiline dependency selector in a divided list.
                                     <button
                                         className="block w-full py-3 text-left text-xs"
                                         key={r.id}
