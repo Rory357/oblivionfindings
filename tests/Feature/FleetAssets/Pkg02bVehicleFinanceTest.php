@@ -784,7 +784,9 @@ class Pkg02bVehicleFinanceTest extends TestCase
         ], ['Idempotency-Key' => 'late-after-decision'])->assertUnprocessable();
         $this->postJson("/fleet-assets/vehicles/{$vehicle->id}/document-files/{$upload['id']}/archive", [
             'reason' => 'Attempt to change decided evidence', 'pause_renewal' => false,
-        ], ['Idempotency-Key' => 'archive-decided'])->assertStatus(409);
+        ], ['Idempotency-Key' => 'archive-decided'])->assertUnprocessable()->assertJsonValidationErrors('source_id');
+        $this->assertNull(AssetDocument::findOrFail($upload['id'])->archived_at);
+        $this->assertSame($upload['id'], $record->fresh()->decision_evidence[0]['id']);
     }
 
     public function test_assignment_reminders_and_delivery_are_scoped_durable_and_deduplicated(): void

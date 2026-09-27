@@ -282,6 +282,7 @@ config(['finance.spend_approval.enforce' => false]);
 $bill = App\Domain\Finance\Models\FinBill::findOrFail((int) $argv[2]);
 $actor = App\Models\User::findOrFail((int) $argv[3]);
 Illuminate\Support\Facades\Auth::login($actor);
+Illuminate\Support\Facades\DB::statement('SET SESSION innodb_lock_wait_timeout = 90');
 file_put_contents($argv[6], 'attempting');
 try {
     $service = app(App\Domain\Finance\Services\AccountsPayableService::class);
@@ -299,11 +300,14 @@ PHP;
             $paths[] = $ready = $barrier.'-'.$index;
             $process = new Process([PHP_BINARY, '-r', $worker, base_path(), (string) $this->bill->id,
                 (string) $this->approver->id, $action, $token, $ready], base_path(), ['APP_ENV' => 'testing', 'DB_DATABASE' => $database]);
-            $process->setTimeout(30);
+            $process->setTimeout(120);
             $process->start();
             $processes[] = $process;
         }
-        $deadline = microtime(true) + 15;
+        // Cold application bootstrap can be slow while other isolated schemas
+        // load. Keep a bounded startup allowance without relaxing the shared
+        // lock barrier or any posting/receipt assertions below.
+        $deadline = microtime(true) + 60;
         while (collect($paths)->contains(fn ($path) => ! is_file($path))) {
             if (microtime(true) >= $deadline) {
                 throw new RuntimeException('Bill workers did not reach the shared lock.');
