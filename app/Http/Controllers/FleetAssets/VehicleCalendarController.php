@@ -9,6 +9,7 @@ use App\Models\FleetVehicleUnavailablePeriod;
 use App\Models\User;
 use App\Services\Fleet\VehicleAppointmentService;
 use App\Services\Fleet\VehicleCalendarService;
+use App\Services\Fleet\VehicleLocationService;
 use App\Services\Fleet\VehicleUnavailablePeriodService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -28,9 +29,85 @@ class VehicleCalendarController extends Controller
     public function __construct(
         private readonly SecurityDevicesAccessService $vehicles,
         private readonly VehicleCalendarService $calendar,
+        private readonly VehicleLocationService $location,
         private readonly VehicleUnavailablePeriodService $unavailable,
         private readonly VehicleAppointmentService $appointments,
     ) {}
+
+    /** One bounded, permission-projected feed for the complete fleet calendar. */
+    public function fleetEvents(Request $request): JsonResponse
+    {
+        $viewer = $this->actor($request);
+        $data = $request->validate([
+            'start' => ['required', 'date'],
+            'end' => ['required', 'date', 'after:start'],
+        ]);
+        $start = CarbonImmutable::parse($data['start'], VehicleLocationService::zone())->utc();
+        $end = CarbonImmutable::parse($data['end'], VehicleLocationService::zone())->utc();
+        // Six local calendar weeks may include a 25-hour daylight-saving day.
+        abort_if($end->greaterThan($start->setTimezone(VehicleLocationService::zone())->addDays(42)),
+            422, 'Choose a shorter fleet calendar period.');
+
+        $events = [];
+        // The service owns source visibility, including the busy-only booking
+        // projection. This is one browser request, independent of list pages.
+        foreach ($this->vehicles->accessibleVehiclesForFleet($viewer)->orderBy('id')->cursor() as $vehicle) {
+            foreach ($this->calendar->events($viewer, $vehicle, $start, $end) as $item) {
+                $busy = $item['kind'] === 'busy';
+                // Busy entries may not carry a source record identifier, even
+                // in the DOM or client-side search corpus.
+                if ($busy) {
+                    $item['id'] = 'busy:'.hash_hmac('sha256', $vehicle->id.'|'.$item['id'].'|'.$item['start'].'|'.$item['end'], config('app.key'));
+                    $item['ref'] = null;
+                    $item['recordId'] = null;
+                    $item['link'] = null;
+                    $item['editable'] = false;
+                }
+                $item['vehicleId'] = (int) $vehicle->id;
+                $events[] = $item;
+            }
+        }
+
+        return response()->json(['events' => $events, 'as_of' => now()->toIso8601String(), 'timezone' => VehicleLocationService::zone()]);
+    }
+
+    /** Every permitted vehicle, with coordinates projected by the location owner. */
+    public function fleetMap(Request $request): JsonResponse
+    {
+        $viewer = $this->actor($request);
+        $vehicles = $this->vehicles->accessibleVehiclesForFleet($viewer)
+            ->with([
+                'homeSite:id,name,latitude,longitude', 'site:id,name,latitude,longitude',
+                'fleetState.lastEvent:id,occurred_at,received_at,external_power,event_type',
+                'fleetState.lastTrip:id,is_personal,consent_blocked,started_at,ended_at',
+            ])
+            ->orderBy('name')->orderBy('id')->get();
+        $siteIds = $this->vehicles->accessibleSiteIds($viewer);
+        $positionIds = $this->location->visibleVehicleIds($viewer, $vehicles->pluck('id')->all());
+
+        return response()->json([
+            'as_of' => now()->toIso8601String(),
+            'timezone' => VehicleLocationService::zone(),
+            'fresh_minutes' => VehicleLocationService::FRESH_MINUTES,
+            'vehicles' => $vehicles->map(function (Asset $vehicle) use ($viewer, $siteIds, $positionIds): array {
+                $home = $vehicle->homeSite ?? $vehicle->site;
+                $showHomeCoordinates = $home && in_array((int) $home->id, $siteIds, true);
+                return [
+                    'id' => (int) $vehicle->id,
+                    'name' => (string) $vehicle->name,
+                    'asset_tag' => $vehicle->asset_tag,
+                    'registration_number' => $vehicle->registration_number,
+                    'status' => $vehicle->status,
+                    'home_site' => $home ? [
+                        'id' => (int) $home->id, 'name' => (string) $home->name,
+                        'lat' => $showHomeCoordinates && $home->latitude !== null ? (float) $home->latitude : null,
+                        'lng' => $showHomeCoordinates && $home->longitude !== null ? (float) $home->longitude : null,
+                    ] : null,
+                    ...$this->location->fleetMapState($viewer, $vehicle, in_array((int) $vehicle->id, $positionIds, true)),
+                ];
+            })->values(),
+        ]);
+    }
 
     public function events(Request $request, Asset $asset): JsonResponse
     {

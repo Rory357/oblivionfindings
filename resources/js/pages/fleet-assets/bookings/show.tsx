@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDateTime, formatDistance } from '@/lib/fleet-utils';
 import { cn } from '@/lib/utils';
+import { fleetReturnFromLocation } from '@/lib/fleet-return';
 import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -85,6 +86,7 @@ const statusBannerColors: Record<string, string> = {
 const statusSteps = ['pending', 'approved', 'checked_out', 'returned'];
 
 export default function BookingShow({ booking, can, maintenance_impacts }: Props) {
+    const fleetReturn = fleetReturnFromLocation();
     const b = booking ?? ({} as Props['booking']);
     const canManage = can.manage;
     // Approvers without full fleet management still decide pending requests.
@@ -114,8 +116,8 @@ export default function BookingShow({ booking, can, maintenance_impacts }: Props
                 <FleetCompactHero
                     pill={`Vehicle booking · ${(b.status ?? 'pending').replace(/_/g, ' ')}`}
                     title={`Booking #${b.id ?? ''}`}
-                    backHref="/fleet-assets/bookings"
-                    backLabel="Bookings"
+                    backHref={fleetReturn ?? '/fleet-assets/bookings'}
+                    backLabel={fleetReturn ? 'Return to Fleet view' : 'Bookings'}
                 />
 
                 {/* Status Banner */}

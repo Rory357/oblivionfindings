@@ -23,6 +23,7 @@ import {
     UserRound,
 } from 'lucide-react';
 import { useState } from 'react';
+import { bookingOffset, bookingOffsets } from './booking-time';
 import type {
     BookingRow,
     CalendarDriver,
@@ -42,8 +43,13 @@ import {
 } from './wizard-kit';
 
 export type BookingWizardMode =
-    | { kind: 'request'; startLocal?: string }
-    | { kind: 'change'; row: BookingRow }
+    | { kind: 'request'; startLocal?: string; endLocal?: string }
+    | {
+          kind: 'change';
+          row: BookingRow;
+          proposedStartLocal?: string;
+          proposedEndLocal?: string;
+      }
     | { kind: 'block'; startLocal?: string }
     | { kind: 'change-block'; row: UnavailableRow };
 
@@ -92,6 +98,7 @@ export function conflictWith(
     start: string,
     end: string,
     ignore?: { kind: 'booking' | 'unavailable'; id: number },
+    offsets?: { start: string; end: string },
 ): string {
     const clash = summary.bookings.find((row) => {
         if (ignore && row.kind === ignore.kind && row.id === ignore.id)
@@ -101,6 +108,13 @@ export function conflictWith(
                 ? LIVE_BOOKING.includes(row.status)
                 : row.status === 'active';
         if (!live) return false;
+        if (offsets?.start && offsets.end)
+            return (
+                Date.parse(`${start}:00${offsets.start}`) <
+                    Date.parse(row.ends_at) &&
+                Date.parse(`${end}:00${offsets.end}`) >
+                    Date.parse(row.starts_at)
+            );
         return (
             start < toDatetimeLocal(row.ends_at) &&
             end > toDatetimeLocal(row.starts_at)
@@ -125,12 +139,14 @@ export function BookingWizard({
     mode,
     onClose,
     onSaved,
+    onTimeChanged,
 }: {
     vehicle: VehicleProfile;
     summary: VehicleCalendarSummary;
     mode: BookingWizardMode;
     onClose: () => void;
     onSaved: () => void;
+    onTimeChanged?: (before: BookingRow, savedVersion: number) => void;
 }) {
     const auth = usePage<SharedData>().props.auth;
     const block = mode.kind === 'block' || mode.kind === 'change-block';
@@ -139,20 +155,38 @@ export function BookingWizard({
     const period = mode.kind === 'change-block' ? mode.row : null;
     const [initial] = useState(() => {
         const start =
-            booking || period
-                ? toDatetimeLocal((booking ?? period)!.starts_at)
-                : ((mode.kind === 'request' || mode.kind === 'block'
-                      ? mode.startLocal
-                      : undefined) ?? defaultBookingStart());
+            mode.kind === 'change' && mode.proposedStartLocal
+                ? mode.proposedStartLocal
+                : booking || period
+                  ? toDatetimeLocal((booking ?? period)!.starts_at)
+                  : ((mode.kind === 'request' || mode.kind === 'block'
+                        ? mode.startLocal
+                        : undefined) ?? defaultBookingStart());
         const end =
-            booking || period
-                ? toDatetimeLocal((booking ?? period)!.ends_at)
-                : addLocalMinutes(start, 60);
+            mode.kind === 'change' && mode.proposedEndLocal
+                ? mode.proposedEndLocal
+                : mode.kind === 'request' && mode.endLocal
+                  ? mode.endLocal
+                  : booking || period
+                    ? toDatetimeLocal((booking ?? period)!.ends_at)
+                    : addLocalMinutes(start, 60);
         return {
             start,
             end,
+            starts_offset:
+                (booking || period) &&
+                !(mode.kind === 'change' && mode.proposedStartLocal)
+                    ? bookingOffset((booking ?? period)!.starts_at)
+                    : '',
+            ends_offset:
+                (booking || period) &&
+                !(mode.kind === 'change' && mode.proposedEndLocal)
+                    ? bookingOffset((booking ?? period)!.ends_at)
+                    : '',
             driver_user_id:
-                booking?.driver?.id ?? (auth.user?.id as number | undefined) ?? null,
+                booking?.driver?.id ??
+                (auth.user?.id as number | undefined) ??
+                null,
             purpose: booking?.purpose ?? period?.purpose ?? '',
             pickup: booking?.pickup_arrangement ?? '',
             reason: '',
@@ -162,6 +196,12 @@ export function BookingWizard({
         };
     });
     const [form, setForm] = useState(initial);
+    const startOffsets = bookingOffsets(form.start);
+    const endOffsets = bookingOffsets(form.end);
+    const startsOffset =
+        startOffsets.length === 1 ? startOffsets[0] : form.starts_offset;
+    const endsOffset =
+        endOffsets.length === 1 ? endOffsets[0] : form.ends_offset;
     const [files, setFiles] = useState<File[]>([]);
     const [step, setStep] = useState(0);
     const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
@@ -169,7 +209,10 @@ export function BookingWizard({
     const [savedText, setSavedText] = useState<string | null>(null);
     const command = useVehicleRecordCommand(isJsonObject);
     const evidence = useEvidenceUpload(vehicle.id);
-    const errors: Record<string, string> = { ...command.errors, ...localErrors };
+    const errors: Record<string, string> = {
+        ...command.errors,
+        ...localErrors,
+    };
     // Server time errors land on the times step, whatever key they use.
     if (errors.asset_id) errors.starts_local = errors.asset_id;
     const drivers = summary.drivers;
@@ -234,7 +277,25 @@ export function BookingWizard({
         key: K,
         value: (typeof form)[K],
     ) => {
-        setForm((old) => ({ ...old, [key]: value }));
+        setForm((old) => ({
+            ...old,
+            [key]: value,
+            ...([
+                'start',
+                'end',
+                'driver_user_id',
+                'approval_route',
+                'starts_offset',
+                'ends_offset',
+            ].includes(key)
+                ? { ready: false }
+                : {}),
+            ...(key === 'start'
+                ? { starts_offset: '' }
+                : key === 'end'
+                  ? { ends_offset: '' }
+                  : {}),
+        }));
         setLocalErrors((old) => {
             const next = { ...old };
             delete next[key as string];
@@ -284,7 +345,24 @@ export function BookingWizard({
                     ? 'Choose when the vehicle is available again.'
                     : 'Choose the return date and time.';
             if (!found.starts_local && !found.ends_local) {
-                if (form.end <= form.start)
+                if (!startOffsets.length)
+                    found.starts_local =
+                        'This time does not exist when the Auckland clocks move forward. Choose another time.';
+                else if (!startOffsets.includes(startsOffset))
+                    found.starts_offset =
+                        'Choose the first or second occurrence of this time.';
+                if (!endOffsets.length)
+                    found.ends_local =
+                        'This time does not exist when the Auckland clocks move forward. Choose another time.';
+                else if (!endOffsets.includes(endsOffset))
+                    found.ends_offset =
+                        'Choose the first or second occurrence of this time.';
+                if (
+                    startsOffset &&
+                    endsOffset &&
+                    Date.parse(`${form.end}:00${endsOffset}`) <=
+                        Date.parse(`${form.start}:00${startsOffset}`)
+                )
                     found.ends_local = 'The end must be after the start.';
                 else if (
                     form.start < today &&
@@ -294,7 +372,13 @@ export function BookingWizard({
                         'Choose a current or future pickup / block start.';
             }
             if (Object.keys(found).length === 0) {
-                const clash = conflictWith(summary, form.start, form.end, ignore);
+                const clash = conflictWith(
+                    summary,
+                    form.start,
+                    form.end,
+                    ignore,
+                    { start: startsOffset, end: endsOffset },
+                );
                 if (clash) {
                     setConflict(clash);
                     setLocalErrors({ starts_local: clash });
@@ -341,6 +425,8 @@ export function BookingWizard({
                 {
                     starts_local: form.start,
                     ends_local: form.end,
+                    starts_offset: startsOffset || null,
+                    ends_offset: endsOffset || null,
                     reason: form.purpose.trim(),
                 },
             );
@@ -354,6 +440,8 @@ export function BookingWizard({
                 {
                     starts_local: form.start,
                     ends_local: form.end,
+                    starts_offset: startsOffset || null,
+                    ends_offset: endsOffset || null,
                     reason: form.purpose.trim(),
                     change_reason: form.reason.trim(),
                     expected_version: mode.row.lock_version,
@@ -361,7 +449,9 @@ export function BookingWizard({
                 { method: 'PUT' },
             );
             if (!result) return;
-            setSavedText('The unavailable period is changed; its history is kept.');
+            setSavedText(
+                'The unavailable period is changed; its history is kept.',
+            );
         } else if (mode.kind === 'change') {
             const result = await command.submit(
                 `/fleet-assets/bookings/${mode.row.id}`,
@@ -369,6 +459,8 @@ export function BookingWizard({
                     expected_version: mode.row.lock_version,
                     starts_local: form.start,
                     ends_local: form.end,
+                    starts_offset: startsOffset || null,
+                    ends_offset: endsOffset || null,
                     purpose: form.purpose.trim(),
                     driver_user_id: form.driver_user_id,
                     pickup_arrangement: form.pickup.trim() || null,
@@ -385,11 +477,23 @@ export function BookingWizard({
                     ? result.message
                     : 'Booking changed.',
             );
+            if (
+                isJsonObject(result.booking) &&
+                Number.isInteger(result.booking.lock_version) &&
+                (Date.parse(String(result.booking.starts_at)) !==
+                    Date.parse(mode.row.starts_at) ||
+                    Date.parse(String(result.booking.ends_at)) !==
+                        Date.parse(mode.row.ends_at))
+            ) {
+                onTimeChanged?.(mode.row, Number(result.booking.lock_version));
+            }
         } else {
             const result = await command.submit('/fleet-assets/bookings', {
                 asset_id: vehicle.id,
                 starts_local: form.start,
                 ends_local: form.end,
+                starts_offset: startsOffset || null,
+                ends_offset: endsOffset || null,
                 purpose: form.purpose.trim(),
                 driver_user_id: form.driver_user_id,
                 pickup_arrangement: form.pickup.trim() || null,
@@ -570,6 +674,32 @@ export function BookingWizard({
                         onChange={(value) => update('start', value)}
                         error={errors.starts_local}
                     />
+                    {startOffsets.length > 1 && (
+                        <WizardField
+                            id="starts_offset"
+                            label="Pickup clock occurrence"
+                            error={errors.starts_offset}
+                        >
+                            <select
+                                id="starts_offset"
+                                className="w-full rounded-md border bg-card p-2"
+                                value={startsOffset}
+                                onChange={(event) =>
+                                    update('starts_offset', event.target.value)
+                                }
+                            >
+                                <option value="">
+                                    Choose which occurrence
+                                </option>
+                                {startOffsets.map((offset, index) => (
+                                    <option key={offset} value={offset}>
+                                        {index === 0 ? 'First' : 'Second'}{' '}
+                                        occurrence (UTC{offset})
+                                    </option>
+                                ))}
+                            </select>
+                        </WizardField>
+                    )}
                     <DateTimeField
                         id="ends_local"
                         label={block ? 'Block end' : 'Return / block end'}
@@ -577,6 +707,32 @@ export function BookingWizard({
                         onChange={(value) => update('end', value)}
                         error={errors.ends_local}
                     />
+                    {endOffsets.length > 1 && (
+                        <WizardField
+                            id="ends_offset"
+                            label="Return clock occurrence"
+                            error={errors.ends_offset}
+                        >
+                            <select
+                                id="ends_offset"
+                                className="w-full rounded-md border bg-card p-2"
+                                value={endsOffset}
+                                onChange={(event) =>
+                                    update('ends_offset', event.target.value)
+                                }
+                            >
+                                <option value="">
+                                    Choose which occurrence
+                                </option>
+                                {endOffsets.map((offset, index) => (
+                                    <option key={offset} value={offset}>
+                                        {index === 0 ? 'First' : 'Second'}{' '}
+                                        occurrence (UTC{offset})
+                                    </option>
+                                ))}
+                            </select>
+                        </WizardField>
+                    )}
                 </div>
             )}
             {stepKey === 'people' && (
@@ -587,7 +743,11 @@ export function BookingWizard({
                     </p>
                     <div className="vehicle-wizard-fields">
                         <WizardField id="requester" label="Requester">
-                            <Input id="requester" value={requesterName} readOnly />
+                            <Input
+                                id="requester"
+                                value={requesterName}
+                                readOnly
+                            />
                         </WizardField>
                         <WizardField
                             id="driver_user_id"
@@ -633,7 +793,11 @@ export function BookingWizard({
                             </Select>
                         </WizardField>
                     </div>
-                    <WizardField id="purpose" label="Purpose" error={errors.purpose}>
+                    <WizardField
+                        id="purpose"
+                        label="Purpose"
+                        error={errors.purpose}
+                    >
                         <Textarea
                             {...fieldProps('purpose', errors.purpose)}
                             rows={2}
@@ -692,7 +856,10 @@ export function BookingWizard({
                         error={errors.purpose ?? errors.reason}
                     >
                         <Textarea
-                            {...fieldProps('purpose', errors.purpose ?? errors.reason)}
+                            {...fieldProps(
+                                'purpose',
+                                errors.purpose ?? errors.reason,
+                            )}
                             rows={3}
                             maxLength={2000}
                             value={form.purpose}
@@ -876,7 +1043,10 @@ export function BookingWizard({
                             title="People & purpose"
                             onEdit={() => setStep(1)}
                         >
-                            <ReviewRow label="Requester" value={requesterName} />
+                            <ReviewRow
+                                label="Requester"
+                                value={requesterName}
+                            />
                             <ReviewRow label="Driver" value={driverName} />
                             <ReviewRow
                                 label="Purpose"
@@ -930,7 +1100,9 @@ export function BookingWizard({
                             )}
                         </ReviewCard>
                     )}
-                    <StudioNotice title="What this changes">{note}</StudioNotice>
+                    <StudioNotice title="What this changes">
+                        {note}
+                    </StudioNotice>
                 </div>
             )}
         </WorkspaceWizard>

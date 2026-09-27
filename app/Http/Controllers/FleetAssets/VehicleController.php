@@ -22,6 +22,7 @@ use App\Services\Fleet\FleetTripSiteScope;
 use App\Services\Fleet\MaintenanceAccessService;
 use App\Services\Fleet\VehicleFinancePresenter;
 use App\Services\Fleet\VehicleLegacyEvidenceGuard;
+use App\Services\Fleet\VehicleLocationService;
 use App\Services\Fleet\VehicleReadinessService;
 use App\Services\Fleet\VehicleStaffDirectory;
 use App\Services\Fleet\VehicleWorkspacePresenter;
@@ -43,6 +44,7 @@ class VehicleController extends Controller
         private readonly FleetVehicleTechnologyProjectionPresenter $vehicleTechnology,
         private readonly AssetMutationIntegrityService $mutationIntegrity,
         private readonly VehicleReadinessService $readiness,
+        private readonly VehicleLocationService $location,
     ) {}
 
     private function canManageFleet(?User $user): bool
@@ -70,7 +72,7 @@ class VehicleController extends Controller
         $user = $request->user();
         $hasFleetFields = $this->hasFleetFields();
 
-        $eagerLoads = ['fleetState'];
+        $eagerLoads = ['fleetState', 'site'];
         if ($hasFleetFields) {
             $eagerLoads[] = 'homeSite';
         }
@@ -78,49 +80,45 @@ class VehicleController extends Controller
         $visibleVehicles = $this->deviceAccess->accessibleVehiclesForFleet($user);
         $query = (clone $visibleVehicles)->with($eagerLoads);
 
-        // CSV export
-        if ($request->input('export') === 'csv') {
-            $exportQuery = (clone $query)->orderBy('name');
+        // Identity and filter options cover the complete permitted fleet, not
+        // the current register page. Position data is supplied separately by
+        // the canonical location projection only when the Map tab loads.
+        $allVehicles = (clone $visibleVehicles)->with(['site', 'homeSite'])->orderBy('name')->orderBy('id')->get();
+        $allIds = $allVehicles->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        $siteVehicleIds = $allIds === [] ? [] : $this->deviceAccess->siteScopedVehiclesForFleet($user)
+            ->whereKey($allIds)->pluck('assets.id')->map(fn (mixed $id): int => (int) $id)->all();
 
-            return response()->streamDownload(function () use ($exportQuery, $hasFleetFields) {
-                $handle = fopen('php://output', 'w');
-                $this->putCsv($handle, ['Name', 'Asset Tag', 'Status', 'Home Site', 'Online Status', 'Last Seen']);
-                foreach ($exportQuery->lazy(200) as $v) {
-                    $this->putCsv($handle, [
-                        $v->name,
-                        $v->asset_tag,
-                        $v->status,
-                        $hasFleetFields && $v->homeSite ? $v->homeSite->name : '',
-                        $v->fleetState?->status ?? 'offline',
-                        optional($v->fleetState?->last_seen_at)->format('Y-m-d H:i:s') ?? '',
-                    ]);
-                }
-                fclose($handle);
-            }, 'vehicles-export.csv');
-        }
-
-        // Status filter (online/offline based on fleet state)
-        if ($request->input('status') === 'online') {
-            $query->whereHas('fleetState', fn ($q) => $q->where('status', 'online'));
-        } elseif ($request->input('status') === 'offline') {
-            $query->where(function ($q) {
-                $q->whereDoesntHave('fleetState')
-                    ->orWhereHas('fleetState', fn ($sub) => $sub->where('status', '!=', 'online'));
-            });
+        if ($request->filled('status') && $request->input('status') !== 'all') {
+            $query->where('assets.status', (string) $request->input('status'));
         }
 
         // Search
         if ($request->filled('search')) {
-            $search = $request->input('search');
+            $search = addcslashes(mb_substr((string) $request->input('search'), 0, 150), '%_\\');
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('asset_tag', 'like', "%{$search}%");
+                    ->orWhere('asset_tag', 'like', "%{$search}%")
+                    ->orWhere('registration_number', 'like', "%{$search}%");
             });
         }
 
         // Site filter
-        if ($request->filled('site_id')) {
-            $query->where('site_id', (int) $request->input('site_id'));
+        if ($request->filled('site_id') && $request->input('site_id') !== 'all') {
+            $query->where(function ($q) use ($request) {
+                $id = (int) $request->input('site_id');
+                $q->where('home_site_id', $id)->orWhere(function ($other) use ($id) {
+                    $other->whereNull('home_site_id')->where('site_id', $id);
+                });
+            });
+        }
+        if ($request->filled('type') && $request->input('type') !== 'all') {
+            $query->where('body_type', (string) $request->input('type'));
+        }
+        if ($request->filled('capacity') && $request->input('capacity') !== 'all') {
+            $query->where('seating_capacity', '>=', max(1, (int) $request->input('capacity')));
+        }
+        if ($request->input('access') === 'wheelchair') {
+            $query->where(fn ($q) => $q->where('has_wheelchair_ramp', true)->orWhere('has_hoist', true));
         }
 
         // Sorting
@@ -135,19 +133,33 @@ class VehicleController extends Controller
         }
         $query->orderBy($sort, $direction);
 
+        // Export the same server-side filtered scope as the register, across
+        // all its pages. Coordinates and private booking data are not columns.
+        if ($request->input('export') === 'csv') {
+            $exportQuery = clone $query;
+            return response()->streamDownload(function () use ($exportQuery, $hasFleetFields) {
+                $handle = fopen('php://output', 'w');
+                $this->putCsv($handle, ['Name', 'Registration', 'Asset Tag', 'Status', 'Home Site', 'Type', 'Seats']);
+                foreach ($exportQuery->lazy(200) as $v) {
+                    $this->putCsv($handle, [
+                        $v->name, $v->registration_number, $v->asset_tag, $v->status,
+                        $hasFleetFields && $v->homeSite ? $v->homeSite->name : $v->site?->name,
+                        $v->body_type, $v->seating_capacity,
+                    ]);
+                }
+                fclose($handle);
+            }, 'vehicles-export.csv');
+        }
+
         $vehicles = $query->paginate(25)->withQueryString();
 
         // Central fleet oversight lists every vehicle, but a vehicle outside
         // the person's Sites shows no position unless the trip Site rule
         // allows it, and isn't offered for bulk Site or tracker actions.
-        $pageIds = $vehicles->getCollection()->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
-        $siteVehicleIds = $pageIds === [] ? [] : $this->deviceAccess->siteScopedVehiclesForFleet($user)
-            ->whereKey($pageIds)->pluck('assets.id')->map(fn (mixed $id): int => (int) $id)->all();
-        $positionVehicleIds = $pageIds === [] ? [] : FleetTripSiteScope::vehicles(array_values(array_map('intval',
-            $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS))))
-            ->whereKey($pageIds)->pluck('assets.id')->map(fn (mixed $id): int => (int) $id)->all();
-
-        $sites = $this->deviceAccess->accessibleSites($user)->orderBy('name')->get(['id', 'name']);
+        $positionIds = $this->location->visibleVehicleIds($user, $vehicles->getCollection()->pluck('id')->all());
+        $sites = $allVehicles->map(fn (Asset $vehicle) => $vehicle->homeSite ?? $vehicle->site)
+            ->filter()->unique('id')->sortBy('name')->values()
+            ->map(fn (Site $site): array => ['id' => (int) $site->id, 'name' => $site->name]);
 
         // Hero stats — whole-fleet counts (independent of filters/pagination).
         $heroTotal = (clone $visibleVehicles)->count();
@@ -205,7 +217,10 @@ class VehicleController extends Controller
         return Inertia::render('fleet-assets/vehicles/index', [
             'hero' => [
                 'total' => $heroTotal,
-                'available' => max(0, $heroTotal - $heroMaintenance - $heroInUse),
+                // Availability requires a vehicle, driver and exact interval
+                // assessment. A subtraction of these overlapping counts is not proof.
+                'available' => null,
+                'availability_label' => 'Assess for a selected trip and time',
                 'in_use' => $heroInUse,
                 'maintenance' => $heroMaintenance,
             ],
@@ -221,28 +236,46 @@ class VehicleController extends Controller
                 'open_alerts' => $openAlerts,
                 'critical_alerts' => $criticalAlerts,
             ],
+            'all_vehicles' => $allVehicles->map(function ($v) use ($siteVehicleIds) {
+                $home = $v->homeSite ?? $v->site;
+                return [
+                    'id' => (int) $v->id, 'name' => $v->name, 'asset_tag' => $v->asset_tag,
+                    'registration_number' => $v->registration_number, 'status' => $v->status,
+                    'body_type' => $v->body_type, 'seating_capacity' => $v->seating_capacity,
+                    'has_wheelchair_ramp' => (bool) $v->has_wheelchair_ramp,
+                    'has_hoist' => (bool) $v->has_hoist,
+                    'at_your_sites' => in_array((int) $v->id, $siteVehicleIds, true),
+                    'home_site' => $home ? ['id' => (int) $home->id, 'name' => $home->name] : null,
+                ];
+            })->values(),
             'vehicles' => [
-                'data' => $vehicles->getCollection()->map(function ($v) use ($hasFleetFields, $siteVehicleIds, $positionVehicleIds) {
+                'data' => $vehicles->getCollection()->map(function ($v) use ($hasFleetFields, $siteVehicleIds, $positionIds, $user) {
                     $atYourSites = in_array((int) $v->id, $siteVehicleIds, true);
-                    $position = $atYourSites || in_array((int) $v->id, $positionVehicleIds, true);
+                    $location = $this->location->fleetMapState($user, $v, in_array((int) $v->id, $positionIds, true));
+                    $position = $location['position'];
 
                     return [
                         'id' => $v->id,
                         'name' => $v->name,
                         'asset_tag' => $v->asset_tag,
                         'status' => $v->status,
+                        'registration_number' => $v->registration_number,
+                        'body_type' => $v->body_type,
+                        'seating_capacity' => $v->seating_capacity,
+                        'has_wheelchair_ramp' => (bool) $v->has_wheelchair_ramp,
+                        'has_hoist' => (bool) $v->has_hoist,
                         'at_your_sites' => $atYourSites,
-                        'home_site' => $hasFleetFields && $v->homeSite ? [
-                            'id' => $v->homeSite->id,
-                            'name' => $v->homeSite->name,
+                        'home_site' => ($v->homeSite ?? $v->site) ? [
+                            'id' => ($v->homeSite ?? $v->site)->id,
+                            'name' => ($v->homeSite ?? $v->site)->name,
                         ] : null,
                         'state' => $v->fleetState ? [
                             'status' => $v->fleetState->status,
                             'last_seen_at' => optional($v->fleetState->last_seen_at)->toISOString(),
-                            'lat' => $position ? $v->fleetState->latitude : null,
-                            'lng' => $position ? $v->fleetState->longitude : null,
-                            'speed_kph' => $position ? $v->fleetState->speed_kph : null,
-                            'battery_pct' => $v->fleetState->battery_pct,
+                            'lat' => $position['lat'] ?? null,
+                            'lng' => $position['lng'] ?? null,
+                            'speed_kph' => $position['speed_kph'] ?? null,
+                            'battery_pct' => $position['battery_pct'] ?? null,
                         ] : null,
                     ];
                 })->values(),
@@ -254,7 +287,8 @@ class VehicleController extends Controller
                 ],
             ],
             'sites' => $sites,
-            'filters' => $request->only(['status', 'search', 'site_id']),
+            'assignment_sites' => $this->deviceAccess->accessibleSites($user)->orderBy('name')->get(['id', 'name']),
+            'filters' => $request->only(['status', 'search', 'site_id', 'type', 'capacity', 'access']),
             'can' => [
                 'manage' => $this->canManageFleet($user),
             ],

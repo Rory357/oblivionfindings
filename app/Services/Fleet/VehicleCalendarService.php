@@ -441,11 +441,11 @@ class VehicleCalendarService
             ->whereNotIn('status', ['cancelled', 'rejected'])
             ->where('starts_at', '<', $end->utc())->where('ends_at', '>', $start->utc())
             ->orderBy('starts_at')->limit(500)
-            ->get(['id', 'reference_number', 'purpose', 'status', 'starts_at', 'ends_at']);
+            ->get(['id', 'reference_number', 'purpose', 'status', 'user_id', 'starts_at', 'ends_at', 'lock_version']);
         $visible = $this->bookings->accessibleBookings($viewer)->whereKey($rows->pluck('id'))->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)->all();
 
-        return $rows->map(function (FleetVehicleBooking $booking) use ($visible): array {
+        return $rows->map(function (FleetVehicleBooking $booking) use ($visible, $viewer): array {
             $starts = CarbonImmutable::parse($booking->starts_at)->setTimezone(self::ZONE);
             $ends = CarbonImmutable::parse($booking->ends_at)->setTimezone(self::ZONE);
             if (! in_array((int) $booking->id, $visible, true)) {
@@ -457,7 +457,7 @@ class VehicleCalendarService
             }
             $label = $this->bookingLabel($booking);
 
-            return $this->item(
+            $item = $this->item(
                 id: 'booking:'.$booking->id, kind: 'booking', source: 'respite',
                 title: ($booking->purpose ?: 'Booking').' · '.$label,
                 start: $starts, end: $ends, allDay: false,
@@ -467,6 +467,11 @@ class VehicleCalendarService
                 statusLabel: $label, ref: $booking->reference_number, recordId: (int) $booking->id,
                 link: '/fleet-assets/bookings/'.$booking->id, desc: null,
             );
+            $item['editable'] = in_array($booking->status, ['pending', 'approved'], true)
+                && ($viewer->canDo('fleet.manage') || ((int) $booking->user_id === (int) $viewer->id && $booking->status === 'pending'));
+            $item['version'] = (int) $booking->lock_version;
+
+            return $item;
         })->all();
     }
 

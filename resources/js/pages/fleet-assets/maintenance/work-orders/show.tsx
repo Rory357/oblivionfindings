@@ -21,6 +21,7 @@ import { ReviewCard, ReviewRow, WizardShell, WizardStepPane, type WizardStep } f
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/fleet-utils';
 import { formatDateOnly } from '@/lib/datetime';
+import { fleetReturnFromLocation } from '@/lib/fleet-return';
 import { Head, Link, router } from '@inertiajs/react';
 import { CalendarDays, ClipboardCheck, Clock, Eye, FileText, History, MessageSquare, ShieldCheck, Truck, UserRound, Wrench } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -337,7 +338,7 @@ export default function WorkOrderShow({ work_order: work, actions, checks, repor
         { title: work.reference_number ?? `Work ${work.id}`, href: '#' }]}>
         <Head title={`${work.reference_number ?? 'Work order'} · ${work.title}`} />
         <PageShell>
-            <PageHeader variant="profile" icon={Wrench} backHref={vehicleReturn() ?? '/fleet-assets/maintenance/work-orders'} wrapTitle className="overflow-clip!"
+            <PageHeader variant="profile" icon={Wrench} backHref={fleetReturnFromLocation() ?? vehicleReturn() ?? '/fleet-assets/maintenance/work-orders'} wrapTitle className="overflow-clip!"
                 title={work.reference_number ?? `WO-${work.id}`}
                 titleChip={<PageHeaderStatusChip variant={assetHeld ? 'critical' : work.status === 'completed' ? 'success' : 'warning'}>
                     {assetHeld ? 'Restricted' : label(work.status)}</PageHeaderStatusChip>}

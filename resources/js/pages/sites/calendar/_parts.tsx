@@ -31,6 +31,7 @@ import {
     ClipboardList,
     Clock,
     Dot,
+    GripVertical,
     Hammer,
     HardHat,
     KeyRound,
@@ -59,6 +60,7 @@ import {
     type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { bindProtectedPress } from './protected-press';
 import { CalendarDayHeading } from './work-schedule';
 export { CalendarWorkRows, WorkSchedule } from './work-schedule';
 export type { CalendarWorkEntry } from './work-schedule';
@@ -578,7 +580,9 @@ export function CalendarContextMenu({
                 .filter((section) => section.items.length > 0 || section.note)
                 .map((section, index) => (
                     <Fragment key={section.key}>
-                        {index > 0 && <div className="my-1 h-px bg-border/60" />}
+                        {index > 0 && (
+                            <div className="my-1 h-px bg-border/60" />
+                        )}
                         {section.note && (
                             <p className="px-2 py-1 text-[11px] text-muted-foreground">
                                 {section.note}
@@ -918,9 +922,12 @@ export function CalendarTimeSlot({ day, hour }: { day: Date; hour: number }) {
     const time = new Date(day);
     time.setHours(hour, 0, 0, 0);
     return (
-        <GuardrailButton unstyled
+        <GuardrailButton
+            unstyled
             type="button"
             data-calendar-slot
+            data-calendar-day={`${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`}
+            data-calendar-hour={hour}
             tabIndex={hour === 9 ? 0 : -1}
             aria-label={`Create entry on ${time.toLocaleString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' })}`}
             className="block w-full border-b border-border/60 text-left hover:bg-primary/5 focus-visible:relative focus-visible:z-10 focus-visible:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
@@ -1000,9 +1007,16 @@ type Packed = Decorated & {
 };
 
 export function occursOnDay(entry: Decorated, day: Date): boolean {
-    const start = new Date(day); start.setHours(0, 0, 0, 0);
-    const end = new Date(start); end.setDate(end.getDate() + 1);
-    return entry._start < end && (entry._end && entry._end > entry._start ? entry._end > start : entry._start >= start);
+    const start = new Date(day);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return (
+        entry._start < end &&
+        (entry._end && entry._end > entry._start
+            ? entry._end > start
+            : entry._start >= start)
+    );
 }
 
 export function packDay(list: Decorated[], day: Date): Packed[] {
@@ -1038,10 +1052,16 @@ export function packDay(list: Decorated[], day: Date): Packed[] {
         clusterEnd = -1;
     };
     evs.forEach((e) => {
-        const boundary = new Date(day); boundary.setHours(0, 0, 0, 0);
-        const next = new Date(boundary); next.setDate(next.getDate() + 1);
+        const boundary = new Date(day);
+        boundary.setHours(0, 0, 0, 0);
+        const next = new Date(boundary);
+        next.setDate(next.getDate() + 1);
         const s = e._start < boundary ? 0 : minutes(e._start);
-        const en = e._end ? (e._end >= next ? 1440 : minutes(e._end)) : Math.min(s + 45, 1440);
+        const en = e._end
+            ? e._end >= next
+                ? 1440
+                : minutes(e._end)
+            : Math.min(s + 45, 1440);
         e._s = s;
         e._e = en;
         if (cluster.length && s >= clusterEnd) flush();
@@ -1054,8 +1074,7 @@ export function packDay(list: Decorated[], day: Date): Packed[] {
 
 function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
     const ui = useCalUI();
-    const { colorBy, srcByKey, onSelect, onMove, onPreview, onPreviewEnd } =
-        ui;
+    const { colorBy, srcByKey, onSelect, onMove, onPreview, onPreviewEnd } = ui;
     const top = topFor(ev._s);
     const canDrag =
         !!onMove &&
@@ -1080,7 +1099,14 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
         if (e.button !== 0) return;
         onPreviewEnd?.();
         if (!canDrag || !onMove) {
-            if (mode === 'move') onSelect(ev);
+            if (mode === 'move') {
+                dragCleanup.current?.();
+                dragCleanup.current = bindProtectedPress(
+                    e,
+                    e.currentTarget,
+                    () => onSelect(ev),
+                );
+            }
             return;
         }
         e.preventDefault();
@@ -1144,9 +1170,16 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
             role="button"
             tabIndex={0}
             aria-label={ariaLabel}
+            aria-description={
+                canDrag
+                    ? 'Drag to propose a change, or press Enter for details.'
+                    : 'Cannot move. Short click or press Enter for details.'
+            }
+            data-calendar-editable={!!canDrag}
             onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
+                    dragCleanup.current?.();
                     onPreviewEnd?.();
                     onSelect(ev);
                 }
@@ -1181,9 +1214,20 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
                 <span className="tnum truncate text-[10px] font-semibold">
                     {fmtTime(ev._start)}
                 </span>
+                {canDrag ? (
+                    <GripVertical
+                        aria-hidden="true"
+                        className="ml-auto h-2.5 w-2.5 shrink-0"
+                    />
+                ) : (
+                    <Lock
+                        aria-hidden="true"
+                        className="ml-auto h-2.5 w-2.5 shrink-0"
+                    />
+                )}
                 <RecurGlyph
                     ev={ev}
-                    className="ml-auto h-2.5 w-2.5 shrink-0 opacity-60"
+                    className="h-2.5 w-2.5 shrink-0 opacity-60"
                 />
             </div>
             <div
@@ -1191,6 +1235,11 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
             >
                 {ev.title}
             </div>
+            {!canDrag && w >= 45 && liveH > 52 && (
+                <div className="truncate text-[10px] text-muted-foreground">
+                    Cannot move
+                </div>
+            )}
             {!compact && liveH > 52 && ev.room && (
                 <div className="mt-0.5 flex items-center gap-1 text-[10.5px] text-muted-foreground">
                     <MapPin className="h-2.5 w-2.5" />
@@ -1256,7 +1305,9 @@ function AllDayRow({
                                         onPreviewEnd?.();
                                         onSelect(e);
                                     }}
-                                    onContextMenu={(event) => contextEntry(event, e, ui)}
+                                    onContextMenu={(event) =>
+                                        contextEntry(event, e, ui)
+                                    }
                                     style={cv(e, colorBy)}
                                     aria-label={`${e.title}, all day, ${d.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}`}
                                     className="flex w-full items-center gap-1 rounded border px-1.5 py-1 text-left text-[11px] font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
@@ -1662,7 +1713,8 @@ export function WeekView({
                     </div>
                     {days.map((d, i) => {
                         const packed = packDay(
-                            events.filter((e) => occursOnDay(e, d)), d,
+                            events.filter((e) => occursOnDay(e, d)),
+                            d,
                         );
                         return (
                             <div
@@ -1721,7 +1773,11 @@ export function DayView({
             className="flex h-full flex-col overflow-hidden rounded-xl border bg-card"
         >
             <CalendarDayHeading
-                date={Date.UTC(day.getFullYear(), day.getMonth(), day.getDate())}
+                date={Date.UTC(
+                    day.getFullYear(),
+                    day.getMonth(),
+                    day.getDate(),
+                )}
                 caption={`${dayEvents.length} ${dayEvents.length === 1 ? 'entry' : 'entries'} scheduled`}
             />
             <AllDayRow days={[day]} events={events} padRight={sbw} />
@@ -1784,7 +1840,8 @@ export function AgendaView({
     const inMonth = events
         .filter(
             (e) =>
-                e._start < monthEnd && (e._end ? e._end > monthStart : e._start >= monthStart),
+                e._start < monthEnd &&
+                (e._end ? e._end > monthStart : e._start >= monthStart),
         )
         .sort((a, b) => a._start.getTime() - b._start.getTime());
     const groups: { key: string; date: Date; items: Decorated[] }[] = [];
@@ -1852,7 +1909,9 @@ export function AgendaView({
                                     unstyled
                                     key={e.id}
                                     onClick={() => onSelect(e)}
-                                    onContextMenu={(event) => contextEntry(event, e, ui)}
+                                    onContextMenu={(event) =>
+                                        contextEntry(event, e, ui)
+                                    }
                                     className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40"
                                 >
                                     <span className="tnum w-20 shrink-0 text-[12px] font-medium text-muted-foreground">
@@ -2039,7 +2098,15 @@ export function TimelineView({
                                                                     onPreviewEnd?.();
                                                                     onSelect(e);
                                                                 }}
-                                                                onContextMenu={(event) => contextEntry(event, e, ui)}
+                                                                onContextMenu={(
+                                                                    event,
+                                                                ) =>
+                                                                    contextEntry(
+                                                                        event,
+                                                                        e,
+                                                                        ui,
+                                                                    )
+                                                                }
                                                                 onMouseEnter={(
                                                                     me,
                                                                 ) =>
