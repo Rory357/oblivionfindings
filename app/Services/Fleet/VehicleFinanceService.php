@@ -266,14 +266,29 @@ class VehicleFinanceService
      *
      * @param  array<string,mixed>  $data
      */
-    public function createRequest(User $actor, int $assetId, array $data, string $requestKey): FleetFinanceReviewRequest
+    public function createRequest(User $actor, int $assetId, array $data, string $requestKey, bool $assetProfile = false): FleetFinanceReviewRequest
     {
         self::assertKey($requestKey);
         $values = $this->validRequest($data);
         $fingerprint = MaintenanceFingerprint::of(['actor' => (int) $actor->id, 'asset' => $assetId, 'request' => $values]);
 
-        $request = $this->guardDuplicate(fn (): FleetFinanceReviewRequest => DB::transaction(function () use ($actor, $assetId, $values, $requestKey, $fingerprint): FleetFinanceReviewRequest {
-            [$current, $asset] = $this->resolve($actor, $assetId, 'fleet.manage');
+        $request = $this->guardDuplicate(fn (): FleetFinanceReviewRequest => DB::transaction(function () use ($actor, $assetId, $values, $requestKey, $fingerprint, $assetProfile): FleetFinanceReviewRequest {
+            if ($assetProfile) {
+                $current = User::findOrFail($actor->id);
+                abort_unless($this->canView($current), 403);
+                $asset = $this->access->assignableAsset($current, $assetId, true) ?? abort(404);
+                Gate::forUser($current)->authorize('update', $asset);
+                abort_if(Asset::vehicles()->whereKey($asset->id)->exists() || $asset->status === 'retired', 409, 'Use the current source profile for this record.');
+                if (str_starts_with($values['source'], 'work_order:')) {
+                    $maintenance = app(MaintenanceAccessService::class);
+                    abort_unless($maintenance->canRead($current) && $maintenance->scopedWorkOrders($current)->where('asset_id', $assetId)->whereKey((int) substr($values['source'], 11))->exists(), 404);
+                }
+                if ($values['existing_document_id']) {
+                    abort_unless(AssetDocument::where('asset_id', $assetId)->whereKey($values['existing_document_id'])->where('state', 'available')->whereNull('archived_at')->exists(), 404);
+                }
+            } else {
+                [$current, $asset] = $this->resolve($actor, $assetId, 'fleet.manage');
+            }
             $prior = FleetFinanceReviewRequest::query()->where('asset_id', $asset->id)->where('request_key', $requestKey)->lockForUpdate()->first();
             if ($prior) {
                 abort_unless(hash_equals((string) $prior->request_fingerprint, $fingerprint), 409, 'This request was already used for a different Finance review request.');
@@ -497,7 +512,9 @@ class VehicleFinanceService
 
     public static function vehicleLabel(Asset $asset): string
     {
-        return ($asset->registration_number ?: $asset->name).' · Vehicle record';
+        $kind = $asset->category === 'vehicle' || $asset->categoryRef?->slug === 'vehicle' ? 'Vehicle' : 'Asset';
+
+        return ($asset->registration_number ?: $asset->name)." · {$kind} record";
     }
 
     public static function workOrderLabel(FleetWorkOrder $order): string
@@ -693,7 +710,7 @@ class VehicleFinanceService
         }
         [$type, $id] = array_pad(explode(':', $value, 2), 2, '');
         $id = ctype_digit($id) ? (int) $id : 0;
-        $invalid = ValidationException::withMessages(['source' => 'Choose a source record that belongs to this vehicle.']);
+        $invalid = ValidationException::withMessages(['source' => 'Choose a source record that belongs to this asset or vehicle.']);
         if ($id < 1) {
             throw $invalid;
         }
@@ -732,7 +749,7 @@ class VehicleFinanceService
                     ->whereColumn('asset_document_sets.current_revision', 'asset_documents.revision'))
                 ->exists();
         if (! $valid) {
-            throw ValidationException::withMessages(['existing_document_id' => 'Choose a current document from this vehicle.']);
+            throw ValidationException::withMessages(['existing_document_id' => 'Choose a current document from this source profile.']);
         }
 
         return $documentId;

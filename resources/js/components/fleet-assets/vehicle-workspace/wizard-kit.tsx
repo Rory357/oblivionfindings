@@ -58,6 +58,7 @@ export function WorkspaceWizard({
     errorKey,
     discardDescription = 'Unsent changes will be removed.',
     freeNavigation = false,
+    maxWidth,
     children,
 }: {
     title: string;
@@ -84,6 +85,7 @@ export function WorkspaceWizard({
     discardDescription?: string;
     /** Section navigation is free; Continue and Submit still validate. */
     freeNavigation?: boolean;
+    maxWidth?: string;
     children: ReactNode;
 }) {
     const [discard, setDiscard] = useState(false);
@@ -109,6 +111,7 @@ export function WorkspaceWizard({
         <>
             <WizardShell
                 open
+                maxWidth={maxWidth}
                 onClose={close}
                 title={title}
                 description={description}
@@ -375,7 +378,7 @@ export function StagedFilesField({
                 </p>
             )}
             {files.length > 0 && (
-                <div className="grid gap-2">
+                <div className="grid grid-cols-1 gap-2">
                     {files.map((file, index) => (
                         <StagedFileCard
                             key={`${file.name}-${file.size}-${file.lastModified}-${index}`}

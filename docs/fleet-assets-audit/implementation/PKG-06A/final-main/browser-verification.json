@@ -1,0 +1,22 @@
+{
+  "SourceCommit": "2d88fdd73d272d062ca8d77b7e951ef2ede8c607",
+  "PublishedMainBase": "79ea01a561f7d2fa5affa592dc096f516d663635",
+  "SourceWorktree": "6421",
+  "Host": "http://127.0.0.1:8774",
+  "SyntheticData": true,
+  "Theme": "dark",
+  "CapturedAt": "2026-09-27T05:03:32.2954209Z",
+  "AssetsEntryObserved": "/build/assets/index-CaAGLVia.js",
+  "BuildManifestSHA256": "20283b14868876b50279a23298c5c701056a8f40334e64f65101a12c3583166b",
+  "PublicHotPresent": false,
+  "BrowserWarningsAndErrors": [],
+  "DialogCountAfterClose": 0,
+  "InventoryAccessibleSearchCount": 1,
+  "InventoryRowCountIncludingHeader": 6,
+  "Screenshots": [
+    "inventory.png",
+    "stocktake-hub.png",
+    "completed-stocktake.png"
+  ],
+  "PhoneTesting": "Deferred by user"
+}

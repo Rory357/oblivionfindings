@@ -19,7 +19,9 @@ class ClientLocationAccessService
     {
         $otherClient = fn (Builder $asset) => $asset->whereNotNull('client_id')->where('client_id', '!=', $client->id);
 
-        return AssetGeofence::query()->eligibleForClientSite($siteId)
+        return AssetGeofence::query()->where('site_id', $siteId)->whereNull('retired_at')
+            ->where(fn (Builder $eligible) => $eligible->where('client_location_eligible', true)
+                ->orWhere(fn (Builder $legacy) => $legacy->where('is_active', true)->whereIn('scope', ['house', 'resident'])))
             ->whereDoesntHave('asset', $otherClient)
             ->whereDoesntHave('assignedAssets', $otherClient);
     }

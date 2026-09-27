@@ -56,7 +56,7 @@ describe('Fleet vehicle freshness', () => {
                     },
                 ]}
                 sites={[]}
-                hero={{ total: 1, available: 1, in_use: 0, maintenance: 0 }}
+                hero={{ total: 1, available: null, in_use: 0, maintenance: 0 }}
                 compliance={{
                     wof_due: 0,
                     wof_expired: 0,
@@ -73,7 +73,9 @@ describe('Fleet vehicle freshness', () => {
             />,
         );
 
-        expect(screen.getByText('Last seen: Sat 2 May, 4:30 pm')).toBeVisible();
+        expect(
+            screen.getByText('Tracker report Sat 2 May, 4:30 pm'),
+        ).toBeVisible();
         expect(screen.queryByText(/2026-05-02T04:30:19/)).toBeNull();
     });
 });

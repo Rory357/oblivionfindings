@@ -1,0 +1,30 @@
+{
+  "date": "2026-09-27",
+  "source": "8821-implementation",
+  "url": "http://127.0.0.1:8905/fleet-assets/assets/1",
+  "environment": "Isolated PID-owned MySQL fixture, synthetic records, real Laravel/Inertia production build",
+  "checks": [
+    "Real two-page PDF rendered with page navigation, zoom and extracted page text",
+    "Downloaded original manual matched source SHA-256",
+    "Real image rendered in the shared file viewer",
+    "Dispatch retained original placement until actual receipt",
+    "Both kit items explicitly acknowledged before receipt moved the asset to Rimu House",
+    "Receipt success and immutable history visible",
+    "Observation draft cancellation requested discard confirmation",
+    "Location view kept placement, manual observation and tracking separate",
+    "390x844 mobile layout had no horizontal overflow",
+    "QR printable PDF rendered in nested shared viewer, with focus returning to its trigger",
+    "Downloaded actual QR label PDF: 20,034 bytes, one A4 page, AS-104 present in extracted content",
+    "Actual PDF upload saved as scan_unavailable with no download and retained its record on retry",
+    "Finance request reviewed before submission, then appeared in the canonical Finance queue",
+    "Finance requester had no decision controls and the source link returned to the Asset Profile"
+  ],
+  "manualDownloadSha256": "f622b50181eb97fefaa7ba126c147cdee9a0278140af5abdc1d1d9289beade9c",
+  "screenshots": ["file-preview.png", "finance-review.png", "finance-section.png", "mobile-custody.png"],
+  "limitations": [
+    "No physical label printer or phone scanner tested",
+    "Malware scanner intentionally not configured in the browser fixture; clean publication covered by explicit scanner test double",
+    "Multiple-asset bulk export remains in the separate PKG-06A branch",
+    "No live migration or deployment"
+  ]
+}

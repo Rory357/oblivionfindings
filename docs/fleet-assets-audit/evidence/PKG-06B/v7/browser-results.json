@@ -1,0 +1,103 @@
+{
+  "checks": [
+    {
+      "name": "Valuation and linked service costs",
+      "status": "passed"
+    },
+    {
+      "name": "Search and pending filter",
+      "status": "passed"
+    },
+    {
+      "name": "Record details and nested source trail",
+      "status": "passed"
+    },
+    {
+      "name": "Shared cards view",
+      "status": "passed"
+    },
+    {
+      "name": "Required review description",
+      "status": "passed"
+    },
+    {
+      "name": "Duplicate request guard and source return",
+      "status": "passed"
+    },
+    {
+      "name": "Unsaved Finance review guard",
+      "status": "passed"
+    },
+    {
+      "name": "Local review submission updates queue",
+      "status": "passed"
+    },
+    {
+      "name": "Link selection required",
+      "status": "passed"
+    },
+    {
+      "name": "Purchase order link does not double count costs",
+      "status": "passed"
+    },
+    {
+      "name": "Finance access hides references and amounts",
+      "status": "passed"
+    },
+    {
+      "name": "Invoice access independently hides spend and requests",
+      "status": "passed"
+    },
+    {
+      "name": "Unavailable source is not zero",
+      "status": "passed"
+    },
+    {
+      "name": "Unlinked record recovery",
+      "status": "passed"
+    },
+    {
+      "name": "Old snapshot retains dates and excludes current transactions",
+      "status": "passed"
+    },
+    {
+      "name": "Conflicting fixed-asset values are suppressed",
+      "status": "passed"
+    },
+    {
+      "name": "Finance disposal points to operational dependencies",
+      "status": "failed",
+      "error": "Error: Retirement handoff failed"
+    },
+    {
+      "name": "Retirement destination corrected",
+      "status": "passed"
+    },
+    {
+      "name": "Read-only disables Finance mutations",
+      "status": "passed"
+    },
+    {
+      "name": "Client-owned financial privacy",
+      "status": "passed"
+    },
+    {
+      "name": "Archived asset shows Finance reconciliation",
+      "status": "passed"
+    },
+    {
+      "name": "Local request survives profile navigation",
+      "status": "passed"
+    },
+    {
+      "name": "Search empty state and recovery",
+      "status": "passed"
+    },
+    {
+      "name": "Request preserves its original author",
+      "status": "passed"
+    }
+  ],
+  "runtimeErrors": [],
+  "verification": "Keyboard interaction; desktop viewport inspection at 1600x1000 and 1024x768. Final full overview captured at 1600x2040. Native viewport restored. Pointer interaction and genuine browser zoom not verified."
+}

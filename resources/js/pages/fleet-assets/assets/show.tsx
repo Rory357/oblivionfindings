@@ -2,6 +2,8 @@ import {
     AssetFinanceTechnologyProjectionPanel,
     type AssetFinanceTechnologyProjection,
 } from '@/components/assets/asset-finance-technology-projection';
+import type { ProfileWorkspace } from '@/components/assets/profile/types';
+import { AssetProfileWorkspace } from '@/components/assets/profile/workspace';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
@@ -591,7 +593,8 @@ type ServiceSchedule = {
     next_due_at: string | null;
 };
 
-type Props = {
+export type Props = {
+    workspace?: ProfileWorkspace;
     active_maintenance_restrictions: number;
     can_manage_assignments: boolean;
     assignment_targets: Array<{
@@ -641,6 +644,7 @@ type Props = {
         documents: Document[];
         vehicle_documents: VehicleDocuments | null;
         assignments: Assignment[];
+        current_assignment: Assignment | null;
         archived_alerts: Alert[];
         work_orders: WorkOrder[];
         service_schedules: ServiceSchedule[];
@@ -658,6 +662,7 @@ type Props = {
         current_holder_name: string | null;
     } | null;
     can_view_hr_assets: boolean;
+    boundaries_href?: string | null;
     asset_finance_technology: AssetFinanceTechnologyProjection;
     /** Option lists for the edit wizard. */
     sites?: Array<{ id: number; name: string }>;
@@ -703,7 +708,15 @@ function isExpired(dateStr: string | null): boolean {
     return new Date(dateStr) < new Date();
 }
 
-export default function AssetShow({
+export default function AssetShow(props: Props) {
+    return props.workspace ? (
+        <AssetProfileWorkspace {...props} workspace={props.workspace} />
+    ) : (
+        <LegacyAssetShow {...props} />
+    );
+}
+
+function LegacyAssetShow({
     asset,
     active_maintenance_restrictions,
     can_manage_assignments,
@@ -711,6 +724,7 @@ export default function AssetShow({
     timeline,
     hr_asset,
     can_view_hr_assets,
+    boundaries_href,
     asset_finance_technology,
     sites,
     clients,
@@ -769,7 +783,7 @@ export default function AssetShow({
     const alerts = asset?.archived_alerts ?? [];
     const work_orders = asset?.work_orders ?? [];
     const service_schedules = asset?.service_schedules ?? [];
-    const can_edit = true;
+    const can_edit = false;
     const [assignmentTarget, setAssignmentTarget] = useState('');
     const [targetSearch, setTargetSearch] = useState(() =>
         typeof window === 'undefined'
@@ -1390,6 +1404,7 @@ export default function AssetShow({
 
                             <div className="space-y-4">
                                 {/* Location Map */}
+                                {boundaries_href && <Button asChild variant="outline"><Link href={boundaries_href}><MapPin/>Open in Maps & boundaries</Link></Button>}
                                 {trackerMarkers.length > 0 && (
                                     <Card>
                                         <CardHeader>
@@ -2042,6 +2057,7 @@ export default function AssetShow({
                                                                             !verifiedReceived
                                                                         }
                                                                         onClick={() =>
+                                                                            asset.current_assignment &&
                                                                             confirmReceipt(
                                                                                 asset.current_assignment,
                                                                             )

@@ -1,0 +1,7 @@
+{
+  "checkedAtUtc": "2026-09-26T12:09:54.615Z",
+  "v1ManifestSha256": "3c8059ce129d39e94fc261550c29e836356b4fff84d63fb8bb80b9e3c54b43f3",
+  "filesChecked": 94,
+  "mismatches": [],
+  "note": "Original v1 page is included in the original manifest; v2-v5 use separate directories."
+}

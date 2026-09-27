@@ -3,6 +3,9 @@
 use App\Http\Controllers\Fleet\FleetTripController;
 use App\Http\Controllers\FleetAssets\AlertController;
 use App\Http\Controllers\FleetAssets\AssetController;
+use App\Http\Controllers\FleetAssets\AssetImportController;
+use App\Http\Controllers\FleetAssets\AssetLabelController;
+use App\Http\Controllers\FleetAssets\AssetStocktakeController;
 use App\Http\Controllers\FleetAssets\ChecklistController;
 use App\Http\Controllers\FleetAssets\CommunityAccessController;
 use App\Http\Controllers\FleetAssets\ComplianceController;
@@ -48,6 +51,24 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
+    Route::middleware('permission:assets.viewAny|assets.viewAssigned')->prefix('asset-register')->group(function () {
+        Route::get('/labels/workspace', [AssetLabelController::class, 'workspace'])->name('fleet-assets.asset-labels.workspace');
+        Route::get('/rooms', [AssetController::class, 'rooms']);
+        Route::get('/stocktakes', [AssetStocktakeController::class, 'index']);
+        Route::get('/stocktake-checklist', [AssetStocktakeController::class, 'checklist']);
+        Route::post('/stocktakes', [AssetStocktakeController::class, 'store']);
+        Route::get('/stocktakes/{stocktake}', [AssetStocktakeController::class, 'show'])->whereNumber('stocktake');
+        Route::patch('/stocktakes/{stocktake}', [AssetStocktakeController::class, 'update'])->whereNumber('stocktake');
+        Route::post('/stocktakes/{stocktake}/resolve', [AssetStocktakeController::class, 'resolve'])->whereNumber('stocktake');
+        Route::get('/stocktakes/{stocktake}/export/{format}', [AssetStocktakeController::class, 'export'])->whereNumber('stocktake');
+        Route::get('/imports', [AssetImportController::class, 'index']);
+        Route::post('/imports', [AssetImportController::class, 'store']);
+        Route::get('/imports/{batch}', [AssetImportController::class, 'show'])->whereNumber('batch');
+        Route::patch('/imports/{batch}', [AssetImportController::class, 'update'])->whereNumber('batch');
+        Route::get('/labels', [AssetLabelController::class, 'index']);
+        Route::post('/labels', [AssetLabelController::class, 'store']);
+        Route::get('/labels/{batch}/{format}', [AssetLabelController::class, 'download'])->whereNumber('batch');
+    });
     // Retain the old URL only as a compatibility redirect into the desktop web workspace.
     Route::middleware('permission:fleet.viewAny|assets.viewAny|assets.viewAssigned')->group(function () {
         Route::redirect('/mobile/dashboard', '/fleet-assets')->name('fleet-assets.mobile.dashboard');
@@ -65,6 +86,8 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     // Vehicles — read (reuses fleet permissions)
     Route::middleware('permission:fleet.viewAny')->group(function () {
         Route::get('/vehicles', [VehicleController::class, 'index'])->name('fleet-assets.vehicles.index');
+        Route::get('/vehicles/fleet-calendar/events', [VehicleCalendarController::class, 'fleetEvents'])->name('fleet-assets.vehicles.fleet-calendar.events');
+        Route::get('/vehicles/fleet-map/data', [VehicleCalendarController::class, 'fleetMap'])->name('fleet-assets.vehicles.fleet-map.data');
         Route::get('/vehicles/{asset}', [VehicleController::class, 'show'])->whereNumber('asset')->name('fleet-assets.vehicles.show');
         Route::get('/vehicles/{asset}/alerts-config', [VehicleController::class, 'alertsConfig'])->whereNumber('asset')->name('fleet-assets.vehicles.alerts-config');
         Route::get('/trips', [VehicleController::class, 'trips'])->name('fleet-assets.trips.index');
@@ -407,10 +430,28 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     // Geofences — read
     Route::middleware('permission:fleet.viewAny|assets.geofences.manage')->group(function () {
         Route::get('/geofences', [GeofenceController::class, 'index'])->name('fleet-assets.geofences.index');
+        Route::get('/geofences/catalogue', [GeofenceController::class, 'catalogue']);
+        Route::get('/geofences/summary', [GeofenceController::class, 'summary']);
+        Route::get('/geofences/sites', [GeofenceController::class, 'sites']);
+        Route::get('/geofences/resources', [GeofenceController::class, 'resources']);
+        Route::get('/geofences/rules', [GeofenceController::class, 'rules']);
+        Route::get('/geofences/events', [GeofenceController::class, 'events']);
+        Route::get('/geofences/handoffs/{token}', [GeofenceController::class, 'handoff']);
+        Route::post('/geofences/handoffs/{token}/return', [GeofenceController::class, 'returnBoundary']);
+        Route::get('/geofences/{geofence}', [GeofenceController::class, 'show'])->whereNumber('geofence');
+        Route::get('/geofences/{geofence}/history', [GeofenceController::class, 'history'])->whereNumber('geofence');
+        Route::get('/geofences/{geofence}/rule-history', [GeofenceController::class, 'ruleHistory'])->whereNumber('geofence');
+        Route::get('/geofences/{geofence}/versions/{revision}', [GeofenceController::class, 'version'])->whereNumber(['geofence', 'revision']);
     });
 
     // Geofences — write
     Route::middleware('permission:assets.geofences.manage|fleet.manage')->group(function () {
+        Route::post('/geofences/address-search', [GeofenceController::class, 'addresses'])->middleware('throttle:20,1');
+        Route::post('/geofences/{geofence}/legacy-links', [GeofenceController::class, 'legacyLinks'])->whereNumber('geofence');
+        Route::get('/geofences/{geofence}/history/export', [GeofenceController::class, 'export'])->whereNumber('geofence');
+        Route::post('/geofences/rules', [GeofenceController::class, 'storeRule']);
+        Route::put('/geofences/rules/{assignment}', [GeofenceController::class, 'updateRule'])->whereNumber('assignment');
+        Route::delete('/geofences/rules/{assignment}', [GeofenceController::class, 'removeRule'])->whereNumber('assignment');
         Route::get('/geofences/create', [GeofenceController::class, 'create'])->name('fleet-assets.geofences.create');
         Route::post('/geofences', [GeofenceController::class, 'store'])->name('fleet-assets.geofences.store');
         Route::get('/geofences/{geofence}/edit', [GeofenceController::class, 'edit'])->whereNumber('geofence')->name('fleet-assets.geofences.edit');
@@ -506,6 +547,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     // Resident Transports (view & create)
     Route::middleware('permission:fleet.viewAny|assets.viewAny')->group(function () {
         Route::get('/transports/workspace/options', [TransportWorkspaceController::class, 'options'])->name('fleet-assets.transports.workspace.options');
+        Route::post('/transports/workspace/address-search', [TransportWorkspaceController::class, 'addressSearch'])->middleware('throttle:20,1')->name('fleet-assets.transports.workspace.address-search');
         Route::get('/transports/workspace/export', [TransportWorkspaceController::class, 'export'])->name('fleet-assets.transports.workspace.export');
         Route::post('/transports/requests', [TransportWorkspaceController::class, 'store'])->name('fleet-assets.transports.requests.store');
         Route::get('/transports/requests/{transportRequest}', [TransportWorkspaceController::class, 'show'])->whereNumber('transportRequest')->name('fleet-assets.transports.requests.show');

@@ -1,0 +1,50 @@
+[
+  {
+    "Source": "storage/logs/assets-final-main-backend.txt",
+    "Evidence": "backend.log",
+    "SourceCommit": "2d88fdd73d272d062ca8d77b7e951ef2ede8c607",
+    "SourceSHA256": "71532ef0137df95feced35bc555435bd907ddfa1996a1e627655a650178d239e",
+    "EvidenceSHA256": "720616874a5c4aa182378b3f223bff43f884d237e928d77ad2116e896ae9923a",
+    "Sanitization": "Absolute worktree path replaced with <worktree>; ANSI styling and trailing whitespace removed; LF endings; outcome text unchanged"
+  },
+  {
+    "Source": "storage/logs/assets-final-main-build.txt",
+    "Evidence": "build.log",
+    "SourceCommit": "2d88fdd73d272d062ca8d77b7e951ef2ede8c607",
+    "SourceSHA256": "27ae2b2938efa25177b5cf499ae9bd6b71d4f7e2baa91cd51f7fed6626d96974",
+    "EvidenceSHA256": "d8095d01e10096194f77ce1f1de8aa6fa3aac5f45cefaf6fa32436a54ef6fc2d",
+    "Sanitization": "Absolute worktree path replaced with <worktree>; ANSI styling and trailing whitespace removed; LF endings; outcome text unchanged"
+  },
+  {
+    "Source": "storage/logs/assets-final-main-database-cleanup.txt",
+    "Evidence": "database-cleanup.json",
+    "SourceCommit": "2d88fdd73d272d062ca8d77b7e951ef2ede8c607",
+    "SourceSHA256": "bb5417588ada30fc18a246e7268bbb0f654137adede03cf37e8acbae373ad2b7",
+    "EvidenceSHA256": "383c2836828e4157eb76c84b576f24547b568df7879ad2a904b059e29db7afb9",
+    "Sanitization": "Absolute worktree path replaced with <worktree>; ANSI styling and trailing whitespace removed; LF endings; outcome text unchanged"
+  },
+  {
+    "Source": "storage/logs/assets-final-main-eslint.txt",
+    "Evidence": "eslint.log",
+    "SourceCommit": "2d88fdd73d272d062ca8d77b7e951ef2ede8c607",
+    "SourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "EvidenceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "Sanitization": "Absolute worktree path replaced with <worktree>; ANSI styling and trailing whitespace removed; LF endings; outcome text unchanged"
+  },
+  {
+    "Source": "storage/logs/assets-final-main-types.txt",
+    "Evidence": "types.log",
+    "SourceCommit": "2d88fdd73d272d062ca8d77b7e951ef2ede8c607",
+    "SourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "EvidenceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "Sanitization": "Absolute worktree path replaced with <worktree>; ANSI styling and trailing whitespace removed; LF endings; outcome text unchanged"
+  },
+  {
+    "Source": "storage/logs/assets-final-main-ui.txt",
+    "Evidence": "ui.log",
+    "SourceCommit": "2d88fdd73d272d062ca8d77b7e951ef2ede8c607",
+    "SourceSHA256": "ba93bb264a03700bed9b5a46fa2b0c7b73f51b83478cec24467c53fcd4b09c8c",
+    "EvidenceSHA256": "29e267f8bb798d3a49f5d3dc0cac2ee6ff7b3fe9aefe9db32fe0522f2ee49d87",
+    "Sanitization": "Absolute worktree path replaced with <worktree>; ANSI styling and trailing whitespace removed; LF endings; outcome text unchanged"
+  }
+]

@@ -20,6 +20,7 @@ class FleetFinanceReviewRequest extends Model
 
     /** Request types, as offered in the approved design. */
     public const TYPES = [
+        'replacement_review' => 'Asset replacement review',
         'supplier_invoice_review' => 'Supplier invoice review',
         'purchase_approval' => 'Purchase approval',
         'fixed_asset_update' => 'Fixed asset / ownership update',

@@ -268,7 +268,7 @@ export const FINANCE_SECTIONS: FinanceSection[] = [
             {
                 // Review requests Fleet raises from a vehicle's Finance view.
                 key: 'vehicle-reviews',
-                label: 'Vehicle reviews',
+                label: 'Asset & vehicle reviews',
                 href: '/finance/vehicle-reviews',
                 icon: Car,
                 prefixes: ['/finance/vehicle-reviews'],

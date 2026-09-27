@@ -1,0 +1,18 @@
+{
+  "url": "http://127.0.0.1:8905/fleet-assets/assets/1",
+  "bundle": "app-FMwTQuLf.js",
+  "assignmentDeepLink": "?tab=assignments opens Custody / Current custody",
+  "receipt": "Explicit attestation required; review and real synthetic save confirmed; canonical receipt visible after reload",
+  "mobileCalendar": {
+    "viewport": 390,
+    "left": 16,
+    "right": 374,
+    "width": 358,
+    "top": 97,
+    "bottom": 582.5,
+    "placement": "vertical with collision flip"
+  },
+  "consoleErrors": [],
+  "viewportRestored": true,
+  "source": "8821 real Laravel/Inertia app with isolated synthetic database"
+}

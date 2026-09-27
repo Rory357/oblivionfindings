@@ -1,0 +1,14 @@
+[
+  {
+    "file": "warranty-104.pdf",
+    "bytes": 42374,
+    "sha256": "a072076d6b2bea1124e4cd8394372600ac21d9577800e01cfc302e11a42be4a4",
+    "matchesServedFile": true
+  },
+  {
+    "file": "transfer-hoist-manual.pdf",
+    "bytes": 43617,
+    "sha256": "f622b50181eb97fefaa7ba126c147cdee9a0278140af5abdc1d1d9289beade9c",
+    "matchesServedFile": true
+  }
+]

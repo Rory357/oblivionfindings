@@ -149,6 +149,7 @@ class FleetTelemetryIngestTest extends TestCase
 
     public function test_geofence_signal_emitted_when_outside(): void
     {
+        Queue::fake();
         config(['services.telemetry.ingest_token' => 'test-token']);
 
         $site = Site::create(['name' => 'Test Site']);
@@ -211,6 +212,7 @@ class FleetTelemetryIngestTest extends TestCase
         $this->assertDatabaseHas('fleet_signals', [
             'asset_id' => $asset->id,
             'signal_type' => 'geofence.breach',
+            'source_event_id' => FleetTelemetryEvent::where('asset_id', $asset->id)->sole()->id,
         ]);
     }
 

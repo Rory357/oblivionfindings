@@ -1,0 +1,81 @@
+
+  [30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\Pkg06bAssetProfileTest[39m
+  [33;1m![39;22m[90m [39m[90mdispatch does not move asset and receipt requires every kit item[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.code[39m[90m…[39m [90m259.12s[39m  
+  [33;1m![39;22m[90m [39m[90msame command replays once but changed and stale submissions are rejected[39m[90m [39m[33m→ file_get_contents(C:\Users\steph[39m[90m…[39m [90m0.77s[39m  
+  [33;1m![39;22m[90m [39m[90mprofile uses canonical assignment receipts and requires explicit attestation[39m[90m [39m[33m→ file_get_contents(C:\Users\s[39m[90m…[39m [90m0.87s[39m  
+  [33;1m![39;22m[90m [39m[90mlinked components move only with an acknowledged kit receipt[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\work[39m[90m…[39m [90m0.89s[39m  
+  [33;1m![39;22m[90m [39m[90mpermissions and foreign asset file ids are enforced[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\882[39m[90m…[39m [90m0.88s[39m  
+  [33;1m![39;22m[90m [39m[90mfiles are scanned versioned and archived without losing bytes[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\wor[39m[90m…[39m [90m5.16s[39m  
+  [33;1m![39;22m[90m [39m[90mprofile and printable qr return real authorised content[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees[39m[90m…[39m [90m1.44s[39m  
+  [33;1m![39;22m[90m [39m[90masset finance requests reuse the finance queue and duplicate boundary[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.c[39m[90m…[39m [90m0.74s[39m  
+  [33;1m![39;22m[90m [39m[90mschema probe stays in the configured application schema[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees[39m[90m…[39m [90m0.67s[39m  
+  [33;1m![39;22m[90m [39m[90msource costs exclude estimates drafts reversals old and foreign allocations[39m[90m [39m[33m→ file_get_contents(C:\Users\st[39m[90m…[39m [90m0.69s[39m  
+  [33;1m![39;22m[90m [39m[90moriginal check evidence uses source permissions and submitted template[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.[39m[90m…[39m [90m0.85s[39m  
+  [33;1m![39;22m[90m [39m[90mscan identity is server owned and foreign observations are withheld[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m [90m0.83s[39m  
+  [33;1m![39;22m[90m [39m[90mbulk labels support both media replay protection and access revocation[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.[39m[90m…[39m [90m2.48s[39m  
+  [33;1m![39;22m[90m [39m[90mviewers cannot create missing qr identity and expired batches cannot download[39m[90m [39m[33m→ file_get_contents(C:\Users</>…[39m[90m [39m[90m2.76s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlabel workspace filters canonical lifecycle without leaking other sites[39m[90m [39m[33m→ file_get_contents(C:\Users\steph</>…[39m[90m [39m[90m0.81s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mpublished label history replays its original layout but new batches use the shared minimum[39m[90m [39m[33m→ file_get_conte[39m[90m…[39m[90m [39m[90m1.17s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mpending receipt blocks register room edits and rechecks the destination room[39m[90m [39m[33m→ file_get_contents(C:\Users\s[39m[90m…[39m[90m [39m[90m1.05s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mownership requires its permission and preserves canonical placement[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m[90m [39m[90m1.39s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreplacement review records a request without retiring or posting[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex</>…[39m[90m [39m[90m1.12s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90masset visibility does not expand finance review scope or replacement details[39m[90m [39m[33m→ file_get_contents(C:\Users\s[39m[90m…[39m[90m [39m[90m2.66s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcomplete ordinary edits cannot split parent or component but unrelated edits and unlinked moves work[39m[90m [39m[33m→ file[39m[90m…[39m[90m [39m[90m1.54s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlinked kit room home site and client placement cannot be changed by ordinary edit[39m[90m [39m[33m→ file_get_contents(C:\Us[39m[90m…[39m[90m [39m[90m0.99s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcomponent with an unresolved movement cannot be linked to a kit[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m1.16s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90moutstanding component loan must return before kit linking[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktre[39m[90m…[39m[90m [39m[90m0.92s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreceipt refuses a legacy independently linked component until explicitly removed[39m[90m [39m[33m→ file_get_contents(C:\Use[39m[90m…[39m[90m [39m[90m0.78s[39m[90m  [39m
+[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\AssetRegisterWorkflowTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlocation directory and checklist use only permitted assets[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktr[39m[90m…[39m[90m [39m[90m0.24s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcoverage excludes selected item counts and followups recheck access[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m[90m [39m[90m0.37s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcount is durable versioned immutable and does not change assignment[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m[90m [39m[90m0.25s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mscan resolves existing identity rejects foreign urls and requires extra confirmation[39m[90m [39m[33m→ file_get_contents(C:[39m[90m…[39m[90m [39m[90m0.31s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mduplicate command is idempotent and undo keeps evidence[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees[39m[90m…[39m[90m [39m[90m0.26s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mmissing and changed items require review and owner[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821[39m[90m…[39m[90m [39m[90m0.39s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mhidden site and asset records are denied and permission revocation blocks writes[39m[90m [39m[33m→ file_get_contents(C:\Use[39m[90m…[39m[90m [39m[90m0.26s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcompleted report is real pdf and typed xlsx[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821\oblivi[39m[90m…[39m[90m [39m[90m0.49s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcsv validation partial import and retry do not duplicate assets[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m0.24s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mnewly conflicting import row can be retried without repeating successes[39m[90m [39m[33m→ file_get_contents(C:\Users\steph</>…[39m[90m [39m[90m0.22s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mempty count requires attestation and records it[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821\ob[39m[90m…[39m[90m [39m[90m0.21s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mread access does not grant counting or import permission[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktree[39m[90m…[39m[90m [39m[90m0.25s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcanonical room filter and registration cannot cross sites[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktre[39m[90m…[39m[90m [39m[90m0.19s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlabel exports preserve tokens and revalidate download scope[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\workt[39m[90m…[39m[90m [39m[90m0.64s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlabel replay requires the original selection and layout[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees[39m[90m…[39m[90m [39m[90m0.22s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mprint permission does not grant permission to create a missing qr identity[39m[90m [39m[33m→ file_get_contents(C:\Users\ste[39m[90m…[39m[90m [39m[90m0.25s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mundone extra history remains access scoped in lists resume and exports[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.[39m[90m…[39m[90m [39m[90m0.53s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlegacy history references are backfilled without rewriting evidence[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m[90m [39m[90m0.34s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mrevoked extra site access also hides retained count history[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\workt[39m[90m…[39m[90m [39m[90m0.36s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreport time matches the worker zone regression in the register[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\wo[39m[90m…[39m[90m [39m[90m0.25s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mordinary edit preserves same site room and reconciles destination room[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.[39m[90m…[39m[90m [39m[90m0.29s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mimported room is cleared on a client derived site move[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees</>…[39m[90m [39m[90m0.26s[39m[90m  [39m
+[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\AssetMutationBoundaryTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90masset register create update and picker data are canonical site scoped[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.[39m[90m…[39m[90m [39m[90m1.02s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90massigned only asset register rows exports and counts follow the asset policy[39m[90m [39m[33m→ file_get_contents(C:\Users\s[39m[90m…[39m[90m [39m[90m1.16s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90masset access uses direct then home then client site provenance and denies conflicts[39m[90m [39m[33m→ file_get_contents(C:</>…[39m[90m [39m[90m0.74s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mevery asset object ability reuses the canonical visibility boundary[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m[90m [39m[90m0.76s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mfleet write routes conceal hidden vehicles and bulk work is atomic[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.code[39m[90m…[39m[90m [39m[90m0.81s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mordinary edits cannot retire assets or move live assignment and device provenance[39m[90m [39m[33m→ file_get_contents(C:\Us[39m[90m…[39m[90m [39m[90m0.81s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mbulk offline state and mutation audits are durable per vehicle[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\wo[39m[90m…[39m[90m [39m[90m0.71s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90masset assignment requires one site valid active holder and explicit release[39m[90m [39m[33m→ file_get_contents(C:\Users\st[39m[90m…[39m[90m [39m[90m0.81s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcompeting custody transfers are serialized and preserve assignment history[39m[90m [39m[33m→ file_get_contents(C:\Users\st[39m[90m…[39m[90m [39m[90m10.14s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90masset ownership transition validates target and retains history[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m0.81s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90masset delete route retires and preserves lifecycle history[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktr[39m[90m…[39m[90m [39m[90m0.74s[39m[90m  [39m
+[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe finance view is concealed without finance access[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\88[39m[90m…[39m[90m [39m[90m0.73s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlinked records combine finance and vehicle links without double counting[39m[90m [39m[33m→ file_get_contents(C:\Users\steph[39m[90m…[39m[90m [39m[90m0.66s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlinking needs fleet management finance access a reason and the vehicles scope[39m[90m [39m[33m→ file_get_contents(C:\Users</>…[39m[90m [39m[90m0.95s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90munlinking keeps the finance record and needs a reason[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8[39m[90m…[39m[90m [39m[90m0.77s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlinkable search is scoped to the vehicle and finance access[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\workt[39m[90m…[39m[90m [39m[90m0.81s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreview requests are idempotent scoped and refuse open duplicates[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex</>…[39m[90m [39m[90m0.91s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreview request files are private and open only for finance viewers[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.code[39m[90m…[39m[90m [39m[90m1.45s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90monly finance decides a review request[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821\oblivionfind[39m[90m…[39m[90m [39m[90m1.07s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe person who asked for a review cannot decide it[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821[39m[90m…[39m[90m [39m[90m0.79s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mfinance decides review requests in finance without fleet access[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m1.28s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mopen review requests reach finance in all tasks[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821\ob[39m[90m…[39m[90m [39m[90m0.92s[39m[90m  [39m
+
+[90m  [39m[90mTests:[39m[90m    [39m[33;1m69 warnings[39;22m[90m (1123 assertions)[39m
+[90m  [39m[90mDuration:[39m[90m [39m[39m327.72s[39m
+

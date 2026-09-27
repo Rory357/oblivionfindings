@@ -1,0 +1,21 @@
+{
+  "checks": [
+    {
+      "name": "Discrepancy requires attributable notes",
+      "status": "passed"
+    },
+    {
+      "name": "All three items with discrepancy remains incomplete; Mara retains custody",
+      "status": "passed"
+    },
+    {
+      "name": "Explicit complete receipt acknowledges Nia and preserves hold",
+      "status": "passed"
+    },
+    {
+      "name": "New report failure/retry creates one distinct issue; existing brake record preserved",
+      "status": "passed"
+    }
+  ],
+  "errors": []
+}

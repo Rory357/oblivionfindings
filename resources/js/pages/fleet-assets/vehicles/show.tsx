@@ -44,7 +44,7 @@ import {
     type GroupedProfileNavTab,
 } from '@/components/page/grouped-profile-nav';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
     Bell,
@@ -125,6 +125,15 @@ export default function VehicleShow({
     finance_workspace,
 }: Props) {
     const { vehicle, can } = workspace;
+    const returnCandidate =
+        typeof window === 'undefined'
+            ? null
+            : new URLSearchParams(window.location.search).get('return_to');
+    const returnHref =
+        returnCandidate &&
+        /^\/fleet-assets\/vehicles(?:\?|$)/.test(returnCandidate)
+            ? returnCandidate
+            : '/fleet-assets/vehicles';
     const tiers = tierTabs(workspace);
     // A link to a section this person can't open falls back to its tab's first section.
     const permitted = useCallback(
@@ -165,13 +174,13 @@ export default function VehicleShow({
             window.history.replaceState(
                 window.history.state,
                 '',
-                locationUrl(vehicle.id, resolved),
+                `${locationUrl(vehicle.id, resolved)}${returnHref !== '/fleet-assets/vehicles' ? `${locationUrl(vehicle.id, resolved).includes('?') ? '&' : '?'}return_to=${encodeURIComponent(returnHref)}` : ''}`,
             );
             // A focused requirement scrolls its own row into view.
             if (!resolved.focus)
                 window.scrollTo({ top: 0, behavior: 'smooth' });
         },
-        [vehicle.id, permitted],
+        [vehicle.id, permitted, returnHref],
     );
     const refresh = useCallback(
         () => router.reload({ only: ['workspace'] }),
@@ -250,19 +259,30 @@ export default function VehicleShow({
             >
                 <div className="vehicle-studio min-w-0">
                     {location.tab === 'calendar' ? (
-                        <VehicleCalendar
-                            workspace={workspace}
-                            focusDate={location.date}
-                            onBack={() =>
-                                navigate(
-                                    location.date
-                                        ? { tab: 'service', view: 'reminders' }
-                                        : { tab: 'overview' },
-                                )
-                            }
-                            onNavigate={navigate}
-                            onChanged={refresh}
-                        />
+                        <div className="space-y-3">
+                            <Link
+                                href={returnHref}
+                                className="text-sm text-primary underline"
+                            >
+                                Return to Fleet view
+                            </Link>
+                            <VehicleCalendar
+                                workspace={workspace}
+                                focusDate={location.date}
+                                onBack={() =>
+                                    navigate(
+                                        location.date
+                                            ? {
+                                                  tab: 'service',
+                                                  view: 'reminders',
+                                              }
+                                            : { tab: 'overview' },
+                                    )
+                                }
+                                onNavigate={navigate}
+                                onChanged={refresh}
+                            />
+                        </div>
                     ) : (
                         <PageLayout
                             hero={
@@ -278,6 +298,7 @@ export default function VehicleShow({
                                             ? () => setReportOpen(true)
                                             : undefined
                                     }
+                                    returnHref={returnHref}
                                 />
                             }
                             tabs={

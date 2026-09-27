@@ -1,0 +1,113 @@
+{
+  "checks": [
+    {
+      "name": "A4 skipped positions and page count",
+      "status": "passed"
+    },
+    {
+      "name": "Export outcome is not claimed as physically printed",
+      "status": "passed"
+    },
+    {
+      "name": "Invalid print settings announce and focus the error",
+      "status": "passed"
+    },
+    {
+      "name": "Print settings have discard protection",
+      "status": "passed"
+    },
+    {
+      "name": "Revoked labels cannot be exported",
+      "status": "passed"
+    },
+    {
+      "name": "Denied QR export hides the code and action",
+      "status": "passed"
+    },
+    {
+      "name": "Missing code has explicit preparation",
+      "status": "passed"
+    },
+    {
+      "name": "Export failure preserves settings and can retry",
+      "status": "passed"
+    },
+    {
+      "name": "Finance request uses shared wizard and category tiles",
+      "status": "passed"
+    },
+    {
+      "name": "Finance invalid review focuses the required note",
+      "status": "passed"
+    },
+    {
+      "name": "Finance category-only change is guarded",
+      "status": "passed"
+    },
+    {
+      "name": "Finance picker resolves the chosen existing record",
+      "status": "passed"
+    },
+    {
+      "name": "Picker Escape keeps the Finance draft open",
+      "status": "passed"
+    },
+    {
+      "name": "Shared Finance wizard reaches explicit sample success",
+      "status": "passed"
+    },
+    {
+      "name": "QR export history survives profile navigation",
+      "status": "passed"
+    },
+    {
+      "name": "1024px dark QR dialog keeps footer and label visible",
+      "status": "passed"
+    },
+    {
+      "name": "Read-only missing-token state cannot generate or export",
+      "status": "passed"
+    },
+    {
+      "name": "Client-owned labels omit the asset name",
+      "status": "passed"
+    },
+    {
+      "name": "Print request is reported without claiming physical output",
+      "status": "passed"
+    },
+    {
+      "name": "Finance review uses readable source and shared edit summary",
+      "status": "passed"
+    },
+    {
+      "name": "Smallest label keeps every text line inside its edge",
+      "status": "harness limitation",
+      "error": "Error: TypeError: t.getBBox is not a function\n    at <anonymous>:2686:182\n    at Array.map (<anonymous>)\n    at __playwrightEvaluate (<anonymous>:2686:146)\n    at <anonymous>:2687:14\n    at runUserScript (<anonymous>:2688:10)\n    at <anonymous>:2692:10\n    at <anonymous>:2693:3"
+    },
+    {
+      "name": "60 × 40 mm text fits within rendered label bounds",
+      "status": "passed"
+    },
+    {
+      "name": "Missing branding logo falls back to company name",
+      "status": "passed"
+    },
+    {
+      "name": "Unavailable branding logo keeps a printable fallback",
+      "status": "passed"
+    },
+    {
+      "name": "Company logo retains aspect ratio and stays outside the QR",
+      "status": "passed"
+    },
+    {
+      "name": "Profile link opens the working bulk QR labels tab",
+      "status": "passed"
+    }
+  ],
+  "errors": [],
+  "downloadEventLimitation": "Download event path returned null in IAB; downloaded bytes verified on disk.",
+  "nativePrint": "Request exercised; native preview and physical output not verified.",
+  "brandingDownloadLimitation": "After the branding update the preview prepared Blob URLs, but IAB download inspection timed out and no new Downloads files were observed. Final branded PDFs were validated through shared SVG/layout source helpers using Sharp; these are separately identified from the earlier actual browser downloads."
+}

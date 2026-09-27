@@ -262,12 +262,14 @@ export function PageHeaderSearch({
     onChange,
     onKeyDown,
     placeholder,
+    ariaLabel,
     className,
 }: {
     value: string;
     onChange: (value: string) => void;
     onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
     placeholder: string;
+    ariaLabel?: string;
     className?: string;
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
@@ -307,6 +309,7 @@ export function PageHeaderSearch({
                 onChange={(e) => onChange(e.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder={placeholder}
+                aria-label={ariaLabel ?? placeholder}
                 className="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
             />
             <kbd

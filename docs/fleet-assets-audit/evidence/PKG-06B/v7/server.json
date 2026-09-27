@@ -1,0 +1,7 @@
+{
+  "Status": 200,
+  "Source": "8821-v7",
+  "Csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'none'; font-src 'self'; base-uri 'none'; form-action 'none'",
+  "Port": 8902,
+  "Pid": 27820
+}

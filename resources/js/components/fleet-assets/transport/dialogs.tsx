@@ -2,6 +2,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
     DateTimeField,
     localDateTimeLabel,
+    validLocalDateTime,
 } from '@/components/fleet-assets/maintenance/date-time-field';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,6 +22,7 @@ import {
 } from '@/components/wizard/shell';
 import { toDatetimeLocal } from '@/lib/datetime';
 import {
+    CalendarDays,
     CheckCircle2,
     FileText,
     KeyRound,
@@ -38,6 +40,10 @@ import {
     WorkspaceWizard,
     type CommandState,
 } from '../vehicle-workspace/wizard-kit';
+import {
+    TransportLocationField,
+    type TransportLocation,
+} from './location-field';
 import type { Intent, Person, TransportRecord } from './types';
 import { Notice } from './ui';
 export function DemandDialog({
@@ -59,6 +65,7 @@ export function DemandDialog({
             (Person & { can_request: boolean })[]
         >([]),
         [optionsError, setOptionsError] = useState('');
+    const [locations, setLocations] = useState<TransportLocation[]>([]);
     const [initial] = useState(() => ({
         client: String(row?.client_id || ''),
         purpose: row?.purpose || '',
@@ -87,7 +94,6 @@ export function DemandDialog({
         setErrors({});
     };
     useEffect(() => {
-        if (row) return;
         const controller = new AbortController();
         fetch('/fleet-assets/transports/workspace/options', {
             headers: { Accept: 'application/json' },
@@ -99,6 +105,7 @@ export function DemandDialog({
                         'Permitted clients could not load. Close and reopen the request to retry.',
                     );
                 const data = await response.json();
+                setLocations(data.locations ?? []);
                 setClients(
                     data.clients.filter(
                         (c: Person & { can_request: boolean }) => c.can_request,
@@ -110,19 +117,26 @@ export function DemandDialog({
             });
         return () => controller.abort();
     }, [row]);
-    const validate = () => {
+    const validate = (currentStep = step, all = false) => {
         const found: Record<string, string> = {};
-        if (!form.client) found.client = 'Choose a client.';
+        if ((all || currentStep === 0) && !form.client)
+            found.client = 'Choose a client.';
         if (
-            !form.purpose.trim() ||
-            !form.pickup.trim() ||
-            !form.destination.trim()
+            (all || currentStep === 0) &&
+            (!form.purpose.trim() ||
+                !form.pickup.trim() ||
+                !form.destination.trim())
         )
             found.route = 'Add the purpose, collection point and destination.';
-        if (!form.start || !form.end || form.end <= form.start)
+        if (
+            (all || currentStep === 1) &&
+            (!validLocalDateTime(form.start) ||
+                !validLocalDateTime(form.end) ||
+                form.end <= form.start)
+        )
             found.window = 'Choose departure and a later expected return.';
         if (
-            step > 0 &&
+            (all || currentStep === 2) &&
             (!form.seats ||
                 Number(form.seats) < 2 ||
                 !form.wheelchair ||
@@ -134,17 +148,18 @@ export function DemandDialog({
         return !Object.keys(found).length;
     };
     const submit = async () => {
-        if (!validate()) {
+        if (!validate(step, true)) {
             setStep(
                 !form.client ||
                     !form.purpose.trim() ||
                     !form.pickup.trim() ||
-                    !form.destination.trim() ||
-                    !form.start ||
-                    !form.end ||
-                    form.end <= form.start
+                    !form.destination.trim()
                     ? 0
-                    : 1,
+                    : !validLocalDateTime(form.start) ||
+                        !validLocalDateTime(form.end) ||
+                        form.end <= form.start
+                      ? 1
+                      : 2,
             );
             return;
         }
@@ -188,6 +203,7 @@ export function DemandDialog({
                   : 'Update requested information';
     return (
         <WorkspaceWizard
+            maxWidth="min(92vw, 1100px)"
             title={title}
             description="Capture the passenger’s needs before choosing a vehicle."
             railIcon={Route}
@@ -195,9 +211,15 @@ export function DemandDialog({
             steps={[
                 {
                     key: 'route',
-                    label: 'Route & time',
-                    blurb: 'Where and when',
+                    label: 'Passenger & route',
+                    blurb: 'Who and where',
                     icon: Route,
+                },
+                {
+                    key: 'time',
+                    label: 'Date & time',
+                    blurb: 'Departure and expected return',
+                    icon: CalendarDays,
                 },
                 {
                     key: 'needs',
@@ -289,6 +311,7 @@ export function DemandDialog({
                         {!row && (
                             <VehicleSearchSelect
                                 label="Client"
+                                invalid={!!allErrors.client}
                                 value={form.client}
                                 onChange={(v) => update('client', v)}
                                 options={clients.map((c) => ({
@@ -300,6 +323,10 @@ export function DemandDialog({
                         <label>
                             Purpose
                             <Input
+                                maxLength={255}
+                                aria-invalid={
+                                    !!allErrors.route && !form.purpose.trim()
+                                }
                                 value={form.purpose}
                                 onChange={(e) =>
                                     update('purpose', e.target.value)
@@ -307,34 +334,51 @@ export function DemandDialog({
                             />
                         </label>
                         <div className="tr-plan-fields">
-                            <label>
-                                Collection point
-                                <Input
-                                    value={form.pickup}
-                                    onChange={(e) =>
-                                        update('pickup', e.target.value)
-                                    }
-                                />
-                            </label>
-                            <label>
-                                Destination
-                                <Input
-                                    value={form.destination}
-                                    onChange={(e) =>
-                                        update('destination', e.target.value)
-                                    }
-                                />
-                            </label>
+                            <TransportLocationField
+                                key={`pickup-${form.client}`}
+                                label="Collection point"
+                                value={form.pickup}
+                                onChange={(value) => update('pickup', value)}
+                                locations={locations}
+                                clientId={form.client}
+                                invalid={
+                                    !!allErrors.route && !form.pickup.trim()
+                                }
+                            />
+                            <TransportLocationField
+                                key={`destination-${form.client}`}
+                                label="Destination"
+                                value={form.destination}
+                                onChange={(value) =>
+                                    update('destination', value)
+                                }
+                                locations={locations}
+                                clientId={form.client}
+                                invalid={
+                                    !!allErrors.route &&
+                                    !form.destination.trim()
+                                }
+                            />
                         </div>
+                        <p className="tr-caption">
+                            Choose a saved site, search for an address, or enter
+                            a meeting point manually.
+                        </p>
+                    </>
+                )}
+                {step === 1 && (
+                    <>
                         <DateTimeField
                             id="demand-start"
                             label="Departure"
+                            error={allErrors.window}
                             value={form.start}
                             onChange={(v) => update('start', v)}
                         />
                         <DateTimeField
                             id="demand-end"
                             label="Expected return"
+                            error={allErrors.window}
                             value={form.end}
                             onChange={(v) => update('end', v)}
                         />
@@ -350,7 +394,7 @@ export function DemandDialog({
                         </label>
                     </>
                 )}
-                {step === 1 && (
+                {step === 2 && (
                     <>
                         <label>
                             Total occupants, including driver and escort
@@ -413,11 +457,11 @@ export function DemandDialog({
                         </label>
                     </>
                 )}
-                {step === 2 && (
+                {step === 3 && (
                     <>
                         <ReviewCard
                             icon={Route}
-                            title="Route & time"
+                            title="Passenger & route"
                             onEdit={() => setStep(0)}
                         >
                             <ReviewRow
@@ -434,6 +478,12 @@ export function DemandDialog({
                                 value={`${form.pickup} → ${form.destination}`}
                             />
                             <ReviewRow label="Purpose" value={form.purpose} />
+                        </ReviewCard>
+                        <ReviewCard
+                            icon={CalendarDays}
+                            title="Date & time"
+                            onEdit={() => setStep(1)}
+                        >
                             <ReviewRow
                                 label="Departure"
                                 value={
@@ -454,7 +504,7 @@ export function DemandDialog({
                         <ReviewCard
                             icon={Users}
                             title="Passenger needs"
-                            onEdit={() => setStep(1)}
+                            onEdit={() => setStep(2)}
                         >
                             <ReviewRow label="Occupants" value={form.seats} />
                             <ReviewRow
@@ -939,13 +989,13 @@ function SimpleTransportAction({
                 }}
             >
                 <DialogContent
-                    className="max-h-[90vh] overflow-y-auto"
+                    className="flex max-h-[90dvh] flex-col overflow-hidden"
                     style={{
                         width: 'min(92vw, 720px)',
                         maxWidth: 'min(92vw, 720px)',
                     }}
                 >
-                    <DialogHeader>
+                    <DialogHeader className="shrink-0 pr-6">
                         <DialogTitle className="flex items-center gap-2">
                             <FileText className="size-4 text-primary" />
                             {title}
@@ -961,7 +1011,7 @@ function SimpleTransportAction({
                             {saved}
                         </p>
                     ) : (
-                        <div className="tr-form mt-3">
+                        <div className="tr-form mt-3 min-h-0 overflow-y-auto">
                             {command.message && (
                                 <Notice>{command.message}</Notice>
                             )}
@@ -988,7 +1038,7 @@ function SimpleTransportAction({
                             </label>
                         </div>
                     )}
-                    <DialogFooter className="mt-4">
+                    <DialogFooter className="mt-4 shrink-0">
                         <Button
                             variant="outline"
                             disabled={command.processing}

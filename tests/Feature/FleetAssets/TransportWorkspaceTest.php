@@ -19,6 +19,7 @@ use App\Services\Fleet\TransportWorkspacePresenter;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -85,11 +86,12 @@ class TransportWorkspaceTest extends TestCase
         $asset = Asset::factory()->vehicle()->create(['site_id' => $this->site->id, 'home_site_id' => $this->site->id, 'status' => 'active', 'seating_capacity' => 6]);
         $driver = $this->user($this->site);
         $room = SiteRoom::create(['site_id' => $this->site->id, 'name' => 'Reception key cabinet']);
-        $payload = ['asset_id' => $asset->id, 'purpose' => $row->purpose,
+        $payload = ['asset_id' => $asset->id, 'client_id' => $row->client_id, 'purpose' => $row->purpose,
             'starts_local' => '2026-10-01T09:00', 'ends_local' => '2026-10-01T10:00', 'driver_user_id' => $driver->id,
             'transport_request_id' => $row->id, 'transport_expected_version' => 1, 'pickup_site_id' => $this->site->id, 'return_site_id' => $this->site->id,
             'key_pickup_room_id' => $room->id, 'key_return_room_id' => $room->id, 'key_delivery_arrangement' => 'Driver collects and returns at reception'];
-        $this->actingAs($this->manager)->postJson('/fleet-assets/bookings', [...$payload, 'key_return_room_id' => 999999])->assertNotFound();
+        $this->actingAs($this->manager)->postJson('/fleet-assets/bookings', [...$payload, 'client_id' => null])->assertNotFound();
+        $this->postJson('/fleet-assets/bookings', [...$payload, 'key_return_room_id' => 999999])->assertNotFound();
         $this->assertNull($row->fresh()->fleet_booking_id);
         $key = (string) Str::uuid();
         $response = $this->withHeader('Idempotency-Key', $key)->postJson('/fleet-assets/bookings', $payload)->assertOk();
@@ -315,6 +317,52 @@ class TransportWorkspaceTest extends TestCase
         $unlinked = FleetVehicleBooking::factory()->create(['asset_id' => $asset->id, 'pickup_site_id' => $this->site->id, 'return_site_id' => $this->site->id, 'user_id' => $this->manager->id, 'status' => 'pending']);
         $this->flushHeaders()->postJson("/fleet-assets/bookings/{$unlinked->id}/cancel", ['reason' => 'Unlinked source regression'])->assertOk();
         $this->assertSame('cancelled', $unlinked->fresh()->status);
+    }
+
+    public function test_location_choices_and_address_search_keep_transport_scope_and_provider_context_separate(): void
+    {
+        Http::preventStrayRequests();
+        config(['fleet.maps.address_search_cache_store' => 'database', 'cache.stores.database.connection' => 'mysql', 'cache.stores.database.lock_connection' => 'mysql']);
+        $this->site->update(['address_line_1' => '10 Example Road', 'city' => 'Auckland']);
+        $foreign = Site::factory()->create(['name' => 'Hidden place', 'address_line_1' => 'Private address']);
+        $foreignClient = Client::factory()->create(['site_id' => $foreign->id]);
+        $this->actingAs($this->manager)->getJson('/fleet-assets/transports/workspace/options')
+            ->assertOk()->assertJsonFragment(['id' => $this->site->id, 'name' => $this->site->name, 'address' => implode(', ', array_filter(['10 Example Road', $this->site->address_line_2, $this->site->suburb, 'Auckland', $this->site->postcode]))])
+            ->assertDontSee('Private address')->assertHeader('Cache-Control', 'no-store, private');
+        $url = '/fleet-assets/transports/workspace/address-search';
+        $this->postJson($url, ['client_id' => $foreignClient->id, 'q' => 'Hidden place'])->assertNotFound();
+        $this->postJson($url, ['client_id' => $this->client->id, 'q' => str_repeat('x', 201)])->assertUnprocessable();
+        Http::assertNothingSent();
+        $query = 'Public library '.Str::uuid();
+        Http::fake(['nominatim.openstreetmap.org/*' => Http::response([
+            ['display_name' => 'Public library, Auckland', 'lat' => '-36.85', 'lon' => '174.76', 'address' => []],
+        ])]);
+        $this->postJson($url, ['client_id' => $this->client->id, 'q' => $query, 'passenger_notes' => 'Never forward'])
+            ->assertOk()->assertJsonPath('results.0.display_name', 'Public library, Auckland')->assertHeader('Cache-Control', 'no-store, private');
+        Http::assertSent(fn ($request) => $request['q'] === $query && array_keys($request->data()) === ['q', 'format', 'addressdetails', 'limit', 'countrycodes']);
+        $this->assertSame(1, count(Http::recorded()));
+    }
+
+    public function test_address_search_distinguishes_provider_failure(): void
+    {
+        config(['fleet.maps.address_search_cache_store' => 'database', 'cache.stores.database.connection' => 'mysql', 'cache.stores.database.lock_connection' => 'mysql']);
+        Http::preventStrayRequests();
+        Http::fake(['nominatim.openstreetmap.org/*' => Http::response([], 503)]);
+        $this->actingAs($this->manager)->postJson('/fleet-assets/transports/workspace/address-search', ['client_id' => $this->client->id, 'q' => 'Unavailable '.Str::uuid()])
+            ->assertStatus(503)->assertJsonMissing(['results' => []]);
+    }
+
+    public function test_address_search_discards_results_after_access_is_revoked(): void
+    {
+        config(['fleet.maps.address_search_cache_store' => 'database', 'cache.stores.database.connection' => 'mysql', 'cache.stores.database.lock_connection' => 'mysql']);
+        Http::preventStrayRequests();
+        Http::fake(function () {
+            $this->client->update(['site_id' => Site::factory()->create()->id]);
+
+            return Http::response([['display_name' => 'Discard these results', 'address' => []]]);
+        });
+        $this->actingAs($this->manager)->postJson('/fleet-assets/transports/workspace/address-search', ['client_id' => $this->client->id, 'q' => 'Revoked '.Str::uuid()])
+            ->assertNotFound()->assertDontSee('Discard these results');
     }
 
     private function request(bool $assessed = false): ClientTransportBooking

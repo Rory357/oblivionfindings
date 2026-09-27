@@ -219,7 +219,7 @@ function ReviewRequestBody({
         <>
             <WorkspaceWizard
                 title="Review Finance request"
-                description="Review the evidence and record Finance’s response."
+                description="Review the evidence and record Finance’s response. The requester sees the outcome on the source profile."
                 railIcon={Car}
                 railSub={request.reference ?? 'Finance review'}
                 steps={steps}
@@ -281,7 +281,12 @@ function ReviewRequestBody({
             >
                 {step === 0 && (
                     <div className="space-y-4">
-                        <p>{request.note ?? 'No note recorded.'}</p>
+                        <p><strong>Review requested:</strong> {request.note ?? 'No note recorded.'}</p>
+                        {request.vehicle.url && (
+                            <Button variant="outline" asChild>
+                                <a href={request.vehicle.url}>Open source profile</a>
+                            </Button>
+                        )}
                         <p>
                             <strong>Source:</strong> {request.source}{' '}
                             {request.bill_url && (

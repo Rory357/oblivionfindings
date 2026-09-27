@@ -1,0 +1,1 @@
+PASS: Month date move/cancel preserves local time; protected down, short release, hold, movement, outside, Escape, keyboard and accessible cannot-move state

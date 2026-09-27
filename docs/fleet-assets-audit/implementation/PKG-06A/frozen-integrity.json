@@ -1,0 +1,9 @@
+{
+  "VerifiedArtifacts": 368,
+  "ActiveServerLogsSkipped": [
+    "docs/fleet-assets-audit/evidence/PKG-06A/v9/server.stderr.log",
+    "docs/fleet-assets-audit/evidence/PKG-06A/v9/server.stdout.log"
+  ],
+  "CheckedAt": "2026-09-27T03:56:03.4641267Z",
+  "Failures": []
+}
