@@ -5,13 +5,15 @@ Stephan's direct request: “can you let main know can you get this on main loca
 ## Exact candidate
 
 - Branch: `codex/pkg03-local-main`.
-- Candidate application/tests: `063ab0fc111208ce22c6abf7e5822bd138a7f296`.
-- Actual integration base: `49e0be5b1c1716aeb4e681529bb71fdce2a7abc0`, the Transport successor now on Main. The earlier `ba5bff2e8` verification remains historical evidence.
+- Candidate merge: `0a48cd37c1a5fe465025435433a0eb85db0bef54`; application/tests remain unchanged from `063ab0fc111208ce22c6abf7e5822bd138a7f296`.
+- Actual integration base: `a6b9fae6a73516548b02e64c41cf1fc94ce43f01`, Main's published Transport lint follow-up. The earlier `ba5bff2e8` verification remains historical evidence.
 - Original implementation: `feca8ad57`; reconciliation merge: `7afb83403`; test reconciliation: `c7d6b3cdc`; final service-race harness correction: `20281ab99`.
 - `source-manifest.json` contains the exact 72 changed source/test/build files and their working-file SHA-256 values. Later evidence-only commits do not change these source hashes.
 - Application ownership remains one organisation, roles, approved sites and canonical record privacy. No new tenancy boundary.
 
 ## Reconciliation
+
+After the application reconciliation below, Main published `a6b9fae6a`: only the frozen Transport mockup ESLint exclusion and three evidence files changed. This was merged without conflicts, all 72 PKG-03 source hashes remain unchanged, and the merged wizard lint was rerun successfully (`reconcile-a6b-eslint.log`). No application/build/test source changed, so the reconciled 49e UI/type/backend results below still describe the exact application source. `cleanup.json` records removal of the disposable verifier, including its task-local dependencies and built assets; shared dependencies and all frozen evidence remain intact.
 
 The successor merges published Transport commit `49e0be5b1` into the existing PKG-03 branch without importing unapproved PKG-04/06 work. One content conflict in `wizard-kit.tsx` retains both optional contracts: Transport's `freeNavigation` (default false) and PKG-03's `discardDescription`. Section navigation retains Transport's opt-in behavior; Continue and Submit retain their validation. PKG-03's 44-pixel mobile actions and discard copy are preserved. The route file auto-merges Transport's additions and PKG-03's cost source route. Only these two of the 72 PKG-03 manifest files changed; `reconcile-49e-source-changes.json` records their before/after hashes. Finance and Maintenance service logic and regression tests did not change in this reconciliation.
 

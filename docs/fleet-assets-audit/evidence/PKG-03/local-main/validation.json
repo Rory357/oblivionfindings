@@ -1,6 +1,6 @@
 {
-  "candidate": "063ab0fc111208ce22c6abf7e5822bd138a7f296",
-  "base": "49e0be5b1c1716aeb4e681529bb71fdce2a7abc0",
+  "candidate": "0a48cd37c1a5fe465025435433a0eb85db0bef54",
+  "base": "a6b9fae6a73516548b02e64c41cf1fc94ce43f01",
   "localMainIntegrated": false,
   "remotePushed": false,
   "deployed": false,
@@ -50,5 +50,11 @@
     "pkg03CasesPassing": 76,
     "failure": "Published Transport allocation test omits required client_id; reported to Main",
     "browserAndBuildEvidenceSource": "20281ab99d4f7cb6db01e823cebe84eac5c6c2e9"
+  },
+  "lintOnlyFollowup": {
+    "commit": "a6b9fae6a73516548b02e64c41cf1fc94ce43f01",
+    "sourceHashesUnchanged": 72,
+    "eslintExit": 0,
+    "cleanup": "cleanup.json"
   }
 }
