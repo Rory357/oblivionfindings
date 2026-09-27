@@ -512,7 +512,7 @@ export function FleetCalendar({
                 )}
             </FleetHeaderSlot>
             {vehicleCriteria.length > 0 && (
-                <Card className="flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-sm">
+                <Card className="flex flex-row flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-sm">
                     <span>Vehicle criteria: {vehicleCriteria.join(' · ')}</span>
                     <Button
                         variant="link"
