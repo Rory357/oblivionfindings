@@ -113,6 +113,13 @@ final class PeopleLocationService
         if ($selected && in_array($view, ['history', 'analytics'], true) && $actor->canDo('people_locations.history.view')) {
             $history = $this->permitted(fn () => $this->history($actor, $selected['id'], $filters['source'], $filters['date'], isset($filters['journey']) ? (int) $filters['journey'] : null));
         }
+        // Observation/history reads can outlive the original actor's permission cache.
+        // Compose independent response evidence and capabilities from current authority.
+        $actor = $actor->fresh();
+        abort_unless($actor && $this->mayEnter($actor), 403);
+        if (! $actor->canDo('people_locations.history.view')) {
+            $history = null;
+        }
         $alerts = $this->alerts($actor, $people, $returnTo);
 
         $boundaries = $view === 'map' ? ($this->permitted(fn () => $this->boundaries($actor, $people)) ?? []) : [];
@@ -303,11 +310,21 @@ final class PeopleLocationService
         $evidence = $this->evidence($assignment, $date, true, $journey);
         $currentActor = $actor->fresh();
         abort_unless($currentActor && $this->mayEnter($currentActor) && $currentActor->canDo('people_locations.history.view'), 403);
-        $fresh = $this->authorisedAssignments($currentActor, $client->fresh())->firstWhere('id', $assignment->id);
+        $currentClient = $client->fresh();
+        abort_unless($currentClient, 403);
+        $fresh = $this->authorisedAssignments($currentActor, $currentClient)->firstWhere('id', $assignment->id);
         abort_unless($fresh && hash_equals($fingerprint, app(ClientLocationAccessService::class)->fingerprint($fresh)), 403);
 
-        return ['needsSource' => false, 'personId' => $person, 'name' => $client->full_name, 'source' => $this->source($assignment),
-            'fingerprint' => $fingerprint, ...$evidence, 'journeys' => $journeys, 'journey' => $journey,
+        // Transport has independent authority and mutable canonical relationships.
+        // Day history remains available if Transport access ends, but its choices
+        // must be current. A selected journey must still describe the read window.
+        $currentJourneys = $this->journeys($currentActor, $currentClient, $date);
+        $currentJourney = $journeyId ? collect($currentJourneys)->firstWhere('id', $journeyId) : null;
+        abort_if($journeyId && ! $currentJourney, 404);
+        abort_if($journeyId && $currentJourney !== $journey, 409, 'The passenger journey changed. Reload the report.');
+
+        return ['needsSource' => false, 'personId' => $person, 'name' => $currentClient->full_name, 'source' => $this->source($fresh),
+            'fingerprint' => $fingerprint, ...$evidence, 'journeys' => $currentJourneys, 'journey' => $currentJourney,
             'scope' => $journey ? 'Selected Auckland day within the passenger journey' : 'Selected Auckland day'];
     }
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\SecurityDevices\Models\Device;
+use App\Models\AppSetting;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\AuditLog;
@@ -21,6 +22,7 @@ use Inertia\Testing\AssertableInertia;
 use Tests\Support\ClientLocationWorkspaceFixture;
 
 beforeEach(function () {
+    $this->travelTo(CarbonImmutable::parse('2026-09-27 12:00:00', 'Pacific/Auckland')->utc());
     Http::preventStrayRequests();
     Queue::fake();
 });
@@ -303,4 +305,107 @@ it('shows permitted shared boundary geometry without enabling personal monitorin
     expect($boundary->fresh()->is_active)->toBeFalse();
     $boundary->forceFill(['retired_at' => now()])->save();
     $this->getJson('/operations/people-locations/map')->assertOk()->assertJsonCount(0, 'boundaries');
+});
+
+it('refreshes independent alert authority and capabilities after observations', function () {
+    extract(peopleFixture());
+    foreach (['controlRoom.alerts.view', 'people_locations.export', 'hazards.manage'] as $key) {
+        grantPeoplePermission($actor, $key);
+    }
+    ControlRoomAlert::create(['source' => 'personal_tracker', 'alert_type' => 'fall_detected', 'severity' => 'critical',
+        'status' => 'open', 'site_id' => $site->id, 'client_id' => $client->id, 'reference_number' => 'PL-REVOKED-ALERT',
+        'context' => ['normalized_data' => ['client_id' => $client->id]], 'triggered_at' => now()]);
+    $role = $actor->roles()->first();
+    $this->mock(IntegrationEventHistoryService::class)->shouldReceive('forDeviceWindow')->andReturnUsing(function () use ($role) {
+        $role->permissions()->detach(Permission::whereIn('key', [
+            'controlRoom.alerts.view', 'people_locations.history.view', 'people_locations.export', 'hazards.manage',
+        ])->pluck('id'));
+
+        return ['positions' => collect(), 'truncated' => false];
+    });
+    $this->actingAs($actor->fresh())->getJson('/operations/people-locations/alerts')->assertOk()
+        ->assertJsonCount(1, 'people')->assertJsonCount(0, 'alerts')->assertJsonPath('canReadAlerts', false)
+        ->assertJsonPath('canViewHistory', false)->assertJsonPath('canExport', false)->assertJsonPath('staffAvailable', false)
+        ->assertDontSee('PL-REVOKED-ALERT')->assertDontSee('/control-room/alerts/');
+});
+
+function peopleJourney(array $fixture): FleetResidentTransport
+{
+    extract($fixture);
+    $asset = Asset::factory()->create(['category' => 'vehicle', 'site_id' => $site->id]);
+
+    return FleetResidentTransport::create(['asset_id' => $asset->id, 'resident_id' => $client->id,
+        'resident_name' => $client->full_name, 'site_id' => $site->id, 'driver_user_id' => $actor->id,
+        'transport_type' => 'medical', 'departed_at' => now()->subMinutes(40), 'arrived_at' => now()->subMinutes(20),
+        'dropoff_location' => 'Authorised passenger destination', 'status' => 'completed', 'journey_uuid' => (string) Str::uuid()]);
+}
+
+it('rechecks Transport scope and the selected window after reading report evidence', function (string $drift, int $status) {
+    $fixture = peopleFixture();
+    extract($fixture);
+    grantPeoplePermission($actor, 'fleet.viewAny');
+    $journey = peopleJourney($fixture);
+    $other = peopleFixture();
+    $role = $actor->roles()->first();
+    $this->mock(IntegrationEventHistoryService::class)->shouldReceive('forDeviceWindow')->andReturnUsing(function () use ($drift, $journey, $role, $other) {
+        match ($drift) {
+            'permission' => $role->permissions()->detach(Permission::where('key', 'fleet.viewAny')->value('id')),
+            'journey site' => $journey->update(['site_id' => $other['site']->id]),
+            'resident binding' => $journey->update(['resident_id' => $other['client']->id]),
+            'vehicle site' => $journey->asset->update(['site_id' => $other['site']->id]),
+            'window' => $journey->update(['arrived_at' => now()->subMinutes(30)]),
+            'unchanged' => null,
+        };
+
+        return ['positions' => collect(), 'truncated' => false];
+    });
+    $response = $this->actingAs($actor->fresh())->getJson('/operations/people-locations/report-preview?'.http_build_query([
+        'person' => 'c'.$client->id, 'source' => $assignment->id,
+        'date' => now('Pacific/Auckland')->toDateString(), 'journey' => $journey->id,
+    ]))->assertStatus($status);
+    if ($status === 200) {
+        $response->assertJsonPath('journey.id', $journey->id)->assertJsonCount(1, 'journeys')
+            ->assertJsonPath('window.from', $journey->departed_at->toISOString())
+            ->assertJsonPath('window.to', $journey->arrived_at->toISOString());
+    } else {
+        $response->assertDontSee('Authorised passenger destination')->assertDontSee('/fleet-assets/transports/'.$journey->id);
+    }
+})->with([
+    'Transport permission revoked' => ['permission', 404],
+    'journey Site changed' => ['journey site', 404],
+    'resident relationship changed' => ['resident binding', 404],
+    'vehicle canonical Site changed' => ['vehicle site', 404],
+    'selected passenger window changed' => ['window', 409],
+    'unchanged authorised journey' => ['unchanged', 200],
+]);
+
+it('preserves independent day history while removing newly inaccessible journey choices', function (string $surface) {
+    $fixture = peopleFixture();
+    extract($fixture);
+    grantPeoplePermission($actor, 'fleet.viewAny');
+    $journey = peopleJourney($fixture);
+    $role = $actor->roles()->first();
+    $this->mock(IntegrationEventHistoryService::class)->shouldReceive('forDeviceWindow')->andReturnUsing(function () use ($role) {
+        $role->permissions()->detach(Permission::where('key', 'fleet.viewAny')->value('id'));
+
+        return ['positions' => collect(), 'truncated' => false];
+    });
+    $query = http_build_query(['person' => 'c'.$client->id, 'selected' => 'c'.$client->id,
+        'source' => $assignment->id, 'date' => now('Pacific/Auckland')->toDateString()]);
+    $response = $this->actingAs($actor->fresh())->getJson('/operations/people-locations/'.$surface.'?'.$query)->assertOk();
+    $prefix = $surface === 'history' ? 'history.' : '';
+    $response->assertJsonPath($prefix.'needsSource', false)->assertJsonPath($prefix.'journey', null)
+        ->assertJsonCount(0, $prefix.'journeys')->assertDontSee('Authorised passenger destination')
+        ->assertDontSee('/fleet-assets/transports/'.$journey->id);
+})->with(['history', 'report-preview']);
+
+it('renders organisation brand tokens for both themes without literal template text', function () {
+    extract(peopleFixture());
+    foreach (['light' => 'oklch(0.5 0.12 190)', 'dark' => 'oklch(0.72 0.12 190)'] as $mode => $colour) {
+        AppSetting::updateOrCreate(['key' => 'theme.'.$mode], ['value' => ['--primary' => $colour]]);
+    }
+    $this->actingAs($actor)->get('/operations/people-locations/map')->assertOk()
+        ->assertSee('html:root { --primary: oklch(0.5 0.12 190); }', false)
+        ->assertSee('html.dark { --primary: oklch(0.72 0.12 190); }', false)
+        ->assertDontSee('! ! $lightCss ! !', false)->assertDontSee('! ! $darkCss ! !', false);
 });

@@ -121,18 +121,11 @@ if ($_userReduceMotion) {
 
     @if($lightCss || $darkCss)
     <style>
-        @if($lightCss) :root {
-                {
-                ! ! $lightCss ! !
-            }
-        }
-
-        @endif @if($darkCss) .dark {
-                {
-                ! ! $darkCss ! !
-            }
-        }
-
+        @if($lightCss)
+        html:root { {!! $lightCss !!} }
+        @endif
+        @if($darkCss)
+        html.dark { {!! $darkCss !!} }
         @endif
     </style>
     @endif

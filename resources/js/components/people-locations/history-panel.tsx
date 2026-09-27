@@ -77,7 +77,7 @@ function HistoricalMap({
             tooltip.textContent = time(event.at);
             L.circleMarker(point, {
                 radius: 6,
-                color: '#6855ee',
+                color: 'var(--primary)',
                 fillOpacity: 0.65,
             })
                 .bindTooltip(tooltip)

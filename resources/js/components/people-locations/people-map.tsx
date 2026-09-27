@@ -262,7 +262,7 @@ export default function PeopleMap({
                 shape.type === 'circle'
                     ? L.circle([shape.center.lat, shape.center.lng], {
                           radius: shape.radius_m,
-                          color: '#6855ee',
+                          color: 'var(--primary)',
                           dashArray: '6 6',
                           fillOpacity: 0.05,
                       })
@@ -271,7 +271,7 @@ export default function PeopleMap({
                               (p) => [p.lat, p.lng] as L.LatLngTuple,
                           ),
                           {
-                              color: '#6855ee',
+                              color: 'var(--primary)',
                               dashArray: '6 6',
                               fillOpacity: 0.05,
                           },

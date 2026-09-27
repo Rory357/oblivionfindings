@@ -1,7 +1,7 @@
 {
   "base": "926b4981b0289da08a20baca0995117fb53e413e",
   "branch": "codex/ops-pl01-implementation",
-  "digest": "8fd11b434ae835f8aa7c21f490460d560fc43f749faa745d79a1097c935cd977",
+  "digest": "e36113fe3fa5d204824594bf0dfc67584656ba65694485431cbf7fb92d2d1437",
   "files": [
     {
       "path": "app/Domain/SecurityDevices/Services/PersonalTrackingPrivacyService.php",
@@ -50,8 +50,8 @@
     },
     {
       "path": "app/Services/Tracking/PeopleLocationService.php",
-      "sha256": "af91e5a629e54b5d92a7160dd39402661da92161d29a7441477a8a21f8ff8c38",
-      "bytes": 25263
+      "sha256": "f2176f1cf9806c63d4a5b1af590d9e1e8ae16565831e760e095416c1ccf23acf",
+      "bytes": 26353
     },
     {
       "path": "database/migrations/2026_09_27_230000_add_people_location_export_permission.php",
@@ -90,8 +90,8 @@
     },
     {
       "path": "resources/js/components/people-locations/history-panel.tsx",
-      "sha256": "26b1890708f149033a9f801a79ac051902b94dd2e547c2de957f6264edb60430",
-      "bytes": 17624
+      "sha256": "c624767bc10ff21188459e2941bfae6f148396178b3967fc1329ef1a344a6e3a",
+      "bytes": 17631
     },
     {
       "path": "resources/js/components/people-locations/model.test.ts",
@@ -105,8 +105,8 @@
     },
     {
       "path": "resources/js/components/people-locations/people-map.tsx",
-      "sha256": "1dea0507dcbf0dc61eb7da198bc4d554b8f1b62b76003c6dd13bc10a78dffdd2",
-      "bytes": 14803
+      "sha256": "2e1ecb95b1e1f6ebbc5733b92c02274ec3db383918aea77e3f0d08b4f7394bfa",
+      "bytes": 14817
     },
     {
       "path": "resources/js/components/people-locations/people-view.tsx",
@@ -169,6 +169,11 @@
       "bytes": 56294
     },
     {
+      "path": "resources/views/app.blade.php",
+      "sha256": "74b9099b03a2452bc93d28c8ecfc2bdc44097408fe57bae6c7919369274fcaaa",
+      "bytes": 6137
+    },
+    {
       "path": "resources/views/pdf/people-location-report.blade.php",
       "sha256": "fc9232e7cc9293c5a86dfe59d06f547b5cd252dcf3b76f9d0ff01647d69385f6",
       "bytes": 3717
@@ -195,8 +200,8 @@
     },
     {
       "path": "tests/Feature/Operations/PeopleLocationsTest.php",
-      "sha256": "158a12215b8479fb74709aef0ec00a21ee01841b06b169e7cca2254a6d246516",
-      "bytes": 20706
+      "sha256": "f193bb67b7c3e655eeb953352db5d4be3e4a60bb8caa48f27ab3453353d087b1",
+      "bytes": 27120
     },
     {
       "path": "tests/Feature/SecurityDevices/CanonicalIntegrationEventHistoryTest.php",
@@ -208,5 +213,6 @@
       "sha256": "29e22a39306792716c443d1f2d76937b3e0397d6b798487d78d79f1a6d8e5c2d",
       "bytes": 1079
     }
-  ]
+  ],
+  "digestAlgorithm": "SHA256 of sorted path + space + lowercase file SHA256 lines; UTF-8; LF; trailing LF"
 }
