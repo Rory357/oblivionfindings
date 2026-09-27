@@ -1,0 +1,37 @@
+
+  [30;43;1m WARN [39;49;22m[39m PKG06BRevisionReviewTest[39m
+  [33;1m![39;22m[90m [39m[90mdispatch does not move asset and receipt requires every kit item[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.code[39m[90m…[39m [90m295.08s[39m  
+  [33;1m![39;22m[90m [39m[90msame command replays once but changed and stale submissions are rejected[39m[90m [39m[33m→ file_get_contents(C:\Users\steph[39m[90m…[39m [90m0.86s[39m  
+  [33;1m![39;22m[90m [39m[90mprofile uses canonical assignment receipts and requires explicit attestation[39m[90m [39m[33m→ file_get_contents(C:\Users\s[39m[90m…[39m [90m0.96s[39m  
+  [33;1m![39;22m[90m [39m[90mlinked components move only with an acknowledged kit receipt[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\work[39m[90m…[39m [90m0.87s[39m  
+  [33;1m![39;22m[90m [39m[90mpermissions and foreign asset file ids are enforced[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\882[39m[90m…[39m [90m0.90s[39m  
+  [33;1m![39;22m[90m [39m[90mfiles are scanned versioned and archived without losing bytes[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\wor[39m[90m…[39m [90m5.15s[39m  
+  [33;1m![39;22m[90m [39m[90mprofile and printable qr return real authorised content[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees[39m[90m…[39m [90m1.64s[39m  
+  [33;1m![39;22m[90m [39m[90masset finance requests reuse the finance queue and duplicate boundary[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.c[39m[90m…[39m [90m0.77s[39m  
+  [33;1m![39;22m[90m [39m[90mschema probe stays in the configured application schema[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees[39m[90m…[39m [90m0.73s[39m  
+  [33;1m![39;22m[90m [39m[90msource costs exclude estimates drafts reversals old and foreign allocations[39m[90m [39m[33m→ file_get_contents(C:\Users\st[39m[90m…[39m [90m0.79s[39m  
+  [33;1m![39;22m[90m [39m[90moriginal check evidence uses source permissions and submitted template[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.[39m[90m…[39m [90m0.86s[39m  
+  [33;1m![39;22m[90m [39m[90mscan identity is server owned and foreign observations are withheld[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m [90m0.75s[39m  
+  [33;1m![39;22m[90m [39m[90mbulk labels support both media replay protection and access revocation[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.[39m[90m…[39m [90m2.08s[39m  
+  [33;1m![39;22m[90m [39m[90mviewers cannot create missing qr identity and expired batches cannot download[39m[90m [39m[33m→ file_get_contents(C:\Users</>…[39m[90m [39m[90m2.25s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlabel workspace filters canonical lifecycle without leaking other sites[39m[90m [39m[33m→ file_get_contents(C:\Users\steph</>…[39m[90m [39m[90m0.63s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mpublished label history replays its original layout but new batches use the shared minimum[39m[90m [39m[33m→ file_get_conte[39m[90m…[39m[90m [39m[90m1.00s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mpending receipt blocks register room edits and rechecks the destination room[39m[90m [39m[33m→ file_get_contents(C:\Users\s[39m[90m…[39m[90m [39m[90m0.81s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mownership requires its permission and preserves canonical placement[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m[90m [39m[90m0.93s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreplacement review records a request without retiring or posting[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex</>…[39m[90m [39m[90m0.62s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90masset visibility does not expand finance review scope or replacement details[39m[90m [39m[33m→ file_get_contents(C:\Users\s[39m[90m…[39m[90m [39m[90m1.10s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcomplete ordinary edits cannot split parent or component but unrelated edits and unlinked moves work[39m[90m [39m[33m→ file[39m[90m…[39m[90m [39m[90m0.85s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlinked kit room home site and client placement cannot be changed by ordinary edit[39m[90m [39m[33m→ file_get_contents(C:\Us[39m[90m…[39m[90m [39m[90m0.86s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcomponent with an unresolved movement cannot be linked to a kit[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m1.00s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90moutstanding component loan must return before kit linking[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktre[39m[90m…[39m[90m [39m[90m0.91s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreceipt refuses a legacy independently linked component until explicitly removed[39m[90m [39m[33m→ file_get_contents(C:\Use[39m[90m…[39m[90m [39m[90m0.76s[39m[90m  [39m
+[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\Pkg07MapPrivacyTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mdirectory and history withhold private vehicle evidence even without a trip link[39m[90m [39m[33m→ file_get_contents(C:\Use[39m[90m…[39m[90m [39m[90m1.03s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mevent visibility uses its exact source and keeps unrelated permitted history[39m[90m [39m[33m→ file_get_contents(C:\Users\s[39m[90m…[39m[90m [39m[90m0.56s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mgeofence evaluator retains the source for entry dwell and breach[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex</>…[39m[90m [39m[90m0.41s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90masset positions require observations from the current unambiguous pairing[39m[90m [39m[33m→ file_get_contents(C:\Users\step[39m[90m…[39m[90m [39m[90m0.80s[39m[90m  [39m
+
+[90m  [39m[90mTests:[39m[90m    [39m[33;1m29 warnings[39;22m[90m (450 assertions)[39m
+[90m  [39m[90mDuration:[39m[90m [39m[39m326.22s[39m
+

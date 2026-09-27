@@ -1,0 +1,65 @@
+[
+  {
+    "check": "Browser warranty download",
+    "path": "C:\\Users\\steph\\Downloads\\warranty-104.pdf"
+  },
+  {
+    "check": "Warranty PDF rendered",
+    "passed": true,
+    "width": 900,
+    "downloadHashVerified": true
+  },
+  {
+    "check": "PDF second page, zoom 125%, extracted text",
+    "passed": true
+  },
+  {
+    "check": "Previous page and fit width",
+    "state": "Page 1 of 2"
+  },
+  {
+    "check": "Archived version has retained PDF",
+    "passed": true
+  },
+  {
+    "check": "Image viewer and download offered",
+    "passed": true
+  },
+  {
+    "check": "Unavailable file blocked",
+    "noDownload": true,
+    "body": "Service report\n\nAS-104 · Transfer hoist · Private record\n\nFile unavailable\n\nThe file could not be retrieved. Its record and version history are still available.\n\nOriginal source\nMaintenance · MW-271\nAdded\nHarbour Equipment · 25 Sep 2026\nFile identity\nDOC-104-4 · Version 1\n\nThe source file cannot currently be retrieved. The record and its history remain available; retry in the source workspace.\n\nRetry retrieval\n\nThese are downloadable design samples. Real documents remain subject to the original source’s access and file checks.\n\nClose\nVersion history\nSynthetic preview · Changes stay in this tab"
+  },
+  {
+    "check": "Quarantine blocked",
+    "noDownload": true,
+    "body": "Calibration certificate\n\nAS-104 · Transfer hoist · Private record\n\nFile access blocked\n\nThe source owner must resolve the file check before this attachment can be viewed or downloaded.\n\nOriginal source\nMaintenance evidence · MW-271\nAdded\nNia Patel · 26 Sep 2026\nFile identity\nDOC-104-5 · Version 1\n\nAccess is blocked while the source owner resolves the file check. No clean scan is asserted by this mockup.\n\nFile access is blocked\n\nAsk the source owner to resolve the file check. No preview or download is offered.\n\nThese are downloadable design samples. Real documents remain subject to the original source’s access and file checks.\n\nClose\nVersion history\nSynthetic preview · Changes stay in this tab"
+  },
+  {
+    "check": "Read-only may read but not change",
+    "download": true,
+    "replaceDisabled": true
+  },
+  {
+    "check": "Denied scenario hides library and file links",
+    "passed": true
+  },
+  {
+    "check": "Card menu offers view, download and history",
+    "passed": true
+  },
+  {
+    "check": "Card menu opens version history",
+    "passed": false
+  },
+  {
+    "check": "Final PDF viewer renders and downloads original",
+    "loaded": true,
+    "naturalWidth": 893,
+    "src": "/files/transfer-hoist-manual-page-1.png"
+  },
+  {
+    "check": "Final toolbar PDF download",
+    "path": "C:\\Users\\steph\\Downloads\\transfer-hoist-manual.pdf"
+  }
+]

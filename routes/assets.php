@@ -7,6 +7,7 @@ use App\Http\Controllers\AssetGeofenceController;
 use App\Http\Controllers\AssetInspectionController;
 use App\Http\Controllers\AssetMaintenanceController;
 use App\Http\Controllers\AssetOwnershipController;
+use App\Http\Controllers\AssetProfileController;
 use App\Http\Controllers\AssetQrController;
 use App\Http\Controllers\AssetScanEventController;
 use App\Http\Controllers\AssetTelemetryIngestController;
@@ -31,6 +32,10 @@ Route::post('/telemetry/ingest/{vendor}', [AssetTelemetryIngestController::class
     ->name('assets.telemetry.ingest');
 
 Route::middleware(['auth'])->group(function () {
+    Route::post('/assets/{asset}/profile-actions', [AssetProfileController::class, 'command'])
+        ->whereNumber('asset')->name('assets.profile.actions');
+    Route::get('/assets/{asset}/profile-options', [AssetProfileController::class, 'options'])
+        ->whereNumber('asset')->name('assets.profile.options');
     // Sites
     Route::middleware('permission:sites.viewAny')->group(function () {
         Route::get('/sites', [SiteController::class, 'index'])->name('sites.index');
@@ -147,11 +152,13 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware('permission:assets.viewAny|assets.viewAssigned')->group(function () {
         // QR code redirect (public-ish, but auth required)
+        Route::post('/assets/{asset}/finance-review', [AssetProfileController::class, 'financeReview'])->whereNumber('asset')->name('assets.finance-review');
         Route::get('/assets/qr/{token}', [AssetQrController::class, 'redirectByToken'])
             ->name('assets.qr.redirect');
 
         // QR code generation (rate limited)
         Route::middleware(['throttle:qr-generation'])->group(function () {
+            Route::get('/assets/{asset}/qr/labels', [AssetQrController::class, 'labels'])->whereNumber('asset')->name('assets.qr.labels');
             Route::get('/assets/{asset}/qr.png', [AssetQrController::class, 'png'])
                 ->whereNumber('asset')
                 ->name('assets.qr.png');
@@ -198,6 +205,12 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/assets/{asset}/documents/{document}', [AssetDocumentController::class, 'destroy'])
             ->whereNumber('asset')
             ->name('assets.documents.destroy');
+    });
+
+    Route::middleware('permission:assets.documents.manage')->group(function () {
+        Route::post('/assets/{asset}/documents/{document}/replace', [AssetDocumentController::class, 'replace'])->whereNumber(['asset', 'document'])->name('assets.documents.replace');
+        Route::post('/assets/{asset}/documents/{document}/archive', [AssetDocumentController::class, 'archive'])->whereNumber(['asset', 'document'])->name('assets.documents.archive');
+        Route::post('/assets/{asset}/documents/{document}/retry', [AssetDocumentController::class, 'retry'])->whereNumber(['asset', 'document'])->name('assets.documents.retry');
     });
 
     Route::middleware('permission:assets.scan.record')->group(function () {

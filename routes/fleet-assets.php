@@ -52,6 +52,7 @@ use Inertia\Inertia;
 
 Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     Route::middleware('permission:assets.viewAny|assets.viewAssigned')->prefix('asset-register')->group(function () {
+        Route::get('/labels/workspace', [AssetLabelController::class, 'workspace'])->name('fleet-assets.asset-labels.workspace');
         Route::get('/rooms', [AssetController::class, 'rooms']);
         Route::get('/stocktakes', [AssetStocktakeController::class, 'index']);
         Route::get('/stocktake-checklist', [AssetStocktakeController::class, 'checklist']);

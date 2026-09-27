@@ -208,7 +208,7 @@ class AssetRegisterWorkflowTest extends TestCase
 
     private function labelPayload(array $ids): array
     {
-        return ['request_id' => (string) Str::uuid(), 'asset_ids' => $ids, 'layout' => ['width' => 60, 'height' => 45, 'margin' => 10, 'gap' => 3, 'copies' => 1, 'start' => 1]];
+        return ['request_id' => (string) Str::uuid(), 'asset_ids' => $ids, 'layout' => ['width' => 60, 'height' => 50, 'margin' => 10, 'gap' => 3, 'copies' => 1, 'start' => 1]];
     }
 
     public function test_newly_conflicting_import_row_can_be_retried_without_repeating_successes(): void

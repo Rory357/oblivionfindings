@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { router } from '@inertiajs/react';
@@ -9,6 +10,8 @@ import { api, download, type Page, REGISTER, stamp } from './api';
 import { ErrorNotice, Paging } from './controls';
 
 type Layout = {
+    paper?: 'a4' | 'label';
+    logo?: boolean;
     width: number;
     height: number;
     margin: number;
@@ -40,8 +43,10 @@ export function Labels({
     onClear: () => void;
 }) {
     const [layout, setLayout] = useState<Layout>({
+        paper: 'a4',
+        logo: true,
         width: 60,
-        height: 45,
+        height: 50,
         margin: 10,
         gap: 3,
         copies: 1,
@@ -55,22 +60,31 @@ export function Labels({
     const [busy, setBusy] = useState('');
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
+    const [preparedDownload, setPreparedDownload] = useState<{
+        href: string;
+        name: string;
+    } | null>(null);
     const requestId = useRef(crypto.randomUUID());
     const aborter = useRef<AbortController | null>(null);
-    const columns = Math.max(
-        0,
-        Math.floor(
-            (210 - layout.margin * 2 + layout.gap) /
-                (layout.width + layout.gap),
-        ),
-    );
-    const rows = Math.max(
-        0,
-        Math.floor(
-            (297 - layout.margin * 2 + layout.gap) /
-                (layout.height + layout.gap),
-        ),
-    );
+    const sheet = layout.paper !== 'label';
+    const columns = sheet
+        ? Math.max(
+              0,
+              Math.floor(
+                  (210 - layout.margin * 2 + layout.gap) /
+                      (layout.width + layout.gap),
+              ),
+          )
+        : 1;
+    const rows = sheet
+        ? Math.max(
+              0,
+              Math.floor(
+                  (297 - layout.margin * 2 + layout.gap) /
+                      (layout.height + layout.gap),
+              ),
+          )
+        : 1;
     const total = selected.length * layout.copies;
     const sheets =
         columns * rows
@@ -81,9 +95,20 @@ export function Labels({
         selected.length <= 200 &&
         total <= 1000 &&
         columns * rows > 0 &&
+        layout.start >= 1 &&
         layout.start <= columns * rows &&
-        layout.width >= 40 &&
-        layout.height >= 40;
+        layout.width >= 50 &&
+        layout.width <= 190 &&
+        layout.height >= 46 &&
+        layout.height <= 277 &&
+        layout.margin >= (sheet ? 5 : 0) &&
+        layout.margin <= 30 &&
+        layout.gap >= 0 &&
+        layout.gap <= 15 &&
+        Number.isInteger(layout.copies) &&
+        layout.copies >= 1 &&
+        layout.copies <= 20 &&
+        Number.isInteger(layout.start);
     useEffect(() => {
         const controller = new AbortController();
         void api<Page<LabelBatch>>(
@@ -102,6 +127,7 @@ export function Labels({
         setBusy('batch');
         setError('');
         setMessage('');
+        setPreparedDownload(null);
         try {
             setBatch(
                 await api<LabelBatch>('/labels', 'POST', {
@@ -122,6 +148,7 @@ export function Labels({
         setBusy(`${item.id}-${format}`);
         setError('');
         setMessage('Preparing your labels…');
+        setPreparedDownload(null);
         const controller = new AbortController();
         aborter.current = controller;
         try {
@@ -133,6 +160,10 @@ export function Labels({
             setMessage(
                 'Download prepared. Check the file before printing at 100% / actual size.',
             );
+            setPreparedDownload({
+                href: `${REGISTER}/labels/${item.id}/${format}`,
+                name: `asset-labels-${item.id}.${format}`,
+            });
         } catch (e) {
             if ((e as Error).name === 'AbortError')
                 setMessage(
@@ -149,9 +180,11 @@ export function Labels({
             router.reload({ only: ['workflow_metrics'] });
         }
     }
-    const change = (key: keyof Layout, value: number) => {
+    const change = (key: keyof Layout, value: number | boolean) => {
         setLayout({ ...layout, [key]: value });
         setBatch(null);
+        setMessage('');
+        setPreparedDownload(null);
         requestId.current = crypto.randomUUID();
     };
     return (
@@ -162,7 +195,7 @@ export function Labels({
                         Create asset labels
                     </h2>
                     <p className="text-sm text-muted-foreground">
-                        Select assets in Inventory, choose a sheet layout, then
+                        Select assets in Inventory, choose a print layout, then
                         download your labels.
                     </p>
                 </div>
@@ -202,7 +235,7 @@ export function Labels({
                         )}
                     </div>
                     <label className="block text-sm font-semibold">
-                        Sheet preset
+                        Print preset
                         <select
                             className="mt-2 block h-11 w-full rounded-md border bg-background px-3 font-normal"
                             defaultValue="standard"
@@ -210,6 +243,8 @@ export function Labels({
                                 const next =
                                     e.target.value === 'large'
                                         ? {
+                                              paper: 'a4' as const,
+                                              logo: layout.logo,
                                               width: 90,
                                               height: 60,
                                               margin: 10,
@@ -217,24 +252,42 @@ export function Labels({
                                               copies: 1,
                                               start: 1,
                                           }
-                                        : {
-                                              width: 60,
-                                              height: 45,
-                                              margin: 10,
-                                              gap: 3,
-                                              copies: 1,
-                                              start: 1,
-                                          };
+                                        : e.target.value === 'label'
+                                          ? {
+                                                paper: 'label' as const,
+                                                logo: layout.logo,
+                                                width: 60,
+                                                height: 50,
+                                                margin: 0,
+                                                gap: 0,
+                                                copies: 1,
+                                                start: 1,
+                                            }
+                                          : {
+                                                paper: 'a4' as const,
+                                                logo: layout.logo,
+                                                width: 60,
+                                                height: 50,
+                                                margin: 10,
+                                                gap: 3,
+                                                copies: 1,
+                                                start: 1,
+                                            };
                                 setLayout(next);
                                 setBatch(null);
+                                setMessage('');
+                                setPreparedDownload(null);
                                 requestId.current = crypto.randomUUID();
                             }}
                         >
                             <option value="standard">
-                                A4 · 60 × 45 mm labels
+                                A4 · 60 × 50 mm labels
                             </option>
                             <option value="large">
                                 A4 · 90 × 60 mm labels
+                            </option>
+                            <option value="label">
+                                Label printer · custom size
                             </option>
                         </select>
                     </label>
@@ -255,7 +308,39 @@ export function Labels({
                                     type="number"
                                     aria-label={label}
                                     className="mt-1.5 h-11"
-                                    min={key === 'gap' ? 0 : 1}
+                                    min={
+                                        key === 'width'
+                                            ? 50
+                                            : key === 'height'
+                                              ? 46
+                                              : key === 'margin'
+                                                ? sheet
+                                                    ? 5
+                                                    : 0
+                                                : key === 'gap'
+                                                  ? 0
+                                                  : 1
+                                    }
+                                    max={
+                                        key === 'width'
+                                            ? 190
+                                            : key === 'height'
+                                              ? 277
+                                              : key === 'margin'
+                                                ? 30
+                                                : key === 'gap'
+                                                  ? 15
+                                                  : key === 'copies'
+                                                    ? 20
+                                                    : Math.max(
+                                                          1,
+                                                          columns * rows,
+                                                      )
+                                    }
+                                    disabled={
+                                        !sheet &&
+                                        ['margin', 'gap', 'start'].includes(key)
+                                    }
                                     value={layout[key]}
                                     onChange={(e) =>
                                         change(key, Number(e.target.value))
@@ -264,9 +349,23 @@ export function Labels({
                             </label>
                         ))}
                     </div>
+                    <label className="flex min-h-11 items-center gap-3 text-sm">
+                        <Checkbox
+                            checked={layout.logo ?? true}
+                            onCheckedChange={(value) =>
+                                change('logo', value === true)
+                            }
+                        />
+                        Include company logo from Branding settings
+                    </label>
                     <p className="text-sm">
                         {columns} columns × {rows} rows · {total} labels ·{' '}
-                        {sheets} A4 {sheets === 1 ? 'sheet' : 'sheets'}
+                        {sheets}{' '}
+                        {sheet
+                            ? sheets === 1
+                                ? 'A4 sheet'
+                                : 'A4 sheets'
+                            : 'label pages'}
                     </p>
                     <p className="text-xs text-muted-foreground">
                         QR identities stay the same when labels are regenerated.
@@ -320,10 +419,18 @@ export function Labels({
                     )}
                 </div>
                 <aside className="rounded-xl bg-muted p-4">
-                    <h3 className="mb-3 font-semibold">A4 placement preview</h3>
+                    <h3 className="mb-3 font-semibold">
+                        {sheet
+                            ? 'A4 placement preview'
+                            : 'Label placement preview'}
+                    </h3>
                     <div
                         className="relative w-full overflow-hidden border bg-white shadow-sm"
-                        style={{ aspectRatio: '210/297' }}
+                        style={{
+                            aspectRatio: sheet
+                                ? '210/297'
+                                : `${layout.width}/${layout.height}`,
+                        }}
                     >
                         {Array.from(
                             { length: Math.min(columns * rows, 80) },
@@ -332,10 +439,18 @@ export function Labels({
                                     key={index}
                                     className="absolute flex flex-col items-center justify-center overflow-hidden border border-dashed border-border text-black"
                                     style={{
-                                        left: `${((layout.margin + (index % columns) * (layout.width + layout.gap)) / 210) * 100}%`,
-                                        top: `${((layout.margin + Math.floor(index / columns) * (layout.height + layout.gap)) / 297) * 100}%`,
-                                        width: `${(layout.width / 210) * 100}%`,
-                                        height: `${(layout.height / 297) * 100}%`,
+                                        left: sheet
+                                            ? `${((layout.margin + (index % columns) * (layout.width + layout.gap)) / 210) * 100}%`
+                                            : 0,
+                                        top: sheet
+                                            ? `${((layout.margin + Math.floor(index / columns) * (layout.height + layout.gap)) / 297) * 100}%`
+                                            : 0,
+                                        width: sheet
+                                            ? `${(layout.width / 210) * 100}%`
+                                            : '100%',
+                                        height: sheet
+                                            ? `${(layout.height / 297) * 100}%`
+                                            : '100%',
                                         opacity:
                                             index < layout.start - 1 ? 0.25 : 1,
                                     }}
@@ -351,7 +466,7 @@ export function Labels({
                         )}
                     </div>
                     <p className="mt-3 text-xs text-muted-foreground">
-                        This shows sheet positions. Open the generated PDF to
+                        This shows print positions. Open the generated PDF to
                         check the actual logo, asset names and scannable labels.
                         Print at actual size with no fit-to-page scaling.
                     </p>
@@ -360,9 +475,22 @@ export function Labels({
             {message && (
                 <div
                     role="status"
-                    className="flex items-center justify-between rounded-xl bg-muted p-4 text-sm"
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted p-4 text-sm"
                 >
                     <span>{message}</span>
+                    {preparedDownload && !busy && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span>If the download did not start:</span>
+                            <Button variant="outline" asChild>
+                                <a
+                                    href={preparedDownload.href}
+                                    download={preparedDownload.name}
+                                >
+                                    Save file directly
+                                </a>
+                            </Button>
+                        </div>
+                    )}
                     {busy && busy !== 'batch' && (
                         <Button
                             variant="outline"

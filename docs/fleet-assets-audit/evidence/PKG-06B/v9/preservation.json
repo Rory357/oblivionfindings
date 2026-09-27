@@ -1,0 +1,287 @@
+{
+  "prior": "PKG-06B-v8",
+  "count": 70,
+  "allUnchanged": true,
+  "files": [
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/01-label-layout.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/02-qr-dark-1024.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/03-finance-review.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/04-smallest-label.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/05-linked-bulk-workspace.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/REVIEW.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-export-verification.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-exports/AS-104-a4-1-labels-DEMO-page-1.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-exports/AS-104-a4-1-labels-DEMO.pdf",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-exports/AS-104-a4-1-labels-DEMO.svg",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-exports/AS-104-a4-3-labels-DEMO-page-1.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-exports/AS-104-a4-3-labels-DEMO-page-2.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-exports/AS-104-a4-3-labels-DEMO.pdf",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-exports/AS-104-a4-3-labels-DEMO.svg",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-exports/AS-104-single-1-labels-DEMO-page-1.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-exports/AS-104-single-1-labels-DEMO.pdf",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-exports/AS-104-single-1-labels-DEMO.svg",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-exports/AS-104-single-2-labels-DEMO-page-1.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-exports/AS-104-single-2-labels-DEMO-page-2.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-exports/AS-104-single-2-labels-DEMO.pdf",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branded-exports/AS-104-single-2-labels-DEMO.svg",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branding-logo-sample.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/branding-validation.cjs",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/browser-results.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/build-inputs.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/export-verification.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/exports/AS-104-a4-1-labels-DEMO-page-1.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/exports/AS-104-a4-1-labels-DEMO.pdf",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/exports/AS-104-a4-3-labels-DEMO-page-1.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/exports/AS-104-a4-3-labels-DEMO-page-2.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/exports/AS-104-a4-3-labels-DEMO.pdf",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/exports/AS-104-qr-DEMO.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/exports/AS-104-qr-DEMO.svg",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/exports/AS-104-single-1-labels-DEMO-page-1.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/exports/AS-104-single-1-labels-DEMO.pdf",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/exports/AS-104-single-2-labels-DEMO-page-1.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/exports/AS-104-single-2-labels-DEMO-page-2.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/exports/AS-104-single-2-labels-DEMO.pdf",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/final-qr-label-1600.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/final-qr-label-branded-native.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/final-qr-label-branded.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/make-demo-qr.py",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/preservation.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/qr-export-validation.cjs",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/reference-qr.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/render-branded-exports.cjs",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/server.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/source-references.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/typecheck.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/verify-branded-exports.py",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v8/verify-exports.py",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/pages/PKG-06B-asset-profile-v8.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/app.css",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/app.js",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/asset-branding.ts",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/asset-finance.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/asset-qr.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/asset-records.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/build.cjs",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/finance-request-ui.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/finance.css",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/index.html",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/modal-ui.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/modal.css",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/profile.css",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/profile.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/qr-export.ts",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/qr-matrix.ts",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/qr.css",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v8/serve.cjs",
+      "unchanged": true
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "DOC-104-1:3": {
+    "filename": "transfer-hoist-manual.pdf",
+    "mime": "application/pdf",
+    "bytes": 43617,
+    "pages": [
+      "transfer-hoist-manual-page-1.png",
+      "transfer-hoist-manual-page-2.png"
+    ],
+    "text": [
+      "OBLIVION CARE  /  ASSET DOCUMENTS\nOperating manual\nDESIGN SAMPLE - NOT AN OPERATIONAL DOCUMENT\nAsset\nAS-104 - Transfer hoist\nSite\nKōwhai House / Equipment room\nVersion\n3 - 12 Sep 2026\nAbout this file\nThis is a real PDF supplied only to demonstrate viewing, page navigation and downloading in the Asset\nProfile design. It is not a manufacturer manual and contains no operating or servicing instructions.\nDocument identity\nDocument set DS-104-1. Added to the synthetic library by Mara Ellis. Version 3 is the current example;\nversion 2 remains available in history.\nSource ownership\nThe asset document set owns this file. Checks and Maintenance retain their own submitted evidence.\nUpdating this file does not replace an attachment on an earlier check.\ntransfer-hoist-manual.pdf  |  Synthetic record\nPage 1 of 2\n",
+      "OBLIVION CARE  /  ASSET DOCUMENTS\nDocument revision notes\nDESIGN SAMPLE - NOT AN OPERATIONAL DOCUMENT\nAsset\nAS-104 - Transfer hoist\nSite\nKōwhai House / Equipment room\nVersion\n3 - 12 Sep 2026\nVersion 3\nCurrent sample dated 12 Sep 2026. A second page demonstrates that every page can be viewed in the\ndocument reader.\nVersion 2\nEarlier sample dated 4 Feb 2026. The library preserves its original file and version identity.\nOperational use\nUse the approved manufacturer documentation and organisation procedures for real equipment. This\nsynthetic PDF grants no approval and supplies no inspection or release criteria.\ntransfer-hoist-manual.pdf  |  Synthetic record\nPage 2 of 2\n"
+    ]
+  },
+  "DOC-104-2:1": {
+    "filename": "warranty-104.pdf",
+    "mime": "application/pdf",
+    "bytes": 42374,
+    "pages": [
+      "warranty-104-page-1.png"
+    ],
+    "text": [
+      "OBLIVION CARE  /  ASSET DOCUMENTS\nPurchase & warranty\nDESIGN SAMPLE - NOT AN OPERATIONAL DOCUMENT\nAsset\nAS-104 - Transfer hoist\nSite\nKōwhai House / Equipment room\nVersion\n1 - 18 Mar 2025\nIllustrative supplier record\nSupplier: Harbour Equipment. Asset: AS-104 Transfer hoist. Purchase reference: BILL-104. These names\nand references are synthetic.\nDates shown in the mockup\nIllustrative purchase date: 18 Mar 2025. Illustrative warranty end: 18 Mar 2027. These dates are sample\ndata, not actual coverage or contractual terms.\nSeparate Finance source\nThe purchase invoice and fixed-asset record are linked in Finance. Downloading this document does not\napprove expenditure, post a journal or confirm payment.\nDocument status\nThis preview attachment demonstrates a downloadable PDF. It is not a warranty agreement, proof of\npurchase or supplier-issued document.\nwarranty-104.pdf  |  Synthetic record\nPage 1 of 1\n"
+    ]
+  },
+  "DOC-104-6:2": {
+    "filename": "transfer-hoist-manual-v2.pdf",
+    "mime": "application/pdf",
+    "bytes": 42247,
+    "pages": [
+      "transfer-hoist-manual-v2-page-1.png"
+    ],
+    "text": [
+      "OBLIVION CARE  /  ASSET DOCUMENTS\nOperating manual - archived\nDESIGN SAMPLE - NOT AN OPERATIONAL DOCUMENT\nAsset\nAS-104 - Transfer hoist\nSite\nKōwhai House / Equipment room\nVersion\n2 - 4 Feb 2026\nArchived version\nThis is the retained version 2 design sample. Version 3 is the current example. Archiving retains the\noriginal bytes and does not erase the earlier document identity.\nWhy it is retained\nThe version history demonstrates how a user can read or download an earlier file without mistaking it for\nthe current document.\nDesign sample only\nThis PDF contains no operating instructions. It is not manufacturer evidence and is not suitable for real\nequipment use.\ntransfer-hoist-manual-v2.pdf  |  Synthetic record\nPage 1 of 1\n"
+    ]
+  },
+  "DOC-104-3:1": {
+    "filename": "brake-assessment.jpg",
+    "mime": "image/jpeg",
+    "bytes": 124779,
+    "pages": [
+      "brake-assessment.jpg"
+    ],
+    "text": [
+      "Synthetic image fixture for AS-104 and CHK-882. No real inspection photo is present."
+    ]
+  }
+}

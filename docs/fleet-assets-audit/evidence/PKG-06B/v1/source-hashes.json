@@ -1,0 +1,122 @@
+[
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Models\\Asset.php",
+    "Hash": "CEB39E404F2D8D43FFFA1EED8E60621AF1651B679A92296FB1792ED2C297BBB7"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Models\\AssetAssignment.php",
+    "Hash": "8D7C445AC476A6C63984592DDD2972B0AE4F30806B776F9D7E8431A4795173FF"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Models\\AssetDocument.php",
+    "Hash": "BC6C6816EF1D1991B9E3E33DDE8B98E489C808543F699742AF4378A3A5C2D2A3"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Models\\AssetDocumentSet.php",
+    "Hash": "B9C3A16F8BD40975D97F1EA93715CCE1820AEAC5A602E2483965DAF1C19D5B8B"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Models\\AssetScanEvent.php",
+    "Hash": "EAC254EAF8D2870F2C4F9D5A516F76712C7BF06AE8BB0DB300532A75D35B814C"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Services\\Assets\\AssetAssignmentService.php",
+    "Hash": "07C999B5BB562C6B731D1AD7CC50EC9F1EC1F64F4EE6446FF8E81220AEC6217F"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Http\\Controllers\\AssetAssignmentController.php",
+    "Hash": "EEAACAD43EE58A7FA1EA0C807FD8641BFBD2056C72F936BAE7F929A761323380"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Http\\Controllers\\FleetAssets\\AssetController.php",
+    "Hash": "3FFBBDFB57DFC1046CCB483E4D7F50F41ACB9FDDCFC7303D5E4C93EEA5062DC6"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Http\\Controllers\\AssetDocumentController.php",
+    "Hash": "4FC69FAC30FE3A62843CF8AA93AAA63E2CE5F72D7A3A7F42AED38F5ED3F7D1FB"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Services\\Fleet\\MaintenanceCheckService.php",
+    "Hash": "51DAAD8CE633C1E52A4613E53C5D95C92B3F918D12EE19BE3603E10B4E596193"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Services\\Fleet\\MaintenanceReportService.php",
+    "Hash": "3670D1EE6580718F9355B1E6B354CAC389249B3B0490D13C6015F6E23EFDCA2B"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Services\\Fleet\\MaintenanceRestrictionService.php",
+    "Hash": "716E6A107E2CD910F2DE47E015C31A3601D5CE09A98F7178A0736AD2CD18128E"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Services\\Fleet\\VehicleDocumentService.php",
+    "Hash": "17D6785551194DE9B4A56F9020A072425294B5CE5E523CDDE3E0D7A2411B2267"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Domain\\SecurityDevices\\Models\\DeviceAssetLink.php",
+    "Hash": "0B1634241023F671E8D82521670093495B8B8C1CD7687B1668EABEFDD7564294"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Domain\\Finance\\Models\\FinFixedAsset.php",
+    "Hash": "E30457C1214B6BC93316E765FABCB543C578A91EAFCBE78F835BFCA6336D6B89"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\app\\Domain\\Finance\\Presenters\\AssetFinanceTechnologyProjectionPresenter.php",
+    "Hash": "4E43A66F8546F6016D6E1C59162FC0B17376693F2D8744BE72E13FC016C591A2"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\resources\\js\\pages\\fleet-assets\\assets\\show.tsx",
+    "Hash": "F9F4836D21A3E072FE1EA937E00B37C0BFB9D2B2349582E5D3A0BFF0D33E78B4"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\resources\\js\\pages\\fleet-assets\\maintenance\\work-orders\\show.tsx",
+    "Hash": "60980D87E3087A2076D9EE27B6BF78F7851F4A7028CCBFF763843D1E97B61AEF"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\resources\\js\\components\\page\\page-header.tsx",
+    "Hash": "FBD198FE142BF1DC2321878BC924C9A8BAA1EED6B0ADD0CC7E28A40E70F01427"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\resources\\js\\components\\page\\grouped-profile-nav.tsx",
+    "Hash": "BC98EC02B540DBB86DB6ABE59F5F0956652A1CF9250C3E21DA07AEBFCD4AD5CD"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\resources\\js\\components\\ui\\button.tsx",
+    "Hash": "E8AE39C3616C4AAF689014C4EB9DE6235E5E4FF16E581C2BE2E970CD36191CC1"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\resources\\js\\components\\ui\\status-badge.tsx",
+    "Hash": "D1D83D69C9F091A1DEA57B7F7312F794097F2A8278DD70D7BA14A288D459C130"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\resources\\js\\components\\ui\\dialog.tsx",
+    "Hash": "B0E74EF729FBF4BDBC918F7ABC08A19486435013451088B9A6248D1039F55DC6"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\resources\\js\\components\\ui\\popover.tsx",
+    "Hash": "00702C92103D2BF0752FAC030C9FC6F671C55A5732534A6FC306DF618F30E652"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\resources\\js\\components\\ui\\command.tsx",
+    "Hash": "ECB3830CCD643FD8871367333CFA2D2B45C057619D0BC47DD972C9C7E873AA14"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\resources\\js\\components\\ui\\file-dropzone.tsx",
+    "Hash": "F74B8A5E4FFE239C55B736199BC27A35617C2A423217AEF1B134065BE7284EDE"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\resources\\js\\components\\wizard\\shell.tsx",
+    "Hash": "A8EA265DAA622FA839A6C714188118B6605E4F6A21ED900CF57D71DC7A552C7E"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\resources\\js\\lib\\fleet-navigation.ts",
+    "Hash": "7D8263982E3C066E827FE4545D546677843AFEB3564F90B80019D74A3621E038"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\resources\\css\\app.css",
+    "Hash": "4FE49B94D074DDE840D79D0813ADEBA3759DFF243956BBFA404325BD00DF149A"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\package-lock.json",
+    "Hash": "2FDEC15606F7D4FAFF29A5DDFE64707FBB2DA2098C334E9FBCBD2D39B85A6140"
+  }
+]

@@ -1,0 +1,67 @@
+{
+  "capturedAtUtc": "2026-09-26T21:52:46.449Z",
+  "references": [
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/DESIGN.md",
+      "sha256": "20d9369ea9857ace9faa9566c8df2a4ba82e15743e5e6f2437c02e683e863474",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/design_styles/POPUP_STYLE_GUIDE.md",
+      "sha256": "2bed42d34d4515b7a4945549f57ed9717cac9794079d5d03102bb034dd8708fa",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/wizard/shell.tsx",
+      "sha256": "a8ea265daa622fa839a6c714188118b6605e4f6a21ed900cf57d71dc7a552c7e",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/ui/dialog.tsx",
+      "sha256": "b0e74ef729fbf4bdbc918f7abc08a19486435013451088b9a6248d1039f55dc6",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/ui/file-dropzone.tsx",
+      "sha256": "f74b8a5e4ffe239c55b736199bc27a35617c2a423217aef1b134065be7284ede",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/ui/command.tsx",
+      "sha256": "ecb3830ccd643fd8871367333cfa2d2b45c057619d0bc47dd972c9c7e873aa14",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/ui/popover.tsx",
+      "sha256": "00702c92103d2bf0752fac030c9fc6f671c55a5732534a6fc306df618f30e652",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/fleet-assets/maintenance/date-picker.tsx",
+      "sha256": "462557d79a15aaf512d6c61d03a53db9d2dc54de633df614a9a13ee76b170b8f",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/hr/leave-calendar-range.tsx",
+      "sha256": "cac7e3a14857159ef67f1248ae20cf1b3744dfa270598362ba11ec2bec8c0c08",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/css/maintenance-date-time.css",
+      "sha256": "1eeb18e92ac20a7a2fc0d99d235414b8905307e3372e7cad4a14ac500b8d0bfe",
+      "access": "read-only"
+    }
+  ],
+  "mainGuides": [
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/DESIGN.md",
+      "sha256": "20d9369ea9857ace9faa9566c8df2a4ba82e15743e5e6f2437c02e683e863474",
+      "matchesCheckout": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/design_styles/POPUP_STYLE_GUIDE.md",
+      "sha256": "2bed42d34d4515b7a4945549f57ed9717cac9794079d5d03102bb034dd8708fa",
+      "matchesCheckout": true
+    }
+  ]
+}

@@ -179,7 +179,7 @@ function ReviewRequestBody({
                 </DialogTitle>
                 <DialogDescription>
                     {open
-                        ? 'Record Finance’s decision with a note. It changes no Finance record by itself; the requester sees it on the vehicle.'
+                        ? 'Record Finance’s decision with a note. It changes no Finance record by itself; the requester sees it on the source profile.'
                         : 'Finance’s decision on this request, kept with its history.'}
                 </DialogDescription>
             </DialogHeader>
@@ -226,7 +226,7 @@ function ReviewRequestBody({
                     </div>
                     <div className="sm:col-span-2">
                         <dt className="text-xs text-muted-foreground">
-                            What Fleet asked
+                            Review requested
                         </dt>
                         <dd className="whitespace-pre-line">
                             {request.note ?? 'No note recorded.'}
@@ -396,7 +396,7 @@ function ReviewRequestBody({
                 </Button>
                 {request.vehicle.url && (
                     <Button type="button" variant="outline" asChild>
-                        <a href={request.vehicle.url}>Open vehicle</a>
+                        <a href={request.vehicle.url}>Open source profile</a>
                     </Button>
                 )}
                 {request.can_decide && (

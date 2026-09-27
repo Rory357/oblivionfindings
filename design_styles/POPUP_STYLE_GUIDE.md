@@ -361,6 +361,17 @@ These are required interaction and integration outcomes for callers. Importing
 the shared visual components alone is not evidence that validation, recovery,
 storage or access control has been implemented.
 
+## File preview and download
+
+Approved by Stephan 2026-09-27. Use the shared `FilePreviewDialog` for one
+PDF/image, with the 900 px simple-dialog token, a bounded scrollable viewer,
+page/zoom controls, accessible page text and a reachable Download action for
+the exact original version. Multiple business sections retain WizardShell.
+Metadata-only covers must not be called file previews. Loading, missing,
+blocked, unsupported and failed/retry states are explicit, and each source
+rechecks access on preview and download. See
+[File preview and download](FILE_PREVIEW_STYLE_GUIDE.md) for the full contract.
+
 ## Calendar date and range selection
 
 Approved addition by Stephan, 2026-09-20. Operational planning forms such as
@@ -622,6 +633,9 @@ final check.
   field.
 
 ## Quick checklist for a new dialog
+
+- [ ] File viewers use the shared preview pattern and display real permitted
+      bytes, with original-version download and truthful failure states.
 
 - [ ] Lives in `_dialogs.tsx` next to the page that opens it.
 - [ ] Shell + body split with `{isOpen && (...)}`.

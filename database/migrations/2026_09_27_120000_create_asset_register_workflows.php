@@ -46,22 +46,26 @@ return new class extends Migration
             $table->json('rows');
             $table->timestamps();
         });
-        Schema::create('asset_label_batches', function (Blueprint $table) {
-            $table->id();
-            $table->uuid('request_id')->unique();
-            $table->foreignId('created_by_user_id')->constrained('users')->restrictOnDelete();
-            $table->string('status', 24)->default('ready');
-            $table->json('asset_ids');
-            $table->json('layout');
-            $table->json('downloads');
-            $table->timestamp('expires_at');
-            $table->timestamps();
-        });
+        // PKG-06B preview databases may already contain this exact shared table.
+        // Keep their stable identities and export history when adopting the register schema.
+        if (! Schema::hasTable('asset_label_batches')) {
+            Schema::create('asset_label_batches', function (Blueprint $table) {
+                $table->id();
+                $table->uuid('request_id')->unique();
+                $table->foreignId('created_by_user_id')->constrained('users')->restrictOnDelete();
+                $table->string('status', 24)->default('ready');
+                $table->json('asset_ids');
+                $table->json('layout');
+                $table->json('downloads');
+                $table->timestamp('expires_at');
+                $table->timestamps();
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('asset_label_batches');
+        // Shared by register and profile: never delete saved label history on rollback.
         Schema::dropIfExists('asset_import_batches');
         Schema::dropIfExists('asset_stocktake_asset_refs');
         Schema::dropIfExists('asset_stocktakes');

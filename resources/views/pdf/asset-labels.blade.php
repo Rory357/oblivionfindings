@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><style>
-@page {size:A4;margin:0;} body {margin:0;font-family:'DejaVu Sans',sans-serif;}
-.page {position:relative;width:210mm;height:296mm;page-break-after:always;} .page:last-child{page-break-after:auto;}
+@page {margin:0;} body {margin:0;font-family:'DejaVu Sans',sans-serif;}
+.page {position:relative;width:{{ ($layout['paper'] ?? 'a4') === 'a4' ? 210 : $layout['width'] }}mm;height:{{ ($layout['paper'] ?? 'a4') === 'a4' ? 296 : $layout['height'] - 0.2 }}mm;page-break-after:always;} .page:last-child{page-break-after:auto;}
 .label{position:absolute;box-sizing:border-box;text-align:center;overflow:hidden;padding:2mm;}
 .brand{height:7mm;font-size:7pt;line-height:4mm;overflow:hidden;} .brand img{max-height:5mm;max-width:28mm;vertical-align:top;}
 .tag{font-size:8pt;font-weight:bold;line-height:4mm;height:4mm;overflow:hidden;} .name{font-size:7pt;line-height:3mm;height:3mm;overflow:hidden;}

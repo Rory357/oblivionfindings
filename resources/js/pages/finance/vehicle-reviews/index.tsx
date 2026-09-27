@@ -57,7 +57,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Home', href: '/dashboard' },
     { title: 'Finance', href: '/finance' },
     { title: 'Payables', href: '/finance/payables' },
-    { title: 'Vehicle reviews', href: '/finance/vehicle-reviews' },
+    { title: 'Asset & vehicle reviews', href: '/finance/vehicle-reviews' },
 ];
 
 /**
@@ -102,7 +102,7 @@ export default function VehicleReviewsIndex({
             },
             request.vehicle.url
                 ? {
-                      label: 'Open vehicle',
+                      label: 'Open profile',
                       icon: ExternalLink,
                       onClick: () => router.get(request.vehicle.url ?? ''),
                   }
@@ -176,7 +176,7 @@ export default function VehicleReviewsIndex({
         <PageHeader
             variant="index"
             icon={Car}
-            title="Vehicle reviews"
+            title="Asset & vehicle reviews"
             titleChip={
                 <PageHeaderStatusChip
                     variant={summary.open > 0 ? 'warning' : 'success'}
@@ -184,7 +184,7 @@ export default function VehicleReviewsIndex({
                     {summary.open} waiting
                 </PageHeaderStatusChip>
             }
-            subline="Requests Fleet sends to Finance from a vehicle’s Finance view. Resolve or decline them here; the requester sees the decision on the vehicle."
+            subline="Requests sent from Asset and Vehicle profiles. Resolve or decline them here; the requester sees the decision on the source profile."
             actions={
                 <PageHeaderSearch
                     value={search}
@@ -192,7 +192,7 @@ export default function VehicleReviewsIndex({
                     onKeyDown={(event) => {
                         if (event.key === 'Enter') apply({ search });
                     }}
-                    placeholder="Search requests, vehicles or notes…"
+                    placeholder="Search requests, assets or notes…"
                 />
             }
             meters={
@@ -238,11 +238,11 @@ export default function VehicleReviewsIndex({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Vehicle reviews" />
+            <Head title="Asset & vehicle reviews" />
 
             <PageLayout hero={header}>
                 <ListCaption
-                    title="Vehicle review requests"
+                    title="Asset & vehicle review requests"
                     caption={`${requests.length} of ${total} shown${can.decide ? '' : ' · view only'}`}
                 />
 
@@ -264,14 +264,14 @@ export default function VehicleReviewsIndex({
                             icon={Car}
                             itemName="request"
                             title="Nothing waiting for Finance"
-                            description="Requests appear here when someone asks Finance to review a vehicle’s invoice, purchase, fixed asset or cost allocation."
+                            description="Requests appear here when someone asks Finance to review an asset or vehicle invoice, purchase, fixed asset or cost allocation."
                         />
                     )
                 ) : (
                     <EntityTable
                         rows={requests}
                         rowKey={(request) => request.id}
-                        identityLabel="Vehicle"
+                        identityLabel="Asset / vehicle"
                         identity={(request) => ({
                             icon: Car,
                             name: request.reference ?? `Request #${request.id}`,

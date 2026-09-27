@@ -10,6 +10,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Finance › Vehicle reviews: the review requests Fleet sent to Finance, for
@@ -105,11 +106,16 @@ class VehicleFinanceReviewQueue
         $decide = $this->finance->canDecide($viewer);
         $spend = $viewer->canDo('finance.ap.view');
         // The vehicle's own page is linked only for people who can open it.
-        $openable = $requests->pluck('asset_id')->unique()
-            ->filter(fn (mixed $id): bool => $this->vehicles->fleetVehicle($viewer, (int) $id) !== null)
-            ->map(fn (mixed $id): int => (int) $id)->values()->all();
+        $profileUrls = [];
+        foreach ($requests->pluck('asset_id')->unique() as $id) {
+            if ($this->vehicles->fleetVehicle($viewer, (int) $id) !== null) {
+                $profileUrls[$id] = "/fleet-assets/vehicles/{$id}?view=finance";
+            } elseif (($asset = $this->vehicles->assignableAsset($viewer, (int) $id)) && Gate::forUser($viewer)->allows('view', $asset)) {
+                $profileUrls[$id] = "/fleet-assets/assets/{$id}#view=overview&section=finance";
+            }
+        }
 
-        return $requests->map(function (FleetFinanceReviewRequest $request) use ($viewer, $files, $decide, $spend, $openable): array {
+        return $requests->map(function (FleetFinanceReviewRequest $request) use ($viewer, $files, $decide, $spend, $profileUrls): array {
             [$label, $tone] = match ($request->status) {
                 'resolved' => ['Resolved', 'success'],
                 'declined' => ['Declined', 'neutral'],
@@ -131,8 +137,7 @@ class VehicleFinanceReviewQueue
                     'name' => $asset?->name ?? 'Vehicle',
                     'registration' => $asset?->registration_number,
                     'site' => $asset?->site?->name,
-                    'url' => in_array((int) $request->asset_id, $openable, true)
-                        ? "/fleet-assets/vehicles/{$request->asset_id}?view=finance" : null,
+                    'url' => $profileUrls[$request->asset_id] ?? null,
                 ],
                 'amount' => $request->amount === null ? null : (float) $request->amount,
                 'note' => $request->note,

@@ -21,6 +21,9 @@
 .phpactor.json
 .phpunit.result.cache
 /phpunit.pkg01.xml
+/phpunit.pkg06b.xml
+/storage/framework/pkg06b-browser.json
+/storage/framework/pkg06b-dev-hot.txt
 Homestead.json
 Homestead.yaml
 npm-debug.log

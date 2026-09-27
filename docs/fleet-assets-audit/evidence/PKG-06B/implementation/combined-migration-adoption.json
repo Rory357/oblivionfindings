@@ -1,0 +1,26 @@
+{
+    "database": "oblivion_findings_pkg06b_8821_test_36804",
+    "asset": 1,
+    "assignment": 1,
+    "labelTable": true,
+    "labelMigrations": [
+        {
+            "migration": "2026_09_27_130000_create_asset_label_batches",
+            "batch": 3
+        }
+    ],
+    "labelHistoryCount": 3,
+    "labelHistoryBeforeSha256": "a0d272f2f1dd076ad1be170530157da855febd115531b8c85e5f26161179925c",
+    "labelHistoryAfterSha256": "a0d272f2f1dd076ad1be170530157da855febd115531b8c85e5f26161179925c",
+    "labelHistoryUnchanged": true,
+    "registerMigrations": [
+        {
+            "migration": "2026_09_27_120000_create_asset_register_workflows",
+            "batch": 7
+        },
+        {
+            "migration": "2026_09_27_140000_retain_stocktake_history_asset_references",
+            "batch": 8
+        }
+    ]
+}

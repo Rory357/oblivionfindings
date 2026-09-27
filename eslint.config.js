@@ -213,6 +213,9 @@ export default [
             'tailwind.config.js',
             // Immutable Transport design evidence is verified by its frozen manifests.
             'docs/fleet-assets-audit/previews/PKG-05/**',
+            // Frozen Asset Profile references retain their recorded byte hashes.
+            'docs/fleet-assets-audit/previews/PKG-06B/**',
+            'docs/fleet-assets-audit/evidence/PKG-06B/v*/**',
             // Claude Code agent worktrees: each is a full repo checkout so
             // recursing into them duplicates lint work for every parallel
             // session and overflows ESLint's stylish formatter on machines

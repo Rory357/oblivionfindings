@@ -3,7 +3,6 @@
 namespace App\Services\Assets;
 
 use App\Http\Controllers\Concerns\SanitizesCsvOutput;
-use App\Services\Fleet\VehicleTripReportExporter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Encoding\Encoding;
@@ -18,7 +17,7 @@ final class AssetLabelExporter
 
     public function bytes($assets, array $layout, string $format): string
     {
-        $brand = app(VehicleTripReportExporter::class)->branding();
+        $brand = app(AssetQrLabelService::class)->branding((bool) ($layout['logo'] ?? true));
         $labels = [];
         $manifest = [];
         foreach ($assets as $asset) {
@@ -37,7 +36,7 @@ final class AssetLabelExporter
 
             return Pdf::setOption(['defaultFont' => 'DejaVu Sans', 'isRemoteEnabled' => false, 'isFontSubsettingEnabled' => true])
                 ->loadView('pdf.asset-labels', ['pages' => array_chunk($slots, $layout['columns'] * $layout['rows']), 'layout' => $layout, 'brand' => $brand])
-                ->setPaper('a4')->output();
+                ->setPaper(($layout['paper'] ?? 'a4') === 'a4' ? 'a4' : [0, 0, $layout['width'] * 72 / 25.4, $layout['height'] * 72 / 25.4])->output();
         }
         $path = tempnam(sys_get_temp_dir(), 'asset-labels-');
         $zip = new ZipArchive;

@@ -1,0 +1,34 @@
+{
+  "CheckedAtUtc": "2026-09-26T21:21:38.7681115Z",
+  "ProcessId": 55744,
+  "ExecSession": 61656,
+  "Cause": "Preview server was not listening; connection refused",
+  "Recovery": "Restarted the same frozen v5 server on loopback port 8900",
+  "Checks": [
+    {
+      "File": "index.html",
+      "Status": 200,
+      "Source": "8821-v5",
+      "ServedHash": "3fa63539f6b208e1dccefbf2a64cbb91aeb35abf9edb3e7a8816a3d37a306a2f",
+      "DiskHash": "3fa63539f6b208e1dccefbf2a64cbb91aeb35abf9edb3e7a8816a3d37a306a2f",
+      "Match": true
+    },
+    {
+      "File": "app.js",
+      "Status": 200,
+      "Source": "8821-v5",
+      "ServedHash": "ddb4ff1d479e575e532ba6aa62293ccb568b257a2bd05d20b64b34ddc6fa26c2",
+      "DiskHash": "ddb4ff1d479e575e532ba6aa62293ccb568b257a2bd05d20b64b34ddc6fa26c2",
+      "Match": true
+    },
+    {
+      "File": "app.css",
+      "Status": 200,
+      "Source": "8821-v5",
+      "ServedHash": "d0c81ce912a828279f7dc6cd6b390748716c5cf7cd5937c39c1bdb25d4e5026f",
+      "DiskHash": "d0c81ce912a828279f7dc6cd6b390748716c5cf7cd5937c39c1bdb25d4e5026f",
+      "Match": true
+    }
+  ],
+  "Browser": "Existing error-tab automatic reload was blocked by browser URL protocol policy. User refresh required; browser rendering not reverified."
+}

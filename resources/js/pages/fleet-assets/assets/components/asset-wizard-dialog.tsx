@@ -13,6 +13,7 @@
  * (Inertia fires onSuccess for back()->with('error') redirects too).
  *
  * NZ English, semantic design tokens only. */
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -70,6 +71,7 @@ type ClientOption = {
 
 /** Editable slice of an asset — what the show/edit payloads expose. */
 export type AssetWizardAsset = {
+    asset_profile_version?: number;
     id: number;
     name: string;
     asset_tag: string | null;
@@ -479,6 +481,7 @@ export function AssetWizardDialog({
         setProcessing(true);
 
         const payload = {
+            expected_version: asset?.asset_profile_version,
             ...(!isEdit
                 ? { site_room_id: canonicalRoom ? Number(canonicalRoom) : null }
                 : {}),
@@ -881,23 +884,27 @@ function StepDetails({ data, set, errors }: StepProps) {
                         Purchase &amp; warranty
                     </SubHead>
                     <Field label="Purchase date" error={errors.purchase_date}>
-                        <Input
-                            type="date"
+                        <DatePicker
+                            id="asset-purchase-date"
+                            label="Purchase date"
+                            allowClear
+                            invalid={!!errors.purchase_date}
                             value={data.purchase_date}
-                            onChange={(e) =>
-                                set('purchase_date', e.target.value)
-                            }
+                            onChange={(value) => set('purchase_date', value)}
                         />
                     </Field>
                     <Field
                         label="Warranty expires"
                         error={errors.warranty_expires_at}
                     >
-                        <Input
-                            type="date"
+                        <DatePicker
+                            id="asset-warranty-expires"
+                            label="Warranty expires"
+                            allowClear
+                            invalid={!!errors.warranty_expires_at}
                             value={data.warranty_expires_at}
-                            onChange={(e) =>
-                                set('warranty_expires_at', e.target.value)
+                            onChange={(value) =>
+                                set('warranty_expires_at', value)
                             }
                         />
                     </Field>
@@ -1061,14 +1068,14 @@ function StepCompliance({ data, set, errors }: StepProps) {
                                         label="Next inspection due"
                                         error={errors.inspection_due_at}
                                     >
-                                        <Input
-                                            type="date"
+                                        <DatePicker
+                                            id="asset-inspection-due"
+                                            label="Next inspection due"
+                                            allowClear
+                                            invalid={!!errors.inspection_due_at}
                                             value={data.inspection_due_at}
-                                            onChange={(e) =>
-                                                set(
-                                                    'inspection_due_at',
-                                                    e.target.value,
-                                                )
+                                            onChange={(value) =>
+                                                set('inspection_due_at', value)
                                             }
                                         />
                                     </Field>
@@ -1097,14 +1104,16 @@ function StepCompliance({ data, set, errors }: StepProps) {
                                         label="Next maintenance due"
                                         error={errors.maintenance_due_at}
                                     >
-                                        <Input
-                                            type="date"
+                                        <DatePicker
+                                            id="asset-maintenance-due"
+                                            label="Next maintenance due"
+                                            allowClear
+                                            invalid={
+                                                !!errors.maintenance_due_at
+                                            }
                                             value={data.maintenance_due_at}
-                                            onChange={(e) =>
-                                                set(
-                                                    'maintenance_due_at',
-                                                    e.target.value,
-                                                )
+                                            onChange={(value) =>
+                                                set('maintenance_due_at', value)
                                             }
                                         />
                                     </Field>

@@ -1,0 +1,25 @@
+
+  [30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\Pkg06bAssetProfileTest[39m
+  [33;1m![39;22m[90m [39m[90mpending receipt blocks register room edits and rechecks the destination room[39m[90m [39m[33m→ file_get_contents(C:\Users\s[39m[90m…[39m [90m3.40s[39m  
+  [31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m  
+  [30;43;1m WARNINGS [39;49;22m [1mTests\Feature\FleetAssets\Pkg06bAssetProfileTest[22m [90m>[39m pending receipt blocks register room edits and reche…   
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\8821\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+  at [32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m:[32m73[39m
+     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option<string> */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);
+
+  [33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m:[39;1m48[39;22m
+  [33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m:[39;1m62[39;22m
+
+
+  [90mTests:[39m    [33;1m1 warning[39;22m[90m (10 assertions)[39m
+  [90mDuration:[39m [39m3.68s[39m
+
