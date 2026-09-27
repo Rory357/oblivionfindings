@@ -55,6 +55,11 @@ export type TransportRecord = {
         condition: string | null;
         approval_route: string;
         decision_reason: string | null;
+        purpose: string;
+        destination: string | null;
+        passengers: number | null;
+        notes: string | null;
+        pickup_arrangement: string | null;
     } | null;
     journey: {
         id: number;

@@ -19,3 +19,16 @@
 - Final desktop layout and same-build confirmation are recorded in the review packet. No operational data, deployment or publication performed.
 
 This is initial implementation, not a correction attempt. No new worker or issue-history reset.
+
+## First technical correction cycle — 27 September 2026
+
+- The user authorised Main coordination and local/GitHub-main publication, then reported missing calendar right-click/drag and noncanonical modals. Publication remains subject to Main's existing integration gate.
+- Added shared blank-slot and entry context menus, keyboard alternatives, permitted Month dragging and Week/Day movement/resizing with a reviewed save and reviewed Undo. Added the canonical calendar date anchor and removed duplicate calendar range controls.
+- Rebuilt structured quick views with the shared wizard shell and named sections; single-section notes/information use simple dialogs. Added shared review/success components, free section navigation and explicit dirty-draft retention/discard.
+- Committed the application and byte-preserved frozen artifacts at `f1330fb0d`, then merged the actual Main parent `ba5bff2e8` in `a285d4fe7`. The sole conflict retained Main's exact `tests/TestCase.php`. All 105 v6 manifest entries match committed Git blob bytes.
+- Main's substantive review of `a285d4fe7` requested changes T05-01 through T05-03. The same owner corrected them; no new worker, guide edit or review-history reset.
+- T05-01: Fleet source pages now hand linked bookings to the authorised current Transport record and hide incompatible old forms. Server checks preserve current UUID/version/key requirements; unlinked cancellation remains compatible.
+- T05-02: a bounded `reschedule_only` path copies untouched values from the locked canonical booking and request. Planner updates carry existing canonical fields and notes. Move, repeated-save, stale-save and reviewed-Undo regression checks preserve distinct source values.
+- T05-03: moves use canonical elapsed duration, then explicitly resolve Auckland wall times and offsets. Ambiguous/nonexistent times cannot silently change duration; the wizard offers offset selection for repeated hours. Shared time-grid callbacks identify move versus resize.
+- Final focused frontend suite: 38 tests passed. TypeScript includes the changed Fleet booking source page; focused lint and PHP formatting passed. Three additional backend regressions passed with 71, 9 and 14 assertions. Initial fixture failures were corrected by removing a nonexistent Fleet booking `client_id`; Client ownership remains on the linked Transport request.
+- Final build and browser evidence are consolidated in `INTEGRATION-AND-CORRECTIONS.md`. No operational database or deployment is part of this work.

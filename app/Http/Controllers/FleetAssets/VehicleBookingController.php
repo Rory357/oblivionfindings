@@ -623,7 +623,8 @@ class VehicleBookingController extends Controller
             $current = $this->freshReadActor($actor);
             $old = $this->bookingAccess->booking($current, (int) $booking->id) ?? abort(404);
             $linked = ClientTransportBooking::where('fleet_booking_id', $old->id)->first();
-            $replacement = $request->integer('asset_id') ?: (int) $old->asset_id;
+            $timeOnly = $request->boolean('reschedule_only');
+            $replacement = $timeOnly ? (int) $old->asset_id : ($request->integer('asset_id') ?: (int) $old->asset_id);
             if ($linked && $replacement !== (int) $old->asset_id) {
                 $assetIds = [(int) $old->asset_id, $replacement];
                 sort($assetIds);
@@ -636,6 +637,16 @@ class VehicleBookingController extends Controller
             $canonical = $this->lockBooking($current, (int) $booking->getKey());
             $manage = $current->canDo('fleet.manage');
             abort_unless($manage || ((int) $canonical->user_id === (int) $current->id && $canonical->status === 'pending'), 403);
+            if ($timeOnly) {
+                abort_unless($linked && $manage, 403);
+                $sourceRequest = app(TransportRequestService::class)->find($current, (int) $linked->id, true);
+                // A calendar proposal owns time and reason only. Keep all other
+                // source fields from the locked booking/request, never a projection.
+                $request->merge([
+                    ...$canonical->only(['purpose', 'destination', 'passengers', 'pickup_arrangement', 'driver_user_id', 'notes']),
+                    ...$sourceRequest->only(['escort_user_id', 'key_pickup_room_id', 'key_return_room_id', 'key_delivery_arrangement']),
+                ]);
+            }
             $resubmission = $linked && $manage && $canonical->status === 'rejected' && ! $canonical->checked_out_at;
             abort_unless(in_array($canonical->status, ['pending', 'approved'], true) || $resubmission, 409,
                 'Only pending, confirmed or declined transport plans can be changed.');
@@ -706,7 +717,8 @@ class VehicleBookingController extends Controller
                 'starts_at' => $startsAt, 'ends_at' => $endsAt, 'purpose' => trim($data['purpose']),
                 'destination' => $data['destination'] ?? null, 'passengers' => $data['passengers'] ?? null,
                 'pickup_arrangement' => $data['pickup_arrangement'] ?? null,
-                'driver_user_id' => $data['driver_user_id'] ?? null, 'notes' => $data['notes'] ?? null,
+                'driver_user_id' => $data['driver_user_id'] ?? null,
+                'notes' => array_key_exists('notes', $data) ? $data['notes'] : $canonical->notes,
                 'lock_version' => (int) $canonical->lock_version + 1,
             ]);
             $assessment = null;
@@ -759,6 +771,9 @@ class VehicleBookingController extends Controller
         $booking = $this->bookingAccess->booking($actor, (int) $booking->getKey());
         abort_unless($booking, 404);
         $booking->load(['asset:id,name,asset_tag', 'user:id,name,email']);
+        $hasTransport = ClientTransportBooking::where('fleet_booking_id', $booking->id)->exists();
+        $transportId = $hasTransport
+            ? app(TransportRequestService::class)->query($actor)->where('fleet_booking_id', $booking->id)->value('id') : null;
         $maintenanceImpacts = DB::table('fleet_maintenance_booking_impacts as impact')
             ->join('fleet_maintenance_restrictions as restriction', 'restriction.id', '=', 'impact.restriction_id')
             ->join('fleet_work_orders as work', 'work.id', '=', 'impact.work_order_id')
@@ -769,6 +784,7 @@ class VehicleBookingController extends Controller
 
         return Inertia::render('fleet-assets/bookings/show', [
             'booking' => $booking,
+            'transport' => $hasTransport ? ['href' => $transportId ? "/fleet-assets/transports/requests/{$transportId}" : null] : null,
             'maintenance_impacts' => $maintenanceImpacts,
             'can' => [
                 'manage' => (bool) $request->user()?->canDo('fleet.manage'),

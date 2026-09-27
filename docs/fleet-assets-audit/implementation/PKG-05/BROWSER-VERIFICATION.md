@@ -30,6 +30,10 @@ Local evidence is under the ignored `output/playwright` directory:
 
 Earlier exploratory screenshots/logs are retained as intermediate evidence and are not final acceptance results. Browser exploration exposed and corrected the All-sites validation error, calendar range mismatch, chart startup sizing, modal spacing and narrow date/time controls. Some early locator waits used the wrong element role or read before Inertia navigation settled; the successful workflow observations above use the settled UI.
 
+## Final calendar/modal correction pass
+
+The final production build and corrected Fleet source-page, Month save/Undo, Week movement, Day resize/conflict, modal/draft and all-six-tab layout checks were completed on 27 September at approximately 17:12 NZDT. See `INTEGRATION-AND-CORRECTIONS.md` and `qa/browser-results.json` for the consolidated results and build-manifest hash. The adjacent six PNG files preserve selected final visual evidence in Git. The final layout sweep again passed all 24 combinations with no errors or warnings; the structured modal passed all four desktop sizes with its footer visible.
+
 ## Verification limits
 
 This is desktop/laptop implementation verification, not a mobile/PWA redesign or a full-system certification. The automated backend run excludes two concurrent subprocess cases. Existing private evidence upload/scanner delivery and downstream external systems were not exercised in this local browser session. Existing source services and permissions remain authoritative. The normal exact-code technical review, release migration and deployment gates still apply.

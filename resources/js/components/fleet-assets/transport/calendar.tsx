@@ -33,6 +33,7 @@ import {
     calendarLocal,
     canRescheduleTransport,
     proposedCalendarWindow,
+    sourceCalendarWindow,
 } from './calendar-actions';
 import { RescheduleDialog } from './reschedule-dialog';
 import type { TransportRecord } from './types';
@@ -111,6 +112,8 @@ export function TransportCalendar({
         row: TransportRecord;
         start: string;
         end: string;
+        startOffset: string;
+        endOffset: string;
     } | null>(null);
     const opening = useRef(false);
     const navDate = useMemo(() => new Date(`${day}T12:00:00`), [day]);
@@ -145,7 +148,12 @@ export function TransportCalendar({
         if (found?.transport) onOpen(found.transport);
         else if (entry.link) window.location.assign(entry.link);
     };
-    const reschedule = async (entry: Decorated, start?: Date, end?: Date) => {
+    const reschedule = async (
+        entry: Decorated,
+        start?: Date,
+        end?: Date,
+        mode?: 'move' | 'resize',
+    ) => {
         const previous = entries.find((e) => e.id === entry.id)?.transport;
         if (!previous || !canRescheduleTransport(previous) || opening.current)
             return;
@@ -170,15 +178,16 @@ export function TransportCalendar({
                 );
             const window = start
                 ? proposedCalendarWindow(
-                      entry._start,
-                      entry._end ?? entry._start,
+                      current.booking!.start,
+                      current.booking!.end,
                       start,
                       end,
+                      mode,
                   )
-                : {
-                      start: toDatetimeLocal(current.booking!.start),
-                      end: toDatetimeLocal(current.booking!.end),
-                  };
+                : sourceCalendarWindow(
+                      current.booking!.start,
+                      current.booking!.end,
+                  );
             setProposal({ row: current, ...window });
         } catch (error) {
             toast.error(
@@ -262,8 +271,8 @@ export function TransportCalendar({
                             hour,
                         });
                     },
-                    onMove: (entry, start, end) =>
-                        void reschedule(entry, start, end),
+                    onMove: (entry, start, end, mode) =>
+                        void reschedule(entry, start, end, mode),
                     onCreateAt: createAt,
                     onMore: (date) => onDayView(dayKey(date)),
                 }}
@@ -474,19 +483,20 @@ export function TransportCalendar({
                                 await response.json();
                             if (
                                 !canRescheduleTransport(current) ||
-                                toDatetimeLocal(current.booking!.start) !==
-                                    start ||
-                                toDatetimeLocal(current.booking!.end) !== end
+                                Date.parse(current.booking!.start) !==
+                                    Date.parse(start) ||
+                                Date.parse(current.booking!.end) !==
+                                    Date.parse(end)
                             )
                                 throw new Error(
                                     'The booking has changed since your save. Reopen its current record before rescheduling.',
                                 );
                             setProposal({
                                 row: current,
-                                start: toDatetimeLocal(
+                                ...sourceCalendarWindow(
                                     proposal.row.booking!.start,
+                                    proposal.row.booking!.end,
                                 ),
-                                end: toDatetimeLocal(proposal.row.booking!.end),
                             });
                         } catch (error) {
                             toast.error(

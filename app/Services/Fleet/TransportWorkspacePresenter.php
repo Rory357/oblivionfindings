@@ -134,6 +134,8 @@ class TransportWorkspacePresenter
                 'returned_at' => $booking->returned_at?->toIso8601String(), 'odometer_out' => $booking->odometer_out,
                 'odometer_in' => $booking->odometer_in, 'condition' => $booking->condition_on_return,
                 'approval_route' => $booking->approval_route, 'decision_reason' => $booking->rejection_reason ?: $booking->cancellation_reason,
+                'purpose' => $booking->purpose, 'destination' => $booking->destination, 'passengers' => $booking->passengers,
+                'notes' => $booking->notes, 'pickup_arrangement' => $booking->pickup_arrangement,
             ] : null,
             'journey' => $journey ? ['id' => $journey->id, 'status' => $journey->status,
                 'departed_at' => $journey->departed_at?->toIso8601String(), 'arrived_at' => $journey->arrived_at?->toIso8601String(),

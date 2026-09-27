@@ -85,7 +85,7 @@ class TransportWorkspaceTest extends TestCase
         $asset = Asset::factory()->vehicle()->create(['site_id' => $this->site->id, 'home_site_id' => $this->site->id, 'status' => 'active', 'seating_capacity' => 6]);
         $driver = $this->user($this->site);
         $room = SiteRoom::create(['site_id' => $this->site->id, 'name' => 'Reception key cabinet']);
-        $payload = ['asset_id' => $asset->id, 'client_id' => $this->client->id, 'purpose' => $row->purpose,
+        $payload = ['asset_id' => $asset->id, 'purpose' => $row->purpose,
             'starts_local' => '2026-10-01T09:00', 'ends_local' => '2026-10-01T10:00', 'driver_user_id' => $driver->id,
             'transport_request_id' => $row->id, 'transport_expected_version' => 1, 'pickup_site_id' => $this->site->id, 'return_site_id' => $this->site->id,
             'key_pickup_room_id' => $room->id, 'key_return_room_id' => $room->id, 'key_delivery_arrangement' => 'Driver collects and returns at reception'];
@@ -242,6 +242,79 @@ class TransportWorkspaceTest extends TestCase
         $this->post('/fleet-assets/handovers', $input)->assertRedirect();
         $this->assertSame(1, FleetShiftHandover::where('booking_id', $booking->id)->count());
         $this->postJson('/fleet-assets/handovers', [...$input, 'notes' => 'Different retry'])->assertConflict();
+    }
+
+    public function test_linked_booking_source_page_hands_actions_to_current_transport_record(): void
+    {
+        $row = $this->request(true);
+        $asset = Asset::factory()->vehicle()->create(['site_id' => $this->site->id, 'home_site_id' => $this->site->id]);
+        $booking = FleetVehicleBooking::factory()->create(['asset_id' => $asset->id,
+            'pickup_site_id' => $this->site->id, 'return_site_id' => $this->site->id, 'user_id' => $this->manager->id]);
+        $row->update(['fleet_booking_id' => $booking->id]);
+        foreach (['pending', 'approved', 'checked_out', 'returned', 'cancelled'] as $status) {
+            $booking->update(['status' => $status]);
+            $this->actingAs($this->manager)->get("/fleet-assets/bookings/{$booking->id}")->assertOk()
+                ->assertInertia(fn (Assert $page) => $page->component('fleet-assets/bookings/show')
+                    ->where('transport.href', "/fleet-assets/transports/requests/{$row->id}"));
+        }
+        $row->update(['fleet_booking_id' => null]);
+        $this->get("/fleet-assets/bookings/{$booking->id}")->assertOk()->assertInertia(fn (Assert $page) => $page->where('transport', null));
+    }
+
+    public function test_time_only_move_and_reviewed_undo_preserve_canonical_booking_fields(): void
+    {
+        $row = $this->request(true);
+        $asset = Asset::factory()->vehicle()->create(['site_id' => $this->site->id, 'home_site_id' => $this->site->id, 'status' => 'active', 'seating_capacity' => 6]);
+        $driver = $this->user($this->site);
+        $room = SiteRoom::create(['site_id' => $this->site->id, 'name' => 'Locked key cabinet']);
+        $booking = FleetVehicleBooking::factory()->create(['asset_id' => $asset->id,
+            'pickup_site_id' => $this->site->id, 'return_site_id' => $this->site->id, 'user_id' => $this->manager->id,
+            'driver_user_id' => $driver->id, 'starts_at' => '2026-09-30 20:00:00', 'ends_at' => '2026-09-30 21:00:00',
+            'status' => 'pending', 'purpose' => 'Distinct Fleet purpose', 'destination' => 'Distinct Fleet destination',
+            'passengers' => 3, 'pickup_arrangement' => 'Distinct Fleet arrangement', 'notes' => 'Retain these source notes', 'lock_version' => 1]);
+        $row->update(['fleet_booking_id' => $booking->id, 'lock_version' => 1, 'key_pickup_room_id' => $room->id,
+            'key_return_room_id' => $room->id, 'key_delivery_arrangement' => 'Driver collects from the cabinet']);
+        $fields = ['asset_id', 'user_id', 'driver_user_id', 'purpose', 'destination', 'passengers', 'pickup_arrangement', 'notes', 'pickup_site_id', 'return_site_id'];
+        $before = $booking->fresh()->only($fields);
+        $payload = ['reschedule_only' => true, 'transport_expected_version' => 1, 'expected_version' => 1,
+            'starts_local' => '2026-10-02T09:00', 'ends_local' => '2026-10-02T10:00', 'starts_offset' => '+13:00', 'ends_offset' => '+13:00', 'reason' => 'Move to Friday'];
+        $this->actingAs($this->manager)->withHeader('Idempotency-Key', (string) Str::uuid());
+        $this->putJson("/fleet-assets/bookings/{$booking->id}", $payload)->assertOk();
+        $this->assertSame($before, $booking->fresh()->only($fields));
+        $this->assertSame('2026-10-01 20:00:00', $booking->fresh()->starts_at->format('Y-m-d H:i:s'));
+        $this->putJson("/fleet-assets/bookings/{$booking->id}", $payload)->assertOk();
+        $this->assertSame(2, $booking->fresh()->lock_version);
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())->putJson("/fleet-assets/bookings/{$booking->id}", $payload)->assertConflict();
+        $undo = [...$payload, 'transport_expected_version' => $row->fresh()->lock_version, 'expected_version' => 2,
+            'starts_local' => '2026-10-01T09:00', 'ends_local' => '2026-10-01T10:00', 'reason' => 'Reviewed undo'];
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())->putJson("/fleet-assets/bookings/{$booking->id}", $undo)->assertOk();
+        $this->assertSame($before, $booking->fresh()->only($fields));
+        $this->assertSame('2026-09-30 20:00:00', $booking->fresh()->starts_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_linked_source_commands_keep_retry_version_and_key_requirements(): void
+    {
+        $row = $this->request(true);
+        $asset = Asset::factory()->vehicle()->create(['site_id' => $this->site->id, 'home_site_id' => $this->site->id, 'status' => 'active', 'seating_capacity' => 6]);
+        $driver = $this->user($this->site);
+        $room = SiteRoom::create(['site_id' => $this->site->id, 'name' => 'Key cabinet']);
+        $booking = FleetVehicleBooking::factory()->create(['asset_id' => $asset->id,
+            'pickup_site_id' => $this->site->id, 'return_site_id' => $this->site->id, 'user_id' => $this->manager->id,
+            'driver_user_id' => $driver->id, 'starts_at' => '2026-09-30 20:00:00', 'ends_at' => '2026-09-30 21:00:00', 'status' => 'approved', 'lock_version' => 1]);
+        $row->update(['fleet_booking_id' => $booking->id, 'key_pickup_room_id' => $room->id, 'key_return_room_id' => $room->id, 'key_delivery_arrangement' => 'Collect from reception']);
+        $this->actingAs($this->manager)->postJson("/fleet-assets/bookings/{$booking->id}/checkout", [])->assertUnprocessable()->assertJsonValidationErrors(['command_key', 'expected_version']);
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson("/fleet-assets/bookings/{$booking->id}/checkout", ['expected_version' => 1, 'keys_handed' => false])->assertUnprocessable();
+        $this->assertSame('approved', $booking->fresh()->status);
+        $this->assertSame(1, $booking->fresh()->lock_version);
+        $cancel = ['expected_version' => 1, 'reason' => 'Transport is no longer required'];
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson("/fleet-assets/bookings/{$booking->id}/cancel", $cancel)->assertOk();
+        $this->postJson("/fleet-assets/bookings/{$booking->id}/cancel", $cancel)->assertOk();
+        $this->assertSame(2, $booking->fresh()->lock_version);
+        $this->postJson("/fleet-assets/bookings/{$booking->id}/cancel", [...$cancel, 'reason' => 'Different payload'])->assertConflict();
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())->postJson("/fleet-assets/bookings/{$booking->id}/cancel", $cancel)->assertConflict();
+        $unlinked = FleetVehicleBooking::factory()->create(['asset_id' => $asset->id, 'pickup_site_id' => $this->site->id, 'return_site_id' => $this->site->id, 'user_id' => $this->manager->id, 'status' => 'pending']);
+        $this->flushHeaders()->postJson("/fleet-assets/bookings/{$unlinked->id}/cancel", ['reason' => 'Unlinked source regression'])->assertOk();
+        $this->assertSame('cancelled', $unlinked->fresh()->status);
     }
 
     private function request(bool $assessed = false): ClientTransportBooking

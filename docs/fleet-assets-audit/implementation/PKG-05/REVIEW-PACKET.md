@@ -2,7 +2,7 @@
 
 ## Scope and approval
 
-The user approved the frozen v6 Transport design and explicitly requested implementation. This change implements the real Laravel/Inertia workspace in `codex/pkg-05-transport-workspace`, based on published main `f7d517359da6ffdf90de2f259111fe5e8a1133f2`. It does not deploy, merge, or modify operational data.
+The user approved the frozen v6 Transport design and explicitly requested implementation. This change implements the real Laravel/Inertia workspace in `codex/pkg-05-transport-workspace`. The initial base was `f7d517359da6ffdf90de2f259111fe5e8a1133f2`; the current comparison base is the actual merged Main parent **`ba5bff2e8b6c22796369443f1cdac918039950dd`**, incorporated by `a285d4fe7dd1139e02a9bfb48c227946b754e199`. The user subsequently authorised local-main and GitHub-main publication after Main's substantive review. No deployment or operational data changes are authorised by this packet.
 
 The six views are Overview, Requests & approvals, Planner, Calendar, Journeys, and Returns & handovers. All reuse PageHeader/PageHeaderRail and TierTwoTabs. Each heading sits directly below the hero. The Overview derives stage and planned-movement graphs from scoped records, with keyboard-accessible values and drilldowns. Search, quick views, full records, action menus, history, source evidence, and scoped PDF exports use persisted application records.
 
@@ -35,17 +35,17 @@ Production still depends on the organisation's real vehicle readiness configurat
 
 ## Verification record
 
-- Frontend model/navigation: 30 tests passed.
+- Frontend model/navigation/calendar: 38 tests passed, including Auckland clock-change duration and ambiguous/gap handling in UTC, Auckland and Los Angeles browser timezones.
 - Focused Transport lint: no diagnostics.
 - TypeScript: Transport pages and imported dependencies passed; expanded checks including the changed vehicle calendar and handover page passed. No whole-repository TypeScript claim.
 - Production frontend build: passed; existing bundle-size warnings retained.
 - Frozen v6: all 105 manifest files verified unchanged. Manifest SHA256 `8bc1e7f92e9aba1df4911313f091943100a584ba1e92c3dfdd6cfa54606c21c9`.
-- Backend: 60 source/workspace tests passed (892 assertions), followed by two focused browser-discovered regressions (161 and 170 assertions). Total: 62 distinct tests and 1,223 assertions. This covers scoped views/options/exports, stale and repeated saves, atomic allocation, driver ownership, journey completion, independent custody observations and linked handover replay. The two concurrent subprocess cases were excluded; this is not a concurrency certification.
+- Backend: 60 source/workspace tests passed (892 assertions), followed by two focused browser-discovered regressions (161 and 170 assertions), and three Main-review regressions (71, 9 and 14 assertions). Total: 65 distinct tests and 1,317 assertions across these staged runs. This covers scoped views/options/exports, stale and repeated saves, atomic allocation, driver ownership, journey completion, independent custody observations, linked handover replay, existing Fleet-page handoff, unrelated-field preservation through move/Undo, current key requirements and unlinked-booking compatibility. The two concurrent subprocess cases were excluded; this is not a concurrency certification or a claim that all tests were rerun after the final corrections.
 - Real browser: assessment to planner, saved Fleet allocation, missing-item receipt, Site-room key storage and passenger completion passed through the actual UI with synthetic records. Search and empty results, current-record context menus, graph drilldowns, quick/full records and the shared calendar were exercised. See `BROWSER-VERIFICATION.md` for the final layout and artifact evidence.
 - Final layout: all six tabs passed at 1280, 1366, 1440 and 1920 pixels (24 combinations), with canonical heading/second-row placement, no document overflow and no browser errors or console warnings.
 - PDF: record and overview exports were downloaded through the application, rendered with Poppler and visually inspected. Text, tables, page breaks and source-derived counts were checked. The overview summary and detailed records occupy separate pages.
 
-The verification databases use task-specific disposable names. The initial schema import exceeded the repository's five-minute import limit before assertions ran; the test bootstrap now accepts an explicit bounded timeout override, retaining its existing default and process isolation. No application environment file or operational database was copied or used.
+The verification databases use task-specific disposable names. The initial schema import exceeded the repository's five-minute import limit before assertions ran. The merge retains Main's canonical `MYSQL_TEST_SCHEMA_TIMEOUT` handling and exact `tests/TestCase.php` blob (`38496aeb7b6621f62d820791717f58bb054beb7a`); the earlier Transport-specific timeout variant was discarded. No application environment file or operational database was copied or used.
 
 ## Audit passes
 
@@ -56,3 +56,7 @@ The verification databases use task-specific disposable names. The initial schem
 The review app runs from this exact checkout at `http://127.0.0.1:8765/fleet-assets/transports/overview?from=2026-10-01&to=2026-10-01&site=all`, with a real login and a guarded disposable database. Its sample records are for 1 October 2026. The production migration has not been applied. The frozen v6 preview on port 4400 remains unchanged.
 
 This packet is for the repository's normal technical review and integration gates. Build/test evidence is not a deployment or full-system certification.
+
+## Main technical review corrections
+
+Main requested changes on `a285d4fe7`; that candidate was not approved for integration. The same owner corrected T05-01 (linked Fleet source actions), T05-02 (preserve canonical fields during rescheduling/planning), and T05-03 (actual duration across Auckland daylight-saving changes). See `INTEGRATION-AND-CORRECTIONS.md` for the consolidated correction and final browser record. Frozen preview bytes and the Main-owned guides remain unchanged.

@@ -291,9 +291,14 @@ function PlanBuilder({
                 asset_id: Number(form.asset),
                 starts_local: form.start,
                 ends_local: form.end,
-                purpose: row.purpose,
-                destination: row.destination,
-                passengers: row.required_seats,
+                purpose: row.booking ? row.booking.purpose : row.purpose,
+                destination: row.booking
+                    ? row.booking.destination
+                    : row.destination,
+                passengers: row.booking
+                    ? row.booking.passengers
+                    : row.required_seats,
+                notes: row.booking?.notes ?? null,
                 pickup_site_id: row.site.id,
                 return_site_id: row.site.id,
                 driver_user_id: Number(form.driver),
@@ -301,7 +306,9 @@ function PlanBuilder({
                 key_pickup_room_id: Number(form.pickupRoom),
                 key_return_room_id: Number(form.returnRoom),
                 key_delivery_arrangement: form.arrangement,
-                pickup_arrangement: form.arrangement,
+                pickup_arrangement: row.booking
+                    ? row.booking.pickup_arrangement
+                    : form.arrangement,
                 approval_route: form.route,
                 approval_not_required_reason: form.reason || null,
                 readiness_acknowledged: form.ready,

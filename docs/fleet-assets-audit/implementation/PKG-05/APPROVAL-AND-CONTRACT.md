@@ -2,6 +2,8 @@
 
 User decision in this same task: **“approved please implement all of this”**. This approves the exact frozen v6 design and authorises implementation of the complete Transport workspace. It supersedes the earlier design-only stop for this package; it does not authorise deployment, production data changes, new clinical/operating authority, edits to protected guides or unrelated package work.
 
+Later in the same task, the user explicitly requested notification to Main and merging to local main and GitHub main. That publication authority is retained after Main's exact-code technical approval; no additional user confirmation is required. The user also requested calendar right-click/drag and modal-rule corrections before completion. See `INTEGRATION-AND-CORRECTIONS.md` for the current source/base mapping, correction history and final evidence.
+
 Approved candidate: previews/PKG-05/v6, runtime SHA256 `21c6f2a28a60bfdffd933917db20a0705d89b48ce9c263ef2dda45aee2c606bb`, manifest SHA256 `8bc1e7f92e9aba1df4911313f091943100a584ba1e92c3dfdd6cfa54606c21c9`, URL http://127.0.0.1:4400/#/fleet-assets/transports/overview. Preserve all six frozen previews.
 
 Same Designer owns this implementation. Model verified gpt-6-astra/xhigh. Isolated checkout b9b9; branch `codex/pkg-05-transport-workspace` starts from fetched published main `f7d517359da6ffdf90de2f259111fe5e8a1133f2`. No other task/worker or message is needed for ordinary implementation choices. Main's protected dirty checkout remains untouched. Existing final technical-review/integration gates remain separate from this build authority.
