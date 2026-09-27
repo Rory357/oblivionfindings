@@ -100,9 +100,7 @@ describe('boundary visibility during map refresh', () => {
                 ? next.promise
                 : Promise.resolve(resources),
         );
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Refresh', exact: true }),
-        );
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
         expect(screen.getByRole('status')).toHaveTextContent(
             'Refreshing permitted map data',
         );
@@ -144,9 +142,7 @@ describe('boundary visibility during map refresh', () => {
         vi.mocked(request).mockRejectedValue(
             new Error('Access to this map is no longer permitted.'),
         );
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Refresh', exact: true }),
-        );
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
         await screen.findByText('Access to this map is no longer permitted.');
         expect(screen.getByTestId('rendered-boundaries')).toBeEmptyDOMElement();
     });

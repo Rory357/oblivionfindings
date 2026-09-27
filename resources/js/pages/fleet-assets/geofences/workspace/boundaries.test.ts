@@ -1,3 +1,4 @@
+import type { ZoneSchedule } from '@/components/client-location/types';
 import { describe, expect, it } from 'vitest';
 import { mapBoundary, type BoundaryRecord } from './data';
 import { decodeGeometry, encodeGeometry } from './geometry-tools';
@@ -117,7 +118,7 @@ describe('inactive timing and detection proposals', () => {
         expect(policyError(policy)).toBe('');
     });
     it('detects overlapping overnight windows across the week boundary', () => {
-        const schedule = {
+        const schedule: ZoneSchedule = {
             timezone: 'Pacific/Auckland',
             weekdays: [7, 1],
             start: '22:00',
