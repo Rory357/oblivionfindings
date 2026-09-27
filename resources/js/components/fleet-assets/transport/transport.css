@@ -540,6 +540,28 @@
     }
 }
 @media (max-width: 767px) {
+    .tr-steps,
+    .tr-fact {
+        flex-direction: column;
+    }
+    .tr-fact {
+        gap: 4px;
+        overflow-wrap: anywhere;
+    }
+    .tr-route {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+        overflow-wrap: anywhere;
+    }
+    .tr-route > svg {
+        transform: rotate(90deg);
+    }
+    .tr-record-next {
+        flex-wrap: wrap;
+    }
+    .tr-record-next > button {
+        width: 100%;
+    }
     .tr-meters {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }

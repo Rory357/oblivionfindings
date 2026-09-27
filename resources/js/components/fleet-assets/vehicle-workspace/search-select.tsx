@@ -83,10 +83,13 @@ export function VehicleSearchSelect({
                 </Button>
             </PopoverTrigger>
             <PopoverContent
-                className="w-[var(--radix-popover-trigger-width)] min-w-64 p-0"
+                className="flex max-h-[var(--radix-popover-content-available-height)] w-[var(--radix-popover-trigger-width)] max-w-[var(--radix-popover-content-available-width)] min-w-64 flex-col overflow-hidden p-0"
                 align="start"
             >
-                <Command>
+                <Command
+                    label={`Search ${label.toLowerCase()}`}
+                    className="min-h-0"
+                >
                     <CommandInput
                         placeholder={`Search ${label.toLowerCase()}…`}
                         value={query}
@@ -95,7 +98,7 @@ export function VehicleSearchSelect({
                             onSearchChange?.(next);
                         }}
                     />
-                    <CommandList>
+                    <CommandList className="min-h-0">
                         <CommandEmpty>No matching choices.</CommandEmpty>
                         <CommandGroup>
                             {options.map((option) => (
@@ -126,7 +129,7 @@ export function VehicleSearchSelect({
                     </CommandList>
                 </Command>
                 {onAdd && (
-                    <div className="border-t p-2">
+                    <div className="shrink-0 border-t p-2">
                         <Button
                             variant="ghost"
                             className="w-full justify-start text-primary"

@@ -377,10 +377,10 @@ export function ReviewRow({
     const empty = value == null || value === '';
     return (
         <div className="flex justify-between gap-4 border-b border-border py-1.5 last:border-0">
-            <span className="shrink-0 text-[13px] text-muted-foreground">
+            <span className="max-w-[45%] shrink-0 text-[13px] break-words text-muted-foreground">
                 {label}
             </span>
-            <span className="min-w-0 text-right text-[13px] font-medium">
+            <span className="min-w-0 text-right text-[13px] font-medium break-words">
                 {empty ? (
                     <span className="font-normal text-muted-foreground">—</span>
                 ) : (

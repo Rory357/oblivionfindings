@@ -527,6 +527,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     // Resident Transports (view & create)
     Route::middleware('permission:fleet.viewAny|assets.viewAny')->group(function () {
         Route::get('/transports/workspace/options', [TransportWorkspaceController::class, 'options'])->name('fleet-assets.transports.workspace.options');
+        Route::post('/transports/workspace/address-search', [TransportWorkspaceController::class, 'addressSearch'])->middleware('throttle:20,1')->name('fleet-assets.transports.workspace.address-search');
         Route::get('/transports/workspace/export', [TransportWorkspaceController::class, 'export'])->name('fleet-assets.transports.workspace.export');
         Route::post('/transports/requests', [TransportWorkspaceController::class, 'store'])->name('fleet-assets.transports.requests.store');
         Route::get('/transports/requests/{transportRequest}', [TransportWorkspaceController::class, 'show'])->whereNumber('transportRequest')->name('fleet-assets.transports.requests.show');

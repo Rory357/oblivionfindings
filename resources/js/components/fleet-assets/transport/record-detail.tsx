@@ -1,5 +1,12 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import { formatDateTime } from '@/lib/datetime';
 import {
@@ -651,6 +658,7 @@ export function TransportQuickView({
                     : 'Loading current record'
             }
             steps={sections}
+            sequential={false}
             stepIndex={section}
             onStepClick={setSection}
             headerLabel={sections[section]?.label || 'Transport details'}
@@ -689,6 +697,26 @@ export function TransportQuickView({
                 ) : undefined
             }
         >
+            <div className="mb-4 sm:hidden">
+                <Select
+                    value={String(section)}
+                    onValueChange={(value) => setSection(Number(value))}
+                >
+                    <SelectTrigger
+                        aria-label="Transport details section"
+                        className="w-full"
+                    >
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {sections.map((item, index) => (
+                            <SelectItem key={item.key} value={String(index)}>
+                                {item.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
             <WizardStepPane key={section}>
                 {error ? (
                     <Notice>

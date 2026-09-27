@@ -17,7 +17,10 @@ import {
     transportPath,
 } from '@/components/fleet-assets/transport/model';
 import { TransportOverview } from '@/components/fleet-assets/transport/overview';
-import { TransportPlanner } from '@/components/fleet-assets/transport/planner';
+import {
+    PlannerEmptyState,
+    TransportPlanner,
+} from '@/components/fleet-assets/transport/planner';
 import {
     availableIntents,
     TransportQuickView,
@@ -695,6 +698,35 @@ export default function TransportWorkspace({
                         />
                     ) : view === 'planner' ? (
                         <TransportPlanner
+                            emptyState={
+                                <PlannerEmptyState
+                                    existing={section === 'planned'}
+                                    awaitingAssessment={
+                                        records.filter((row) =>
+                                            [
+                                                'assessment',
+                                                'information',
+                                            ].includes(row.stage),
+                                        ).length
+                                    }
+                                    scope={`${formatDateOnly(filters.from)} to ${formatDateOnly(filters.to)} · ${sites.find((site) => String(site.id) === filters.site)?.name || 'All permitted sites'}`}
+                                    onRequest={() => setCreate({})}
+                                    onRequests={() =>
+                                        navigate('requests', 'all')
+                                    }
+                                    onCalendar={() => navigate('calendar')}
+                                    onClearFilters={
+                                        filters.search || filters.site !== 'all'
+                                            ? () =>
+                                                  navigate('planner', section, {
+                                                      ...filters,
+                                                      search: '',
+                                                      site: 'all',
+                                                  })
+                                            : undefined
+                                    }
+                                />
+                            }
                             records={filtered}
                             canManage={canManage}
                             onSaved={refresh}

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\FleetAssets;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Sites\SiteGeocodingController;
 use App\Models\AppSetting;
+use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Services\Fleet\Data\VehicleReadinessContext;
 use App\Services\Fleet\MaintenanceLocalTime;
@@ -97,7 +99,12 @@ class TransportWorkspaceController extends Controller
         $actor = $request->user();
         if (! $request->filled('transport_request_id')) {
             return response()->json(['clients' => $this->access->clients($actor)->map(fn ($c) => ['id' => $c->id,
-                'name' => $c->full_name, 'site_id' => $c->site_id, 'can_request' => $actor->canDo('fleet.manage') || $actor->can('update', $c)])]);
+                'name' => $c->full_name, 'site_id' => $c->site_id, 'can_request' => $actor->canDo('fleet.manage') || $actor->can('update', $c)]),
+                'locations' => Site::whereIn('id', $this->access->sites($actor)->pluck('id'))->orderBy('name')
+                    ->get(['id', 'name', 'address_line_1', 'address_line_2', 'suburb', 'city', 'postcode'])
+                    ->map(fn ($site) => ['id' => $site->id, 'name' => $site->name,
+                        'address' => implode(', ', array_filter([$site->address_line_1, $site->address_line_2, $site->suburb, $site->city, $site->postcode]))]),
+            ])->header('Cache-Control', 'no-store, private');
         }
         $row = $this->requests->find($actor, $request->integer('transport_request_id'));
         $data = $request->validate(['starts_local' => 'required|string', 'ends_local' => 'required|string',
@@ -123,6 +130,29 @@ class TransportWorkspaceController extends Controller
                 'staff' => isset($data['asset_id']) && (int) $data['asset_id'] === (int) $asset->id
                     ? app(VehicleStaffDirectory::class)->candidates($asset, $data['search'] ?? null, array_filter([$row->driver_id, $row->escort_user_id, $data['driver_user_id'] ?? null, $data['escort_user_id'] ?? null])) : []];
         })->values(), 'rooms' => SiteRoom::where('site_id', $row->client->site_id)->orderBy('name')->get(['id', 'name'])]);
+    }
+
+    public function addressSearch(Request $request)
+    {
+        $data = $request->validate(['client_id' => 'required|integer', 'q' => 'required|string|min:3|max:200']);
+        $authorize = function () use ($request, $data): void {
+            $actor = $request->user()->fresh() ?? abort(403);
+            $client = $this->access->client($actor, (int) $data['client_id']) ?? abort(404);
+            abort_unless($actor->canDo('fleet.manage') || $actor->can('update', $client), 403);
+        };
+        $authorize();
+        try {
+            // Only the explicitly submitted place query reaches the shared provider.
+            // Client identity, passenger needs and transport notes never leave the app.
+            $lookup = Request::create('/search', 'GET', ['q' => $data['q']]);
+            $response = app(SiteGeocodingController::class)->search($lookup, true);
+        } catch (\RuntimeException) {
+            return response()->json(['message' => 'Address search is unavailable. Try again, choose a saved site, or enter the location manually.'], 503)
+                ->header('Cache-Control', 'no-store, private');
+        }
+        $authorize();
+
+        return $response->header('Cache-Control', 'no-store, private');
     }
 
     public function export(Request $request)

@@ -18,7 +18,7 @@ import {
     Route,
     Users,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
     isJsonObject,
     useVehicleRecordCommand,
@@ -33,6 +33,7 @@ type Props = {
     onCalendar: () => void;
     selectedId?: number;
     onDirty: (dirty: boolean) => void;
+    emptyState?: ReactNode;
 };
 export function TransportPlanner({
     records,
@@ -41,6 +42,7 @@ export function TransportPlanner({
     onCalendar,
     selectedId,
     onDirty,
+    emptyState,
 }: Props) {
     const [selected, setSelected] = useState<number | null>(
         selectedId || records[0]?.id || null,
@@ -56,7 +58,7 @@ export function TransportPlanner({
         setDirty(value);
         onDirty(value);
     };
-    if (!records.length) return <Empty />;
+    if (!records.length) return emptyState ?? <Empty />;
     return (
         <div className="tr-builder">
             <Panel
@@ -114,6 +116,93 @@ export function TransportPlanner({
                 }}
             />
         </div>
+    );
+}
+
+export function PlannerEmptyState({
+    existing,
+    awaitingAssessment,
+    scope,
+    onRequest,
+    onRequests,
+    onCalendar,
+    onClearFilters,
+}: {
+    existing: boolean;
+    awaitingAssessment: number;
+    scope: string;
+    onRequest: () => void;
+    onRequests: () => void;
+    onCalendar: () => void;
+    onClearFilters?: () => void;
+}) {
+    return (
+        <Panel
+            title={
+                existing
+                    ? 'No existing plans in this view'
+                    : 'Start with a transport request'
+            }
+            icon={Route}
+        >
+            <div className="space-y-5">
+                <div className="space-y-2">
+                    <p>
+                        {existing
+                            ? 'Allocated vehicle plans appear here after a request has been planned.'
+                            : awaitingAssessment
+                              ? `${awaitingAssessment} request${awaitingAssessment === 1 ? '' : 's'} need assessment before a vehicle can be assigned.`
+                              : 'There are no requests ready to plan in this view. Add a request or check Requests & approvals.'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                        {scope} · The planner shows assessed passenger requests.
+                        The calendar shows shared vehicle bookings and
+                        availability.
+                    </p>
+                </div>
+                <ol className="grid gap-3 md:grid-cols-3">
+                    {[
+                        [
+                            '1. Request the journey',
+                            'Choose the passenger, collection point, destination and times.',
+                        ],
+                        [
+                            '2. Assess the needs',
+                            'Confirm seating, accessibility, escort and equipment in Requests & approvals.',
+                        ],
+                        [
+                            '3. Build the plan',
+                            'Choose an available vehicle, driver and key arrangements here.',
+                        ],
+                    ].map(([title, text]) => (
+                        <li
+                            key={title}
+                            className="space-y-2 rounded-lg border bg-muted/20 p-4"
+                        >
+                            <h3 className="font-semibold">{title}</h3>
+                            <p className="text-sm text-muted-foreground">
+                                {text}
+                            </p>
+                        </li>
+                    ))}
+                </ol>
+                <div className="flex flex-wrap gap-2">
+                    <Button onClick={onRequest}>Request transport</Button>
+                    <Button variant="outline" onClick={onRequests}>
+                        Open Requests & approvals
+                    </Button>
+                    <Button variant="outline" onClick={onCalendar}>
+                        <CalendarDays className="size-4" /> View vehicle
+                        availability
+                    </Button>
+                    {onClearFilters && (
+                        <Button variant="ghost" onClick={onClearFilters}>
+                            Clear search & site filters
+                        </Button>
+                    )}
+                </div>
+            </div>
+        </Panel>
     );
 }
 function PlanBuilder({

@@ -72,11 +72,12 @@ export function RescheduleDialog({
                 'Choose valid Auckland times. For a repeated hour, choose its UTC offset below.';
         else if (chosenEnd.instant <= chosenStart.instant)
             next.window = 'Choose a departure and a later expected return.';
-        if (!form.reason.trim())
+        if (review && !form.reason.trim())
             next.reason = 'Explain why this transport needs a different time.';
         if (review && !form.confirmed)
             next.confirmed = 'Confirm the proposed time and team arrangements.';
         setErrors(next);
+        if (review && next.window) setStep(0);
         return Object.keys(next).length === 0;
     };
     const submit = async () => {
@@ -107,6 +108,7 @@ export function RescheduleDialog({
     return (
         <WorkspaceWizard
             title="Reschedule transport"
+            maxWidth="min(92vw, 1100px)"
             description="Review a proposed time change to the existing Fleet booking."
             railIcon={CalendarDays}
             railSub={row.reference}
@@ -114,13 +116,13 @@ export function RescheduleDialog({
                 {
                     key: 'time',
                     label: 'New time',
-                    blurb: 'Departure, return and reason',
+                    blurb: 'Departure and expected return',
                     icon: CalendarDays,
                 },
                 {
                     key: 'review',
                     label: 'Review change',
-                    blurb: 'Check the team and arrangements',
+                    blurb: 'Check the team and record a reason',
                     icon: CheckCircle2,
                 },
             ]}
@@ -197,11 +199,6 @@ export function RescheduleDialog({
                 )}
                 {step === 0 ? (
                     <>
-                        <Notice>
-                            Current booking: {formatDateTime(booking.start)} –{' '}
-                            {formatDateTime(booking.end)}. The calendar changes
-                            only after you save.
-                        </Notice>
                         <DateTimeField
                             id="transport-reschedule-start"
                             label="Proposed departure"
@@ -262,22 +259,14 @@ export function RescheduleDialog({
                                 }))}
                             />
                         )}
-                        <label>
-                            Reason for rescheduling
-                            <Textarea
-                                value={form.reason}
-                                aria-invalid={!!allErrors.reason}
-                                onChange={(event) =>
-                                    setForm({
-                                        ...form,
-                                        reason: event.target.value,
-                                    })
-                                }
-                            />
-                        </label>
                     </>
                 ) : (
                     <>
+                        <Notice>
+                            Current booking: {formatDateTime(booking.start)} –{' '}
+                            {formatDateTime(booking.end)}. The calendar changes
+                            only after you save.
+                        </Notice>
                         <ReviewCard
                             icon={CalendarDays}
                             title="Proposed time · Pacific/Auckland"
@@ -291,7 +280,6 @@ export function RescheduleDialog({
                                 label="Expected return"
                                 value={`${localDateTimeLabel(form.end)} · UTC${chosenEnd?.offset || 'offset required'}`}
                             />
-                            <ReviewRow label="Reason" value={form.reason} />
                         </ReviewCard>
                         <ReviewCard
                             icon={CheckCircle2}
@@ -314,6 +302,20 @@ export function RescheduleDialog({
                                 value={row.key_delivery_arrangement}
                             />
                         </ReviewCard>
+                        <label>
+                            Reason for rescheduling
+                            <Textarea
+                                value={form.reason}
+                                maxLength={2000}
+                                aria-invalid={!!allErrors.reason}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        reason: event.target.value,
+                                    })
+                                }
+                            />
+                        </label>
                         <Notice>
                             Fleet will recheck vehicle and staff availability
                             for the full new window. Any required approval must

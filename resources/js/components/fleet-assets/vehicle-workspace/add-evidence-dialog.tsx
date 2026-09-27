@@ -67,8 +67,14 @@ export function AddEvidenceDialog({
             open
             onOpenChange={(open) => !open && !command.processing && onClose()}
         >
-            <DialogContent className="max-w-xl">
-                <DialogHeader>
+            <DialogContent
+                className="flex max-h-[90dvh] flex-col overflow-hidden"
+                style={{
+                    width: 'min(92vw, 720px)',
+                    maxWidth: 'min(92vw, 720px)',
+                }}
+            >
+                <DialogHeader className="shrink-0 pr-6">
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>
                         {vehicle.name} · original evidence stays with its
@@ -80,7 +86,7 @@ export function AddEvidenceDialog({
                         {done}
                     </p>
                 ) : (
-                    <div className="grid gap-4">
+                    <div className="grid min-h-0 grid-cols-1 gap-4 overflow-y-auto">
                         {command.message && (
                             <p
                                 role="alert"
@@ -116,7 +122,7 @@ export function AddEvidenceDialog({
                         </WizardField>
                     </div>
                 )}
-                <DialogFooter>
+                <DialogFooter className="shrink-0">
                     {done ? (
                         <Button onClick={onClose}>Done</Button>
                     ) : (

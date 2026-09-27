@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Clock3, Keyboard, Check, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Popover,
   PopoverContent,
@@ -31,6 +32,7 @@ export function TimePicker({
   describedBy?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
   const [hour, setHour] = useState("09");
   const [minute, setMinute] = useState("00");
   const [period, setPeriod] = useState("AM");
@@ -113,8 +115,8 @@ export function TimePicker({
       </PopoverTrigger>
       <PopoverContent
         className="time-picker-popover"
-        side="right"
-        align="center"
+        side={isMobile ? "bottom" : "right"}
+        align={isMobile ? "start" : "center"}
         collisionPadding={16}
         sideOffset={8}
         aria-label={`${label} picker`}
