@@ -1,3 +1,4 @@
+import { EntityChip } from '@/components/lists/entity-cells';
 import {
     EntityContextMenu,
     useEntityContextMenu,
@@ -27,15 +28,19 @@ import { router } from '@inertiajs/react';
 import {
     ArrowUpRight,
     Bell,
+    CalendarCheck,
     CheckCircle2,
     Eye,
+    FileCheck,
     Mail,
     Radio,
     RotateCcw,
     Shield,
     SlidersHorizontal,
+    Truck,
+    Wrench,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     changedChannels,
     channelName,
@@ -57,9 +62,26 @@ const sections = [
     { key: 'rules', label: 'Rules & owners', icon: Shield },
 ];
 type Recovery = { base: Overrides; draft: Overrides; revision: string };
+export type NotificationSummary = {
+    inapp: number;
+    email: number;
+    overrides: number;
+    changes: number;
+    configured: number;
+};
+const eventIcons = {
+    'fleet.booking_decisions': CalendarCheck,
+    'fleet.maintenance_reminders': Wrench,
+    'fleet.handover_updates': Truck,
+    'fleet.import_results': FileCheck,
+};
 export function Notifications({
     initial,
     userId,
+    userName,
+    section,
+    onSection: setSection,
+    onSummary,
     query,
     filter,
     scope,
@@ -68,6 +90,10 @@ export function Notifications({
 }: {
     initial: NotificationSnapshot;
     userId: number;
+    userName: string;
+    section: string;
+    onSection: (section: string) => void;
+    onSummary: (summary: NotificationSummary) => void;
     query: string;
     filter: string;
     scope: string;
@@ -76,8 +102,7 @@ export function Notifications({
 }) {
     const [saved, setSaved] = useState(initial),
         [draft, setDraft] = useState<Overrides>(initial.overrides);
-    const [section, setSection] = useState('preferences'),
-        [busy, setBusy] = useState(false),
+    const [busy, setBusy] = useState(false),
         [message, setMessage] = useState('');
     const [review, setReview] = useState(false),
         [discard, setDiscard] = useState(false),
@@ -92,11 +117,28 @@ export function Notifications({
         [checks, setChecks] = useState<Check[]>([]),
         [check, setCheck] = useState<Check | null>(null);
     const context = useEntityContextMenu<NotificationEvent>();
+    const previewTrigger = useRef<HTMLElement | null>(null);
+    const previewReturnTitle = useRef('');
     const storageKey = `fleet-settings.notifications.draft.${userId}`;
     const changes = changedChannels(saved.overrides, draft),
         dirty = changes.length > 0,
         personal = scope === 'personal';
     const values = personal ? draft : {};
+    useEffect(() => {
+        onSummary({
+            inapp: saved.events.filter((event) =>
+                effective(event, personal ? draft : {}, 'inapp'),
+            ).length,
+            email: saved.events.filter((event) =>
+                effective(event, personal ? draft : {}, 'email'),
+            ).length,
+            overrides: Object.keys(clean(draft)).length,
+            changes: changes.length,
+            configured: Object.values(saved.channels).filter(
+                (channel) => channel.available,
+            ).length,
+        });
+    }, [saved, draft, personal, changes.length, onSummary]);
     useEffect(() => {
         try {
             const stored = JSON.parse(
@@ -174,6 +216,38 @@ export function Notifications({
             'Defaults restored in your draft. Review and save to apply.',
         );
     }
+    function openPreview(event: NotificationEvent) {
+        previewReturnTitle.current = event.title;
+        previewTrigger.current =
+            document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : null;
+        setPreview(event);
+        setPreviewSection(0);
+        setPreviewChannel('inapp');
+    }
+    async function reloadSaved() {
+        setBusy(true);
+        setMessage('');
+        try {
+            const result = await api<NotificationSnapshot>(
+                'notification-preferences',
+            );
+            setSaved(result);
+            setDraft(result.overrides);
+            setUndo(null);
+            setDiscard(false);
+            setMessage('Saved preferences reloaded.');
+        } catch (error) {
+            setMessage(
+                error instanceof Error
+                    ? error.message
+                    : 'Could not reload. Your draft is retained.',
+            );
+        } finally {
+            setBusy(false);
+        }
+    }
     async function save() {
         setBusy(true);
         setMessage('');
@@ -233,10 +307,7 @@ export function Notifications({
         {
             label: 'Preview notification',
             icon: Eye,
-            onClick: () => {
-                setPreview(event);
-                setPreviewSection(0);
-            },
+            onClick: () => openPreview(event),
         },
         ...(personal && !busy && !recovery
             ? [
@@ -303,24 +374,50 @@ export function Notifications({
             )}
             {section === 'preferences' && (
                 <>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 className="text-base font-semibold">
+                                Notification preferences
+                            </h2>
+                            <p className="text-subtle mt-1">
+                                {userName} ·{' '}
+                                {personal
+                                    ? 'your optional copies'
+                                    : 'your inherited defaults'}
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={!saved.events.length}
+                                onClick={() =>
+                                    openPreview(visible[0] ?? saved.events[0])
+                                }
+                            >
+                                <Eye className="size-3.5" />
+                                Preview a notification
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSection('delivery')}
+                            >
+                                Try delivery check
+                            </Button>
+                        </div>
+                    </div>
                     <ListCaption
                         title={
                             personal
-                                ? 'Your optional notifications'
+                                ? 'Optional notifications'
                                 : 'Your inherited defaults'
                         }
                         caption={`${visible.length} of ${saved.events.length} event types shown`}
                         right={
-                            personal && (
-                                <Button
-                                    variant="outline"
-                                    disabled={busy || !!recovery}
-                                    onClick={() => reset()}
-                                >
-                                    <RotateCcw className="size-4" />
-                                    Use defaults
-                                </Button>
-                            )
+                            <EntityChip>
+                                {dirty ? 'Unsaved draft' : 'Saved preferences'}
+                            </EntityChip>
                         }
                     />
                     {!personal && (
@@ -335,50 +432,58 @@ export function Notifications({
                         <EntityTable<NotificationEvent>
                             rows={visible}
                             rowKey={(event) => event.key}
-                            identityLabel="Event"
+                            identityLabel="Notification type"
                             identity={(event) => ({
-                                icon: Bell,
+                                icon:
+                                    eventIcons[
+                                        event.key as keyof typeof eventIcons
+                                    ] ?? Bell,
                                 name: event.title,
                                 subline: event.description,
                             })}
-                            identityWidth="2fr"
+                            identityWidth="2.4fr"
                             minWidth={740}
                             actionsFor={actions}
-                            onOpen={setPreview}
+                            onOpen={openPreview}
                             onRowContextMenu={context.open}
-                            columns={channels.map((channel) => ({
-                                key: channel,
-                                label: channelName(channel),
-                                width: '1fr',
-                                cell: (event) => (
-                                    <div
-                                        className="flex items-center gap-3"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <Switch
-                                            aria-label={`${event.title} ${channelName(channel)}`}
-                                            checked={effective(
-                                                event,
-                                                values,
-                                                channel,
-                                            )}
-                                            disabled={
-                                                !personal || busy || !!recovery
-                                            }
-                                            onCheckedChange={(choice) => {
-                                                setDraft(
-                                                    clean({
-                                                        ...draft,
-                                                        [event.key]: {
-                                                            ...draft[event.key],
-                                                            [channel]: choice,
-                                                        },
-                                                    }),
-                                                );
-                                                setUndo(null);
-                                            }}
-                                        />
-                                        <div>
+                            columns={[
+                                ...channels.map((channel) => ({
+                                    key: channel,
+                                    label: channelName(channel),
+                                    width: '0.8fr',
+                                    cell: (event) => (
+                                        <div
+                                            className="flex items-center gap-3"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <Switch
+                                                aria-label={`${event.title} ${channelName(channel)}`}
+                                                checked={effective(
+                                                    event,
+                                                    values,
+                                                    channel,
+                                                )}
+                                                disabled={
+                                                    !personal ||
+                                                    busy ||
+                                                    !!recovery
+                                                }
+                                                onCheckedChange={(choice) => {
+                                                    setDraft(
+                                                        clean({
+                                                            ...draft,
+                                                            [event.key]: {
+                                                                ...draft[
+                                                                    event.key
+                                                                ],
+                                                                [channel]:
+                                                                    choice,
+                                                            },
+                                                        }),
+                                                    );
+                                                    setUndo(null);
+                                                }}
+                                            />
                                             <span className="text-subtle">
                                                 {effective(
                                                     event,
@@ -388,17 +493,29 @@ export function Notifications({
                                                     ? 'On'
                                                     : 'Off'}
                                             </span>
-                                            <div className="text-caption">
-                                                {values[event.key]?.[
-                                                    channel
-                                                ] === undefined
-                                                    ? event.defaultSource
-                                                    : 'Personal choice'}
-                                            </div>
                                         </div>
-                                    </div>
-                                ),
-                            }))}
+                                    ),
+                                })),
+                                {
+                                    key: 'source',
+                                    label: 'Applied from',
+                                    width: '1.6fr',
+                                    cell: (event) => (
+                                        <div className="text-caption space-y-1">
+                                            {channels.map((channel) => (
+                                                <div key={channel}>
+                                                    {channelName(channel)} ·{' '}
+                                                    {values[event.key]?.[
+                                                        channel
+                                                    ] === undefined
+                                                        ? event.defaultSource
+                                                        : 'Personal choice'}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ),
+                                },
+                            ]}
                         />
                     ) : (
                         <EmptyState
@@ -407,35 +524,65 @@ export function Notifications({
                             description="Change your search or filter to see more event types."
                         />
                     )}
-                    <Notice>
-                        Required safety responses remain in Control Room.
-                        Preferences change optional copies only; delivery does
-                        not complete a task or grant personal-location sharing.
-                    </Notice>
                     {personal && (
                         <Card className="sticky bottom-0 z-10 flex flex-row flex-wrap items-center justify-between gap-3 p-4">
-                            <span className="text-subtle">
-                                {dirty
-                                    ? `${changes.length} channel ${changes.length === 1 ? 'change' : 'changes'} to review`
-                                    : 'Your saved preferences are up to date'}
-                            </span>
-                            <div className="flex gap-2">
+                            <div>
+                                <p className="text-sm font-semibold">
+                                    {dirty
+                                        ? `${changes.length} channel ${changes.length === 1 ? 'change' : 'changes'} to review`
+                                        : 'No unsaved changes'}
+                                </p>
+                                <p className="text-caption mt-1">
+                                    Optional copies inherit defaults until you
+                                    choose otherwise.
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={busy || !!recovery}
+                                    onClick={() => reset()}
+                                >
+                                    Use role defaults
+                                </Button>
                                 <Button
                                     variant="outline"
-                                    disabled={!dirty || busy}
-                                    onClick={() => setDiscard(true)}
+                                    size="sm"
+                                    disabled={busy || !!recovery}
+                                    onClick={() =>
+                                        dirty
+                                            ? setDiscard(true)
+                                            : void reloadSaved()
+                                    }
                                 >
-                                    Discard changes
+                                    Reload saved
                                 </Button>
                                 <Button
                                     disabled={!dirty || busy || !!recovery}
                                     onClick={() => setReview(true)}
+                                    size="sm"
                                 >
-                                    Review changes
+                                    Save preferences
                                 </Button>
                             </div>
                         </Card>
                     )}
+                    <div className="text-subtle flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                        <span className="inline-flex items-center gap-2">
+                            <Shield className="size-3.5" />
+                            Required responses and sharing rules stay with their
+                            owners.
+                        </span>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSection('rules')}
+                        >
+                            Review rules & owners
+                            <ArrowUpRight className="size-3.5" />
+                        </Button>
+                    </div>
                 </>
             )}
             {section === 'delivery' && (
@@ -621,11 +768,18 @@ export function Notifications({
                     onClose={() => setPreview(null)}
                     onCloseAutoFocus={(event) => {
                         event.preventDefault();
-                        document
-                            .querySelector<HTMLButtonElement>(
-                                `button[aria-label="Actions for ${preview.title}"]`,
-                            )
-                            ?.focus();
+                        if (
+                            previewTrigger.current?.isConnected &&
+                            previewTrigger.current.getAttribute('role') !==
+                                'menuitem'
+                        )
+                            previewTrigger.current.focus();
+                        else
+                            document
+                                .querySelector<HTMLButtonElement>(
+                                    `button[aria-label="Actions for ${previewReturnTitle.current}"]`,
+                                )
+                                ?.focus();
                     }}
                     title="Notification preview"
                     description="Synthetic sample; no message is sent."
@@ -667,6 +821,30 @@ export function Notifications({
                     <WizardStepPane key={previewSection}>
                         {previewSection === 0 ? (
                             <div className="space-y-4">
+                                <Select
+                                    value={preview.key}
+                                    onValueChange={(key) =>
+                                        setPreview(
+                                            saved.events.find(
+                                                (event) => event.key === key,
+                                            ) ?? null,
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger aria-label="Notification type to preview">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {saved.events.map((event) => (
+                                            <SelectItem
+                                                key={event.key}
+                                                value={event.key}
+                                            >
+                                                {event.title}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 <Sections
                                     tabs={[
                                         {
@@ -788,28 +966,24 @@ export function Notifications({
                 <Modal
                     title="Discard notification changes?"
                     description="Your saved preferences will be kept."
-                    onClose={() => setDiscard(false)}
+                    onClose={() => !busy && setDiscard(false)}
                     footer={
                         <>
                             <Button
                                 variant="outline"
+                                disabled={busy}
                                 onClick={() => setDiscard(false)}
                             >
                                 Keep editing
                             </Button>
-                            <Button
-                                onClick={() => {
-                                    setDraft(saved.overrides);
-                                    setUndo(null);
-                                    setDiscard(false);
-                                }}
-                            >
+                            <Button disabled={busy} onClick={reloadSaved}>
                                 Discard changes
                             </Button>
                         </>
                     }
                 >
                     Your unsaved channel choices will be removed.
+                    {message && <Notice>{message}</Notice>}
                 </Modal>
             )}
             {latest && (

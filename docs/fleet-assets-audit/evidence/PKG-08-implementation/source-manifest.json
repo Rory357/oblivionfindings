@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-27T14:15:02.264Z",
+  "checkedAt": "2026-09-27T19:05:48.473Z",
   "base": "926b4981b0289da08a20baca0995117fb53e413e",
   "mainHead": "926b4981b0289da08a20baca0995117fb53e413e",
   "branch": "codex/pkg08-settings-implementation",
@@ -36,11 +36,11 @@
     "resources/js/lib/fleet-navigation.ts": "3bea22b840c117c253e9fab767e56748851fe05dcfe3d20e3be2c6e10f2ce3f1",
     "resources/js/pages/fleet-assets/settings/_map-tools.tsx": "66eb22544203333c034ce28cbd47946b6b0c7f9cdc1c88cca3705c7b4c81781a",
     "resources/js/pages/fleet-assets/settings/_maps.tsx": "68f37eaadb4cd233db75f80c7339bf0688911fbcf841b0e919b9a9d370fb79c1",
-    "resources/js/pages/fleet-assets/settings/_notifications.tsx": "4fa62ca8ffa3efbdb1d13ec2447331776f24f6c07124cff8668327c5897e811b",
+    "resources/js/pages/fleet-assets/settings/_notifications.tsx": "4c713df12dc04236955fa39979de9e92c8e169704938803433ec14948d8a13ef",
     "resources/js/pages/fleet-assets/settings/_owners.tsx": "452b550ac45d965f1b1bb50c7e4bbd87e3cc188981f8c3bcd4ea747f71140194",
     "resources/js/pages/fleet-assets/settings/_types.ts": "383f3702f36574d9555315d3b882c9373296848678898f965c6addf06265e9f7",
     "resources/js/pages/fleet-assets/settings/_ui.tsx": "491ec6af42a4299a672c84def4b8941d35d4b6907930f637b9057e6aacef3074",
-    "resources/js/pages/fleet-assets/settings/index.tsx": "abca00804179472223a4572efc0ea8909706f9bb6af259ccc52befe7e71f022a",
+    "resources/js/pages/fleet-assets/settings/index.tsx": "d3f5e7fc722ee8ef573c898beaef69eca4c4c0f9244d84d3e59193f4a1f7b445",
     "resources/js/pages/fleet-assets/settings/notifications.tsx": "ae1dffa083e5ce27ca4dee40aca37dc4b6000c9d09c904eaccf3dfc518ed65bc",
     "resources/js/pages/fleet-assets/settings/settings-draft.test.ts": "97ce0a6aa9e7dd8a2148c96cf5671466f90c6d80343e2416f68c1d654fd42454",
     "routes/fleet-assets.php": "863965d95309e759992017f165b1db11d15fcd630eb40f6772b4bb73ee38e2a8",
@@ -93,5 +93,5 @@
     "implementation": "1a4a6140ff2c2f222e4ad46f74cd347b5a4582c02345702beba93412059621bc",
     "main": "1a4a6140ff2c2f222e4ad46f74cd347b5a4582c02345702beba93412059621bc"
   },
-  "reviewParent": "322b4ebfdaf4a242d9bd705b5a6f958ca973f8ee"
+  "reviewParent": "b07888e9b413696649ceceb03bbae3ee38edf166"
 }

@@ -1,6 +1,8 @@
+import { EntityChip } from '@/components/lists/entity-cells';
 import {
     PageHeader,
     PageHeaderFilterSelect,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
@@ -16,11 +18,12 @@ import {
     History,
     Map,
     Settings,
+    Shield,
     SlidersHorizontal,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Maps } from './_maps';
-import { Notifications } from './_notifications';
+import { Notifications, type NotificationSummary } from './_notifications';
 import { ChangeHistory, Setup, Tracking } from './_owners';
 import type { MapSnapshot, NotificationSnapshot, Policy } from './_types';
 import { Modal } from './_ui';
@@ -47,7 +50,8 @@ export default function SettingsWorkspace({
         devices: boolean;
     };
 }) {
-    const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
+    const { auth } = usePage<{ auth: { user: { id: number; name: string } } }>()
+        .props;
     const initialTab = () =>
         tabs.some((tab) => tab.key === window.location.hash.slice(1))
             ? window.location.hash.slice(1)
@@ -61,6 +65,20 @@ export default function SettingsWorkspace({
         [dirty, setDirty] = useState(false),
         [leaving, setLeaving] = useState<string | null>(null);
     const [mapDirty, setMapDirty] = useState(false);
+    const [notificationSection, setNotificationSection] =
+        useState('preferences');
+    const [notificationSummary, setNotificationSummary] =
+        useState<NotificationSummary>({
+            inapp: notifications.events.filter((event) => event.effective.inapp)
+                .length,
+            email: notifications.events.filter((event) => event.effective.email)
+                .length,
+            overrides: Object.keys(notifications.overrides).length,
+            changes: 0,
+            configured: Object.values(notifications.channels).filter(
+                (channel) => channel.available,
+            ).length,
+        });
     const allowLeave = useRef(false),
         onDirty = useCallback((value: boolean) => setDirty(value), []);
     const select = (key: string) => {
@@ -114,76 +132,160 @@ export default function SettingsWorkspace({
                     className="overflow-clip!"
                     icon={Settings}
                     title="Settings"
-                    subline="Fleet & Assets · map providers, optional notifications and source-owned setup"
+                    titleChip={<EntityChip>Organisation</EntityChip>}
+                    subline="Maps, tracking, notifications and operational setup"
                     actions={
-                        <PageHeaderSearch
-                            value={query}
-                            onChange={setQuery}
-                            placeholder={`Search ${tabs.find((tab) => tab.key === view)?.label.toLowerCase()}`}
-                        />
+                        <>
+                            <PageHeaderSearch
+                                value={query}
+                                onChange={setQuery}
+                                placeholder={`Search ${tabs.find((tab) => tab.key === view)?.label.toLowerCase()}`}
+                            />
+                            <PageHeaderGlassButton
+                                icon={History}
+                                onClick={() => select('history')}
+                            >
+                                Changes
+                            </PageHeaderGlassButton>
+                        </>
                     }
                     meters={
-                        <>
-                            <PageHeaderMeterBlock
-                                label="Map capabilities"
-                                onClick={() => select('maps')}
-                            >
-                                <PageHeaderMeterBig>
-                                    {
-                                        maps.capabilities.filter(
-                                            (capability) => capability.enabled,
-                                        ).length
+                        view === 'notifications' ? (
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="In-app copies"
+                                    onClick={() => {
+                                        setNotificationSection('preferences');
+                                        setFilter('all');
+                                    }}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {notificationSummary.inapp}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Of {notifications.events.length} event
+                                        types ·{' '}
+                                        {scope !== 'personal'
+                                            ? 'inherited defaults'
+                                            : notificationSummary.changes
+                                              ? 'draft choices'
+                                              : 'saved choices'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Email copies"
+                                    onClick={() =>
+                                        setNotificationSection('delivery')
                                     }
-                                    <span className="text-[11px] text-primary-foreground/70">
-                                        {' '}
-                                        / 4 Google
-                                    </span>
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    OSM remains the default
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Notification types"
-                                onClick={() => select('notifications')}
-                            >
-                                <PageHeaderMeterBig>
-                                    {notifications.events.length}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Optional copies
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Data policies"
-                                onClick={() => select('tracking')}
-                            >
-                                <PageHeaderMeterBig>
-                                    {policies.length}
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Source-owned interpretation
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                            <PageHeaderMeterBlock
-                                label="Setup"
-                                onClick={() => select('setup')}
-                            >
-                                <PageHeaderMeterBig>
-                                    Manual first
-                                </PageHeaderMeterBig>
-                                <PageHeaderMeterCaption>
-                                    Tracking is optional
-                                </PageHeaderMeterCaption>
-                            </PageHeaderMeterBlock>
-                        </>
+                                >
+                                    <PageHeaderMeterBig>
+                                        {notificationSummary.email}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Optional choices · receipt unconfirmed
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="My overrides"
+                                    onClick={() => {
+                                        setScope('personal');
+                                        setFilter('overrides');
+                                        setNotificationSection('preferences');
+                                    }}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {notificationSummary.overrides}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Event types with personal choices
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Channels"
+                                    onClick={() =>
+                                        setNotificationSection('delivery')
+                                    }
+                                >
+                                    <PageHeaderMeterBig>
+                                        {notificationSummary.configured} of{' '}
+                                        {
+                                            Object.keys(notifications.channels)
+                                                .length
+                                        }
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Configured · inspect delivery
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        ) : (
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Map capabilities"
+                                    onClick={() => select('maps')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {
+                                            maps.capabilities.filter(
+                                                (capability) =>
+                                                    capability.enabled,
+                                            ).length
+                                        }
+                                        <span className="text-[11px] text-primary-foreground/70">
+                                            {' '}
+                                            / 4 Google
+                                        </span>
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        OSM remains the default
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Notification types"
+                                    onClick={() => select('notifications')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {notifications.events.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Optional copies
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Data policies"
+                                    onClick={() => select('tracking')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {policies.length}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Source-owned interpretation
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Setup"
+                                    onClick={() => select('setup')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        Manual first
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Tracking is optional
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        )
                     }
                     filters={
                         view === 'notifications' ? (
                             <>
+                                <span className="mr-2 inline-flex items-center gap-1.5 text-[11px] text-primary-foreground/80">
+                                    <Shield className="size-3" />
+                                    Approved sites · Pacific/Auckland
+                                </span>
                                 <PageHeaderFilterSelect
                                     allValue="personal"
-                                    label="Scope"
+                                    label="Personal"
                                     value={scope}
                                     onChange={setScope}
                                     options={[
@@ -198,7 +300,7 @@ export default function SettingsWorkspace({
                                     ]}
                                 />
                                 <PageHeaderFilterSelect
-                                    label="Show"
+                                    label="All notifications"
                                     value={filter}
                                     onChange={setFilter}
                                     options={[
@@ -245,6 +347,10 @@ export default function SettingsWorkspace({
                     <Notifications
                         initial={notifications}
                         userId={auth.user.id}
+                        userName={auth.user.name}
+                        section={notificationSection}
+                        onSection={setNotificationSection}
+                        onSummary={setNotificationSummary}
                         query={view === 'notifications' ? query : ''}
                         filter={filter}
                         scope={scope}
