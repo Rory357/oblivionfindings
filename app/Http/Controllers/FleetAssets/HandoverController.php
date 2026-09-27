@@ -8,6 +8,8 @@ use App\Models\FleetShiftHandover;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Fleet\MaintenanceFingerprint;
+use App\Services\Fleet\VehicleBookingAccessService;
 use App\Services\UserSiteAccessService;
 use App\Support\LegacyStorageContext;
 use Illuminate\Database\Eloquent\Builder;
@@ -136,7 +138,7 @@ class HandoverController extends Controller
             'stats' => $stats,
             // New-handover wizard payload (retired /handovers/create page) —
             // only when opened via ?new=1.
-            'wizard' => $request->boolean('new') ? $this->wizardPayload($auth, $siteAccess) : null,
+            'wizard' => $request->boolean('new') ? $this->wizardPayload($auth, $siteAccess, $request->integer('booking_id') ?: null) : null,
             'can' => [
                 'manage' => (bool) $auth?->canDo('fleet.manage'),
             ],
@@ -159,8 +161,12 @@ class HandoverController extends Controller
      * Options for the new-handover wizard modal (ported from the retired
      * create page).
      */
-    protected function wizardPayload(User $auth, UserSiteAccessService $siteAccess): array
+    protected function wizardPayload(User $auth, UserSiteAccessService $siteAccess, ?int $bookingId = null): array
     {
+        $booking = $bookingId ? app(VehicleBookingAccessService::class)->booking($auth, $bookingId) : null;
+        if ($bookingId) {
+            abort_unless($booking, 404);
+        }
         $vehicleQuery = Asset::query()->where('category', 'vehicle')->orderBy('name');
         $this->applyAssetSiteScope($vehicleQuery, $auth, $siteAccess);
 
@@ -189,12 +195,16 @@ class HandoverController extends Controller
             'vehicles' => $vehicles,
             'users' => $users,
             'current_user_id' => $auth->id,
+            'booking_id' => $booking?->id,
+            'asset_id' => $booking?->asset_id,
         ];
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
+            'booking_id' => ['nullable', 'integer'],
+            'request_key' => ['required_with:booking_id', 'nullable', 'uuid'],
             'asset_id' => ['required', 'integer', 'exists:assets,id'],
             'incoming_user_id' => ['required', 'integer', 'exists:users,id'],
             'odometer_km' => ['nullable', 'integer', 'min:0'],
@@ -231,6 +241,12 @@ class HandoverController extends Controller
             );
 
             $siteId = $asset->site_id ?: $asset->home_site_id;
+            $booking = ! empty($data['booking_id'])
+                ? app(VehicleBookingAccessService::class)->booking($actor, (int) $data['booking_id'], true) : null;
+            if (! empty($data['booking_id'])) {
+                abort_unless($booking && (int) $booking->asset_id === (int) $asset->id, 404);
+                abort_unless(in_array($booking->status, ['checked_out', 'returned'], true), 409, 'A transport handover needs an actual checkout or return.');
+            }
             $site = $siteId
                 ? Site::query()->active()->notArchived()->whereKey($siteId)->lockForUpdate()->first()
                 : null;
@@ -266,7 +282,16 @@ class HandoverController extends Controller
                 'You are not authorized to hand this vehicle over to that user.',
             );
 
+            $fingerprint = MaintenanceFingerprint::of(['actor' => $actor->id, 'data' => $data]);
+            if ($booking && ($prior = FleetShiftHandover::where('request_key', $data['request_key'])->first())) {
+                abort_unless((int) $prior->booking_id === (int) $booking->id && (int) $prior->outgoing_user_id === (int) $actor->id && hash_equals((string) $prior->request_fingerprint, $fingerprint), 409, 'This handover save key was already used with different details.');
+
+                return $prior;
+            }
             $handover = FleetShiftHandover::query()->create([
+                'booking_id' => $booking?->id,
+                'request_key' => $booking ? $data['request_key'] : null,
+                'request_fingerprint' => $booking ? $fingerprint : null,
                 ...LegacyStorageContext::attributes(),
                 'asset_id' => $asset->id,
                 'outgoing_user_id' => $actor->id,

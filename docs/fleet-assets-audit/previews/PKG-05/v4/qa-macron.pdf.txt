@@ -1,0 +1,44 @@
+Synthetic design preview · No operational or clinical record changed
+Page 1
+OBLIVION FINDINGS / TRANSPORT
+Jordan Lee · transport record
+DESIGN PREVIEW · Synthetic records · Pacific/Auckland
+TR-1043
+Kōwhai House
+Status: Needs information
+1 matching record. This export reflects the selected preview scope.
+Transport summary
+Detail
+Recorded value
+Route
+Kōwhai House → Library
+Planned
+28 Sep 2026 12:00 PM – 02:00 PM
+Actual departure
+Not recorded
+Actual return
+Not recorded
+Vehicle / driver
+Not allocated
+Passenger return
+Not confirmed
+Medication handoff
+No unresolved source obligation shown
+Vehicle return observations
+No records in this section.
+Keys and site arrangement
+No allocated vehicle key · current vehicle custody: Not confirmed
+Collect: Location not confirmed. Return to: Location not confirmed
+Responsible driver: Not assigned. Receiving worker: Not assigned. Driver collects and returns
+No additional arrangement recorded.
+Current key custody can be newer than this historical journey. A receipt alone does not confirm key-safe placement.
+History
+Time / source
+Actor / event
+Detail
+27 Sep 2026 03:00 PM
+TR-1043
+Ava Thompson
+Transport requested
+Time, pickup and authorised transport
+needs recorded.

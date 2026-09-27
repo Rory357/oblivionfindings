@@ -6282,7 +6282,8 @@ export default function ClientShow({
                                                                             ) : null}
                                                                         </div>
                                                                     </div>
-                                                                    {can.edit ? (
+                                                                    {b.workspace_url ? <Button size="sm" variant="outline" asChild><Link href={b.workspace_url}>Open transport</Link></Button> : null}
+                                                                    {can.edit && b.can_remove ? (
                                                                         <Button
                                                                             size="sm"
                                                                             variant="ghost"

@@ -21,6 +21,7 @@ class FleetKeyLog extends Model
         'key_number',
         'location',
         'notes',
+        'site_room_id', 'recorded_by_user_id',
     ];
 
     protected static function booted(): void
