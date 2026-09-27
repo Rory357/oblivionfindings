@@ -814,7 +814,7 @@ export default function TransportWorkspace({
                                                     : 'Transport window',
                                             width: '1.1fr',
                                             cell: (r) => (
-                                                <span className="text-xs">
+                                                <span className="min-w-0 text-xs">
                                                     {formatDateTime(
                                                         view === 'returns'
                                                             ? r.booking
@@ -827,7 +827,14 @@ export default function TransportWorkspace({
                                                                   ?.start ||
                                                                   r.start,
                                                     )}
-                                                    <small className="mt-1 block text-muted-foreground">
+                                                    <small
+                                                        className="mt-1 block truncate text-muted-foreground"
+                                                        title={
+                                                            view === 'returns'
+                                                                ? undefined
+                                                                : r.destination
+                                                        }
+                                                    >
                                                         {view === 'returns'
                                                             ? r.booking
                                                                   ?.returned_at
