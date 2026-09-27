@@ -54,6 +54,8 @@ class Pkg07MapPrivacyTest extends TestCase
         $this->actingAs($user)->getJson($url)->assertOk()->assertJsonPath('data.0.position.lat', -41.29)->assertJsonPath('data.0.accuracy_m', 15);
         $locations = app(VehicleLocationService::class);
         $this->assertSame(-41.29, $locations->lastPermittedPosition($user, $vehicle)['lat']);
+        $fleetMapUrl = '/fleet-assets/vehicles/fleet-map/data';
+        $this->getJson($fleetMapUrl)->assertOk()->assertJsonPath('vehicles.0.id', $vehicle->id)->assertJsonPath('vehicles.0.position.lat', -41.29);
         $signal = FleetSignal::create(['asset_id' => $vehicle->id, 'geofence_id' => $boundary->id,
             'signal_type' => 'geofence_enter', 'occurred_at' => $event->occurred_at, 'idempotency_key' => (string) Str::uuid(), 'payload' => []]);
         $eventsUrl = '/fleet-assets/geofences/events?boundary_id='.$boundary->id;
@@ -79,6 +81,8 @@ class Pkg07MapPrivacyTest extends TestCase
         $event->update(['consent_blocked' => true]);
         $this->getJson($url)->assertOk()->assertJsonPath('data.0.position', null);
         $this->assertNull($locations->lastPermittedPosition($user, $vehicle));
+        $this->assertNull($locations->fleetMapState($user, $vehicle)['position']['lat']);
+        $this->getJson($fleetMapUrl)->assertOk()->assertJsonPath('vehicles.0.position.lat', null)->assertJsonPath('vehicles.0.position.withheld', 'consent');
         $this->assertDatabaseHas('fleet_signals', ['id' => $signal->id]);
     }
 

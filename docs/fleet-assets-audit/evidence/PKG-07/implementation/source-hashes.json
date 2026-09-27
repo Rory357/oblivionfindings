@@ -1,5 +1,9 @@
 [
   {
+    "path": ".env.example",
+    "sha256": "E64AA21F1A758A9408F3D76979DC9CB0A5763F4F851F6F74F3F19CD537CE0CF8"
+  },
+  {
     "path": "app/Console/Commands/FixSiteGeofenceScopes.php",
     "sha256": "54BB2B2FB763BB5DC749956B0A707183F43F487EC77AAE1262E32FBA5DDFA9BE"
   },
@@ -9,7 +13,7 @@
   },
   {
     "path": "app/Http/Controllers/FleetAssets/AssetController.php",
-    "sha256": "2AAD33FD05604E7A09A0DDB420736DE3CD30D71B0505205C4D6E4BA02248916B"
+    "sha256": "016DDA4642BFEB44F35FD0860DE5312C735B1CD517066FC96FBCBC873B8DAABB"
   },
   {
     "path": "app/Http/Controllers/FleetAssets/GeofenceController.php",
@@ -18,6 +22,10 @@
   {
     "path": "app/Http/Controllers/FleetAssets/LiveMapController.php",
     "sha256": "1567D9FAC428E96A3315C7A3C3E74437F0078C5988EE5045FC6A522453124D53"
+  },
+  {
+    "path": "app/Http/Controllers/FleetAssets/VehicleCalendarController.php",
+    "sha256": "E41DA1BDAA1605854BDA4DDE9236B94E398B0C09F71A550173F0EE1AF10737B7"
   },
   {
     "path": "app/Http/Controllers/Operations/ClientLocationZoneDraftController.php",
@@ -65,7 +73,7 @@
   },
   {
     "path": "app/Services/Fleet/VehicleLocationService.php",
-    "sha256": "EDC850F7450A0B02DD50E0E5800A455C890279222D6CDA34DB0F30FE51FA0BAC"
+    "sha256": "3B2B01977D7BEBF3687629EDEA9182412EF942A6CEB68530EB8A28AF06064AD9"
   },
   {
     "path": "app/Services/Sites/SiteProfileData.php",
@@ -129,15 +137,19 @@
   },
   {
     "path": "resources/js/pages/fleet-assets/assets/show.tsx",
-    "sha256": "363467298C4972BDE237CF75E560F42BF6D14B3515CFF0AA49A9C17EB13517E1"
+    "sha256": "7A09BF92E1257B37825D71F6CDBD722AB468AE9AAF883AAE5152440DEF3CCBA8"
   },
   {
     "path": "resources/js/pages/fleet-assets/geofences/index.tsx",
-    "sha256": "DEBBE1596A8886B238D48FA0E07D3D41FA7979D2A674929468970C373B6F6972"
+    "sha256": "70F248B506B31F85C5677B0A476A4B49B75F52FE3DEAE6EABDCE78053F88BDC4"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/geofences/workspace/address-search.test.tsx",
+    "sha256": "FB875312CB841653E6D152F0C1F605A2ED962191131E8CF0F58D601BFE4CF904"
   },
   {
     "path": "resources/js/pages/fleet-assets/geofences/workspace/address-search.tsx",
-    "sha256": "2DD17710121357ACD7B3A8B968B1E8CBFB2CDEC896C229038F0C4CAA551FE245"
+    "sha256": "1ACB9C792A3EB4777813190FB85CF9DF6795191F237E979D315D277DFC8EC95D"
   },
   {
     "path": "resources/js/pages/fleet-assets/geofences/workspace/api.ts",
@@ -148,8 +160,12 @@
     "sha256": "1D844DFCC9095F84E700FBF28040F3122586ECFF8619680EF6FE83E506962C74"
   },
   {
+    "path": "resources/js/pages/fleet-assets/geofences/workspace/boundary-wizard.test.tsx",
+    "sha256": "74C2DCEE664A625CE791F8AAB51FBFCE4A49E84A300F9239260E83D24D47D28B"
+  },
+  {
     "path": "resources/js/pages/fleet-assets/geofences/workspace/boundary-wizard.tsx",
-    "sha256": "DCED095DD19CD2BF7600F6A1017F8F012506C783A5FABE7786AD5F82D428EB38"
+    "sha256": "3EC903EA33E64F267BD3A037DDFC850AC5CEC0C2C64BA5885157CC60A5AC9B6C"
   },
   {
     "path": "resources/js/pages/fleet-assets/geofences/workspace/data.ts",
@@ -165,7 +181,7 @@
   },
   {
     "path": "resources/js/pages/fleet-assets/geofences/workspace/history.tsx",
-    "sha256": "0AE1E930D09FE3D1884095641C5AE2CB21CA1EF1268EDB13938EF822D7CEC207"
+    "sha256": "E7EAEF02E25A9EA7700D6171D9426E120CE1FAE0CA03AB487AAA60D14B205D21"
   },
   {
     "path": "resources/js/pages/fleet-assets/geofences/workspace/lifecycle-dialog.tsx",
@@ -181,15 +197,19 @@
   },
   {
     "path": "resources/js/pages/fleet-assets/geofences/workspace/map.tsx",
-    "sha256": "E3BB621BEA7AB82F561072A1F381D4818BCE039384E8CFBEB3EC58C33C473B65"
+    "sha256": "6FC37D50A7AE22C6E46BC6DC3C1A5F2A5F37DFD305429CFBD32C77FF273E5A58"
   },
   {
     "path": "resources/js/pages/fleet-assets/geofences/workspace/operational-canvas.tsx",
-    "sha256": "794726DB418F4FAD78055BFA7C41ADA5B38EAC7418EC74845279BCCFBB6FBD93"
+    "sha256": "5C2231AD4D0340B92B96F8301905F76C31F1BDD1452A7300318853E04870F4A3"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/geofences/workspace/operational-map.test.tsx",
+    "sha256": "A0AF64762473CE9AD9F240B9E48E09A65185CA8FA71F99A628C978F06C364DFD"
   },
   {
     "path": "resources/js/pages/fleet-assets/geofences/workspace/operational-map.tsx",
-    "sha256": "FF7C0EE1EBB4C962EE4C2B6DCE8D8292CA060A80F7CCD62292FAF8FF6D68917B"
+    "sha256": "3E5C32AAC392583737098ED99356987214F3E6A12CD7005C94AC8C042244E2D4"
   },
   {
     "path": "resources/js/pages/fleet-assets/geofences/workspace/policy-summary.tsx",
@@ -209,7 +229,7 @@
   },
   {
     "path": "resources/js/pages/fleet-assets/geofences/workspace/rule-history.tsx",
-    "sha256": "02362F37521579CF88D46469BABA9A466B4D2407507C25B98677A803490694EA"
+    "sha256": "0DFCEA7BB9E93EDE2E9EDDCE17F8E66FA2EF2636668C35092666A1ED6605CEB9"
   },
   {
     "path": "resources/js/pages/fleet-assets/geofences/workspace/rule-policy.ts",
@@ -221,7 +241,7 @@
   },
   {
     "path": "resources/js/pages/fleet-assets/geofences/workspace/ui.tsx",
-    "sha256": "F55F0BF40B23C7809CC83580B3C0956CCE031921C4547B2A96A18B89506799FF"
+    "sha256": "050C5F92CFD195959869B84A8CEE2B9AA683A824130D583930C8EAFC613B1CED"
   },
   {
     "path": "resources/js/pages/fleet-assets/geofences/workspace/workspace.css",
@@ -237,7 +257,7 @@
   },
   {
     "path": "routes/fleet-assets.php",
-    "sha256": "02919F8420A0DC57FE7851B6642A1CBA0A4A3357E34BB470545EFC6A126892E9"
+    "sha256": "B4D3844FAD1190419E0C2ACB4543D81CEC8C6F0591457DC81C4DDE5E60355308"
   },
   {
     "path": "routes/operations.php",
@@ -245,34 +265,14 @@
   },
   {
     "path": "tests/Feature/FleetAssets/Pkg07BoundariesTest.php",
-    "sha256": "BF20BCC1FF8AC11A18408DBFA5393E1FD011BC8A8E652C04D173722D675C7E78"
+    "sha256": "95A1DE93C05DB7692DE83507E45A5E0A3D165747B1EDDB7479087B0AD0E49860"
   },
   {
     "path": "tests/Feature/FleetAssets/Pkg07MapPrivacyTest.php",
-    "sha256": "FD4B225BDE30EC74E8E5602237FD7C0189E686CF367AA90A17F651D07BECEC89"
+    "sha256": "14D266213B61FA03BB08362A13D5E5D620D9DACFB75573E2F18BED99BF1182BB"
   },
   {
     "path": "tests/Feature/Sites/SiteGeofenceTest.php",
     "sha256": "F753B0C13CED4ECD50D566027D00AF904B6AD6AA43A7D940F27A8D95D7251D5F"
-  },
-  {
-    "path": "tests/TestCase.php",
-    "sha256": "D20BE5E25CB3992AD473D5DCDAB17309EB4E21D682E80DDD299C3C46870D1962"
-  },
-  {
-    "path": "resources/js/pages/fleet-assets/geofences/workspace/address-search.test.tsx",
-    "sha256": "FB875312CB841653E6D152F0C1F605A2ED962191131E8CF0F58D601BFE4CF904"
-  },
-  {
-    "path": "resources/js/pages/fleet-assets/geofences/workspace/boundary-wizard.test.tsx",
-    "sha256": "3483B5EF1A3DEEDC786EB5415293C08E55FACA30A589D63FF04EBE6970B45A42"
-  },
-  {
-    "path": ".env.example",
-    "sha256": "E64AA21F1A758A9408F3D76979DC9CB0A5763F4F851F6F74F3F19CD537CE0CF8"
-  },
-  {
-    "path": "resources/js/pages/fleet-assets/geofences/workspace/operational-map.test.tsx",
-    "sha256": "A0AF64762473CE9AD9F240B9E48E09A65185CA8FA71F99A628C978F06C364DFD"
   }
 ]

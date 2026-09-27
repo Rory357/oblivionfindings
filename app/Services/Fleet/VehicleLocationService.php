@@ -60,7 +60,7 @@ final class VehicleLocationService
         $snapshot = $vehicle->relationLoaded('fleetState')
             ? $vehicle->fleetState
             : FleetVehicleStateSnapshot::query()
-                ->with(['lastEvent:id,occurred_at,received_at,external_power,event_type', 'lastTrip:id,is_personal,consent_blocked,started_at,ended_at'])
+                ->with(['lastEvent:id,occurred_at,received_at,external_power,event_type,accuracy_m,consent_blocked', 'lastTrip:id,is_personal,consent_blocked,started_at,ended_at'])
                 ->find($vehicle->getKey());
         $visible = $positionAccess ?? $this->positionsVisible($user, $vehicle);
         $state = $snapshot ? $this->state($vehicle, $snapshot, $visible) : null;

@@ -46,3 +46,7 @@ New purpose proposals deliberately remain inactive under the approved v9 scope. 
 ## Address-search follow-up
 
 User-selected free OpenStreetMap submitted lookup is enabled in the isolated preview. Real Te Papa lookup and selection populated the address, coordinates and map; Site selection also autofills untouched locations. The final build passes, 17 focused frontend checks and six backend tests (111 assertions) pass, and implementation TypeScript diagnostics are empty. Browser verification confirms existing boundary geometry is preserved and the original user draft remains in its original tab. See `ADDRESS-SEARCH.md` for policy, configuration and screenshot evidence.
+
+## Main integration candidate
+
+`MERGE-HANDOFF.md` records the user's local/GitHub main publication request and current-base reconciliation through published `79ea01a561f7d2fa5affa592dc096f516d663635`. This candidate passes 35 focused frontend checks, 14 backend tests / 193 assertions, and scoped ESLint on 34 TS/TSX files with zero errors or warnings. Changed-implementation TypeScript diagnostics are empty; inherited graph diagnostics remain separately recorded. The final build passes in 3m 49s and the rebuilt browser verifies address selection and geometry/camera preservation during refresh. Earlier fixture and lint failures are distinguished in the handoff rather than hidden. Actual main integration and GitHub push remain subject to Main's exact-source technical approval and serial slot.
