@@ -32,6 +32,7 @@ class FleetVehicleGeofenceAssignment extends Model
         'purpose',
         'response_proposal',
         'schedule',
+        'policy_proposal',
         'geometry_hash',
         'geometry_snapshot',
         'monitoring',
@@ -49,6 +50,7 @@ class FleetVehicleGeofenceAssignment extends Model
 
     protected $casts = [
         'schedule' => 'array',
+        'policy_proposal' => 'array',
         'geometry_snapshot' => 'array',
         'lock_version' => 'integer',
         'removed_at' => 'datetime',

@@ -112,6 +112,7 @@ export function AssetProfileWorkspace({
     asset_finance_technology: finance,
     hr_asset,
     can_view_hr_assets,
+    boundaries_href,
     timeline = [],
 }: Props & { workspace: ProfileWorkspace }) {
     const [view, setView] = useState('overview'),
@@ -743,6 +744,16 @@ export function AssetProfileWorkspace({
                 )}
                 {view === 'location' && (
                     <div className="grid gap-5 lg:grid-cols-2">
+                        {boundaries_href && (
+                            <div className="lg:col-span-2">
+                                <Button asChild variant="outline">
+                                    <Link href={boundaries_href}>
+                                        <MapPin />
+                                        Open in Maps & boundaries
+                                    </Link>
+                                </Button>
+                            </div>
+                        )}
                         <Panel
                             title="Assigned location"
                             icon={MapPin}

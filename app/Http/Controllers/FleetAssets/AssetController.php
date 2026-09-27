@@ -679,6 +679,8 @@ class AssetController extends Controller
         ];
 
         return Inertia::render('fleet-assets/assets/show', [
+            'boundaries_href' => ($user->canDo('fleet.viewAny') || $user->canDo('assets.geofences.manage'))
+                ? '/fleet-assets/geofences?tab=map&resource='.$asset->id : null,
             'asset' => $safeAsset,
             'workspace' => app(AssetProfilePresenter::class)->present($user, $asset, $request->integer('history_before') ?: null),
             'active_maintenance_restrictions' => $asset->site_id && $this->hasTable('fleet_maintenance_restrictions')

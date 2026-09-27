@@ -985,16 +985,9 @@ export default function SiteShow(props: SiteProfileProps) {
             <SiteGeofenceDialog
                 isOpen={geofenceOpen}
                 onClose={() => setGeofenceOpen(false)}
-                onOpenLocation={() => {
-                    setGeofenceOpen(false);
-                    setLocationOpen(true);
-                }}
                 siteId={site.id}
                 siteName={site.name}
-                siteLat={site.latitude}
-                siteLng={site.longitude}
-                existing={overview.geofences[0] ?? null}
-                assets={overview.geofence_assets}
+                geofences={overview.geofences}
             />
             <TabSearchPalette
                 open={searchOpen}

@@ -1,0 +1,27 @@
+resources/js/pages/fleet-assets/geofences/index.tsx 665ms
+resources/js/pages/fleet-assets/geofences/workspace/address-search.tsx 50ms
+resources/js/pages/fleet-assets/geofences/workspace/api.ts 33ms
+resources/js/pages/fleet-assets/geofences/workspace/boundaries.test.ts 38ms
+resources/js/pages/fleet-assets/geofences/workspace/boundary-wizard.tsx 87ms (unchanged)
+resources/js/pages/fleet-assets/geofences/workspace/data.ts 32ms (unchanged)
+resources/js/pages/fleet-assets/geofences/workspace/geometry-model.ts 28ms (unchanged)
+resources/js/pages/fleet-assets/geofences/workspace/geometry-tools.ts 33ms (unchanged)
+resources/js/pages/fleet-assets/geofences/workspace/history.tsx 60ms
+resources/js/pages/fleet-assets/geofences/workspace/lifecycle-dialog.tsx 35ms (unchanged)
+resources/js/pages/fleet-assets/geofences/workspace/map-data.ts 28ms (unchanged)
+resources/js/pages/fleet-assets/geofences/workspace/map-model.ts 33ms (unchanged)
+resources/js/pages/fleet-assets/geofences/workspace/map.tsx 58ms
+resources/js/pages/fleet-assets/geofences/workspace/operational-canvas.tsx 77ms (unchanged)
+resources/js/pages/fleet-assets/geofences/workspace/operational-map.tsx 78ms
+resources/js/pages/fleet-assets/geofences/workspace/policy-summary.tsx 27ms (unchanged)
+resources/js/pages/fleet-assets/geofences/workspace/production.css 22ms (unchanged)
+resources/js/pages/fleet-assets/geofences/workspace/provider.tsx 23ms (unchanged)
+resources/js/pages/fleet-assets/geofences/workspace/remote-picker.tsx 28ms
+resources/js/pages/fleet-assets/geofences/workspace/rule-history.tsx 30ms
+resources/js/pages/fleet-assets/geofences/workspace/rule-policy.ts 29ms (unchanged)
+resources/js/pages/fleet-assets/geofences/workspace/rule-wizard.tsx 63ms
+resources/js/pages/fleet-assets/geofences/workspace/ui.tsx 47ms
+resources/js/pages/fleet-assets/geofences/workspace/workspace.css 183ms (unchanged)
+resources/js/components/client-location/boundary-handoff.tsx 25ms (unchanged)
+resources/js/components/client-location/zone-draft-dialog.tsx 66ms (unchanged)
+resources/js/pages/sites/_site-geofence-dialog.tsx 31ms

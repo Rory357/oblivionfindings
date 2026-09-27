@@ -1,0 +1,235 @@
+.pkg07 {
+    min-width: 0;
+}
+.pkg07 .bnd-map-layout {
+    display: grid;
+    grid-template-columns: 230px minmax(300px, 1fr) 290px;
+    gap: 16px;
+    align-items: start;
+}
+.pkg07 .ops-canvas {
+    height: 690px;
+    min-height: 520px;
+}
+.pkg07 .ops-leaflet {
+    --bnd-map-outline: oklch(from var(--primary) 0.48 c h);
+    height: 100%;
+    width: 100%;
+    z-index: 0;
+}
+.bnd-tiles {
+    filter: grayscale(1);
+}
+.bnd-form {
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    margin: 0;
+}
+.bnd-form .coordinate-grid .inline-row input {
+    width: 130px;
+}
+.bnd-form .flow-stack,
+.bnd-dialog .flow-stack {
+    min-width: 0;
+}
+.pkg07 select {
+    max-width: 100%;
+}
+.bnd-dialog .modal-body {
+    min-height: 0;
+}
+.pkg07 .ops-marker.uncertain {
+    background: var(--status-warning-bg);
+    color: var(--status-warning);
+}
+@media (max-width: 1400px) {
+    .pkg07 .bnd-map-layout {
+        grid-template-columns: 210px minmax(300px, 1fr);
+    }
+    .pkg07 .bnd-map-layout > aside:last-child {
+        grid-column: 1/-1;
+    }
+}
+@media (max-width: 1000px) {
+    .pkg07 .bnd-map-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .pkg07 .bnd-map-layout > aside:first-child {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+    .pkg07 .bnd-map-layout > aside:first-child h2 {
+        grid-column: 1/-1;
+    }
+}
+/* Production data in the approved v9 map anatomy. */
+.pkg07 {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+.pkg07 .bnd-header-filters,
+.pkg07 .bnd-header-site {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.pkg07 .bnd-header-filters {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.pkg07 .bnd-header-site .field > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+.pkg07 .bnd-header-site .min-w-60 {
+    min-width: 170px;
+}
+.pkg07 .bnd-header-filters > button,
+.pkg07 .bnd-header-site button {
+    height: 23px;
+    min-height: 0;
+    font-size: 11px;
+    color: var(--primary-foreground);
+    background: color-mix(in oklch, var(--primary-foreground) 10%, transparent);
+    border-color: color-mix(
+        in oklch,
+        var(--primary-foreground) 20%,
+        transparent
+    );
+}
+.pkg07 .bnd-header-site .field {
+    gap: 0;
+}
+.pkg07 .ops-heading .inline-row {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.pkg07 .ops-scope {
+    padding: 10px 16px 16px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+}
+.pkg07 .ops-scope small,
+.pkg07 .ops-directory-controls small {
+    font-size: 10px;
+    color: var(--muted-foreground);
+    line-height: 1.5;
+}
+.pkg07 .ops-scope .check-row {
+    font-size: 11px;
+    gap: 8px;
+    margin: 0;
+}
+.pkg07 .ops-directory-controls {
+    padding: 0 16px 12px;
+    gap: 12px;
+}
+.pkg07 .ops-directory-controls input,
+.pkg07 .ops-directory-controls select,
+.pkg07 .ops-directory-controls [role='combobox'],
+.pkg07 .ops-scope select {
+    width: 100%;
+    min-width: 0;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--foreground);
+    padding: 6px 9px;
+    font-size: 11px;
+}
+.pkg07 .ops-directory-controls .field {
+    gap: 6px;
+}
+.pkg07 .ops-directory-controls .field > span {
+    font-size: 11px;
+}
+.pkg07 .ops-layer-panel {
+    background: var(--card);
+}
+.pkg07 .ops-layer-toggles strong {
+    margin-left: auto;
+}
+.pkg07 .ops-record-line.selected {
+    border-radius: 9px;
+    background: color-mix(in oklch, var(--primary) 9%, var(--card));
+    box-shadow: inset 3px 0 var(--primary);
+}
+.pkg07 .ops-directory-pagination {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    border-top: 1px solid var(--border);
+    padding: 9px;
+}
+.pkg07 .ops-directory-pagination span {
+    margin-right: auto;
+    color: var(--muted-foreground);
+    font-size: 10px;
+}
+.pkg07 .ops-directory-pagination button {
+    height: 28px;
+    width: 26px;
+    padding: 3px;
+}
+.pkg07 .ops-directory-pagination select {
+    font-size: 10px;
+    width: 65px;
+    min-width: 0;
+    background: var(--card);
+    color: var(--foreground);
+    border-radius: 6px;
+}
+.pkg07 .ops-inspector .ops-inspector-title > button {
+    width: 26px;
+    height: 28px;
+    padding: 3px;
+    flex-shrink: 0;
+}
+.pkg07 .ops-inspector .facts {
+    margin-top: 14px;
+}
+.pkg07 .ops-inspector .facts dd {
+    overflow-wrap: anywhere;
+}
+.pkg07 .ops-record-icon.stale {
+    border: 1px dashed var(--muted-foreground);
+}
+@media (max-width: 1250px) {
+    .pkg07 .ops-canvas {
+        height: 480px;
+        min-height: 480px;
+    }
+}
+@media (max-width: 800px) {
+    .pkg07 .ops-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .pkg07 .ops-records {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    .pkg07 .ops-heading {
+        flex-wrap: wrap;
+    }
+}
+.pkg07 .bnd-history-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+.pkg07 .bnd-history-filters > .field,
+.pkg07 .bnd-history-filters > div {
+    min-width: 0;
+}
+@media (max-width: 1100px) {
+    .pkg07 .bnd-history-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

@@ -22,6 +22,9 @@ class LiveMapController extends Controller
 
     public function __invoke(Request $request)
     {
+        if ($request->user()->canDo('fleet.viewAny') || $request->user()->canDo('assets.geofences.manage')) {
+            return redirect('/fleet-assets/geofences?tab=map');
+        }
         $hasFleetFields = Schema::hasColumn('assets', 'home_site_id');
         $user = $request->user();
         $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
