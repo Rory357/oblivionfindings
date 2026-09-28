@@ -42,10 +42,12 @@ class VehicleBookingAccessService
             ->all();
     }
 
-    public function accessibleBookings(User $actor): Builder
+    public function accessibleBookings(User $actor, bool $forReport = false): Builder
     {
         $siteIds = $this->accessibleSiteIds($actor);
-        $vehicleIds = $this->authorizedVehicleIds($actor);
+        $vehicleIds = $forReport
+            ? $this->access->reportVehiclesForFleet($actor)->pluck('assets.id')->all()
+            : $this->authorizedVehicleIds($actor);
 
         return FleetVehicleBooking::query()
             ->when($vehicleIds === [], fn (Builder $query): Builder => $query->whereRaw('1 = 0'))

@@ -959,3 +959,4 @@ Artisan::command('finance:review-reminders', function () {
 });
 app(Schedule::class)->command('finance:review-notices')->everyMinute()->withoutOverlapping();
 app(Schedule::class)->command('finance:review-reminders')->dailyAt('08:30')->timezone('Pacific/Auckland')->withoutOverlapping();
+Illuminate\Support\Facades\Schedule::command('reports:run-schedules')->everyFiveMinutes()->withoutOverlapping();

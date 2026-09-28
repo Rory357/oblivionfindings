@@ -1484,6 +1484,7 @@ function LoneWorkerCheckInCard({
                     <AlertTriangle className="h-4 w-4" />I need help
                 </Button>
             </div>
+        <Link href="/my-day/safety-reports" className="mt-3 inline-flex min-h-11 items-center text-sm text-primary underline">My safety history</Link>
         </section>
     );
 }

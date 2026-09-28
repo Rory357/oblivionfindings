@@ -10,12 +10,39 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\LazyCollection;
 
 class IntegrationEventHistoryService
 {
     private const int MAX_DEVICE_LIMIT = 100;
 
     private const int MAX_HISTORY_LIMIT = 500;
+
+    /** Capture once, before reading either source. New arrivals belong to the next run. */
+    public function reportWatermark(): array
+    {
+        return [
+            'integration_events' => SchemaCache::hasTable('integration_events') ? (int) IntegrationEvent::query()->max('id') : 0,
+            'fleet_telemetry_events' => SchemaCache::hasTable('fleet_telemetry_events') ? (int) FleetTelemetryEvent::query()->max('id') : 0,
+            'captured_at' => now()->toISOString(),
+        ];
+    }
+
+    /**
+     * Complete, bounded-memory read in source/id order. Caller must authorize the
+     * device and intersect the period with assignment, purpose and retention.
+     * The interactive map reader deliberately keeps its separate 500-row limit.
+     */
+    public function reportForDevice(Device $device, array $filters, int $retentionDays, array $watermark, ?\Closure $observe = null): LazyCollection
+    {
+        $devices = collect([$device])->keyBy('id');
+        $cutoff = now()->subDays(max(1, $retentionDays));
+
+        return LazyCollection::make(function () use ($devices, $filters, $cutoff, $watermark, $observe) {
+            yield from $this->integrationEventLocationsForDevices($devices, $filters, true, $cutoff, 500, watermark: (int) $watermark['integration_events'], observe: $observe);
+            yield from $this->fleetTelemetryLocationsForDevices($devices, $filters, true, $cutoff, 500, watermark: (int) $watermark['fleet_telemetry_events'], observe: $observe);
+        });
+    }
 
     public function forDevice(
         ?Device $device,
@@ -41,8 +68,8 @@ class IntegrationEventHistoryService
         $devices = collect([$device])->keyBy('id');
         $cutoff = now()->subDays(max(1, $retentionDays));
         $limited = false;
-        $locations = $this->integrationEventLocationsForDevices($devices, $filters, true, $cutoff, 501, $limited)
-            ->merge($this->fleetTelemetryLocationsForDevices($devices, $filters, true, $cutoff, 501, $limited))
+        $locations = $this->integrationEventLocationsForDevices($devices, $filters, true, $cutoff, 501, limited: $limited)
+            ->merge($this->fleetTelemetryLocationsForDevices($devices, $filters, true, $cutoff, 501, limited: $limited))
             ->sortByDesc('timestamp');
 
         return ['positions' => $locations->take(500)->values(), 'truncated' => $limited || $locations->count() > 500];
@@ -106,8 +133,10 @@ class IntegrationEventHistoryService
         bool $includeEventType,
         \DateTimeInterface $retentionCutoff,
         int $candidateLimit,
+        ?int $watermark = null,
+        ?\Closure $observe = null,
         ?bool &$limited = null,
-    ): Collection {
+    ): Collection|LazyCollection {
         if (! SchemaCache::hasTable('integration_events')) {
             return collect();
         }
@@ -164,11 +193,18 @@ class IntegrationEventHistoryService
             }
         }
 
-        $events = $query->orderByDesc('occurred_at')->orderByDesc('id')->limit($candidateLimit)->get();
-        $limited = $limited || $events->count() >= $candidateLimit;
+        if ($watermark === null) {
+            $candidates = $query->orderByDesc('occurred_at')->orderByDesc('id')->limit($candidateLimit)->get();
+            // Count before mapping: invalid observations still consume the scan budget.
+            $limited = $limited || $candidates->count() >= $candidateLimit;
+            $events = $candidates->take(self::MAX_HISTORY_LIMIT)->toBase();
+        } else {
+            // A zero watermark remains empty; report reads never take the interactive cap.
+            $events = $query->where('id', '<=', $watermark)->lazyById(500);
+        }
 
-        return $events->take(500)->toBase()
-            ->map(function (IntegrationEvent $event) use ($devices, $legacyHardwareMap, $hasCanonicalColumn, $includeEventType): ?array {
+        return $events
+            ->map(function (IntegrationEvent $event) use ($devices, $legacyHardwareMap, $hasCanonicalColumn, $includeEventType, $observe): ?array {
                 $deviceId = $hasCanonicalColumn && $event->canonical_device_id !== null
                     ? (int) $event->canonical_device_id
                     : $legacyHardwareMap->get($event->hardware_id);
@@ -178,7 +214,11 @@ class IntegrationEventHistoryService
 
                 $location = $this->mapLocationEvent($event, $includeEventType);
 
-                return $location === null ? null : ['device_id' => $deviceId, ...$location];
+                if ($location !== null && $observe) {
+                    $observe($event);
+                }
+
+                return $location === null ? null : ['device_id' => $deviceId, 'source' => 'integration_events', 'source_id' => $event->id, ...$location];
             })
             ->filter()
             ->values();
@@ -191,8 +231,10 @@ class IntegrationEventHistoryService
         bool $includeEventType,
         \DateTimeInterface $retentionCutoff,
         int $candidateLimit,
+        ?int $watermark = null,
+        ?\Closure $observe = null,
         ?bool &$limited = null,
-    ): Collection {
+    ): Collection|LazyCollection {
         if (! SchemaCache::hasTable('fleet_telemetry_events')) {
             return collect();
         }
@@ -236,11 +278,18 @@ class IntegrationEventHistoryService
             }
         }
 
-        $events = $query->orderByDesc('occurred_at')->orderByDesc('id')->limit($candidateLimit)->get();
-        $limited = $limited || $events->count() >= $candidateLimit;
+        if ($watermark === null) {
+            $candidates = $query->orderByDesc('occurred_at')->orderByDesc('id')->limit($candidateLimit)->get();
+            // Count before mapping: invalid observations still consume the scan budget.
+            $limited = $limited || $candidates->count() >= $candidateLimit;
+            $events = $candidates->take(self::MAX_HISTORY_LIMIT)->toBase();
+        } else {
+            // A zero watermark remains empty; report reads never take the interactive cap.
+            $events = $query->where('id', '<=', $watermark)->lazyById(500);
+        }
 
-        return $events->take(500)->toBase()
-            ->map(function (FleetTelemetryEvent $event) use ($devices, $legacyTrackerMap, $includeEventType): ?array {
+        return $events
+            ->map(function (FleetTelemetryEvent $event) use ($devices, $legacyTrackerMap, $includeEventType, $observe): ?array {
                 $deviceId = $event->device_id !== null
                     ? (int) $event->device_id
                     : $legacyTrackerMap->get($event->asset_tracker_id);
@@ -248,7 +297,15 @@ class IntegrationEventHistoryService
                     return null;
                 }
 
-                return ['device_id' => $deviceId, ...$this->mapFleetTelemetryEvent($event, $includeEventType)];
+                if (! $this->validCoordinates($event->latitude, $event->longitude)) {
+                    return null;
+                }
+
+                if ($observe) {
+                    $observe($event);
+                }
+
+                return ['device_id' => $deviceId, 'source' => 'fleet_telemetry_events', 'source_id' => $event->id, ...$this->mapFleetTelemetryEvent($event, $includeEventType)];
             })
             ->filter()
             ->values();
@@ -257,12 +314,22 @@ class IntegrationEventHistoryService
     /** @param Collection<int, Device> $devices */
     private function uniqueLegacyDeviceMap(Collection $devices, string $attribute): Collection
     {
-        return $devices
+        $matches = $devices
             ->filter(fn (Device $device): bool => is_numeric($device->getAttribute($attribute))
                 && (int) $device->getAttribute($attribute) > 0)
             ->groupBy(fn (Device $device): int => (int) $device->getAttribute($attribute))
-            ->filter(fn (Collection $matches): bool => $matches->count() === 1)
-            ->map(fn (Collection $matches): int => (int) $matches->first()->id);
+            ->filter(fn (Collection $matches): bool => $matches->count() === 1);
+        if ($matches->isEmpty()) {
+            return collect();
+        }
+
+        // Global ambiguity includes devices outside the caller's set and soft-deleted records.
+        // Batch the lookup so each legacy source adds one query, not one per device.
+        $unique = Device::withTrashed()->select($attribute)
+            ->whereIn($attribute, $matches->keys()->all())->groupBy($attribute)
+            ->havingRaw('COUNT(*) = 1')->pluck($attribute)->all();
+
+        return $matches->only($unique)->map(fn (Collection $matches): int => (int) $matches->first()->id);
     }
 
     private function mapLocationEvent(IntegrationEvent $event, bool $includeEventType): ?array
@@ -282,7 +349,7 @@ class IntegrationEventHistoryService
             ?? data_get($payload, 'gps.lng')
             ?? data_get($payload, 'gps.lon');
 
-        if ($lat === null || $lng === null) {
+        if (! $this->validCoordinates($lat, $lng)) {
             return null;
         }
 
@@ -300,6 +367,7 @@ class IntegrationEventHistoryService
                 ?? $event->created_at,
             'speed' => $payload['speed'] ?? $payload['speed_kph'] ?? null,
             'battery' => $payload['battery'] ?? $payload['battery_level'] ?? $payload['battery_pct'] ?? null,
+            'received_at' => $event->received_at?->toISOString(),
             'accuracy' => $payload['accuracy_m'] ?? $payload['accuracy'] ?? data_get($payload, 'location.accuracy'),
         ];
 
@@ -325,6 +393,7 @@ class IntegrationEventHistoryService
                 ?? $event->created_at,
             'speed' => $event->speed_kph !== null ? (float) $event->speed_kph : null,
             'battery' => $event->battery_pct,
+            'received_at' => $event->received_at?->toISOString(),
             'accuracy' => $event->accuracy_m,
         ];
 
@@ -342,6 +411,12 @@ class IntegrationEventHistoryService
         return preg_match('/\d{1,2}:\d{2}/', $raw) === 1
             ? Carbon::parse($raw)->toDateTimeString()
             : Carbon::parse($raw)->endOfDay()->toDateTimeString();
+    }
+
+    private function validCoordinates(mixed $lat, mixed $lng): bool
+    {
+        return is_numeric($lat) && is_numeric($lng) && is_finite((float) $lat) && is_finite((float) $lng)
+            && abs((float) $lat) <= 90 && abs((float) $lng) <= 180;
     }
 
     private function resolvePayload(IntegrationEvent $event): array
@@ -386,6 +461,7 @@ class IntegrationEventHistoryService
             'event_type',
             'occurred_at',
             'created_at',
+            'received_at',
             'raw_payload',
             'normalized_payload',
         ];

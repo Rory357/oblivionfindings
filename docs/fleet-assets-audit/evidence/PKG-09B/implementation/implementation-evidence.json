@@ -1,0 +1,419 @@
+{
+  "recordedAt": "2026-09-27T10:48:45.454Z",
+  "branch": "codex/fleet-personal-reports",
+  "baseline": "926b4981b0289da08a20baca0995117fb53e413e",
+  "checkout": "C:/Users/steph/.codex/worktrees/fleet-personal-reports/oblivionfindings",
+  "deployed": false,
+  "mainHead": "926b4981b0289da08a20baca0995117fb53e413e",
+  "mainAuditedFiles": [
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/app/Services/Tracking/ClientLocationAccessService.php",
+      "unchanged": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/app/Services/Tracking/ClientLocationHistoryService.php",
+      "unchanged": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/app/Services/Tracking/ClientTrackerStatusService.php",
+      "unchanged": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/SecurityDevices/Services/PersonalTrackingPrivacyService.php",
+      "unchanged": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/SecurityDevices/Services/PersonalTrackingLocationExportService.php",
+      "unchanged": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/app/Services/Integration/IntegrationEventHistoryService.php",
+      "unchanged": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/SecurityDevices/Models/DeviceAssignment.php",
+      "unchanged": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/SecurityDevices/Presenters/TrackingWorkspacePresenter.php",
+      "unchanged": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/app/Models/LoneWorkerSession.php",
+      "unchanged": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/app/Services/HealthSafety/LoneWorkerSignalService.php",
+      "unchanged": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Hr/Services/ReportBuilderService.php",
+      "unchanged": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/app/Domain/Hr/Jobs/RunHrScheduledReportsJob.php",
+      "unchanged": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/app/Http/Controllers/ClientController.php",
+      "unchanged": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/handoffs/OPS-PL01-DESIGNER.md",
+      "unchanged": true
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/12-navigation-page-inventory.md",
+      "unchanged": true
+    }
+  ],
+  "protectedPreviews": [
+    {
+      "version": "v1",
+      "files": 61,
+      "manifestSha256": "5DBB05CD6B00E3BF8405C851531AA272B9596192140B61F4E0948ECAC40071A0",
+      "mismatches": []
+    },
+    {
+      "version": "v2",
+      "files": 61,
+      "manifestSha256": "53E96B73CA7408EB8EB69D41D1720AA589C92196B7A041320ABA919BBD8C521D",
+      "mismatches": []
+    }
+  ],
+  "preview": {
+    "url": "http://127.0.0.1:8973/",
+    "identity": "PKG-09B-implementation-926b4981",
+    "syntheticOnly": true,
+    "browserErrors": 0
+  },
+  "catalogue": {
+    "sources": 22,
+    "templates": 21
+  },
+  "verification": {
+    "acceptance": {
+      "passed": 16,
+      "assertions": 214
+    },
+    "finalScope": {
+      "passed": 2,
+      "assertions": 24
+    },
+    "typeScript": "passed after generating route helpers",
+    "eslint": "passed for reporting model/workspace and shared page header",
+    "productionBuild": "passed; existing large-chunk warnings",
+    "axe": {
+      "light": 0,
+      "dark": 0,
+      "results": 0
+    },
+    "baselineFailures": {
+      "suite": "CanonicalIntegrationEventHistoryTest",
+      "count": 4,
+      "status": "Same HTTP 403 failures reproduced with baseline services; not introduced by this implementation"
+    },
+    "pdfVisualReview": "Final real export passed; subsequent CSS spacing rendered with synthetic values through actual PDF template, one page, all content visually verified.",
+    "finalExport": {
+      "passed": 1,
+      "assertions": 20
+    },
+    "commands": [
+      "php artisan test tests/Feature/Reporting/OperationalReportsTest.php tests/Feature/SecurityDevices/PersonalTrackingConsentWithdrawalTest.php",
+      "php artisan test tests/Feature/Reporting/OperationalReportsTest.php --filter=\"report_only_viewer|catalogue_queries\"",
+      "php artisan test tests/Feature/Reporting/OperationalReportsTest.php --filter=private_run_reconciles_and_exports_actual_workbook_and_pdf",
+      "vite build --config reports-build.config.mjs --configLoader runner (temporary __dirname compatibility wrapper, QA only)",
+      "tsc --noEmit",
+      "eslint resources/js/pages/reporting/model.ts resources/js/pages/reporting/workspace.tsx resources/js/components/page/page-header.tsx"
+    ]
+  },
+  "productionManifestSha256": "5EE23241DA341409E8CA8C7627594FD9C722F834B0EC43BB7D0D8393087DC4C0",
+  "implementationFiles": [
+    {
+      "path": "app/Domain/SecurityDevices/Services/PersonalTrackingLocationExportService.php",
+      "sha256": "1447B943DE9456783C8D48C5462A5DFB3FBE0F8302AC6A38622D2301555CBD92"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php",
+      "sha256": "05450DC3B02CBB58E36CBD6735B6BBF331F91D6F5996DFB6630214E539110E81"
+    },
+    {
+      "path": "app/Http/Controllers/HealthSafety/LoneWorkerController.php",
+      "sha256": "DCB42B4AAD56F389961DC8BB78C414E43A81ECD27EBB82B704A067C8A723917C"
+    },
+    {
+      "path": "app/Services/Assets/BrandedWorkbook.php",
+      "sha256": "39C2BDE7D1765382E3F4E33DA87AAB0C116A1B8E9919D8EE84F0121C0CC405DF"
+    },
+    {
+      "path": "app/Services/Fleet/VehicleBookingAccessService.php",
+      "sha256": "97BF37322A504FFA10A753655A44A22E6CA4A08575C73261E2E6EAA1F8F40E31"
+    },
+    {
+      "path": "app/Services/Integration/IntegrationEventHistoryService.php",
+      "sha256": "5DCFADDC714A0CE5C85E7014A734CCDED4E41902A5668A13169E7C713EC52DBF"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationHistoryService.php",
+      "sha256": "49413D484C20277E1DA0B568D775B9E50FDE2D870B2AA5F48257B05D9CCDDDC5"
+    },
+    {
+      "path": "database/seeders/RbacSeeder.php",
+      "sha256": "DD254C22A4269D2B5750CE6F5D5FC6E7BFA27141B997F5F7668D57871833D9A3"
+    },
+    {
+      "path": "resources/js/components/client-location/location-workspace.tsx",
+      "sha256": "CD25DBDB27E93B7CBA1885897105DB0BC25153697DC721A16D1BF60828783222"
+    },
+    {
+      "path": "resources/js/components/page/page-header.tsx",
+      "sha256": "222B375F72A64D927CFC1E547B547299E4A52559728C1D7C91C6FFCC6347580A"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/reports/index.tsx",
+      "sha256": "530DA1AE9C60B8E58C85528DBF543949A0960DA9CB2F9D358A006DE2DFB9A201"
+    },
+    {
+      "path": "resources/js/pages/health-safety/lone-workers/index.tsx",
+      "sha256": "20E81B71EF1E72071772ABC8332DE14DDB06E4A3AEA153436397FA8D03E246D2"
+    },
+    {
+      "path": "resources/js/pages/my-day/index.tsx",
+      "sha256": "91B642541CECAD717D0D5D754F7BC340A961417C7C5A9FAABFD873F4BE68AB5D"
+    },
+    {
+      "path": "routes/console.php",
+      "sha256": "22B083F18C615D0F35013521CC766D66DAF2D256A129C922C5B7C8FBC93FD499"
+    },
+    {
+      "path": "routes/web.php",
+      "sha256": "F9ABB10A37972BBEAF459EB6308B3DBCF75C88E66A297EF4EE715D5D62865E61"
+    },
+    {
+      "path": "app/Console/Commands/RunOperationalReportSchedules.php",
+      "sha256": "A15EAE96CC4BEAA434B2B7DAA8903C2BC22F014B0529FA8601EBAAFB1DEB8EEA"
+    },
+    {
+      "path": "app/Http/Controllers/OperationalReportController.php",
+      "sha256": "566604AB2EB16A09CB4B09A190322CF62CE4E9BC4DB1925BF7B978D29C6E7654"
+    },
+    {
+      "path": "app/Jobs/GenerateOperationalReport.php",
+      "sha256": "74BE09C8D6A2B5293260BD961219F7502B44B5E11B5F22A592BC6A48FE424F07"
+    },
+    {
+      "path": "app/Models/OperationalReport.php",
+      "sha256": "304F74DBC5E413A46AED8B821D17CD89EF2DE8C3616D3BD5E6B5F003A009DD23"
+    },
+    {
+      "path": "app/Models/OperationalReportRun.php",
+      "sha256": "2E1E413684465F925CD10564A791284687CFEA4408F0CF0706CEEB85CB87A0FF"
+    },
+    {
+      "path": "app/Models/OperationalReportSubscription.php",
+      "sha256": "4A35872B8F462639C6ACBF7CEAB73FE03125C318EF82CA4E8C97804378B0A1CC"
+    },
+    {
+      "path": "app/Models/OperationalReportVersion.php",
+      "sha256": "F8F1057841C7A1A0DA33452C5C678958CA2AFE61CD04DB95B3837A4DAFFEB8D3"
+    },
+    {
+      "path": "app/Notifications/OperationalReportReady.php",
+      "sha256": "C060F37D66692AED39BD29E838273C1C17095F7BD9E7731EE64A12F012D1FDCE"
+    },
+    {
+      "path": "app/Services/HealthSafety/LoneWorkerSessionScope.php",
+      "sha256": "D102F74C16EA14BC35D8CEA41B7D92735A2BEEDD52E8563E2A203EE0E9CA07B1"
+    },
+    {
+      "path": "app/Services/Reporting/FleetSupplementalReports.php",
+      "sha256": "F856DCED6649620C4A13302002D3B19E080289AF86843735C972C572A1012C12"
+    },
+    {
+      "path": "app/Services/Reporting/PersonalReportEvidence.php",
+      "sha256": "0ED700C911D356859671B49E8A4C591EA7811C19B6A4533211CE1C5B73CA426C"
+    },
+    {
+      "path": "app/Services/Reporting/ReportAccess.php",
+      "sha256": "F69B02EFFD19812CA1B2D034DEC82AE6B48ACE91B92C6FCAB3C245855D0C214F"
+    },
+    {
+      "path": "app/Services/Reporting/ReportDefinition.php",
+      "sha256": "9A3F0A35989CB78DB48E48DFE8C45C5CB36DADBE0DD9BCDADE4DFC577B1D1BA1"
+    },
+    {
+      "path": "app/Services/Reporting/ReportEngine.php",
+      "sha256": "4111D49A893D4F94DD156E6A426B949309276D1A3F2F3CF75E46A211815AA31A"
+    },
+    {
+      "path": "app/Services/Reporting/ReportExporter.php",
+      "sha256": "5135943FFC3E17223B4053DC85F8660D410F0845A5370323644A5828DF81756A"
+    },
+    {
+      "path": "app/Services/Reporting/ReportFormula.php",
+      "sha256": "BB7410E627BFBC601723A1107988C246BFF1EC6D57335310519D72B4F8680282"
+    },
+    {
+      "path": "app/Services/Reporting/ReportRuns.php",
+      "sha256": "44311ED8E667E8E66119441AB5C0EBE139C64F59852C90A5778B16DFD75EC9AA"
+    },
+    {
+      "path": "app/Services/Reporting/ReportSourceReader.php",
+      "sha256": "42E40718A6A085219EC34B6A01909FF24771E8F3150B9AE1F0FFFFEF129CA2E6"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationReportWindow.php",
+      "sha256": "204F95B398F6E3F223119073C7031A34A8AD6142F17C113B9F2874113B170663"
+    },
+    {
+      "path": "config/operational-reports.php",
+      "sha256": "8931F52FD628F49692C37AC57BF63BD32F579154141505C286E3453C52F6E22E"
+    },
+    {
+      "path": "database/migrations/2026_09_27_230000_create_operational_reporting_tables.php",
+      "sha256": "1F1E5E3BD43BD88FABB5993E7F7A06FDEF521FDFBB30B87438E1D5ED2D2AB8CC"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/app.css",
+      "sha256": "B55AAF7EB50C8620FAFD19C6F42B2784F2272D12B2018CD21B1A165958D3DFAF"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/app.js",
+      "sha256": "2311AB40F372FAFAAED8CBAE83D97EEC8505B54B9641CEC8FBC501F6344D82C9"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/app.tsx",
+      "sha256": "1CC8099103D5F10C9425C7E224171A4C75CA2097DB1AAFFBD3D9975744FCB5EF"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/build-inputs.json",
+      "sha256": "A94ADF44F77A37DF590B198A7527F80A40FA0E3061F5E5B252C3CD9005571BE3"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/build.mjs",
+      "sha256": "F2C548CC063511645BBA99FFB138EF761A4E421202EE76BBAD2239FEA17C48C4"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/fixtures.json",
+      "sha256": "56DEEF004297F2E68B99C79017BDB4DD5AC346CA86B131B1D2B1C6682F2EAD33"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/index.html",
+      "sha256": "F67B839DFE6DD6107DD23DF556368E53D34103CE8D151D5803092DA7C8EF4C51"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/layout-stub.tsx",
+      "sha256": "2CCDDD27ABC1F04DB057069B8CBC6B123B13EE4A9EC0BC241D86091CF2BA5DBC"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/server.mjs",
+      "sha256": "7013BFCFC59CB6F9BFAFF7BFEC775C2D35738D43C71DF08502A2FA3ADA528DEA"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/synthetic-api.ts",
+      "sha256": "0AB50A157DE5C0A802FF4BB583B9E1691665236111A738450E9B130AF5750C4A"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/OPERATIONAL-REPORTS-IMPLEMENTATION.md",
+      "sha256": "73044FBF48B76FD2B54B579316FC420BA0D135E155E6EFADB6BA23DE3304C913"
+    },
+    {
+      "path": "resources/js/pages/reporting/model.ts",
+      "sha256": "14BD7D944BC9CE863A321493DE65490EF1DCADFED293C8D96AA443A8C13C4945"
+    },
+    {
+      "path": "resources/js/pages/reporting/workspace.tsx",
+      "sha256": "D1C120C19C2582DE13DA9476595911B8D1B363B52D334983B12173F81A295B4C"
+    },
+    {
+      "path": "resources/views/pdf/operational-report.blade.php",
+      "sha256": "23D4315D938DB435635A9453D204910ECC57E0AF95DB77C3C926FF788421E1C7"
+    },
+    {
+      "path": "routes/operational-reports.php",
+      "sha256": "80339E3628EE7BA8192056941355624FBB28791818D0F24318E58331E25C8696"
+    },
+    {
+      "path": "tests/Feature/Reporting/OperationalReportsTest.php",
+      "sha256": "4A7606E3103B0171F8EB707601AA8E1A81A2EB9429208058302E66D2E651B0B6"
+    }
+  ],
+  "evidenceFiles": [
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/accessibility.json",
+      "sha256": "2815ED1D3A77353A7EB82EDB5628CED2070A66FC1D32C9357069CEB5656E90C7"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/browser-qa.json",
+      "sha256": "EACB67B2C82913185FA2F5F582DC344EDB23ABC5BF2D1A01B58299C7F210177B"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/browser-summary.csv",
+      "sha256": "9DF90C1B3F4A156FB0CFCE99C5CCC4D4E7F0BBA15801DF443C771FE2EBEAB8CF"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/builder-dark-final.png",
+      "sha256": "31D04E3678BC6EAD32AA9EEE272444451C4907419A09E44F84565547129CEB53"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/builder-data-1280.png",
+      "sha256": "0933A072D0EC0690623506A7D757506E33A20B6CF80DA0725E35B363B9D56892"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/layout-verified-1.png",
+      "sha256": "373A2563811C1DE58C08F3CD33C0D3E419DC7D28FF902D2A785B0DE4E819B30B"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/layout-verified-report.pdf",
+      "sha256": "E091D60217E70A8F9DF3FB33D909B55014CC33E3E592ED0320ABBD3E62E7F4D7"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/pivot-result-1366.png",
+      "sha256": "FBB85C9D8F8A9AE8E6BC01045839F1E54A7B598EECA336F19A971E906CB89D97"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/render-final-pdf.php",
+      "sha256": "6E911574AF0C4BB74995BF416068D6C83C505BB7B6FA3130EA4DCFF2BD5EEA66"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-acceptance-tests.log",
+      "sha256": "A8E0D5F7E0FBECEB9DC873D6B9EA70DE9BEFF08FB23B7A5C01B39BC8FE145A96"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-baseline.log",
+      "sha256": "34DB4C58400A7A189EED4D0017A3563BE0E56E6B12968D8B756224B8899A7BE6"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-build.log",
+      "sha256": "BEEFE2B23EBBBD27E055E1B916C5160D843F6719D617B241607A24AF1AFBE598"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-eslint-final.log",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-export-final.log",
+      "sha256": "7581D1E3FF797F47684A4D80AF5C04368B71C46722A28AA3C6DC3CA8739021A2"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-scope-tests.log",
+      "sha256": "8A0AC97B0FBD4DAC6F945118024BAEDC22A8710A91A6A395D81A546DB340B6CD"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-types-final-generated.log",
+      "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/synthetic-report.pdf",
+      "sha256": "2BD239225081382C62B2C68D3263A6FE7332DECCC26BC100E8436C913AF569D7"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/synthetic-report.xlsx",
+      "sha256": "4CC5E59A02B1F9696496932616BA8644C860080B6E4E628C432733A0F85FC5F9"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/time-series-final.png",
+      "sha256": "E20CB54992FF0FBE5482ADDC8954250C4B6080C2F0C906B4851DABB53E97F2B8"
+    }
+  ]
+}

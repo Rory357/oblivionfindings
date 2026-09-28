@@ -1,0 +1,24 @@
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\Reporting\OperationalReportsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mschema rejects malformed imports before mutating saved definitions[39m[90m                                        [39m [90m265.54s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtime series is chronological has calendar gaps and does not use top n dates[39m[90m                                 [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90munknowns negative values and formula division are preserved[39m[90m                                                 [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mformula rejects code and cyclic dependencies[39m[90m                                                                [39m [90m1.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreport reader exceeds map limit and freezes source watermark[39m[90m                                                [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90msaved versions conflicts archive and other users are denied[39m[90m                                                 [39m [90m1.49s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfleet permission does not grant personal sources[39m[90m                                                            [39m [90m0.25s[39m  
+  [32;1m✓[39;22m[90m [39m[90mprivate run reconciles and exports actual workbook and pdf[39m[90m                                                  [39m [90m2.82s[39m  
+  [32;1m✓[39;22m[90m [39m[90mclient export is complete and clips to consent then rechecks before download[39m[90m                                [39m [90m2.88s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstaff history is session bound and never restarts collection[39m[90m                                                [39m [90m2.16s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreport only viewer receives only their site vehicles[39m[90m                                                        [39m [90m0.42s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcatalogue queries execute with empty sources and overlapping intervals are unioned[39m[90m                          [39m [90m1.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90mfinance costs require canonical asset site and exclude unposted invoices[39m[90m                                    [39m [90m0.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconditional measures keep unknowns and numeric equality matches decimal input[39m[90m                               [39m [90m1.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90msharing copies only definition and schedules reauthorise the owner[39m[90m                                          [39m [90m1.89s[39m  
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\SecurityDevices\PersonalTrackingConsentWithdrawalTest[39m
+  [32;1m✓[39;22m[90m [39m[90mwithdrawal stops collection and blocks ui api export direct url and cached recheck[39m[90m                          [39m [90m2.90s[39m  
+
+  [90mTests:[39m    [32;1m16 passed[39;22m[90m (214 assertions)[39m
+  [90mDuration:[39m [39m286.76s[39m
+

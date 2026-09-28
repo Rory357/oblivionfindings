@@ -1,0 +1,28 @@
+{
+  "viewports": [
+    [
+      1366,
+      768
+    ],
+    [
+      1280,
+      720
+    ]
+  ],
+  "errors": [],
+  "checks": [
+    "Fleet/client/staff/self libraries",
+    "multiple resource and Site controls",
+    "conditional measures",
+    "pivot matrix",
+    "chronological time series with descending metric-sorted table",
+    "CSV grouped measures",
+    "invalid decimals import preserves draft",
+    "saved versions",
+    "stale result disables download",
+    "calendar viewport fit and Escape",
+    "light and settled dark WCAG2A/AA axe: no violations",
+    "keyboard tab navigation"
+  ],
+  "syntheticOnly": true
+}

@@ -1,0 +1,625 @@
+{
+  "package": "PKG-09B Reports implementation review",
+  "recordedAt": "2026-09-27T21:46:34.998Z",
+  "branch": "codex/fleet-personal-reports",
+  "base": "926b4981b0289da08a20baca0995117fb53e413e",
+  "commitIdentity": "The commit containing this packet; exact full SHA is provided in the final handback.",
+  "checksumMeaning": "SHA-256 of worktree bytes before staging. Git may normalise text line endings. The commit is authoritative for integration.",
+  "applicationAndTestFiles": 46,
+  "existingPayloadFiles": 94,
+  "files": [
+    {
+      "path": "app/Console/Commands/RunOperationalReportSchedules.php",
+      "category": "application-or-test",
+      "bytes": 2996,
+      "worktreeSha256": "a15eae96cc4beaa434b2b7daa8903c2bc22f014b0529fa8601ebaafb1deb8eea"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/PersonalTrackingLocationExportService.php",
+      "category": "application-or-test",
+      "bytes": 4520,
+      "worktreeSha256": "1447b943de9456783c8d48c5462a5dfb3fbe0f8302ac6a38622d2301555cbd92"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php",
+      "category": "application-or-test",
+      "bytes": 67121,
+      "worktreeSha256": "05450dc3b02cbb58e36cbd6735b6bbf331f91d6f5996dfb6630214e539110e81"
+    },
+    {
+      "path": "app/Http/Controllers/HealthSafety/LoneWorkerController.php",
+      "category": "application-or-test",
+      "bytes": 75021,
+      "worktreeSha256": "dcb42b4aad56f389961dc8bb78c414e43a81ecd27ebb82b704a067c8a723917c"
+    },
+    {
+      "path": "app/Http/Controllers/OperationalReportController.php",
+      "category": "application-or-test",
+      "bytes": 13783,
+      "worktreeSha256": "66dd3a5711a11b7d0897cff4eae7e6da9d26b83571d009af80ef7777b2c41ae2"
+    },
+    {
+      "path": "app/Jobs/GenerateOperationalReport.php",
+      "category": "application-or-test",
+      "bytes": 1312,
+      "worktreeSha256": "74be09c8d6a2b5293260bd961219f7502b44b5e11b5f22a592bc6a48fe424f07"
+    },
+    {
+      "path": "app/Models/OperationalReport.php",
+      "category": "application-or-test",
+      "bytes": 367,
+      "worktreeSha256": "304f74dbc5e413a46aed8b821d17cd89ef2de8c3616d3bd5e6b5f003a009dd23"
+    },
+    {
+      "path": "app/Models/OperationalReportRun.php",
+      "category": "application-or-test",
+      "bytes": 424,
+      "worktreeSha256": "2e1e413684465f925cd10564a791284687cfea4408f0cf0706ceeb85cb87a0ff"
+    },
+    {
+      "path": "app/Models/OperationalReportSubscription.php",
+      "category": "application-or-test",
+      "bytes": 338,
+      "worktreeSha256": "4a35872b8f462639c6acbf7ceab73fe03125c318ef82ca4e8c97804378b0a1cc"
+    },
+    {
+      "path": "app/Models/OperationalReportVersion.php",
+      "category": "application-or-test",
+      "bytes": 301,
+      "worktreeSha256": "f8f1057841c7a1a0da33452c5c678958ca2afe61cd04db95b3837a4daffeb8d3"
+    },
+    {
+      "path": "app/Notifications/OperationalReportReady.php",
+      "category": "application-or-test",
+      "bytes": 794,
+      "worktreeSha256": "c060f37d66692aed39bd29e838273c1c17095f7bd9e7731ee64a12f012d1fdce"
+    },
+    {
+      "path": "app/Services/Assets/BrandedWorkbook.php",
+      "category": "application-or-test",
+      "bytes": 8921,
+      "worktreeSha256": "39c2bde7d1765382e3f4e33da87aab0c116a1b8e9919d8ee84f0121c0cc405df"
+    },
+    {
+      "path": "app/Services/Fleet/VehicleBookingAccessService.php",
+      "category": "application-or-test",
+      "bytes": 4876,
+      "worktreeSha256": "97bf37322a504ffa10a753655a44a22e6ca4a08575c73261e2e6eaa1f8f40e31"
+    },
+    {
+      "path": "app/Services/HealthSafety/LoneWorkerSessionScope.php",
+      "category": "application-or-test",
+      "bytes": 7733,
+      "worktreeSha256": "d102f74c16ea14bc35d8cea41b7d92735a2beedd52e8563e2a203ee0e9ca07b1"
+    },
+    {
+      "path": "app/Services/Integration/IntegrationEventHistoryService.php",
+      "category": "application-or-test",
+      "bytes": 16583,
+      "worktreeSha256": "5dcfaddc714a0ce5c85e7014a734ccded4e41902a5668a13169e7c713ec52dbf"
+    },
+    {
+      "path": "app/Services/Reporting/FleetSupplementalReports.php",
+      "category": "application-or-test",
+      "bytes": 9537,
+      "worktreeSha256": "f856dced6649620c4a13302002d3b19e080289af86843735c972c572a1012c12"
+    },
+    {
+      "path": "app/Services/Reporting/PersonalReportEvidence.php",
+      "category": "application-or-test",
+      "bytes": 5600,
+      "worktreeSha256": "0ed700c911d356859671b49e8a4c591ea7811c19b6a4533211ce1c5b73ca426c"
+    },
+    {
+      "path": "app/Services/Reporting/ReportAccess.php",
+      "category": "application-or-test",
+      "bytes": 7073,
+      "worktreeSha256": "f69b02effd19812ca1b2d034dec82ae6b48ace91b92c6fcab3c245855d0c214f"
+    },
+    {
+      "path": "app/Services/Reporting/ReportDefinition.php",
+      "category": "application-or-test",
+      "bytes": 8146,
+      "worktreeSha256": "39e17f32aaee93443dcb661baf2a7d4d4c62e8c61be575f31038e23568115dd2"
+    },
+    {
+      "path": "app/Services/Reporting/ReportEngine.php",
+      "category": "application-or-test",
+      "bytes": 9349,
+      "worktreeSha256": "5dda375241010931deb33dbe121c23e51c131133e880cbf080f224a5a4ca6bac"
+    },
+    {
+      "path": "app/Services/Reporting/ReportExporter.php",
+      "category": "application-or-test",
+      "bytes": 5033,
+      "worktreeSha256": "5135943ffc3e17223b4053dc85f8660d410f0845a5370323644a5828df81756a"
+    },
+    {
+      "path": "app/Services/Reporting/ReportFormula.php",
+      "category": "application-or-test",
+      "bytes": 2735,
+      "worktreeSha256": "bb7410e627bfbc601723a1107988c246bff1ec6d57335310519d72b4f8680282"
+    },
+    {
+      "path": "app/Services/Reporting/ReportRuns.php",
+      "category": "application-or-test",
+      "bytes": 6254,
+      "worktreeSha256": "44311ed8e667e8e66119441ab5c0ebe139c64f59852c90a5778b16dfd75ec9aa"
+    },
+    {
+      "path": "app/Services/Reporting/ReportSourceReader.php",
+      "category": "application-or-test",
+      "bytes": 19427,
+      "worktreeSha256": "42e40718a6a085219ec34b6a01909ff24771e8f3150b9ae1f0ffffef129ca2e6"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationHistoryService.php",
+      "category": "application-or-test",
+      "bytes": 7382,
+      "worktreeSha256": "49413d484c20277e1da0b568d775b9e50fde2d870b2aa5f48257b05d9ccdddc5"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationReportWindow.php",
+      "category": "application-or-test",
+      "bytes": 2284,
+      "worktreeSha256": "204f95b398f6e3f223119073c7031a34a8ad6142f17c113b9f2874113b170663"
+    },
+    {
+      "path": "config/operational-reports.php",
+      "category": "application-or-test",
+      "bytes": 50835,
+      "worktreeSha256": "8931f52fd628f49692c37ac57bf63bd32f579154141505c286e3453c52f6e22e"
+    },
+    {
+      "path": "database/migrations/2026_09_27_230000_create_operational_reporting_tables.php",
+      "category": "application-or-test",
+      "bytes": 3340,
+      "worktreeSha256": "1f1e5e3bd43bd88fabb5993e7f7a06fdef521fdfbb30b87438e1d5ed2d2ab8cc"
+    },
+    {
+      "path": "database/seeders/RbacSeeder.php",
+      "category": "application-or-test",
+      "bytes": 93386,
+      "worktreeSha256": "dd254c22a4269d2b5750ce6f5d5fc6e7bfa27141b997f5f7668d57871833d9a3"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/QA-INVENTORY.md",
+      "category": "documentation-or-evidence",
+      "bytes": 1069,
+      "worktreeSha256": "92d389fc8b6ed5004672fc1e6f81341d72838750270f4d36a0bad30ac8a83e55"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/acceptance-verified.log",
+      "category": "documentation-or-evidence",
+      "bytes": 3901,
+      "worktreeSha256": "16e8fb6d861068b8467e6f31ed10fe70bad40e108e68d33873a644867f4fe960"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/builder-dark-verified-1366.png",
+      "category": "documentation-or-evidence",
+      "bytes": 195919,
+      "worktreeSha256": "7efb0b2c7b9d60d95f6531f573a30de474f2aa6a310be9be383f10f4148c2b60"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/builder-mobile-verified.png",
+      "category": "documentation-or-evidence",
+      "bytes": 134060,
+      "worktreeSha256": "f7167cba3e1165ecce5445e37eaeb64719c52a6e5dbe3def1d0fb4f153d896fe"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/builder-verified-1366.png",
+      "category": "documentation-or-evidence",
+      "bytes": 202140,
+      "worktreeSha256": "d54c0205bdc0af94bcdb8b08eea868db32d170d798ae2f9f5ea1c145b70671ca"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/calendar-mobile.png",
+      "category": "documentation-or-evidence",
+      "bytes": 140006,
+      "worktreeSha256": "1302c9000905040959451529d6c0ad4e4a102667527cb9ce95d93eab8925195e"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/eslint-final.log",
+      "category": "documentation-or-evidence",
+      "bytes": 0,
+      "worktreeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/export-dark-verified-1366.png",
+      "category": "documentation-or-evidence",
+      "bytes": 158816,
+      "worktreeSha256": "c1207fd547d405b53816c3704441303b09162e964f545c2079a25ae3ec3a1e2c"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/fidelity-evidence.json",
+      "category": "documentation-or-evidence",
+      "bytes": 8784,
+      "worktreeSha256": "24cde80659110b86fbfe446559167bf988269bde6a854b1b31b5934cbbc68ac4"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/grouped-filters-1366.png",
+      "category": "documentation-or-evidence",
+      "bytes": 159686,
+      "worktreeSha256": "62461348d1a0a429a1685c24701bd450bc7b57bfdf0d51b084f3efbf466a66ec"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/grouped-summary.csv",
+      "category": "documentation-or-evidence",
+      "bytes": 213,
+      "worktreeSha256": "c8415ce69f7a3c191d6eeb467e6553fddb11c0cb0ac8f7379ca61845df21882e"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/library-verified-1366.png",
+      "category": "documentation-or-evidence",
+      "bytes": 257764,
+      "worktreeSha256": "5b9ca74e07b6db3b0c6ba5bde104a06690d63ecfb4a5da802bf95a982fae0da6"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/production-build-final.log",
+      "category": "documentation-or-evidence",
+      "bytes": 172901,
+      "worktreeSha256": "b11a35dcd8e4ba4a129d8ee602754ba8a8a43a7f687fc2755bd59dd39bf970c1"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/types-final.log",
+      "category": "documentation-or-evidence",
+      "bytes": 0,
+      "worktreeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/weekly-chart-1366.png",
+      "category": "documentation-or-evidence",
+      "bytes": 153849,
+      "worktreeSha256": "418f0543d282f4f893f377faac5a6f3b49939f0a9875df5a8accd2330541ed0f"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/accessibility.json",
+      "category": "documentation-or-evidence",
+      "bytes": 70,
+      "worktreeSha256": "2815ed1d3a77353a7eb82edb5628ced2070a66fc1d32c9357069ceb5656e90c7"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/browser-qa.json",
+      "category": "documentation-or-evidence",
+      "bytes": 618,
+      "worktreeSha256": "eacb67b2c82913185fa2f5f582dc344edb23abc5bf2d1a01b58299c7f210177b"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/browser-summary.csv",
+      "category": "documentation-or-evidence",
+      "bytes": 160,
+      "worktreeSha256": "9df90c1b3f4a156fb0cfce99c5ccc4d4e7f0bba15801df443c771fe2ebeab8cf"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/builder-dark-final.png",
+      "category": "documentation-or-evidence",
+      "bytes": 93907,
+      "worktreeSha256": "31d04e3678bc6ead32aa9eee272444451c4907419a09e44f84565547129ceb53"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/builder-data-1280.png",
+      "category": "documentation-or-evidence",
+      "bytes": 97678,
+      "worktreeSha256": "0933a072d0ec0690623506a7d757506e33a20b6cf80da0725e35b363b9d56892"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/implementation-evidence.json",
+      "category": "documentation-or-evidence",
+      "bytes": 17087,
+      "worktreeSha256": "fd52e5d3f84e2ac6c2d1c7676c711362fa1a580a8889026cc324b9a3a1e8ea4d"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/layout-verified-1.png",
+      "category": "documentation-or-evidence",
+      "bytes": 113746,
+      "worktreeSha256": "373a2563811c1de58c08f3cd33c0d3e419dc7d28ff902d2a785b0de4e819b30b"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/layout-verified-report.pdf",
+      "category": "documentation-or-evidence",
+      "bytes": 24862,
+      "worktreeSha256": "e091d60217e70a8f9df3fb33d909b55014cc33e3e592ed0320abbd3e62e7f4d7"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/pivot-result-1366.png",
+      "category": "documentation-or-evidence",
+      "bytes": 48652,
+      "worktreeSha256": "fbb85c9d8f8a9ae8e6bc01045839f1e54a7b598eeca336f19a971e906cb89d97"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/render-final-pdf.php",
+      "category": "documentation-or-evidence",
+      "bytes": 1779,
+      "worktreeSha256": "6e911574af0c4bb74995bf416068d6c83c505bb7b6fa3130ea4dcff2bd5eea66"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-acceptance-tests.log",
+      "category": "documentation-or-evidence",
+      "bytes": 3185,
+      "worktreeSha256": "a8e0d5f7e0fbeceb9dc873d6b9ea70de9beff08fb23b7a5c01b39bc8fe145a96"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-baseline.log",
+      "category": "documentation-or-evidence",
+      "bytes": 5083,
+      "worktreeSha256": "34db4c58400a7a189eed4d0017a3563be0e56e6b12968d8b756224b8899a7be6"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-build.log",
+      "category": "documentation-or-evidence",
+      "bytes": 172494,
+      "worktreeSha256": "beefe2b23ebbbd27e055e1b916c5160d843f6719d617b241607a24af1afbe598"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-eslint-final.log",
+      "category": "documentation-or-evidence",
+      "bytes": 0,
+      "worktreeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-export-final.log",
+      "category": "documentation-or-evidence",
+      "bytes": 387,
+      "worktreeSha256": "7581d1e3ff797f47684a4d80af5c04368b71c46722a28aa3c6dc3ca8739021a2"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-scope-tests.log",
+      "category": "documentation-or-evidence",
+      "bytes": 566,
+      "worktreeSha256": "8a0ac97b0fbd4dac6f945118024baedc22a8710a91a6a395d81a546db340b6cd"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-types-final-generated.log",
+      "category": "documentation-or-evidence",
+      "bytes": 0,
+      "worktreeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/synthetic-report.pdf",
+      "category": "documentation-or-evidence",
+      "bytes": 25891,
+      "worktreeSha256": "2bd239225081382c62b2c68d3263a6fe7332deccc26bc100e8436c913af569d7"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/synthetic-report.xlsx",
+      "category": "documentation-or-evidence",
+      "bytes": 4339,
+      "worktreeSha256": "4cc5e59a02b1f9696496932616ba8644c860080b6e4e628c432733a0f85fc5f9"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/time-series-final.png",
+      "category": "documentation-or-evidence",
+      "bytes": 47720,
+      "worktreeSha256": "e20cb54992ff0fbe5482addc8954250c4b6080c2f0c906b4851dabb53e97f2b8"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/app.css",
+      "category": "synthetic-preview",
+      "bytes": 395992,
+      "worktreeSha256": "0dee4de4aa9f7fa88d64fd24bf79709dc78cf3e145ea143efcc91eba41fee521"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/app.js",
+      "category": "synthetic-preview",
+      "bytes": 1090565,
+      "worktreeSha256": "1a744997b363b0efb4b924827a3d166aaba1545e7f0f4d6acffcdb09c9451d67"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/app.tsx",
+      "category": "synthetic-preview",
+      "bytes": 792,
+      "worktreeSha256": "2d4d01491b77ff6c842e356667e1e40cb72d9d5b72faca8ec7cb6b1d3099e833"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/build-inputs.json",
+      "category": "synthetic-preview",
+      "bytes": 1758,
+      "worktreeSha256": "b9bb5661c29775cec61d092bdb48854165f6e1eae7e52bd620b9bb69a2570a34"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/build.mjs",
+      "category": "synthetic-preview",
+      "bytes": 2143,
+      "worktreeSha256": "e60217d765ca9c54e7607690c4db807a361c760ba8d5b69d692737021073f11b"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/fixtures.json",
+      "category": "synthetic-preview",
+      "bytes": 34416,
+      "worktreeSha256": "56deef004297f2e68b99c79017bdb4dd5ac346ca86b131b1d2b1c6682f2ead33"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/index.html",
+      "category": "synthetic-preview",
+      "bytes": 317,
+      "worktreeSha256": "f67b839dfe6dd6107dd23df556368e53d34103ce8d151d5803092da7c8ef4c51"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/layout-stub.tsx",
+      "category": "synthetic-preview",
+      "bytes": 127,
+      "worktreeSha256": "2ccddd27abc1f04db057069b8cbc6b123b13ee4a9ec0bc241d86091cf2ba5dbc"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/preview-shell.css",
+      "category": "synthetic-preview",
+      "bytes": 3585,
+      "worktreeSha256": "a6d1fb3a6af2604edebbb145877e92d66c531386fc9998bccb76b264809f609f"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/preview-shell.tsx",
+      "category": "synthetic-preview",
+      "bytes": 2833,
+      "worktreeSha256": "f7f2625d59d0ea5d8aebd3f20b4dfa2bddd0902eb0a9ac7e16b6181f2d5bdf48"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/server.mjs",
+      "category": "synthetic-preview",
+      "bytes": 941,
+      "worktreeSha256": "7013bfcfc59cb6f9bfaff7bfec775c2d35738d43c71df08502a2fa3ada528dea"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/synthetic-api.ts",
+      "category": "synthetic-preview",
+      "bytes": 10523,
+      "worktreeSha256": "0b9f2e81de75a1642d4fbea4b5d7e437a6218ce1130432dfca7af20601f7d76c"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/OPERATIONAL-REPORTS-IMPLEMENTATION.md",
+      "category": "documentation-or-evidence",
+      "bytes": 13594,
+      "worktreeSha256": "203fb6202399a93f097e17072374f331ef2fff0b27fa504dbfc32670752dff85"
+    },
+    {
+      "path": "resources/css/report-studio.css",
+      "category": "application-or-test",
+      "bytes": 8811,
+      "worktreeSha256": "dcfaeb037305599e42955054274f93676a86166da4342436bc60b1975d3ae4c0"
+    },
+    {
+      "path": "resources/js/components/client-location/location-workspace.tsx",
+      "category": "application-or-test",
+      "bytes": 43626,
+      "worktreeSha256": "cd25dbdb27e93b7cba1885897105db0bc25153697dc721a16d1bf60828783222"
+    },
+    {
+      "path": "resources/js/components/lists/entity-table.tsx",
+      "category": "application-or-test",
+      "bytes": 16494,
+      "worktreeSha256": "828845f58168f2da1db12e360796068cbef1a2c56a520618770ae517e951c68b"
+    },
+    {
+      "path": "resources/js/components/page/page-header.tsx",
+      "category": "application-or-test",
+      "bytes": 60419,
+      "worktreeSha256": "99caf1ea485e6fe62c5e326395b77cf268ef328275b07e9fcc9949d4953a149c"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/reports/index.tsx",
+      "category": "application-or-test",
+      "bytes": 53626,
+      "worktreeSha256": "530da1ae9c60b8e58c85528dbf543949a0960da9cb2f9d358a006de2dfb9a201"
+    },
+    {
+      "path": "resources/js/pages/health-safety/lone-workers/index.tsx",
+      "category": "application-or-test",
+      "bytes": 51527,
+      "worktreeSha256": "20e81b71ef1e72071772abc8332de14ddb06e4a3aea153436397fa8d03e246d2"
+    },
+    {
+      "path": "resources/js/pages/my-day/index.tsx",
+      "category": "application-or-test",
+      "bytes": 76620,
+      "worktreeSha256": "91b642541cecad717d0d5d754f7bc340a961417c7c5a9faabfd873f4be68ab5d"
+    },
+    {
+      "path": "resources/js/pages/reporting/_dialogs.tsx",
+      "category": "application-or-test",
+      "bytes": 2070,
+      "worktreeSha256": "759c3127840cb6fbece5d024192139ac70415936d4930c2ac8c1b0f418b5ad04"
+    },
+    {
+      "path": "resources/js/pages/reporting/model.ts",
+      "category": "application-or-test",
+      "bytes": 9930,
+      "worktreeSha256": "0ba9ad3bda35d4d37cde629462884b1bda344cc30795d79541ab778933547e65"
+    },
+    {
+      "path": "resources/js/pages/reporting/studio-controls.tsx",
+      "category": "application-or-test",
+      "bytes": 19247,
+      "worktreeSha256": "c0d5886b39ff3ce6fcba5230f25f7c50a473cf5488090ca767780dde5698a1e9"
+    },
+    {
+      "path": "resources/js/pages/reporting/studio-library.tsx",
+      "category": "application-or-test",
+      "bytes": 7819,
+      "worktreeSha256": "4207993fc5d112d6327ce0fb05bfa7b1045debdcd05544daef2c99c70aaecdf4"
+    },
+    {
+      "path": "resources/js/pages/reporting/workspace.tsx",
+      "category": "application-or-test",
+      "bytes": 189927,
+      "worktreeSha256": "a723bdcee07706e7726ca3bf31308b5b8f95f6946d0897b6a0431baf75f26c08"
+    },
+    {
+      "path": "resources/views/pdf/operational-report.blade.php",
+      "category": "application-or-test",
+      "bytes": 2508,
+      "worktreeSha256": "23d4315d938db435635a9453d204910ecc57e0af95db77c3c926ff788421e1c7"
+    },
+    {
+      "path": "routes/console.php",
+      "category": "application-or-test",
+      "bytes": 33219,
+      "worktreeSha256": "22b083f18c615d0f35013521cc766d66daf2d256a129c922c5b7c8fbc93fd499"
+    },
+    {
+      "path": "routes/operational-reports.php",
+      "category": "application-or-test",
+      "bytes": 2172,
+      "worktreeSha256": "80339e3628ee7ba8192056941355624fbb28791818d0f24318e58331e25c8696"
+    },
+    {
+      "path": "routes/web.php",
+      "category": "application-or-test",
+      "bytes": 44634,
+      "worktreeSha256": "f9abb10a37972bbeaf459eb6308b3dbcf75c88e66a297ef4ee715d5d62865e61"
+    },
+    {
+      "path": "tests/Feature/Reporting/OperationalReportsTest.php",
+      "category": "application-or-test",
+      "bytes": 35452,
+      "worktreeSha256": "d6481a89c155f007a605b437896f22837ae549392d7b61e7f36e99b93f7bc8dd"
+    }
+  ],
+  "excluded": [
+    "reports-preview.log",
+    "reports-preview-error.log",
+    ".env",
+    "vendor/",
+    "node_modules/",
+    "public/build/",
+    "generated ignored action/route bindings"
+  ],
+  "qaSourceComparison": {
+    "basis": "implementation/implementation-evidence.json overridden by fidelity/fidelity-evidence.json sourceFiles",
+    "applicationOrTestDrift": [],
+    "historicalManifestDifferences": [
+      "docs/fleet-assets-audit/previews/PKG-09B/implementation/app.css",
+      "docs/fleet-assets-audit/previews/PKG-09B/implementation/app.js",
+      "docs/fleet-assets-audit/previews/PKG-09B/implementation/build-inputs.json",
+      "docs/fleet-assets-audit/reports/OPERATIONAL-REPORTS-IMPLEMENTATION.md"
+    ],
+    "explanation": "The four documentation/preview outputs were updated during the final fidelity pass; they are hashed at their current reviewed state here. No application/test files were changed in this freeze turn."
+  },
+  "frozenDesigns": [
+    {
+      "version": "v1",
+      "baseline": "64995efca1b067814a53f93fae962028e6510eb1",
+      "url": "http://127.0.0.1:8967/",
+      "manifestSha256": "5dbb05cd6b00e3bf8405c851531aa272b9596192140b61f4e0948ecac40071a0",
+      "files": 61,
+      "mismatches": [],
+      "checks": {
+        "passed": 49,
+        "unverified": 1,
+        "genuineZoom": "unverified"
+      }
+    },
+    {
+      "version": "v2",
+      "baseline": "64995efca1b067814a53f93fae962028e6510eb1",
+      "url": "http://127.0.0.1:8968/",
+      "manifestSha256": "53e96b73ca7408eb8eb69d41d1720aa589c92196b7a041320aba919bbd8c521d",
+      "files": 61,
+      "mismatches": [],
+      "checks": {
+        "engine": 21,
+        "browser": 34,
+        "pageErrors": 0,
+        "genuineZoom": "unverified"
+      }
+    }
+  ]
+}

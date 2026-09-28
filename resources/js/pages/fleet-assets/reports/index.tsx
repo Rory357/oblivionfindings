@@ -363,6 +363,8 @@ export default function FleetReports({
                     </div>
                 </HeroShell>
 
+                <Link href="/fleet-assets/reports/builder" className="flex items-center justify-between gap-3 rounded-lg border bg-card p-4 text-primary hover:bg-muted">Build a custom report · saved versions, source evidence and private exports</Link>
+
                 {/* Report hub cross-link: geocoding & maps usage dashboard */}
                 <Link
                     href="/fleet-management/maps-usage"

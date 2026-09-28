@@ -385,6 +385,23 @@ class SecurityDevicesAccessService
      * them. The scope must not be derived from Device links or a bounded
      * picker, because ordinary Fleet vehicles need neither.
      */
+    public function reportAssets(User $user): Builder
+    {
+        abort_unless($user->canDo('fleet.reports.view') || $user->canDo('fleet.viewAny'), 403);
+
+        return $this->assetCandidateQuery($user, false)->where(function (Builder $scope) use ($user): void {
+            $scope->vehicles()->orWhereIn('assets.id', $this->accessibleAssets($user)->select('assets.id'));
+        });
+    }
+
+    /** Report-only permission grants this scoped projection, not operational actions. */
+    public function reportVehiclesForFleet(User $user): Builder
+    {
+        abort_unless($user->canDo('fleet.reports.view') || $user->canDo('fleet.viewAny'), 403);
+
+        return $this->assetCandidateQuery($user, true);
+    }
+
     public function siteScopedVehiclesForFleet(User $user): Builder
     {
         return $this->withFleetReadGate($user, $this->assetCandidateQuery($user, true));

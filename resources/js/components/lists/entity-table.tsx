@@ -163,7 +163,9 @@ export function EntityTable<T>({
                                 {c.label}
                             </span>
                         ))}
-                        <span role="columnheader" aria-label="Actions" />
+                        <span role="columnheader" className="relative">
+                            <span className="sr-only">Actions</span>
+                        </span>
                     </div>
 
                     {/* data rows */}

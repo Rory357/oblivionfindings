@@ -35,6 +35,7 @@ class RbacSeeder extends Seeder
         'safeguarding.declassification.approve',
         'fleet.maintenance.release',
         'fleet.maintenance.configure',
+        'assets.telemetry.history',
     ];
 
     public function run(): void
@@ -174,6 +175,7 @@ class RbacSeeder extends Seeder
             ['key' => 'assets.trackers.manage', 'description' => 'Manage asset trackers', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.telemetry.ingest', 'description' => 'Ingest asset telemetry', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.telemetry.view', 'description' => 'View asset telemetry', 'group' => 'assets', 'module' => 'Resources'],
+            ['key' => 'assets.telemetry.history', 'description' => 'Read retained staff tracker observations within an authorised safety session', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.telemetry.export', 'description' => 'Export authorised personal location telemetry with a recorded purpose', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.alerts.view', 'description' => 'View asset alerts', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.alerts.manage', 'description' => 'Manage asset alerts', 'group' => 'assets', 'module' => 'Resources'],

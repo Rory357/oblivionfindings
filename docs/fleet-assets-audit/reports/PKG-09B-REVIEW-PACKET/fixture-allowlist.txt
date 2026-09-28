@@ -1,0 +1,9 @@
+tests/Feature/SecurityDevices/CanonicalIntegrationEventHistoryTest.php
+docs/fleet-assets-audit/evidence/PKG-09B/corrections/fixture-tests.log
+docs/fleet-assets-audit/evidence/PKG-09B/corrections/fixture-tests.xml
+docs/fleet-assets-audit/evidence/PKG-09B/corrections/fixture-verification.json
+docs/fleet-assets-audit/evidence/PKG-09B/corrections/fixture-database-cleanup.json
+docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/CORRECTIONS.md
+docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/correction-manifest.json
+docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/FIXTURE-CORRECTION.md
+docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/fixture-allowlist.txt
