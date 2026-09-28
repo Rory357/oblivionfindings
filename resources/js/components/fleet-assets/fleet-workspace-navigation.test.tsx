@@ -78,6 +78,14 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Fleet workspace navigation', () => {
+    it('returns to the report library from a focused report', () => {
+        fixture.url = '/fleet-assets/reports?view=demand';
+        render(<FleetWorkspaceNavigation />);
+        expect(
+            screen.getByRole('link', { name: 'Report library' }),
+        ).toHaveAttribute('href', '/fleet-assets/reports');
+    });
+
     it.each([
         {
             name: 'report only',
@@ -166,7 +174,7 @@ describe('Fleet workspace navigation', () => {
                 screen.getByRole('navigation', { name: 'Reports pages' }),
             );
             expect(
-                context.getByRole('link', { name: 'Reports & analytics' }),
+                context.getByRole('link', { name: 'Report library' }),
             ).toHaveAttribute('href', '/fleet-assets/reports');
             fireEvent.keyDown(
                 context.getByRole('button', { name: 'Costs & mileage pages' }),
@@ -234,7 +242,10 @@ describe('Fleet workspace navigation', () => {
 
     it.each([
         ['/fleet-assets/trips/12/playback?site_id=7', '/fleet-assets/vehicles'],
-        ['/fleet-assets/transports/12/pre-check', '/fleet-assets/transports/overview'],
+        [
+            '/fleet-assets/transports/12/pre-check',
+            '/fleet-assets/transports/overview',
+        ],
         ['/fleet-assets/handovers/12', '/fleet-assets/vehicles'],
         ['/fleet-assets/assets/12?tab=documents', '/fleet-assets/assets'],
         [
@@ -284,7 +295,9 @@ describe('Fleet workspace navigation', () => {
     it('keeps connected transport sources discoverable in the dedicated workspace', () => {
         fixture.url = '/fleet-assets/transports/overview';
         render(<FleetWorkspaceNavigation />);
-        const trigger = screen.getByRole('button', { name: 'Connected records pages' });
+        const trigger = screen.getByRole('button', {
+            name: 'Connected records pages',
+        });
         fireEvent.keyDown(trigger, { key: 'Enter' });
         const menu = within(
             screen.getByRole('menu', { name: 'Connected records pages' }),

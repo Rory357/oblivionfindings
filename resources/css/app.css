@@ -680,7 +680,9 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     --eh-sky-mid: oklch(from var(--primary) 0.42 calc(c * 0.8) h);
     position: relative;
     border-radius: 16px;
-    overflow: hidden;
+    /* Clip the decorative arcs without creating a scroll container. A focused
+       rail control must not scroll the identity out of its own header on resize. */
+    overflow: clip;
     background:
         radial-gradient(
             56% 78% at 80% 108%,

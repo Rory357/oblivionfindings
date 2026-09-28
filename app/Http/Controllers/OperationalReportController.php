@@ -34,11 +34,19 @@ class OperationalReportController extends Controller
         abort_unless(in_array($domain, ['fleet', 'client', 'staff', 'self']), 404);
         $sources = $this->access->sources($request->user(), $domain);
         abort_unless($sources !== [], 403);
+        $views = ['library', 'builder', 'saved'];
+        foreach (['demand' => 'demand', 'readiness' => 'maintenance', 'use' => 'journeys', 'costs' => 'resource_costs'] as $view => $source) {
+            if ($domain === 'fleet' && isset($sources[$source])) {
+                $views[] = $view;
+            }
+        }
+        $view = $request->query('view', $request->routeIs('operational-reports.fleet') ? 'builder' : 'library');
         $saved = OperationalReport::query()->where('user_id', $request->user()->id)->whereIn('source', array_keys($sources))->orderByDesc('updated_at')->get();
         $shared = OperationalReport::whereJsonContains('shared_with', (int) $request->user()->id)->whereNull('archived_at')->whereIn('source', array_keys($sources))->get()
             ->map(fn ($report) => ['id' => $report->id, 'name' => $report->name, 'source' => $report->source, 'definition' => $this->portableDefinition($report->definition)]);
 
         return Inertia::render('reporting/workspace', [
+            'initialView' => in_array($view, $views, true) ? $view : 'library',
             'domain' => $domain, 'sources' => $sources, 'canExport' => $domain === 'fleet' || $request->user()->canDo('assets.telemetry.export'),
             'templates' => array_values(array_filter(config('operational-reports.templates'), fn ($t) => isset($sources[$t['source']]))),
             'saved' => $saved, 'shared' => $shared, 'viewerId' => $request->user()->id, 'initialSubject' => $request->integer('subject') ?: null,

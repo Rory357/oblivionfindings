@@ -78,6 +78,7 @@ class AlertController extends Controller
 
     public function index(Request $request)
     {
+        $request->validate(['activity' => ['nullable', 'string', 'in:acknowledged_today,resolved_7d']]);
         $user = $request->user();
         $siteAccess = $this->siteAccess();
         $bypassPermissions = $this->alertBypassPermissions();
@@ -100,9 +101,9 @@ class AlertController extends Controller
             ->whereIn('source', $this->fleetAlertSources());
         $siteAccess->applyAlertScope($crQuery, $user, $bypassPermissions);
 
-        if ($request->filled('status')) {
+        if ($request->filled('status') && $request->input('status') !== 'all') {
             $crQuery->where('status', $request->input('status'));
-        } else {
+        } elseif ($request->input('status') !== 'all' && ! $request->filled('activity')) {
             // Default to unresolved
             $crQuery->actionable();
         }
@@ -114,6 +115,8 @@ class AlertController extends Controller
         if ($request->filled('asset_id')) {
             $crQuery->where('asset_id', (int) $request->input('asset_id'));
         }
+
+        $this->applyActivityFilter($crQuery, $request->input('activity'));
 
         // Sorting
         $allowedSorts = ['triggered_at', 'severity', 'status'];
@@ -135,9 +138,11 @@ class AlertController extends Controller
             ->with(['asset:id,name,asset_tag', 'tracker:id,vendor,device_uid']);
         $this->applyArchivedAssetAlertScope($archivedAssetAlertQuery, $user);
 
-        if ($request->filled('status')) {
+        if ($request->filled('status') && $request->input('status') !== 'all') {
             $archivedAssetAlertQuery->where('status', $request->input('status'));
         }
+
+        $this->applyActivityFilter($archivedAssetAlertQuery, $request->input('activity'));
 
         if ($request->filled('severity')) {
             $archivedAssetAlertQuery->where('severity', $request->input('severity'));
@@ -163,9 +168,12 @@ class AlertController extends Controller
                 'tracker' => $a->tracker ? ['id' => $a->tracker->id, 'vendor' => $a->tracker->vendor, 'device_uid' => $a->tracker->device_uid] : null,
             ])->values();
 
-        // Hero — whole fleet-alert universe (independent of filters/pagination).
+        // Meters span statuses and severities, retaining the selected asset and access scope.
         $heroBase = ControlRoomAlert::query()->whereIn('source', $this->fleetAlertSources());
         $siteAccess->applyAlertScope($heroBase, $user, $bypassPermissions);
+        if ($request->filled('asset_id')) {
+            $heroBase->where('asset_id', (int) $request->input('asset_id'));
+        }
         $hero = [
             'unresolved' => (clone $heroBase)->actionable()->count(),
             'critical' => (clone $heroBase)->actionable()->where('severity', 'critical')->count(),
@@ -187,11 +195,21 @@ class AlertController extends Controller
                 ],
             ],
             'archived_asset_alerts' => $archivedAssetAlerts,
-            'filters' => $request->only(['status', 'severity', 'asset_id']),
+            'filters' => $request->only(['status', 'severity', 'asset_id', 'activity', 'sort', 'direction']),
             'can' => [
                 'manage' => (bool) $request->user()?->canDo('controlRoom.alerts.manage'),
+                'controlRoomView' => (bool) $request->user()?->canDo('controlRoom.viewAny'),
             ],
         ]);
+    }
+
+    private function applyActivityFilter($query, ?string $activity): void
+    {
+        if ($activity === 'acknowledged_today') {
+            $query->where('acknowledged_at', '>=', now()->startOfDay());
+        } elseif ($activity === 'resolved_7d') {
+            $query->where('resolved_at', '>=', now()->subDays(7));
+        }
     }
 
     public function bulkAction(Request $request, ControlRoomAlertLifecycleService $lifecycle)

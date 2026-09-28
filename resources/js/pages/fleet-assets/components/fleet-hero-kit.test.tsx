@@ -78,7 +78,7 @@ describe('FleetComplianceBadges', () => {
         }
     });
 
-    it('renders healthy documents as current and hides unsupported insurance', () => {
+    it('reports zero expiry alerts without asserting current evidence and hides unsupported insurance', () => {
         render(
             <FleetComplianceBadges
                 insuranceExpiring={null}
@@ -86,9 +86,10 @@ describe('FleetComplianceBadges', () => {
             />,
         );
 
-        expect(screen.getByText('WOF · Current')).toBeInTheDocument();
-        expect(screen.getByText('Rego · Current')).toBeInTheDocument();
-        expect(screen.getByText('CoF · Current')).toBeInTheDocument();
+        expect(screen.getByText('WOF · No expiry alerts')).toBeInTheDocument();
+        expect(screen.getByText('Rego · No expiry alerts')).toBeInTheDocument();
+        expect(screen.getByText('CoF · No expiry alerts')).toBeInTheDocument();
+        expect(screen.getByText('Alerts · 0 open')).toBeInTheDocument();
         expect(screen.queryByText(/Insurance/)).not.toBeInTheDocument();
     });
 });

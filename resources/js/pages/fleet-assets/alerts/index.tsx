@@ -1,16 +1,18 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
@@ -21,14 +23,6 @@ import {
     type FleetAlertAction,
 } from '@/lib/fleet-alert-workflow';
 import { formatDateTime } from '@/lib/fleet-utils';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -58,7 +52,6 @@ type ControlRoomAlert = {
     asset: { id: number; name: string; asset_tag?: string } | null;
     assigned_to: { id: number; name: string } | null;
 };
-
 type AssetAlert = {
     id: number;
     alert_type: string;
@@ -89,9 +82,13 @@ type Props = {
         severity?: string;
         status?: string;
         asset_id?: string;
+        activity?: string;
+        sort?: string;
+        direction?: 'asc' | 'desc';
     };
     can: {
         manage: boolean;
+        controlRoomView?: boolean;
     };
 };
 
@@ -318,14 +315,13 @@ export default function AlertsIndex({
     const [resolveAlertId, setResolveAlertId] = useState<number | null>(null);
     const [resolveBulkOpen, setResolveBulkOpen] = useState(false);
     const [resolutionNotes, setResolutionNotes] = useState('');
-    const [sortField, setSortField] = useState<string>('');
-    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+    const sortField = filters.sort ?? 'triggered_at';
+    const sortDir = filters.direction ?? 'desc';
 
     function handleSort(field: string) {
         const newDir =
             sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
-        setSortField(field);
-        setSortDir(newDir);
+
         router.get(
             window.location.pathname,
             { ...filters, sort: field, direction: newDir },
@@ -341,10 +337,21 @@ export default function AlertsIndex({
         const active = sortField === field;
         return (
             <th
+                aria-sort={
+                    active
+                        ? sortDir === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                        : 'none'
+                }
                 className={`cursor-pointer px-4 py-3 font-medium select-none hover:bg-muted/50 ${className ?? 'text-left'}`}
-                onClick={() => handleSort(field)}
             >
-                <div className="flex items-center gap-1">
+                <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={() => handleSort(field)}
+                    className="flex min-h-9 items-center gap-1 rounded focus-visible:outline-2 focus-visible:outline-primary"
+                >
                     {children}
                     {active ? (
                         sortDir === 'asc' ? (
@@ -355,7 +362,7 @@ export default function AlertsIndex({
                     ) : (
                         <ChevronsUpDown className="h-3 w-3 text-muted-foreground/50" />
                     )}
-                </div>
+                </Button>
             </th>
         );
     };
@@ -511,78 +518,177 @@ export default function AlertsIndex({
     ]);
 
     const resolveDialogOpen = resolveAlertId !== null || resolveBulkOpen;
+    const meterHref = (parameters: Record<string, string> = {}) => {
+        const query = new URLSearchParams(parameters);
+        if (filters.asset_id) query.set('asset_id', filters.asset_id);
+        return (
+            '/fleet-assets/alerts' + (query.size ? '?' + query.toString() : '')
+        );
+    };
 
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Alerts', href: '/fleet-assets/alerts' },
             ]}
         >
             <Head title="Alerts" />
             <PageShell>
-                <HeroShell>
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={Bell} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Fleet alerts · Control Room feed
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Alerts
-                            </h1>
-                            <p className="mt-0.5 max-w-xl text-[13px] text-primary-foreground/75">
-                                These are the same live records used by Control
-                                Room. Work each alert in order, then record the
-                                outcome once the situation is safe.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
-                                href="/fleet-assets/alerts"
-                                label="Unresolved"
-                                value={fmt(hero.unresolved)}
-                                caption="need action"
-                                tone={
-                                    hero.unresolved > 0 ? 'warning' : 'success'
+                <PageHeader
+                    icon={Bell}
+                    title="Alerts"
+                    subline="Fleet alerts · Shared with Control Room"
+                    actions={
+                        can.controlRoomView ? (
+                            <PageHeaderGlassButton
+                                icon={ExternalLink}
+                                onClick={() => router.visit('/control-room')}
+                            >
+                                Control Room
+                            </PageHeaderGlassButton>
+                        ) : undefined
+                    }
+                    meters={
+                        <>
+                            {[
+                                {
+                                    label: 'Unresolved',
+                                    value: hero.unresolved,
+                                    caption: 'Need action',
+                                    href: meterHref(),
+                                    tone:
+                                        hero.unresolved > 0
+                                            ? ('warning' as const)
+                                            : ('brand' as const),
+                                },
+                                {
+                                    label: 'Critical',
+                                    value: hero.critical,
+                                    caption: 'Unresolved · immediate attention',
+                                    href: meterHref({ severity: 'critical' }),
+                                    tone:
+                                        hero.critical > 0
+                                            ? ('critical' as const)
+                                            : ('brand' as const),
+                                },
+                                {
+                                    label: 'Acknowledged today',
+                                    value: hero.acknowledged_today,
+                                    caption: 'Including alerts since resolved',
+                                    href: meterHref({
+                                        activity: 'acknowledged_today',
+                                    }),
+                                    tone: 'brand' as const,
+                                },
+                                {
+                                    label: 'Resolved in 7 days',
+                                    value: hero.resolved_7d,
+                                    caption:
+                                        'Recorded resolution · past 7 days',
+                                    href: meterHref({
+                                        activity: 'resolved_7d',
+                                    }),
+                                    tone: 'brand' as const,
+                                },
+                            ].map((meter) => (
+                                <PageHeaderMeterBlock
+                                    key={meter.label}
+                                    label={meter.label}
+                                    href={meter.href}
+                                    tone={meter.tone}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {rawHero ? meter.value : '—'}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {meter.caption}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            ))}
+                        </>
+                    }
+                    filters={
+                        <>
+                            <span className="mr-auto text-xs text-primary-foreground/70">
+                                Meters:{' '}
+                                {filters.asset_id
+                                    ? 'selected asset'
+                                    : 'permitted assets'}{' '}
+                                · all statuses and severities
+                            </span>
+                            <PageHeaderFilterSelect
+                                label="All severities"
+                                value={filters.severity || 'all'}
+                                options={[
+                                    { value: 'all', label: 'All severities' },
+                                    { value: 'critical', label: 'Critical' },
+                                    { value: 'high', label: 'High' },
+                                    { value: 'medium', label: 'Medium' },
+                                    { value: 'low', label: 'Low' },
+                                ]}
+                                onChange={(value) =>
+                                    applyFilters({
+                                        severity: value === 'all' ? '' : value,
+                                    })
                                 }
                             />
-                            <HeroClusterTile
-                                href="/fleet-assets/alerts?severity=critical"
-                                label="Critical"
-                                value={fmt(hero.critical)}
-                                caption="immediate attention"
-                                tone={
-                                    hero.critical > 0 ? 'critical' : 'success'
+                            <PageHeaderFilterSelect
+                                label="Status · Unresolved"
+                                allValue="unresolved"
+                                value={
+                                    filters.status ||
+                                    (filters.activity ? 'all' : 'unresolved')
+                                }
+                                options={[
+                                    {
+                                        value: 'unresolved',
+                                        label: 'Unresolved',
+                                    },
+                                    { value: 'all', label: 'All statuses' },
+                                    ...Object.entries(STATUS_LABELS).map(
+                                        ([value, label]) => ({ value, label }),
+                                    ),
+                                ]}
+                                onChange={(value) =>
+                                    applyFilters({
+                                        status:
+                                            value === 'unresolved' ? '' : value,
+                                        activity: '',
+                                    })
                                 }
                             />
-                            <HeroClusterTile
-                                href="/fleet-assets/alerts?status=ack"
-                                label="Acknowledged today"
-                                value={fmt(hero.acknowledged_today)}
-                                caption="picked up by the team"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/alerts?status=resolved"
-                                label="Resolved 7d"
-                                value={fmt(hero.resolved_7d)}
-                                caption="closed this week"
-                                tone={
-                                    hero.resolved_7d > 0 ? 'success' : 'neutral'
-                                }
-                            />
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <FleetHeroAction
-                            href="/control-room"
-                            icon={ExternalLink}
-                        >
-                            Control Room
-                        </FleetHeroAction>
-                    </div>
-                </HeroShell>
+                            {filters.activity && (
+                                <PageHeaderFilterButton
+                                    onClick={() =>
+                                        applyFilters({ activity: '' })
+                                    }
+                                >
+                                    {filters.activity === 'acknowledged_today'
+                                        ? 'Acknowledged today'
+                                        : 'Resolved in past 7 days'}{' '}
+                                    <X className="size-3" />{' '}
+                                    <span className="sr-only">
+                                        Clear activity filter
+                                    </span>
+                                </PageHeaderFilterButton>
+                            )}
+                            {filters.asset_id && (
+                                <PageHeaderFilterButton
+                                    onClick={() =>
+                                        applyFilters({ asset_id: '' })
+                                    }
+                                >
+                                    Selected asset <X className="size-3" />
+                                    <span className="sr-only">
+                                        Clear asset filter
+                                    </span>
+                                </PageHeaderFilterButton>
+                            )}
+                        </>
+                    }
+                />
 
                 {/* Severity distribution (current page of results) */}
                 <div className="grid gap-3">
@@ -590,7 +696,7 @@ export default function AlertsIndex({
                         <Card className="border bg-primary/10 sm:col-span-2 md:col-span-3 lg:col-span-4 dark:bg-primary/20">
                             <CardContent className="p-4">
                                 <p className="mb-3 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                    SEVERITY DISTRIBUTION
+                                    Unresolved severity · current page
                                 </p>
                                 <div className="flex h-3 w-full overflow-hidden rounded-full">
                                     {severityBars.map(
@@ -619,7 +725,7 @@ export default function AlertsIndex({
                                             <span className="text-muted-foreground">
                                                 {bar.label}
                                             </span>
-                                            <span className="font-medium text-white">
+                                            <span className="font-medium text-foreground">
                                                 {bar.count}
                                             </span>
                                         </div>
@@ -631,7 +737,7 @@ export default function AlertsIndex({
                 </div>
 
                 <Card className="border-primary/20 bg-primary/5">
-                    <CardContent className="flex items-center justify-between gap-6 p-4">
+                    <CardContent className="flex flex-wrap items-center justify-between gap-4 p-4">
                         <div>
                             <p className="text-sm font-semibold">
                                 One Control Room workflow
@@ -642,7 +748,7 @@ export default function AlertsIndex({
                                 response is up to.
                             </p>
                         </div>
-                        <ol className="flex shrink-0 items-center gap-2 text-xs font-medium">
+                        <ol className="flex flex-wrap items-center gap-2 text-xs font-medium">
                             <li className="rounded-full border bg-background px-3 py-1.5">
                                 1 · Acknowledge
                             </li>
@@ -667,45 +773,6 @@ export default function AlertsIndex({
                         </ol>
                     </CardContent>
                 </Card>
-
-                {/* Filters */}
-                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                    <Select
-                        value={filters.severity || 'all'}
-                        onValueChange={(v) =>
-                            applyFilters({ severity: v === 'all' ? '' : v })
-                        }
-                    >
-                        <SelectTrigger className="w-36">
-                            <SelectValue placeholder="Severity" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All severities</SelectItem>
-                            <SelectItem value="critical">Critical</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="low">Low</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Select
-                        value={filters.status || 'all'}
-                        onValueChange={(v) =>
-                            applyFilters({ status: v === 'all' ? '' : v })
-                        }
-                    >
-                        <SelectTrigger className="w-36">
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All statuses</SelectItem>
-                            <SelectItem value="open">Open</SelectItem>
-                            <SelectItem value="ack">Acknowledged</SelectItem>
-                            <SelectItem value="triaging">Triaging</SelectItem>
-                            <SelectItem value="resolved">Resolved</SelectItem>
-                            <SelectItem value="closed">Closed</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
 
                 {/* Table with severity left borders */}
                 <div className="overflow-hidden rounded-lg border">
@@ -914,8 +981,8 @@ export default function AlertsIndex({
                                         >
                                             <FleetEmptyState
                                                 icon={Bell}
-                                                title="No operational alerts"
-                                                description="Control Room fleet alerts appear here when triggered by geofence breaches, speed violations, or other configured rules."
+                                                title="No alerts match this view"
+                                                description="Try another status, severity or activity filter to see other permitted alerts."
                                             />
                                         </td>
                                     </tr>
@@ -930,13 +997,11 @@ export default function AlertsIndex({
                         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                                    Archived Asset Alert History
+                                    Earlier alert history
                                 </h2>
                                 <p className="text-sm text-muted-foreground">
-                                    Legacy <code>asset_alerts</code> records are
-                                    retained for historical visibility only and
-                                    are no longer part of the active operational
-                                    alert workflow.
+                                    Earlier alerts are kept here for reference.
+                                    Respond to current alerts in the list above.
                                 </p>
                             </div>
                         </div>

@@ -6,23 +6,13 @@ import {
 } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import PageShell from '@/components/page-shell';
-import { Button } from '@/components/ui/button';
+import { PageHeaderFilterSelect } from '@/components/page/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/fleet-utils';
-import {
-    CompactHeroStat,
-    FleetCompactHero,
-} from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, router } from '@inertiajs/react';
-import { Calendar, Download, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
+import { FleetReportHeader } from './report-header';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -109,72 +99,47 @@ export default function CommunityAccess({
         >
             <Head title="Community Access Analytics" />
             <PageShell>
-                <FleetCompactHero
-                    pill={`Fleet reports · last ${days} days`}
-                    title="Community Access Analytics"
-                    backHref="/fleet-assets/reports"
-                    backLabel="Reports"
-                    stats={
-                        <>
-                            <CompactHeroStat
-                                label="Outings"
-                                value={String(stats.total_outings)}
-                                tone={
-                                    stats.total_outings > 0
-                                        ? 'success'
-                                        : 'neutral'
-                                }
-                            />
-                            <CompactHeroStat
-                                label="Residents"
-                                value={String(stats.residents_participating)}
-                                tone="neutral"
-                            />
-                            <CompactHeroStat
-                                label="Avg hrs / resident"
-                                value={String(stats.avg_hours_per_resident)}
-                                tone="neutral"
-                            />
-                            <CompactHeroStat
-                                label="Community hrs"
-                                value={String(stats.total_hours)}
-                                tone="neutral"
-                            />
-                        </>
-                    }
-                />
-                <p className="text-sm text-muted-foreground">
-                    Track resident community participation, outings, and
-                    transport usage for MSD/MOH compliance.
-                </p>
-
-                {/* Period Selector + Export */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Calendar className="h-5 w-5 text-muted-foreground" />
-                        <Select
+                <FleetReportHeader
+                    title="Community access"
+                    description={`Recorded participation and outings · last ${days} days`}
+                    onExport={handleExport}
+                    filters={
+                        <PageHeaderFilterSelect
+                            label="Period · Last 30 days"
                             value={String(days)}
-                            onValueChange={handlePeriodChange}
-                        >
-                            <SelectTrigger className="w-48">
-                                <SelectValue placeholder="Select period" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="30">Last 30 days</SelectItem>
-                                <SelectItem value="90">Last 90 days</SelectItem>
-                                <SelectItem value="180">
-                                    Last 6 months
-                                </SelectItem>
-                                <SelectItem value="365">
-                                    Last 12 months
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={handleExport}>
-                        <Download className="mr-1.5 h-3.5 w-3.5" /> Export CSV
-                    </Button>
-                </div>
+                            allValue="30"
+                            options={[
+                                { value: '30', label: 'Last 30 days' },
+                                { value: '90', label: 'Last 90 days' },
+                                { value: '180', label: 'Last 6 months' },
+                                { value: '365', label: 'Last 12 months' },
+                            ]}
+                            onChange={handlePeriodChange}
+                        />
+                    }
+                    meters={[
+                        {
+                            label: 'Outings',
+                            value: stats.total_outings,
+                            caption: 'Recorded in this period',
+                        },
+                        {
+                            label: 'Residents',
+                            value: stats.residents_participating,
+                            caption: 'With recorded participation',
+                        },
+                        {
+                            label: 'Average hours per resident',
+                            value: stats.avg_hours_per_resident,
+                            caption: 'Recorded participation',
+                        },
+                        {
+                            label: 'Community hours',
+                            value: stats.total_hours,
+                            caption: 'Recorded in this period',
+                        },
+                    ]}
+                />
 
                 {/* Charts Row */}
                 <div className="grid gap-4 lg:grid-cols-3">

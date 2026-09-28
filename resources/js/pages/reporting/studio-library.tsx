@@ -128,7 +128,7 @@ export function StudioLibrary({
                             Ready-made reports
                         </h2>
                         <p className="text-subtle">
-                            Four focused starting points
+                            Focused reports available to you
                         </p>
                     </div>
                     <div className="report-ready-grid">

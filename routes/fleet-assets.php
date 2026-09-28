@@ -50,6 +50,7 @@ use App\Http\Controllers\FleetAssets\VehicleTripHistoryController;
 use App\Http\Controllers\FleetAssets\WanderingAlertController;
 use App\Http\Controllers\FleetAssets\WorkOrderController;
 use App\Http\Controllers\FleetAssets\WorkspaceSettingsController;
+use App\Http\Controllers\OperationalReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
@@ -672,7 +673,8 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
 
     // Reports
     Route::middleware('permission:fleet.viewAny|fleet.reports.view')->group(function () {
-        Route::get('/reports', [ReportController::class, 'index'])->name('fleet-assets.reports.index');
+        Route::get('/reports', [OperationalReportController::class, 'index'])->defaults('domain', 'fleet')->name('fleet-assets.reports.index');
+        Route::get('/reports/operating-summary', [ReportController::class, 'index'])->name('fleet-assets.reports.operating-summary');
         Route::get('/reports/export', [ReportController::class, 'export'])->name('fleet-assets.reports.export');
         Route::get('/reports/by-house', [ReportController::class, 'byHouse'])->name('fleet-assets.reports.by-house');
         Route::get('/reports/reimbursement', [ReportController::class, 'reimbursement'])->name('fleet-assets.reports.reimbursement');

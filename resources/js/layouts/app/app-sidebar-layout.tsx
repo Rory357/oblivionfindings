@@ -63,8 +63,14 @@ export default function AppSidebarLayout({
     const page = usePage<SharedData>();
     const defaultSidebarOpen = page.props.sidebarOpen ?? true;
     const fleetWorkspace = fleetWorkspaceForUrl(page.url);
+    const pageBreadcrumbs =
+        fleetWorkspace &&
+        breadcrumbs.length > 0 &&
+        breadcrumbs[0].href !== '/dashboard'
+            ? [{ title: 'Home', href: '/dashboard' }, ...breadcrumbs]
+            : breadcrumbs;
     const hasBreadcrumbStrip =
-        breadcrumbs.length > 1 || Boolean(fleetWorkspace);
+        pageBreadcrumbs.length > 1 || Boolean(fleetWorkspace);
     const { collapsed, setExpanded } = useAppSidebarState(defaultSidebarOpen);
     const isMobile = useIsMobile();
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -119,9 +125,9 @@ export default function AppSidebarLayout({
                                               'flex-wrap justify-between gap-x-5 gap-y-1',
                                       )}
                                   >
-                                      {breadcrumbs.length > 1 && (
+                                      {pageBreadcrumbs.length > 1 && (
                                           <Breadcrumbs
-                                              breadcrumbs={breadcrumbs}
+                                              breadcrumbs={pageBreadcrumbs}
                                           />
                                       )}
                                       {fleetWorkspace && (

@@ -274,7 +274,18 @@ export const FLEET_WORKSPACES: FleetWorkspace[] = [
         groups: [
             {
                 label: 'Reports',
-                links: [link('Reports & analytics', 'reports', reports)],
+                links: [link('Report library', 'reports', reports)],
+            },
+            {
+                label: 'Report tools',
+                links: [
+                    link('Report builder', 'reports/builder', reports),
+                    link(
+                        'Operating summary & exports',
+                        'reports/operating-summary',
+                        reports,
+                    ),
+                ],
             },
             {
                 label: 'Resource use',

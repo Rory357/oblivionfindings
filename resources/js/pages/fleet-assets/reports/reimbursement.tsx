@@ -13,7 +13,6 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { formatDateForFilename } from '@/lib/datetime';
 import { formatCurrency } from '@/lib/fleet-utils';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head } from '@inertiajs/react';
 import {
     Calculator,
@@ -23,7 +22,8 @@ import {
     Receipt,
     Users,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FleetReportHeader } from './report-header';
 
 type StaffRow = {
     name: string;
@@ -39,9 +39,21 @@ export default function MileageReimbursement() {
     const [rate, setRate] = useState('0.95');
     const [data, setData] = useState<StaffRow[] | null>(null);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const scope = [period, rate, customFrom, customTo].join('|');
+    const currentScope = useRef(scope);
+    currentScope.current = scope;
+
+    useEffect(() => {
+        setData(null);
+        setError('');
+    }, [scope]);
 
     const handleGenerate = useCallback(async () => {
         setLoading(true);
+        setData(null);
+        setError('');
+        const requestedScope = currentScope.current;
         try {
             const params = new URLSearchParams();
             params.set('period', period);
@@ -59,12 +71,21 @@ export default function MileageReimbursement() {
                     },
                 },
             );
-            if (response.ok) {
-                const json = await response.json();
-                setData(json.staff ?? []);
-            } else setData([]);
+            if (!response.ok)
+                throw new Error(
+                    'The report could not be generated. Check the period and rate, then try again.',
+                );
+            const json = await response.json();
+            if (!Array.isArray(json.staff))
+                throw new Error(
+                    'The report response was incomplete. Try again.',
+                );
+            if (requestedScope === currentScope.current) setData(json.staff);
         } catch {
-            setData([]);
+            if (requestedScope === currentScope.current)
+                setError(
+                    'The report could not be generated. Check the period and rate, then try again.',
+                );
         } finally {
             setLoading(false);
         }
@@ -129,16 +150,36 @@ export default function MileageReimbursement() {
         >
             <Head title="Mileage Reimbursement" />
             <PageShell>
-                <FleetCompactHero
-                    pill="Fleet reports · payroll export"
-                    title="Mileage Reimbursement"
-                    backHref="/fleet-assets/reports"
-                    backLabel="Reports"
+                <FleetReportHeader
+                    title="Mileage reimbursement"
+                    description="Calculate reimbursement from recorded trips using the selected rate."
+                    meters={
+                        data !== null
+                            ? [
+                                  {
+                                      label: 'Staff',
+                                      value: staffCount,
+                                      caption: 'With recorded trips',
+                                  },
+                                  {
+                                      label: 'Trips',
+                                      value: totalTrips,
+                                      caption: 'Recorded in selected period',
+                                  },
+                                  {
+                                      label: 'Distance',
+                                      value: `${totalDistance.toFixed(1)} km`,
+                                      caption: 'Recorded travel',
+                                  },
+                                  {
+                                      label: 'Reimbursement',
+                                      value: formatCurrency(totalAmount),
+                                      caption: `At ${formatCurrency(Number(rate))}/km`,
+                                  },
+                              ]
+                            : []
+                    }
                 />
-                <p className="text-sm text-muted-foreground">
-                    Calculate staff mileage reimbursement based on trip data and
-                    the NZ IRD rate.
-                </p>
 
                 {/* Dark KPI Cards (visible when data is loaded) */}
                 {data !== null && data.length > 0 && (
@@ -244,11 +285,20 @@ export default function MileageReimbursement() {
                                     />
                                 </div>
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    IRD rate: $0.95/km (2024/25)
+                                    Enter the reimbursement rate approved for
+                                    this period.
                                 </p>
                             </div>
                         </div>
-                        <div className="mt-4 flex gap-2">
+                        {error && (
+                            <p
+                                role="alert"
+                                className="mt-4 text-sm text-status-critical"
+                            >
+                                {error}
+                            </p>
+                        )}
+                        <div className="mt-4 flex flex-wrap gap-2">
                             <Button onClick={handleGenerate} disabled={loading}>
                                 <Receipt className="mr-2 h-4 w-4" />
                                 {loading ? 'Generating...' : 'Generate Report'}
