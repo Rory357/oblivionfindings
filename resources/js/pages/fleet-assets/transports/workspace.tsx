@@ -86,6 +86,8 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { MapTools } from '../settings/_map-tools';
+import type { MapSnapshot } from '../settings/_types';
 const tabs = [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },
     { key: 'requests', label: 'Requests & approvals', icon: Inbox },
@@ -177,6 +179,7 @@ export default function TransportWorkspace({
     canManage,
     generatedAt,
     calendarAnchor,
+    googleMaps = null,
 }: {
     view: WorkspaceView;
     records: TransportRecord[];
@@ -186,7 +189,9 @@ export default function TransportWorkspace({
     canManage: boolean;
     generatedAt: string;
     calendarAnchor: string;
+    googleMaps?: MapSnapshot | null;
 }) {
+    const [mapToolsOpen, setMapToolsOpen] = useState(false);
     const params =
         typeof window !== 'undefined'
             ? new URLSearchParams(window.location.search)
@@ -356,6 +361,15 @@ export default function TransportWorkspace({
             : []),
     ];
     const heroActions: MenuItem[] = [
+        ...(googleMaps
+            ? [
+                  {
+                      label: 'Address & route tools',
+                      icon: Route,
+                      onClick: () => setMapToolsOpen(true),
+                  },
+              ]
+            : []),
         {
             label: 'Request transport',
             icon: Plus,
@@ -980,6 +994,12 @@ export default function TransportWorkspace({
                     next?.();
                 }}
             />
+            {mapToolsOpen && googleMaps && (
+                <MapTools
+                    settings={googleMaps}
+                    onClose={() => setMapToolsOpen(false)}
+                />
+            )}
         </AppLayout>
     );
 }

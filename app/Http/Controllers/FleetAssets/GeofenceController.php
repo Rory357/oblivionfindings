@@ -16,6 +16,7 @@ use App\Services\AuditLogger;
 use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\Fleet\BoundaryRuleService;
 use App\Services\Fleet\BoundaryService;
+use App\Services\Fleet\FleetMapSettings;
 use App\Services\Fleet\VehicleGeofenceRules;
 use App\Services\Fleet\VehicleLocationService;
 use App\Services\Tracking\BoundaryHandoffService;
@@ -36,6 +37,7 @@ final class GeofenceController extends Controller
         return Inertia::render('fleet-assets/geofences/index', [
             'canManage' => $this->boundaries->canManage($actor), 'addressSearch' => $this->addressCapabilities(),
             'mapProvider' => ['url' => config('fleet.maps.boundary_tile_url'), 'attribution' => config('fleet.maps.boundary_tile_attribution')],
+            'googleMaps' => $actor->canDo('fleet.viewAny') || $actor->canDo('assets.viewAny') ? app(FleetMapSettings::class)->snapshot() : null,
         ])->toResponse($request)->withHeaders(['Cache-Control' => 'no-store, private']);
     }
 

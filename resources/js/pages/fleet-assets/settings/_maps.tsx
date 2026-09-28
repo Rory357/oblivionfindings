@@ -16,16 +16,25 @@ import {
     WizardShell,
     WizardStepPane,
 } from '@/components/wizard/shell';
+import { formatDateTime } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
 import {
     ArrowUpRight,
     Eye,
     KeyRound,
+    ListChecks,
     Map,
+    RefreshCw,
     Settings2,
     Shield,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import {
+    googleConsoleUrl,
+    mapConfigurationErrors,
+    mapErrorStep,
+    type MapErrors,
+} from './_map-configuration';
 import { MapTools } from './_map-tools';
 import type { MapSnapshot, MapValues } from './_types';
 import { mergeMapDraft } from './_types';
@@ -45,6 +54,12 @@ const steps = [
         icon: Map,
     },
     {
+        key: 'check',
+        label: 'Check configuration',
+        blurb: 'Credentials and API requirements',
+        icon: ListChecks,
+    },
+    {
         key: 'review',
         label: 'Review & save',
         blurb: 'Restrictions, costs and impact',
@@ -53,7 +68,7 @@ const steps = [
 ];
 const fallback: Record<string, string> = {
     display: 'OSM basemap and application-owned markers remain usable.',
-    places: 'Choose an existing site or permitted coordinates.',
+    places: 'Enter any address manually, choose a saved site or use coordinates.',
     geocoding: 'Coordinates remain usable without a derived address.',
     routes: 'Bookings remain usable without a route or travel estimate.',
 };
@@ -83,6 +98,11 @@ export function Maps({
         MapSnapshot['capabilities'][number] | null
     >(null);
     const [toolsOpen, setToolsOpen] = useState(false);
+    const [fieldErrors, setFieldErrors] = useState<MapErrors>({});
+    const errorRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (error) errorRef.current?.focus();
+    }, [error, step]);
     const [recovery, setRecovery] = useState<{
             base: MapValues;
             draft: MapValues;
@@ -133,6 +153,7 @@ export function Maps({
         setDraft(saved.values);
         setStep(0);
         setError('');
+        setFieldErrors({});
         setOpen(true);
     };
     const close = () => {
@@ -141,9 +162,64 @@ export function Maps({
             setDiscard(true);
         else setOpen(false);
     };
-    const edit = <K extends keyof MapValues>(key: K, value: MapValues[K]) =>
-        setDraft((current) => ({ ...current, [key]: value }));
+    const edit = <K extends keyof MapValues>(key: K, value: MapValues[K]) => {
+        setDraft((current) => ({
+            ...current,
+            [key]: value,
+            ...(key === 'google' && value === true ? { display: true } : {}),
+        }));
+        setError('');
+        setFieldErrors({});
+    };
+    function validate(all = false) {
+        const issues = mapConfigurationErrors(draft, saved.credentials);
+        const keys = all
+            ? Object.keys(issues)
+            : step === 0
+              ? ['project', 'google']
+              : step === 1
+                ? ['display', 'places']
+                : [];
+        const relevant = Object.fromEntries(
+            keys
+                .filter((key) => issues[key as keyof MapValues])
+                .map((key) => [key, issues[key as keyof MapValues]]),
+        ) as MapErrors;
+        setFieldErrors(relevant);
+        if (Object.keys(relevant).length) {
+            setStep(mapErrorStep(relevant));
+            setError(Object.values(relevant).join(' '));
+            return false;
+        }
+        setError('');
+        return true;
+    }
+    async function reload() {
+        setBusy(true);
+        setError('');
+        try {
+            const current = await api<MapSnapshot>('maps');
+            if (dirty && current.revision !== saved.revision)
+                setLatest(current);
+            else {
+                setSaved(current);
+                if (!dirty) setDraft(current.values);
+                setNotice(
+                    'Configuration reloaded. No provider request was made.',
+                );
+            }
+        } catch (problem) {
+            setError(
+                problem instanceof Error
+                    ? problem.message
+                    : 'Could not reload. Your draft is retained.',
+            );
+        } finally {
+            setBusy(false);
+        }
+    }
     async function save() {
+        if (!validate(true)) return;
         setBusy(true);
         setError('');
         try {
@@ -169,12 +245,25 @@ export function Maps({
         } catch (problem) {
             if (problem instanceof SettingsError && problem.status === 409)
                 setLatest(problem.latest as MapSnapshot);
-            else
+            else {
+                if (problem instanceof SettingsError && problem.errors) {
+                    const issues = Object.fromEntries(
+                        Object.entries(problem.errors).map(
+                            ([key, messages]) => [
+                                key.replace(/^values\./, ''),
+                                messages[0],
+                            ],
+                        ),
+                    ) as MapErrors;
+                    setFieldErrors(issues);
+                    setStep(mapErrorStep(issues));
+                }
                 setError(
                     problem instanceof Error
                         ? problem.message
                         : 'Could not save. Your draft is retained.',
                 );
+            }
         } finally {
             setBusy(false);
         }
@@ -230,16 +319,36 @@ export function Maps({
                     <Notice>{notice}</Notice>
                 </div>
             )}
+            {error && !open && (
+                <div
+                    role="alert"
+                    aria-label="Map configuration error"
+                    ref={errorRef}
+                    tabIndex={-1}
+                >
+                    <Notice role="note">{error}</Notice>
+                </div>
+            )}
             <ListCaption
                 title="Map provider"
                 caption="OSM by default · Google is optional"
                 right={
-                    canManage && (
-                        <Button onClick={configure} disabled={!!recovery}>
-                            <Settings2 className="size-4" />
-                            Configure provider
+                    <div className="flex flex-wrap gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={reload}
+                            disabled={busy || !!recovery}
+                        >
+                            <RefreshCw className="size-4" />
+                            Reload saved
                         </Button>
-                    )
+                        {canManage && (
+                            <Button onClick={configure} disabled={!!recovery}>
+                                <Settings2 className="size-4" />
+                                Configure provider
+                            </Button>
+                        )}
+                    </div>
                 }
             />
             <div className="grid gap-5 lg:grid-cols-2">
@@ -277,13 +386,42 @@ export function Maps({
                         quota, billing or provider health. No paid check runs
                         automatically.
                     </p>
+                    <ReviewRow
+                        label="Live API verification"
+                        value="Not run by this setup"
+                    />
+                    <ReviewRow
+                        label="Quota and billing"
+                        value="Check Google Cloud"
+                    />
+                    <p className="text-caption">
+                        Recent request results below expire after 24 hours and
+                        apply only to the current configuration. They are not a
+                        continuous health check or a billing total.
+                    </p>
                     <Button variant="link" asChild>
                         <a
-                            href="https://console.cloud.google.com/google/maps-apis/overview"
+                            href={googleConsoleUrl(
+                                '/google/maps-apis/overview',
+                                saved.values.project,
+                            )}
                             target="_blank"
                             rel="noreferrer"
                         >
                             Review Google API usage{' '}
+                            <ArrowUpRight className="size-4" />
+                        </a>
+                    </Button>
+                    <Button variant="link" asChild>
+                        <a
+                            href={googleConsoleUrl(
+                                '/google/maps-apis/quotas',
+                                saved.values.project,
+                            )}
+                            target="_blank"
+                            rel="noreferrer"
+                        >
+                            Review API quotas{' '}
                             <ArrowUpRight className="size-4" />
                         </a>
                     </Button>
@@ -306,11 +444,24 @@ export function Maps({
                         label: 'Google configuration',
                         width: '1.2fr',
                         cell: (row) => (
-                            <StatusBadge
-                                variant={row.enabled ? 'info' : 'neutral'}
-                            >
-                                {row.status}
-                            </StatusBadge>
+                            <div className="space-y-1">
+                                <StatusBadge
+                                    variant={
+                                        row.selected && !row.enabled
+                                            ? 'warning'
+                                            : row.enabled
+                                              ? 'info'
+                                              : 'neutral'
+                                    }
+                                >
+                                    {row.status}
+                                </StatusBadge>
+                                <p className="text-caption">
+                                    {row.observation
+                                        ? `${{ succeeded: 'Last request succeeded', quota: 'Provider quota reached', unavailable: 'Provider unavailable', rejected: 'Provider rejected the request' }[row.observation.status]} · ${formatDateTime(row.observation.observed_at)} NZ`
+                                        : 'No recent provider result'}
+                                </p>
+                            </div>
                         ),
                     },
                     {
@@ -392,20 +543,44 @@ export function Maps({
                     railSub="Optional Google setup"
                     steps={steps}
                     stepIndex={step}
-                    onStepClick={setStep}
+                    onStepClick={(index) => {
+                        if (!busy) {
+                            setStep(index);
+                            setError('');
+                        }
+                    }}
                     pct={null}
                     footerStart={
-                        <Button
-                            variant="outline"
-                            disabled={busy}
-                            onClick={close}
-                        >
-                            Cancel
-                        </Button>
+                        <>
+                            <Button
+                                variant="outline"
+                                disabled={busy}
+                                onClick={close}
+                            >
+                                Cancel
+                            </Button>
+                            {step > 0 && (
+                                <Button
+                                    variant="ghost"
+                                    disabled={busy}
+                                    onClick={() => {
+                                        setStep(step - 1);
+                                        setError('');
+                                    }}
+                                >
+                                    Back
+                                </Button>
+                            )}
+                        </>
                     }
                     footerEnd={
-                        step < 2 ? (
-                            <Button onClick={() => setStep(step + 1)}>
+                        step < 3 ? (
+                            <Button
+                                disabled={busy}
+                                onClick={() => {
+                                    if (validate()) setStep(step + 1);
+                                }}
+                            >
                                 Continue
                             </Button>
                         ) : (
@@ -416,10 +591,15 @@ export function Maps({
                     }
                 >
                     <WizardStepPane key={step}>
-                        <div className="space-y-5">
+                        <fieldset disabled={busy} className="min-w-0 space-y-5">
                             {error && (
-                                <div role="alert">
-                                    <Notice>{error}</Notice>
+                                <div
+                                    role="alert"
+                                    aria-label="Map configuration error"
+                                    tabIndex={-1}
+                                    ref={errorRef}
+                                >
+                                    <Notice role="note">{error}</Notice>
                                 </div>
                             )}
                             {step === 0 && (
@@ -450,6 +630,8 @@ export function Maps({
                                             id="google-project"
                                             value={draft.project}
                                             maxLength={100}
+                                            aria-invalid={!!fieldErrors.project}
+                                            aria-describedby="google-project-help"
                                             onChange={(event) =>
                                                 edit(
                                                     'project',
@@ -458,16 +640,56 @@ export function Maps({
                                             }
                                             placeholder="Your approved project reference"
                                         />
+                                        <p
+                                            id="google-project-help"
+                                            className="text-caption"
+                                        >
+                                            {fieldErrors.project ??
+                                                'Use the project ID from Google Cloud. This reference does not create a project or configure a key.'}
+                                        </p>
                                     </div>
                                     <ReviewCard
                                         icon={KeyRound}
-                                        title="Deployment-owned credentials"
+                                        title="Add your Google API keys in deployment"
                                     >
+                                        <ol className="mb-4 list-decimal space-y-2 pl-5 text-sm">
+                                            <li>
+                                                Choose your Google Cloud project
+                                                and review its billing setup.
+                                                Keep Google off here until you
+                                                are ready.
+                                            </li>
+                                            <li>
+                                                Create a browser key for Maps
+                                                JavaScript API. Restrict
+                                                websites to your approved
+                                                application domains, such as{' '}
+                                                <code>
+                                                    https://oblivionfindings.com/*
+                                                </code>
+                                                .
+                                            </li>
+                                            <li>
+                                                For optional services, create a
+                                                separate server key restricted
+                                                to the deployment server’s
+                                                public egress IP addresses and
+                                                only the selected APIs.
+                                            </li>
+                                            <li>
+                                                Add the keys to the deployment
+                                                environment using the names
+                                                below, refresh its configuration
+                                                cache, then reload this wizard.
+                                            </li>
+                                        </ol>
                                         <ReviewRow
                                             label="Restricted browser key"
                                             value={
                                                 saved.credentials.browser
-                                                    ? 'Present'
+                                                    ? (saved.references
+                                                          ?.browser ??
+                                                      'Present')
                                                     : 'Not configured'
                                             }
                                         />
@@ -475,23 +697,59 @@ export function Maps({
                                             label="Separate server key"
                                             value={
                                                 saved.credentials.server
-                                                    ? 'Present'
+                                                    ? (saved.references
+                                                          ?.server ?? 'Present')
                                                     : 'Not configured'
                                             }
                                         />
                                         <p className="text-subtle mt-3">
-                                            Ask the deployment owner to
-                                            configure the browser and server
-                                            credentials. Secret values are never
-                                            entered or shown here. Browser-only
-                                            map display does not need a server
-                                            key.
+                                            Add a website-restricted key as{' '}
+                                            <code>GOOGLE_MAPS_API_KEY</code> in
+                                            your deployment environment. For
+                                            address search, reverse geocoding or
+                                            routes, add a separate
+                                            server-restricted key as{' '}
+                                            <code>
+                                                GOOGLE_MAPS_SERVER_API_KEY
+                                            </code>
+                                            . Refresh the deployment
+                                            configuration cache, then reload
+                                            here. Map display alone does not
+                                            need the server key.
                                         </p>
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            <Button variant="outline" asChild>
+                                                <a
+                                                    href={googleConsoleUrl(
+                                                        '/google/maps-apis/credentials',
+                                                        draft.project,
+                                                    )}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                >
+                                                    Open Google credentials{' '}
+                                                    <ArrowUpRight className="size-4" />
+                                                </a>
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                onClick={reload}
+                                                disabled={busy}
+                                            >
+                                                Reload configuration
+                                            </Button>
+                                        </div>
                                     </ReviewCard>
                                 </>
                             )}
                             {step === 1 && (
                                 <>
+                                    <Notice>
+                                        Google map display provides the map
+                                        context for Google results. Address
+                                        search, reverse geocoding and routing
+                                        are separate optional APIs.
+                                    </Notice>
                                     {saved.capabilities.map((capability) => (
                                         <Card
                                             key={capability.key}
@@ -512,7 +770,13 @@ export function Maps({
                                             </div>
                                             <Switch
                                                 id={`google-${capability.key}`}
+                                                disabled={
+                                                    busy ||
+                                                    !draft.google ||
+                                                    capability.key === 'display'
+                                                }
                                                 checked={
+                                                    draft.google &&
                                                     draft[
                                                         capability.key as
                                                             | 'display'
@@ -543,9 +807,83 @@ export function Maps({
                             )}
                             {step === 2 && (
                                 <>
+                                    <h2 className="text-section-title">
+                                        Check the setup before saving
+                                    </h2>
+                                    <Notice>
+                                        This checks configuration presence only.
+                                        It makes no Google request and cannot
+                                        verify key restrictions, enabled APIs,
+                                        quota or billing.
+                                    </Notice>
+                                    {saved.capabilities.map((capability) => {
+                                        const selected =
+                                            draft.google &&
+                                            draft[
+                                                capability.key as
+                                                    | 'display'
+                                                    | 'places'
+                                                    | 'geocoding'
+                                                    | 'routes'
+                                            ];
+                                        const present =
+                                            saved.credentials[
+                                                capability.key === 'display'
+                                                    ? 'browser'
+                                                    : 'server'
+                                            ];
+                                        return (
+                                            <ReviewCard
+                                                key={capability.key}
+                                                icon={Map}
+                                                title={capability.title}
+                                            >
+                                                <ReviewRow
+                                                    label="Selection"
+                                                    value={
+                                                        selected
+                                                            ? 'Selected'
+                                                            : 'Off'
+                                                    }
+                                                />
+                                                <ReviewRow
+                                                    label="Credential"
+                                                    value={
+                                                        present
+                                                            ? 'Present · API not verified'
+                                                            : 'Missing'
+                                                    }
+                                                />
+                                                <ReviewRow
+                                                    label="When unavailable"
+                                                    value={
+                                                        fallback[capability.key]
+                                                    }
+                                                />
+                                            </ReviewCard>
+                                        );
+                                    })}
+                                    <Button variant="outline" asChild>
+                                        <a
+                                            href={googleConsoleUrl(
+                                                '/google/maps-apis/api-list',
+                                                draft.project,
+                                            )}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                        >
+                                            Review enabled Google APIs{' '}
+                                            <ArrowUpRight className="size-4" />
+                                        </a>
+                                    </Button>
+                                </>
+                            )}
+                            {step === 3 && (
+                                <>
                                     <ReviewCard
                                         icon={Map}
                                         title="Configuration impact"
+                                        onEdit={() => setStep(1)}
                                     >
                                         <ReviewRow
                                             label="Provider"
@@ -565,6 +903,7 @@ export function Maps({
                                                 saved.capabilities
                                                     .filter(
                                                         (capability) =>
+                                                            draft.google &&
                                                             draft[
                                                                 capability.key as
                                                                     | 'display'
@@ -591,9 +930,9 @@ export function Maps({
                                     <div className="flex items-start justify-between gap-4">
                                         <Label htmlFor="restrictions-reviewed">
                                             The deployment owner has restricted
-                                            the browser key by website and API,
-                                            and the server key by server access
-                                            and API.
+                                            each configured key to its approved
+                                            websites or server IP addresses and
+                                            selected APIs.
                                         </Label>
                                         <Switch
                                             id="restrictions-reviewed"
@@ -628,9 +967,45 @@ export function Maps({
                                         test a provider or change Google project
                                         billing and key restrictions.
                                     </Notice>
+                                    <p className="text-subtle">
+                                        Set conservative API quotas in Google
+                                        Cloud before enabling services. Budget
+                                        alerts notify you; they do not cap
+                                        spending.{' '}
+                                        <a
+                                            className="text-primary underline"
+                                            href="https://developers.google.com/maps/billing-and-pricing/manage-costs"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                        >
+                                            Review Google’s cost controls
+                                        </a>
+                                        .
+                                    </p>
+                                    <ReviewCard
+                                        icon={Map}
+                                        title="Affected workspaces"
+                                    >
+                                        <ReviewRow
+                                            label="Fleet, Assets and shared maps"
+                                            value="Map display and permitted source overlays"
+                                        />
+                                        <ReviewRow
+                                            label="Maps & boundaries"
+                                            value="Canonical boundary tools and geometry remain with their owner"
+                                        />
+                                        <ReviewRow
+                                            label="Transport"
+                                            value="Saved sites and manual addresses remain available"
+                                        />
+                                        <ReviewRow
+                                            label="Client and People locations"
+                                            value="Existing consent, source and site permissions still apply"
+                                        />
+                                    </ReviewCard>
                                 </>
                             )}
-                        </div>
+                        </fieldset>
                     </WizardStepPane>
                 </WizardShell>
             )}
@@ -673,7 +1048,7 @@ export function Maps({
             {latest && (
                 <Modal
                     title="Map configuration changed"
-                    description="Another administrator saved changes. Keep your edited fields and review them against the current configuration, or load the saved configuration."
+                    description="Saved settings or deployment credentials changed. Keep your edited fields and review them against the current configuration, or load the saved configuration."
                     onClose={() => setLatest(null)}
                     footer={
                         <>
@@ -699,7 +1074,7 @@ export function Maps({
                                     );
                                     setSaved(latest);
                                     setLatest(null);
-                                    setStep(2);
+                                    setStep(3);
                                 }}
                             >
                                 Keep my changes

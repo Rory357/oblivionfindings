@@ -12,6 +12,7 @@ use App\Services\Fleet\FleetNotificationPreferences;
 use App\Services\Fleet\VehicleTelemetryPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class WorkspaceSettingsController extends Controller
 {
@@ -67,10 +68,8 @@ class WorkspaceSettingsController extends Controller
             foreach (array_diff(array_keys($values), ['project']) as $key) {
                 $values[$key] = (bool) $values[$key];
             }
-            if ($values['google']) {
-                abort_unless($values['project'] !== '' && $values['restrictions_reviewed'] && $values['terms_reviewed'], 422, 'Record the project and review key restrictions, billing and provider terms.');
-                abort_unless($values['display'] && $maps->credentials()['browser'], 422, 'Google display needs the configured browser key. Ask the deployment owner to configure it.');
-                abort_unless(! ($values['places'] || $values['geocoding'] || $values['routes']) || $maps->credentials()['server'], 422, 'The selected server APIs need a separate server credential.');
+            if ($errors = $maps->validationErrors($values)) {
+                throw ValidationException::withMessages($errors);
             }
             $row->update(['value' => $values]);
             AuditLogger::logOrFail('fleet.settings.maps.updated', $row, ['before' => $before['values'], 'after' => $values], $request);
