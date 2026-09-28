@@ -79,11 +79,14 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     // Dashboard & Map - viewable if user can see fleet or assets
     Route::middleware('permission:fleet.viewAny|assets.viewAny|assets.viewAssigned')->group(function () {
         Route::get('/', DashboardController::class)->name('fleet-assets.dashboard');
-        Route::get('/map', LiveMapController::class)->name('fleet-assets.map');
         Route::get('/compliance', [ComplianceController::class, 'index'])->name('fleet-assets.compliance.index');
         Route::get('/daily-check', [DailyCheckController::class, 'index'])->name('fleet-assets.daily-check.index');
         Route::post('/daily-check', [DailyCheckController::class, 'store'])->name('fleet-assets.daily-check.store');
     });
+
+    // Legacy map URL uses the same capability boundary as the canonical map workspace.
+    Route::get('/map', LiveMapController::class)
+        ->middleware('permission:fleet.viewAny|assets.geofences.manage')->name('fleet-assets.map');
 
     // Vehicles — read (reuses fleet permissions)
     Route::middleware('permission:fleet.viewAny')->group(function () {

@@ -10,14 +10,39 @@ it('keeps active IT Security Devices and Monitoring partition behavior at absolu
 
 it('keeps the Fleet dashboard on canonical Site and Security Devices projections', function () {
     $root = str_replace('\\', '/', dirname(__DIR__, 2));
-    $contents = file_get_contents($root.'/app/Http/Controllers/FleetAssets/DashboardController.php');
+    $controller = file_get_contents($root.'/app/Http/Controllers/FleetAssets/DashboardController.php');
+    $overview = file_get_contents($root.'/app/Services/Fleet/FleetOverviewService.php');
+    $locations = file_get_contents($root.'/app/Services/Fleet/VehicleLocationService.php');
 
-    expect($contents)->toBeString()
-        ->and($contents)->toContain('SecurityDevicesAccessService')
-        ->and($contents)->toContain('visibleDevices($user)')
-        ->and($contents)->not->toMatch('/\b(?:tenant_id|organization_id|organisation_id)\b/u')
-        ->and($contents)->not->toContain("'payload' => \$s->payload")
-        ->and($contents)->not->toContain("'trackers' =>");
+    expect($controller)->toBeString()
+        ->toContain('FleetOverviewService $overview')
+        ->toContain('$this->overview->present($request->user()')
+        ->and($overview)->toBeString()
+        ->toContain('SecurityDevicesAccessService $access')
+        ->toContain("canDo('fleet.viewAny')")
+        ->toContain("canDo('assets.viewAny')")
+        ->toContain("canDo('assets.viewAssigned')")
+        ->toContain('accessibleVehiclesForFleet($viewer)')
+        ->toContain('accessibleAssets($viewer')
+        ->toContain('accessibleSites($viewer)')
+        ->toContain('$this->locations->lastPermittedPosition($viewer, $vehicle)')
+        ->and($locations)->toBeString()
+        ->toContain('accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS)')
+        ->toContain('FleetTripSiteScope::vehicles($siteIds)')
+        ->toContain('if (! $this->positionsVisible($user, $vehicle))')
+        ->toContain('$state = $this->state($vehicle, $snapshot, true)')
+        ->toContain('$snapshot->consent_blocked')
+        ->toContain('$snapshot->lastTrip?->consent_blocked')
+        ->toContain('$this->personalAt($vehicle, $observed, $snapshot->lastTrip)');
+
+    foreach ([$controller, $overview, $locations] as $source) {
+        expect($source)->not->toMatch('/\b(?:tenant_id|organization_id|organisation_id)\b/u')
+            ->not->toContain("'payload' => \$s->payload")
+            ->not->toContain("'raw_payload' =>");
+    }
+    foreach ([$controller, $overview] as $source) {
+        expect($source)->not->toContain("'trackers' =>");
+    }
 });
 
 it('keeps native monitoring to IT independent of the Control Room Device projection', function () {
