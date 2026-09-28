@@ -66,6 +66,7 @@ async function openDiscard() {
     });
     click(screen.getByRole('button', { name: 'Continue' }));
     click(screen.getByRole('button', { name: 'Continue' }));
+    click(screen.getByRole('button', { name: 'Continue' }));
     const cancel = screen.getByRole('button', { name: 'Cancel' });
     click(cancel);
     const discard = await screen.findByRole('dialog', {

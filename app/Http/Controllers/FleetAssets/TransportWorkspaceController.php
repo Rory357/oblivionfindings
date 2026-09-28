@@ -8,6 +8,7 @@ use App\Models\AppSetting;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Services\Fleet\Data\VehicleReadinessContext;
+use App\Services\Fleet\FleetMapSettings;
 use App\Services\Fleet\MaintenanceLocalTime;
 use App\Services\Fleet\TransportRequestService;
 use App\Services\Fleet\TransportWorkspacePresenter;
@@ -64,6 +65,7 @@ class TransportWorkspaceController extends Controller
         }
 
         return Inertia::render('fleet-assets/transports/workspace', ['view' => $view, 'records' => $rows,
+            'googleMaps' => $actor->canDo('fleet.viewAny') || $actor->canDo('assets.viewAny') ? app(FleetMapSettings::class)->snapshot() : null,
             'filters' => $filters, 'sites' => $this->access->sites($actor), 'calendar' => $calendar,
             'canManage' => $actor->canDo('fleet.manage'), 'generatedAt' => now()->toIso8601String(), 'calendarAnchor' => $calendarAnchor]);
     }
