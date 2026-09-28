@@ -80,7 +80,7 @@ class FleetReportSiteAccessTest extends TestCase
         $viewer = $this->staffAt($this->localSite, ['fleet.viewAny']);
 
         $this->actingAs($viewer)
-            ->get('/fleet-assets/reports')
+            ->get('/fleet-assets/reports/operating-summary')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('fleet-assets/reports/index')
@@ -177,7 +177,7 @@ class FleetReportSiteAccessTest extends TestCase
         $this->grant($unplaced, ['fleet.viewAny']);
 
         $this->actingAs($unplaced)
-            ->get('/fleet-assets/reports')
+            ->get('/fleet-assets/reports/operating-summary')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('trip_stats.total_trips', 0)
@@ -215,7 +215,7 @@ class FleetReportSiteAccessTest extends TestCase
         $fleetManager = $this->staffAt($this->localSite, ['fleet.viewAny', 'fleet.manage']);
 
         $this->actingAs($fleetManager)
-            ->get('/fleet-assets/reports')
+            ->get('/fleet-assets/reports/operating-summary')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('trip_stats.total_trips', 3)

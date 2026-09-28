@@ -6,25 +6,19 @@ import {
 } from '@/components/fleet-charts';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatCurrency, formatDate, formatDistance } from '@/lib/fleet-utils';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -42,7 +36,6 @@ import {
     User,
     Users,
 } from 'lucide-react';
-
 type UtilizationRow = {
     vehicle: string;
     asset_tag: string;
@@ -202,7 +195,7 @@ export default function FleetReports({
 
     const handlePeriodChange = (newPeriod: string) => {
         router.get(
-            '/fleet-assets/reports',
+            '/fleet-assets/reports/operating-summary',
             { period: newPeriod },
             { preserveState: true },
         );
@@ -256,114 +249,140 @@ export default function FleetReports({
         value: tripDistribution[String(dow)] ?? 0,
     }));
 
-    // Sparkline for fuel cost trend
-    const fuelTrendData = [
-        fuel_stats.total_cost * 0.6,
-        fuel_stats.total_cost * 0.75,
-        fuel_stats.total_cost * 0.65,
-        fuel_stats.total_cost * 0.8,
-        fuel_stats.total_cost * 0.9,
-        fuel_stats.total_cost * 0.85,
-        fuel_stats.total_cost,
-    ];
-
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Reports', href: '/fleet-assets/reports' },
+                {
+                    title: 'Operating summary & exports',
+                    href: '/fleet-assets/reports/operating-summary',
+                },
             ]}
         >
-            <Head title="Fleet Reports" />
+            <Head title="Operating summary & exports" />
             <PageShell>
-                <HeroShell
-                    footer={
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="mr-1 text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
-                                Period & exports
-                            </span>
-                            <Select
-                                value={period}
-                                onValueChange={handlePeriodChange}
-                            >
-                                <SelectTrigger className="h-[34px] w-32 border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="7d">
-                                        Last 7 days
-                                    </SelectItem>
-                                    <SelectItem value="30d">
-                                        Last 30 days
-                                    </SelectItem>
-                                    <SelectItem value="90d">
-                                        Last 90 days
-                                    </SelectItem>
-                                    <SelectItem value="1y">
-                                        Last year
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FleetHeroAction
-                                href={`/fleet-assets/reports/export?period=${period}&type=trips`}
+                <PageHeader
+                    icon={FileBarChart}
+                    title="Operating summary & exports"
+                    wrapTitle
+                    subline={`Recorded fleet activity · ${periodLabel}`}
+                    actions={
+                        <>
+                            <PageHeaderGlassButton
                                 icon={Download}
-                                external
+                                onClick={() => {
+                                    window.location.href = `/fleet-assets/reports/export?period=${period}&type=trips`;
+                                }}
                             >
                                 Trips CSV
-                            </FleetHeroAction>
-                            <FleetHeroAction
-                                href={`/fleet-assets/reports/export?period=${period}&type=fuel`}
+                            </PageHeaderGlassButton>
+                            <PageHeaderGlassButton
                                 icon={Download}
-                                external
+                                onClick={() => {
+                                    window.location.href = `/fleet-assets/reports/export?period=${period}&type=fuel`;
+                                }}
                             >
                                 Fuel CSV
-                            </FleetHeroAction>
-                        </div>
-                    }
-                >
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={FileBarChart} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Report hub · {periodLabel}
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Fleet & Asset Reports
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Analytics and reporting for fleet operations.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-3 gap-2 lg:ml-auto lg:max-w-xl">
-                            <HeroClusterTile
-                                label={`Total km · ${periodLabel}`}
-                                value={fmt(trip_stats.total_distance_km, ' km')}
-                                caption={`${trip_stats.total_trips ?? 0} trips`}
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                label={`Fuel spend · ${periodLabel}`}
-                                value={formatCurrency(
-                                    fuel_stats.total_cost ?? 0,
-                                )}
-                                caption={`${fuel_stats.total_fill_ups ?? 0} fill-ups`}
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                label="Cost/km"
-                                value={
-                                    costPerKm !== null
-                                        ? `$${costPerKm.toFixed(2)}`
-                                        : '—'
+                            </PageHeaderGlassButton>
+                            <PageHeaderPrimaryButton
+                                icon={FileBarChart}
+                                onClick={() =>
+                                    router.visit(
+                                        '/fleet-assets/reports/builder',
+                                    )
                                 }
-                                caption="fuel spend per km"
-                                tone="neutral"
-                            />
-                        </div>
-                    </div>
-                </HeroShell>
-
-                <Link href="/fleet-assets/reports/builder" className="flex items-center justify-between gap-3 rounded-lg border bg-card p-4 text-primary hover:bg-muted">Build a custom report · saved versions, source evidence and private exports</Link>
+                            >
+                                Build report
+                            </PageHeaderPrimaryButton>
+                        </>
+                    }
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
+                                label="Trips"
+                                onClick={() =>
+                                    document
+                                        .getElementById('recorded-activity')
+                                        ?.scrollIntoView({ behavior: 'smooth' })
+                                }
+                            >
+                                <PageHeaderMeterBig>
+                                    {trip_stats.total_trips}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {periodLabel}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Distance"
+                                onClick={() =>
+                                    document
+                                        .getElementById('recorded-activity')
+                                        ?.scrollIntoView({ behavior: 'smooth' })
+                                }
+                            >
+                                <PageHeaderMeterBig>
+                                    {formatDistance(
+                                        trip_stats.total_distance_km,
+                                    )}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    Recorded travel
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Fuel spend"
+                                onClick={() =>
+                                    document
+                                        .getElementById('recorded-activity')
+                                        ?.scrollIntoView({ behavior: 'smooth' })
+                                }
+                            >
+                                <PageHeaderMeterBig>
+                                    {formatCurrency(fuel_stats.total_cost)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {fuel_stats.total_fill_ups} fill-ups
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Fuel cost per km"
+                                onClick={() =>
+                                    document
+                                        .getElementById('recorded-activity')
+                                        ?.scrollIntoView({ behavior: 'smooth' })
+                                }
+                            >
+                                <PageHeaderMeterBig>
+                                    {costPerKm === null
+                                        ? '—'
+                                        : formatCurrency(costPerKm)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {costPerKm === null
+                                        ? 'No recorded distance'
+                                        : 'Fuel spend ÷ distance'}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
+                    filters={
+                        <PageHeaderFilterSelect
+                            label="Period · Last 30 days"
+                            value={period}
+                            allValue="30d"
+                            options={[
+                                { value: '7d', label: 'Last 7 days' },
+                                { value: '30d', label: 'Last 30 days' },
+                                { value: '90d', label: 'Last 90 days' },
+                                { value: '1y', label: 'Last year' },
+                            ]}
+                            onChange={handlePeriodChange}
+                        />
+                    }
+                />
 
                 {/* Report hub cross-link: geocoding & maps usage dashboard */}
                 <Link
@@ -387,21 +406,15 @@ export default function FleetReports({
                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </Link>
 
-                {/* Row 1: KPI Cards with sparklines */}
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                {/* Recorded activity for the selected period. */}
+                <div
+                    id="recorded-activity"
+                    className="grid scroll-mt-4 grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4"
+                >
                     <FleetStatCard
                         label="Total Trips"
                         value={trip_stats.total_trips ?? 0}
                         icon={Route}
-                        trend={[
-                            3,
-                            5,
-                            4,
-                            7,
-                            6,
-                            8,
-                            trip_stats.total_trips > 0 ? 10 : 3,
-                        ]}
                     />
                     <FleetStatCard
                         label="Distance"
@@ -410,37 +423,25 @@ export default function FleetReports({
                         )}
                         icon={Car}
                         color="blue"
-                        trend={[
-                            100,
-                            250,
-                            180,
-                            320,
-                            280,
-                            350,
-                            trip_stats.total_distance_km > 0 ? 400 : 100,
-                        ]}
                     />
                     <FleetStatCard
                         label="Total Hours"
                         value={`${(trip_stats.total_hours ?? 0).toLocaleString()} hrs`}
                         icon={Clock}
                         color="cyan"
-                        trend={[
-                            5,
-                            8,
-                            6,
-                            10,
-                            9,
-                            12,
-                            trip_stats.total_hours > 0 ? 14 : 5,
-                        ]}
                     />
                     <FleetStatCard
                         label="Fuel Cost"
                         value={formatCurrency(fuel_stats.total_cost ?? 0)}
                         icon={DollarSign}
                         color="amber"
-                        trend={fuelTrendData.map((v) => Math.max(v, 1))}
+                    />
+                    <FleetStatCard
+                        label="Fuel cost per km"
+                        value={
+                            costPerKm === null ? '—' : formatCurrency(costPerKm)
+                        }
+                        icon={DollarSign}
                     />
                 </div>
 
@@ -630,14 +631,11 @@ export default function FleetReports({
                                                         )}
                                                     </Badge>
                                                     <span className="text-xs text-muted-foreground">
-                                                        {item.days_remaining !=
-                                                        null
-                                                            ? item.days_remaining <
-                                                              0
-                                                                ? `${Math.abs(item.days_remaining)}d overdue`
-                                                                : `${item.days_remaining}d`
-                                                            : (item.expires_at ??
-                                                              '---')}
+                                                        {item.expires_at
+                                                            ? formatDate(
+                                                                  item.expires_at,
+                                                              )
+                                                            : 'Expiry not recorded'}
                                                     </span>
                                                 </div>
                                             </div>

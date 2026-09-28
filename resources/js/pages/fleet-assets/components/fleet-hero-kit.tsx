@@ -20,11 +20,9 @@ import {
     AlertTriangle,
     Bell,
     Car,
-    CheckCircle2,
     Clock,
     FileCheck2,
     type LucideIcon,
-    ShieldCheck,
     Umbrella,
 } from 'lucide-react';
 import { type ReactNode } from 'react';
@@ -83,7 +81,7 @@ export type FleetComplianceHrefs = {
 
 /** The five canonical NZ fleet compliance chips — WOF, Registration, CoF,
  *  Insurance (expired outranks due-soon for each) and open Control-Room alerts. Fed by counts so every
- *  fleet hero reads identically; each chip goes green in its all-clear state.
+ *  fleet hero reads identically; zero expiry alerts do not establish current evidence.
  *  Pass `insuranceExpiring: null` (schema without the column) to hide that chip. */
 export function FleetComplianceBadges({
     wofDue = 0,
@@ -124,7 +122,7 @@ export function FleetComplianceBadges({
             ? `WOF · ${wofExpired} expired`
             : wofDue > 0
               ? `WOF · ${wofDue} due 30d`
-              : 'WOF · Current';
+              : 'WOF · No expiry alerts';
 
     const regoTone: BadgeTone =
         regoExpired > 0 ? 'critical' : regoDue > 0 ? 'warning' : 'success';
@@ -133,7 +131,7 @@ export function FleetComplianceBadges({
             ? `Rego · ${regoExpired} expired`
             : regoDue > 0
               ? `Rego · ${regoDue} due 30d`
-              : 'Rego · Current';
+              : 'Rego · No expiry alerts';
 
     const cofTone: BadgeTone =
         cofExpired > 0 ? 'critical' : cofDue > 0 ? 'warning' : 'success';
@@ -142,7 +140,7 @@ export function FleetComplianceBadges({
             ? `CoF · ${cofExpired} expired`
             : cofDue > 0
               ? `CoF · ${cofDue} due 30d`
-              : 'CoF · Current';
+              : 'CoF · No expiry alerts';
 
     const insuranceSupported =
         insuranceExpiring !== null || insuranceExpired !== null;
@@ -159,7 +157,7 @@ export function FleetComplianceBadges({
             ? `Insurance · ${insuranceExpiredCount} expired`
             : insuranceExpiringCount > 0
               ? `Insurance · ${insuranceExpiringCount} expiring`
-              : 'Insurance · Current';
+              : 'Insurance · No expiry alerts';
 
     const alertTone: BadgeTone =
         criticalAlerts > 0
@@ -171,14 +169,14 @@ export function FleetComplianceBadges({
     const badges: (FleetBadge | null)[] = [
         {
             key: 'wof',
-            icon: wofTone === 'success' ? CheckCircle2 : AlertTriangle,
+            icon: wofTone === 'success' ? FileCheck2 : AlertTriangle,
             tone: wofTone,
             label: wofLabel,
             href: hrefs.wof,
         },
         {
             key: 'rego',
-            icon: regoTone === 'success' ? CheckCircle2 : AlertTriangle,
+            icon: regoTone === 'success' ? FileCheck2 : AlertTriangle,
             tone: regoTone,
             label: regoLabel,
             href: hrefs.rego,
@@ -201,12 +199,12 @@ export function FleetComplianceBadges({
               },
         {
             key: 'alerts',
-            icon: alertTone === 'success' ? ShieldCheck : Bell,
+            icon: Bell,
             tone: alertTone,
             label:
                 openAlerts > 0
                     ? `Alerts · ${openAlerts} open`
-                    : 'Alerts · All clear',
+                    : 'Alerts · 0 open',
             href: hrefs.alerts,
         },
     ];

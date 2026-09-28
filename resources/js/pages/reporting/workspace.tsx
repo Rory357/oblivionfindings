@@ -1,6 +1,7 @@
 import { EntityTable } from '@/components/lists/entity-table';
 import {
     PageHeader,
+    PageHeaderFilterButton,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
@@ -12,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -23,7 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     ArrowLeft,
     BarChart3,
@@ -94,6 +96,7 @@ import {
 import { StudioLibrary, fleetViews } from './studio-library';
 
 type Props = {
+    initialView?: string;
     domain: string;
     sources: Record<string, Source>;
     templates: Template[];
@@ -217,18 +220,48 @@ class BuilderBoundary extends Component<
 
 export function ReportWorkspace(props: Props) {
     const { domain, sources, templates, viewerId } = props;
+    const [activeView, setActiveView] = useState(
+        props.initialView ?? 'library',
+    );
+    const focusedView =
+        domain === 'fleet'
+            ? fleetViews.find((v) => v.key === activeView && sources[v.source])
+            : undefined;
+    const focusView = focusedView?.key ?? null;
+    const tab = focusView ? 'builder' : activeView;
+    const navigateView = (value: string) => {
+        setActiveView(value);
+        if (props.initialView === undefined) return;
+        const url = new URL(window.location.href);
+        if (domain === 'fleet')
+            url.pathname =
+                value === 'builder'
+                    ? '/fleet-assets/reports/builder'
+                    : '/fleet-assets/reports';
+        if (value === 'library' || (domain === 'fleet' && value === 'builder'))
+            url.searchParams.delete('view');
+        else url.searchParams.set('view', value);
+        router.push({
+            url: url.pathname + url.search,
+            props: (current) => ({ ...current, initialView: value }),
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
     const [definition, setDefinition] = useState<Definition>(() => ({
-        ...initialDefinition(Object.keys(sources)[0], sources),
+        ...initialDefinition(
+            focusedView?.source ?? Object.keys(sources)[0],
+            sources,
+            focusedView?.title,
+        ),
         subject_id: props.initialSubject ?? null,
     }));
     const [saved, setSaved] = useState(props.saved);
     const [selected, setSelected] = useState<Saved | null>(null);
-    const [tab, setTab] = useState('library');
     const [livePreview, setLivePreview] = useState(true);
     const [exportOpen, setExportOpen] = useState(false);
     const [saveOpen, setSaveOpen] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(false);
-    const [focusView, setFocusView] = useState<string | null>(null);
     const requestedPreview = useRef('');
     const generateRef = useRef<() => void>(() => {});
     const [step, setStep] = useState(0);
@@ -268,8 +301,14 @@ export function ReportWorkspace(props: Props) {
         }[]
     >([]);
     const serial = useRef(0);
+    const [runsRefresh, setRunsRefresh] = useState(0);
+    const [runsLoading, setRunsLoading] = useState(false);
+    const [runsError, setRunsError] = useState('');
     const importInput = useRef<HTMLInputElement>(null);
     const recoveredDraft = useRef<string | null | undefined>(undefined);
+    const editedDraft = useRef(false);
+    const [hasDraft, setHasDraft] = useState(false);
+    const [draftStored, setDraftStored] = useState(false);
     const key = 'operational-report-draft:' + viewerId + ':' + domain;
     const source = sources[definition.source];
     const fields = Object.entries(source.fields).map(([value, f]) => ({
@@ -281,6 +320,7 @@ export function ReportWorkspace(props: Props) {
         definitionKey(runDefinition) !== definitionKey(definition);
 
     const change = (patch: Partial<Definition>) => {
+        editedDraft.current = activeView === 'builder';
         setHistory((items) => [...items.slice(-29), definition]);
         setFuture([]);
         setDefinition({ ...definition, ...patch });
@@ -317,18 +357,51 @@ export function ReportWorkspace(props: Props) {
                     'This draft belongs to another reporting area.',
                 );
             change(valid);
-            setTab('builder');
+            editedDraft.current = true;
+            navigateView('builder');
             setNotice('Recovered and validated the draft.');
         });
     useEffect(() => {
         try {
-            if (recoveredDraft.current === undefined)
+            if (recoveredDraft.current === undefined) {
                 recoveredDraft.current = sessionStorage.getItem(key);
-            sessionStorage.setItem(key, JSON.stringify(definition));
+                setHasDraft(Boolean(recoveredDraft.current));
+            }
+            if (editedDraft.current && activeView === 'builder') {
+                const draft = JSON.stringify(definition);
+                sessionStorage.setItem(key, draft);
+                recoveredDraft.current = draft;
+                setHasDraft(true);
+                setDraftStored(true);
+            }
         } catch {
+            setDraftStored(false);
             /* Storage can be unavailable; saved reports still work. */
         }
-    }, [definition, key]);
+    }, [definition, key, activeView]);
+    useEffect(() => {
+        if (props.initialView !== undefined) setActiveView(props.initialView);
+    }, [props.initialView]);
+    useEffect(() => {
+        // Back/Forward can return to a different focused source without remounting.
+        if (!focusedView || definition.source === focusedView.source) return;
+        serial.current++;
+        requestedPreview.current = '';
+        setDefinition((current) => ({
+            ...initialDefinition(
+                focusedView.source,
+                sources,
+                focusedView.title,
+            ),
+            date_from: current.date_from,
+            date_to: current.date_to,
+            site_ids: current.site_ids,
+        }));
+        setRun(null);
+        setPayload(null);
+        setRunDefinition(null);
+        setSelected(null);
+    }, [focusedView, definition.source, sources]);
     useEffect(() => {
         const controller = new AbortController();
         const timer = setTimeout(async () => {
@@ -404,19 +477,24 @@ export function ReportWorkspace(props: Props) {
         };
     }, [run]);
 
-    const load = (d: Definition, savedReport: Saved | null = null) => {
+    const load = (
+        d: Definition,
+        savedReport: Saved | null = null,
+        nextView = 'builder',
+    ) => {
         serial.current++;
         requestedPreview.current = '';
         setRun(null);
         change(d);
+        editedDraft.current = nextView === 'builder';
+        setDraftStored(false);
         setSelected(savedReport);
         setFolder(savedReport?.folder ?? '');
         setFavourite(savedReport?.favourite ?? false);
         setPayload(null);
         setRunDefinition(null);
         setVersions([]);
-        setTab('builder');
-        setFocusView(null);
+        navigateView(nextView);
         setStep(0);
         setPage(0);
     };
@@ -530,19 +608,49 @@ export function ReportWorkspace(props: Props) {
 
     const openStarter = (sourceKey: string, name?: string, focus?: string) => {
         const next = initialDefinition(sourceKey, sources, name);
-        load({
-            ...next,
-            date_from: definition.date_from,
-            date_to: definition.date_to,
-            site_ids: definition.site_ids,
-            resource_ids: definition.resource_ids,
-            subject_id: definition.subject_id ?? props.initialSubject ?? null,
-        });
-        if (focus) setFocusView(focus);
+        load(
+            {
+                ...next,
+                date_from: definition.date_from,
+                date_to: definition.date_to,
+                site_ids: definition.site_ids,
+                resource_ids: definition.resource_ids,
+                subject_id:
+                    definition.subject_id ?? props.initialSubject ?? null,
+            },
+            null,
+            focus ?? 'builder',
+        );
     };
     useEffect(() => {
         generateRef.current = generate;
     });
+    useEffect(() => {
+        if (!['library', 'saved'].includes(tab)) return;
+        const controller = new AbortController();
+        setRunsLoading(true);
+        setRunsError('');
+        api('/report-builder/runs', 'GET', undefined, controller.signal)
+            .then((response) => response.json())
+            .then((data) => {
+                if (!controller.signal.aborted)
+                    setRecent(
+                        data.runs.filter((item: { definition: Definition }) =>
+                            Boolean(sources[item.definition.source]),
+                        ),
+                    );
+            })
+            .catch(() => {
+                if (!controller.signal.aborted)
+                    setRunsError(
+                        'Recent runs could not be loaded. Try Refresh runs.',
+                    );
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setRunsLoading(false);
+            });
+        return () => controller.abort();
+    }, [tab, sources, runsRefresh]);
     const previewKey = definitionKey(definition) + '|' + reason.trim();
     useEffect(() => {
         if (
@@ -562,6 +670,16 @@ export function ReportWorkspace(props: Props) {
     }, [tab, livePreview, running, busy, reason, previewKey]);
     return (
         <div className="report-workspace space-y-5">
+            <Head
+                title={
+                    focusedView?.title ??
+                    (tab === 'builder'
+                        ? 'Report builder'
+                        : tab === 'saved'
+                          ? 'Saved reports'
+                          : 'Reports')
+                }
+            />
             <ReportDialog
                 open={scopeOpen}
                 onClose={() => setScopeOpen(false)}
@@ -774,34 +892,71 @@ export function ReportWorkspace(props: Props) {
                 }}
             />
             <PageHeader
-                icon={tab === 'builder' ? SlidersHorizontal : BarChart3}
+                icon={
+                    focusedView?.icon ??
+                    (tab === 'builder'
+                        ? SlidersHorizontal
+                        : tab === 'saved'
+                          ? FileText
+                          : BarChart3)
+                }
                 title={
                     tab === 'builder'
                         ? focusView
                             ? (fleetViews.find((v) => v.key === focusView)
                                   ?.title ?? 'Report builder')
                             : 'Report builder'
-                        : domain === 'fleet'
-                          ? 'Reports'
-                          : domain === 'client'
-                            ? 'Client tracker reports'
-                            : domain === 'staff'
-                              ? 'Staff safety reports'
-                              : 'My safety history'
+                        : tab === 'saved'
+                          ? 'Saved reports'
+                          : domain === 'fleet'
+                            ? 'Reports'
+                            : domain === 'client'
+                              ? 'Client tracker reports'
+                              : domain === 'staff'
+                                ? 'Staff safety reports'
+                                : 'My safety history'
                 }
                 subline={
-                    tab === 'builder'
+                    focusedView?.note ??
+                    (tab === 'builder'
                         ? 'Design, explore and save a report'
-                        : 'Trusted reports and a flexible report studio'
+                        : tab === 'saved'
+                          ? 'Saved designs, versions and private scheduled runs'
+                          : 'Trusted reports and a flexible report studio')
                 }
                 actions={
-                    tab === 'builder' ? (
+                    focusedView ? (
+                        <>
+                            <PageHeaderGlassButton
+                                icon={ArrowLeft}
+                                onClick={() => navigateView('library')}
+                            >
+                                Report library
+                            </PageHeaderGlassButton>
+                            <PageHeaderGlassButton
+                                icon={SlidersHorizontal}
+                                onClick={() => navigateView('builder')}
+                            >
+                                Customise
+                            </PageHeaderGlassButton>
+                            <PageHeaderPrimaryButton
+                                icon={Download}
+                                disabled={
+                                    !payload ||
+                                    dirtyResult ||
+                                    busy ||
+                                    running ||
+                                    props.canExport === false
+                                }
+                                onClick={() => setExportOpen(true)}
+                            >
+                                Export
+                            </PageHeaderPrimaryButton>
+                        </>
+                    ) : tab === 'builder' ? (
                         <PageHeaderGlassButton
                             icon={ArrowLeft}
-                            onClick={() => {
-                                setTab('library');
-                                setFocusView(null);
-                            }}
+                            onClick={() => navigateView('library')}
                         >
                             Report library
                         </PageHeaderGlassButton>
@@ -830,7 +985,48 @@ export function ReportWorkspace(props: Props) {
                     )
                 }
                 meters={
-                    tab !== 'builder' && domain === 'fleet' ? (
+                    focusedView ? (
+                        <div className="report-library-meters">
+                            {definition.measures.slice(0, 4).map((measure) => (
+                                <PageHeaderMeterBlock
+                                    key={measure.id}
+                                    label={measure.label}
+                                    onClick={() => {
+                                        setView('rows');
+                                        setPage(0);
+                                        document
+                                            .getElementById('report-preview')
+                                            ?.scrollIntoView({
+                                                block: 'start',
+                                            });
+                                    }}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {payload && !dirtyResult
+                                            ? displayNumber(
+                                                  payload.result.totals[
+                                                      measure.id
+                                                  ],
+                                                  measure.decimals,
+                                              )
+                                            : '—'}
+                                        {payload &&
+                                        !dirtyResult &&
+                                        !['count', 'number'].includes(
+                                            measure.unit,
+                                        )
+                                            ? ` ${measure.unit}`
+                                            : ''}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {payload && !dirtyResult
+                                            ? `${measure.operation} · ${payload.result.row_count} permitted source rows`
+                                            : 'Run this scope for figures'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            ))}
+                        </div>
+                    ) : tab !== 'builder' && domain === 'fleet' ? (
                         <div className="report-library-meters">
                             {fleetViews
                                 .filter((v) => sources[v.source])
@@ -866,7 +1062,7 @@ export function ReportWorkspace(props: Props) {
                                             runDefinition?.source ===
                                                 v.source &&
                                             !dirtyResult
-                                                ? 'Last private result'
+                                                ? `${runDefinition.measures[0].label} · last private result`
                                                 : 'Open and run for scoped figures'}
                                         </PageHeaderMeterCaption>
                                     </PageHeaderMeterBlock>
@@ -875,20 +1071,20 @@ export function ReportWorkspace(props: Props) {
                     ) : undefined
                 }
                 filters={
-                    tab !== 'builder' ? (
+                    tab !== 'builder' || focusedView ? (
                         <>
                             <span className="text-xs text-primary-foreground/80">
                                 Pacific/Auckland
                             </span>
                             <div className="ml-auto flex flex-wrap gap-2">
-                                <PageHeaderGlassButton
+                                <PageHeaderFilterButton
                                     icon={CalendarDays}
                                     onClick={() => setScopeOpen(true)}
                                 >
                                     {reportDate(definition.date_from)} –{' '}
                                     {reportDate(definition.date_to)}
-                                </PageHeaderGlassButton>
-                                <PageHeaderGlassButton
+                                </PageHeaderFilterButton>
+                                <PageHeaderFilterButton
                                     icon={ShieldCheck}
                                     onClick={() => setScopeOpen(true)}
                                 >
@@ -896,20 +1092,19 @@ export function ReportWorkspace(props: Props) {
                                         ? definition.site_ids.length +
                                           ' selected sites'
                                         : 'All permitted sites'}
-                                </PageHeaderGlassButton>
-                                <PageHeaderGlassButton
+                                </PageHeaderFilterButton>
+                                <PageHeaderFilterButton
                                     icon={SlidersHorizontal}
                                     onClick={() => setScopeOpen(true)}
                                 >
                                     More filters
-                                </PageHeaderGlassButton>
+                                </PageHeaderFilterButton>
                             </div>
                         </>
                     ) : undefined
                 }
                 rail={
                     <PageHeaderRail
-                        showFind={false}
                         items={[
                             {
                                 key: 'library',
@@ -948,8 +1143,7 @@ export function ReportWorkspace(props: Props) {
                                     focused.key,
                                 );
                             else {
-                                setFocusView(null);
-                                setTab(value);
+                                navigateView(value);
                             }
                         }}
                     />
@@ -995,7 +1189,11 @@ export function ReportWorkspace(props: Props) {
                         />
                     )}
                     <div className="flex justify-end">
-                        <Button variant="outline" onClick={restoreDraft}>
+                        <Button
+                            variant="outline"
+                            onClick={restoreDraft}
+                            disabled={!hasDraft}
+                        >
                             <RotateCcw className="size-4" />
                             Recover draft
                         </Button>
@@ -1007,30 +1205,24 @@ export function ReportWorkspace(props: Props) {
                             </h2>
                             <Button
                                 variant="outline"
+                                disabled={runsLoading}
                                 onClick={() =>
-                                    perform(async () =>
-                                        setRecent(
-                                            (
-                                                await (
-                                                    await api(
-                                                        '/report-builder/runs',
-                                                    )
-                                                ).json()
-                                            ).runs.filter(
-                                                (r: {
-                                                    definition: Definition;
-                                                }) =>
-                                                    !!sources[
-                                                        r.definition.source
-                                                    ],
-                                            ),
-                                        ),
-                                    )
+                                    setRunsRefresh((value) => value + 1)
                                 }
                             >
                                 Refresh runs
                             </Button>
                         </div>
+                        {runsLoading && (
+                            <p role="status">Loading recent runs…</p>
+                        )}
+                        {runsError && <p role="alert">{runsError}</p>}
+                        {!runsLoading && !runsError && recent.length === 0 && (
+                            <p className="text-subtle">
+                                No recent runs in this reporting area. Run a
+                                report to create a private result.
+                            </p>
+                        )}
                         {recent.map((r) => (
                             <div
                                 className="flex flex-wrap items-center gap-3 border-t pt-3"
@@ -1103,72 +1295,81 @@ export function ReportWorkspace(props: Props) {
                             ))}
                         </Card>
                     )}
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h2 className="text-section-title">Saved reports</h2>
-                        <Input
-                            aria-label="Search saved reports"
-                            className="max-w-sm"
-                            placeholder="Search reports or folders"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
+                    <h2 className="text-section-title">Saved reports</h2>
+                    {visibleSaved.length === 0 ? (
+                        <EmptyState
+                            icon={FileText}
+                            title={
+                                query
+                                    ? 'No reports match your search'
+                                    : 'No saved reports yet'
+                            }
+                            description={
+                                query
+                                    ? 'Try another report name or folder.'
+                                    : 'Create a report or choose a starting point, then save its design here.'
+                            }
                         />
-                    </div>
-                    <EntityTable
-                        rows={visibleSaved}
-                        rowKey={(r) => r.id}
-                        identityLabel="Report"
-                        identity={(r) => ({
-                            icon: BarChart3,
-                            name: r.name,
-                            subline: sources[r.source]?.label,
-                        })}
-                        columns={[
-                            {
-                                key: 'version',
-                                label: 'Version',
-                                width: '90px',
-                                cell: (r) => r.version,
-                            },
-                            {
-                                key: 'folder',
-                                label: 'Folder',
-                                width: '1fr',
-                                cell: (r) => r.folder ?? 'Unfiled',
-                            },
-                            {
-                                key: 'status',
-                                label: 'Status',
-                                width: '1fr',
-                                cell: (r) =>
-                                    r.archived_at
-                                        ? 'Archived'
-                                        : r.favourite
-                                          ? 'Favourite'
-                                          : 'Saved',
-                            },
-                        ]}
-                        onOpen={(r) => load(r.definition, r)}
-                        actionsFor={(r) => [
-                            {
-                                label: 'Open',
-                                onClick: () => load(r.definition, r),
-                            },
-                            {
-                                label: 'Duplicate',
-                                icon: Copy,
-                                onClick: () =>
-                                    load({
-                                        ...r.definition,
-                                        name: r.name + ' copy',
-                                    }),
-                            },
-                            {
-                                label: r.archived_at ? 'Restore' : 'Archive',
-                                icon: Trash2,
-                                onClick: () => archive(r),
-                            },
-                        ]}
-                    />
+                    ) : (
+                        <EntityTable
+                            rows={visibleSaved}
+                            rowKey={(r) => r.id}
+                            identityLabel="Report"
+                            identity={(r) => ({
+                                icon: BarChart3,
+                                name: r.name,
+                                subline: sources[r.source]?.label,
+                            })}
+                            columns={[
+                                {
+                                    key: 'version',
+                                    label: 'Version',
+                                    width: '90px',
+                                    cell: (r) => r.version,
+                                },
+                                {
+                                    key: 'folder',
+                                    label: 'Folder',
+                                    width: '1fr',
+                                    cell: (r) => r.folder ?? 'Unfiled',
+                                },
+                                {
+                                    key: 'status',
+                                    label: 'Status',
+                                    width: '1fr',
+                                    cell: (r) =>
+                                        r.archived_at
+                                            ? 'Archived'
+                                            : r.favourite
+                                              ? 'Favourite'
+                                              : 'Saved',
+                                },
+                            ]}
+                            onOpen={(r) => load(r.definition, r)}
+                            actionsFor={(r) => [
+                                {
+                                    label: 'Open',
+                                    onClick: () => load(r.definition, r),
+                                },
+                                {
+                                    label: 'Duplicate',
+                                    icon: Copy,
+                                    onClick: () =>
+                                        load({
+                                            ...r.definition,
+                                            name: r.name + ' copy',
+                                        }),
+                                },
+                                {
+                                    label: r.archived_at
+                                        ? 'Restore'
+                                        : 'Archive',
+                                    icon: Trash2,
+                                    onClick: () => archive(r),
+                                },
+                            ]}
+                        />
+                    )}
                 </>
             ) : (
                 <>
@@ -1185,7 +1386,10 @@ export function ReportWorkspace(props: Props) {
                                 }
                             />
                             <p className="text-caption text-muted-foreground">
-                                Draft saved in this tab ·{' '}
+                                {draftStored && activeView === 'builder'
+                                    ? 'Draft saved in this tab'
+                                    : 'Report design'}{' '}
+                                ·{' '}
                                 {selected
                                     ? 'Version ' + selected.version
                                     : 'Unsaved report'}
@@ -1257,7 +1461,7 @@ export function ReportWorkspace(props: Props) {
                         {focusView && (
                             <Button
                                 variant="outline"
-                                onClick={() => setFocusView(null)}
+                                onClick={() => navigateView('builder')}
                             >
                                 <SlidersHorizontal className="size-4" />
                                 Customise
@@ -2675,6 +2879,7 @@ export function ReportWorkspace(props: Props) {
                         </aside>
                         <section
                             className="report-preview"
+                            id="report-preview"
                             aria-label="Live report preview"
                         >
                             <div className="report-preview-toolbar">
@@ -2905,17 +3110,26 @@ export function ReportWorkspace(props: Props) {
                                                     }
                                                 />
                                             )}
-                                        <ResultTable
-                                            definition={runDefinition!}
-                                            source={
-                                                sources[runDefinition!.source]
-                                            }
-                                            rows={shownRows.slice(
-                                                page * 50,
-                                                page * 50 + 50,
-                                            )}
-                                            detail={view === 'rows'}
-                                        />
+                                        {shownRows.length === 0 ? (
+                                            <EmptyState
+                                                title="No matching source records"
+                                                description="No permitted records match this period and scope. Adjust the report filters to check another scope."
+                                            />
+                                        ) : (
+                                            <ResultTable
+                                                definition={runDefinition!}
+                                                source={
+                                                    sources[
+                                                        runDefinition!.source
+                                                    ]
+                                                }
+                                                rows={shownRows.slice(
+                                                    page * 50,
+                                                    page * 50 + 50,
+                                                )}
+                                                detail={view === 'rows'}
+                                            />
+                                        )}
                                         <div className="flex flex-wrap items-center justify-between gap-3">
                                             <p className="text-caption text-muted-foreground">
                                                 Browser preview: up to{' '}
@@ -3388,7 +3602,11 @@ function ReportChart({
 }
 export default function Workspace(props: Props) {
     const base =
-        props.domain === 'fleet' ? '/fleet-assets/reports' : '/operations';
+        props.domain === 'fleet'
+            ? '/fleet-assets'
+            : props.domain === 'self'
+              ? '/my-day'
+              : '/operations';
     return (
         <AppLayout
             breadcrumbs={[
@@ -3397,14 +3615,16 @@ export default function Workspace(props: Props) {
                     title:
                         props.domain === 'fleet'
                             ? 'Fleet & Assets'
-                            : 'Operations',
+                            : props.domain === 'self'
+                              ? 'My Day'
+                              : 'Operations',
                     href: base,
                 },
                 {
                     title: 'Reports',
                     href:
                         props.domain === 'fleet'
-                            ? '/fleet-assets/reports/builder'
+                            ? '/fleet-assets/reports'
                             : props.domain === 'self'
                               ? '/my-day/safety-reports'
                               : '/operations/people-location-reports/' +
@@ -3412,7 +3632,6 @@ export default function Workspace(props: Props) {
                 },
             ]}
         >
-            <Head title="Report builder" />
             <BuilderBoundary>
                 <ReportWorkspace {...props} />
             </BuilderBoundary>

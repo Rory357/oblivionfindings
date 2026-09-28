@@ -32,7 +32,8 @@ export function FleetWorkspaceNavigation() {
     const groups = visibleFleetGroups(match.workspace, page.props.auth?.can);
     if (!groups.length) return null;
     const hrefFor = (href: string) =>
-        fleetNavigationPath(page.url) === href
+        fleetNavigationPath(page.url) === href &&
+        href !== '/fleet-assets/reports'
             ? page.url
             : fleetScopeHref(href, page.url);
 

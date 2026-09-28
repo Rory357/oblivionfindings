@@ -1,0 +1,6 @@
+
+   PASS  Tests\Feature\FleetAssets\ComplianceAlertsQueueTest
+  ✓ bulk json response is atomic retains notes and snapshots keep scope                                        272.08s
+
+  Tests:    1 passed (14 assertions)
+  Duration: 272.33s

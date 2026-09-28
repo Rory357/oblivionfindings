@@ -145,6 +145,7 @@ class AlertController extends Controller
             'status' => ['nullable', 'in:unresolved,all,open,ack,triaging,confirmed,resolved,closed,dismissed'],
             'severity' => ['nullable', 'in:all,critical,high,medium,low'], 'layout' => ['nullable', 'in:table,cards'],
             'sort' => ['nullable', 'in:triggered_at,severity,status'], 'direction' => ['nullable', 'in:asc,desc'],
+            'activity' => ['nullable', 'string', 'in:acknowledged_today,resolved_7d'],
         ]);
         $scope = app(FleetAlertScope::class)->query($user, $filters);
 
@@ -166,7 +167,7 @@ class AlertController extends Controller
 
         if ($request->filled('status') && ! in_array($request->input('status'), ['all', 'unresolved'], true)) {
             $crQuery->where('status', $request->input('status'));
-        } elseif ($request->input('status') !== 'all') {
+        } elseif ($request->input('status') === 'unresolved' || ($request->input('status') !== 'all' && ! $request->filled('activity'))) {
             // Default to unresolved
             $crQuery->actionable();
         }
@@ -179,7 +180,9 @@ class AlertController extends Controller
                     ->orWhereHas('asset', fn ($asset) => $asset->where('name', 'like', $search)->orWhere('asset_tag', 'like', $search));
             });
         }
-        // The four instruments describe this status/search before severity, across every page.
+        $this->applyActivityFilter($crQuery, $request->input('activity'));
+
+        // The four instruments describe this status/search/activity before severity, across every page.
         $severityCounts = (clone $crQuery)->select('severity', DB::raw('count(*) as aggregate'))->groupBy('severity')->pluck('aggregate', 'severity');
         $severity = collect(['critical', 'high', 'medium', 'low'])->mapWithKeys(fn ($key) => [$key => (int) ($severityCounts[$key] ?? 0)])->all();
         if ($request->filled('severity') && $request->input('severity') !== 'all') {
@@ -216,6 +219,7 @@ class AlertController extends Controller
         $archivedAssetAlertQuery = AssetAlert::query()
             ->with(['asset:id,name,asset_tag', 'tracker:id,vendor,device_uid']);
         $this->applyArchivedAssetAlertScope($archivedAssetAlertQuery, $user);
+        $this->applyActivityFilter($archivedAssetAlertQuery, $request->input('activity'));
 
         if ($request->filled('status') && ! in_array($request->input('status'), ['all', 'unresolved'], true)) {
             $archivedAssetAlertQuery->where('status', $request->input('status'));
@@ -278,12 +282,22 @@ class AlertController extends Controller
                 ],
             ],
             'archived_asset_alerts' => $archivedAssetAlerts,
-            'filters' => [...$filters, 'status' => $filters['status'] ?? 'unresolved'],
+            'filters' => [...$filters, 'status' => $filters['status'] ?? ($request->filled('activity') ? 'all' : 'unresolved')],
             'can' => [
                 'manage' => (bool) $request->user()?->canDo('controlRoom.alerts.manage'),
                 'control_room' => app(ControlRoomAlertAccessService::class)->canRead($user),
+                'controlRoomView' => (bool) $user?->canDo('controlRoom.viewAny'),
             ],
         ]);
+    }
+
+    private function applyActivityFilter($query, ?string $activity): void
+    {
+        if ($activity === 'acknowledged_today') {
+            $query->where('acknowledged_at', '>=', now()->startOfDay());
+        } elseif ($activity === 'resolved_7d') {
+            $query->where('resolved_at', '>=', now()->subDays(7));
+        }
     }
 
     public function bulkAction(Request $request, ControlRoomAlertLifecycleService $lifecycle)

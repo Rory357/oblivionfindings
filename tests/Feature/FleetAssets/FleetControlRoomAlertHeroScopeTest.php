@@ -3,6 +3,7 @@
 namespace Tests\Feature\FleetAssets;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Asset;
 use App\Models\ControlRoomAlert;
 use App\Models\Permission;
 use App\Models\Site;
@@ -55,6 +56,42 @@ class FleetControlRoomAlertHeroScopeTest extends TestCase
         $this->actingAs($viewer)->get('/fleet-assets/alerts')->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('hero.unresolved', 1)
                 ->has('control_room_alerts.data', 1)->where('control_room_alerts.data.0.id', $visible->id));
+    }
+
+    public function test_alert_meter_destinations_match_activity_counts_and_preserve_asset_and_site_access(): void
+    {
+        $this->travelTo(now()->startOfDay()->addHours(12));
+        [$local, $foreign] = [Site::factory()->create(), Site::factory()->create()];
+        $viewer = $this->siteScopedUser($local, ['fleet.viewAny', 'assets.viewAny']);
+        $vehicle = Asset::factory()->vehicle()->create(['site_id' => $local->id, 'home_site_id' => $local->id]);
+        $otherVehicle = Asset::factory()->vehicle()->create(['site_id' => $local->id, 'home_site_id' => $local->id]);
+        $resolved = ControlRoomAlert::factory()->fromFleet()->resolved()->create([
+            'site_id' => $local->id, 'asset_id' => $vehicle->id,
+            'acknowledged_at' => now()->subHour(), 'resolved_at' => now(),
+        ]);
+        ControlRoomAlert::factory()->fromFleet()->open()->create(['site_id' => $local->id, 'asset_id' => $vehicle->id]);
+        ControlRoomAlert::factory()->fromFleet()->resolved()->create([
+            'site_id' => $local->id, 'asset_id' => $vehicle->id,
+            'acknowledged_at' => now()->subDays(10), 'resolved_at' => now()->subDays(9),
+        ]);
+        ControlRoomAlert::factory()->fromFleet()->resolved()->create([
+            'site_id' => $local->id, 'asset_id' => $otherVehicle->id,
+            'acknowledged_at' => now(), 'resolved_at' => now(),
+        ]);
+        ControlRoomAlert::factory()->fromFleet()->resolved()->create([
+            'site_id' => $foreign->id, 'acknowledged_at' => now(), 'resolved_at' => now(),
+        ]);
+        foreach (['acknowledged_today', 'resolved_7d'] as $activity) {
+            $this->actingAs($viewer)->get('/fleet-assets/alerts?asset_id='.$vehicle->id.'&activity='.$activity)
+                ->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->where('hero.'.$activity, 1)->where('control_room_alerts.meta.total', 1)
+                ->where('control_room_alerts.data.0.id', $resolved->id)
+                ->where('can.controlRoomView', false));
+        }
+        $this->get('/fleet-assets/alerts?asset_id='.$vehicle->id.'&status=all')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('control_room_alerts.meta.total', 3));
+        $this->get('/fleet-assets/alerts?asset_id='.$vehicle->id)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('control_room_alerts.meta.total', 1));
     }
 
     private function assertFleetHeroAlertCounts(User $user, int $expected): void

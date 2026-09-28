@@ -4,6 +4,7 @@ import { Breadcrumbs } from '@/components/breadcrumbs';
 import { Sheet } from '@/components/ui/sheet';
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { fleetWorkspaceForUrl } from '@/lib/fleet-navigation';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
@@ -60,7 +61,13 @@ export default function AppSidebarLayout({
 }: PropsWithChildren<AppSidebarLayoutProps>) {
     const page = usePage<SharedData>();
     const defaultSidebarOpen = page.props.sidebarOpen ?? true;
-    const hasBreadcrumbStrip = breadcrumbs.length > 1;
+    const pageBreadcrumbs =
+        fleetWorkspaceForUrl(page.url) &&
+        breadcrumbs.length > 0 &&
+        breadcrumbs[0].href !== '/dashboard'
+            ? [{ title: 'Home', href: '/dashboard' }, ...breadcrumbs]
+            : breadcrumbs;
+    const hasBreadcrumbStrip = pageBreadcrumbs.length > 1;
     const { collapsed, setExpanded } = useAppSidebarState(defaultSidebarOpen);
     const isMobile = useIsMobile();
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -109,7 +116,9 @@ export default function AppSidebarLayout({
                                    * the 20px rhythm); the content wrapper
                                    * drops its top padding beneath it. */
                                   <div className="flex items-center px-5 py-2.5 text-muted-foreground">
-                                      <Breadcrumbs breadcrumbs={breadcrumbs} />
+                                      <Breadcrumbs
+                                          breadcrumbs={pageBreadcrumbs}
+                                      />
                                   </div>
                               )
                             : header}

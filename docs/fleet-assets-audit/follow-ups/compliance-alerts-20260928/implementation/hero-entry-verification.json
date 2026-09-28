@@ -1,0 +1,30 @@
+{
+  "checkedAt": "2026-09-28 21:09:59 UTC",
+  "change": "Remove Fleet navigation from the breadcrumb strip and put Compliance & renewals / Fleet alerts entry buttons inside the Overview, Vehicles and queue heroes.",
+  "checks": {
+    "build": {
+      "status": "passed",
+      "exitCode": 0,
+      "duration": "4m 30s",
+      "log": "hero-entry-build-final.log"
+    },
+    "typescript": {
+      "status": "passed",
+      "exitCode": 0,
+      "log": "hero-entry-types.log"
+    },
+    "eslint": {
+      "status": "passed",
+      "exitCode": 0,
+      "log": "hero-entry-lint.log"
+    },
+    "diffWhitespace": {
+      "status": "passed"
+    }
+  },
+  "browser": {
+    "status": "requires_existing_login",
+    "url": "http://127.0.0.1:8768/fleet-assets",
+    "note": "Port 62477 remains the unchanged frozen v5 preview. Existing application tab is at /login; no authenticated visual verification claimed."
+  }
+}

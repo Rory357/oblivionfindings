@@ -23,6 +23,7 @@ const parameters: Record<string, string[]> = {
         'site_id',
         'entity',
         'asset_id',
+        'activity',
         'status',
         'severity',
         'cr_page',

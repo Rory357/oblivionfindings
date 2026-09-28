@@ -26,6 +26,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Notifications\OperationalReportReady;
 use App\Services\HealthSafety\LoneWorkerSignalService;
 use App\Services\Integration\IntegrationEventHistoryService;
 use App\Services\Reporting\FleetSupplementalReports;
@@ -66,6 +67,36 @@ class OperationalReportsTest extends TestCase
             'date_from' => '2026-09-20', 'date_to' => '2026-09-27', 'site_ids' => [], 'resource_ids' => [], 'subject_id' => null,
             'match' => 'all', 'filters' => [], 'groups' => ['date'], 'measures' => [['id' => 'm1', 'label' => 'Rows', 'operation' => 'count', 'field' => null, 'formula' => null, 'decimals' => 0, 'unit' => 'count']],
             'layout' => 'table', 'sort' => 'group', 'direction' => 'asc', 'limit' => 20, 'precision' => 'redacted', 'comparison' => false];
+    }
+
+    public function test_normal_fleet_landing_opens_library_and_builder_is_intentional(): void
+    {
+        $actor = $this->actor();
+        foreach (['/fleet-assets/reports' => 'library', '/fleet-assets/reports/builder' => 'builder', '/fleet-assets/reports?view=saved' => 'saved', '/fleet-assets/reports?view=readiness' => 'readiness'] as $url => $view) {
+            $this->actingAs($actor)->get($url)->assertOk()->assertInertia(fn ($page) => $page
+                ->component('reporting/workspace')->where('domain', 'fleet')->where('initialView', $view));
+        }
+        $this->get('/fleet-assets/reports/operating-summary')->assertOk()->assertInertia(fn ($page) => $page->component('fleet-assets/reports/index'));
+    }
+
+    public function test_library_preserves_report_only_access_and_source_denial(): void
+    {
+        $this->actor();
+        $reader = User::factory()->create(['approved_at' => now(), 'role' => 'support_worker']);
+        $reader->permissionOverrides()->attach(Permission::where('key', 'fleet.reports.view')->value('id'), ['allowed' => true]);
+        $this->actingAs($reader)->get('/fleet-assets/reports')->assertOk()->assertInertia(fn ($page) => $page
+            ->component('reporting/workspace')->where('initialView', 'library')->has('sources.journeys')->missing('sources.demand')->missing('sources.resource_costs'));
+        $this->get('/fleet-assets/reports?view=costs')->assertOk()->assertInertia(fn ($page) => $page->where('initialView', 'library'));
+        $this->get('/fleet-assets/reports/builder')->assertOk()->assertInertia(fn ($page) => $page->where('initialView', 'builder'));
+        $denied = User::factory()->create(['approved_at' => now(), 'role' => 'support_worker']);
+        $this->actingAs($denied)->get('/fleet-assets/reports')->assertForbidden();
+        $this->get('/fleet-assets/reports/builder')->assertForbidden();
+    }
+
+    public function test_scheduled_report_notice_opens_the_saved_runs_view(): void
+    {
+        $notice = new OperationalReportReady('fleet');
+        $this->assertSame('/fleet-assets/reports?view=saved', $notice->toArray(new \stdClass)['url']);
     }
 
     public function test_schema_rejects_malformed_imports_before_mutating_saved_definitions(): void

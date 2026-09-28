@@ -78,6 +78,14 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Fleet workspace navigation', () => {
+    it('returns to the report library from a focused report', () => {
+        fixture.url = '/fleet-assets/reports?view=demand';
+        render(<FleetWorkspaceNavigation />);
+        expect(
+            screen.getByRole('link', { name: 'Report library' }),
+        ).toHaveAttribute('href', '/fleet-assets/reports');
+    });
+
     it.each([
         {
             name: 'report only',
@@ -166,7 +174,7 @@ describe('Fleet workspace navigation', () => {
                 screen.getByRole('navigation', { name: 'Reports pages' }),
             );
             expect(
-                context.getByRole('link', { name: 'Reports & analytics' }),
+                context.getByRole('link', { name: 'Report library' }),
             ).toHaveAttribute('href', '/fleet-assets/reports');
             fireEvent.keyDown(
                 context.getByRole('button', { name: 'Costs & mileage pages' }),

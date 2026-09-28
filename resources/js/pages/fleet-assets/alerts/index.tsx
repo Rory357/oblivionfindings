@@ -136,8 +136,28 @@ export default function AlertsIndex({
         ...(severity !== 'all'
             ? [{ key: 'severity', label: `Severity: ${alertTitle(severity)}` }]
             : []),
+        ...(filters.activity
+            ? [
+                  {
+                      key: 'activity',
+                      label:
+                          filters.activity === 'acknowledged_today'
+                              ? 'Acknowledged today'
+                              : 'Resolved in past 7 days',
+                  },
+              ]
+            : []),
+        ...(filters.asset_id
+            ? [{ key: 'asset_id', label: 'Selected asset' }]
+            : []),
     ];
-    const clear = () => patch({ search: '', severity: undefined });
+    const clear = () =>
+        patch({
+            search: '',
+            severity: undefined,
+            activity: undefined,
+            asset_id: undefined,
+        });
     const openSource = (alert: FleetAlert) => {
         if (alert.asset?.href)
             router.visit(
@@ -302,6 +322,7 @@ export default function AlertsIndex({
                                         setLegacy(false);
                                         patch({
                                             status: 'unresolved',
+                                            activity: undefined,
                                             severity: undefined,
                                             search: '',
                                         });
@@ -443,7 +464,10 @@ export default function AlertsIndex({
                                 onSelect={(value) => {
                                     setLegacy(value === 'archived');
                                     if (value !== 'archived')
-                                        patch({ status: value });
+                                        patch({
+                                            status: value,
+                                            activity: undefined,
+                                        });
                                 }}
                             />
                         }
@@ -579,6 +603,7 @@ export default function AlertsIndex({
                                     {layout === 'table' && (
                                         <div className="hidden md:block">
                                             <EntityTable
+                                                rowHeight="content"
                                                 rows={queue.data}
                                                 rowKey={(alert) => alert.id}
                                                 identityLabel="Alert / source"

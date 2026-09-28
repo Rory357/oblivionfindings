@@ -533,6 +533,7 @@ export default function ComplianceIndex({
                             {layout === 'table' && (
                                 <div className="hidden md:block">
                                     <EntityTable
+                                        rowHeight="content"
                                         rows={queue.data}
                                         rowKey={(row) => row.id}
                                         identityLabel="Vehicle / requirement"
