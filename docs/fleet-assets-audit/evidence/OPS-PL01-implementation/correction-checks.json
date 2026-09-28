@@ -1,0 +1,24 @@
+{
+  "submittedBase": "ff856d9814086006d158dc788f4ebe55b9838305",
+  "sourceFiles": 42,
+  "sourceDigest": "e36113fe3fa5d204824594bf0dfc67584656ba65694485431cbf7fb92d2d1437",
+  "protectedReferencesChecked": 6,
+  "referenceMismatches": [],
+  "frozenV5Files": 41,
+  "frozenV5Digest": "10b27c27220c1be0ca122464f2f4e2ca8e92036a7dfed32b609574f96fb15b7d",
+  "frozenMismatches": [],
+  "mainProbeSha256": "9f039e6b47fc831bf88f409401c02da850a479dc9be0fc27c7491bf34dc3e64c",
+  "checks": {
+    "scopedBackend": "37 passed / 228 assertions",
+    "sharedBrandTemplate": "1 passed / 5 assertions",
+    "unchangedMainProbes": "2 passed / 9 assertions; unchanged file, explicit midday clock bootstrap",
+    "frontend": "16 passed",
+    "types": "passed",
+    "lint": "passed",
+    "build": "passed; pre-existing large-chunk warnings",
+    "ordinaryBrowser": "brand matrix, filled dialog, nested picker, keyboard focus, resize passed",
+    "actual125PercentZoom": "pending manual user setup"
+  },
+  "mainIntegration": "Not released; no Main source, compiled asset, migration, grant or remote push performed",
+  "remainingCorrectionSchemas": []
+}

@@ -1,0 +1,49 @@
+{
+  "environment": "Normal authenticated Chrome, isolated synthetic DB, production Vite assets",
+  "scenarios": [
+    "The selected identity remains visible and searchable outside the current cohort. An explicit banner explains whose reports are open; selection can be cleared. Searching Noah while Maia is selected no longer blanks Maia’s picker.",
+    "Response status is visible in the filter controls and active-filter line, with clear actions and a 0-of-1 empty state. Clearing acknowledged restores the original open response.",
+    "Journey/authority/day intersections are applied before the bounded source reads. Saturation is disclosed even when invalid rows are discarded. CSV includes both streams, effective UTC window, generation and partial metadata; preview, PDF and HTML use the same scoped report.",
+    "Report work is abortable and timed out; navigation/cancel cannot deliver a late file. HTTP redirects, wrong MIME and failed authority are rejected. The export reason survives retryable failure.",
+    "Person, source, journey and Site record choices use shared searchable controls. Export/calculation dialogs use the 720px bounded popup structure and shared date picker. Cohort chips have plain-language labels.",
+    "Personal population, Site, Cards/List and boundary defaults now have review/save/cancel, revision-conflict protection and safe handling of unavailable Sites. Save and reload were exercised, and the reviewer’s Cards default was restored. Source consent/provider ownership stays canonical.",
+    "The isolated candidate was fast-forwarded to current Main 926b4981 before applying fixes. Shared permitted Site/house geometry comes from BoundaryService, excludes retired/personal/asset records and never enables monitoring. Current passenger journeys retain Transport ownership.",
+    "Alerts show canonical severity, owner, due time and overdue state. Selected-person map detail shows the original readable response. The original PL-PREVIEW-01 opens in Control Room and closes back to Maia.",
+    "History includes a recorded-position map, interactive chronological observation list, source samples, exact day/journey preview and direct outing export. Analytics opens the report dialog with the selected person/source/day; the client-profile entry was verified.",
+    "Map markers retain stable identities across refresh; safe DOM tooltips and keyboard context menus remain. Camera state survives Inertia view/selection changes while the keyed evidence view rechecks access. Browser zoom 17 remained 17 after Noah-to-Maia selection and refresh, with selected marker focus restored.",
+    "Analytics now has separate Population snapshot and Person history modes, position-age and battery-age bands, accurate units/unknown denominators and exact people drills. The 1–24-hour position cohort opens its four matching people. No synthetic response trend was invented."
+  ],
+  "additionalFix": "The browser-confirmed account menu Settings link now targets /settings/profile instead of the missing /profile route.",
+  "viewports": [
+    "1280×720",
+    "1440×1000",
+    "normal ultrawide"
+  ],
+  "overflow": "No horizontal document overflow at 1280 and 1440 CSS pixels",
+  "preferences": "Cards default and System appearance restored after verification",
+  "screenshotNote": "Some browser full-page captures had display-scaling artifacts and were excluded from final proof. DOM overflow checks and ordinary viewport captures were used.",
+  "cameraEvidence": {
+    "before": 17,
+    "afterPersonSelection": 17,
+    "afterRefresh": 17
+  },
+  "pdfDownload": "browser-outing-report.pdf",
+  "proofFiles": [
+    "fixed-outing-export-1280.png",
+    "fixed-analytics-report-entry-1440.png",
+    "final-map-1440-dark.png",
+    "final-analytics-1440-dark.png",
+    "fixed-outing-pdf-1.png",
+    "large-report-contact-sheet.jpg",
+    "pdf-validation.json",
+    "final-browser-check.json"
+  ],
+  "limits": [
+    "Main and sibling checkouts were not changed; no publication or production activation was performed.",
+    "New history/export permissions are unassigned to operational roles. Deployment must use the approved role matrix; client/site/consent checks still apply independently.",
+    "Non-vehicle outings need a canonical Transport-owned source before this page can report them. Shared boundary overlays are reference geometry and do not activate personal monitoring.",
+    "Performance evidence is local synthetic service-level measurement, not production HTTP/end-to-end load certification. Larger populations and deployment infrastructure need their own budget.",
+    "Normal authenticated Chrome preview is available. The in-app browser has separate authentication. PDF is untagged; HTML remains the readable alternative. Genuine browser zoom and full accessibility certification were not completed.",
+    "Some browser full-page captures had display-scaling artifacts and were excluded from final proof. DOM overflow checks and ordinary viewport captures were used."
+  ]
+}

@@ -1107,6 +1107,8 @@ function buildOperationsSubPanelGroups({
     const clientLabel = labels?.['client.singular'] ?? 'Client';
     const clientLabelPlural = labels?.['client.plural'] ?? 'Clients';
     const clientMgmt: NavItem[] = [];
+    if (can?.assets?.telemetryView && (can?.clients?.viewAny || can?.clients?.viewAssigned || can?.hazards?.manage))
+        clientMgmt.push({ title: 'People Locations', href: '/operations/people-locations', icon: MapPin });
     if (can?.clients?.viewAny || can?.clients?.viewAssigned)
         clientMgmt.push({
             title: clientLabelPlural,

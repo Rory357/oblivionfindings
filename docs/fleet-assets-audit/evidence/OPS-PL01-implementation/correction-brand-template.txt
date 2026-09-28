@@ -1,0 +1,6 @@
+
+   PASS  Tests\Feature\Operations\PeopleLocationsTest
+  ✓ it renders organisation brand tokens for both themes without literal template text                         246.96s
+
+  Tests:    1 passed (5 assertions)
+  Duration: 247.24s

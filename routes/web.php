@@ -528,3 +528,4 @@ Route::middleware(['auth'])->group(function () {
 });
 
 require __DIR__.'/vendor-vault.php';
+require __DIR__.'/people-locations.php';

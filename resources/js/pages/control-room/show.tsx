@@ -20,17 +20,22 @@ export default function ControlRoomAlertShow(
     const ref = props.alert.reference_number ?? `Alert ${props.alert.id}`;
     const returnTo = props.return_to;
     const cameFromTasks = returnTo.startsWith('/tasks');
-    const alertHref = cameFromTasks
+    const cameFromPeople = returnTo.startsWith('/operations/people-locations');
+    const cameFromWorkspace = cameFromTasks || cameFromPeople;
+    const alertHref = cameFromWorkspace
         ? `/control-room/alerts/${props.alert.id}?return_to=${encodeURIComponent(returnTo)}`
         : `/control-room/alerts/${props.alert.id}`;
 
     return (
         <AppLayout
             breadcrumbs={[
-                cameFromTasks
-                    ? { title: 'Tasks', href: returnTo }
+                cameFromWorkspace
+                    ? {
+                          title: cameFromPeople ? 'People Locations' : 'Tasks',
+                          href: returnTo,
+                      }
                     : { title: 'Control Room', href: '/control-room' },
-                ...(cameFromTasks
+                ...(cameFromWorkspace
                     ? []
                     : [{ title: 'Alerts', href: '/control-room/alerts' }]),
                 { title: ref, href: alertHref },

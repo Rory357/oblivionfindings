@@ -1,0 +1,273 @@
+{
+  "checks": [
+    {
+      "case": "People at 1440",
+      "data": {
+        "filters": "Permitted records onlyClientsStaffBothAll permitted sitesAll evidence statesSortName A–ZCardsList",
+        "headerHeight": 250.5,
+        "height": 1000,
+        "scrollWidth": 1428,
+        "width": 1440
+      }
+    },
+    {
+      "case": "Site search and keyboard selection",
+      "url": "http://127.0.0.1:8776/operations/people-locations/people?date=2026-09-27&q=&site=2",
+      "visiblePeople": [
+        "People Locations",
+        "People & source health",
+        "Noah Williams"
+      ],
+      "site": "Harbour House 2"
+    },
+    {
+      "case": "Lowest battery sort",
+      "url": "http://127.0.0.1:8776/operations/people-locations/people?date=2026-09-27&q=&site=all&sort=battery",
+      "order": [
+        "People Locations",
+        "People & source health",
+        "Noah Williams",
+        "Aroha Te Rangi-Williams",
+        "Eli Patel",
+        "Maia Thompson",
+        "Alex Morgan",
+        "Olivia Chen"
+      ]
+    },
+    {
+      "case": "Position unavailable",
+      "url": "http://127.0.0.1:8776/operations/people-locations/people?cohort=position%3Aunknown&date=2026-09-27&q=&site=all&sort=name",
+      "people": [
+        "People Locations",
+        "People & source health",
+        "Alex Morgan",
+        "Olivia Chen"
+      ],
+      "label": "Position unavailable"
+    },
+    {
+      "case": "List search",
+      "rows": [
+        "PersonSite / sourceRecorded positionBattery / powerSource responses",
+        "NWNoah WilliamsClient 2 · ClientHarbour House 2Device 2Last known · staleSun 27 Sept, 5:31 pm12% · 5:31 pmNot chargingNo open source responsesStationary / rest · 5:31 pm"
+      ],
+      "query": "Noah"
+    },
+    {
+      "case": "People at 1280",
+      "data": {
+        "headerHeight": 250.5,
+        "height": 880,
+        "scrollWidth": 1268,
+        "width": 1280
+      }
+    },
+    {
+      "case": "People at 390",
+      "data": {
+        "controls": {
+          "bottom": 507.4375,
+          "height": 81,
+          "left": 39.5,
+          "right": 338.8999938964844,
+          "top": 426.4375,
+          "width": 299.3999938964844,
+          "x": 39.5,
+          "y": 426.4375
+        },
+        "height": 800,
+        "primaryForeground": "oklch(100% 0 0)",
+        "scopeColor": "oklch(0.6 0.015 277)",
+        "scrollWidth": 378,
+        "width": 390
+      }
+    },
+    {
+      "case": "Escape returns focus to Site",
+      "focused": "Site",
+      "expanded": false
+    },
+    {
+      "case": "Combined evidence filter label",
+      "url": "http://127.0.0.1:8776/operations/people-locations/people?cohort=position%3Anot-recent%7Cposition%3Astale&date=2026-09-27&peopleView=cards&q=&site=all&sort=name",
+      "label": "Without a recent position · Last known · stale"
+    },
+    {
+      "case": "History controls at 390",
+      "data": {
+        "controls": [
+          {
+            "bounds": {
+              "bottom": 827.2625122070312,
+              "height": 52.5,
+              "left": 17.5,
+              "right": 194.2250061035156,
+              "top": 774.7625122070312,
+              "width": 176.72500610351562,
+              "x": 17.5,
+              "y": 774.7625122070312
+            },
+            "text": "PersonMaia Thompson"
+          },
+          {
+            "bounds": {
+              "bottom": 895.7625122070312,
+              "height": 52.5,
+              "left": 17.5,
+              "right": 224.65000915527344,
+              "top": 843.2625122070312,
+              "width": 207.15000915527344,
+              "x": 17.5,
+              "y": 843.2625122070312
+            },
+            "text": "SourcePersonal tracker D101"
+          },
+          {
+            "bounds": {
+              "bottom": 1001.3500137329102,
+              "height": 89.5875015258789,
+              "left": 17.5,
+              "right": 334.8125,
+              "top": 911.7625122070312,
+              "width": 317.3125,
+              "x": 17.5,
+              "y": 911.7625122070312
+            },
+            "text": "Recorded day27 Sep 2026Choose a day on the calendar"
+          }
+        ],
+        "scrollWidth": 410,
+        "width": 390
+      }
+    },
+    {
+      "case": "Final History at 390",
+      "data": {
+        "map": {
+          "bottom": 800.9249877929688,
+          "height": 280,
+          "left": 39.29999923706055,
+          "right": 339.1000175476074,
+          "top": 520.9249877929688,
+          "width": 299.8000183105469,
+          "x": 39.29999923706055,
+          "y": 520.9249877929688
+        },
+        "reportSelector": {
+          "bottom": 337.3374938964844,
+          "height": 31.5,
+          "left": 39.29999923706055,
+          "right": 339.1000175476074,
+          "top": 305.8374938964844,
+          "width": 299.8000183105469,
+          "x": 39.29999923706055,
+          "y": 305.8374938964844
+        },
+        "scopeColor": "oklab(1 0 0 / 0.8)",
+        "scrollWidth": 378,
+        "width": 390
+      }
+    },
+    {
+      "case": "Final mobile outing actions",
+      "data": {
+        "actions": [
+          {
+            "bounds": {
+              "bottom": 588.7750244140625,
+              "height": 31.5,
+              "left": 54.10000228881836,
+              "right": 181.10000228881836,
+              "top": 557.2750244140625,
+              "width": 127,
+              "x": 54.10000228881836,
+              "y": 557.2750244140625
+            },
+            "text": "Preview day slice"
+          },
+          {
+            "bounds": {
+              "bottom": 588.7750244140625,
+              "height": 31.5,
+              "left": 188.1000061035156,
+              "right": 295.83750915527344,
+              "top": 557.2750244140625,
+              "width": 107.7375030517578,
+              "x": 188.1000061035156,
+              "y": 557.2750244140625
+            },
+            "text": "Export outing"
+          },
+          {
+            "bounds": {
+              "bottom": 627.2750244140625,
+              "height": 31.5,
+              "left": 54.10000228881836,
+              "right": 161.47500228881836,
+              "top": 595.7750244140625,
+              "width": 107.375,
+              "x": 54.10000228881836,
+              "y": 595.7750244140625
+            },
+            "text": "Open journey"
+          }
+        ],
+        "scrollWidth": 378,
+        "width": 390
+      }
+    },
+    {
+      "case": "Final People at 1440",
+      "data": {
+        "filters": "Permitted records onlyClientsStaffBothAll permitted sitesAll evidence statesSortName A–ZCardsList",
+        "headerHeight": 250.5,
+        "height": 1000,
+        "scopeColor": "oklab(1 0 0 / 0.8)",
+        "scrollWidth": 1428,
+        "width": 1440
+      }
+    },
+    {
+      "case": "Final People at 1280",
+      "data": {
+        "headerHeight": 250.5,
+        "height": 880,
+        "scrollWidth": 1268,
+        "width": 1280
+      },
+      "evidence": "DOM measurements; resized screenshot capture timed out"
+    },
+    {
+      "case": "Final Analytics at 1440",
+      "data": {
+        "header": "Permitted records onlyClientsStaffBothAll permitted sitesAll evidence statesSortName A–Z",
+        "headings": [
+          "Location intelligence",
+          "Position availability",
+          "Position coverage by site",
+          "Battery reporting",
+          "Control Room responses",
+          "Power & movement observations",
+          "Why a position is unavailable",
+          "Position observation age",
+          "Battery observation age"
+        ],
+        "scrollWidth": 1428,
+        "width": 1440
+      }
+    },
+    {
+      "case": "Restored normal viewport",
+      "data": {
+        "dpr": 1.25,
+        "height": 999,
+        "scrollWidth": 2752,
+        "width": 2752
+      },
+      "url": "http://127.0.0.1:8776/operations/people-locations/people?date=2026-09-27&peopleView=cards&q=&selected=c1&site=all&sort=name&source=1"
+    }
+  ],
+  "consoleErrors": [],
+  "captureLimitations": "Some resized captures timed out or retained stale composition. Only final inspected People 1440 and History map 390 images are delivered. Layout and action wrapping are also verified using DOM bounds.",
+  "actual125PercentZoom": "Not performed; existing manual setup question remains pending"
+}
