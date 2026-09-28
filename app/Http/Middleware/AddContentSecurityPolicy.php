@@ -77,11 +77,16 @@ class AddContentSecurityPolicy
      */
     private function policy(string $nonce): string
     {
+        // The optional provider is never loaded without application configuration.
+        // Keep OSM-only deployments on their existing policy; no unsafe script execution is added.
+        $google = filled(config('fleet.maps.api_key'));
+        $googleSources = $google ? ' https://*.googleapis.com https://*.gstatic.com https://*.google.com' : '';
+
         return implode('; ', [
             "default-src 'self'",
-            "script-src 'self' 'nonce-{$nonce}'",
-            "style-src 'self' 'unsafe-inline' https://fonts.bunny.net",
-            "font-src 'self' https://fonts.bunny.net data:",
+            "script-src 'self' 'nonce-{$nonce}'".$googleSources,
+            "style-src 'self' 'unsafe-inline' https://fonts.bunny.net".($google ? ' https://fonts.googleapis.com' : ''),
+            "font-src 'self' https://fonts.bunny.net data:".($google ? ' https://fonts.gstatic.com' : ''),
             // Map tiles: OpenStreetMap (street/dark basemap) and Esri ArcGIS
             // (satellite layer) are fetched as <img> by Leaflet.
             'img-src '.implode(' ', [
@@ -91,11 +96,13 @@ class AddContentSecurityPolicy
                 'https://tile.openstreetmap.org',
                 'https://*.tile.openstreetmap.org',
                 'https://server.arcgisonline.com',
-            ]),
+            ]).$googleSources.($google ? ' https://*.googleusercontent.com' : ''),
             "media-src 'self'",
             // The document preconnects to Bunny Fonts before loading its stylesheet.
             // Browsers evaluate that connection hint against connect-src.
-            "connect-src 'self' https://fonts.bunny.net",
+            "connect-src 'self' https://fonts.bunny.net".$googleSources,
+            "worker-src 'self'".($google ? ' blob:' : ''),
+            "frame-src 'self'".($google ? ' https://*.google.com' : ''),
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",

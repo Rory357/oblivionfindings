@@ -1,0 +1,101 @@
+{
+  "checkedAt": "2026-09-27T14:13:05.355Z",
+  "source": "Isolated Laravel application, synthetic one-Site vehicle/trip only; actual OSM renderer",
+  "fleet": {
+    "initial": {
+      "viewport": [
+        1280,
+        720
+      ],
+      "frameHeight": 688,
+      "leafletHeight": 686,
+      "markers": 1
+    },
+    "resized": {
+      "frame": {
+        "bottom": 1216,
+        "height": 748,
+        "left": 249.5,
+        "right": 1049,
+        "top": 468,
+        "width": 799.5,
+        "x": 249.5,
+        "y": 468
+      },
+      "map": {
+        "bottom": 1215,
+        "height": 746,
+        "left": 250.5,
+        "right": 1048,
+        "top": 469,
+        "width": 797.5,
+        "x": 250.5,
+        "y": 469
+      },
+      "markers": 1,
+      "selection": "Synthetic map review vanTEST08 · PKG08-MAP-FIXTUREHome site: Settings test siteLast known · staleObserved Mon 28 Sept, 2:51 amLast known; this vehicle may have moved.Needs assessmentRegistration: assess applicability.Readiness comes from the vehicle source.Open vehicle  Vehicle calendarReview evidence ",
+      "viewport": {
+        "height": 1000,
+        "width": 1440
+      }
+    },
+    "selectionSurvivedResize": true,
+    "canonicalVehicleHandoff": true,
+    "keyboardAction": {
+      "name": "Vehicle calendar",
+      "top": 865.5,
+      "bottom": 893.5,
+      "viewportHeight": 1000
+    }
+  },
+  "location": {
+    "normal": {
+      "width": 835,
+      "height": 645.1875,
+      "callerBorder": 0,
+      "markers": 1
+    },
+    "expanded": {
+      "width": 1058,
+      "height": 775.5,
+      "markers": 5,
+      "paths": 1
+    },
+    "trailPoints": 21,
+    "sourceState": "Last known · stale",
+    "exitExpandedActionReachable": true
+  },
+  "trip": {
+    "frame": {
+      "bottom": 556.59375,
+      "height": 360,
+      "left": 249.5,
+      "right": 1082.5,
+      "top": 196.59375,
+      "width": 833,
+      "x": 249.5,
+      "y": 196.59375
+    },
+    "map": {
+      "bottom": 556.59375,
+      "height": 360,
+      "left": 249.5,
+      "right": 1082.5,
+      "top": 196.59375,
+      "width": 833,
+      "x": 249.5,
+      "y": 196.59375
+    },
+    "markers": 7,
+    "paths": 21,
+    "selectedPoint": "Point 2 of 21",
+    "nextRecordedPoint": "Point 1 of 21 -> Point 2 of 21"
+  },
+  "fallback": {
+    "keyboardFocusedAction": "Reload map",
+    "top": 516.5,
+    "bottom": 544.5,
+    "viewportHeight": 720
+  },
+  "browserZoom": "Not verified; responsive viewport checks are not page zoom"
+}

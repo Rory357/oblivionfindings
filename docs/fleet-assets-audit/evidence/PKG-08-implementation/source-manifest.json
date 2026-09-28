@@ -1,0 +1,97 @@
+{
+  "checkedAt": "2026-09-27T19:05:48.473Z",
+  "base": "926b4981b0289da08a20baca0995117fb53e413e",
+  "mainHead": "926b4981b0289da08a20baca0995117fb53e413e",
+  "branch": "codex/pkg08-settings-implementation",
+  "sourceCount": 40,
+  "files": {
+    "app/Http/Controllers/FleetAssets/AssetImportController.php": "212d05f699165a7f07feb7b19a6e846c8298439a71ae7906261275533b9b5529",
+    "app/Http/Controllers/FleetAssets/GeofenceController.php": "d1b1bbef760faf921bef986430b40ff70d3197811cbfde38bde3ddbf3263d919",
+    "app/Http/Controllers/FleetAssets/HandoverController.php": "5d25a0816ee7409545afe625e5ab841e9bb7a96205af0d96aba59471c62f488f",
+    "app/Http/Controllers/FleetAssets/MapCapabilityController.php": "f06b6d2af965368fcc76cf5e705f1e1d4fe19e40831e622ff517face1190e2d3",
+    "app/Http/Controllers/FleetAssets/SettingsNotificationController.php": "45b2258784443b11bb27cd0081df7254613db3bbf1a8e7e60479f5b417bee807",
+    "app/Http/Controllers/FleetAssets/WorkspaceSettingsController.php": "2b9537a7c0cfee3b63c8c454ea053367ed0d5d155115d33a5425c9faa2ba5bb3",
+    "app/Http/Controllers/Settings/NotificationPreferencesController.php": "9e4299e10b1fd6f1497718c1f9ac70dd308459a6d79414702155e607f5b2da48",
+    "app/Http/Middleware/AddContentSecurityPolicy.php": "2ecf62375234061b10839112f811e88f8782a262c6f0227f4c0e6c2591168257",
+    "app/Http/Middleware/HandleInertiaRequests.php": "200abec8c87d71a4b45c9de6abd60d1a316d19270665ed773a6d38969e5b1760",
+    "app/Models/UserNotificationPreference.php": "b4d876e467971c67cd200b4a85f737359f4a51b2decf80cd4508f7d62222db00",
+    "app/Notifications/Fleet/FleetBookingApprovedNotification.php": "5f9b8698083036518e72188d91051412e331786088308dedcb00a08c561ca424",
+    "app/Notifications/Fleet/FleetBookingRejectedNotification.php": "1e7a4f734a46640820666b16d03226eec49f2c7139892ce901f02ed26f9fa34b",
+    "app/Notifications/Fleet/FleetComplianceDueNotification.php": "98838345f29dbcb390c0c751ea7e93749abc2a1d1f2a7f5254fc01d274902b7f",
+    "app/Notifications/Fleet/FleetSourceUpdateNotification.php": "e1dd806b2334d62a0efa62579db3ca7bf446197d9c946ac59914ac61d7e58679",
+    "app/Services/Fleet/FleetMapSettings.php": "7b98f735753eebe1e6b16215bd0f53c2c98f6aa766a263d7aed7a6bb3f325256",
+    "app/Services/Fleet/FleetNotificationPreferences.php": "d27abad6226e1e1437bb488c5619260617f094e95b1cd2535b7123626dfd4c01",
+    "app/Services/Fleet/FleetOptionalNotice.php": "a34bdf8a8e86aaabf3e659aa7927b1e8507f204b90aa82b2ee90f61e44e0198f",
+    "app/Services/Fleet/Geocoding/GoogleReverseGeocoder.php": "695260b7ccab91de2578dc1bdda2b818aa53e5990a69b7fe28e3d5c532cedbe8",
+    "app/Services/Fleet/GoogleMapCapabilities.php": "1bad89da193d7b2df6bc4b1158ed0aebea1b975b825e807d7cf3b8792b38d820",
+    "app/Services/Fleet/ReverseGeocodeService.php": "9d212d0172562d70814d73b58bcabebf33985e25950fa35ee792ae0d3acbab55",
+    "config/fleet.php": "b4639a374ca718c1c1ccfe10cf546d780210af80d9d329e2251d3108bfddb9aa",
+    "config/notification_events.php": "2faaadaa966987dd009e17143e2ec541acaf1c3a120f3c87108b1c8fdadaa5f7",
+    "database/migrations/2026_09_28_000100_add_notification_channel_overrides.php": "51faa929190812c4b9a018f2dcd1dbba98e3b141943f22c5a190a218f2c6ca81",
+    "resources/js/components/leaflet-map.tsx": "aa74b466c687340ba9472a1ab65db2ea2b09eb04f5471bacac9c3c25608ff5da",
+    "resources/js/components/maps/google-map.test.tsx": "62c265b5dff2137950d474c571e0f1d59e42c099d832c975b64731d8caad1cae",
+    "resources/js/components/maps/google-map.tsx": "dcb3afc4107623c6eed48d2682a224dabbaeba82981a8aac83c627c0dada994d",
+    "resources/js/components/maps/google-sdk.test.ts": "eee057b0f855b2be9278d1b35bb855f526cb7bfda5b9f7741c85626a5a13c54b",
+    "resources/js/components/maps/google-sdk.ts": "fc8134b2603b87bd1b03dcb3416757a8035d699c81b2fc58152a08614a09752b",
+    "resources/js/lib/fleet-navigation.ts": "3bea22b840c117c253e9fab767e56748851fe05dcfe3d20e3be2c6e10f2ce3f1",
+    "resources/js/pages/fleet-assets/settings/_map-tools.tsx": "66eb22544203333c034ce28cbd47946b6b0c7f9cdc1c88cca3705c7b4c81781a",
+    "resources/js/pages/fleet-assets/settings/_maps.tsx": "68f37eaadb4cd233db75f80c7339bf0688911fbcf841b0e919b9a9d370fb79c1",
+    "resources/js/pages/fleet-assets/settings/_notifications.tsx": "4c713df12dc04236955fa39979de9e92c8e169704938803433ec14948d8a13ef",
+    "resources/js/pages/fleet-assets/settings/_owners.tsx": "452b550ac45d965f1b1bb50c7e4bbd87e3cc188981f8c3bcd4ea747f71140194",
+    "resources/js/pages/fleet-assets/settings/_types.ts": "383f3702f36574d9555315d3b882c9373296848678898f965c6addf06265e9f7",
+    "resources/js/pages/fleet-assets/settings/_ui.tsx": "491ec6af42a4299a672c84def4b8941d35d4b6907930f637b9057e6aacef3074",
+    "resources/js/pages/fleet-assets/settings/index.tsx": "d3f5e7fc722ee8ef573c898beaef69eca4c4c0f9244d84d3e59193f4a1f7b445",
+    "resources/js/pages/fleet-assets/settings/notifications.tsx": "ae1dffa083e5ce27ca4dee40aca37dc4b6000c9d09c904eaccf3dfc518ed65bc",
+    "resources/js/pages/fleet-assets/settings/settings-draft.test.ts": "97ce0a6aa9e7dd8a2148c96cf5671466f90c6d80343e2416f68c1d654fd42454",
+    "routes/fleet-assets.php": "863965d95309e759992017f165b1db11d15fcd630eb40f6772b4bb73ee38e2a8",
+    "tests/Feature/FleetAssets/Pkg08SettingsTest.php": "83b60d50a80725861e5c36adccb17d7675fa433df6a8a920f70a6d7fb3f70399"
+  },
+  "authorities": {
+    "DESIGN.md": {
+      "implementation": "dbf4a4448ba0d999e0cd17b6c794c2fd7ce493826bd7e114e95f6fba50f47113",
+      "main": "dbf4a4448ba0d999e0cd17b6c794c2fd7ce493826bd7e114e95f6fba50f47113"
+    },
+    "design_styles/PAGE_HEADER_STYLE_GUIDE.md": {
+      "implementation": "33aeeb0e4434d3bb4d3023e3ce95ffee12e95ba1fe62c02f36601f8219827faa",
+      "main": "33aeeb0e4434d3bb4d3023e3ce95ffee12e95ba1fe62c02f36601f8219827faa"
+    },
+    "design_styles/NAVIGATION_STYLE_GUIDE.md": {
+      "implementation": "9295cdb1386322b8a088ae03de41bc3c75a0fbe3e8fa3331c92c704ccb15895d",
+      "main": "9295cdb1386322b8a088ae03de41bc3c75a0fbe3e8fa3331c92c704ccb15895d"
+    },
+    "design_styles/LIST_STYLE_GUIDE.md": {
+      "implementation": "56b59b464fd46917446b482b8e355d47d7341105915f6c016b6195e2a58138ac",
+      "main": "56b59b464fd46917446b482b8e355d47d7341105915f6c016b6195e2a58138ac"
+    },
+    "design_styles/POPUP_STYLE_GUIDE.md": {
+      "implementation": "c9de50bfc00874987e17f9d2b30b4a509431ae318359fa31dc5f98f9fcf90b1b",
+      "main": "c9de50bfc00874987e17f9d2b30b4a509431ae318359fa31dc5f98f9fcf90b1b"
+    },
+    "design_styles/DESIGN_TOKENS.md": {
+      "implementation": "43f99f4360de9c00b75c326f4e0fbab47378aaa8224d42be56e62e2b8ba3f48b",
+      "main": "43f99f4360de9c00b75c326f4e0fbab47378aaa8224d42be56e62e2b8ba3f48b"
+    },
+    "design_styles/LOADER_STYLE_GUIDE.md": {
+      "implementation": "cc20485e6e42e0a848b8cacc8ac6124e5e5a01206d966de6ebbbdec39dbe2a91",
+      "main": "cc20485e6e42e0a848b8cacc8ac6124e5e5a01206d966de6ebbbdec39dbe2a91"
+    },
+    "design_styles/APP_SHELL_STYLE_GUIDE.md": {
+      "implementation": "4f433617e4d0df8b51795f6ceb0dbb125913803949de8fb421e7dd9624469201",
+      "main": "4f433617e4d0df8b51795f6ceb0dbb125913803949de8fb421e7dd9624469201"
+    },
+    "design_styles/MAP_GEOFENCING_STYLE_GUIDE.md": {
+      "implementation": "810ed32d26452b54b96b6b24ac4557bd4adae96cee8e7cdd6aa95c978a087fce",
+      "main": "810ed32d26452b54b96b6b24ac4557bd4adae96cee8e7cdd6aa95c978a087fce"
+    },
+    "docs/architecture/single-tenant-application.md": {
+      "implementation": "3dea6218db87ce22bed3cab6b9c500d1a850445d04e9325cb16c23a604979b3c",
+      "main": "3dea6218db87ce22bed3cab6b9c500d1a850445d04e9325cb16c23a604979b3c"
+    }
+  },
+  "mainCommittedOverlap": [],
+  "protectedBlade": {
+    "implementation": "1a4a6140ff2c2f222e4ad46f74cd347b5a4582c02345702beba93412059621bc",
+    "main": "1a4a6140ff2c2f222e4ad46f74cd347b5a4582c02345702beba93412059621bc"
+  },
+  "reviewParent": "b07888e9b413696649ceceb03bbae3ee38edf166"
+}

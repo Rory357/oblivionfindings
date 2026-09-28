@@ -1,0 +1,97 @@
+# PKG-08 Settings implementation candidate
+
+Owner: existing Settings designer, GPT-6 Astra / xhigh. Date: 28 September 2026.
+
+This implements the user-approved v6 Settings workspace in an isolated application checkout. It is a technical-review candidate, not an operating deployment or all-location correctness sign-off. Main's revision 2 implementation release records the explicit “please implement now” approval; no repeat mockup approval is needed.
+
+## Exact review boundary
+
+- Checkout: `C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings`.
+- Branch: `codex/pkg08-settings-implementation`.
+- Base: `926b4981b0289da08a20baca0995117fb53e413e`. Actual Main HEAD was reconciled before this packet was prepared; see `source-manifest.json` for the final check and source hashes.
+- Actual application preview: `http://127.0.0.1:8794/fleet-assets/settings#notifications`, served by this checkout with its own Vite server on 5194 and a synthetic test database. Old previews 8788–8793 remain separate and intact.
+- The final commit SHA is supplied in the consolidated Main handoff. `source-manifest.json` covers every changed application and test source file without a circular self-hash.
+- No Main source write, merge, push, operating migration, live notification, Google request, key/billing change or device command was performed.
+
+## Implemented behaviour
+
+**Notifications:** real per-user persistence in the existing `UserNotificationPreference` table, effective role defaults, independent in-app/email overrides, versioned saves, atomic audit, conflict merge, browser draft recovery, guarded navigation, review/discard/default reset and undo. Event rows have shared kebab/right-click actions and draft-aware sample viewers. Required Control Room response and source permissions remain independent. Existing Application settings reads/writes remain compatible and Fleet changes written there enter the same history.
+
+The four supported optional event families are booking approval/decline, scheduled maintenance, handover transitions and the actor's import results. Existing booking/maintenance notifications now read these choices. Minimal new handover/import copies use committed canonical transitions and re-check current source access and preferences when the queue delivers them. They contain no handover notes, import rows, personal locations or coordinates. Optional queue dispatch failure is reported without rolling back the source action. This is not a new durable event outbox or a guarantee of delivery.
+
+**Delivery checks:** a saved-preference dry run with an explicit synthetic-input label, captured revision and the actor's last five checks. It never sends, replays an event, verifies a real recipient, claims provider acceptance or claims acknowledgement. The v6 mockup's simulated acceptance/failure choices are deliberately not presented as operating delivery evidence. Mail transport presence is shown separately from verified delivery; log/array mailers are not labelled external email.
+
+**Maps:** OSM default; optional Google display, Places (New), Geocoding and Routes, stored in the existing `AppSetting` owner. Google configuration requires the existing `fleet.settings.manage` permission, review, separate browser/server credential presence and optimistic revision matching. Secrets cannot be entered through the form or returned in JSON/audit. Configuration drafts have recovery and conflict merge. Browser-key rotation invalidates the revision; a loaded SDK requires a reload after a configuration/authentication failure instead of injecting a second SDK.
+
+The shared `LeafletMap` provider boundary supports Google rendering of already-authorised application markers, circles, polygons and trip lines, including missing-evidence dashes and endpoints. It preserves the viewport on fallback. Google-only search/route results are kept separate from application overlays and cleared on provider failure, revision change, input change, tab change or unmount. Server requests accept explicitly entered input, use minimal field masks, bounded results, timeouts, throttling and quota backoff. No provider-content cache is created. Provider attributions and supplied safe attribution links are retained.
+
+**Tracking & data:** current source configuration values, contact-versus-fix explanation, explicit freshness/unknown/withheld meanings, permitted canonical tracker metadata and handoffs to existing device controls. The directory never returns personal positions or assignment identities. Device model/firmware/profile/command authority remains with Security & Devices; Fleet retains operational interpretation, Client/People owns personal tracking authority, and Control Room owns response. No new threshold, retention policy, profile store or batch-command engine was added.
+
+**Setup and history:** canonical vehicle, asset, Site/room, maintenance, import and boundary workspaces; no duplicate importer or records. Change history shows only the actor's preference changes and, for map managers, shared map configuration saves. Existing import correction and accepted-row preservation remain in the importer.
+
+## Provider coverage and explicit limits
+
+The shared renderer is used by Fleet vehicle location/trip views, Fleet map/dashboard/device views, transport/outing/asset maps, existing resident-tracking/portal maps, shared Security & Devices tracking and Site overview maps. Only the projections already supplied by those source screens are rendered. Their source selection, consent, assignment and visibility rules were not replaced.
+
+Independent map canvases/editors, including the PKG-07 boundary editor and separate Client Location maps, retain their existing renderer and geometry controls. Google is not claimed to replace every map in the application. Address search, reverse lookup and route estimation are available through the explicit Settings map explorer; source workflows have not acquired automatic address enrichment or new route-calculation writes. Live Google billing, quota, browser-key restrictions, current SDK/CSP behaviour and provider availability still require an authorised deployment check with real credentials. No such check was performed.
+
+Google reverse geocoding is now disabled in automatic telemetry ingestion: that path returns no new Google-derived address and does not persist third-party content outside its map context. Explicit Google lookup is handled by the new capability endpoint. Existing Nominatim behaviour remains separately configured; its cache namespace now includes the provider/endpoint. Historical stored addresses and their provenance are not repaired by this change. Main should review this prospective behaviour change explicitly before integration.
+
+**MAIN-TELEM-01 remains open:** the published Queclink normaliser treats HDOP as metre accuracy. The Settings guidance distinguishes dilution of precision from metre accuracy but does not correct the adapter, invent a conversion or rewrite historical evidence. No cross-location accuracy sign-off is claimed.
+
+**People Locations collision:** `resources/views/app.blade.php` was not changed or imported from the unpublished sibling candidate. Main's release revision 2 records the isolated branding repair at `419e4c890` and outstanding genuine 125% verification with that owner. This candidate uses the current published shell and keeps that custody boundary.
+
+## Data, permissions and deployment
+
+- Migration `2026_09_28_000100_add_notification_channel_overrides.php` adds nullable JSON to the existing user preference table. Null preserves legacy full-row meaning; explicit masks permit channel inheritance. Rollback drops only the new field and retains the existing effective channel columns.
+- Existing permissions are reused: Fleet/Assets workspace visibility, `fleet.settings.manage`, `settings.access.manage`, canonical device visibility and each source policy. No permission grant or new role/tenant boundary is introduced.
+- Browser display key remains `GOOGLE_MAPS_API_KEY` through the existing config owner. Server APIs use a separate `GOOGLE_MAPS_SERVER_API_KEY`. Google remains disabled by default; browser/server keys and provider settings must be deployed deliberately. The optional CSP additions preserve nonce-based scripts and do not introduce unsafe script execution.
+- Queue workers must receive the new code before optional source notifications are used. Mail transport/queue health and provider restrictions are deployment concerns, not inferred from a successful settings save.
+- Operating migration, permission rollout, provider/device activation and final acceptance remain outside this isolated candidate. Main technical review and its serial integration slot are still required.
+
+The optional browser fixture harness requires `PKG08_DB_USERNAME` and `PKG08_DB_PASSWORD` supplied locally for a disposable MySQL test database. It generates its own application key. Its generated environment and fixture files are excluded from Git; do not rerun bootstrap against the retained review preview. The browser fixture account is synthetic and does not provide access to operating records.
+
+## Verification
+
+- `settings-tests.xml`: 34 tests / 179 assertions, including durable actor-only changes, inheritance, stale revisions, required-response preservation, no-send checks, permission denial, missing/foreign source denial, map credential separation, paid-request backoff, private history, audit rollback, ingestion protection and existing handover mutation/Site-isolation regressions.
+- `legacy-notification-tests.xml`: 17 existing tests / 60 assertions. The first run exposed an empty Eloquent collection merge error; conversion to a base collection corrected it and the rerun passed.
+- `frontend-tests.json`: 13 tests covering conflict merge/reset inheritance, Google SDK single-load/authentication lifecycle, authorised overlays and cleanup, dashed route meaning, existing popup escaping and device UI contracts. Google SDK/provider responses are synthetic, with no live paid request.
+- `eslint.json`: scoped lint including the shared renderer and navigation. `typecheck.txt` and `build.txt` record final full-project compilation after route generation; generation and TypeScript are sequential to avoid reading transiently deleted generated route files.
+- `browser-verification.json` and `browser/`: owner-run real browser observations/screenshots against the isolated Laravel/Inertia application, separate from the frozen synthetic v6 tests. They cover persistence, filters, shared row actions, preview focus/Escape, conflict/recovery, dry runs, nested guards, source handoffs, history and short-desktop light/dark layouts. The existing header `overflow-clip!` treatment prevents rail focus from scrolling away the title.
+- `device-scope-check.json` records a separate synthetic two-Site check: only the permitted tracker is returned and its projection has no positions or assignment identities. The filled metadata dialog and source handoff were exercised; the source correctly withheld telemetry from the fixture role.
+- A pre-existing user-menu Settings link targets `/profile`, while the published route is `/settings/profile`; it returned 404 in this fixture. This unrelated menu link was not changed. The Settings workspace and canonical importer handoff were verified independently.
+- `preserved-previews.json`: comparison of v1–v5 against v6's saved preservation snapshot, plus all 96 v6 manifest entries and the approved manifest/bundle hashes. Read-only Rory guide hashes are included in `source-manifest.json`.
+
+## Current primary provider references
+
+- [Google API security](https://developers.google.com/maps/api-security-best-practices), [Maps JavaScript keys](https://developers.google.com/maps/documentation/javascript/get-api-key) and [CSP](https://developers.google.com/maps/documentation/javascript/content-security-policy).
+- [Maps JavaScript loading](https://developers.google.com/maps/documentation/javascript/load-maps-js-api) and [deprecations](https://developers.google.com/maps/deprecations). The implementation uses its own overlays and does not depend on the removed Drawing library or deprecated Marker class.
+- [Places Text Search](https://developers.google.com/maps/documentation/places/web-service/text-search), [Routes requests](https://developers.google.com/maps/documentation/routes/compute_route_directions) and [Geocoding policies](https://developers.google.com/maps/documentation/geocoding/policies). Provider content is temporary, attributed and kept in its Google map context.
+
+## Main review correction: T08-01 and T08-02
+
+Parent candidate: `322b4ebfdaf4a242d9bd705b5a6f958ca973f8ee`. This successor changes only `resources/js/components/leaflet-map.tsx` among application sources. Main still has HEAD `926b4981b0289da08a20baca0995117fb53e413e`; no source was written there.
+
+**T08-01 repaired and owner-verified; renewed Main review required.** One outer frame now owns the numeric/default/percentage height, caller classes and border. A definite flex viewport holds either renderer, with the fallback message kept inside the frame. Leaflet resize invalidation retains its compensating pan to prevent geographic centre drift. No Fleet or Vehicle Profile caller was redesigned.
+
+`review-rendered-map-results.json` records five passing real-browser phases (15 map measurements): OSM at full and reduced sizes, synthetic Google at both sizes, and Google failure into real Leaflet. Percentage/fixed/default heights, caller border removal, selection, viewport, removal of temporary provider markers and fallback action reachability were checked. The tolerance allows at most one projected Leaflet pixel after resize. `review-populated-maps.json` and the new Fleet/location/trip screenshots exercise a synthetic vehicle and 21-point journey in the actual Laravel preview. Fleet's previously zero-height map is now 686px within a 688px frame; its resized map is 746px within 748px. The Vehicle Profile journey is 360px and advances from point 1 to point 2.
+
+To repeat the rendered regression, start the separate test-only server from this checkout with `node node_modules/vite/bin/vite.js --config docs/fleet-assets-audit/evidence/PKG-08-implementation/vite.map-regression.mts`, then open `http://127.0.0.1:5195/docs/fleet-assets-audit/evidence/PKG-08-implementation/map-layout.html`. Check layout, resize and check again. Select Synthetic Google case, select Application vehicle, move the synthetic viewport, check, resize/check, fail Google/check. The fixture imports the real shared component and swaps only the SDK in this separate server. No application configuration or application-server alias is altered. A dependency-junction asset restriction left the fixture's stock Layers icon blank; geometry, controls and real application maps were verified independently. This is not live Google SDK/CSP/billing verification.
+
+Fresh checks: `review-frontend-tests.json` (13 tests in five files), `review-eslint.json` (zero errors/warnings), `review-typecheck.txt` (full TypeScript exit 0), and `review-build.txt` (production build exit 0, existing large-chunk warning). Backend sources and tests are byte-identical to the original candidate, so the original 51 tests/239 assertions and Main's independent 12 tests/78 assertions remain the relevant backend evidence; they were not needlessly rerun for this CSS/resize repair. `review-preservation.json` freshly checks all 437 frozen v1–v6 entries, 10 protected authorities and the shared Blade file, with zero mismatches.
+
+**T08-02 remains blocked and unverified.** `review-zoom-blocker.json` records real attempts in IAB and Chrome: the zoom shortcut changed neither page's metrics, and the exposed browser controls offer viewport resizing but no page zoom. OS scaling/DPR and resizing are not substituted. Native computer APIs are disabled. The existing People Locations manual setup request stays with that owner; no duplicate request or browser-policy workaround was made. Filled 125% preview/review/map configuration/nested discard/conflict checks must still run once actual zoom is available. No integration readiness or completion of all review findings is claimed.
+
+MAIN-TELEM-01, provider activation, operating migration/queue rollout and the unpublished People Locations branding correction retain their original ownership and gates.
+
+## Notifications mockup alignment
+
+The user compared the application against the approved v6 mockup and explicitly asked to continue correcting visual fidelity. This successor is based on `b07888e9b413696649ceceb03bbae3ee38edf166` and changes only the Settings workspace and Notifications UI. It restores notification-specific meter cards with live saved/draft counts, the Organisation context chip, visible filter values, Changes shortcut, actor heading, prominent preview/delivery-check actions, distinct event icons, the separate Applied from column and the defaults/reload/save footer followed by the source-owner rule link. Shared list/header/dialog primitives and branding tokens are reused.
+
+The restored controls retain production meaning: supported/configured channel counts come from the server (the synthetic review account has1 of2, not the mockup's simulated2 of3); saved/draft/inherited captions track the actual state. Canonical event descriptions and the published global shell are retained. Saved preferences uses no invented sequential revision number. The top-level preview offers an event selector and returns focus to its initiating control, including when the previewed event changes. Save preferences still opens the existing review before the durable update. Reload saved performs a fresh GET, asks before discarding a dirty draft and retains the draft on failure. Required-response and source-access rules remain unchanged.
+
+Owner verification: `fidelity-browser-verification.json` plus seven `browser/fidelity-*.png` screenshots. Compared1440×1000 light against frozen v6, checked1280×800 light and1366×768 dark; every notification row and footer action is reachable on short desktops, with no page-width overflow. Filled preview footer bottoms are752/800px and721.9/768px respectively. Verified draft summary updates, guarded discard/cancel, server reload, save/reload persistence and restoration of the synthetic fixture's original choice, inherited read-only scope, override filter, top-level/kebab/right-click preview, changed-event focus restoration, Changes and rules destinations. Appearance was restored to light. No external notice or paid provider request was sent.
+
+`fidelity-qa.json` links the fresh four existing draft/inheritance/conflict tests, scoped lint, full TypeScript and production build. Backend and shared map sources are byte-identical to the Main-reviewed parent; existing backend and map verification remains applicable. `fidelity-preservation.json` rechecks all437 frozen preview entries,10 authorities and the shared Blade with zero mismatches.
+
+Main review revision2 closed T08-01 for the shared map repair. T08-02 remains blocked/unverified: these are ordinary desktop viewport checks, not genuine125% browser zoom. The existing People Locations manual setup request remains with that owner. No Main write/integration slot, push, operating migration, new permissions or provider activation is claimed. MAIN-TELEM-01 and unpublished sibling branding custody remain unchanged.

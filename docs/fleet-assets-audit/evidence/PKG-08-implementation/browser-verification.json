@@ -1,0 +1,59 @@
+{
+  "verification": "Owner-run manual browser observations against the isolated Laravel/Inertia application",
+  "preview": "http://127.0.0.1:8794/fleet-assets/settings#notifications",
+  "fixture": "Dedicated disposable synthetic database; no operating records, live notification, Google request or device command",
+  "browser": "Codex in-app browser via CUA",
+  "checks": [
+    { "name": "Durable notification preferences", "result": "pass", "observed": "Booking email disabled, reviewed and saved; clean reload retained the saved value." },
+    { "name": "Defaults and undo", "result": "pass", "observed": "Use defaults changes the draft; Undo restores the previous draft choices." },
+    { "name": "Notification draft recovery", "result": "pass", "observed": "A second clean tab offered the saved browser draft and restored it." },
+    { "name": "Notification concurrent saves", "result": "pass", "observed": "Two tabs produced a 409 conflict; Keep edited channels preserved the edited maintenance channel and adopted the other tab's untouched import choice." },
+    { "name": "Search, scope and filters", "result": "pass", "observed": "Handover search, inherited-event filtering, read-only role defaults, clear filters and header Find view navigation operated correctly." },
+    { "name": "Shared row actions", "result": "pass", "observed": "Kebab and right-click menus exposed the same preview, default and source actions." },
+    { "name": "Notification preview", "result": "pass", "observed": "In-app and email samples reflected the current draft, including email suppression; Rules and source handoffs were available." },
+    { "name": "Preview keyboard focus", "result": "pass", "observed": "Escape closed the preview and returned focus to the invoking row action after the final focus repair." },
+    { "name": "Saved-choice dry run", "result": "pass", "observed": "Check captured the saved revision and channel choices, explicitly sent no messages, and appeared in the actor's last-five history; array mailer was not presented as external delivery." },
+    { "name": "Required-response boundary", "result": "pass", "observed": "Optional preference controls retain the separate Control Room response obligation and do not grant personal-location access." },
+    { "name": "Map draft recovery", "result": "pass", "observed": "Second clean tab restored the entered project text from the pending map configuration draft." },
+    { "name": "Map concurrent saves", "result": "pass", "observed": "Two-tab version conflict displayed the comparison; Keep my changes merged the edited fields and saved." },
+    { "name": "Map activation validation", "result": "pass", "observed": "Attempt without credentials/review returned a useful 422 validation response. Google remained off; cancellation/discard worked." },
+    { "name": "Nested discard guard", "result": "pass", "observed": "Escape from the discard guard returned focus to Cancel in the underlying configuration wizard." },
+    { "name": "Tracking policy details", "result": "pass", "observed": "Current source-owned policy values and the 480px read-only detail dialog were usable." },
+    { "name": "Permitted tracker metadata", "result": "pass", "observed": "Directory progressed from empty state to the permitted synthetic tracker, showing model/firmware/contact metadata. Separate device-scope-check.json confirms foreign-Site exclusion and absence of position/assignment fields." },
+    { "name": "Canonical tracker handoff", "result": "pass", "observed": "Existing device page opened and correctly withheld telemetry from the fixture actor. No device command was executed." },
+    { "name": "Canonical import handoff", "result": "pass", "observed": "Existing importer opened with mapping, validation and correction workflow; no file was uploaded or import executed." },
+    { "name": "Canonical boundary handoff", "result": "pass", "observed": "Existing Maps & boundaries workspace opened with OSM attribution; no boundary was changed." },
+    { "name": "Change history", "result": "pass", "observed": "Own preference saves and permitted shared map saves appeared in history." },
+    { "name": "Header focus and clipping", "result": "pass", "observed": "Shared overflow-clip treatment prevented rail focus from scrolling the page title away." },
+    { "name": "Light and dark layouts", "result": "pass", "observed": "Checked actual 1440x1000, 1366x768 and 1280x800 viewports in both themes. No horizontal overflow in measured short desktop layouts." }
+  ],
+  "measuredLayouts": {
+    "notificationPreviewAt1366x768": { "x": 193, "y": 45.086, "width": 980, "height": 677.828, "footerBottom": 721.914 },
+    "mapWizardAt1280x800": { "x": 150, "y": 47, "width": 980, "height": 706, "footerBottom": 752 },
+    "finalNotifications": { "width": 1440, "height": 1000, "documentWidth": 1440, "openDialogs": 0, "dirtyDraft": false, "theme": "light", "lastErrorLogEntries": [] }
+  },
+  "screenshots": [
+    "browser/notifications-light-1440.png",
+    "browser/notifications-light-1366.png",
+    "browser/notifications-light-1280.png",
+    "browser/notifications-dark-1440.png",
+    "browser/notifications-dark-1366.png",
+    "browser/notification-preview-dark-1440.png",
+    "browser/tracking-dark-1366.png",
+    "browser/tracking-policy-light-1280.png",
+    "browser/permitted-device-dark-1440.png",
+    "browser/map-validation-light-1280.png",
+    "browser/map-capabilities-dark-1280.png",
+    "browser/dry-run-light-1280.png",
+    "browser/canonical-import-light-1440.png"
+  ],
+  "limitations": [
+    "Manual owner observations are not fresh Main execution and are separate from the frozen v6 mockup's 54 journeys.",
+    "Expected 409 and 422 responses occurred during conflict and validation checks; no claim of zero errors across all journeys is made.",
+    "The existing unrelated user-menu Settings link uses /profile and returned 404; canonical settings uses /settings/profile. This baseline menu defect was not changed.",
+    "Reload of a dirty form was prevented or dismissed by the browser; persistence evidence uses a clean reload and draft recovery uses another clean tab.",
+    "Google SDK/API lifecycle uses synthetic automated tests. Live credentials, CSP/provider compatibility, quotas and billing remain an authorised deployment check.",
+    "People Locations genuine 125 percent browser-zoom verification remains with its owner; this packet does not claim it.",
+    "MAIN-TELEM-01 and historical accuracy/address provenance repairs remain outside this candidate."
+  ]
+}

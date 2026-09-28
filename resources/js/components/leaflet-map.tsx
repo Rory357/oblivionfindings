@@ -1,6 +1,9 @@
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { router, usePage } from '@inertiajs/react';
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { GoogleMap } from './maps/google-map';
 
 // Lazy-load leaflet to avoid SSR issues
 let L: typeof import('leaflet') | null = null;
@@ -57,7 +60,13 @@ type PolylineOptions = {
     dashArray?: string;
 };
 
-type LeafletMapProps = {
+export type LeafletMapProps = {
+    preserveViewport?: boolean;
+    googleResults?: {
+        markers?: MapMarker[];
+        polyline?: { lat: number; lng: number }[];
+    };
+    onProviderChange?: (provider: 'google' | 'osm') => void;
     center: { lat: number; lng: number };
     zoom?: number;
     markers?: MapMarker[];
@@ -90,6 +99,8 @@ type LeafletMapProps = {
     onContext?: (point: MapContextPoint) => void;
     /** Street tiles loading or failing, e.g. to offer an unavailable state. */
     onTileStatus?: (status: 'loaded' | 'failed') => void;
+    /** Preserve viewport when the provider changes; application-owned selection stays with the caller. */
+    onViewport?: (center: { lat: number; lng: number }, zoom: number) => void;
 };
 
 // OpenStreetMap's standard tile server — keyless and reliable. (The former
@@ -398,7 +409,10 @@ type ClusterGroup = {
     markers: MapMarker[];
 };
 
-function clusterMarkers(markers: MapMarker[], zoom: number): ClusterGroup[] {
+export function clusterMarkers(
+    markers: MapMarker[],
+    zoom: number,
+): ClusterGroup[] {
     // Grid cell size shrinks as zoom increases
     const gridSize = 360 / Math.pow(2, zoom);
     const buckets: Record<string, ClusterGroup> = {};
@@ -526,15 +540,13 @@ function injectMapStyles() {
 
 // ── Main component ──────────────────────────────────────────────────────────
 
-export default function LeafletMap({
+export function OpenStreetMap({
     center,
     zoom = 13,
     markers = [],
     polyline,
     polylineOptions,
     geofences = [],
-    height = 400,
-    className,
     clustering = false,
     clusterThreshold = 20,
     darkMode,
@@ -547,10 +559,14 @@ export default function LeafletMap({
     observeResize = false,
     onContext,
     onTileStatus,
+    onViewport,
+    preserveViewport = false,
 }: LeafletMapProps) {
     // Read at event time so the latest handlers run; registered only when a
     // handler exists, so other maps keep the browser's own right-click menu.
     const onContextRef = useRef(onContext);
+    const onViewportRef = useRef(onViewport);
+    onViewportRef.current = onViewport;
     onContextRef.current = onContext;
     const onTileStatusRef = useRef(onTileStatus);
     onTileStatusRef.current = onTileStatus;
@@ -853,6 +869,13 @@ export default function LeafletMap({
                     zoomControl: true,
                     attributionControl: true,
                 });
+                mapRef.current.on('moveend', () => {
+                    const point = mapRef.current.getCenter();
+                    onViewportRef.current?.(
+                        { lat: point.lat, lng: point.lng },
+                        mapRef.current.getZoom(),
+                    );
+                });
 
                 const isDark = resolvedDark;
                 const streetUrl = isDark ? DARK_TILE_URL : STREET_TILE_URL;
@@ -914,7 +937,9 @@ export default function LeafletMap({
                     typeof ResizeObserver !== 'undefined'
                 ) {
                     resizeObserverRef.current = new ResizeObserver(() =>
-                        mapRef.current?.invalidateSize({ pan: false }),
+                        // Leaflet's default pan compensates for the changed
+                        // pixel centre; pan:false shifts the geographic view.
+                        mapRef.current?.invalidateSize({ animate: false }),
                     );
                     resizeObserverRef.current.observe(containerRef.current);
                 }
@@ -925,9 +950,9 @@ export default function LeafletMap({
                 // old `mapReady` state trigger so the layer effects below no
                 // longer need an extra dep to fire after init.
                 renderMarkers();
-                fitBoundsToMarkers();
+                if (!preserveViewport) fitBoundsToMarkers();
                 renderPolyline();
-                fitToContent();
+                if (!preserveViewport) fitToContent();
                 renderGeofences();
                 syncClusterZoomListenerRef.current();
             }
@@ -936,7 +961,7 @@ export default function LeafletMap({
         return () => {
             cancelled = true;
         };
-    }, [center.lat, center.lng, resolvedDark, zoom]);
+    }, [center.lat, center.lng, resolvedDark, zoom, preserveViewport]);
 
     // Keep onMapClick ref current
     useEffect(() => {
@@ -1063,21 +1088,137 @@ export default function LeafletMap({
         };
     }, []);
 
-    const heightStyle = typeof height === 'number' ? `${height}px` : height;
-
     return (
         <div
+            ref={containerRef}
+            className="grayscale-map h-full w-full"
+            style={{ height: '100%' }}
+        />
+    );
+}
+
+/** Shared provider boundary. A failed optional provider keeps authorised application overlays usable. */
+export default function LeafletMap(props: LeafletMapProps) {
+    const { fleet } = usePage<{
+        fleet?: {
+            maps?: {
+                provider: string;
+                apiKey: string | null;
+                revision: string;
+            };
+        };
+    }>().props;
+    const provider = fleet?.maps;
+    const [failedRevision, setFailedRevision] = useState<string | null>(null);
+    const [viewport, setViewport] = useState({
+            center: props.center,
+            zoom: props.zoom ?? 13,
+        }),
+        [hadViewport, setHadViewport] = useState(false);
+    const { lat, lng } = props.center,
+        requestedZoom = props.zoom ?? 13;
+    useEffect(() => {
+        setViewport({ center: { lat, lng }, zoom: requestedZoom });
+    }, [lat, lng, requestedZoom]);
+    const onViewport = (center: { lat: number; lng: number }, zoom: number) => {
+        setHadViewport(true);
+        setViewport((previous) =>
+            previous.center.lat === center.lat &&
+            previous.center.lng === center.lng &&
+            previous.zoom === zoom
+                ? previous
+                : { center, zoom },
+        );
+        props.onViewport?.(center, zoom);
+    };
+    useEffect(() => {
+        const changed = (event: StorageEvent) => {
+            if (event.key === 'fleet.maps.configuration.changed')
+                router.reload({ only: ['fleet'], preserveScroll: true });
+        };
+        window.addEventListener('storage', changed);
+        return () => window.removeEventListener('storage', changed);
+    }, []);
+    const google = !!(
+        provider?.provider === 'google' &&
+        provider.apiKey &&
+        provider.revision !== failedRevision
+    );
+    const { onProviderChange } = props;
+    useEffect(() => {
+        onProviderChange?.(google ? 'google' : 'osm');
+    }, [google, onProviderChange]);
+    return (
+        <div
+            data-map-frame
             className={cn(
-                'relative w-full overflow-hidden rounded-lg border border-border',
-                className,
+                'relative flex min-h-0 w-full flex-col overflow-hidden rounded-lg border border-border',
+                props.className,
             )}
-            style={{ zIndex: 0, isolation: 'isolate' }}
+            style={{
+                height: props.height ?? 400,
+                zIndex: 0,
+                isolation: 'isolate',
+            }}
         >
-            <div
-                ref={containerRef}
-                className="w-full"
-                style={{ height: heightStyle }}
-            />
+            {/* The frame owns the caller's height and border. Its remaining
+                space is definite for either provider, including 100% callers. */}
+            <div data-map-viewport className="relative min-h-0 flex-1">
+                {google ? (
+                    <GoogleMap
+                        {...props}
+                        height="100%"
+                        className="h-full w-full"
+                        preserveViewport={hadViewport}
+                        markers={
+                            props.googleResults?.markers
+                                ? [
+                                      ...(props.markers ?? []),
+                                      ...props.googleResults.markers,
+                                  ]
+                                : props.markers
+                        }
+                        polyline={
+                            props.googleResults?.polyline?.length
+                                ? props.googleResults.polyline
+                                : props.polyline
+                        }
+                        apiKey={provider!.apiKey!}
+                        center={viewport.center}
+                        zoom={viewport.zoom}
+                        onViewport={onViewport}
+                        onFailure={() => setFailedRevision(provider!.revision)}
+                    />
+                ) : (
+                    <OpenStreetMap
+                        {...props}
+                        preserveViewport={hadViewport}
+                        center={viewport.center}
+                        zoom={viewport.zoom}
+                        onViewport={onViewport}
+                    />
+                )}
+            </div>
+            {provider?.provider === 'google' &&
+                failedRevision === provider.revision && (
+                    <div
+                        role="status"
+                        className="text-caption flex max-h-[50%] shrink-0 items-center justify-between gap-2 overflow-auto border-t bg-card p-2"
+                    >
+                        <span>
+                            Google Maps is unavailable. Showing OSM. Check the
+                            provider configuration before reloading.
+                        </span>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={() => window.location.reload()}
+                        >
+                            Reload map
+                        </Button>
+                    </div>
+                )}
         </div>
     );
 }

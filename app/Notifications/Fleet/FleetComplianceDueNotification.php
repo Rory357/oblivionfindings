@@ -3,6 +3,7 @@
 namespace App\Notifications\Fleet;
 
 use App\Models\Asset;
+use App\Services\Fleet\FleetNotificationPreferences;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -31,7 +32,9 @@ class FleetComplianceDueNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        return $this->kind === 'maintenance'
+            ? app(FleetNotificationPreferences::class)->channels($notifiable, 'fleet.maintenance_reminders')
+            : ['database', 'mail'];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -41,9 +44,9 @@ class FleetComplianceDueNotification extends Notification
 
         return (new MailMessage)
             ->subject($this->subjectLine($assetName))
-            ->greeting('Kia ora ' . ($notifiable->name ?? 'there') . ',')
+            ->greeting('Kia ora '.($notifiable->name ?? 'there').',')
             ->line($this->headline($assetName, $dueLabel))
-            ->action('View Vehicle', url('/fleet-assets/vehicles/' . $this->asset->id))
+            ->action('View Vehicle', url('/fleet-assets/vehicles/'.$this->asset->id))
             ->line('Please arrange the required work so the vehicle stays compliant and on the road.');
     }
 
@@ -75,17 +78,17 @@ class FleetComplianceDueNotification extends Notification
 
     private function subjectLine(string $assetName): string
     {
-        return $this->title() . ': ' . $assetName;
+        return $this->title().': '.$assetName;
     }
 
     private function headline(string $assetName, string $dueLabel): string
     {
-        return '**' . $assetName . '** — ' . $this->describe($dueLabel);
+        return '**'.$assetName.'** — '.$this->describe($dueLabel);
     }
 
     private function headlinePlain(string $assetName, string $dueLabel): string
     {
-        return $assetName . ' — ' . $this->describe($dueLabel);
+        return $assetName.' — '.$this->describe($dueLabel);
     }
 
     private function describe(string $dueLabel): string

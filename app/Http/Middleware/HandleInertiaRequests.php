@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Domain\Finance\Services\FinanceHubCountsService;
+use App\Domain\Governance\Models\PerformanceReview;
 use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Domain\It\ItModuleNavigation;
 use App\Models\Announcement;
@@ -14,6 +15,7 @@ use App\Models\ShiftOpenPosition;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Assurance\NzsAssuranceResolver;
+use App\Services\Fleet\FleetMapSettings;
 use App\Services\MarScheduleService;
 use App\Services\Operations\OpsMessageVisibilityService;
 use App\Services\Tasks\TaskAggregator;
@@ -281,9 +283,7 @@ class HandleInertiaRequests extends Middleware
                 'time_format' => $user->time_format ?? '24',
             ] : null,
             'fleet' => [
-                'maps' => [
-                    'apiKey' => config('fleet.maps.api_key'),
-                ],
+                'maps' => $user ? app(FleetMapSettings::class)->browser() : ['provider' => 'osm', 'apiKey' => null],
             ],
 
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
@@ -1012,7 +1012,7 @@ class HandleInertiaRequests extends Middleware
                     // own review from the sidebar. Navigation only — the
                     // review policy still authorises every page.
                     'reviewee' => $user->canDo('governance.performance.view')
-                        && \App\Domain\Governance\Models\PerformanceReview::query()
+                        && PerformanceReview::query()
                             ->where('reviewee_id', $user->id)
                             ->exists(),
                 ],

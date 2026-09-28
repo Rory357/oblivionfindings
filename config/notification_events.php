@@ -4,6 +4,12 @@ return [
     // Used for preferences UI + routing defaults.
     // Keys should remain stable (audit/readability).
     'groups' => [
+        'Fleet & Assets' => [
+            'fleet.booking_decisions',
+            'fleet.maintenance_reminders',
+            'fleet.handover_updates',
+            'fleet.import_results',
+        ],
         'Timesheets' => [
             'timesheets.created',
             'timesheets.updated',

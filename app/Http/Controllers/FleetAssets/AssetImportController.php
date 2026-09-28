@@ -9,6 +9,7 @@ use App\Models\AssetImportBatch;
 use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Fleet\FleetOptionalNotice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -79,6 +80,7 @@ class AssetImportController extends Controller
             $batch = AssetImportBatch::whereKey($batch->id)->lockForUpdate()->firstOrFail();
             abort_unless($batch->version === $data['version'], 409, 'This import changed. Reload its saved results before retrying.');
             $rows = $batch->rows;
+            $previousRows = $rows;
             if ($data['action'] === 'validate') {
                 abort_if(collect($rows)->contains('status', 'imported'), 422, 'Mapping is fixed once rows have been imported. Start a new batch for corrected source data.');
                 $mapping = array_intersect_key($data['mapping'] ?? [], array_flip(self::FIELDS));
@@ -144,6 +146,10 @@ class AssetImportController extends Controller
             $batch->rows = $rows;
             $batch->version++;
             $batch->save();
+
+            if ($data['action'] === 'import' && $rows !== $previousRows) {
+                FleetOptionalNotice::afterCommit((int) $batch->created_by_user_id, 'fleet.import_results', $batch->id);
+            }
 
             return $batch;
         }, 3);
