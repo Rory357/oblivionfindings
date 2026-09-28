@@ -111,6 +111,15 @@ class DashboardScheduleCountsTest extends TestCase
                 ->where('schedule', fn ($rows) => collect($rows)->count() === 4
                     && collect($rows)->where('status', 'overdue')->count() === 3
                     && collect($rows)->where('status', 'given')->count() === 1));
+
+        // NF-25: the home /dashboard eMAR widget shows the same numbers.
+        $this->actingAs($this->asManager())
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('emarWidgets.dueNow', 3)
+                ->where('emarWidgets.overdue', 3)
+                ->where('emarWidgets.adminRate', 25));
     }
 
     public function test_admin_rate_is_not_applicable_before_any_dose_is_due(): void
@@ -128,6 +137,13 @@ class DashboardScheduleCountsTest extends TestCase
                 ->where('stats.adminRate', null)
                 ->where('stats.overdue', 0)
                 ->where('stats.dueNow', 0));
+
+        $this->actingAs($this->asManager())
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('emarWidgets.adminRate', null)
+                ->where('emarWidgets.dueNow', 0));
     }
 
     private function seedOneClientOnShift(): void
@@ -184,6 +200,20 @@ class DashboardScheduleCountsTest extends TestCase
             'actual_ends_at' => null,
             'status' => 'in_progress',
         ]);
+    }
+
+    /** /dashboard (and its eMAR widget) is for rostering managers; frontline staff go to My Day. */
+    private function asManager(): User
+    {
+        $this->worker->permissionOverrides()->syncWithoutDetaching(
+            Permission::query()
+                ->where('key', 'shifts.manageAny')
+                ->pluck('id')
+                ->mapWithKeys(fn (int $id) => [$id => ['allowed' => true]])
+                ->all(),
+        );
+
+        return $this->worker->fresh();
     }
 
     private function order(string $name, string $doseTime): ClientMedication

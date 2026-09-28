@@ -64,19 +64,7 @@ class MedicationOverviewService
      */
     public function payload(?Carbon $date = null, ?User $actor = null): array
     {
-        $this->includeControlled = $actor === null
-            || $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
-        if ($actor !== null) {
-            $this->readerSiteIds = $this->governanceScope->readerSiteIds(
-                $actor,
-                MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
-            );
-            $this->readerClientIds = Client::query()
-                ->whereIn('site_id', $this->readerSiteIds)
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-        }
+        $this->scopeToReader($actor);
 
         // The dashboard day and clock are the worker's (NZ) day and clock —
         // the same ones Meds today and the MAR use — never the UTC date.
@@ -112,6 +100,80 @@ class MedicationOverviewService
             'medicationOptions' => $this->medicationOptions(),
             'witnesses' => $this->witnesses(),
             'notGivenReasons' => NotGivenReason::options(),
+        ];
+    }
+
+    /**
+     * Scheduled-dose counts for another surface (the /dashboard eMAR widget,
+     * NF-25): the same reader Site scope, controlled-medicine concealment,
+     * schedule and definitions as the eMAR dashboard.
+     *
+     * @return array{total: int, given: int, refused: int, withheld: int, missed: int, overdue: int, due: int, dueNow: int, notYetRecorded: int, eligible: int, adminRate: float|null}
+     */
+    public function doseSummary(User $actor, ?Carbon $date = null): array
+    {
+        $this->scopeToReader($actor);
+
+        return $this->doseCounts($this->workerDate($date));
+    }
+
+    /** Limit every read to the actor's approved Sites (null actor = unscoped internal use). */
+    private function scopeToReader(?User $actor): void
+    {
+        $this->includeControlled = $actor === null
+            || $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
+        if ($actor !== null) {
+            $this->readerSiteIds = $this->governanceScope->readerSiteIds(
+                $actor,
+                MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+            );
+            $this->readerClientIds = Client::query()
+                ->whereIn('site_id', $this->readerSiteIds)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+    }
+
+    /**
+     * EM-01: dose counts come from the scheduled slots Meds today and the MAR
+     * use. Production never writes `pending` administration rows, so counting
+     * them made "due now" and "overdue" structurally zero.
+     *
+     * Admin rate = given ÷ eligible scheduled doses (slots already recorded
+     * or whose time has come). Nothing eligible is "n/a" (null), never a
+     * reassuring 0 %.
+     *
+     * @return array{total: int, given: int, refused: int, withheld: int, missed: int, overdue: int, due: int, dueNow: int, notYetRecorded: int, eligible: int, adminRate: float|null}
+     */
+    private function doseCounts(Carbon $date): array
+    {
+        $doses = collect($this->scheduledDoses($date));
+        $countStatus = fn (string ...$statuses): int => $doses
+            ->filter(fn (array $row): bool => in_array($row['status'], $statuses, true))
+            ->count();
+
+        $now = $this->workerNow();
+        $eligible = $doses
+            ->filter(fn (array $row): bool => $row['recorded'] !== null
+                || Carbon::parse($row['scheduled_for'])->lte($now))
+            ->count();
+        $given = $countStatus('given');
+        $overdue = $countStatus('overdue');
+        $due = $countStatus('due');
+
+        return [
+            'total' => $doses->count(),
+            'given' => $given,
+            'refused' => $countStatus('refused'),
+            'withheld' => $countStatus('withheld'),
+            'missed' => $countStatus('missed'),
+            'overdue' => $overdue,
+            'due' => $due,
+            'dueNow' => $overdue + $due,
+            'notYetRecorded' => $countStatus('overdue', 'due', 'upcoming'),
+            'eligible' => $eligible,
+            'adminRate' => $eligible > 0 ? round(($given / $eligible) * 100, 1) : null,
         ];
     }
 
@@ -265,28 +327,7 @@ class MedicationOverviewService
 
     public function stats(Carbon $date): array
     {
-        // EM-01: dose counts come from the scheduled slots Meds today and the
-        // MAR use. Production never writes `pending` administration rows, so
-        // counting them made "due now" and "overdue" structurally zero.
-        $doses = collect($this->scheduledDoses($date));
-        $countStatus = fn (string ...$statuses): int => $doses
-            ->filter(fn (array $row): bool => in_array($row['status'], $statuses, true))
-            ->count();
-
-        $total = $doses->count();
-        $given = $countStatus('given');
-        $overdue = $countStatus('overdue');
-        $dueWithinHour = $countStatus('due');
-        $notYetRecorded = $countStatus('overdue', 'due', 'upcoming');
-
-        // Admin rate = given ÷ eligible scheduled doses: slots already
-        // recorded or whose time has come. Nothing eligible is "n/a" (null),
-        // never a reassuring 0 %.
-        $now = $this->workerNow();
-        $eligible = $doses
-            ->filter(fn (array $row): bool => $row['recorded'] !== null
-                || Carbon::parse($row['scheduled_for'])->lte($now))
-            ->count();
+        $doses = $this->doseCounts($date);
 
         [$dayStartUtc, $dayEndUtc] = $this->utcDay($date);
         $prnToday = $this->effectiveAdministrationRows(ClientMedicationAdministration::query())
@@ -327,17 +368,17 @@ class MedicationOverviewService
         $trend = $this->trend($date);
 
         return [
-            'totalToday' => $total,
-            'givenToday' => $given,
-            'refusedToday' => $countStatus('refused'),
-            'withheldToday' => $countStatus('withheld'),
-            'missedToday' => $countStatus('missed'),
-            'pendingToday' => $notYetRecorded,
-            'eligibleToday' => $eligible,
-            'adminRate' => $eligible > 0 ? round(($given / $eligible) * 100, 1) : null,
-            'dueNow' => $overdue + $dueWithinHour,
-            'overdue' => $overdue,
-            'missed' => $countStatus('missed'),
+            'totalToday' => $doses['total'],
+            'givenToday' => $doses['given'],
+            'refusedToday' => $doses['refused'],
+            'withheldToday' => $doses['withheld'],
+            'missedToday' => $doses['missed'],
+            'pendingToday' => $doses['notYetRecorded'],
+            'eligibleToday' => $doses['eligible'],
+            'adminRate' => $doses['adminRate'],
+            'dueNow' => $doses['dueNow'],
+            'overdue' => $doses['overdue'],
+            'missed' => $doses['missed'],
             'prnToday' => $prnToday,
             'controlledCount' => ClientMedication::active()->controlled()->whereIn('client_id', $allowedClientIds)->count(),
             'cdDue' => ClientMedication::active()->controlled()->whereIn('client_id', $allowedClientIds)->count(),

@@ -182,8 +182,11 @@ type Props = {
     } | null;
     /* eMAR */
     emarWidgets?: {
-        adminRate: number;
-        pending: number;
+        /** Given ÷ due scheduled doses (same as /emar); null = none due yet. */
+        adminRate: number | null;
+        /** Unrecorded scheduled doses that are overdue or due within the hour. */
+        dueNow: number;
+        overdue: number;
         activeAlerts: number;
         overdueReviews: number;
         lowStock: number;
@@ -384,19 +387,27 @@ function ManagerDashboard({ props }: { props: Props }) {
                         <CardContent>
                             <div className="grid grid-cols-1 gap-4 text-center sm:grid-cols-3">
                                 <div>
-                                    <p className="text-2xl font-bold text-status-success">
-                                        {props.emarWidgets.adminRate}%
+                                    <p
+                                        className={`text-2xl font-bold ${props.emarWidgets.adminRate === null ? 'text-muted-foreground' : 'text-status-success'}`}
+                                    >
+                                        {props.emarWidgets.adminRate === null
+                                            ? 'n/a'
+                                            : `${props.emarWidgets.adminRate}%`}
                                     </p>
                                     <p className="text-[10px] text-muted-foreground">
                                         Admin Rate
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-2xl font-bold">
-                                        {props.emarWidgets.pending}
+                                    <p
+                                        className={`text-2xl font-bold ${props.emarWidgets.overdue > 0 ? 'text-status-critical' : ''}`}
+                                    >
+                                        {props.emarWidgets.dueNow}
                                     </p>
                                     <p className="text-[10px] text-muted-foreground">
-                                        Pending
+                                        {props.emarWidgets.overdue > 0
+                                            ? `Due now · ${props.emarWidgets.overdue} overdue`
+                                            : 'Due now'}
                                     </p>
                                 </div>
                                 <div>

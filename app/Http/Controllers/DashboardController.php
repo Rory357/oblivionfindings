@@ -12,7 +12,6 @@ use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\Client;
 use App\Models\ClientIncident;
-use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\IncidentFollowup;
 use App\Models\MedicationDashboardAlert;
@@ -23,6 +22,7 @@ use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationTimelineVisibilityService;
+use App\Services\MedicationOverviewService;
 use App\Services\WorkstreamService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -492,20 +492,12 @@ class DashboardController extends Controller
                 $user,
                 MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
             );
-            $todayAdminQuery = ClientMedicationAdministration::query()
-                ->effectiveClinicalEvidence()
-                ->where(function ($query) use ($today): void {
-                    $query->whereDate('scheduled_for', $today)
-                        ->orWhereDate('administered_at', $today);
-                });
-            $todayAdminQuery = $medicationScope
-                ->scopeCanonicalClientMedicationRows($todayAdminQuery, $siteIds, false);
-            if (! $canViewControlled) {
-                $medicationScope->scopeWithoutControlledMedicationRows($todayAdminQuery);
-            }
-            $todayAdmins = $todayAdminQuery
-                ->selectRaw("COUNT(*) as total, SUM(CASE WHEN status='given' THEN 1 ELSE 0 END) as given")
-                ->first();
+            // NF-25: the same scheduled-dose counts as the eMAR dashboard —
+            // reader Sites, controlled concealment, the worker (NZ) day, and
+            // admin rate = given ÷ eligible scheduled doses (null = "n/a").
+            // Recorded-row counts were given ÷ recorded, and UTC-dated.
+            $doses = app(MedicationOverviewService::class)->doseSummary($user);
+            $workerToday = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
             $alertQuery = $medicationScope->scopeCanonicalClientMedicationRows(
                 MedicationDashboardAlert::query()->where('status', 'active'),
                 $siteIds,
@@ -518,15 +510,14 @@ class DashboardController extends Controller
                 ]);
                 $medicationScope->scopeWithoutControlledMedicationRows($alertQuery);
             }
-            $emarTotal = (int) ($todayAdmins->total ?? 0);
-            $emarGiven = (int) ($todayAdmins->given ?? 0);
             $emarWidgets = [
-                'adminRate' => $emarTotal > 0 ? round(($emarGiven / $emarTotal) * 100, 1) : 0,
-                'pending' => $emarTotal - $emarGiven,
+                'adminRate' => $doses['adminRate'],
+                'dueNow' => $doses['dueNow'],
+                'overdue' => $doses['overdue'],
                 'activeAlerts' => $alertQuery->count(),
                 'overdueReviews' => MedicationReview::where('status', 'scheduled')
                     ->whereHas('client', fn ($query) => $query->whereIn('site_id', $siteIds))
-                    ->where('scheduled_date', '<', $today->toDateString())
+                    ->where('scheduled_date', '<', $workerToday)
                     ->count(),
                 'lowStock' => ClientMedicationStock::whereHas('medication', fn ($query) => $query
                     ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))

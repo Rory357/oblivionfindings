@@ -14,6 +14,7 @@ use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -24,7 +25,17 @@ class MedicationGenericReportingSurfaceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // The /dashboard eMAR widget counts scheduled 09:00 slots on the
+        // worker (NZ) day (NF-25): pin the clock after that slot.
+        Carbon::setTestNow(Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland'));
         $this->seed(RbacSeeder::class);
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
     }
 
     public function test_generic_reports_and_compliance_conceal_controlled_foreign_and_forged_rows(): void
@@ -93,8 +104,12 @@ class MedicationGenericReportingSurfaceTest extends TestCase
             collect($medicationRows)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all(),
         );
 
+        // Ordinary reader: the local ordinary 09:00 dose (recorded missed) and
+        // the replacement order's unrecorded 09:00 dose — never the
+        // controlled one.
         $dashboard = $this->actingAs($ordinary)->get(route('dashboard'))->assertOk();
-        $this->assertSame(1, $dashboard->inertiaProps('emarWidgets.pending'));
+        $this->assertSame(1, $dashboard->inertiaProps('emarWidgets.dueNow'));
+        $this->assertSame(1, $dashboard->inertiaProps('emarWidgets.overdue'));
         $this->assertSame(1, $dashboard->inertiaProps('emarWidgets.lowStock'));
 
         $compliance = $this->actingAs($ordinary)->get(route('compliance.index'))->assertOk();
@@ -185,7 +200,8 @@ class MedicationGenericReportingSurfaceTest extends TestCase
         $this->assertSame(1, $controlledReports->inertiaProps('kpis.openDiscrepancies'));
 
         $controlledDashboard = $this->actingAs($controlledReader)->get(route('dashboard'))->assertOk();
-        $this->assertSame(2, $controlledDashboard->inertiaProps('emarWidgets.pending'));
+        // The controlled reader also counts the active controlled 09:00 dose.
+        $this->assertSame(2, $controlledDashboard->inertiaProps('emarWidgets.dueNow'));
         $this->assertSame(2, $controlledDashboard->inertiaProps('emarWidgets.lowStock'));
 
         $controlledCompliance = $this->actingAs($controlledReader)
@@ -285,7 +301,8 @@ class MedicationGenericReportingSurfaceTest extends TestCase
             'client_medication_id' => $medication->id,
             'service_context_id' => $client->service_context_id,
             'administered_by' => $recorder->id,
-            'scheduled_for' => now(),
+            // On the order's 09:00 slot, so the schedule matches it.
+            'scheduled_for' => Carbon::parse('2026-05-21 09:00:00', 'Pacific/Auckland')->utc(),
             'administered_at' => now(),
             'status' => 'missed',
             'dose_given' => '1 tablet',
