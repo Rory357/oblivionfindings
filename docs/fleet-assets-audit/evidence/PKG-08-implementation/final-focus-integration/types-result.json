@@ -1,0 +1,16 @@
+{
+  "job": "types",
+  "attempt": "",
+  "command": {
+    "executable": "C:\\Users\\steph\\.hermes\\node\\node.exe",
+    "args": [
+      "node_modules/typescript/bin/tsc",
+      "--noEmit"
+    ],
+    "cwd": "C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings"
+  },
+  "startedAt": "2026-09-28T05:05:41.649Z",
+  "finishedAt": "2026-09-28T05:07:51.009Z",
+  "exitCode": 0,
+  "signal": null
+}

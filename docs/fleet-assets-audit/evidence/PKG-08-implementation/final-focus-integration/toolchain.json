@@ -1,0 +1,12 @@
+{
+  "node": "v22.23.2",
+  "php": "8.4.16",
+  "packages": {
+    "vite": "7.3.6",
+    "vitest": "4.1.5",
+    "typescript": "5.9.3",
+    "eslint": "9.39.2"
+  },
+  "dependencyDirectory": "C:\\Users\\steph\\Herd\\oblivionfindings\\node_modules",
+  "dependenciesInstalledInThisTurn": false
+}

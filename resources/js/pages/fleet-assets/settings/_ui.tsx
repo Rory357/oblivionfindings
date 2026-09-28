@@ -12,7 +12,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Info } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 
 export function Notice({ children }: { children: ReactNode }) {
     return (
@@ -58,16 +58,21 @@ export function Modal({
     children,
     footer,
     onClose,
+    onCloseAutoFocus,
 }: {
     title: string;
     description: string;
     children: ReactNode;
     footer?: ReactNode;
     onClose: () => void;
+    onCloseAutoFocus?: ComponentProps<typeof DialogContent>['onCloseAutoFocus'];
 }) {
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="flex max-h-[88vh] flex-col overflow-hidden p-0 sm:max-w-[480px]">
+            <DialogContent
+                className="flex max-h-[88vh] flex-col overflow-hidden p-0 sm:max-w-[480px]"
+                onCloseAutoFocus={onCloseAutoFocus}
+            >
                 <div className="shrink-0 border-b p-5 pr-12">
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription className="mt-2">

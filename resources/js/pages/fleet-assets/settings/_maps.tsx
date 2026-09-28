@@ -25,7 +25,7 @@ import {
     Settings2,
     Shield,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MapTools } from './_map-tools';
 import type { MapSnapshot, MapValues } from './_types';
 import { mergeMapDraft } from './_types';
@@ -89,6 +89,7 @@ export function Maps({
         } | null>(null),
         [draftReady, setDraftReady] = useState(false);
     const storageKey = `fleet.maps.draft.${userId}`;
+    const discardClosesProvider = useRef(false);
     const dirty = JSON.stringify(draft) !== JSON.stringify(saved.values);
     useEffect(() => {
         try {
@@ -638,6 +639,13 @@ export function Maps({
                     title="Discard map changes?"
                     description="Your saved map configuration will be kept."
                     onClose={() => setDiscard(false)}
+                    onCloseAutoFocus={(event) => {
+                        if (discardClosesProvider.current) {
+                            // The closing provider owns restoration to its opener.
+                            event.preventDefault();
+                            discardClosesProvider.current = false;
+                        }
+                    }}
                     footer={
                         <>
                             <Button
@@ -648,6 +656,7 @@ export function Maps({
                             </Button>
                             <Button
                                 onClick={() => {
+                                    discardClosesProvider.current = true;
                                     setDiscard(false);
                                     setOpen(false);
                                     setDraft(saved.values);

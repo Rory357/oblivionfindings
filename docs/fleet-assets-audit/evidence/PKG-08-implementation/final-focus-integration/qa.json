@@ -1,0 +1,118 @@
+{
+  "checkedAt": "2026-09-28T05:08:28.655Z",
+  "base": "a3cb72895ce6682bcf39fe6276ce38955987bd7d",
+  "reviewedFocusCommit": "2f788b0b880e9b838c0b89b3c8eba2ecd57bf097",
+  "frontend": {
+    "passed": 15,
+    "failed": 0,
+    "files": 4
+  },
+  "lint": {
+    "files": 3,
+    "errors": 0,
+    "warnings": 0
+  },
+  "typecheck": {
+    "exitCode": 0,
+    "scope": "Full repository TypeScript, after production route generation"
+  },
+  "productionBuild": {
+    "exitCode": 0,
+    "warning": "Vite reports chunks over 500 kB after minification; complete build log retained."
+  },
+  "attempts": {
+    "tests-final": {
+      "job": "tests",
+      "attempt": "final",
+      "command": {
+        "executable": "C:\\Users\\steph\\.hermes\\node\\node.exe",
+        "args": [
+          "C:/Users/steph/.codex/visualizations/2026/09/27/01a0e1a8-1548-7873-a062-e0db43eed7e1/final-focus-vite-worker.mjs",
+          "tests",
+          "final"
+        ],
+        "cwd": "C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings"
+      },
+      "configLoader": "runner with repository-root __dirname shim",
+      "cacheDirectory": "storage/framework/pkg08-map-regression/final-focus-qa-cache",
+      "startedAt": "2026-09-28T04:59:10.355Z",
+      "finishedAt": "2026-09-28T04:59:39.147Z",
+      "exitCode": 0,
+      "signal": null
+    },
+    "lint": {
+      "job": "lint",
+      "command": {
+        "executable": "C:\\Users\\steph\\.hermes\\node\\node.exe",
+        "args": [
+          "node_modules/eslint/bin/eslint.js",
+          "resources/js/pages/fleet-assets/settings/_maps.tsx",
+          "resources/js/pages/fleet-assets/settings/_ui.tsx",
+          "resources/js/pages/fleet-assets/settings/maps-focus.test.tsx",
+          "--max-warnings=0",
+          "--format=json",
+          "--output-file",
+          "C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings/docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/eslint.json"
+        ],
+        "cwd": "C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings"
+      },
+      "startedAt": "2026-09-28T04:57:49.523Z",
+      "finishedAt": "2026-09-28T04:58:01.128Z",
+      "exitCode": 0,
+      "signal": null
+    },
+    "build": {
+      "job": "build",
+      "attempt": "",
+      "command": {
+        "executable": "C:\\Users\\steph\\.hermes\\node\\node.exe",
+        "args": [
+          "C:/Users/steph/.codex/visualizations/2026/09/27/01a0e1a8-1548-7873-a062-e0db43eed7e1/final-focus-vite-worker.mjs",
+          "build"
+        ],
+        "cwd": "C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings"
+      },
+      "configLoader": "runner with repository-root __dirname shim",
+      "cacheDirectory": "storage/framework/pkg08-map-regression/final-focus-qa-cache",
+      "startedAt": "2026-09-28T05:00:03.389Z",
+      "finishedAt": "2026-09-28T05:05:29.177Z",
+      "exitCode": 0,
+      "signal": null
+    },
+    "types": {
+      "job": "types",
+      "attempt": "",
+      "command": {
+        "executable": "C:\\Users\\steph\\.hermes\\node\\node.exe",
+        "args": [
+          "node_modules/typescript/bin/tsc",
+          "--noEmit"
+        ],
+        "cwd": "C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings"
+      },
+      "startedAt": "2026-09-28T05:05:41.649Z",
+      "finishedAt": "2026-09-28T05:07:51.009Z",
+      "exitCode": 0,
+      "signal": null
+    }
+  },
+  "retainedInitialFailure": {
+    "log": "tests.log",
+    "result": "tests-result.json",
+    "reason": "Runner loader did not inject __dirname used by the existing config; no tests ran. Harness supplied the repository-root value, with no source/config changes."
+  },
+  "backend": {
+    "reused": true,
+    "rerun": false,
+    "tests": 494,
+    "assertions": 5905,
+    "failed": 0,
+    "evidence": "docs/fleet-assets-audit/evidence/CONSOLIDATION-QA/backend-final-summary.json",
+    "sha256": "70c534d7adb1f4dcbfd96358aca9d986382a1ed2ae62d397a198b57cc4de592e"
+  },
+  "browser": {
+    "runInThisIntegration": false,
+    "reportedByMain": "Main approved the reviewed focus commit after actual Chrome125% at CSS1024x576, nested-discard focus and two-tab map/preference409 checks. This is prior verification on the identical focus files, not a fresh browser claim on the combined tree."
+  },
+  "operations": "Local integration in the existing checkout only. No Main checkout source writes, push, browser interaction, database suite, migration, fixture, credentials, provider, device or notification action."
+}

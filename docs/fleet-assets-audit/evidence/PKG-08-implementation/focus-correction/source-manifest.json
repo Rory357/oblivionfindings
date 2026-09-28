@@ -1,0 +1,13 @@
+{
+  "parent": "38239d35506bf97c4b6f865a13aa10933b4cb439",
+  "checkedAt": "2026-09-28T04:46:51.497Z",
+  "files": {
+    "resources/js/pages/fleet-assets/settings/_maps.tsx": "a8ee1445b2ac57e4d16ae86848c4682ae9142624e39aa2cd0670185e25dff244",
+    "resources/js/pages/fleet-assets/settings/_ui.tsx": "6a2282273398f26ce4e4017cd5ad112d7550780d7dce51567e6529ace8d166bf",
+    "resources/js/pages/fleet-assets/settings/maps-focus.test.tsx": "0c29332aafe9423f8a6319cc9a4650469803cb25dce7c752770a9427989565ae"
+  },
+  "priorManifestSha256": "2658daa681789fb2afcdee76595ae6825e8fc11a8b26a98fc0b7516ec0895b76",
+  "sharedDialogAndWizardUnchanged": true,
+  "authorityFilesVerified": 10,
+  "protectedBladeUnchanged": true
+}
