@@ -17,6 +17,7 @@ import {
 import {
     __resetOfflineQueueRuntimeForTests,
     __setOfflineQueueStorageForTests,
+    dismissRejectedOfflineSubmissions,
     EphemeralCredentialQueueError,
     getPendingCount,
     OfflineQueueStorageError,
@@ -530,7 +531,9 @@ describe('offline queue', () => {
         );
 
         setOfflineQueueActor(101);
-        mockedAxios.mockResolvedValueOnce({ data: { success: true } });
+        mockedAxios.mockResolvedValueOnce({
+            data: { success: true, sync: { status: 'synced' } },
+        });
         await replayOfflineQueue();
 
         expect(mockedAxios).toHaveBeenCalledWith(
@@ -661,7 +664,9 @@ describe('offline queue', () => {
     it('replays queued submissions and clears successful items', async () => {
         const storage = createStorage([queuedSubmission()]);
         __setOfflineQueueStorageForTests(storage);
-        mockedAxios.mockResolvedValueOnce({ data: { success: true } });
+        mockedAxios.mockResolvedValueOnce({
+            data: { success: true, sync: { status: 'synced' } },
+        });
 
         await replayOfflineQueue();
 
@@ -678,7 +683,7 @@ describe('offline queue', () => {
         expect(toast.success).toHaveBeenCalledWith('Queued item sent.');
     });
 
-    it('drops conflict responses and emits the eMAR conflict event', async () => {
+    it('keeps a conflict visible as not recorded and emits the eMAR conflict event', async () => {
         const storage = createStorage([queuedSubmission()]);
         __setOfflineQueueStorageForTests(storage);
         const conflictSpy = vi.fn();
@@ -698,9 +703,17 @@ describe('offline queue', () => {
 
         await replayOfflineQueue();
 
-        expect(storage.items()).toHaveLength(0);
+        expect(storage.items()).toHaveLength(1);
+        expect(storage.items()[0]).toMatchObject({
+            rejected: true,
+            needsAttention: true,
+            lastError: 'Medication state changed.',
+        });
         expect(conflictSpy).toHaveBeenCalled();
-        expect(toast.error).toHaveBeenCalledWith('Medication state changed.');
+        expect(toast.error).toHaveBeenCalledWith(
+            'Not recorded — Medication state changed.',
+        );
+        expect(toast.success).not.toHaveBeenCalled();
 
         window.removeEventListener('emar:offline-conflict', conflictSpy);
     });
@@ -739,7 +752,9 @@ describe('offline queue', () => {
         });
         const storage = createStorage([item]);
         __setOfflineQueueStorageForTests(storage);
-        mockedAxios.mockResolvedValueOnce({ data: { success: true } });
+        mockedAxios.mockResolvedValueOnce({
+            data: { success: true, sync: { status: 'synced' } },
+        });
 
         await retryOfflineSubmissionsNeedingAttention();
 
@@ -767,6 +782,184 @@ describe('offline queue', () => {
             action: 'administration',
             id: 'c7ca4a4d-b4f6-4335-a2ad-a554ab74d0fc',
             createdAt: '2026-04-30T10:00:00.000Z',
+        });
+    });
+
+    describe('EM-26: a refused PRN is never reported as recorded', () => {
+        const overLimitRejection = {
+            isAxiosError: true,
+            message: 'Request failed with status code 422',
+            response: {
+                status: 422,
+                data: {
+                    success: false,
+                    error: 'PRN limit reached (4 of 4 in 24 hours).',
+                    error_field: 'client_medication_id',
+                    errors: {
+                        client_medication_id: [
+                            'PRN limit reached (4 of 4 in 24 hours).',
+                        ],
+                    },
+                    sync: {
+                        status: 'rejected',
+                        message: 'PRN limit reached (4 of 4 in 24 hours).',
+                    },
+                },
+            },
+        };
+
+        it('keeps a replayed over-limit PRN visible as not recorded instead of deleting it', async () => {
+            const storage = createStorage([queuedSubmission()]);
+            __setOfflineQueueStorageForTests(storage);
+            mockedAxios.mockRejectedValueOnce(overLimitRejection);
+
+            await replayOfflineQueue();
+
+            expect(storage.items()).toHaveLength(1);
+            expect(storage.items()[0]).toMatchObject({
+                id: 'a92be861-e38f-4cb0-8daf-87bd65dfcae7',
+                rejected: true,
+                needsAttention: true,
+                lastError: 'PRN limit reached (4 of 4 in 24 hours).',
+            });
+            expect(toast.error).toHaveBeenCalledWith(
+                'Not recorded — PRN limit reached (4 of 4 in 24 hours).',
+            );
+            expect(toast.success).not.toHaveBeenCalled();
+            await expect(getPendingCount()).resolves.toBe(0);
+        });
+
+        it('never resends a refused item on manual retry, and dismiss removes only refused items', async () => {
+            const refused = queuedSubmission({
+                attempts: 1,
+                needsAttention: true,
+                rejected: true,
+                lastError: 'Awaiting pharmacist verification.',
+            });
+            const uncertain = queuedSubmission({
+                id: '0f8c3d0e-2c1d-4f7a-9b3e-2d4c5e6f7a8b',
+                payload: {
+                    client_request_uuid: '0f8c3d0e-2c1d-4f7a-9b3e-2d4c5e6f7a8b',
+                    queued_offline: true,
+                },
+                createdAt: '2026-04-30T09:10:00.000Z',
+                attempts: 8,
+                needsAttention: true,
+            });
+            const storage = createStorage([refused, uncertain]);
+            __setOfflineQueueStorageForTests(storage);
+            mockedAxios.mockResolvedValueOnce({
+                data: { success: true, sync: { status: 'synced' } },
+            });
+
+            await retryOfflineSubmissionsNeedingAttention();
+
+            expect(mockedAxios).toHaveBeenCalledTimes(1);
+            expect(mockedAxios).toHaveBeenCalledWith(
+                expect.objectContaining({ data: uncertain.payload }),
+            );
+            expect(storage.items()).toEqual([refused]);
+
+            await dismissRejectedOfflineSubmissions();
+            expect(storage.items()).toHaveLength(0);
+        });
+
+        it('does not clear a replayed item when the server answers without a sync envelope', async () => {
+            const storage = createStorage([queuedSubmission()]);
+            __setOfflineQueueStorageForTests(storage);
+            // axios followed a legacy redirect to an HTML page.
+            mockedAxios.mockResolvedValueOnce({ data: '<!DOCTYPE html>' });
+
+            await replayOfflineQueue();
+
+            expect(storage.items()).toHaveLength(1);
+            expect(storage.items()[0]).toMatchObject({
+                needsAttention: true,
+            });
+            expect(storage.items()[0].rejected).toBeUndefined();
+            expect(storage.items()[0].payload).toEqual(
+                queuedSubmission().payload,
+            );
+            expect(toast.success).not.toHaveBeenCalled();
+        });
+
+        it('rejects an online PRN refusal through submitEmarMutation without a success toast', async () => {
+            mockedAxios.mockRejectedValueOnce(overLimitRejection);
+
+            await expect(
+                submitEmarMutation(
+                    '/meds/today/prn',
+                    { client_medication_id: 42 },
+                    {
+                        action: 'prn',
+                        successMessage: 'PRN administration recorded.',
+                    },
+                ),
+            ).rejects.toMatchObject({ response: { status: 422 } });
+
+            expect(toast.success).not.toHaveBeenCalled();
+        });
+
+        it('does not report a followed redirect as recorded', async () => {
+            mockedAxios.mockResolvedValueOnce({ data: '<!DOCTYPE html>' });
+
+            const result = await submitEmarMutation(
+                '/meds/today/prn',
+                { client_medication_id: 42 },
+                {
+                    action: 'prn',
+                    successMessage: 'PRN administration recorded.',
+                },
+            );
+
+            expect(result.status).toBe('rejected');
+            expect(toast.success).not.toHaveBeenCalled();
+            expect(toast.error).toHaveBeenCalledWith(
+                expect.stringContaining('did not confirm this was saved'),
+            );
+        });
+
+        it('does not report a 200 rejected envelope as recorded (online-only path)', async () => {
+            mockedAxios.mockResolvedValueOnce({
+                data: {
+                    success: false,
+                    sync: { status: 'rejected', message: 'Witness required.' },
+                },
+            });
+
+            const result = await submitEmarMutation(
+                '/meds/today/prn',
+                { client_medication_id: 42 },
+                {
+                    action: 'prn',
+                    allowQueueWhenOffline: false,
+                    successMessage: 'PRN administration recorded.',
+                },
+            );
+
+            expect(result.status).toBe('rejected');
+            expect(toast.success).not.toHaveBeenCalled();
+            expect(toast.error).toHaveBeenCalledWith('Witness required.');
+        });
+
+        it('reports success only for a confirmed sync envelope', async () => {
+            mockedAxios.mockResolvedValueOnce({
+                data: { success: true, sync: { status: 'processed' } },
+            });
+
+            const result = await submitEmarMutation(
+                '/meds/today/prn',
+                { client_medication_id: 42 },
+                {
+                    action: 'prn',
+                    successMessage: 'PRN administration recorded.',
+                },
+            );
+
+            expect(result.status).toBe('processed');
+            expect(toast.success).toHaveBeenCalledWith(
+                'PRN administration recorded.',
+            );
         });
     });
 });

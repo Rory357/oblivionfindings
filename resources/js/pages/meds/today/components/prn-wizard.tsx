@@ -32,9 +32,14 @@ import {
     submitEmarMutation,
 } from '@/lib/emar-offline';
 import { applyFormRequestErrors } from '@/lib/form-request-errors';
-import { createOfflineRequestUuid } from '@/lib/offline-queue';
+import {
+    createOfflineRequestUuid,
+    readServerSyncOutcome,
+    serverRejectionMessage,
+} from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
 import { router, useForm } from '@inertiajs/react';
+import axios from 'axios';
 import {
     AlertTriangle,
     Check,
@@ -127,6 +132,10 @@ export function PrnWizard({
     const [severity, setSeverity] = useState<Severity>('moderate');
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [submitting, setSubmitting] = useState(false);
+    // A server refusal (over limit, awaiting verification, competency,
+    // witness) keeps the worker on Review with a blocking "not recorded"
+    // message — the field it names may not be rendered on any step.
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const submissionReplay = useRef({
         uuid: createOfflineRequestUuid(),
         fingerprint: null as string | null,
@@ -241,6 +250,7 @@ export function PrnWizard({
         };
 
         setSubmitting(true);
+        setSubmitError(null);
         form.clearErrors();
         try {
             const result = await submitEmarMutation(
@@ -261,6 +271,27 @@ export function PrnWizard({
             }
             resetAndClose();
         } catch (error) {
+            const body = axios.isAxiosError(error)
+                ? error.response?.data
+                : undefined;
+            if (readServerSyncOutcome(body).kind === 'rejected') {
+                const message =
+                    serverRejectionMessage(body) ??
+                    'The server refused this PRN dose.';
+                const field =
+                    body && typeof body.error_field === 'string'
+                        ? body.error_field
+                        : null;
+                if (field) {
+                    (form.setError as (key: string, value: string) => void)(
+                        field,
+                        message,
+                    );
+                }
+                setSubmitError(message);
+                return;
+            }
+
             let firstField: string | null = null;
             applyFormRequestErrors(
                 error,
@@ -748,7 +779,17 @@ export function PrnWizard({
                                 value={signedAs.name}
                             />
                         </div>
-                        {err('reason') ? (
+                        {submitError ? (
+                            <div role="alert" data-test="meds-prn-rejected">
+                                <InfoCard icon={AlertTriangle} tone="crit">
+                                    <strong>
+                                        Not recorded — this PRN dose was not
+                                        saved.
+                                    </strong>{' '}
+                                    {submitError}
+                                </InfoCard>
+                            </div>
+                        ) : err('reason') ? (
                             <InfoCard icon={AlertTriangle} tone="crit">
                                 {err('reason')}
                             </InfoCard>

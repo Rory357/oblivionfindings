@@ -866,6 +866,133 @@ class WorkerMedsRecordDoseTest extends TestCase
         $this->assertDatabaseCount('client_medication_administrations', 0);
     }
 
+    /**
+     * EM-26: the PRN wizard and offline queue post JSON through axios, which
+     * follows a redirect to a 200 page. A service refusal must be an explicit
+     * 422 `rejected` envelope, online and on replay, so it is never reported
+     * to the worker as recorded.
+     */
+    public function test_prn_json_over_limit_is_rejected_online_and_on_replay_without_recording(): void
+    {
+        $medication = $this->scheduledMedication([], [
+            'name' => 'Over-limit PRN',
+            'is_prn' => true,
+            'prn_reason' => 'Pain',
+            'max_per_day' => 1,
+        ]);
+        ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $medication->id,
+            'administered_by' => $this->worker->id,
+            'status' => 'given',
+            'administered_at' => now()->subHour(),
+        ]);
+
+        $online = $this->actingAs($this->worker)
+            ->postJson('/meds/today/prn', [
+                'client_medication_id' => $medication->id,
+                'reason' => 'Pain (moderate)',
+                'client_request_uuid' => '5d0b3c9e-8f6a-4b7e-9c2d-1a3f5e7b9d11',
+                'queued_offline' => false,
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('sync.status', 'rejected');
+        $field = (string) $online->json('error_field');
+        $this->assertNotSame('', $field);
+        $this->assertSame($online->json('error'), $online->json("errors.{$field}.0"));
+        $this->assertSame($online->json('error'), $online->json('sync.message'));
+
+        $this->actingAs($this->worker)
+            ->postJson('/meds/today/prn', [
+                'client_medication_id' => $medication->id,
+                'reason' => 'Pain (moderate)',
+                'client_request_uuid' => '7c1e2d3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f',
+                'captured_offline_at' => now()->subMinutes(10)->toIso8601String(),
+                'origin_device_id' => 'worker-device-over-limit',
+                'queued_offline' => true,
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('sync.status', 'rejected')
+            ->assertJsonPath('sync.queued_offline', true);
+
+        $this->assertSame(1, ClientMedicationAdministration::query()
+            ->where('client_medication_id', $medication->id)
+            ->count());
+    }
+
+    public function test_prn_json_awaiting_verification_is_rejected_without_recording(): void
+    {
+        $medication = $this->scheduledMedication([], [
+            'name' => 'Unverified PRN',
+            'is_prn' => true,
+            'prn_reason' => 'Pain',
+            'max_per_day' => 4,
+            'approval_status' => 'awaiting_verification',
+        ]);
+
+        $this->actingAs($this->worker)
+            ->postJson('/meds/today/prn', [
+                'client_medication_id' => $medication->id,
+                'reason' => 'Pain (mild)',
+                'client_request_uuid' => '9e8d7c6b-5a49-4382-a716-f5e4d3c2b1a0',
+                'queued_offline' => false,
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('sync.status', 'rejected')
+            ->assertJsonPath('error_field', 'approval_status')
+            ->assertJsonPath('errors.approval_status.0', 'Medication order is awaiting verification before it can be administered.');
+
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+    }
+
+    public function test_prn_json_success_and_duplicate_carry_a_confirmed_sync_envelope(): void
+    {
+        $medication = $this->scheduledMedication([], [
+            'name' => 'Confirmed PRN',
+            'is_prn' => true,
+            'prn_reason' => 'Pain',
+            'max_per_day' => 4,
+        ]);
+        $payload = [
+            'client_medication_id' => $medication->id,
+            'reason' => 'Pain (mild)',
+            'client_request_uuid' => '1b2c3d4e-5f60-4718-8293-a4b5c6d7e8f9',
+            'queued_offline' => false,
+        ];
+
+        $first = $this->actingAs($this->worker)
+            ->postJson('/meds/today/prn', $payload)
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('sync.status', 'processed')
+            ->assertJsonPath('sync.duplicate', false);
+        $administration = ClientMedicationAdministration::query()->sole();
+        $first->assertJsonPath('administration.id', $administration->id)
+            ->assertJsonPath('administration.status', 'given');
+
+        $this->actingAs($this->worker)
+            ->postJson('/meds/today/prn', $payload)
+            ->assertOk()
+            ->assertJsonPath('sync.status', 'duplicate')
+            ->assertJsonPath('sync.duplicate', true)
+            ->assertJsonPath('administration.id', $administration->id);
+
+        $this->actingAs($this->worker)
+            ->postJson('/meds/today/prn', [
+                ...$payload,
+                'client_request_uuid' => '2c3d4e5f-6071-4829-93a4-b5c6d7e8f9a0',
+                'captured_offline_at' => now()->subMinutes(2)->toIso8601String(),
+                'origin_device_id' => 'worker-device-confirmed',
+                'queued_offline' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('sync.status', 'synced');
+
+        $this->assertDatabaseCount('client_medication_administrations', 2);
+    }
+
     public function test_controlled_dose_strict_audit_failure_rolls_back_administration_and_stock(): void
     {
         $medication = $this->scheduledMedication(['09:30'], [

@@ -7,6 +7,7 @@ import {
     getOfflineQueueSnapshot,
     isOfflineRequestUuidV4,
     quarantineLegacyOfflineSubmission,
+    readServerSyncOutcome,
     submitOffline,
     type OfflineAction,
 } from './offline-queue';
@@ -250,6 +251,48 @@ function requiresConnectionResult<T>(
     };
 }
 
+const UNCONFIRMED_SERVER_RESPONSE_MESSAGE =
+    'The server did not confirm this was saved, so it is not shown as recorded. Check the record before retrying — a retry reuses the same request ID.';
+
+/**
+ * Only a JSON body with a confirmed `sync.status` counts as success. A
+ * followed redirect (HTML), a bare `{ success }` body, or a `rejected` /
+ * `conflict` envelope is never reported as recorded.
+ */
+function resolveServerResponse<T>(
+    data: unknown,
+    messages: { successMessage?: string; duplicateMessage?: string },
+): SubmitMutationResult<T> {
+    const outcome = readServerSyncOutcome(data);
+
+    if (outcome.kind === 'confirmed') {
+        if (outcome.status === 'duplicate') {
+            toast.info(
+                messages.duplicateMessage ??
+                    outcome.message ??
+                    'This action was already synced.',
+            );
+        } else if (messages.successMessage) {
+            toast.success(messages.successMessage);
+        }
+
+        return { status: outcome.status, data: data as T };
+    }
+
+    if (outcome.kind === 'rejected') {
+        toast.error(
+            outcome.message ??
+                'The server refused this action. It was not recorded.',
+        );
+
+        return { status: outcome.status, data: data as T };
+    }
+
+    toast.error(UNCONFIRMED_SERVER_RESPONSE_MESSAGE);
+
+    return { status: 'rejected' };
+}
+
 export async function submitEmarMutation<T = unknown>(
     url: string,
     payload: Record<string, unknown>,
@@ -279,35 +322,23 @@ export async function submitEmarMutation<T = unknown>(
                 return requiresConnectionResult<T>(clientRequestUuid);
             }
 
-            let data: T & {
-                sync?: { status?: SyncStatus; message?: string };
-            };
+            let data: unknown;
             try {
-                data = await executeMutation<
-                    T & { sync?: { status?: SyncStatus; message?: string } }
-                >(method, url, onlinePayload);
+                data = await executeMutation<unknown>(
+                    method,
+                    url,
+                    onlinePayload,
+                );
             } catch (error) {
                 if (isUncertainTransportError(error)) {
                     return requiresConnectionResult<T>(clientRequestUuid);
                 }
                 throw error;
             }
-            const syncStatus = data?.sync?.status ?? 'processed';
-
-            if (syncStatus === 'duplicate') {
-                toast.info(
-                    duplicateMessage ??
-                        data?.sync?.message ??
-                        'This action was already synced.',
-                );
-            } else if (successMessage) {
-                toast.success(successMessage);
-            }
-
-            return {
-                status: syncStatus,
-                data,
-            };
+            return resolveServerResponse<T>(data, {
+                successMessage,
+                duplicateMessage,
+            });
         }
 
         const result = await submitOffline({
@@ -339,25 +370,10 @@ export async function submitEmarMutation<T = unknown>(
             };
         }
 
-        const data = result.data as T & {
-            sync?: { status?: SyncStatus; message?: string };
-        };
-        const syncStatus = data?.sync?.status ?? 'processed';
-
-        if (syncStatus === 'duplicate') {
-            toast.info(
-                duplicateMessage ??
-                    data?.sync?.message ??
-                    'This action was already synced.',
-            );
-        } else if (successMessage) {
-            toast.success(successMessage);
-        }
-
-        return {
-            status: syncStatus,
-            data,
-        };
+        return resolveServerResponse<T>(result.data, {
+            successMessage,
+            duplicateMessage,
+        });
     } catch (error) {
         if (axios.isAxiosError(error) && error.response?.status === 409) {
             const message =

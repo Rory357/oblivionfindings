@@ -51,6 +51,12 @@ export interface OfflineSubmission {
     attempts: number;
     lastError: string | null;
     needsAttention?: boolean;
+    /**
+     * The server definitively refused this action (422/409 or a `rejected`
+     * sync envelope). It was NOT recorded. The item stays on this device,
+     * out of automatic and manual replay, until the worker dismisses it.
+     */
+    rejected?: boolean;
 }
 
 export interface OfflineQueueState {
@@ -58,6 +64,8 @@ export interface OfflineQueueState {
     pendingCount: number;
     needsAttentionCount: number;
     pendingSubmissions: OfflineSubmission[];
+    rejectedCount: number;
+    rejectedSubmissions: OfflineSubmission[];
     syncing: boolean;
 }
 
@@ -155,6 +163,8 @@ let lastBroadcast: OfflineQueueState = {
     pendingCount: 0,
     needsAttentionCount: 0,
     pendingSubmissions: [],
+    rejectedCount: 0,
+    rejectedSubmissions: [],
     syncing: false,
 };
 let lastPendingSignature = '';
@@ -303,6 +313,8 @@ export function setOfflineQueueActor(actorId: unknown): void {
         pendingCount: 0,
         needsAttentionCount: 0,
         pendingSubmissions: [],
+        rejectedCount: 0,
+        rejectedSubmissions: [],
         syncing,
     };
     lastPendingSignature = '';
@@ -514,7 +526,22 @@ export async function quarantineLegacyOfflineSubmission(
 
 export async function getPendingCount(): Promise<number> {
     const queue = await listQueue();
-    return queue.length;
+    return queue.filter((item) => !item.rejected).length;
+}
+
+/**
+ * Remove server-rejected items once the worker has read why they were not
+ * recorded. Only items the server definitively refused are removed.
+ */
+export async function dismissRejectedOfflineSubmissions(): Promise<void> {
+    const queue = await listQueue();
+    for (const item of queue) {
+        if (item.rejected) {
+            await removeQueueItem(item.id);
+        }
+    }
+
+    await broadcastState();
 }
 
 /* -------------------------------------------------------------------------- */
@@ -526,14 +553,19 @@ async function broadcastState(): Promise<void> {
     const pendingSignature = queue
         .map(
             (item) =>
-                `${item.id}:${item.needsAttention ? 'attention' : 'pending'}:${item.attempts}`,
+                `${item.id}:${item.rejected ? 'rejected' : item.needsAttention ? 'attention' : 'pending'}:${item.attempts}`,
         )
         .join('|');
+    const pending = queue.filter((item) => !item.rejected);
+    const rejected = queue.filter((item) => item.rejected);
     const next: OfflineQueueState = {
         online: typeof navigator === 'undefined' ? true : navigator.onLine,
-        pendingCount: queue.length,
-        needsAttentionCount: queue.filter((item) => item.needsAttention).length,
-        pendingSubmissions: queue,
+        pendingCount: pending.length,
+        needsAttentionCount: pending.filter((item) => item.needsAttention)
+            .length,
+        pendingSubmissions: pending,
+        rejectedCount: rejected.length,
+        rejectedSubmissions: rejected,
         syncing,
     };
     if (
@@ -587,6 +619,8 @@ export function __resetOfflineQueueRuntimeForTests(): void {
         pendingCount: 0,
         needsAttentionCount: 0,
         pendingSubmissions: [],
+        rejectedCount: 0,
+        rejectedSubmissions: [],
         syncing: false,
     };
     lastPendingSignature = '';
@@ -728,11 +762,94 @@ async function postMutation(
             Accept: 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
         },
-        // We don't care about following redirects — a 302 after a successful
-        // write is fine; axios will follow it and we'll treat anything 2xx/3xx
-        // as success. 409/422 from the server are real errors.
+        // axios silently follows a redirect to a 200 page, so an HTTP success
+        // is NOT proof the write landed. Callers must confirm the JSON sync
+        // envelope with `readServerSyncOutcome` before reporting success.
     });
     return response.data;
+}
+
+const CONFIRMED_SYNC_STATUSES = ['processed', 'synced', 'duplicate'] as const;
+const REJECTED_SYNC_STATUSES = ['rejected', 'conflict'] as const;
+
+export type ServerSyncOutcome =
+    | {
+          kind: 'confirmed';
+          status: (typeof CONFIRMED_SYNC_STATUSES)[number];
+          message: string | null;
+      }
+    | {
+          kind: 'rejected';
+          status: (typeof REJECTED_SYNC_STATUSES)[number];
+          message: string | null;
+      }
+    | { kind: 'unconfirmed'; message: null };
+
+/**
+ * Classify a 2xx response body. Only a JSON object carrying a known
+ * `sync.status` confirms the server handled the medication action; anything
+ * else (an HTML page reached by following a redirect, a bare `{success}`) is
+ * unconfirmed and must never be shown as recorded.
+ */
+export function readServerSyncOutcome(data: unknown): ServerSyncOutcome {
+    if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+        return { kind: 'unconfirmed', message: null };
+    }
+
+    const body = data as {
+        sync?: { status?: unknown; message?: unknown };
+        error?: unknown;
+    };
+    const status = body.sync?.status;
+    const syncMessage =
+        typeof body.sync?.message === 'string' ? body.sync.message : null;
+    const errorMessage = typeof body.error === 'string' ? body.error : null;
+
+    if (
+        typeof status === 'string' &&
+        (CONFIRMED_SYNC_STATUSES as readonly string[]).includes(status)
+    ) {
+        return {
+            kind: 'confirmed',
+            status: status as (typeof CONFIRMED_SYNC_STATUSES)[number],
+            message: syncMessage,
+        };
+    }
+
+    if (
+        typeof status === 'string' &&
+        (REJECTED_SYNC_STATUSES as readonly string[]).includes(status)
+    ) {
+        return {
+            kind: 'rejected',
+            status: status as (typeof REJECTED_SYNC_STATUSES)[number],
+            message: syncMessage ?? errorMessage,
+        };
+    }
+
+    return { kind: 'unconfirmed', message: null };
+}
+
+/** Best human-readable reason from a 4xx medication rejection body. */
+export function serverRejectionMessage(data: unknown): string | null {
+    if (data === null || typeof data !== 'object') return null;
+    const body = data as {
+        sync?: { message?: unknown };
+        error?: unknown;
+        message?: unknown;
+        errors?: Record<string, unknown>;
+    };
+    if (typeof body.sync?.message === 'string') return body.sync.message;
+    if (typeof body.error === 'string') return body.error;
+    if (body.errors && typeof body.errors === 'object') {
+        for (const value of Object.values(body.errors)) {
+            const first = Array.isArray(value) ? value[0] : value;
+            if (typeof first === 'string' && first.length > 0) return first;
+        }
+    }
+    if (typeof body.message === 'string') return body.message;
+
+    return null;
 }
 
 export async function submitOffline(
@@ -820,9 +937,36 @@ export async function submitOffline(
     }
 }
 
+const REJECTED_REPLAY_FALLBACK_MESSAGE =
+    'The server refused this saved action, so it was NOT recorded.';
+const UNCONFIRMED_REPLAY_MESSAGE =
+    'The server did not confirm this saved action. It is kept with the same request ID for a safe manual retry.';
+
+/**
+ * Keep a server-refused item on the device, flagged as not recorded, so the
+ * worker sees it instead of it disappearing. It is never replayed again.
+ */
+async function markRejected(
+    item: OfflineSubmission,
+    message: string | null,
+): Promise<'rejected'> {
+    const reason = message ?? REJECTED_REPLAY_FALLBACK_MESSAGE;
+    await putQueueItem({
+        ...item,
+        attempts: item.attempts + 1,
+        lastAttemptAt: new Date().toISOString(),
+        lastError: reason,
+        needsAttention: true,
+        rejected: true,
+    });
+    toast.error(`Not recorded — ${reason}`);
+
+    return 'rejected';
+}
+
 async function replayOne(
     item: OfflineSubmission,
-): Promise<'sent' | 'retry' | 'failed' | 'conflict' | 'needs_attention'> {
+): Promise<'sent' | 'retry' | 'failed' | 'rejected' | 'needs_attention'> {
     const itemActorId = normalizeActorId(item.actorId);
     if (itemActorId === null || itemActorId !== currentActorId) {
         notifyQueueWarningOnce(
@@ -845,9 +989,26 @@ async function replayOne(
     }
 
     try {
-        await postMutation(item.method, item.url, item.payload);
-        await removeQueueItem(item.id);
-        return 'sent';
+        const data = await postMutation(item.method, item.url, item.payload);
+        const outcome = readServerSyncOutcome(data);
+        if (outcome.kind === 'confirmed') {
+            await removeQueueItem(item.id);
+            return 'sent';
+        }
+        if (outcome.kind === 'rejected') {
+            return markRejected(item, outcome.message);
+        }
+
+        // A 2xx without a sync envelope (e.g. a followed redirect) is not
+        // proof of a write. Keep the exact body and UUID for manual retry.
+        await putQueueItem({
+            ...item,
+            attempts: item.attempts + 1,
+            lastAttemptAt: new Date().toISOString(),
+            lastError: UNCONFIRMED_REPLAY_MESSAGE,
+            needsAttention: true,
+        });
+        return 'needs_attention';
     } catch (error) {
         const next: OfflineSubmission = {
             ...item,
@@ -866,13 +1027,12 @@ async function replayOne(
             return 'retry';
         }
 
-        // Permanent-looking failure (4xx that isn't 409/429). Keep the item so
-        // the worker can be told about it on reconnect; don't silently drop.
+        // 409 (competing server state) and 422 (refused: over limit, awaiting
+        // verification, competency, witness, validation) are terminal — no
+        // retry helps. The action was NOT recorded, so it stays visible on
+        // this device as rejected rather than being silently deleted.
         if (axios.isAxiosError(error) && error.response) {
             const status = error.response.status;
-            // 409 conflict is terminal: server already has a competing state.
-            // Drop the queued item and surface a clear error so the worker
-            // re-enters if needed.
             if (status === 409) {
                 if (typeof window !== 'undefined') {
                     window.dispatchEvent(
@@ -884,21 +1044,18 @@ async function replayOne(
                         }),
                     );
                 }
-                await removeQueueItem(item.id);
-                const message =
-                    typeof error.response.data?.sync?.message === 'string'
-                        ? error.response.data.sync.message
-                        : typeof error.response.data?.error === 'string'
-                          ? error.response.data.error
-                          : 'A queued item conflicted with newer server state. Please re-enter it if needed.';
-                toast.error(message);
-                return 'conflict';
+
+                return markRejected(
+                    item,
+                    serverRejectionMessage(error.response.data) ??
+                        'A queued item conflicted with newer server state.',
+                );
             }
-            // 422 validation means the payload isn't acceptable — there is no
-            // amount of retrying that helps. Drop and notify.
             if (status === 422) {
-                await removeQueueItem(item.id);
-                return 'failed';
+                return markRejected(
+                    item,
+                    serverRejectionMessage(error.response.data),
+                );
             }
         }
 
@@ -926,19 +1083,19 @@ export async function replayOfflineQueue(): Promise<void> {
 
     let sent = 0;
     let failed = 0;
-    let conflicts = 0;
+    let rejected = 0;
     let needsAttention = 0;
 
     try {
         for (const item of queue) {
-            if (item.needsAttention) {
+            if (item.needsAttention || item.rejected) {
                 continue;
             }
 
             const result = await replayOne(item);
             if (result === 'sent') sent += 1;
             else if (result === 'failed') failed += 1;
-            else if (result === 'conflict') conflicts += 1;
+            else if (result === 'rejected') rejected += 1;
             else if (result === 'needs_attention') needsAttention += 1;
             else if (result === 'retry') {
                 // Stop the sweep on the first network retry — we'll try again
@@ -965,9 +1122,9 @@ export async function replayOfflineQueue(): Promise<void> {
                 : `${failed} queued items could not be saved. Please re-enter them.`,
         );
     }
-    if (conflicts > 1) {
+    if (rejected > 1) {
         toast.error(
-            `${conflicts} queued items conflicted with newer server state. Please re-enter them if needed.`,
+            `${rejected} queued items were NOT recorded. They stay on this device until you dismiss them.`,
         );
     }
     if (needsAttention > 0) {
@@ -981,7 +1138,11 @@ export async function replayOfflineQueue(): Promise<void> {
 
 export async function retryOfflineSubmissionsNeedingAttention(): Promise<void> {
     const queue = await listQueue();
-    const attentionItems = queue.filter((item) => item.needsAttention);
+    // A server-refused item is never resent: retrying cannot change a refusal
+    // and would silently re-attempt a dose the server already blocked.
+    const attentionItems = queue.filter(
+        (item) => item.needsAttention && !item.rejected,
+    );
     for (const item of attentionItems) {
         await putQueueItem({ ...item, needsAttention: false });
     }

@@ -1,7 +1,13 @@
-import { CloudOff, RefreshCw } from 'lucide-react';
+/* eslint-disable no-restricted-syntax -- The banner's inline actions are
+ * compact text buttons that inherit the banner's semantic tone colour
+ * (border-current); a full <Button> would break the one-line status strip. */
+import { AlertTriangle, CloudOff, RefreshCw } from 'lucide-react';
 
 import { useOfflineQueueState } from '@/hooks/use-offline-queue';
-import { retryOfflineSubmissionsNeedingAttention } from '@/lib/offline-queue';
+import {
+    dismissRejectedOfflineSubmissions,
+    retryOfflineSubmissionsNeedingAttention,
+} from '@/lib/offline-queue';
 
 /**
  * PR 26 — A thin, calm banner that surfaces offline state and the number of
@@ -17,10 +23,50 @@ import { retryOfflineSubmissionsNeedingAttention } from '@/lib/offline-queue';
  *
  * The banner sits at the very top of the viewport, above the frontline
  * sticky header, so it never covers interactive content.
+ *
+ * Saved actions the server refused (e.g. a PRN over its daily limit) were NOT
+ * recorded. They stay listed here with the server's reason until the worker
+ * dismisses them, so a refusal is never silently lost.
  */
 export default function OfflineStatusBanner() {
-    const { online, pendingCount, needsAttentionCount, syncing } =
-        useOfflineQueueState();
+    const {
+        online,
+        pendingCount,
+        needsAttentionCount,
+        rejectedCount = 0,
+        rejectedSubmissions = [],
+        syncing,
+    } = useOfflineQueueState();
+
+    if (rejectedCount > 0) {
+        const reason = rejectedSubmissions[0]?.lastError;
+
+        return (
+            <div
+                role="alert"
+                className="sticky top-0 z-50 w-full border-b border-status-critical/30 bg-status-critical-bg px-3 py-1.5 text-xs font-medium text-status-critical dark:border-status-critical/60"
+            >
+                <div className="mx-auto flex max-w-3xl items-center justify-center gap-2">
+                    <AlertTriangle aria-hidden className="h-4 w-4" />
+                    <span>
+                        {rejectedCount === 1
+                            ? 'A saved medication action was NOT recorded'
+                            : `${rejectedCount} saved medication actions were NOT recorded`}
+                        {reason ? `: ${reason}` : '.'}
+                    </span>
+                    <button
+                        type="button"
+                        className="rounded border border-current px-2 py-0.5 font-semibold"
+                        onClick={() => {
+                            void dismissRejectedOfflineSubmissions();
+                        }}
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     const showing = !online || pendingCount > 0 || syncing;
     if (!showing) return null;

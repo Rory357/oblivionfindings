@@ -25,6 +25,7 @@ use App\Services\Timeline\TimelineEmitter;
 use App\Services\UserSiteAccessService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -312,8 +313,15 @@ class WorkerMedsController extends Controller
      * PRN over-limit incident handling all run exactly as they do from the
      * admin recording path. This avoids creating a second administration path
      * for as-needed doses.
+     *
+     * The PRN wizard and the offline queue submit through axios with
+     * `Accept: application/json`, and axios silently follows a redirect to a
+     * 200 page. JSON callers therefore get an explicit 422 `rejected` sync
+     * envelope for every service rejection (over limit, awaiting verification,
+     * competency, witness) and a `processed`/`synced` envelope on success, so a
+     * refused PRN is never reported to the worker as recorded.
      */
-    public function recordPrn(Request $request): RedirectResponse
+    public function recordPrn(Request $request): RedirectResponse|JsonResponse
     {
         $user = $request->user();
         abort_unless($user, 403);
@@ -355,7 +363,7 @@ class WorkerMedsController extends Controller
             null,
             null,
             null,
-            function (MedicationScopeDecision $scope) use ($user, $data, $submittedAdministrationAt) {
+            function (MedicationScopeDecision $scope) use ($request, $user, $data, $submittedAdministrationAt) {
                 $medication = $scope->medication;
                 $shiftId = $scope->shiftId();
 
@@ -390,13 +398,43 @@ class WorkerMedsController extends Controller
 
                 if (! ($result['success'] ?? false)) {
                     $field = $result['error_field'] ?? 'reason';
+                    $message = $result['error'] ?? 'Could not record this PRN dose.';
 
-                    return back()->withErrors([
-                        $field => $result['error'] ?? 'Could not record this PRN dose.',
-                    ]);
+                    if ($request->expectsJson()) {
+                        return response()->json(
+                            $this->withMedicationSync(
+                                array_filter([
+                                    'success' => false,
+                                    'message' => $message,
+                                    'error' => $message,
+                                    'error_field' => $field,
+                                    'errors' => [$field => [$message]],
+                                    'competency_state' => $result['competency_state'] ?? null,
+                                    'safety_check' => $result['safety_check'] ?? null,
+                                ], fn ($value) => $value !== null),
+                                $data,
+                                'rejected',
+                                false,
+                                $message,
+                            ),
+                            422,
+                        );
+                    }
+
+                    return back()->withErrors([$field => $message]);
                 }
 
                 if ($result['duplicate'] ?? false) {
+                    if ($request->expectsJson()) {
+                        return response()->json($this->withMedicationSync(
+                            $this->prnAdministrationPayload($result),
+                            $data,
+                            'duplicate',
+                            true,
+                            'This PRN dose was already recorded — no changes made.',
+                        ));
+                    }
+
                     return $this->onDuplicateOfflineSubmission('prn', $data);
                 }
 
@@ -407,13 +445,43 @@ class WorkerMedsController extends Controller
                     $medication->name,
                 );
 
-                return back()->with(
-                    'success',
-                    'Saved — '.$medication->name.' recorded for '.trim(($medication->client->first_name ?? '').' '.($medication->client->last_name ?? '')),
-                );
+                $savedMessage = 'Saved — '.$medication->name.' recorded for '.trim(($medication->client->first_name ?? '').' '.($medication->client->last_name ?? ''));
+
+                if ($request->expectsJson()) {
+                    return response()->json($this->withMedicationSync(
+                        $this->prnAdministrationPayload($result),
+                        $data,
+                        $this->medicationProcessedStatus($data),
+                        false,
+                        $savedMessage,
+                    ));
+                }
+
+                return back()->with('success', $savedMessage);
             }, authorizationUserIds: array_filter([
                 is_numeric($data['witnessed_by'] ?? null) ? (int) $data['witnessed_by'] : null,
             ]));
+    }
+
+    /**
+     * Minimal confirmation of the worker's own recorded PRN administration for
+     * JSON callers.
+     *
+     * @return array<string, mixed>
+     */
+    private function prnAdministrationPayload(array $result): array
+    {
+        $administration = $result['administration'] ?? null;
+
+        return [
+            'success' => true,
+            'administration' => $administration instanceof ClientMedicationAdministration ? [
+                'id' => $administration->id,
+                'status' => $administration->status,
+                'administered_at' => $administration->administered_at?->toIso8601String(),
+            ] : null,
+            'safety_check' => $result['safety_check'] ?? null,
+        ];
     }
 
     /**
