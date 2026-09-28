@@ -64,7 +64,13 @@ export interface ClientInfo {
     age: number | null;
     site_id: number | null;
     site_name: string | null;
+    /** Medication allergy register + health profile allergy labels. */
     allergies: string[];
+    /**
+     * Whether `allergies` could be read. An empty list is "none recorded",
+     * never a confirmed "no known allergies".
+     */
+    allergy_status?: 'recorded' | 'none_recorded' | 'unavailable';
 }
 
 export interface SiteInfo {

@@ -7,6 +7,7 @@
  * same offline queue behaviour the original quick sheet had. */
 import {
     CdBadge,
+    ClientAllergyNotice,
     ClientAvatar,
     ClientSummaryCard,
 } from '@/components/meds/board-bits';
@@ -739,6 +740,10 @@ export function PrnWizard({
                     />
                     <div className="grid gap-4">
                         <ClientSummaryCard
+                            client={client}
+                            fallbackName={med.client_name}
+                        />
+                        <ClientAllergyNotice
                             client={client}
                             fallbackName={med.client_name}
                         />

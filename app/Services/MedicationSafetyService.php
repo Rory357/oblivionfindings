@@ -6,6 +6,8 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\MedicationAllergy;
 use App\Models\MedicationInteraction;
+use App\Services\Medication\ClientAllergyRecordService;
+use App\Services\Medication\MedicationSafetyPolicySettings;
 use Carbon\Carbon;
 
 class MedicationSafetyService
@@ -20,6 +22,11 @@ class MedicationSafetyService
         'danger' => ['label' => 'Danger', 'color' => 'red', 'icon' => 'shield-alert'],
         'blocked' => ['label' => 'Blocked', 'color' => 'red', 'icon' => 'ban'],
     ];
+
+    public function __construct(
+        private ?ClientAllergyRecordService $allergyRecords = null,
+        private ?MedicationSafetyPolicySettings $policy = null,
+    ) {}
 
     /**
      * Perform complete safety check before medication administration
@@ -51,10 +58,41 @@ class MedicationSafetyService
             return $this->compileSafetyResult($warnings, $alerts, $blocked, $blockReason);
         }
 
-        // 2. Check for allergies
+        // 2. Check for allergies — the medication allergy register and the
+        // health profile (EM-07). A profile entry has no severity; whether its
+        // match warns or blocks is the organisation's setting.
         $allergyCheck = $this->checkAllergies($client, $medication);
         if ($allergyCheck['has_match']) {
-            foreach ($allergyCheck['matches'] as $allergy) {
+            $blockUnratedProfileMatches = ($allergyCheck['profile_match_policy'] ?? 'warn') === 'block';
+
+            foreach ($allergyCheck['matches'] as $index => $allergy) {
+                $fromProfile = ($allergyCheck['sources'][$index] ?? ClientAllergyRecordService::SOURCE_REGISTER)
+                    === ClientAllergyRecordService::SOURCE_PROFILE;
+
+                if ($fromProfile) {
+                    $warning = [
+                        'type' => 'allergy',
+                        'severity' => $blockUnratedProfileMatches ? 'danger' : 'warning',
+                        'message' => "⚠️ ALLERGY ALERT: Client has a recorded allergy to {$allergy->allergen} (health profile — severity not recorded)",
+                        'details' => [
+                            'allergen' => $allergy->allergen,
+                            'reaction' => null,
+                            'severity' => null,
+                            'source' => ClientAllergyRecordService::SOURCE_PROFILE,
+                        ],
+                    ];
+
+                    if ($blockUnratedProfileMatches) {
+                        $blocked = true;
+                        $warning['message'] .= ' - ADMINISTRATION BLOCKED';
+                        $blockReason = "Recorded allergy to {$allergy->allergen} (health profile, severity not recorded). Check with the prescriber before giving.";
+                    }
+
+                    $warnings[] = $warning;
+
+                    continue;
+                }
+
                 $severity = $allergy->severity === 'life_threatening' ? 'danger' : 'warning';
                 $blocked = $blocked || $allergy->isSevere();
 
@@ -66,6 +104,7 @@ class MedicationSafetyService
                         'allergen' => $allergy->allergen,
                         'reaction' => $allergy->reaction,
                         'severity' => $allergy->severity,
+                        'source' => ClientAllergyRecordService::SOURCE_REGISTER,
                     ],
                 ];
 
@@ -241,21 +280,33 @@ class MedicationSafetyService
     /**
      * Check for allergies to a medication
      */
+    /**
+     * Match the medicine against every recorded allergy: the medication
+     * allergy register and the health profile. Profile matches are unsaved
+     * MedicationAllergy instances (severity null) so both sources share the
+     * same matching rules; `sources[i]` names where `matches[i]` came from.
+     *
+     * @return array{has_match: bool, matches: list<MedicationAllergy>, sources: list<string>, allergy_count: int, profile_match_policy: string}
+     */
     public function checkAllergies(Client $client, ClientMedication $medication): array
     {
-        $allergies = MedicationAllergy::where('client_id', $client->id)->get();
+        $records = ($this->allergyRecords ?? app(ClientAllergyRecordService::class))->forClient($client);
         $matches = [];
+        $sources = [];
 
-        foreach ($allergies as $allergy) {
-            if ($allergy->matchesMedication($medication->name)) {
-                $matches[] = $allergy;
+        foreach ($records as $record) {
+            if ($record['allergy']->matchesMedication($medication->name)) {
+                $matches[] = $record['allergy'];
+                $sources[] = $record['source'];
             }
         }
 
         return [
             'has_match' => count($matches) > 0,
             'matches' => $matches,
-            'allergy_count' => $allergies->count(),
+            'sources' => $sources,
+            'allergy_count' => count($records),
+            'profile_match_policy' => ($this->policy ?? app(MedicationSafetyPolicySettings::class))->profileAllergyMatch(),
         ];
     }
 

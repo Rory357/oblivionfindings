@@ -8,6 +8,7 @@
  * recording path. */
 import {
     CdBadge,
+    ClientAllergyNotice,
     ClientSummaryCard,
     StatusPill,
 } from '@/components/meds/board-bits';
@@ -445,18 +446,10 @@ export function RecordDoseWizard({
                             </InfoCard>
                         ) : null}
 
-                        {client && client.allergies.length > 0 ? (
-                            <InfoCard icon={AlertTriangle} tone="crit">
-                                <strong>Allergies:</strong>{' '}
-                                {client.allergies.join(', ')}. Check the label
-                                against the allergy list before giving.
-                            </InfoCard>
-                        ) : (
-                            <InfoCard icon={Info}>
-                                No known medication allergies on file for{' '}
-                                {client?.preferred ?? row.client_name}.
-                            </InfoCard>
-                        )}
+                        <ClientAllergyNotice
+                            client={client}
+                            fallbackName={row.client_name}
+                        />
 
                         <div>
                             <SubHead icon={ClipboardCheck}>

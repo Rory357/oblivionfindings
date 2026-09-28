@@ -4,8 +4,9 @@
  * eMAR page redesigns reuse one idiom. */
 import { avatarHueStyle } from '@/components/rostering/avatar-hue';
 import { Badge } from '@/components/ui/badge';
+import { InfoCard } from '@/components/wizard/primitives';
 import { cn } from '@/lib/utils';
-import { MapPin } from 'lucide-react';
+import { AlertTriangle, Info, MapPin } from 'lucide-react';
 
 import {
     clientHue,
@@ -124,6 +125,46 @@ export function ClientAvatar({
         >
             {clientInitials(name)}
         </span>
+    );
+}
+
+/**
+ * Allergy notice for a recording wizard. Reads the medication allergy
+ * register and the health profile (server-side). An empty or unreadable
+ * record is never shown as a confirmed "no known allergies".
+ */
+export function ClientAllergyNotice({
+    client,
+    fallbackName,
+}: {
+    client: ClientInfo | null | undefined;
+    fallbackName: string;
+}) {
+    const name = client?.preferred ?? client?.name ?? fallbackName;
+
+    if (client && client.allergies.length > 0) {
+        return (
+            <InfoCard icon={AlertTriangle} tone="crit">
+                <strong>Allergies:</strong> {client.allergies.join(', ')}. Check
+                the label against the allergy list before giving.
+            </InfoCard>
+        );
+    }
+
+    if (!client || client.allergy_status === 'unavailable') {
+        return (
+            <InfoCard icon={AlertTriangle} tone="warn">
+                <strong>Allergy record couldn’t be loaded</strong> for {name}.
+                Check the health profile before giving.
+            </InfoCard>
+        );
+    }
+
+    return (
+        <InfoCard icon={Info}>
+            No allergies recorded for {name} — check the health profile before
+            giving.
+        </InfoCard>
     );
 }
 

@@ -10,6 +10,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\User;
 use App\Services\MarScheduleService;
+use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
@@ -232,17 +233,29 @@ class MedsBoardPayloadService
             return [];
         }
 
+        // Allergies are read separately so a failed allergy read is reported
+        // as "unavailable" rather than looking like nothing is recorded (EM-07).
+        // Both the medication allergy register and the health profile count.
+        try {
+            $allergyLabels = app(ClientAllergyRecordService::class)
+                ->labelsForClients(array_values(array_map('intval', $clientIds)));
+        } catch (\Throwable $e) {
+            report($e);
+            $allergyLabels = null;
+        }
+
         try {
             $timezone = $this->scheduleService->workerTimezone();
 
             return Client::query()
                 ->whereIn('id', $clientIds)
-                ->with(['site:id,name', 'medicationAllergies' => fn ($q) => $q->whereNull('deleted_at')])
+                ->with(['site:id,name'])
                 ->orderBy('first_name')
                 ->get()
-                ->map(function (Client $client) use ($timezone) {
+                ->map(function (Client $client) use ($timezone, $allergyLabels) {
                     $name = trim($client->first_name.' '.$client->last_name);
                     $dob = $client->date_of_birth;
+                    $allergies = $allergyLabels[(int) $client->id] ?? [];
 
                     return [
                         'id' => $client->id,
@@ -253,11 +266,14 @@ class MedsBoardPayloadService
                         'age' => $dob ? (int) $dob->copy()->timezone($timezone)->diffInYears(now($timezone)) : null,
                         'site_id' => $client->site_id,
                         'site_name' => $client->site?->name,
-                        'allergies' => $client->medicationAllergies
-                            ->map(fn ($a) => trim((string) $a->allergen))
-                            ->filter()
-                            ->values()
-                            ->all(),
+                        'allergies' => $allergies,
+                        // recorded | none_recorded | unavailable — never a
+                        // confirmed "no known allergies".
+                        'allergy_status' => match (true) {
+                            $allergyLabels === null => 'unavailable',
+                            $allergies !== [] => 'recorded',
+                            default => 'none_recorded',
+                        },
                     ];
                 })
                 ->values()
