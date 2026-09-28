@@ -1,0 +1,26 @@
+{
+  "parent": "38239d35506bf97c4b6f865a13aa10933b4cb439",
+  "checkedAt": "2026-09-28T04:46:51.533Z",
+  "baseline": {
+    "passed": 3,
+    "failed": 1,
+    "defect": "Confirmed discard closes both dialogs and focuses the global header"
+  },
+  "final": {
+    "passed": 15,
+    "failed": 0,
+    "files": 4
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "types": {
+    "exitCode": 0,
+    "finishedAt": "2026-09-28T04:46:17.9651949Z"
+  },
+  "typecheckInitial": "Retained test-only unsupported query-option diagnostic; corrected without changing the assertion",
+  "browser": "Not exercised by this owner; Main owns current actual125% Chrome verification",
+  "operations": "No source write to Main, merge, push, database/fixture/configuration/preference change, external notice or browser operation",
+  "preserved": "Prior committed QA and source evidence, ten authority files, shared Dialog/Wizard and protected Blade unchanged"
+}
