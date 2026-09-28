@@ -2,18 +2,11 @@ import { FLEET_COLORS, HorizontalBarChart } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
+import { PageHeaderFilterSelect } from '@/components/page/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { toDateInput } from '@/lib/datetime';
 import { formatCurrency, formatDate, formatDistance } from '@/lib/fleet-utils';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, router } from '@inertiajs/react';
 import {
     Building2,
@@ -24,6 +17,7 @@ import {
     Truck,
     Users,
 } from 'lucide-react';
+import { FleetReportHeader } from './report-header';
 
 type HouseSummary = {
     id: number;
@@ -102,63 +96,75 @@ export default function ReportByHouse({
         >
             <Head title="Usage by House" />
             <PageShell>
-                <FleetCompactHero
-                    pill="Fleet reports · usage by house"
-                    title="Vehicle Usage by House"
-                    backHref="/fleet-assets/reports"
-                    backLabel="Reports"
+                <FleetReportHeader
+                    title="Vehicle usage by house"
+                    description="Recorded vehicle usage, fuel costs and transport activity by house."
+                    filters={
+                        <>
+                            <PageHeaderFilterSelect
+                                icon={Calendar}
+                                label={
+                                    months.find((m) => m.value === currentMonth)
+                                        ?.label ?? currentMonth
+                                }
+                                value={currentMonth}
+                                allValue={currentMonth}
+                                options={months}
+                                onChange={handleMonthChange}
+                            />
+                            <PageHeaderFilterSelect
+                                icon={Building2}
+                                label="All permitted houses"
+                                value={
+                                    selected_house_id
+                                        ? String(selected_house_id)
+                                        : 'all'
+                                }
+                                options={[
+                                    {
+                                        value: 'all',
+                                        label: 'All permitted houses',
+                                    },
+                                    ...houses.map((house) => ({
+                                        value: String(house.id),
+                                        label: house.name,
+                                    })),
+                                ]}
+                                onChange={handleHouseChange}
+                            />
+                        </>
+                    }
+                    meters={
+                        selectedSummary
+                            ? [
+                                  {
+                                      label: 'Vehicles',
+                                      value: selectedSummary.vehicles_count,
+                                      caption: 'Assigned to selected house',
+                                  },
+                                  {
+                                      label: 'Trips',
+                                      value: selectedSummary.trips_this_month,
+                                      caption: currentMonth,
+                                  },
+                                  {
+                                      label: 'Distance',
+                                      value: formatDistance(
+                                          selectedSummary.distance_this_month,
+                                      ),
+                                      caption: currentMonth,
+                                  },
+                                  {
+                                      label: 'Fuel cost',
+                                      value: formatCurrency(
+                                          selectedSummary.fuel_cost_this_month,
+                                      ),
+                                      caption: currentMonth,
+                                  },
+                              ]
+                            : []
+                    }
                 />
-                <p className="text-sm text-muted-foreground">
-                    Compare vehicle usage, costs, and transport activity across
-                    houses.
-                </p>
-
-                {/* Month & House Selectors */}
-                <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <Calendar className="h-5 w-5 text-muted-foreground" />
-                        <Select
-                            value={currentMonth}
-                            onValueChange={handleMonthChange}
-                        >
-                            <SelectTrigger className="w-52">
-                                <SelectValue placeholder="Select month" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {months.map((m) => (
-                                    <SelectItem key={m.value} value={m.value}>
-                                        {m.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Building2 className="h-5 w-5 text-muted-foreground" />
-                        <Select
-                            value={
-                                selected_house_id
-                                    ? String(selected_house_id)
-                                    : 'all'
-                            }
-                            onValueChange={handleHouseChange}
-                        >
-                            <SelectTrigger className="w-64">
-                                <SelectValue placeholder="Select a house" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">
-                                    All Houses (Comparison)
-                                </SelectItem>
-                                {houses.map((h) => (
-                                    <SelectItem key={h.id} value={String(h.id)}>
-                                        {h.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
 
                 {/* Selected House Dark KPI Cards */}
                 {selectedSummary && (
@@ -170,13 +176,13 @@ export default function ReportByHouse({
                             subtitle="Assigned to house"
                         />
                         <FleetStatCard
-                            label="TRIPS (MTD)"
+                            label="TRIPS"
                             value={selectedSummary.trips_this_month}
                             icon={Route}
-                            subtitle="This month"
+                            subtitle="Selected month"
                         />
                         <FleetStatCard
-                            label="DISTANCE (MTD)"
+                            label="DISTANCE"
                             value={formatDistance(
                                 selectedSummary.distance_this_month,
                             )}
@@ -184,7 +190,7 @@ export default function ReportByHouse({
                             subtitle="Kilometres driven"
                         />
                         <FleetStatCard
-                            label="FUEL COST (MTD)"
+                            label="FUEL COST"
                             value={formatCurrency(
                                 selectedSummary.fuel_cost_this_month,
                             )}

@@ -88,6 +88,8 @@ export interface EntityTableProps<T> {
     mutedFor?: (row: T) => boolean;
     /** Horizontal scroll threshold for the inner grid. */
     minWidth?: number;
+    /** Let multi-line operational details expand beyond the standard 50px row. */
+    rowHeight?: 'compact' | 'content';
     /** Summary rows pinned under the data rows (opening/closing, totals). */
     footerRows?: EntityTableFooterRow[];
     /* Multi-select support (page-owned state). */
@@ -120,6 +122,7 @@ export function EntityTable<T>({
     onRowContextMenu,
     mutedFor,
     minWidth = 900,
+    rowHeight = 'compact',
     footerRows,
     selectMode = false,
     selectedKeys,
@@ -203,7 +206,10 @@ export function EntityTable<T>({
                                     onRowContextMenu?.(e, row)
                                 }
                                 className={cn(
-                                    'grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                                    'grid cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                                    rowHeight === 'content'
+                                        ? 'min-h-[50px] py-3'
+                                        : 'h-[50px]',
                                     selected
                                         ? 'bg-primary/[0.11] hover:bg-primary/[0.11]'
                                         : 'hover:bg-primary/5',

@@ -25,7 +25,7 @@ function signatureOf(data: Record<string, unknown> | FormData): string {
     return parts.join('&');
 }
 
-function csrfHeaders(): Record<string, string> {
+export function csrfHeaders(): Record<string, string> {
     const xsrf = document.cookie
         .split('; ')
         .find((part) => part.startsWith('XSRF-TOKEN='))

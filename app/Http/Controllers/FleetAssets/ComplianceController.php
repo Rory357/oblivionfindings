@@ -5,180 +5,93 @@ namespace App\Http\Controllers\FleetAssets;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Services\Fleet\VehicleReadinessService;
+use App\Services\Fleet\ComplianceQueueProjection;
+use App\Services\Fleet\MaintenanceAccessService;
+use App\Services\Fleet\VehicleWorkspacePresenter;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 
 class ComplianceController extends Controller
 {
-    public function __construct(
-        private readonly SecurityDevicesAccessService $access,
-        private readonly VehicleReadinessService $readiness,
-    ) {}
+    public function __construct(private readonly SecurityDevicesAccessService $access, private readonly ComplianceQueueProjection $projection) {}
+
+    public function context(Request $request, int $asset, VehicleWorkspacePresenter $presenter)
+    {
+        $actor = $request->user();
+        abort_unless($actor instanceof User && $this->access->canReadFleetVehicles($actor), 403);
+        $vehicle = $this->access->fleetVehicle($actor, $asset) ?? abort(404);
+        $workspace = $presenter->present($actor, $vehicle, false);
+
+        return response()->json(collect($workspace)->only(['vehicle', 'compliance', 'can', 'catalogues']))->header('Cache-Control', 'private, no-store');
+    }
 
     public function index(Request $request)
     {
         $actor = $request->user();
         abort_unless($actor instanceof User, 403);
-        $hasFleetFields = Schema::hasColumn('assets', 'home_site_id');
-
-        $eagerLoads = ['homeSite'];
-
-        // Fleet readers get the register's vehicle scope, which central fleet
-        // oversight widens to every Site; people who only see assigned assets
-        // keep seeing just those vehicles.
+        $filters = $request->validate([
+            'site_id' => ['nullable', 'integer', 'min:1'], 'search' => ['nullable', 'string', 'max:200'],
+            'view' => ['nullable', 'in:attention,all,current,not_applicable'],
+            'state' => ['nullable', 'in:all,not_recorded,needs_assessment,not_applicable,current,recorded,due_soon,expired,failed,restricted,failed_restricted'],
+            'kind' => ['nullable', 'in:all,wof,registration,cof,ruc,insurance,restriction'],
+            'layout' => ['nullable', 'in:table,cards'],
+        ]);
         $query = $this->access->canReadFleetVehicles($actor)
             ? $this->access->accessibleVehiclesForFleet($actor)
             : $this->access->accessibleAssets($actor, true);
-        if ($hasFleetFields) {
-            $query->with($eagerLoads);
+        $vehicles = $query->with(['homeSite:id,name', 'site:id,name', 'fleetResponsible:id,name'])->orderBy('name')->get();
+        $sites = $vehicles->map(fn ($vehicle) => $vehicle->homeSite ?? $vehicle->site)->filter()->unique('id')->map->only(['id', 'name'])->values();
+        if (! empty($filters['site_id'])) {
+            $vehicles = $vehicles->filter(fn ($vehicle) => (int) ($vehicle->home_site_id ?? $vehicle->site_id) === (int) $filters['site_id'])->values();
         }
-
-        // Search filter
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('asset_tag', 'like', "%{$search}%");
-                if (Schema::hasColumn('assets', 'registration_number')) {
-                    $q->orWhere('registration_number', 'like', "%{$search}%");
-                }
-            });
-        }
-
-        $vehicles = $query->orderBy('name')->get();
-        $projections = $this->readiness->projections($vehicles);
-
-        $now = now();
-
-        $vehiclesData = $vehicles->map(function ($v) use ($hasFleetFields, $now, $projections) {
-            $regoExpiry = $hasFleetFields ? $v->registration_expires_at : null;
-            $wofExpiry = $hasFleetFields ? $v->wof_expires_at : null;
-            $cofExpiry = $hasFleetFields ? $v->cof_expires_at : null;
-            $insuranceExpiry = $hasFleetFields && Schema::hasColumn('assets', 'insurance_expires_at') ? $v->insurance_expires_at : null;
-
-            $status = 'ok';
-            $worstDays = PHP_INT_MAX;
-
-            foreach ([$regoExpiry, $wofExpiry, $cofExpiry, $insuranceExpiry] as $date) {
-                if ($date) {
-                    $days = $now->diffInDays($date, false);
-                    if ($days < $worstDays) {
-                        $worstDays = $days;
-                    }
-                }
+        $maintenance = app(MaintenanceAccessService::class);
+        $planningSites = $maintenance->canManage($actor) ? $maintenance->approvedSiteIds($actor) : [];
+        $vehicleSites = $vehicles->pluck('site_id', 'id');
+        $rows = $this->projection->rows($vehicles)->map(fn ($row) => [
+            ...$row,
+            'can_plan' => in_array((int) $vehicleSites[$row['vehicle']['id']], $planningSites, true),
+        ]);
+        $attention = fn ($row) => ! in_array($row['state'], ['current', 'not_applicable', 'recorded'], true);
+        $unique = fn ($items) => $items->pluck('vehicle.id')->unique()->count();
+        $summary = [
+            'vehicles' => $vehicles->count(), 'attention' => $unique($rows->filter($attention)),
+            'not_recorded' => $unique($rows->where('state', 'not_recorded')),
+            'due_soon' => $unique($rows->where('state', 'due_soon')),
+            'failed_restricted' => $unique($rows->whereIn('state', ['failed', 'restricted'])),
+        ];
+        $view = $filters['view'] ?? 'attention';
+        $filtered = $rows->filter(function ($row) use ($filters, $view, $attention) {
+            if ($view === 'attention' && ! $attention($row)) {
+                return false;
             }
-
-            if ($worstDays < 0) {
-                $status = 'expired';
-            } elseif ($worstDays <= 30) {
-                $status = 'critical';
-            } elseif ($worstDays <= 60) {
-                $status = 'warning';
+            if ($view === 'current' && $row['state'] !== 'current') {
+                return false;
             }
-
-            // A vehicle readiness blocks is "Not ready" (missing evidence, a
-            // hold or an unresolved check), not "Expiring soon"; an expiry
-            // already past stays the more specific status.
-            $readiness = $projections[(int) $v->id];
-            if (! $readiness->canProceed && $status !== 'expired') {
-                $status = 'not_ready';
+            if ($view === 'not_applicable' && $row['state'] !== 'not_applicable') {
+                return false;
             }
-
-            return [
-                'id' => $v->id,
-                'name' => $v->name,
-                'asset_tag' => $v->asset_tag,
-                'registration_number' => $hasFleetFields ? $v->registration_number : null,
-                'registration_expires_at' => $regoExpiry ? $regoExpiry->toDateString() : null,
-                'wof_expires_at' => $wofExpiry ? $wofExpiry->toDateString() : null,
-                'cof_expires_at' => $cofExpiry ? $cofExpiry->toDateString() : null,
-                'insurance_expires_at' => $insuranceExpiry ? $insuranceExpiry->toDateString() : null,
-                'home_site' => $hasFleetFields && $v->homeSite ? [
-                    'id' => $v->homeSite->id,
-                    'name' => $v->homeSite->name,
-                ] : null,
-                'status' => $status,
-                'worst_days' => $worstDays === PHP_INT_MAX ? null : (int) $worstDays,
-                'readiness' => $readiness->toArray(),
-            ];
-        });
-
-        $notReady = $vehiclesData->where('status', 'not_ready')->count();
-
-        // Status filter
-        if ($request->filled('status') && $request->input('status') !== 'all') {
-            $filterStatus = $request->input('status');
-            $vehiclesData = $vehiclesData->filter(fn ($v) => $v['status'] === $filterStatus)->values();
-        }
-
-        // Summary counts
-        $allVehicles = $vehicles->count();
-        $expiredWof = $vehicles->filter(fn ($v) => $hasFleetFields && $v->wof_expires_at && $v->wof_expires_at->isPast())->count();
-        $expiredRego = $vehicles->filter(fn ($v) => $hasFleetFields && $v->registration_expires_at && $v->registration_expires_at->isPast())->count();
-        $expiring30 = $vehicles->filter(function ($v) use ($hasFleetFields, $now) {
-            if (!$hasFleetFields) return false;
-            foreach (['registration_expires_at', 'wof_expires_at', 'cof_expires_at'] as $field) {
-                if ($v->$field && !$v->$field->isPast() && $now->diffInDays($v->$field, false) <= 30) {
-                    return true;
-                }
+            $state = $filters['state'] ?? 'all';
+            if ($state === 'failed_restricted' && ! in_array($row['state'], ['failed', 'restricted'], true)) {
+                return false;
             }
-            return false;
-        })->count();
-        $expiring60 = $vehicles->filter(function ($v) use ($hasFleetFields, $now) {
-            if (!$hasFleetFields) return false;
-            foreach (['registration_expires_at', 'wof_expires_at', 'cof_expires_at'] as $field) {
-                if ($v->$field && !$v->$field->isPast() && $now->diffInDays($v->$field, false) <= 60 && $now->diffInDays($v->$field, false) > 30) {
-                    return true;
-                }
+            if (! in_array($state, ['all', 'failed_restricted'], true) && $row['state'] !== $state) {
+                return false;
             }
-            return false;
-        })->count();
+            if (($filters['kind'] ?? 'all') !== 'all' && $row['kind'] !== $filters['kind']) {
+                return false;
+            }
+            $text = implode(' ', [$row['vehicle']['name'], $row['vehicle']['asset_tag'], $row['vehicle']['registration_number'], $row['label'], $row['reference']]);
 
-        // Hero — per-document due-in-30 counts + vehicles already expired. Computed
-        // from the loaded collection (the page already fetches every vehicle).
-        $dueWithin30 = function (string $field) use ($vehicles, $hasFleetFields, $now) {
-            if (!$hasFleetFields) return 0;
-            return $vehicles->filter(function ($v) use ($field, $now) {
-                $date = $v->$field;
-                return $date && !$date->isPast() && $now->diffInDays($date, false) <= 30;
-            })->count();
-        };
-        $hasInsuranceColumn = $hasFleetFields && Schema::hasColumn('assets', 'insurance_expires_at');
-        $expiredNow = $hasFleetFields
-            ? $vehicles->filter(function ($v) use ($hasInsuranceColumn) {
-                foreach (['registration_expires_at', 'wof_expires_at', 'cof_expires_at'] as $field) {
-                    if ($v->$field && $v->$field->isPast()) return true;
-                }
-                return $hasInsuranceColumn && $v->insurance_expires_at && $v->insurance_expires_at->isPast();
-            })->count()
-            : 0;
+            return empty($filters['search']) || mb_stripos($text, trim($filters['search'])) !== false;
+        })->values();
+        $requestedPage = filter_var($request->input('page', 1), FILTER_VALIDATE_INT);
+        $page = $requestedPage && $requestedPage > 0 && $requestedPage <= max(1, (int) ceil($filtered->count() / 25)) ? $requestedPage : 1;
+        $queue = new LengthAwarePaginator($filtered->forPage($page, 25)->values(), $filtered->count(), 25, $page, ['path' => $request->url(), 'query' => $request->query()]);
 
         return Inertia::render('fleet-assets/compliance/index', [
-            'vehicles' => $vehiclesData->values(),
-            'hero' => [
-                'wof_due_30' => $dueWithin30('wof_expires_at'),
-                'rego_due_30' => $dueWithin30('registration_expires_at'),
-                'cof_due_30' => $dueWithin30('cof_expires_at'),
-                'expired_now' => $expiredNow,
-            ],
-            'summary' => [
-                'total' => $allVehicles,
-                'expired_wof' => $expiredWof,
-                'expired_rego' => $expiredRego,
-                'expiring_30' => $expiring30,
-                'expiring_60' => $expiring60,
-                'not_ready' => $notReady,
-                // null (column absent) hides the strip metric entirely.
-                'insurance_expiring' => $hasInsuranceColumn
-                    ? $vehicles->filter(function ($v) use ($now) {
-                        $date = $v->insurance_expires_at;
-                        return $date && $now->diffInDays($date, false) <= 30;
-                    })->count()
-                    : null,
-            ],
-            'filters' => $request->only(['status', 'search']),
+            'queue' => $queue, 'summary' => $summary, 'sites' => $sites, 'filters' => [...$filters, 'view' => $view],
+            'can' => ['manage' => $actor->canDo('fleet.manage')],
         ]);
     }
 }

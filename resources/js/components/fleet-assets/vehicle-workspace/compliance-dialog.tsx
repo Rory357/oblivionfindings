@@ -22,6 +22,7 @@ import {
     type ComplianceOutcome,
     type ComplianceRecord,
     type VehicleProfile,
+    type VehicleWorkspace,
 } from './types';
 import {
     fieldProps,
@@ -69,6 +70,8 @@ export function ComplianceDialog({
     record,
     initialStep = 0,
     presetApplicability,
+    open = true,
+    onKeepDraft,
     onClose,
     onSaved,
 }: {
@@ -77,10 +80,15 @@ export function ComplianceDialog({
     initialStep?: number;
     /** Starts from this applicability instead of the current version's. */
     presetApplicability?: Applicability;
+    open?: boolean;
+    onKeepDraft?: () => void;
     onClose: () => void;
     onSaved: () => void;
 }) {
-    const current = record.current;
+    const [sourceRecord, setSourceRecord] = useState(record);
+    const current = sourceRecord.current;
+    const [refreshing, setRefreshing] = useState(false);
+    const [refreshMessage, setRefreshMessage] = useState('');
     const [initial] = useState<Form>(() => ({
         applicability:
             presetApplicability ?? current?.applicability ?? 'unknown',
@@ -168,7 +176,7 @@ export function ComplianceDialog({
         const found: Record<string, string> = {};
         if (at === 0 && notApplicable && !form.applicability_basis.trim())
             found.applicability_basis = `Record why ${label} does not apply to this vehicle.`;
-        if (at === 1 && !notApplicable) {
+        if (at === 1 && applicable) {
             if (assessed && !form.evidence_reference.trim())
                 found.evidence_reference =
                     'Record the certificate, licence or receipt reference.';
@@ -186,6 +194,8 @@ export function ComplianceDialog({
                         'The licence end must be higher than its start.';
             }
             if (
+                needsCoverage &&
+                record.kind !== 'ruc' &&
                 form.effective_on &&
                 form.expires_on &&
                 form.expires_on < form.effective_on
@@ -212,17 +222,24 @@ export function ComplianceDialog({
                 applicability: form.applicability,
                 applicability_basis: form.applicability_basis || null,
                 outcome: notApplicable ? 'recorded' : form.outcome,
-                evidence_reference: notApplicable
+                evidence_reference: !assessed
                     ? null
                     : form.evidence_reference || null,
-                effective_on: notApplicable ? null : form.effective_on || null,
-                expires_on: notApplicable ? null : form.expires_on || null,
+                effective_on: !assessed ? null : form.effective_on || null,
+                expires_on:
+                    !needsCoverage || record.kind === 'ruc'
+                        ? null
+                        : form.expires_on || null,
                 ruc_start_km:
-                    notApplicable || form.ruc_start_km === ''
+                    !needsCoverage ||
+                    record.kind !== 'ruc' ||
+                    form.ruc_start_km === ''
                         ? null
                         : Number(form.ruc_start_km),
                 ruc_end_km:
-                    notApplicable || form.ruc_end_km === ''
+                    !needsCoverage ||
+                    record.kind !== 'ruc' ||
+                    form.ruc_end_km === ''
                         ? null
                         : Number(form.ruc_end_km),
                 reason: form.reason || null,
@@ -232,7 +249,7 @@ export function ComplianceDialog({
         if (!result) return;
         const version = isJsonObject(result.version) ? result.version : null;
         const outcome =
-            files.length && version
+            assessed && files.length && version
                 ? await uploads.upload(files, {
                       category: `${label} evidence`,
                       reason: `${label} evidence for version ${String(version.version)}`,
@@ -241,13 +258,51 @@ export function ComplianceDialog({
                   })
                 : null;
         setSavedText(
-            `${label} is recorded as version ${String(version?.version ?? '')}.${uploadSummary(outcome, files.length)}`,
+            `${label} is recorded as version ${String(version?.version ?? '')}.${uploadSummary(outcome, assessed ? files.length : 0)}`,
         );
         onSaved();
     };
 
+    const reviewLatest = async () => {
+        if (refreshing) return;
+        setRefreshing(true);
+        try {
+            const response = await fetch(
+                `/fleet-assets/compliance/vehicles/${vehicle.id}`,
+                {
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    headers: { Accept: 'application/json' },
+                },
+            );
+            if (!response.ok) throw new Error('unavailable');
+            const latest: Pick<VehicleWorkspace, 'compliance' | 'can'> =
+                await response.json();
+            const source = latest.compliance.find(
+                (item) => item.kind === record.kind,
+            );
+            if (!source || !latest.can.manage) throw new Error('unavailable');
+            setSourceRecord(source);
+            command.reset();
+            setStep(2);
+            setRefreshMessage(
+                'Latest source loaded. Your draft and staged files are retained. Compare the current evidence below before recording a new version.',
+            );
+        } catch {
+            setRefreshMessage(
+                'The latest editable source could not be loaded. Your draft is retained. Check your access or connection and try again.',
+            );
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
     return (
         <WorkspaceWizard
+            open={open}
+            onKeepDraft={dirty && !command.locked ? onKeepDraft : undefined}
+            freeNavigation
+            maxWidth="min(92vw, 900px)"
             title={`Update ${label} evidence`}
             description={`${vehicle.name}: a new version keeps earlier evidence.`}
             railIcon={ShieldCheck}
@@ -262,14 +317,18 @@ export function ComplianceDialog({
                     .filter(Boolean)
                     .join(' · '),
             }}
-            command={command}
+            command={{
+                ...command,
+                processing: command.processing || refreshing,
+                locked: command.locked || refreshing,
+            }}
             dirty={dirty}
             saved={savedText !== null}
             submitLabel="Record evidence"
             onValidateStep={validateStep}
             onSubmit={submit}
             onClose={onClose}
-            onReload={onClose}
+            onReload={() => void reviewLatest()}
             errorKey={JSON.stringify(errors)}
             success={
                 <WizardSuccess
@@ -279,6 +338,36 @@ export function ComplianceDialog({
                 />
             }
         >
+            {refreshMessage && (
+                <div role="status" className="mb-5 space-y-3">
+                    <p>{refreshMessage}</p>
+                    {!command.requiresReload && current && (
+                        <ReviewCard
+                            title="Latest source evidence"
+                            icon={ShieldCheck}
+                        >
+                            <ReviewRow
+                                label="Version / reference"
+                                value={`${current.version} · ${current.evidence_reference || 'Not recorded'}`}
+                            />
+                            <ReviewRow
+                                label="Applicability / outcome"
+                                value={`${applicabilityNames[current.applicability]} · ${outcomeNames[current.outcome]}`}
+                            />
+                            <ReviewRow
+                                label="Expiry / coverage"
+                                value={
+                                    record.kind === 'ruc'
+                                        ? `${current.ruc_start_km ?? '—'}–${current.ruc_end_km ?? '—'} km`
+                                        : current.expires_on
+                                          ? formatDateOnly(current.expires_on)
+                                          : 'Not recorded'
+                                }
+                            />
+                        </ReviewCard>
+                    )}
+                </div>
+            )}
             {step === 0 && (
                 <div className="space-y-5">
                     <p className="text-subtle">
@@ -598,7 +687,7 @@ export function ComplianceDialog({
                             value={form.applicability_basis || undefined}
                         />
                     </ReviewCard>
-                    {!notApplicable && (
+                    {assessed && (
                         <ReviewCard
                             icon={CalendarDays}
                             title="Evidence & next action"
@@ -612,25 +701,36 @@ export function ComplianceDialog({
                                 label="Reference"
                                 value={form.evidence_reference || undefined}
                             />
-                            {record.kind === 'ruc' ? (
-                                <ReviewRow
-                                    label="Licence range"
-                                    value={
-                                        form.ruc_start_km && form.ruc_end_km
-                                            ? `${Number(form.ruc_start_km).toLocaleString('en-NZ')} – ${Number(form.ruc_end_km).toLocaleString('en-NZ')} km`
-                                            : undefined
-                                    }
-                                />
-                            ) : (
-                                <ReviewRow
-                                    label="Next due / expiry"
-                                    value={
-                                        form.expires_on
-                                            ? formatDateOnly(form.expires_on)
-                                            : undefined
-                                    }
-                                />
-                            )}
+                            {needsCoverage &&
+                                (record.kind === 'ruc' ? (
+                                    <ReviewRow
+                                        label="Licence range"
+                                        value={
+                                            form.ruc_start_km && form.ruc_end_km
+                                                ? `${Number(form.ruc_start_km).toLocaleString('en-NZ')} – ${Number(form.ruc_end_km).toLocaleString('en-NZ')} km`
+                                                : undefined
+                                        }
+                                    />
+                                ) : (
+                                    <ReviewRow
+                                        label="Next due / expiry"
+                                        value={
+                                            form.expires_on
+                                                ? formatDateOnly(
+                                                      form.expires_on,
+                                                  )
+                                                : undefined
+                                        }
+                                    />
+                                ))}
+                            <ReviewRow
+                                label="Effective from"
+                                value={
+                                    form.effective_on
+                                        ? formatDateOnly(form.effective_on)
+                                        : 'Not recorded'
+                                }
+                            />
                             <ReviewRow
                                 label="Files"
                                 value={
@@ -643,6 +743,16 @@ export function ComplianceDialog({
                             />
                         </ReviewCard>
                     )}
+                    <ReviewCard
+                        title="Notes"
+                        icon={ClipboardCheck}
+                        onEdit={() => setStep(1)}
+                    >
+                        <ReviewRow
+                            label="Notes"
+                            value={form.reason || 'No additional notes'}
+                        />
+                    </ReviewCard>
                     <p className="text-caption">
                         Saving records a new version and rechecks readiness.
                         Earlier versions stay in the history; any repair or

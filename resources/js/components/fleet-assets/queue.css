@@ -1,0 +1,43 @@
+/* These corrections are scoped to the approved Fleet queues. */
+.fleet-queue-header.eh-header {
+    overflow: clip;
+}
+.fleet-queue-header .queue-severity-active {
+    outline: 2px solid var(--primary-foreground);
+    outline-offset: -2px;
+}
+.fleet-queue-header .queue-severity-low {
+    --eh-meter-accent: var(--primary-foreground);
+}
+.fleet-queue-header .eh-meter-donut-arc {
+    stroke: var(--eh-meter-accent);
+}
+.fleet-queue-header .eh-meter-donut-v {
+    color: var(--eh-meter-accent);
+}
+.fleet-queue-stack {
+    display: grid;
+    gap: 20px;
+    min-width: 0;
+}
+.fleet-queue-cell {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    overflow-wrap: anywhere;
+}
+.fleet-queue-link {
+    color: var(--primary);
+    font-weight: 600;
+    text-align: left;
+}
+.fleet-queue-link:hover {
+    text-decoration: underline;
+}
+.fleet-queue-link:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+    border-radius: 4px;
+}

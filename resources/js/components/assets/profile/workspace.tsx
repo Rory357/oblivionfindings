@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import { fleetQueueReturn } from '@/lib/fleet-queue-context';
 import { formatDate, formatDateTime } from '@/lib/fleet-utils';
 import { AssetWizardDialog } from '@/pages/fleet-assets/assets/components/asset-wizard-dialog';
 import type { Props } from '@/pages/fleet-assets/assets/show';
@@ -339,7 +340,15 @@ export function AssetProfileWorkspace({
                     }
                     variant="profile"
                     icon={Package}
-                    backHref="/fleet-assets/assets"
+                    backHref={
+                        fleetQueueReturn(
+                            typeof window === 'undefined'
+                                ? null
+                                : new URLSearchParams(
+                                      window.location.search,
+                                  ).get('return_to'),
+                        ) ?? '/fleet-assets/assets'
+                    }
                     title={asset.name}
                     wrapTitle
                     titleChip={

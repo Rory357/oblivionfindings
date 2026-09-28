@@ -50,6 +50,7 @@ use App\Http\Controllers\FleetAssets\VehicleTripHistoryController;
 use App\Http\Controllers\FleetAssets\WanderingAlertController;
 use App\Http\Controllers\FleetAssets\WorkOrderController;
 use App\Http\Controllers\FleetAssets\WorkspaceSettingsController;
+use App\Http\Controllers\OperationalReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
@@ -80,6 +81,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     Route::middleware('permission:fleet.viewAny|assets.viewAny|assets.viewAssigned')->group(function () {
         Route::get('/', DashboardController::class)->name('fleet-assets.dashboard');
         Route::get('/compliance', [ComplianceController::class, 'index'])->name('fleet-assets.compliance.index');
+        Route::get('/compliance/vehicles/{asset}', [ComplianceController::class, 'context'])->whereNumber('asset')->name('fleet-assets.compliance.context');
         Route::get('/daily-check', [DailyCheckController::class, 'index'])->name('fleet-assets.daily-check.index');
         Route::post('/daily-check', [DailyCheckController::class, 'store'])->name('fleet-assets.daily-check.store');
     });
@@ -293,6 +295,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     // Alerts — read
     Route::middleware('permission:assets.viewAny|assets.alerts.view')->group(function () {
         Route::get('/alerts', [AlertController::class, 'index'])->name('fleet-assets.alerts.index');
+        Route::get('/alerts/{alert}/snapshot', [AlertController::class, 'snapshot'])->whereNumber('alert')->name('fleet-assets.alerts.snapshot');
     });
 
     // Alerts — write through the canonical Control Room lifecycle.
@@ -672,7 +675,8 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
 
     // Reports
     Route::middleware('permission:fleet.viewAny|fleet.reports.view')->group(function () {
-        Route::get('/reports', [ReportController::class, 'index'])->name('fleet-assets.reports.index');
+        Route::get('/reports', [OperationalReportController::class, 'index'])->defaults('domain', 'fleet')->name('fleet-assets.reports.index');
+        Route::get('/reports/operating-summary', [ReportController::class, 'index'])->name('fleet-assets.reports.operating-summary');
         Route::get('/reports/export', [ReportController::class, 'export'])->name('fleet-assets.reports.export');
         Route::get('/reports/by-house', [ReportController::class, 'byHouse'])->name('fleet-assets.reports.by-house');
         Route::get('/reports/reimbursement', [ReportController::class, 'reimbursement'])->name('fleet-assets.reports.reimbursement');

@@ -1,0 +1,28 @@
+{
+  "date": "2026-09-29",
+  "implementationCommit": "e5b085628",
+  "remoteMainIntegrated": "ee22de096d6f79fa1448b184436908b9c077f5bd",
+  "checks": {
+    "frontend": { "status": "passed", "tests": 53, "files": 9, "log": "merge-frontend.log" },
+    "backend": { "status": "passed", "tests": 22, "assertions": 453, "log": "merge-backend.log" },
+    "typescript": { "status": "passed", "exitCode": 0, "log": "final-types.log" },
+    "eslint": { "status": "passed", "maxWarnings": 0 },
+    "pint": { "status": "passed" },
+    "build": { "status": "passed", "exitCode": 0, "duration": "5m 59s", "log": "final-build.log", "advisory": "Existing large output chunks" },
+    "diffWhitespace": { "status": "passed" }
+  },
+  "browser": {
+    "host": "http://127.0.0.1:8768",
+    "checkout": "C:/Users/steph/Herd/oblivionfindings",
+    "login": "Existing Demo Admin, normal sign-in",
+    "verified": [
+      "Overview hero entry buttons with standard breadcrumbs above",
+      "Fleet alerts hero cross-link, empty state and critical severity filtering",
+      "Compliance queue, selected-site filtering and site-preserving Alerts cross-link",
+      "Existing evidence wizard opens and cancels without saving",
+      "Compliance card branch at measured 390px viewport without page overflow",
+      "Final production build reload with expanding table rows and no console errors"
+    ],
+    "limits": "No live alert records in the local queue; alert writes and recovery verified by automated tests. No operational records were submitted or seeded. Theme switching was not tested in this run."
+  }
+}

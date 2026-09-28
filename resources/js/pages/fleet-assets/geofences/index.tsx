@@ -40,6 +40,8 @@ import {
     ShieldCheck,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { MapTools } from '../settings/_map-tools';
+import type { MapSnapshot } from '../settings/_types';
 import { base, query, request, useDebounced, useRemote } from './workspace/api';
 import { BoundaryWizard } from './workspace/boundary-wizard';
 import {
@@ -87,10 +89,12 @@ export default function MapsBoundaries({
     canManage,
     addressSearch,
     mapProvider,
+    googleMaps = null,
 }: {
     canManage: boolean;
     addressSearch: AddressCapabilities;
     mapProvider: MapProvider;
+    googleMaps?: MapSnapshot | null;
 }) {
     const [nav, setNav] = useState(
             () => new URLSearchParams(window.location.search),
@@ -124,6 +128,7 @@ export default function MapsBoundaries({
         } | null>(null),
         [people, setPeople] = useState<BoundaryRecord | null>(null);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [mapToolsOpen, setMapToolsOpen] = useState(false);
     const [lifecycle, setLifecycle] = useState<LifecycleAction | null>(null);
     const tab = tabs.some((t) => t.key === nav.get('tab'))
             ? nav.get('tab')!
@@ -1608,31 +1613,46 @@ export default function MapsBoundaries({
                             description="Availability of the configured map and address services"
                             onClose={() => setSettingsOpen(false)}
                             footer={
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setSettingsOpen(false)}
-                                >
-                                    Close
-                                </Button>
+                                <>
+                                    {googleMaps && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                                setSettingsOpen(false);
+                                                router.visit(
+                                                    '/fleet-assets/settings#maps',
+                                                );
+                                            }}
+                                        >
+                                            Shared provider settings
+                                        </Button>
+                                    )}
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setSettingsOpen(false)}
+                                    >
+                                        Close
+                                    </Button>
+                                </>
                             }
                         >
                             <div className="bnd-dialog flow-stack">
                                 <Facts
                                     rows={[
                                         [
-                                            'Map imagery',
+                                            'Boundary editor imagery',
                                             mapProvider?.url
-                                                ? 'Configured'
+                                                ? 'OSM-compatible tiles configured · not a provider health check'
                                                 : 'Unavailable',
                                         ],
                                         [
-                                            'Address search',
+                                            'Boundary editor address search',
                                             addressSearch.enabled
                                                 ? 'Enabled'
                                                 : 'Not enabled',
                                         ],
                                         [
-                                            'Address suggestions',
+                                            'Boundary editor suggestions',
                                             addressSearch.enabled &&
                                             addressSearch.autocomplete
                                                 ? 'Enabled while typing'
@@ -1640,14 +1660,42 @@ export default function MapsBoundaries({
                                         ],
                                     ]}
                                 />
+                                {googleMaps && (
+                                    <>
+                                        <Facts
+                                            rows={googleMaps.capabilities.map(
+                                                (capability) => [
+                                                    capability.title,
+                                                    capability.status,
+                                                ],
+                                            )}
+                                        />
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                                setSettingsOpen(false);
+                                                setMapToolsOpen(true);
+                                            }}
+                                        >
+                                            Open Google address & route tools
+                                        </Button>
+                                    </>
+                                )}
                                 <Notice title="Shared geometry remains available">
                                     Choose an approved site, enter coordinates
                                     or edit the boundary when an external
-                                    service is unavailable. Provider changes are
-                                    managed in application configuration.
+                                    service is unavailable. Google tools use a
+                                    separate Google map; the boundary editor
+                                    keeps its existing geometry controls.
                                 </Notice>
                             </div>
                         </Modal>
+                    )}
+                    {mapToolsOpen && googleMaps && (
+                        <MapTools
+                            settings={googleMaps}
+                            onClose={() => setMapToolsOpen(false)}
+                        />
                     )}
                     {lifecycle && (
                         <LifecycleDialog

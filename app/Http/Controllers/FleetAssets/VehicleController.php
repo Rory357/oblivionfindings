@@ -8,7 +8,6 @@ use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Client;
-use App\Models\ControlRoomAlert;
 use App\Models\FleetFuelLog;
 use App\Models\FleetTrip;
 use App\Models\FleetVehicleBooking;
@@ -18,6 +17,7 @@ use App\Models\User;
 use App\Services\Assets\AssetMutationIntegrityService;
 use App\Services\AuditLogger;
 use App\Services\Fleet\Data\VehicleReadinessContext;
+use App\Services\Fleet\FleetAlertScope;
 use App\Services\Fleet\FleetTripSiteScope;
 use App\Services\Fleet\MaintenanceAccessService;
 use App\Services\Fleet\VehicleFinancePresenter;
@@ -207,8 +207,7 @@ class VehicleController extends Controller
                 ->where('insurance_expires_at', '<', now())
                 ->count()
             : null;
-        $alertQuery = ControlRoomAlert::query()->actionable();
-        $this->siteAccess->applyAlertScope($alertQuery, $user, ['fleet.manage']);
+        $alertQuery = app(FleetAlertScope::class)->query($user, $request->only(['site_id']))->actionable();
         $openAlerts = (clone $alertQuery)->count();
         $criticalAlerts = (clone $alertQuery)
             ->where('severity', 'critical')

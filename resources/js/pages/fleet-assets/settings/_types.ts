@@ -43,11 +43,18 @@ export type MapSnapshot = {
     revision: string;
     values: MapValues;
     credentials: { browser: boolean; server: boolean };
+    references?: { browser: string | null; server: string | null };
     capabilities: {
         key: string;
         title: string;
         enabled: boolean;
+        selected?: boolean;
         status: string;
+        observation?: {
+            status: 'succeeded' | 'quota' | 'unavailable' | 'rejected';
+            observed_at: string;
+            last_success_at: string | null;
+        } | null;
     }[];
 };
 export function mergeMapDraft(

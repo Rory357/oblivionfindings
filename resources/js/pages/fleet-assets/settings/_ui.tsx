@@ -14,9 +14,15 @@ import {
 import { Info } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 
-export function Notice({ children }: { children: ReactNode }) {
+export function Notice({
+    children,
+    role = 'alert',
+}: {
+    children: ReactNode;
+    role?: 'alert' | 'note';
+}) {
     return (
-        <Alert>
+        <Alert role={role}>
             <Info className="size-4" />
             <AlertDescription>{children}</AlertDescription>
         </Alert>
@@ -99,6 +105,7 @@ export class SettingsError extends Error {
         message: string,
         public status: number,
         public latest?: unknown,
+        public errors?: Record<string, string[]>,
     ) {
         super(message);
     }
@@ -130,17 +137,16 @@ export async function api<T>(
         },
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
-    const data = await response
-        .json()
-        .catch(() => ({
-            message:
-                'The server could not complete this request. Your draft is retained.',
-        }));
+    const data = await response.json().catch(() => ({
+        message:
+            'The server could not complete this request. Your draft is retained.',
+    }));
     if (!response.ok)
         throw new SettingsError(
             data.message ?? 'Could not save. Please retry.',
             response.status,
             data.latest,
+            data.errors,
         );
     return data;
 }

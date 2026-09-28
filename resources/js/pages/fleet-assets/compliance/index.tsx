@@ -1,565 +1,820 @@
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+import { FleetQueueActions } from '@/components/fleet-assets/fleet-queue-actions';
+import {
+    QueueCriteria,
+    QueueEmpty,
+    QueuePagination,
+    useQueueFilters,
+} from '@/components/fleet-assets/queue-kit';
+import { CatalogueProvider } from '@/components/fleet-assets/vehicle-workspace/choice-picker';
+import { ComplianceDialog } from '@/components/fleet-assets/vehicle-workspace/compliance-dialog';
+import { PlanAppointmentDialog } from '@/components/fleet-assets/vehicle-workspace/studio-kit';
+import { EntityCard, EntityCardGrid } from '@/components/lists/entity-card';
+import {
+    EntityContextMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists/entity-menu';
+import { EntityTable } from '@/components/lists/entity-table';
+import { ListCaption } from '@/components/lists/list-caption';
+import { PageLayout } from '@/components/page';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderViewToggle,
+} from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate } from '@/lib/fleet-utils';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
+import { Head, router } from '@inertiajs/react';
 import {
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-    HeroSummaryMetric,
-    HeroSummaryStrip,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
-import { Head, Link, router } from '@inertiajs/react';
-import {
-    AlertTriangle,
-    CheckCircle,
-    Clock,
-    Search,
+    ArrowRight,
+    CalendarDays,
+    Car,
+    CheckCircle2,
+    FileText,
+    LayoutGrid,
+    List,
+    Loader2,
+    RefreshCw,
+    ShieldAlert,
     ShieldCheck,
-    Wrench,
-    XCircle,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { ComplianceSourceDialog } from './_dialogs';
+import {
+    kindLabels,
+    stateLabels,
+    stateTone,
+    type EvidenceContext,
+    type OpenEvidence,
+    type Props,
+    type QueueRow,
+} from './_types';
 
-type Vehicle = {
-    id: number;
-    name: string;
-    asset_tag: string;
-    registration_number: string | null;
-    registration_expires_at: string | null;
-    wof_expires_at: string | null;
-    cof_expires_at: string | null;
-    insurance_expires_at: string | null;
-    home_site: { id: number; name: string } | null;
-    /** `not_ready`: vehicle readiness blocks use (evidence, a hold or an unresolved check). */
-    status: 'ok' | 'warning' | 'critical' | 'expired' | 'not_ready';
-    worst_days: number | null;
-};
-
-type Props = {
-    vehicles: Vehicle[];
-    hero?: {
-        wof_due_30: number;
-        rego_due_30: number;
-        cof_due_30: number;
-        expired_now: number;
-    };
-    summary: {
-        total: number;
-        expired_wof: number;
-        expired_rego: number;
-        expiring_30: number;
-        expiring_60: number;
-        /** Vehicles readiness blocks from use. */
-        not_ready?: number;
-        /** `null` when the schema has no insurance column — hides the metric. */
-        insurance_expiring: number | null;
-    };
-    filters: {
-        status?: string;
-        search?: string;
-    };
-};
-
-function daysUntil(dateStr: string | null): number | null {
-    if (!dateStr) return null;
-    const diff =
-        (new Date(dateStr).getTime() - new Date().getTime()) /
-        (1000 * 60 * 60 * 24);
-    return Math.floor(diff);
-}
-
-function expiryColor(dateStr: string | null): string {
-    const days = daysUntil(dateStr);
-    if (days === null) return 'text-muted-foreground';
-    if (days < 0) return 'text-status-critical dark:text-status-critical';
-    if (days <= 30) return 'text-status-warning dark:text-status-warning';
-    if (days <= 60) return 'text-status-warning dark:text-status-warning';
-    return 'text-primary dark:text-primary';
-}
-
-function expiryBadge(dateStr: string | null): {
-    variant: 'default' | 'secondary' | 'destructive' | 'outline';
-    label: string;
-} {
-    const days = daysUntil(dateStr);
-    if (days === null) return { variant: 'secondary', label: 'N/A' };
-    if (days < 0) return { variant: 'destructive', label: 'Expired' };
-    if (days <= 30) return { variant: 'destructive', label: `${days}d` };
-    if (days <= 60) return { variant: 'default', label: `${days}d` };
-    return { variant: 'outline', label: `${days}d` };
-}
-
-function statusBadge(status: string): {
-    variant: 'default' | 'secondary' | 'destructive' | 'outline';
-    label: string;
-    icon: typeof CheckCircle;
-} {
-    switch (status) {
-        case 'expired':
-            return { variant: 'destructive', label: 'Expired', icon: XCircle };
-        case 'critical':
-            return {
-                variant: 'destructive',
-                label: 'Expiring Soon',
-                icon: AlertTriangle,
-            };
-        case 'not_ready':
-            return {
-                variant: 'destructive',
-                label: 'Not ready',
-                icon: AlertTriangle,
-            };
-        case 'warning':
-            return { variant: 'default', label: 'Warning', icon: Clock };
-        default:
-            return { variant: 'outline', label: 'OK', icon: CheckCircle };
-    }
+const tabs = [
+    { key: 'attention', label: 'Needs attention', icon: ShieldAlert },
+    { key: 'all', label: 'All records', icon: List },
+    { key: 'current', label: 'Current evidence', icon: CheckCircle2 },
+    { key: 'not_applicable', label: 'Not applicable', icon: ShieldCheck },
+];
+const actionLabel = (row: QueueRow) =>
+    ({
+        evidence:
+            row.state === 'not_recorded'
+                ? 'Assess applicability'
+                : 'Record evidence',
+        maintenance: 'Open maintenance',
+        source: 'View source evidence',
+        documents: 'View vehicle documents',
+        mileage: 'Record odometer',
+    })[row.action] ?? 'Open vehicle profile';
+const km = (value: number | null) =>
+    value === null
+        ? 'Not recorded'
+        : `${Number(value).toLocaleString('en-NZ')} km`;
+function due(row: QueueRow) {
+    return row.state === 'not_applicable'
+        ? 'Not required · basis recorded'
+        : row.kind === 'ruc' && row.ruc_end_km !== null
+          ? `${km(row.ruc_start_km)}–${km(row.ruc_end_km)}`
+          : row.expires_on
+            ? formatDateOnly(row.expires_on)
+            : 'Not recorded';
 }
 
 export default function ComplianceIndex({
-    vehicles,
-    hero: rawHero,
+    queue,
     summary,
     filters,
+    sites,
+    can,
 }: Props) {
-    const hero = rawHero ?? {
-        wof_due_30: 0,
-        rego_due_30: 0,
-        cof_due_30: 0,
-        expired_now: 0,
+    const { url, search, onSearch, patch } = useQueueFilters(
+        '/fleet-assets/compliance',
+        filters,
+    );
+    const contextMenu = useEntityContextMenu<QueueRow>();
+    const [opened, setOpened] = useState<OpenEvidence[]>([]),
+        [loading, setLoading] = useState<{
+            row: QueueRow;
+            mode: OpenEvidence['mode'];
+            error?: string;
+        } | null>(null);
+    const request = useRef(0);
+    const layout = filters.layout === 'cards' ? 'cards' : 'table';
+    const view = String(filters.view ?? 'attention');
+    const profileHref = (row: QueueRow, action = false) => {
+        const location =
+            row.kind === 'insurance'
+                ? 'tab=overview&view=documents'
+                : row.kind === 'restriction' ||
+                    (action && row.action === 'maintenance')
+                  ? 'tab=maintenance&view=open'
+                  : action && row.action === 'mileage'
+                    ? 'tab=service&view=mileage'
+                    : `tab=service&view=evidence&focus=${row.kind}`;
+        return `/fleet-assets/vehicles/${row.vehicle.id}?${location}&return_to=${encodeURIComponent(url)}`;
     };
-    const [search, setSearch] = useState(filters.search ?? '');
-
-    const applyFilters = (newFilters: Partial<typeof filters>) => {
-        router.get(
-            '/fleet-assets/compliance',
-            {
-                ...filters,
-                ...newFilters,
-            },
-            { preserveState: true },
-        );
+    const open = async (row: QueueRow, mode: OpenEvidence['mode']) => {
+        if (['insurance', 'restriction'].includes(row.kind)) {
+            router.visit(profileHref(row));
+            return;
+        }
+        const key = `${row.id}-${mode}`;
+        if (opened.some((item) => item.key === key)) {
+            setOpened((items) =>
+                items.map((item) => ({ ...item, hidden: item.key !== key })),
+            );
+            return;
+        }
+        const sequence = ++request.current;
+        setLoading({ row, mode });
+        try {
+            const response = await fetch(
+                `/fleet-assets/compliance/vehicles/${row.vehicle.id}`,
+                {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                },
+            );
+            if (!response.ok)
+                throw new Error(
+                    [403, 404].includes(response.status)
+                        ? 'This vehicle is no longer available in your permitted scope.'
+                        : 'The source could not be loaded. Your queue context is retained.',
+                );
+            const context: EvidenceContext = await response.json();
+            const record = context.compliance.find(
+                (record) => record.kind === row.kind,
+            );
+            if (!record)
+                throw new Error('The source evidence could not be found.');
+            if (
+                (mode === 'evidence' && !context.can.manage) ||
+                (mode === 'plan' && !context.can.schedule_service)
+            )
+                throw new Error(
+                    'You can view this record but cannot perform this action.',
+                );
+            if (sequence !== request.current) return;
+            setOpened((items) => [
+                ...items.map((item) => ({ ...item, hidden: true })),
+                { key, mode, context, record, hidden: false },
+            ]);
+            setLoading(null);
+        } catch (error) {
+            if (sequence === request.current)
+                setLoading({
+                    row,
+                    mode,
+                    error:
+                        error instanceof Error
+                            ? error.message
+                            : 'The source could not be loaded.',
+                });
+        }
     };
-
-    const handleSearch = () => {
-        applyFilters({ search });
+    const act = (row: QueueRow) => {
+        if (row.action === 'evidence' && can.manage) void open(row, 'evidence');
+        else if (row.action === 'source') void open(row, 'source');
+        else router.visit(profileHref(row, true));
     };
-
-    // Compute compliance percentage
-    const totalVehicles = summary.total ?? 0;
-    const problemVehicles =
-        (summary.expired_wof ?? 0) +
-        (summary.expired_rego ?? 0) +
-        (summary.expiring_30 ?? 0) +
-        (summary.not_ready ?? 0);
-    const compliancePct =
-        totalVehicles > 0
-            ? Math.round(
-                  ((totalVehicles - Math.min(problemVehicles, totalVehicles)) /
-                      totalVehicles) *
-                      100,
-              )
-            : 100;
-
+    const actions = (row: QueueRow): MenuItem[] => [
+        {
+            label: 'Open profile evidence',
+            icon: Car,
+            onClick: () => router.visit(profileHref(row)),
+        },
+        ...(!['insurance', 'restriction'].includes(row.kind)
+            ? [
+                  {
+                      label: 'View source & version',
+                      icon: FileText,
+                      onClick: () => void open(row, 'source'),
+                  },
+              ]
+            : []),
+        ...(can.manage
+            ? [
+                  {
+                      label: actionLabel(row),
+                      icon: ArrowRight,
+                      onClick: () => act(row),
+                  },
+              ]
+            : []),
+        ...(row.can_plan && ['wof', 'cof', 'registration'].includes(row.kind)
+            ? [
+                  {
+                      label: 'Plan inspection',
+                      icon: CalendarDays,
+                      onClick: () => void open(row, 'plan'),
+                  },
+              ]
+            : []),
+    ];
+    const criteria = [
+        ...(filters.search
+            ? [{ key: 'search', label: `Search: ${filters.search}` }]
+            : []),
+        ...(filters.state && filters.state !== 'all'
+            ? [
+                  {
+                      key: 'state',
+                      label: `State: ${stateLabels[String(filters.state)]}`,
+                  },
+              ]
+            : []),
+        ...(filters.kind && filters.kind !== 'all'
+            ? [
+                  {
+                      key: 'kind',
+                      label: `Requirement: ${kindLabels[String(filters.kind)]}`,
+                  },
+              ]
+            : []),
+    ];
+    const clear = () =>
+        patch({ search: '', state: undefined, kind: undefined });
+    const chooseMeter = (nextView: string, state?: string) =>
+        patch({ view: nextView, state, search: '', kind: undefined });
+    const close = (key: string) =>
+        setOpened((items) => items.filter((item) => item.key !== key));
+    const cards = (
+        <EntityCardGrid>
+            {queue.data.map((row) => (
+                <EntityCard
+                    key={row.id}
+                    name={row.vehicle.name}
+                    icon={Car}
+                    subline={`${row.vehicle.registration_number ?? row.vehicle.asset_tag} · ${row.label}`}
+                    meridian={stateTone(row.state)}
+                    actions={actions(row)}
+                    onOpen={() => router.visit(profileHref(row))}
+                    onContextMenu={(event) => contextMenu.open(event, row)}
+                    chips={
+                        <StatusBadge variant={stateTone(row.state)}>
+                            {stateLabels[row.state]}
+                        </StatusBadge>
+                    }
+                    alerts={
+                        <div className="fleet-queue-cell">
+                            <strong>{due(row)}</strong>
+                            <p className="text-caption">{row.reason}</p>
+                        </div>
+                    }
+                    footer={{
+                        personName: row.vehicle.responsible,
+                        primary:
+                            row.vehicle.responsible ?? 'No responsible person',
+                        secondary:
+                            row.vehicle.site?.name ?? 'Site not recorded',
+                    }}
+                />
+            ))}
+        </EntityCardGrid>
+    );
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
-                { title: 'Compliance', href: '/fleet-assets/compliance' },
+                {
+                    title: 'Compliance & renewals',
+                    href: '/fleet-assets/compliance',
+                },
             ]}
         >
-            <Head title="Compliance & Registrations" />
-            <PageShell>
-                <HeroShell
-                    footer={
-                        <HeroSummaryStrip label="Fleet posture">
-                            <HeroSummaryMetric
-                                tone={
-                                    compliancePct >= 80
-                                        ? 'success'
-                                        : compliancePct >= 50
-                                          ? 'warning'
-                                          : 'critical'
-                                }
-                            >
-                                {compliancePct}% of fleet compliant
-                            </HeroSummaryMetric>
-                            <HeroSummaryMetric
-                                tone={
-                                    summary.expiring_60 > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                            >
-                                {summary.expiring_60} renewal
-                                {summary.expiring_60 === 1 ? '' : 's'} in 31–60
-                                days
-                            </HeroSummaryMetric>
-                            {summary.insurance_expiring !== null && (
-                                <HeroSummaryMetric
-                                    tone={
-                                        summary.insurance_expiring > 0
-                                            ? 'warning'
-                                            : 'success'
+            <Head title="Compliance & renewals" />
+            <PageLayout
+                hero={
+                    <PageHeader
+                        className="fleet-queue-header"
+                        title="Compliance & renewals"
+                        wrapTitle
+                        icon={ShieldCheck}
+                        subline="Vehicle evidence, applicability and next actions · one requirement per row"
+                        actions={
+                            <>
+                                <FleetQueueActions siteId={filters.site_id} />
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={onSearch}
+                                    placeholder="Search vehicles or evidence…"
+                                />
+                                <PageHeaderGlassButton
+                                    onClick={() => router.reload()}
+                                >
+                                    <RefreshCw className="size-4" />
+                                    Refresh
+                                </PageHeaderGlassButton>
+                            </>
+                        }
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Permitted vehicles"
+                                    onClick={() => chooseMeter('all')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.vehicles}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Unique vehicles · current site scope
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Need attention"
+                                    tone="warning"
+                                    onClick={() => chooseMeter('attention')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.attention}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Vehicles with one or more queue items
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Evidence not recorded"
+                                    tone="warning"
+                                    onClick={() =>
+                                        chooseMeter('all', 'not_recorded')
                                     }
                                 >
-                                    {summary.insurance_expiring === 0
-                                        ? 'Insurance current'
-                                        : `${summary.insurance_expiring} insurance polic${summary.insurance_expiring === 1 ? 'y' : 'ies'} expiring 30d`}
-                                </HeroSummaryMetric>
-                            )}
-                            <HeroSummaryMetric tone="neutral">
-                                {summary.total} vehicles tracked
-                            </HeroSummaryMetric>
-                        </HeroSummaryStrip>
-                    }
-                >
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={ShieldCheck} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Compliance register · WOF / Rego / CoF
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Compliance & Registrations
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Track vehicle registrations, WOF, and COF expiry
-                                dates.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
-                                href="/fleet-assets/compliance?status=critical"
-                                label="WOF due 30d"
-                                value={fmt(hero.wof_due_30)}
-                                caption="book inspections"
-                                tone={
-                                    hero.wof_due_30 > 0 ? 'warning' : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/compliance?status=critical"
-                                label="Rego due 30d"
-                                value={fmt(hero.rego_due_30)}
-                                caption="renew registration"
-                                tone={
-                                    hero.rego_due_30 > 0 ? 'warning' : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/compliance?status=critical"
-                                label="CoF due 30d"
-                                value={fmt(hero.cof_due_30)}
-                                caption="certificate of fitness"
-                                tone={
-                                    hero.cof_due_30 > 0 ? 'warning' : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/compliance?status=expired"
-                                label="Expired now"
-                                value={fmt(hero.expired_now)}
-                                caption="off the road until renewed"
-                                tone={
-                                    hero.expired_now > 0
-                                        ? 'critical'
-                                        : 'success'
-                                }
-                            />
-                        </div>
-                    </div>
-                </HeroShell>
-
-                {/* Filters */}
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <div className="relative flex-1 sm:max-w-xs">
-                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            placeholder="Search vehicles..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            onKeyDown={(e) =>
-                                e.key === 'Enter' && handleSearch()
-                            }
-                            className="pl-9"
-                        />
-                    </div>
-                    <Select
-                        value={filters.status || 'all'}
-                        onValueChange={(value) =>
-                            applyFilters({
-                                status: value === 'all' ? '' : value,
-                            })
+                                    <PageHeaderMeterBig>
+                                        {summary.not_recorded}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Unknown is never current
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Due within 30 days"
+                                    tone="warning"
+                                    onClick={() =>
+                                        chooseMeter('all', 'due_soon')
+                                    }
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.due_soon}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Recorded dates approaching expiry
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Failed / restricted"
+                                    tone="critical"
+                                    onClick={() =>
+                                        chooseMeter('all', 'failed_restricted')
+                                    }
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.failed_restricted}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Review the stated source reason
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
                         }
-                    >
-                        <SelectTrigger className="w-44">
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All statuses</SelectItem>
-                            <SelectItem value="ok">OK</SelectItem>
-                            <SelectItem value="warning">
-                                Warning (60d)
-                            </SelectItem>
-                            <SelectItem value="critical">
-                                Critical (30d)
-                            </SelectItem>
-                            <SelectItem value="expired">Expired</SelectItem>
-                            <SelectItem value="not_ready">Not ready</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                {/* Compliance Table */}
-                <div className="rounded-lg border">
-                    <div
-                        data-fleet-narrow-strategy="horizontal-scroll"
-                        className="overflow-x-auto"
-                    >
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Vehicle
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Registration #
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Rego Expires
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        WOF Expires
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        CoF Expires
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Insurance
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Status
-                                    </th>
-                                    <th className="px-4 py-3 text-right font-medium">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(vehicles ?? []).length > 0 ? (
-                                    vehicles.map((vehicle) => {
-                                        const badge = statusBadge(
-                                            vehicle.status,
-                                        );
-                                        const StatusIcon = badge.icon;
-                                        return (
-                                            <tr
-                                                key={vehicle.id}
-                                                className="cursor-pointer border-b transition-colors hover:bg-muted/50"
-                                                onClick={() =>
-                                                    router.visit(
-                                                        `/fleet-assets/vehicles/${vehicle.id}`,
-                                                    )
-                                                }
-                                            >
-                                                <td className="px-4 py-3">
-                                                    <div className="font-medium">
-                                                        {vehicle.name}
+                        filters={
+                            <>
+                                <PageHeaderFilterSelect
+                                    label="All permitted sites"
+                                    value={String(filters.site_id ?? 'all')}
+                                    options={sites.map((site) => ({
+                                        value: String(site.id),
+                                        label: site.name,
+                                    }))}
+                                    onChange={(site) =>
+                                        patch({
+                                            site_id:
+                                                site === 'all'
+                                                    ? undefined
+                                                    : site,
+                                        })
+                                    }
+                                />
+                                <PageHeaderFilterSelect
+                                    label="All requirements"
+                                    value={String(filters.kind ?? 'all')}
+                                    options={Object.entries(kindLabels).map(
+                                        ([value, label]) => ({ value, label }),
+                                    )}
+                                    onChange={(kind) => patch({ kind })}
+                                />
+                                <PageHeaderFilterSelect
+                                    label="All states"
+                                    value={String(filters.state ?? 'all')}
+                                    options={Object.entries(stateLabels).map(
+                                        ([value, label]) => ({ value, label }),
+                                    )}
+                                    onChange={(state) => patch({ state })}
+                                />
+                                <PageHeaderViewToggle
+                                    value={layout}
+                                    onChange={(value) =>
+                                        patch({ layout: value })
+                                    }
+                                    options={[
+                                        {
+                                            value: 'table',
+                                            label: 'Table',
+                                            icon: List,
+                                        },
+                                        {
+                                            value: 'cards',
+                                            label: 'Cards',
+                                            icon: LayoutGrid,
+                                        },
+                                    ]}
+                                />
+                            </>
+                        }
+                        rail={
+                            <PageHeaderRail
+                                items={tabs}
+                                value={view}
+                                onSelect={(value) => patch({ view: value })}
+                            />
+                        }
+                    />
+                }
+            >
+                <div className="fleet-queue-stack">
+                    {opened
+                        .filter((item) => item.hidden && item.mode !== 'source')
+                        .map((item) => (
+                            <div
+                                key={item.key}
+                                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3"
+                            >
+                                <span>
+                                    Unsent{' '}
+                                    {item.mode === 'plan'
+                                        ? 'appointment'
+                                        : 'evidence'}{' '}
+                                    draft · {item.context.vehicle.name} ·{' '}
+                                    {item.record.label} evidence
+                                </span>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() =>
+                                            setOpened((items) =>
+                                                items.map((draft) => ({
+                                                    ...draft,
+                                                    hidden:
+                                                        draft.key !== item.key,
+                                                })),
+                                            )
+                                        }
+                                    >
+                                        Resume draft
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        onClick={() => close(item.key)}
+                                    >
+                                        Discard draft
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    <ListCaption
+                        title="Compliance queue"
+                        caption={`${queue.from ?? 0}–${queue.to ?? 0} of ${queue.total} requirement records`}
+                        right={
+                            criteria.length ? (
+                                <Button variant="ghost" onClick={clear}>
+                                    Clear list filters
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                    <QueueCriteria
+                        scope={`${sites.find((site) => String(site.id) === String(filters.site_id))?.name ?? 'All permitted sites'} · ${tabs.find((tab) => tab.key === view)?.label ?? 'All records'} · ${summary.vehicles} unique vehicles`}
+                        criteria={criteria}
+                        onRemove={(key) => patch({ [key]: undefined })}
+                    />
+                    {!queue.data.length ? (
+                        <QueueEmpty
+                            title={
+                                summary.vehicles
+                                    ? 'No matching requirement records'
+                                    : 'No vehicles in this permitted scope'
+                            }
+                            hasCriteria={criteria.length > 0}
+                            onClear={
+                                criteria.length
+                                    ? clear
+                                    : () => chooseMeter('all')
+                            }
+                        />
+                    ) : (
+                        <>
+                            {layout === 'table' && (
+                                <div className="hidden md:block">
+                                    <EntityTable
+                                        rowHeight="content"
+                                        rows={queue.data}
+                                        rowKey={(row) => row.id}
+                                        identityLabel="Vehicle / requirement"
+                                        identity={(row) => ({
+                                            icon: Car,
+                                            name: row.vehicle.name,
+                                            subline: `${row.vehicle.registration_number ?? row.vehicle.asset_tag} · ${row.label}`,
+                                        })}
+                                        columns={[
+                                            {
+                                                key: 'state',
+                                                label: 'State / reason',
+                                                width: '1.7fr',
+                                                cell: (row) => (
+                                                    <div className="fleet-queue-cell">
+                                                        <StatusBadge
+                                                            variant={stateTone(
+                                                                row.state,
+                                                            )}
+                                                        >
+                                                            {
+                                                                stateLabels[
+                                                                    row.state
+                                                                ]
+                                                            }
+                                                        </StatusBadge>
+                                                        <span className="text-caption">
+                                                            {row.reason}
+                                                        </span>
                                                     </div>
-                                                    {vehicle.asset_tag && (
-                                                        <div className="text-xs text-muted-foreground">
-                                                            {vehicle.asset_tag}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 font-mono text-xs">
-                                                    {vehicle.registration_number ??
-                                                        '-'}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {vehicle.registration_expires_at ? (
-                                                        <span
-                                                            className={expiryColor(
-                                                                vehicle.registration_expires_at,
-                                                            )}
-                                                        >
-                                                            {formatDate(
-                                                                vehicle.registration_expires_at,
-                                                            )}{' '}
-                                                            <Badge
-                                                                variant={
-                                                                    expiryBadge(
-                                                                        vehicle.registration_expires_at,
-                                                                    ).variant
-                                                                }
-                                                                className="ml-1 text-xs"
+                                                ),
+                                            },
+                                            {
+                                                key: 'due',
+                                                label: 'Due / recorded coverage',
+                                                width: '1.1fr',
+                                                cell: (row) => (
+                                                    <div className="fleet-queue-cell">
+                                                        <strong>
+                                                            {due(row)}
+                                                        </strong>
+                                                        {row.kind === 'ruc' && (
+                                                            <span className="text-caption">
+                                                                Recorded
+                                                                odometer:{' '}
+                                                                {km(
+                                                                    row.odometer_km,
+                                                                )}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ),
+                                            },
+                                            {
+                                                key: 'source',
+                                                label: 'Source / version',
+                                                width: '1fr',
+                                                cell: (row) => (
+                                                    <div className="fleet-queue-cell">
+                                                        {row.version ? (
+                                                            <Button
+                                                                variant="link"
+                                                                className="fleet-queue-link h-auto p-0 text-left whitespace-normal"
+                                                                onClick={(
+                                                                    event,
+                                                                ) => {
+                                                                    event.stopPropagation();
+                                                                    void open(
+                                                                        row,
+                                                                        'source',
+                                                                    );
+                                                                }}
                                                             >
-                                                                {
-                                                                    expiryBadge(
-                                                                        vehicle.registration_expires_at,
-                                                                    ).label
-                                                                }
-                                                            </Badge>
+                                                                {row.reference ??
+                                                                    'View evidence'}{' '}
+                                                                · v{row.version}
+                                                            </Button>
+                                                        ) : (
+                                                            <span className="text-caption">
+                                                                No evidence
+                                                                version
+                                                            </span>
+                                                        )}
+                                                        <span className="text-caption">
+                                                            {row.recorded_by ??
+                                                                'Recorder not recorded'}
+                                                            {row.recorded_at
+                                                                ? ` · ${formatDateTime(row.recorded_at)}`
+                                                                : ''}
                                                         </span>
-                                                    ) : (
-                                                        <span className="text-muted-foreground">
-                                                            -
+                                                    </div>
+                                                ),
+                                            },
+                                            {
+                                                key: 'owner',
+                                                label: 'Owner / next action',
+                                                width: '1.2fr',
+                                                cell: (row) => (
+                                                    <div className="fleet-queue-cell">
+                                                        <span>
+                                                            {row.vehicle
+                                                                .responsible ??
+                                                                'No responsible person'}
                                                         </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {vehicle.wof_expires_at ? (
-                                                        <span
-                                                            className={expiryColor(
-                                                                vehicle.wof_expires_at,
-                                                            )}
+                                                        <Button
+                                                            variant="link"
+                                                            className="fleet-queue-link h-auto p-0 text-left whitespace-normal"
+                                                            onClick={(
+                                                                event,
+                                                            ) => {
+                                                                event.stopPropagation();
+                                                                if (
+                                                                    can.manage ||
+                                                                    row.action ===
+                                                                        'source'
+                                                                )
+                                                                    act(row);
+                                                                else
+                                                                    router.visit(
+                                                                        profileHref(
+                                                                            row,
+                                                                        ),
+                                                                    );
+                                                            }}
                                                         >
-                                                            {formatDate(
-                                                                vehicle.wof_expires_at,
-                                                            )}{' '}
-                                                            <Badge
-                                                                variant={
-                                                                    expiryBadge(
-                                                                        vehicle.wof_expires_at,
-                                                                    ).variant
-                                                                }
-                                                                className="ml-1 text-xs"
-                                                            >
-                                                                {
-                                                                    expiryBadge(
-                                                                        vehicle.wof_expires_at,
-                                                                    ).label
-                                                                }
-                                                            </Badge>
+                                                            {can.manage ||
+                                                            row.action ===
+                                                                'source'
+                                                                ? actionLabel(
+                                                                      row,
+                                                                  )
+                                                                : 'Open source record'}{' '}
+                                                            →
+                                                        </Button>
+                                                        <span className="text-caption">
+                                                            {row.vehicle.site
+                                                                ?.name ??
+                                                                'Site not recorded'}
                                                         </span>
-                                                    ) : (
-                                                        <span className="text-muted-foreground">
-                                                            -
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {vehicle.cof_expires_at ? (
-                                                        <span
-                                                            className={expiryColor(
-                                                                vehicle.cof_expires_at,
-                                                            )}
-                                                        >
-                                                            {formatDate(
-                                                                vehicle.cof_expires_at,
-                                                            )}{' '}
-                                                            <Badge
-                                                                variant={
-                                                                    expiryBadge(
-                                                                        vehicle.cof_expires_at,
-                                                                    ).variant
-                                                                }
-                                                                className="ml-1 text-xs"
-                                                            >
-                                                                {
-                                                                    expiryBadge(
-                                                                        vehicle.cof_expires_at,
-                                                                    ).label
-                                                                }
-                                                            </Badge>
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-muted-foreground">
-                                                            -
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {vehicle.insurance_expires_at ? (
-                                                        <span
-                                                            className={expiryColor(
-                                                                vehicle.insurance_expires_at,
-                                                            )}
-                                                        >
-                                                            {formatDate(
-                                                                vehicle.insurance_expires_at,
-                                                            )}{' '}
-                                                            <Badge
-                                                                variant={
-                                                                    expiryBadge(
-                                                                        vehicle.insurance_expires_at,
-                                                                    ).variant
-                                                                }
-                                                                className="ml-1 text-xs"
-                                                            >
-                                                                {
-                                                                    expiryBadge(
-                                                                        vehicle.insurance_expires_at,
-                                                                    ).label
-                                                                }
-                                                            </Badge>
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-muted-foreground">
-                                                            -
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <Badge
-                                                        variant={badge.variant}
-                                                        className="gap-1"
-                                                    >
-                                                        <StatusIcon className="h-3 w-3" />
-                                                        {badge.label}
-                                                    </Badge>
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        asChild
-                                                        onClick={(e) =>
-                                                            e.stopPropagation()
-                                                        }
-                                                    >
-                                                        <Link
-                                                            href={`/fleet-assets/maintenance/work-orders?new=1&asset_id=${vehicle.id}`}
-                                                        >
-                                                            <Wrench className="mr-1 h-3 w-3" />
-                                                            Work order
-                                                        </Link>
-                                                    </Button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                ) : (
-                                    <tr>
-                                        <td
-                                            colSpan={8}
-                                            className="px-4 py-8 text-center"
-                                        >
-                                            <ShieldCheck className="mx-auto mb-2 h-12 w-12 text-muted-foreground/50" />
-                                            <p className="text-sm text-muted-foreground">
-                                                No vehicles found.
-                                            </p>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                                    </div>
+                                                ),
+                                            },
+                                        ]}
+                                        actionsFor={actions}
+                                        onOpen={(row) =>
+                                            router.visit(profileHref(row))
+                                        }
+                                        onRowContextMenu={contextMenu.open}
+                                    />
+                                </div>
+                            )}
+                            <div
+                                className={
+                                    layout === 'table' ? 'md:hidden' : ''
+                                }
+                            >
+                                {cards}
+                            </div>
+                            <QueuePagination links={queue.links} />
+                        </>
+                    )}
+                    <p className="text-caption">
+                        Header groups count unique vehicles and may overlap. The
+                        list counts requirement records. Insurance dates are
+                        context only; missing evidence remains unknown.
+                    </p>
                 </div>
-            </PageShell>
+            </PageLayout>
+            {contextMenu.ctx && (
+                <EntityContextMenu
+                    {...contextMenu.ctx}
+                    title={`${contextMenu.ctx.record.vehicle.name} · ${contextMenu.ctx.record.label}`}
+                    icon={ShieldCheck}
+                    items={actions(contextMenu.ctx.record)}
+                    onClose={contextMenu.close}
+                />
+            )}
+            <Dialog
+                open={!!loading}
+                onOpenChange={(next) => {
+                    if (!next) {
+                        ++request.current;
+                        setLoading(null);
+                    }
+                }}
+            >
+                <DialogContent
+                    style={{
+                        width: 'min(92vw, 480px)',
+                        maxWidth: 'min(92vw, 480px)',
+                    }}
+                >
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <FileText className="size-4" />
+                            {loading?.error
+                                ? 'Source unavailable'
+                                : 'Loading source evidence'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {loading?.error ??
+                                'Checking the current evidence and your permitted actions.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    {loading?.error ? (
+                        <Button
+                            onClick={() => void open(loading.row, loading.mode)}
+                        >
+                            Try again
+                        </Button>
+                    ) : (
+                        <Loader2 className="size-5 animate-spin" />
+                    )}
+                </DialogContent>
+            </Dialog>
+            {opened.map((item) => (
+                <CatalogueProvider
+                    key={item.key}
+                    entries={item.context.catalogues}
+                    canAdd={item.context.can.add_catalogue}
+                >
+                    {item.mode === 'evidence' ? (
+                        <ComplianceDialog
+                            open={!item.hidden}
+                            vehicle={item.context.vehicle}
+                            record={item.record}
+                            onClose={() => close(item.key)}
+                            onKeepDraft={() =>
+                                setOpened((items) =>
+                                    items.map((draft) =>
+                                        draft.key === item.key
+                                            ? { ...draft, hidden: true }
+                                            : draft,
+                                    ),
+                                )
+                            }
+                            onSaved={() =>
+                                router.reload({ only: ['queue', 'summary'] })
+                            }
+                        />
+                    ) : item.mode === 'plan' ? (
+                        <PlanAppointmentDialog
+                            open={!item.hidden}
+                            onKeepDraft={() =>
+                                setOpened((items) =>
+                                    items.map((draft) =>
+                                        draft.key === item.key
+                                            ? { ...draft, hidden: true }
+                                            : draft,
+                                    ),
+                                )
+                            }
+                            vehicle={item.context.vehicle}
+                            presetType={`${item.record.label} inspection`}
+                            source={
+                                item.record.record_id
+                                    ? {
+                                          type: 'compliance_record',
+                                          id: item.record.record_id,
+                                      }
+                                    : undefined
+                            }
+                            onClose={() => close(item.key)}
+                            onSaved={() =>
+                                router.reload({ only: ['queue', 'summary'] })
+                            }
+                        />
+                    ) : !item.hidden ? (
+                        <ComplianceSourceDialog
+                            vehicle={item.context.vehicle}
+                            record={item.record}
+                            onClose={() => close(item.key)}
+                            onProfile={() =>
+                                router.visit(
+                                    `/fleet-assets/vehicles/${item.context.vehicle.id}?tab=service&view=evidence&focus=${item.record.kind}&return_to=${encodeURIComponent(url)}`,
+                                )
+                            }
+                        />
+                    ) : null}
+                </CatalogueProvider>
+            ))}
         </AppLayout>
     );
 }

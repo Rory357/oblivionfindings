@@ -1,0 +1,47 @@
+
+   FAIL  Tests\Feature\FleetAssets\ComplianceAlertsQueueTest
+  ✓ queue uses versions unique vehicle counts and honest unknowns                                              285.23s
+  ✓ compliance scope precedes search counts and context access                                                   5.02s
+  ✓ invalid version pointer never exposes another vehicle evidence                                               3.14s
+  ✓ alert instruments cover all pages before severity and share entry scope                                      7.49s
+  ✓ alert search empty and foreign site never widen counts                                                       4.86s
+  ✓ response checks current status and retains canonical authority                                               1.46s
+  ⨯ bulk json response is atomic retains notes and snapshots keep scope                                          1.12s
+
+   PASS  Tests\Feature\FleetAssets\AlertControllerTest
+  ✓ index exposes control room manage flag only for canonical permission                                         3.20s
+  ✓ acknowledge uses canonical status actor and audit                                                            1.10s
+  ✓ start triage uses canonical status note and audit                                                            1.11s
+  ✓ open and acknowledged alerts cannot skip straight to resolution                                              1.14s
+  ✓ resolve requires resolution notes                                                                            1.09s
+  ✓ resolve uses canonical status actor notes and audit                                                          1.09s
+  ✓ bulk acknowledge uses canonical status and actor                                                             1.13s
+  ✓ bulk start triage advances only acknowledged alerts                                                          1.13s
+  ✓ bulk resolve requires resolution notes                                                                       1.12s
+  ✓ bulk resolve uses canonical status actor and notes                                                           1.11s
+  ✓ fleet manage alone cannot mutate alerts                                                                      0.78s
+  ✓ fleet bridge does not mutate non fleet alerts                                                                1.16s
+
+   PASS  Tests\Feature\FleetAssets\FleetControlRoomAlertHeroScopeTest
+  ✓ fleet hero alert counts are actionable site scoped and globally available to managers                       25.75s
+  ✓ canonical vehicle signals appear in fleet alerts without widening site access                                2.82s
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\FleetAssets\ComplianceAlertsQueueTest > bulk json response is atomic retains not…  TypeError
+  PHPUnit\Framework\Assert::assertStringContainsString(): Argument #2 ($haystack) must be of type string, null given, called in C:\Users\steph\Herd\oblivionfindings\tests\Feature\FleetAssets\ComplianceAlertsQueueTest.php on line 152
+
+  at tests\Feature\FleetAssets\ComplianceAlertsQueueTest.php:152
+    148▕         $this->actingAs($this->admin)->postJson('/fleet-assets/alerts/bulk-action', $payload)->assertConflict();
+    149▕         $this->assertSame('open', $first->fresh()->status);
+    150▕         $payload['expected_statuses'][$second->id] = 'open';
+    151▕         $this->actingAs($this->admin)->postJson('/fleet-assets/alerts/bulk-action', $payload)->assertOk()->assertJsonPath('updated', 2);
+  ➜ 152▕         $this->assertStringContainsString('Checking both vehicles', $first->fresh()->notes);
+    153▕         $this->assertStringContainsString('Checking both vehicles', $second->fresh()->notes);
+    154▕         $this->actingAs($this->admin)->getJson('/fleet-assets/alerts/'.$first->id.'/snapshot')->assertOk()->assertJsonPath('status', 'ack')->assertJsonPath('can_respond', true);
+    155▕         $viewer = $this->viewer(['assets.alerts.view']);
+    156▕         $this->actingAs($viewer)->getJson('/fleet-assets/alerts/'.$first->id.'/snapshot')->assertOk()->assertJsonPath('can_respond', false)->assertJsonPath('can_open_control_room', false);
+
+  1   tests\Feature\FleetAssets\ComplianceAlertsQueueTest.php:152
+
+
+  Tests:    1 failed, 20 passed (387 assertions)
+  Duration: 352.29s

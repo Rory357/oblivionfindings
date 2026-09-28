@@ -11,18 +11,31 @@ import {
     visibleFleetGroups,
     type FleetNavigationPermissions,
 } from '@/lib/fleet-navigation';
+import { fleetScopeHref } from '@/lib/fleet-queue-context';
 import { Link, usePage } from '@inertiajs/react';
 import { ChevronDown } from 'lucide-react';
 
 /** Fleet-only contextual links in the shell breadcrumb strip; page headers and view tabs stay owned by their pages. */
 export function FleetWorkspaceNavigation() {
-    const page = usePage<{ auth?: { can?: FleetNavigationPermissions } }>();
+    const page = usePage<{
+        auth?: { can?: FleetNavigationPermissions };
+        overview?: { fleet_alert_count?: number | null };
+        hero?: { unresolved?: number };
+        compliance?: { open_alerts?: number };
+    }>();
+    const alertCount =
+        page.props.overview?.fleet_alert_count ??
+        page.props.hero?.unresolved ??
+        page.props.compliance?.open_alerts;
     const match = fleetWorkspaceForUrl(page.url);
     if (!match) return null;
     const groups = visibleFleetGroups(match.workspace, page.props.auth?.can);
     if (!groups.length) return null;
     const hrefFor = (href: string) =>
-        fleetNavigationPath(page.url) === href ? page.url : href;
+        fleetNavigationPath(page.url) === href &&
+        href !== '/fleet-assets/reports'
+            ? page.url
+            : fleetScopeHref(href, page.url);
 
     return (
         <nav
@@ -48,6 +61,13 @@ export function FleetWorkspaceNavigation() {
                                 }
                             >
                                 {item.label}
+                                {item.href === '/fleet-assets/alerts' &&
+                                    alertCount !== undefined &&
+                                    alertCount !== null && (
+                                        <span className="rounded-md bg-status-critical-bg px-1.5 text-xs font-bold text-status-critical">
+                                            {alertCount}
+                                        </span>
+                                    )}
                             </Link>
                         </Button>
                     );

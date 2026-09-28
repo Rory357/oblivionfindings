@@ -1,15 +1,9 @@
 import { FLEET_COLORS, HorizontalBarChart } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import PageShell from '@/components/page-shell';
+import { PageHeaderFilterSelect } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import {
     TabsRoot as Tabs,
     TabsContent,
@@ -18,12 +12,9 @@ import {
 } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import { formatCurrency } from '@/lib/fleet-utils';
-import {
-    CompactHeroStat,
-    FleetCompactHero,
-} from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, router } from '@inertiajs/react';
-import { Building2, Download, PieChart, Users } from 'lucide-react';
+import { Building2, Download, Users } from 'lucide-react';
+import { FleetReportHeader } from './report-header';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -249,58 +240,46 @@ export default function CostAllocation({
         >
             <Head title="Cost Allocation" />
             <PageShell>
-                <FleetCompactHero
-                    pill={`Fleet reports · last ${days} days`}
-                    title="Cost Allocation"
-                    backHref="/fleet-assets/reports"
-                    backLabel="Reports"
-                    stats={
-                        <>
-                            <CompactHeroStat
-                                label="Fleet cost"
-                                value={formatCurrency(stats.total_fleet_cost)}
-                                tone="neutral"
-                            />
-                            <CompactHeroStat
-                                label="Per vehicle"
-                                value={formatCurrency(stats.cost_per_vehicle)}
-                                tone="neutral"
-                            />
-                            <CompactHeroStat
-                                label="Per resident"
-                                value={formatCurrency(stats.cost_per_resident)}
-                                tone="neutral"
-                            />
-                            <CompactHeroStat
-                                label="Per house"
-                                value={formatCurrency(stats.cost_per_house)}
-                                tone="neutral"
-                            />
-                        </>
+                <FleetReportHeader
+                    title="Cost allocation"
+                    description={`Fleet costs by permitted house and resident · last ${days} days`}
+                    filters={
+                        <PageHeaderFilterSelect
+                            label="Period · Last 30 days"
+                            value={String(days)}
+                            allValue="30"
+                            options={[
+                                { value: '30', label: 'Last 30 days' },
+                                { value: '90', label: 'Last 90 days' },
+                                { value: '180', label: 'Last 6 months' },
+                                { value: '365', label: 'Last 12 months' },
+                            ]}
+                            onChange={handlePeriodChange}
+                        />
                     }
+                    meters={[
+                        {
+                            label: 'Fleet cost',
+                            value: formatCurrency(stats.total_fleet_cost),
+                            caption: 'Recorded in this period',
+                        },
+                        {
+                            label: 'Per vehicle',
+                            value: formatCurrency(stats.cost_per_vehicle),
+                            caption: 'Recorded allocation',
+                        },
+                        {
+                            label: 'Per resident',
+                            value: formatCurrency(stats.cost_per_resident),
+                            caption: 'Recorded allocation',
+                        },
+                        {
+                            label: 'Per house',
+                            value: formatCurrency(stats.cost_per_house),
+                            caption: 'Recorded allocation',
+                        },
+                    ]}
                 />
-                <p className="text-sm text-muted-foreground">
-                    Analyse fleet costs allocated by house/site and by resident.
-                </p>
-
-                {/* Period Selector */}
-                <div className="flex items-center gap-3">
-                    <PieChart className="h-5 w-5 text-muted-foreground" />
-                    <Select
-                        value={String(days)}
-                        onValueChange={handlePeriodChange}
-                    >
-                        <SelectTrigger className="w-48">
-                            <SelectValue placeholder="Select period" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="30">Last 30 days</SelectItem>
-                            <SelectItem value="90">Last 90 days</SelectItem>
-                            <SelectItem value="180">Last 6 months</SelectItem>
-                            <SelectItem value="365">Last 12 months</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
 
                 {/* Main Content */}
                 <div className="grid gap-4 lg:grid-cols-[1fr_240px]">

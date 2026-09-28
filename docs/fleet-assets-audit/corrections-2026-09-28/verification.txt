@@ -1,0 +1,47 @@
+Fleet entry correction verification checkpoint
+Recorded: 2026-09-29T00:03:27.0386001+13:00
+Branch: codex/fleet-entry-corrections
+Base: 52dafa6728ebe343631453d4863f645d97c59506
+Application root: C:/Users/steph/.codex/worktrees/fleet-entry-corrections/oblivionfindings
+Browser host: http://127.0.0.1:8789; isolated synthetic database; no public/hot
+OperationalReportsTest + FleetReportSiteAccessTest: 27 tests / 469 assertions passed
+FleetControlRoomAlertHeroScopeTest: 3 tests / 203 assertions passed
+Vitest: 5 files / 38 tests passed
+TypeScript: npx tsc --noEmit passed
+ESLint: targeted changed files passed; final Alerts/Usage-by-house copy lint passed
+PHP Pint: touched PHP files formatted; changes were import/chain formatting only
+Vite build: passed in 5m39s, exit 0; bundle-size advisory remains
+git diff --check: passed
+
+Browser checks: actual sidebar entry, seven report URLs, Back/refresh, draft recovery, private recent runs, approved-site report-only sources and denied 403, specialist report menus/filters, reimbursement stale-result invalidation, Alerts activity filter, responsive header clipping, light/dark, Escape/focus restoration.
+Measured CSS viewports: desktop 1536x711; explicit desktop override 1536x864; mobile 390x844. Header scrollTop stayed 0 after focus and responsive resize. No document horizontal overflow was observed in the measured library layouts.
+True browser-menu 125% zoom was not established. DPR is not treated as zoom evidence.
+Native Trips CSV download was not confirmed (browser observer timed out); backend exports passed.
+Final copy changes were browser-verified after the final build: No alerts match this view; Earlier alert history; Selected month.
+Final browser error-log inspection returned no errors. Theme restored to System and viewport override reset.
+Evidence screenshots use synthetic records only. Their capture occurred across the successful build and final copy rebuild; report-library and scope code was unchanged between these builds.
+Remaining scope, approval blocker and main-checkout overlap are documented in CHECKPOINT.md. This is not full Fleet programme acceptance or a production deployment.
+
+SHA-256 source/build identity:
+[
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\fleet-entry-corrections\\oblivionfindings\\public\\build\\manifest.json",
+    "Hash": "0556FE14ED458C9214E745FDCB169883E7A7D1FD2A6CFCCB57CB3DF6C26F97B2"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\fleet-entry-corrections\\oblivionfindings\\resources\\js\\pages\\reporting\\workspace.tsx",
+    "Hash": "05DAFF07AB0EEEC4CFBEED101259DAD03862CEC51060187FFB1464F29D539F3A"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\fleet-entry-corrections\\oblivionfindings\\resources\\js\\pages\\fleet-assets\\alerts\\index.tsx",
+    "Hash": "212DD5716344234CF37A3AABD0505FC854857F4437F38F09C6EFB98FCEC7EEC7"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\fleet-entry-corrections\\oblivionfindings\\resources\\js\\pages\\fleet-assets\\reports\\by-house.tsx",
+    "Hash": "AB37D60CFB278AC635A31FCE67974764980FE71AF9534073A581EB04131F63A7"
+  },
+  {
+    "Path": "C:\\Users\\steph\\.codex\\worktrees\\fleet-entry-corrections\\oblivionfindings\\resources\\css\\app.css",
+    "Hash": "4341BA8DC4AA79EFA2799A93905FFEE1092C82345174E0519F91889688ADAF42"
+  }
+]

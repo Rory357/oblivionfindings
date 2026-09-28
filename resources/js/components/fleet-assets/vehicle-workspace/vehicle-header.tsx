@@ -120,7 +120,13 @@ export function VehicleHeader({
                     <Link
                         href={returnHref}
                         className="hero-back"
-                        aria-label="Back to vehicles"
+                        aria-label={
+                            returnHref.startsWith('/fleet-assets/compliance')
+                                ? 'Back to compliance queue'
+                                : returnHref.startsWith('/fleet-assets/alerts')
+                                  ? 'Back to Fleet alerts'
+                                  : 'Back to vehicles'
+                        }
                     >
                         <ArrowLeft className="size-4" />
                     </Link>

@@ -18,7 +18,7 @@ class OperationalReportReady extends Notification
         return ['kind' => 'operational_report_ready', 'title' => 'Your scheduled report is ready',
             'body' => 'Open Recent and scheduled runs. Access is checked again before viewing or downloading.',
             'url' => match ($this->domain) {
-                'fleet' => '/fleet-assets/reports/builder','self' => '/my-day/safety-reports',default => '/operations/people-location-reports/'.$this->domain
+                'fleet' => '/fleet-assets/reports?view=saved','self' => '/my-day/safety-reports?view=saved',default => '/operations/people-location-reports/'.$this->domain.'?view=saved'
             }];
     }
 }
