@@ -1,0 +1,46 @@
+
+ RUN  v4.1.5 C:/Users/steph/.codex/worktrees/fleet-personal-reports/oblivionfindings
+
+ ❯ resources/js/components/fleet-assets/vehicle-workspace/finance-studio.test.tsx (0 test)
+ ✓ resources/js/components/fleet-assets/vehicle-workspace/record-command.test.tsx (7 tests) 37ms
+ ✓ resources/js/components/fleet-assets/vehicle-workspace/booking-request.test.tsx (6 tests) 352ms
+ ❯ resources/js/components/fleet-assets/maintenance/cost-workspace.test.tsx (0 test)
+ ❯ resources/js/pages/finance/bills/Show.test.tsx (0 test)
+ ❯ resources/js/pages/finance/vehicle-reviews/history.test.tsx (0 test)
+ ✓ resources/js/components/people-locations/model.test.ts (8 tests) 12ms
+ ✓ resources/js/components/maps/google-map.test.tsx (1 test) 105ms
+ ✓ resources/js/pages/operations/people-locations/index.test.tsx (4 tests) 284ms
+ ✓ resources/js/components/people-locations/report-dialog.test.tsx (4 tests) 529ms
+ ✓ resources/js/components/fleet-assets/transport/location-field.test.tsx (3 tests) 367ms
+ ✓ resources/js/components/fleet-assets/maintenance/date-picker.test.tsx (4 tests) 414ms
+ ❯ resources/js/components/finance/document-preview.test.tsx (0 test)
+ ✓ resources/js/components/finance/record-batch-wizard.test.tsx (2 tests) 425ms
+   ✓ retains successful, stale and uncertain outcomes and retries only the original uncertain command  341ms
+ ✓ resources/js/components/maps/google-sdk.test.ts (3 tests) 35ms
+ ✓ resources/js/components/assets/profile/finance-review-dialog.test.tsx (1 test) 425ms
+   ✓ reviews an asset Finance request before submitting to the canonical queue  423ms
+ ✓ resources/js/pages/fleet-assets/settings/settings-draft.test.ts (4 tests) 10ms
+ ✓ resources/js/lib/fleet-return.test.ts (2 tests) 2ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  resources/js/components/finance/document-preview.test.tsx [ resources/js/components/finance/document-preview.test.tsx ]
+ FAIL  resources/js/components/fleet-assets/maintenance/cost-workspace.test.tsx [ resources/js/components/fleet-assets/maintenance/cost-workspace.test.tsx ]
+ FAIL  resources/js/components/fleet-assets/vehicle-workspace/finance-studio.test.tsx [ resources/js/components/fleet-assets/vehicle-workspace/finance-studio.test.tsx ]
+ FAIL  resources/js/pages/finance/bills/Show.test.tsx [ resources/js/pages/finance/bills/Show.test.tsx ]
+ FAIL  resources/js/pages/finance/vehicle-reviews/history.test.tsx [ resources/js/pages/finance/vehicle-reviews/history.test.tsx ]
+Error: Denied ID C:/Users/steph/.codex/visualizations/2026/09/27/01a0e1a8-7e5a-7b81-921c-feaf73216636/consolidation-qa/pdfjs-dist/build/pdf.worker.min.mjs?url
+  File: C:/Users/steph/.codex/visualizations/2026/09/27/01a0e1a8-7e5a-7b81-921c-feaf73216636/consolidation-qa/pdfjs-dist/build/pdf.worker.min.mjs?url
+ ❯ loadAndTransform ../../../../Herd/oblivionfindings/node_modules/vite/dist/node/chunks/config.js:22696:33
+ ❯ doTransform ../../../../Herd/oblivionfindings/node_modules/vite/dist/node/chunks/config.js:22673:17
+ ❯ fetchModule ../../../../Herd/oblivionfindings/node_modules/vite/dist/node/chunks/config.js:34073:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+
+ Test Files  5 failed | 13 passed (18)
+      Tests  49 passed (49)
+   Start at  13:16:45
+   Duration  33.30s (transform 1.03s, setup 4.79s, import 12.71s, tests 3.00s, environment 38.97s)
+
+JSON report written to C:/Users/steph/.codex/visualizations/2026/09/27/01a0e1a8-7e5a-7b81-921c-feaf73216636/consolidation-qa/frontend-tests.json

@@ -1,0 +1,8 @@
+commit f3fd2f77657c7fe09022ff69562e8c3487c9668b
+Merge: 19ec8b3d3 50716b9cc
+Author:     Stephan <stephanv48v@gmail.com>
+AuthorDate: Mon Sep 28 13:12:43 2026 +1300
+Commit:     Stephan <stephanv48v@gmail.com>
+CommitDate: Mon Sep 28 13:12:43 2026 +1300
+
+    merge: reconcile Reports and People history contracts for isolated QA

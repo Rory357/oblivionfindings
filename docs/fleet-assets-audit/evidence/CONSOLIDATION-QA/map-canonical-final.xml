@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest" file="tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest.php" tests="2" assertions="57" errors="0" failures="0" skipped="0" time="353.017260">
+    <testcase name="it redirects the legacy map and scopes current resources Sites and alert projections" file="tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest.php::it redirects the legacy map and scopes current resources Sites and alert projections" class="Tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest" classname="Tests.Feature.FleetAssets.FleetLiveMapSiteAccessTest" assertions="35" time="352.149976"/>
+    <testcase name="it requires approved Sites even for fleet managers and includes an approved secondary Site" file="tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest.php::it requires approved Sites even for fleet managers and includes an approved secondary Site" class="Tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest" classname="Tests.Feature.FleetAssets.FleetLiveMapSiteAccessTest" assertions="22" time="0.867284"/>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,232 @@
+{
+  "routes": 307,
+  "duplicateUriMethods": [],
+  "duplicateNames": [],
+  "settings": [
+    {
+      "uri": "fleet-assets/settings",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": "fleet-assets.settings.index",
+      "action": "App\\Http\\Controllers\\FleetAssets\\WorkspaceSettingsController@index",
+      "middleware": [
+        "web",
+        "auth",
+        "permission:fleet.viewAny|assets.viewAny"
+      ],
+      "wheres": []
+    },
+    {
+      "uri": "fleet-assets/settings/notifications",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": "fleet-assets.settings.notifications",
+      "action": "App\\Http\\Controllers\\FleetAssets\\WorkspaceSettingsController@index",
+      "middleware": [
+        "web",
+        "auth",
+        "permission:fleet.viewAny|assets.viewAny"
+      ],
+      "wheres": []
+    },
+    {
+      "uri": "fleet-assets/settings/notification-preferences",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": null,
+      "action": "App\\Http\\Controllers\\FleetAssets\\SettingsNotificationController@show",
+      "middleware": [
+        "web",
+        "auth",
+        "permission:fleet.viewAny|assets.viewAny"
+      ],
+      "wheres": []
+    },
+    {
+      "uri": "fleet-assets/settings/notification-preferences",
+      "methods": [
+        "PUT"
+      ],
+      "name": null,
+      "action": "App\\Http\\Controllers\\FleetAssets\\SettingsNotificationController@update",
+      "middleware": [
+        "web",
+        "auth",
+        "permission:fleet.viewAny|assets.viewAny"
+      ],
+      "wheres": []
+    },
+    {
+      "uri": "fleet-assets/settings/notification-checks",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": null,
+      "action": "App\\Http\\Controllers\\FleetAssets\\SettingsNotificationController@checks",
+      "middleware": [
+        "web",
+        "auth",
+        "permission:fleet.viewAny|assets.viewAny"
+      ],
+      "wheres": []
+    },
+    {
+      "uri": "fleet-assets/settings/notification-checks",
+      "methods": [
+        "POST"
+      ],
+      "name": null,
+      "action": "App\\Http\\Controllers\\FleetAssets\\SettingsNotificationController@check",
+      "middleware": [
+        "web",
+        "auth",
+        "permission:fleet.viewAny|assets.viewAny",
+        "throttle:10,1"
+      ],
+      "wheres": []
+    },
+    {
+      "uri": "fleet-assets/settings/maps",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": null,
+      "action": "App\\Http\\Controllers\\FleetAssets\\WorkspaceSettingsController@maps",
+      "middleware": [
+        "web",
+        "auth",
+        "permission:fleet.viewAny|assets.viewAny"
+      ],
+      "wheres": []
+    },
+    {
+      "uri": "fleet-assets/settings/maps",
+      "methods": [
+        "PUT"
+      ],
+      "name": null,
+      "action": "App\\Http\\Controllers\\FleetAssets\\WorkspaceSettingsController@updateMaps",
+      "middleware": [
+        "web",
+        "auth",
+        "permission:fleet.viewAny|assets.viewAny",
+        "permission:fleet.settings.manage"
+      ],
+      "wheres": []
+    },
+    {
+      "uri": "fleet-assets/settings/tracking-devices",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": null,
+      "action": "App\\Http\\Controllers\\FleetAssets\\WorkspaceSettingsController@devices",
+      "middleware": [
+        "web",
+        "auth",
+        "permission:fleet.viewAny|assets.viewAny"
+      ],
+      "wheres": []
+    },
+    {
+      "uri": "fleet-assets/settings/history",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "name": null,
+      "action": "App\\Http\\Controllers\\FleetAssets\\WorkspaceSettingsController@history",
+      "middleware": [
+        "web",
+        "auth",
+        "permission:fleet.viewAny|assets.viewAny"
+      ],
+      "wheres": []
+    },
+    {
+      "uri": "fleet-assets/settings/map-capabilities/{capability}",
+      "methods": [
+        "POST"
+      ],
+      "name": null,
+      "action": "App\\Http\\Controllers\\FleetAssets\\MapCapabilityController",
+      "middleware": [
+        "web",
+        "auth",
+        "permission:fleet.viewAny|assets.viewAny",
+        "throttle:30,1"
+      ],
+      "wheres": {
+        "capability": "places|geocoding|routes"
+      }
+    }
+  ],
+  "submitEvidence": [
+    {
+      "uri": "fleet-assets/vehicles/{asset}/finance/review-requests/{reviewRequest}/submit",
+      "methods": [
+        "POST"
+      ],
+      "name": "fleet-assets.vehicles.finance.requests.submit",
+      "action": "App\\Http\\Controllers\\FleetAssets\\VehicleFinanceController@submitEvidence",
+      "middleware": [
+        "web",
+        "auth",
+        "permission:fleet.manage"
+      ],
+      "wheres": {
+        "asset": "[0-9]+",
+        "reviewRequest": "[0-9]+"
+      }
+    }
+  ],
+  "legacyMap": {
+    "uri": "fleet-assets/map",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "fleet-assets.map",
+    "action": "App\\Http\\Controllers\\FleetAssets\\LiveMapController",
+    "middleware": [
+      "web",
+      "auth",
+      "permission:fleet.viewAny|assets.geofences.manage"
+    ],
+    "wheres": []
+  },
+  "operationalReportRoutes": 16,
+  "retainedSchedules": [
+    {
+      "command": "\"C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe\" \"artisan\" finance:review-notices",
+      "expression": "* * * * *",
+      "timezone": "UTC",
+      "withoutOverlapping": true,
+      "onOneServer": false
+    },
+    {
+      "command": "\"C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe\" \"artisan\" finance:review-reminders",
+      "expression": "30 8 * * *",
+      "timezone": "Pacific/Auckland",
+      "withoutOverlapping": true,
+      "onOneServer": false
+    },
+    {
+      "command": "\"C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe\" \"artisan\" reports:run-schedules",
+      "expression": "*/5 * * * *",
+      "timezone": "UTC",
+      "withoutOverlapping": true,
+      "onOneServer": false
+    }
+  ],
+  "schedulesExecuted": false
+}

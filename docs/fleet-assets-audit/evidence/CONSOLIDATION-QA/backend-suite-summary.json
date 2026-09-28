@@ -1,0 +1,380 @@
+[
+  {
+    "name": "Tests\\Architecture\\ItSecuritySingleTenantBoundaryTest",
+    "tests": "45",
+    "assertions": "600",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\Finance\\BillApprovalSnapshotTest",
+    "tests": "16",
+    "assertions": "234",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "it rejects changes made after review even within the same timestamp second",
+    "tests": "3",
+    "assertions": "39",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "it serializes independent approval and cancellation workers without duplicate or contradictory posting",
+    "tests": "2",
+    "assertions": "13",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\Finance\\BillSpendApprovalGateTest",
+    "tests": "14",
+    "assertions": "109",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "it rejects missing approval foreign action and source or evidence tamper without posting",
+    "tests": "7",
+    "assertions": "28",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "it preserves below-threshold and disabled-gate behavior",
+    "tests": "2",
+    "assertions": "4",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\FleetAssets\\Pkg02bVehicleFinanceTest",
+    "tests": "21",
+    "assertions": "567",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\FleetAssets\\Pkg01MaintenanceProtectedSliceTest",
+    "tests": "21",
+    "assertions": "484",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\FleetAssets\\Pkg06bAssetProfileTest",
+    "tests": "4",
+    "assertions": "107",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\FleetAssets\\Pkg08SettingsTest",
+    "tests": "12",
+    "assertions": "78",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\FleetAssets\\FleetOverviewContractTest",
+    "tests": "14",
+    "assertions": "210",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\FleetAssets\\TransportWorkspaceTest",
+    "tests": "1",
+    "assertions": "12",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\FleetAssets\\ResidentTransportJourneySecurityTest",
+    "tests": "22",
+    "assertions": "465",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\FleetAssets\\Pkg07MapPrivacyTest",
+    "tests": "4",
+    "assertions": "86",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\FleetAssets\\Pkg02bVehicleMapTest",
+    "tests": "8",
+    "assertions": "228",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\FleetAssets\\FleetLiveMapSiteAccessTest",
+    "tests": "2",
+    "assertions": "2",
+    "failures": "2",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\Operations\\PeopleLocationsTest",
+    "tests": "33",
+    "assertions": "191",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "it uses exact Auckland day boundaries for both telemetry streams",
+    "tests": "3",
+    "assertions": "21",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "it rechecks Transport scope and the selected window after reading report evidence",
+    "tests": "6",
+    "assertions": "20",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "it preserves independent day history while removing newly inaccessible journey choices",
+    "tests": "2",
+    "assertions": "12",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\Operations\\ClientLocationHistoryBoundaryTest",
+    "tests": "6",
+    "assertions": "126",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\Operations\\ClientLocationConsentDisclosureTest",
+    "tests": "5",
+    "assertions": "109",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\Reporting\\OperationalReportsTest",
+    "tests": "19",
+    "assertions": "171",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\Reporting\\OperationalReportPrivacyTest",
+    "tests": "23",
+    "assertions": "531",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Current privacy blocks cached detail derived results and every export",
+    "tests": "6",
+    "assertions": "144",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Alert reports use canonical read permission and recheck withdrawal",
+    "tests": "6",
+    "assertions": "96",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Alerts exclude wrong site conflicting person and controlled content",
+    "tests": "2",
+    "assertions": "72",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Controlled content withdrawal invalidates cached alert without removing source",
+    "tests": "2",
+    "assertions": "58",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\SecurityDevices\\CanonicalIntegrationEventHistoryTest",
+    "tests": "4",
+    "assertions": "34",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\SecurityDevices\\ConsolidatedIntegrationHistoryTest",
+    "tests": "10",
+    "assertions": "20",
+    "failures": "0",
+    "errors": "6"
+  },
+  {
+    "name": "Interactive scan reports saturation before invalid rows are filtered",
+    "tests": "6",
+    "assertions": "9",
+    "failures": "0",
+    "errors": "3"
+  },
+  {
+    "name": "Report stream keeps 601 original contributors and honours late arrival and zero watermarks",
+    "tests": "2",
+    "assertions": "11",
+    "failures": "0",
+    "errors": "1"
+  },
+  {
+    "name": "Tests\\Feature\\SecurityDevices\\TrackingWorkspaceCanonicalHistoryTest",
+    "tests": "3",
+    "assertions": "24",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\SecurityDevices\\PersonalTrackingConsentWithdrawalTest",
+    "tests": "1",
+    "assertions": "94",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\SecurityDevices\\DeviceCustodyAuthorizationTest",
+    "tests": "4",
+    "assertions": "60",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\HealthSafety\\LoneWorkerSiteAccessTest",
+    "tests": "4",
+    "assertions": "126",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\HealthSafety\\LoneWorkerIntegrityHardeningTest",
+    "tests": "61",
+    "assertions": "635",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Lone worker controller canonical identity rejects malformed alert detail and list links",
+    "tests": "12",
+    "assertions": "180",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Lone worker controller canonical identity blocks malformed operational actions",
+    "tests": "2",
+    "assertions": "14",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Lone worker canonical identity rejects malformed persisted tuples",
+    "tests": "10",
+    "assertions": "100",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\HealthSafety\\LoneWorkerLifecycleAndIntegrationContextTest",
+    "tests": "14",
+    "assertions": "86",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Normal check in remains available for active and overdue sessions",
+    "tests": "2",
+    "assertions": "20",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Normal check in does not clear an emergency session",
+    "tests": "2",
+    "assertions": "10",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Completed session rejects normal check in and remains terminal",
+    "tests": "2",
+    "assertions": "8",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\HealthSafety\\LoneWorkerControllerTest",
+    "tests": "17",
+    "assertions": "124",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\HealthSafety\\CheckLoneWorkerOverdueJobIntegrityTest",
+    "tests": "1",
+    "assertions": "12",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Feature\\SettingsControllerTest",
+    "tests": "17",
+    "assertions": "60",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Unit\\BrandThemeTokensTest",
+    "tests": "57",
+    "assertions": "84",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "it retains supported colour values and normalizes legacy channels",
+    "tests": "25",
+    "assertions": "25",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "it only emits supported nonnegative radius lengths",
+    "tests": "6",
+    "assertions": "6",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "it omits malformed values for every allowed key at the real Blade emission boundary",
+    "tests": "25",
+    "assertions": "50",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Unit\\FleetAssets\\MaintenanceCostSummaryTest",
+    "tests": "4",
+    "assertions": "5",
+    "failures": "0",
+    "errors": "0"
+  },
+  {
+    "name": "Tests\\Unit\\PeopleLocationsReturnUrlTest",
+    "tests": "1",
+    "assertions": "8",
+    "failures": "0",
+    "errors": "0"
+  }
+]

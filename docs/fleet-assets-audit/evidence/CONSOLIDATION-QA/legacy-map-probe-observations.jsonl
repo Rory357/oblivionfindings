@@ -1,0 +1,2 @@
+{"permission":"assets.viewAny","status":200,"component":"fleet-assets\/map","exposed_vehicle_count":2,"exposed_positions":[{"lat":"-41.2800000","lng":"174.7700000","consent_blocked":true},{"lat":"-41.2800000","lng":"174.7700000","consent_blocked":false}],"open_alerts":2}
+{"permission":"assets.viewAssigned","status":200,"component":"fleet-assets\/map","exposed_vehicle_count":2,"exposed_positions":[{"lat":"-41.2800000","lng":"174.7700000","consent_blocked":true},{"lat":"-41.2800000","lng":"174.7700000","consent_blocked":false}],"open_alerts":2}

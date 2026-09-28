@@ -1,0 +1,60 @@
+
+  .⨯⨯⨯
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest > it allows explicit fleet management across active…    
+  Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+ Array &0 [
+     0 => 3,
+-    1 => 4,
+ ]
+
+  at tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest.php:65
+     61▕     $manager = mapViewerAt($localSite, ['fleet.viewAny', 'fleet.manage']);
+     62▕     $this->actingAs($manager)->get('/fleet-assets/map')->assertRedirect('/fleet-assets/geofences?tab=map');
+     63▕     $this->get('/fleet-assets/geofences?tab=map')->assertOk()->assertInertia(fn (Assert $page) => $page->component('fleet-assets/geofences/index'));
+     64▕     $resources = $this->getJson('/fleet-assets/geofences/resources')->assertOk()->json('data');
+  ➜  65▕     expect(collect($resources)->pluck('id')->sort()->values()->all())->toBe(collect([$localVehicle->id, $otherVehicle->id])->sort()->values()->all());
+     66▕     $sites = $this->getJson('/fleet-assets/geofences/sites')->assertOk()->json('data');
+     67▕     expect(collect($sites)->pluck('id')->sort()->values()->all())->toBe(collect([$localSite->id, $otherSite->id])->sort()->values()->all());
+     68▕ });
+     69▕
+
+  1   tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest.php:65
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\FleetAssets\LegacyMapProjectionProbeTest > assets only actor cannot receive restricted flee…   
+  Expected response status code [403] but received 200.
+Failed asserting that 200 is identical to 403.
+
+  at .consolidation-tools\LegacyMapProjectionProbeTest.php:52
+     48▕             $props = $response->viewData('page')['props'];
+     49▕             $observation = ['permission' => $permissionKey, 'status' => 200, 'component' => $response->viewData('page')['component'], 'exposed_vehicle_count' => count($props['vehicle_markers'] ?? []), 'exposed_positions' => collect($props['vehicle_markers'] ?? [])->map(fn ($row) => ['lat' => $row['lat'], 'lng' => $row['lng'], 'consent_blocked' => $row['consent_blocked']])->all(), 'open_alerts' => $props['open_alerts'] ?? null];
+     50▕             file_put_contents(getenv('CONSOLIDATION_PROBE_OUTPUT'), json_encode($observation, JSON_THROW_ON_ERROR).PHP_EOL, FILE_APPEND);
+     51▕         }
+  ➜  52▕         $response->assertForbidden();
+     53▕     }
+     54▕ }
+     55▕
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\FleetAssets\LegacyMapProjectionProbeTest > assets only actor cannot receive restricted flee…   
+  Expected response status code [403] but received 200.
+Failed asserting that 200 is identical to 403.
+
+  at .consolidation-tools\LegacyMapProjectionProbeTest.php:52
+     48▕             $props = $response->viewData('page')['props'];
+     49▕             $observation = ['permission' => $permissionKey, 'status' => 200, 'component' => $response->viewData('page')['component'], 'exposed_vehicle_count' => count($props['vehicle_markers'] ?? []), 'exposed_positions' => collect($props['vehicle_markers'] ?? [])->map(fn ($row) => ['lat' => $row['lat'], 'lng' => $row['lng'], 'consent_blocked' => $row['consent_blocked']])->all(), 'open_alerts' => $props['open_alerts'] ?? null];
+     50▕             file_put_contents(getenv('CONSOLIDATION_PROBE_OUTPUT'), json_encode($observation, JSON_THROW_ON_ERROR).PHP_EOL, FILE_APPEND);
+     51▕         }
+  ➜  52▕         $response->assertForbidden();
+     53▕     }
+     54▕ }
+     55▕
+
+
+  Tests:    3 failed, 1 passed (57 assertions)
+  Duration: 314.80s
+

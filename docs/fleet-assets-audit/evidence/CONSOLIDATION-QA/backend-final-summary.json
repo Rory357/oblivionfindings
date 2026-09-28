@@ -1,0 +1,329 @@
+{
+  "method": "Latest complete execution of each test class, excluding the temporary vulnerability proof; previous attempts retained without rewriting.",
+  "tests": 494,
+  "passed": 494,
+  "failed": 0,
+  "skipped": 0,
+  "assertions": 5905,
+  "attempts": [
+    {
+      "file": "combined-backend.xml",
+      "name": "CLI Arguments",
+      "tests": "468",
+      "assertions": "5682",
+      "errors": "6",
+      "failures": "2",
+      "skipped": "0",
+      "time": "730.905554",
+      "parsedTests": 468,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "file": "supplement-backend.xml",
+      "name": "CLI Arguments",
+      "tests": "32",
+      "assertions": "152",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "time": "306.381108",
+      "parsedTests": 32,
+      "evidence": "supplement-backend.xml"
+    },
+    {
+      "file": "map-checks.xml",
+      "name": "CLI Arguments",
+      "tests": "4",
+      "assertions": "57",
+      "errors": "0",
+      "failures": "3",
+      "skipped": "0",
+      "time": "314.399467",
+      "parsedTests": 4,
+      "evidence": "map-checks.xml"
+    },
+    {
+      "file": "tests\\Feature\\FleetAssets\\FleetLiveMapSiteAccessTest.php",
+      "name": "Tests\\Feature\\FleetAssets\\FleetLiveMapSiteAccessTest",
+      "tests": "2",
+      "assertions": "57",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "time": "353.017260",
+      "parsedTests": 2,
+      "evidence": "map-canonical-final.xml"
+    },
+    {
+      "file": "map-fix-regressions.xml",
+      "name": "CLI Arguments",
+      "tests": "77",
+      "assertions": "1216",
+      "errors": "0",
+      "failures": "1",
+      "skipped": "0",
+      "time": "500.847922",
+      "parsedTests": 77,
+      "evidence": "map-fix-regressions.xml"
+    },
+    {
+      "file": "history-architecture-final.xml",
+      "name": "CLI Arguments",
+      "tests": "55",
+      "assertions": "651",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "time": "259.876200",
+      "parsedTests": 55,
+      "evidence": "history-architecture-final.xml"
+    }
+  ],
+  "classes": [
+    {
+      "name": "Tests\\Architecture\\ItSecuritySingleTenantBoundaryTest",
+      "tests": 45,
+      "assertions": 600,
+      "failed": 0,
+      "evidence": "history-architecture-final.xml"
+    },
+    {
+      "name": "Tests\\Feature\\Finance\\BillApprovalSnapshotTest",
+      "tests": 16,
+      "assertions": 234,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\Finance\\BillSpendApprovalGateTest",
+      "tests": 14,
+      "assertions": 109,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\FleetAssets\\Pkg02bVehicleFinanceTest",
+      "tests": 21,
+      "assertions": 567,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\FleetAssets\\Pkg01MaintenanceProtectedSliceTest",
+      "tests": 21,
+      "assertions": 484,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\FleetAssets\\Pkg06bAssetProfileTest",
+      "tests": 4,
+      "assertions": 107,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\FleetAssets\\Pkg08SettingsTest",
+      "tests": 12,
+      "assertions": 78,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\FleetAssets\\FleetOverviewContractTest",
+      "tests": 14,
+      "assertions": 210,
+      "failed": 0,
+      "evidence": "map-fix-regressions.xml"
+    },
+    {
+      "name": "Tests\\Feature\\FleetAssets\\TransportWorkspaceTest",
+      "tests": 1,
+      "assertions": 12,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\FleetAssets\\ResidentTransportJourneySecurityTest",
+      "tests": 22,
+      "assertions": 465,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\FleetAssets\\Pkg07MapPrivacyTest",
+      "tests": 4,
+      "assertions": 86,
+      "failed": 0,
+      "evidence": "map-fix-regressions.xml"
+    },
+    {
+      "name": "Tests\\Feature\\FleetAssets\\Pkg02bVehicleMapTest",
+      "tests": 8,
+      "assertions": 228,
+      "failed": 0,
+      "evidence": "map-fix-regressions.xml"
+    },
+    {
+      "name": "Tests\\Feature\\FleetAssets\\FleetLiveMapSiteAccessTest",
+      "tests": 2,
+      "assertions": 57,
+      "failed": 0,
+      "evidence": "map-fix-regressions.xml"
+    },
+    {
+      "name": "Tests\\Feature\\Operations\\PeopleLocationsTest",
+      "tests": 33,
+      "assertions": 191,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\Operations\\ClientLocationHistoryBoundaryTest",
+      "tests": 6,
+      "assertions": 126,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\Operations\\ClientLocationConsentDisclosureTest",
+      "tests": 5,
+      "assertions": 109,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\Reporting\\OperationalReportsTest",
+      "tests": 19,
+      "assertions": 171,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\Reporting\\OperationalReportPrivacyTest",
+      "tests": 23,
+      "assertions": 531,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\SecurityDevices\\CanonicalIntegrationEventHistoryTest",
+      "tests": 4,
+      "assertions": 34,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\SecurityDevices\\ConsolidatedIntegrationHistoryTest",
+      "tests": 10,
+      "assertions": 51,
+      "failed": 0,
+      "evidence": "history-architecture-final.xml"
+    },
+    {
+      "name": "Tests\\Feature\\SecurityDevices\\TrackingWorkspaceCanonicalHistoryTest",
+      "tests": 3,
+      "assertions": 24,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\SecurityDevices\\PersonalTrackingConsentWithdrawalTest",
+      "tests": 1,
+      "assertions": 94,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\SecurityDevices\\DeviceCustodyAuthorizationTest",
+      "tests": 4,
+      "assertions": 60,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\HealthSafety\\LoneWorkerSiteAccessTest",
+      "tests": 4,
+      "assertions": 126,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\HealthSafety\\LoneWorkerIntegrityHardeningTest",
+      "tests": 61,
+      "assertions": 635,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\HealthSafety\\LoneWorkerLifecycleAndIntegrationContextTest",
+      "tests": 14,
+      "assertions": 86,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\HealthSafety\\LoneWorkerControllerTest",
+      "tests": 17,
+      "assertions": 124,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\HealthSafety\\CheckLoneWorkerOverdueJobIntegrityTest",
+      "tests": 1,
+      "assertions": 12,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\SettingsControllerTest",
+      "tests": 17,
+      "assertions": 60,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Unit\\BrandThemeTokensTest",
+      "tests": 57,
+      "assertions": 84,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Unit\\FleetAssets\\MaintenanceCostSummaryTest",
+      "tests": 4,
+      "assertions": 5,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Unit\\PeopleLocationsReturnUrlTest",
+      "tests": 1,
+      "assertions": 8,
+      "failed": 0,
+      "evidence": "combined-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\FleetAssets\\FleetHandoverSiteIsolationTest",
+      "tests": 9,
+      "assertions": 62,
+      "failed": 0,
+      "evidence": "supplement-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\FleetAssets\\FleetHandoverMutationIntegrityTest",
+      "tests": 13,
+      "assertions": 39,
+      "failed": 0,
+      "evidence": "supplement-backend.xml"
+    },
+    {
+      "name": "Tests\\Feature\\FleetAssets\\LegacyMapAccessTest",
+      "tests": 4,
+      "assertions": 36,
+      "failed": 0,
+      "evidence": "map-fix-regressions.xml"
+    }
+  ]
+}

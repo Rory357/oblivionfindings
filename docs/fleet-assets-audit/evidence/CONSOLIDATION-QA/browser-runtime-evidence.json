@@ -1,0 +1,13 @@
+{
+  "url": "http://127.0.0.1:8974/fleet-assets/geofences?tab=map",
+  "viewport": {
+    "height": 900,
+    "scrollWidth": 1351,
+    "width": 1351
+  },
+  "entryScripts": [
+    "http://127.0.0.1:8974/build/assets/app-khc5tsDn.js"
+  ],
+  "errors": [],
+  "zoom": "Genuine 125% unverified; no zoom check or substitute attempted."
+}

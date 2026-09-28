@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="CLI Arguments" tests="4" assertions="57" errors="0" failures="3" skipped="0" time="314.399467">
+    <testsuite name="Tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest" file="tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest.php" tests="2" assertions="49" errors="0" failures="1" skipped="0" time="314.048148">
+      <testcase name="it redirects the legacy map and scopes current resources Sites and alert projections" file="tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest.php::it redirects the legacy map and scopes current resources Sites and alert projections" class="Tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest" classname="Tests.Feature.FleetAssets.FleetLiveMapSiteAccessTest" assertions="35" time="313.337580"/>
+      <testcase name="it allows explicit fleet management across active Sites through the current map" file="tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest.php::it allows explicit fleet management across active Sites through the current map" class="Tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest" classname="Tests.Feature.FleetAssets.FleetLiveMapSiteAccessTest" assertions="14" time="0.710568">
+        <failure type="PHPUnit\Framework\ExpectationFailedException">it allows explicit fleet management across active Sites through the current mapFailed asserting that two arrays are identical.&#13;
+at tests\Feature\FleetAssets\FleetLiveMapSiteAccessTest.php:65</failure>
+      </testcase>
+    </testsuite>
+    <testsuite name="Tests\Feature\FleetAssets\LegacyMapProjectionProbeTest" file="Legacy Map Projection Probe (Tests\Feature\FleetAssets\LegacyMapProjectionProbe)" tests="2" assertions="8" errors="0" failures="2" skipped="0" time="0.351319">
+      <testsuite name="Assets only actor cannot receive restricted fleet positions" tests="2" assertions="8" errors="0" failures="2" skipped="0" time="0.351319">
+        <testcase name="Assets only actor cannot receive restricted fleet positions with data set &quot;assets view any&quot;" file="Legacy Map Projection Probe (Tests\Feature\FleetAssets\LegacyMapProjectionProbe)::Assets only actor cannot receive restricted fleet positions with data set &quot;assets view any&quot;" class="Tests\Feature\FleetAssets\LegacyMapProjectionProbeTest" classname="Tests.Feature.FleetAssets.LegacyMapProjectionProbeTest" assertions="4" time="0.166946">
+          <failure type="PHPUnit\Framework\ExpectationFailedException">Assets only actor cannot receive restricted fleet positions with data set "assets view any"Expected response status code [403] but received 200.
+Failed asserting that 200 is identical to 403.&#13;
+at vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+at vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:176
+at vendor\laravel\framework\src\Illuminate\Testing\Concerns\AssertsStatusCodes.php:141
+at .consolidation-tools\LegacyMapProjectionProbeTest.php:52</failure>
+        </testcase>
+        <testcase name="Assets only actor cannot receive restricted fleet positions with data set &quot;assets view assigned&quot;" file="Legacy Map Projection Probe (Tests\Feature\FleetAssets\LegacyMapProjectionProbe)::Assets only actor cannot receive restricted fleet positions with data set &quot;assets view assigned&quot;" class="Tests\Feature\FleetAssets\LegacyMapProjectionProbeTest" classname="Tests.Feature.FleetAssets.LegacyMapProjectionProbeTest" assertions="4" time="0.184373">
+          <failure type="PHPUnit\Framework\ExpectationFailedException">Assets only actor cannot receive restricted fleet positions with data set "assets view assigned"Expected response status code [403] but received 200.
+Failed asserting that 200 is identical to 403.&#13;
+at vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+at vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:176
+at vendor\laravel\framework\src\Illuminate\Testing\Concerns\AssertsStatusCodes.php:141
+at .consolidation-tools\LegacyMapProjectionProbeTest.php:52</failure>
+        </testcase>
+      </testsuite>
+    </testsuite>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,20 @@
+[
+  "resources/js/components/finance/document-preview.test.tsx",
+  "resources/js/components/finance/record-batch-wizard.test.tsx",
+  "resources/js/components/fleet-assets/maintenance/cost-workspace.test.tsx",
+  "resources/js/components/fleet-assets/vehicle-workspace/finance-studio.test.tsx",
+  "resources/js/components/fleet-assets/vehicle-workspace/record-command.test.tsx",
+  "resources/js/components/maps/google-map.test.tsx",
+  "resources/js/components/maps/google-sdk.test.ts",
+  "resources/js/components/people-locations/model.test.ts",
+  "resources/js/components/people-locations/report-dialog.test.tsx",
+  "resources/js/pages/finance/bills/Show.test.tsx",
+  "resources/js/pages/finance/vehicle-reviews/history.test.tsx",
+  "resources/js/pages/fleet-assets/settings/settings-draft.test.ts",
+  "resources/js/pages/operations/people-locations/index.test.tsx",
+  "resources/js/components/assets/profile/finance-review-dialog.test.tsx",
+  "resources/js/components/fleet-assets/vehicle-workspace/booking-request.test.tsx",
+  "resources/js/components/fleet-assets/maintenance/date-picker.test.tsx",
+  "resources/js/components/fleet-assets/transport/location-field.test.tsx",
+  "resources/js/lib/fleet-return.test.ts"
+]
