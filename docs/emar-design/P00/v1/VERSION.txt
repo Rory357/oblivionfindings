@@ -1,0 +1,11 @@
+eMAR P00 v1 — Medication rules & states (design mockup)
+Recorded 28 September 2026 NZDT · baseline 52dafa6728ebe343631453d4863f645d97c59506 · branch claude/vigilant-mclaren-233129
+Approval applies to exactly these files (SHA-256):
+
+d46a04eb921827a837ab6cca54289c9c56cb5a6414bc4134acdd4603a3dec797 *index.html
+b563ec0d3ff6efa0ce23f1287c4634fa66dc41528b914f2b9ee15b2ae88a4ab4 *mockup.css
+c44468740961d9d2419ee667b0f74000b35592633cd8d3acce49a4d277f55291 *mockup.js
+eb9dffbd72ce97ab5f6e52657e810b03d6c5de59135202a46bd529979e9c8cba *serve.mjs
+f69cccd8ec0f9c08f273b951bd58515b2769cf46b8a504a6e6ac725b6d1e0f86 *README.md
+
+Screenshots (evidence, not part of the approved design surface): 63 PNG files in screenshots/
