@@ -169,7 +169,19 @@ export default function MedicationErrors({
     const [siteFilter, setSiteFilter] = useState<number | null>(
         activeSite?.id ?? null,
     );
-    const [modal, setModal] = useState<Modal>(null);
+    // `/emar/errors?error=<id>` (the All Tasks link) opens that record's
+    // triage view — only when the server included it in this reader's register.
+    const [modal, setModal] = useState<Modal>(() => {
+        if (typeof window === 'undefined') return null;
+        const requested = Number(
+            new URLSearchParams(window.location.search).get('error'),
+        );
+        const match =
+            Number.isInteger(requested) && requested > 0
+                ? errors.find((e) => e.id === requested)
+                : undefined;
+        return match ? { type: 'triage', error: match } : null;
+    });
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
 
     const monthLabel = useMemo(() => {

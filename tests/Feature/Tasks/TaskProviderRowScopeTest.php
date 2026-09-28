@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\ClientMedication;
 use App\Models\ControlledDrugLossReport;
 use App\Models\ControlRoomAlert;
 use App\Models\DataBreachLog;
@@ -1177,4 +1178,145 @@ it('requires the explicit global permissions and scopes the staff lookup indepen
         ->assertOk()
         ->assertJsonCount(1, 'users')
         ->assertJsonPath('users.0.name', 'TASK-RBAC Site B private colleague');
+});
+
+it('conceals controlled medication errors from a same-site reader without the controlled view capability', function () {
+    // EM-12: the register hides controlled-drug errors from readers without
+    // medications.controlled.view; every Tasks projection must do the same.
+    $site = Site::factory()->create([
+        'name' => 'TASK-RBAC CD Site',
+        'is_active' => true,
+        'archived' => false,
+        'archived_at' => null,
+    ]);
+    $reporter = taskRbacStaff($site, 'TASK-RBAC CD reporter');
+    $reader = taskRbacStaff($site, 'TASK-RBAC same-site team lead');
+    $reader->roles()->attach(Role::query()->firstOrCreate(
+        ['name' => 'team_lead'],
+        ['label' => 'Team Lead', 'level' => 55, 'type' => 'system'],
+    )->id);
+    taskRbacGrant($reader, ['medications.view']);
+    taskRbacGrant($reader, ['medications.controlled.view'], false);
+    $reader = taskRbacFreshRequest($reader);
+    expect($reader->canDo('medications.view'))->toBeTrue()
+        ->and($reader->canDo('medications.controlled.view'))->toBeFalse();
+
+    $client = Client::factory()->create([
+        'site_id' => $site->id,
+        'first_name' => 'TASKRBACCD',
+        'last_name' => 'Resident',
+        'status' => 'active',
+    ]);
+    $controlledOrder = ClientMedication::query()->create([
+        'client_id' => $client->id,
+        'name' => 'TASK-RBAC Oxycodone',
+        'dosage' => '5mg',
+        'frequency' => 'As needed',
+        'dose_times' => [],
+        'is_prn' => true,
+        'controlled_drug' => true,
+        'active' => true,
+        'state' => 'active',
+    ]);
+    $ordinaryOrder = ClientMedication::query()->create([
+        'client_id' => $client->id,
+        'name' => 'TASK-RBAC Paracetamol',
+        'dosage' => '500mg',
+        'frequency' => 'As needed',
+        'dose_times' => [],
+        'is_prn' => true,
+        'controlled_drug' => false,
+        'active' => true,
+        'state' => 'active',
+    ]);
+    $controlledError = MedicationError::withoutEvents(fn () => MedicationError::query()->create([
+        'reference_number' => 'MED-93101',
+        'client_id' => $client->id,
+        'client_medication_id' => $controlledOrder->id,
+        'error_type' => 'wrong_dose',
+        'severity' => 'major',
+        'description' => 'TASK-RBAC controlled oxycodone discrepancy',
+        'reported_by' => $reporter->id,
+        'reported_at' => now(),
+        'status' => 'reported',
+    ]));
+    $ordinaryError = MedicationError::withoutEvents(fn () => MedicationError::query()->create([
+        'reference_number' => 'MED-93102',
+        'client_id' => $client->id,
+        'client_medication_id' => $ordinaryOrder->id,
+        'error_type' => 'wrong_time',
+        'severity' => 'minor',
+        'description' => 'TASK-RBAC ordinary paracetamol late',
+        'reported_by' => $reporter->id,
+        'reported_at' => now(),
+        'status' => 'reported',
+    ]));
+    $controlledId = 'med_error-'.$controlledError->id;
+    $ordinaryId = 'med_error-'.$ordinaryError->id;
+    $provider = collect(TaskAggregator::defaultProviders())
+        ->first(fn ($candidate) => $candidate->sourceKey() === 'med_error');
+
+    expect(collect($provider->authorizedTasks($reader, ['include_done' => true]))->pluck('id')->all())
+        ->toBe([$ordinaryId]);
+
+    // List and stats.
+    $this->actingAs($reader)
+        ->get('/tasks?sources=med_error')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('pagination.total', 1)
+            ->where('items', fn ($items) => collect($items)->pluck('id')->all() === [$ordinaryId]));
+    $this->actingAs($reader)
+        ->get('/tasks?sources=med_error&q='.urlencode('MED-93101'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('pagination.total', 0)
+            ->where('items', []));
+
+    // Reports count only the ordinary error.
+    $this->actingAs($reader)
+        ->get('/tasks/reports')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('modules', fn ($modules) => collect($modules)->firstWhere('key', 'med_error')['open'] === 1));
+
+    // CSV.
+    $csv = $this->actingAs($reader)->get('/tasks?format=csv&sources=med_error')->assertOk()->streamedContent();
+    expect($csv)->toContain('MED-93102')
+        ->not->toContain('MED-93101')
+        ->not->toContain('oxycodone');
+
+    // Detail: the ordinary error links to its exact register record.
+    $this->actingAs($reader)
+        ->getJson('/tasks/detail?'.http_build_query(['source' => 'med_error', 'id' => $controlledError->id]))
+        ->assertNotFound();
+    $this->actingAs($reader)
+        ->getJson('/tasks/detail?'.http_build_query(['source' => 'med_error', 'id' => $ordinaryError->id]))
+        ->assertOk()
+        ->assertJsonPath('item.id', $ordinaryId)
+        ->assertJsonPath('item.link', '/emar/errors?error='.$ordinaryError->id);
+
+    // Global-search lookup.
+    $this->actingAs($reader)
+        ->getJson('/tasks/lookup?q='.urlencode('MED-93101'))
+        ->assertOk()
+        ->assertJsonPath('match', null);
+    $this->actingAs($reader)
+        ->getJson('/tasks/lookup?q='.urlencode('MED-93102'))
+        ->assertOk()
+        ->assertJsonPath('match.ref', 'MED-93102');
+
+    // Watch.
+    TaskWatcher::query()->create([
+        'source' => 'med_error',
+        'item_id' => $controlledError->id,
+        'user_id' => $reader->id,
+    ]);
+    expect((new TaskAggregator)->visibleWatcherIdsFor('med_error', $controlledError->id))->toBe([]);
+
+    // The exact controlled reader capability restores the row.
+    taskRbacGrant($reader, ['medications.controlled.view']);
+    $reader = taskRbacFreshRequest($reader);
+    expect(collect($provider->authorizedTasks($reader, ['include_done' => true]))->pluck('id')->sort()->values()->all())
+        ->toBe(collect([$controlledId, $ordinaryId])->sort()->values()->all());
 });

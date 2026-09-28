@@ -4,12 +4,12 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\MedicationError;
 use App\Models\User;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 use App\Services\Tasks\TaskProviderAuthorization;
-use App\Services\UserSiteAccessService;
 
 class MedicationErrorProvider implements HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
@@ -45,18 +45,30 @@ class MedicationErrorProvider implements HasModelClass, SiteScopedTaskProvider, 
             $query->whereIn('status', ['reported', 'investigating']);
         }
 
+        // Mirror the medication error register exactly: the reader's Sites,
+        // canonical client/medication ownership, and — without the controlled
+        // medicines reader capability — no controlled-drug rows at all. Tasks
+        // list, stats, reports, detail, lookup (global search), CSV and watch
+        // all read through this one query.
         return app(TaskProviderAuthorization::class)->siteScoped(
             $user,
             $this->canView($user),
             $query,
-            fn ($scoped, User $actor) => $scoped->whereHas(
-                'client',
-                fn ($clients) => app(UserSiteAccessService::class)->applyClientScope(
-                    $clients,
-                    $actor,
-                    ['clinical.accessAllSites', 'sites.viewAll'],
-                ),
-            ),
+            function ($scoped, User $actor) {
+                $governance = app(MedicationGovernanceScopeService::class);
+                $governance->scopeCanonicalClientMedicationRows(
+                    $scoped,
+                    $governance->readerSiteIds(
+                        $actor,
+                        MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
+                    ),
+                );
+                if (! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
+                    $governance->scopeWithoutControlledMedicationRows($scoped);
+                }
+
+                return $scoped;
+            },
             function (MedicationError $error) {
                 $client = $error->client;
 
@@ -84,7 +96,7 @@ class MedicationErrorProvider implements HasModelClass, SiteScopedTaskProvider, 
                         : null,
                     dueAt: null,
                     createdAt: optional($error->created_at)->toIso8601String(),
-                    link: '/emar/errors',
+                    link: '/emar/errors?error='.$error->id,
                     type: 'Medication error',
                     description: $error->description ? str($error->description)->limit(140)->toString() : null,
                 );
