@@ -27,22 +27,29 @@ class FleetFinanceReviewRequest extends Model
         'cost_allocation_correction' => 'Cost allocation correction',
     ];
 
-    public const STATUSES = ['submitted', 'resolved', 'declined'];
+    public const STATUSES = ['preparing', 'submitted', 'changes_requested', 'resolved', 'declined'];
 
-    public const DECISIONS = ['resolved', 'declined'];
+    public const DECISIONS = ['resolved', 'declined', 'changes_requested'];
 
     protected $fillable = [
+        'expected_file_count', 'evidence_ready_at', 'decision_evidence', 'assigned_to_user_id', 'due_on', 'response_note', 'submission_count',
         'reference_number', 'asset_id', 'request_type', 'source_type', 'source_id', 'source_label', 'amount',
         'note', 'existing_document_id', 'status', 'lock_version', 'requested_by_user_id', 'decided_by_user_id',
         'decided_at', 'decision_note', 'request_key', 'request_fingerprint',
     ];
 
     protected $casts = [
-        'source_id' => 'integer',
+        'source_id' => 'integer', 'expected_file_count' => 'integer', 'submission_count' => 'integer',
+        'evidence_ready_at' => 'datetime', 'decision_evidence' => 'array', 'due_on' => 'date',
         'amount' => 'decimal:2',
         'lock_version' => 'integer',
         'decided_at' => 'datetime',
     ];
+
+    public function assignedTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to_user_id');
+    }
 
     public function asset(): BelongsTo
     {

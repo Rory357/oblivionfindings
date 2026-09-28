@@ -1,3 +1,4 @@
+import { DocumentPreview } from '@/components/finance/document-preview';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -12,6 +13,7 @@ import { SkeletonTable } from '@/components/ui/skeleton-table';
 import { Spinner } from '@/components/ui/spinner';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
+import { WizardSuccessPane } from '@/components/wizard/shell';
 import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { formatCurrency } from '@/lib/fleet-utils';
 import { Link } from '@inertiajs/react';
@@ -31,6 +33,11 @@ import {
 import { useEffect, useState } from 'react';
 import { uploadSummary } from './evidence-upload';
 import {
+    isFinanceLinkResponse,
+    isReviewFileResponse,
+    isReviewRequestResponse,
+} from './finance-command-results';
+import {
     FinanceNotice,
     useFinanceEvidenceUpload,
     vehicleReference,
@@ -49,7 +56,7 @@ import {
     VehicleCollectionToggle,
     VehicleRecordCollection,
 } from './record-collection';
-import { isJsonObject, useVehicleRecordCommand } from './record-command';
+import { useVehicleRecordCommand } from './record-command';
 import './studio.css';
 import type { VehicleProfile, VehicleWorkspace } from './types';
 import {
@@ -57,6 +64,7 @@ import {
     RecordDialog,
     StagedFilesField,
     WizardField,
+    WorkspaceWizard,
 } from './wizard-kit';
 import { FILE_STATE_LABELS } from './workspace-model';
 
@@ -465,11 +473,13 @@ export function FinanceRecordDialog({
     onClose: () => void;
     onChanged: () => void;
 }) {
-    const [decision, setDecision] = useState<'resolved' | 'declined' | null>(
-        null,
-    );
+    const [decision, setDecision] = useState<
+        'resolved' | 'declined' | 'changes_requested' | null
+    >(null);
     const [addingFiles, setAddingFiles] = useState(false);
-    const retry = useVehicleRecordCommand(isJsonObject);
+    const [submittingEvidence, setSubmittingEvidence] = useState(false);
+    const [failedFile, setFailedFile] = useState<FinanceFile | null>(null);
+    const retry = useVehicleRecordCommand(isReviewFileResponse);
     const record =
         target.kind === 'record'
             ? finance.records.find((item) => item.key === target.key)
@@ -666,6 +676,18 @@ export function FinanceRecordDialog({
                                                 ? () => void retryCheck(file)
                                                 : undefined
                                         }
+                                        onWithdraw={
+                                            request?.can_add_files &&
+                                            [
+                                                'quarantined',
+                                                'storage_failed',
+                                                'reserved',
+                                                'scan_unavailable',
+                                                'publication_failed',
+                                            ].includes(file.state ?? '')
+                                                ? () => setFailedFile(file)
+                                                : undefined
+                                        }
                                         retrying={retry.processing}
                                     />
                                 ))}
@@ -682,6 +704,13 @@ export function FinanceRecordDialog({
                             Back to vehicle
                         </Button>
                         <div className="flex flex-wrap items-center gap-2">
+                            {request?.can_submit && (
+                                <Button
+                                    onClick={() => setSubmittingEvidence(true)}
+                                >
+                                    Submit evidence / response
+                                </Button>
+                            )}
                             {request?.can_add_files && (
                                 <Button
                                     variant="outline"
@@ -693,6 +722,14 @@ export function FinanceRecordDialog({
                             )}
                             {request?.can_decide && (
                                 <>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() =>
+                                            setDecision('changes_requested')
+                                        }
+                                    >
+                                        Return for correction
+                                    </Button>
                                     <Button
                                         variant="outline"
                                         onClick={() => setDecision('declined')}
@@ -727,6 +764,22 @@ export function FinanceRecordDialog({
                     onSaved={onChanged}
                 />
             )}
+            {request && submittingEvidence && (
+                <SubmitEvidenceWizard
+                    vehicleId={vehicle.id}
+                    request={request}
+                    onClose={() => setSubmittingEvidence(false)}
+                    onSaved={onChanged}
+                />
+            )}
+            {failedFile && (
+                <WithdrawReviewFile
+                    vehicleId={vehicle.id}
+                    file={failedFile}
+                    onClose={() => setFailedFile(null)}
+                    onSaved={onChanged}
+                />
+            )}
             {request && addingFiles && (
                 <AddRequestFilesDialog
                     vehicleId={vehicle.id}
@@ -742,10 +795,12 @@ export function FinanceRecordDialog({
 function AttachmentItem({
     file,
     onRetry,
+    onWithdraw,
     retrying,
 }: {
     file: FinanceFile;
     onRetry?: () => void;
+    onWithdraw?: () => void;
     retrying: boolean;
 }) {
     const state =
@@ -777,6 +832,16 @@ function AttachmentItem({
     return (
         <div className="attachment-item">
             {body}
+            {onWithdraw && (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={retrying}
+                    onClick={onWithdraw}
+                >
+                    Withdraw failed file
+                </Button>
+            )}
             {onRetry && (
                 <Button
                     size="sm"
@@ -809,7 +874,7 @@ function UnlinkDialog({
 }) {
     const [reason, setReason] = useState('');
     const [error, setError] = useState('');
-    const command = useVehicleRecordCommand(isJsonObject);
+    const command = useVehicleRecordCommand(isFinanceLinkResponse);
     const shown = error || command.errors.reason;
     const label =
         [record.reference, record.name].filter(Boolean).join(' · ') ||
@@ -871,15 +936,24 @@ function DecisionDialog({
 }: {
     vehicleId: number;
     request: FinanceReviewRequest;
-    decision: 'resolved' | 'declined';
+    decision: 'resolved' | 'declined' | 'changes_requested';
     onClose: () => void;
     onSaved: () => void;
 }) {
     const [note, setNote] = useState('');
     const [error, setError] = useState('');
-    const command = useVehicleRecordCommand(isJsonObject);
+    const [reviewed] = useState(request);
+    const [step, setStep] = useState(0);
+    const [saved, setSaved] = useState(false);
+    const [preview, setPreview] = useState<FinanceFile | null>(null);
+    const command = useVehicleRecordCommand(isReviewRequestResponse);
     const shown = error || command.errors.note;
     const resolving = decision === 'resolved';
+    const title = resolving
+        ? 'Resolve Finance review'
+        : decision === 'changes_requested'
+          ? 'Return Finance review for correction'
+          : 'Decline Finance review';
     const save = async () => {
         if (!note.trim()) {
             setError('Record the Finance decision and any next step.');
@@ -890,52 +964,167 @@ function DecisionDialog({
             {
                 decision,
                 note: note.trim(),
-                expected_version: request.lock_version,
+                expected_version: reviewed.lock_version,
+                evidence_token: reviewed.evidence_token,
             },
         );
-        if (result) {
-            onSaved();
-            onClose();
-        }
+        if (result) setSaved(true);
     };
 
     return (
-        <RecordDialog
-            title={
-                resolving ? 'Resolve Finance review' : 'Decline Finance review'
-            }
+        <WorkspaceWizard
+            title={title}
             description={`${[request.reference, request.type_label].filter(Boolean).join(' · ')}. The requester sees this note. Approvals, payments and postings stay in their own Finance records.`}
+            railIcon={ReceiptText}
+            railSub={reviewed.reference ?? 'Finance review'}
+            steps={[
+                {
+                    key: 'request',
+                    label: 'Request',
+                    blurb: 'Context and ownership',
+                    icon: ReceiptText,
+                },
+                {
+                    key: 'evidence',
+                    label: 'Evidence',
+                    blurb: 'Files and history',
+                    icon: FileText,
+                },
+                {
+                    key: 'decision',
+                    label: 'Decision',
+                    blurb: 'Reason and next step',
+                    icon: ShieldCheck,
+                },
+            ]}
+            step={step}
+            setStep={setStep}
+            pct={note.trim() ? 100 : 0}
+            context={{
+                name: reviewed.type_label,
+                detail: reviewed.source.label,
+            }}
             command={command}
-            submitLabel={resolving ? 'Resolve request' : 'Decline request'}
+            dirty={!!note}
+            saved={saved}
+            submitLabel={
+                resolving
+                    ? 'Resolve request'
+                    : decision === 'changes_requested'
+                      ? 'Return for correction'
+                      : 'Decline request'
+            }
+            onValidateStep={() => true}
             onSubmit={save}
             onClose={() => {
-                if (command.requiresReload) onSaved();
+                if (saved || command.requiresReload) onSaved();
                 onClose();
             }}
-        >
-            <WizardField
-                id="finance-decision-note"
-                label="Decision note"
-                error={shown}
-                hint={
-                    resolving
-                        ? 'What Finance did or will do, for example a credit note requested.'
-                        : 'Why Finance is not taking this further, and who should.'
-                }
-            >
-                <Textarea
-                    {...fieldProps('finance-decision-note', shown)}
-                    rows={3}
-                    maxLength={2000}
-                    value={note}
-                    onChange={(event) => {
-                        setNote(event.target.value);
-                        setError('');
-                        command.clearError('note');
-                    }}
+            onReload={() => {
+                onSaved();
+                onClose();
+            }}
+            errorKey={JSON.stringify(command.errors)}
+            success={
+                <WizardSuccessPane
+                    title="Finance decision recorded"
+                    blurb="The reviewed evidence, your decision and its reason are retained in the request history. The requester notification is queued."
+                    actions={
+                        <Button
+                            onClick={() => {
+                                onSaved();
+                                onClose();
+                            }}
+                        >
+                            Back to request
+                        </Button>
+                    }
                 />
-            </WizardField>
-        </RecordDialog>
+            }
+        >
+            {step === 0 && (
+                <div className="space-y-3">
+                    <p>{reviewed.note}</p>
+                    <p>
+                        Requested by {reviewed.requested_by ?? 'A former user'}
+                    </p>
+                    <p>
+                        {reviewed.amount === null
+                            ? 'Amount not provided'
+                            : formatCurrency(reviewed.amount)}
+                    </p>
+                    {reviewed.response_note && (
+                        <p>Response: {reviewed.response_note}</p>
+                    )}
+                </div>
+            )}
+            {step === 1 && (
+                <div className="space-y-4">
+                    {reviewed.files.map((file) => (
+                        <div key={file.id}>
+                            <strong>{file.name}</strong>
+                            {file.url && (
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setPreview(file)}
+                                    >
+                                        Preview {file.name}
+                                    </Button>
+                                    <a
+                                        className="text-primary underline"
+                                        href={file.url}
+                                    >
+                                        Download
+                                    </a>
+                                </>
+                            )}
+                        </div>
+                    ))}
+                    {!reviewed.files.length && (
+                        <p>No supporting files attached.</p>
+                    )}
+                    {preview?.url && (
+                        <DocumentPreview
+                            url={preview.url + '?inline=1'}
+                            name={preview.name}
+                            mime={preview.mime}
+                        />
+                    )}
+                    <ul>
+                        {reviewed.history.map((event) => (
+                            <li key={event.id}>{historyLine(event)}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+            {step === 2 && (
+                <WizardField
+                    id="finance-decision-note"
+                    label="Decision note"
+                    error={shown}
+                    hint={
+                        resolving
+                            ? 'What Finance did or will do, for example a credit note requested.'
+                            : decision === 'changes_requested'
+                              ? 'Explain what the requester must correct and which evidence is needed.'
+                              : 'Why Finance is not taking this further, and who should.'
+                    }
+                >
+                    <Textarea
+                        {...fieldProps('finance-decision-note', shown)}
+                        rows={3}
+                        maxLength={2000}
+                        value={note}
+                        onChange={(event) => {
+                            setNote(event.target.value);
+                            setError('');
+                            command.clearError('note');
+                        }}
+                    />
+                </WizardField>
+            )}
+        </WorkspaceWizard>
     );
 }
 
@@ -1064,5 +1253,198 @@ function AddRequestFilesDialog({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+function SubmitEvidenceWizard({
+    vehicleId,
+    request,
+    onClose,
+    onSaved,
+}: {
+    vehicleId: number;
+    request: FinanceReviewRequest;
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const command = useVehicleRecordCommand(isReviewRequestResponse);
+    const [note, setNote] = useState('');
+    const [saved, setSaved] = useState(false);
+    const submit = async () => {
+        const result = await command.submit(
+            '/fleet-assets/vehicles/' +
+                vehicleId +
+                '/finance/review-requests/' +
+                request.id +
+                '/submit',
+            { expected_version: request.lock_version, note },
+        );
+        if (result) setSaved(true);
+    };
+    const close = () => {
+        onClose();
+        if (saved) onSaved();
+    };
+    return (
+        <WorkspaceWizard
+            title="Submit evidence to Finance"
+            description="Confirm the prepared evidence or respond to requested corrections."
+            railIcon={FileText}
+            railSub={request.reference ?? 'Finance review'}
+            steps={[
+                {
+                    key: 'submit',
+                    label: 'Evidence and response',
+                    blurb: 'Review before submitting',
+                    icon: FileText,
+                },
+            ]}
+            step={0}
+            setStep={() => {}}
+            pct={100}
+            context={{ name: request.type_label, detail: request.source.label }}
+            command={{
+                ...command,
+                message:
+                    command.message || Object.values(command.errors).join(' '),
+            }}
+            dirty={!!note}
+            saved={saved}
+            submitLabel="Submit to Finance"
+            onValidateStep={() => true}
+            onSubmit={submit}
+            onClose={close}
+            onReload={() => {
+                onSaved();
+                command.reset();
+            }}
+            errorKey={JSON.stringify(command.errors)}
+            success={
+                <WizardSuccessPane
+                    title="Evidence submitted"
+                    blurb="Finance can now review the prepared evidence. The notification is queued for delivery."
+                    actions={<Button onClick={close}>Back to request</Button>}
+                />
+            }
+        >
+            <div className="space-y-4">
+                {request.decision_note && (
+                    <p>
+                        <strong>Finance requested:</strong>{' '}
+                        {request.decision_note}
+                    </p>
+                )}
+                <ul>
+                    {request.files.map((file) => (
+                        <li key={file.id}>
+                            {file.name} · {file.state?.replaceAll('_', ' ')}
+                        </li>
+                    ))}
+                </ul>
+                <WizardField
+                    id="finance-response"
+                    label={
+                        request.status === 'changes_requested'
+                            ? 'How you addressed the requested changes'
+                            : 'Supporting note'
+                    }
+                    error={command.errors.note}
+                >
+                    <Textarea
+                        id="finance-response"
+                        value={note}
+                        maxLength={2000}
+                        onChange={(event) => setNote(event.target.value)}
+                    />
+                </WizardField>
+                <p>
+                    All selected files must pass their virus checks. Submission
+                    preserves the request’s history.
+                </p>
+            </div>
+        </WorkspaceWizard>
+    );
+}
+
+function WithdrawReviewFile({
+    vehicleId,
+    file,
+    onClose,
+    onSaved,
+}: {
+    vehicleId: number;
+    file: FinanceFile;
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const command = useVehicleRecordCommand(isReviewFileResponse);
+    const [reason, setReason] = useState('');
+    const [saved, setSaved] = useState(false);
+    const submit = async () => {
+        const result = await command.submit(
+            '/fleet-assets/vehicles/' +
+                vehicleId +
+                '/document-files/' +
+                file.id +
+                '/archive',
+            { reason, pause_renewal: false },
+        );
+        if (result) setSaved(true);
+    };
+    const close = () => {
+        onClose();
+        if (saved) onSaved();
+    };
+    return (
+        <WorkspaceWizard
+            title="Withdraw failed supporting file"
+            description="The original file and reason stay in retained history. Upload a replacement before submitting the evidence."
+            railIcon={FileText}
+            railSub="Finance supporting evidence"
+            steps={[
+                {
+                    key: 'withdraw',
+                    label: 'Withdrawal reason',
+                    blurb: 'Explain the replacement',
+                    icon: FileText,
+                },
+            ]}
+            step={0}
+            setStep={() => {}}
+            pct={reason.trim() ? 100 : 0}
+            context={{ name: file.name, detail: 'Failed supporting file' }}
+            command={command}
+            dirty={!!reason}
+            saved={saved}
+            submitLabel="Withdraw file"
+            onValidateStep={() => true}
+            onSubmit={submit}
+            onClose={close}
+            onReload={() => {
+                onSaved();
+                onClose();
+            }}
+            errorKey={JSON.stringify(command.errors)}
+            success={
+                <WizardSuccessPane
+                    title="File withdrawn"
+                    blurb="The original file and your reason are retained. Add its replacement to the request before submitting to Finance."
+                    actions={<Button onClick={close}>Back to request</Button>}
+                />
+            }
+        >
+            <WizardField
+                id="withdraw-evidence-reason"
+                label="Reason"
+                error={command.errors.reason}
+            >
+                <Textarea
+                    id="withdraw-evidence-reason"
+                    value={reason}
+                    maxLength={2000}
+                    onChange={(event) => setReason(event.target.value)}
+                />
+            </WizardField>
+        </WorkspaceWizard>
     );
 }

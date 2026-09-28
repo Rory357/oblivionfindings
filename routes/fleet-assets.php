@@ -262,6 +262,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
             ->whereNumber('asset')->name('fleet-assets.vehicles.finance.links.store');
         Route::post('/vehicles/{asset}/finance/links/{link}/unlink', [VehicleFinanceController::class, 'unlink'])
             ->whereNumber(['asset', 'link'])->name('fleet-assets.vehicles.finance.links.unlink');
+        Route::post('/vehicles/{asset}/finance/review-requests/{reviewRequest}/submit', [VehicleFinanceController::class, 'submitEvidence'])->whereNumber(['asset', 'reviewRequest'])->name('fleet-assets.vehicles.finance.requests.submit');
         Route::post('/vehicles/{asset}/finance/review-requests', [VehicleFinanceController::class, 'storeRequest'])
             ->whereNumber('asset')->name('fleet-assets.vehicles.finance.requests.store');
     });

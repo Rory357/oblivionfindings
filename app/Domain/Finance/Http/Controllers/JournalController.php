@@ -4,14 +4,17 @@ namespace App\Domain\Finance\Http\Controllers;
 
 use App\Domain\Finance\Http\Requests\StoreJournalRequest;
 use App\Domain\Finance\Models\FinAccount;
+use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinCostCentre;
 use App\Domain\Finance\Models\FinFixedAssetDepreciation;
 use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinRecurringJournalOccurrence;
+use App\Domain\Finance\Services\BillWorkContext;
 use App\Domain\Finance\Services\FixedAssetService;
 use App\Domain\Finance\Services\JournalPostingService;
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -127,7 +130,7 @@ class JournalController extends Controller
      * The index's status/type/date/search filters, applied to a fresh query so
      * the list and its header totals always describe the same set.
      */
-    private function filteredJournals(Request $request, ?int $orgId): \Illuminate\Database\Eloquent\Builder
+    private function filteredJournals(Request $request, ?int $orgId): Builder
     {
         $query = FinJournal::forOrganization($orgId);
 
@@ -256,10 +259,22 @@ class JournalController extends Controller
             'postedBy:id,name',
             'createdBy:id,name',
             'reversedByJournal:id,journal_number',
+            'reversalOfJournal:id,journal_number,source_type,source_id',
         ]);
+
+        $sourceJournal = $journal->reversalOfJournal ?? $journal;
+        $bill = $sourceJournal->source_type === FinBill::class
+            ? FinBill::find($sourceJournal->source_id) : null;
+        $sourceBill = $bill && $request->user()->can('view', $bill) ? [
+            'id' => $bill->id, 'reference' => $bill->bill_number, 'status' => $bill->status,
+            'total' => $bill->total_amount, 'paid' => $bill->amount_paid,
+            'work' => app(BillWorkContext::class)->present($request->user(), $bill)['work'],
+        ] : null;
 
         return Inertia::render('finance/journals/Show', [
             'journal' => $journal,
+            'sourceBill' => $sourceBill,
+            'can' => ['post' => $request->user()->can('post', $journal), 'reverse' => $request->user()->can('reverse', $journal)],
         ]);
     }
 

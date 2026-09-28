@@ -1,0 +1,362 @@
+[
+  {
+    "path": "app/Domain/Finance/Exceptions/StaleBillApprovalException.php",
+    "sha256": "0BEADDD89796A078247C4DB958CB6592896603F5D266C28EB4D98E454B0C9211",
+    "gitBlob": "0ece96f0244cf434bdc546c065086c99df92a852"
+  },
+  {
+    "path": "app/Domain/Finance/Http/Controllers/BillController.php",
+    "sha256": "4EA4B1E828C9E38485535BF0EC80D7B008DA7FC4ADD1478315826CBDB21E369E",
+    "gitBlob": "5029030546ddc8aa3cd618b427671419453001ce"
+  },
+  {
+    "path": "app/Domain/Finance/Http/Controllers/BillDocumentController.php",
+    "sha256": "711CBC2D0F0A55D1856A0F6DD04019D1F1F6749F95FCCAC14D81C3C429A4BFF3",
+    "gitBlob": "9b7c9d754f9b1cb66ce2785f04dd25c290495313"
+  },
+  {
+    "path": "app/Domain/Finance/Http/Controllers/JournalController.php",
+    "sha256": "49A2322C2EF350F0028334D3E6F06501E8937366B1715A5EFB5DCA96FFE4A2B7",
+    "gitBlob": "62db2ea5c3b31b5504c906c27f100592cb7afcba"
+  },
+  {
+    "path": "app/Domain/Finance/Http/Controllers/VehicleReviewRequestController.php",
+    "sha256": "9B4B3CA3D2F013FABC035982E272D3A0FAA10FA9A1F70C5A99DD32CD08CD0CE6",
+    "gitBlob": "d5a25bdd30328156324bf688600c42d04e1b0d86"
+  },
+  {
+    "path": "app/Domain/Finance/Http/Requests/StoreBillRequest.php",
+    "sha256": "42C80E7F10198CEC6C173BF06043A3BE993132D97E705923A0D3B9DA342503E0",
+    "gitBlob": "782ebf557734cf3e30221588e796148a8cf969fd"
+  },
+  {
+    "path": "app/Domain/Finance/Http/Requests/UpdateBillRequest.php",
+    "sha256": "08291CD9F01D02E541A1D973F3C56227DAB5314DC5D1CB7CB2F78943B4AC71D4",
+    "gitBlob": "15ff6b6bee2e141d7f74329ed03e2e0e65b86287"
+  },
+  {
+    "path": "app/Domain/Finance/Models/FinBill.php",
+    "sha256": "2643E11BBFAC9EB2D7499E0B604BF2AB8F181294376D6A13137013D8DB6FA477",
+    "gitBlob": "8251cd1abce756ac25efd7f04b75149ea78f9745"
+  },
+  {
+    "path": "app/Domain/Finance/Models/FinBillApprovalReceipt.php",
+    "sha256": "A3D48FAB60D79DAD845B8F3321B07B57CAA20E6F4D910AF80BACD4C22FF56ED4",
+    "gitBlob": "589ab436069303ba7b3398cc7eb444915e7eb16e"
+  },
+  {
+    "path": "app/Domain/Finance/Models/FinBillDocument.php",
+    "sha256": "0181ABC820E928FF8ED1EF118B13199DD9895BE62FE4A101A1B6C12464AA95F9",
+    "gitBlob": "c99dde02861f6ae16219ed46f718914fcd81e81e"
+  },
+  {
+    "path": "app/Domain/Finance/Policies/FinBillPolicy.php",
+    "sha256": "5F8A2FC9E1A1F30B16FDA6FEAD308DB2470FD4BC114F3FF8A0B8FE2129CADF11",
+    "gitBlob": "442aefe4dfc61457330edb84c4a1c46b95907c12"
+  },
+  {
+    "path": "app/Domain/Finance/Services/AccountsPayableService.php",
+    "sha256": "D2A6610FB441490A95E1D7744D1DE8D434AFF99DE6CA37DB97378C1445949BDF",
+    "gitBlob": "1b478c2eb0c9e41bdc9f8b3906d86cb0973cb852"
+  },
+  {
+    "path": "app/Domain/Finance/Services/BillApprovalSnapshot.php",
+    "sha256": "0D274785B758FD7A935CB0EC2AC9D1EE68F816F2A97EBABE6C2A6B25DAD98298",
+    "gitBlob": "bd07a478d31274b14c8489129869cddafc6c5de2"
+  },
+  {
+    "path": "app/Domain/Finance/Services/BillDocumentService.php",
+    "sha256": "49A5A3D15AFCB72014FB47CE912AB33AB2665111A8F5D1385DD0DC29F2490937",
+    "gitBlob": "467b919f9e247b1b07b82086eff150add28c3462"
+  },
+  {
+    "path": "app/Domain/Finance/Services/BillSiteScope.php",
+    "sha256": "863780C253B444825B910182BD4CA3FD485C5802E28F834AFC4D307021537AD3",
+    "gitBlob": "ae4e1b51c9db8e1c75d61c36fedf3f9caaa88c34"
+  },
+  {
+    "path": "app/Domain/Finance/Services/BillWorkContext.php",
+    "sha256": "BA696956226451A7F066F6604E14D0C559178AA028C2446B074493854A518A07",
+    "gitBlob": "cb526c78f0b10562db0f0fb12f6c8606e50db55d"
+  },
+  {
+    "path": "app/Http/Controllers/FleetAssets/VehicleFinanceController.php",
+    "sha256": "536C4A69B283EB775CC5FC91D32BFB521D71458BD94340747196FCD2E26D5B00",
+    "gitBlob": "e79a1a9d03c26c0d2d1ac179d815240dcf5544aa"
+  },
+  {
+    "path": "app/Http/Controllers/FleetAssets/WorkOrderController.php",
+    "sha256": "0FD3B97EFDE8FC2642C0BC22D50612F9A51B536E839DBE08440E277536B4B381",
+    "gitBlob": "08c5f8ed5f9012ebf58514e98b70cd1e4c000076"
+  },
+  {
+    "path": "app/Jobs/DeliverFinanceReviewNotice.php",
+    "sha256": "8731832FFD07BA01EADD340B05230EBC51BA3C93D1ECB4B1B733CE8836B682E0",
+    "gitBlob": "e32125b3160662c1b1cfabe65b86a8d0a4468781"
+  },
+  {
+    "path": "app/Models/FleetFinanceReviewRequest.php",
+    "sha256": "6311792B3CB0ED30E8BD65E3FC1887908E5B7B01AE9971EA222835D4E60E458B",
+    "gitBlob": "8bdf0b3b0e8a0e8822ecf773629c7a6508335485"
+  },
+  {
+    "path": "app/Models/FleetFinanceReviewRequestEvent.php",
+    "sha256": "1BB32D4D14B5A8999FAD641A58FC0FBE6F08F423B1D5B4D371A6699186EFFDCF",
+    "gitBlob": "25d3df686071c84734c0be1f8f2d1ec9b2205787"
+  },
+  {
+    "path": "app/Services/Fleet/FinanceReviewEvidence.php",
+    "sha256": "E4A434FBE7670EF702B6851F672A7F664CFAB96D9275A4B67AF71DCAF8890D41",
+    "gitBlob": "6a5a8e1b38009bc250b771fb642177cc022964ba"
+  },
+  {
+    "path": "app/Services/Fleet/FinanceReviewNotices.php",
+    "sha256": "3697EF562803E881AF7D331F9DC83001BEB99F654C56A983084EFA3E100D77B8",
+    "gitBlob": "d4db2b991d9e7bbef696b9248f3a8faab066c6e8"
+  },
+  {
+    "path": "app/Services/Fleet/MaintenanceCostPresenter.php",
+    "sha256": "E0E562D2F4483351B4B245A7D0644527444069E682EA29F09555927CE4128311",
+    "gitBlob": "85053adea555ac200ed7105f76d526ab36815037"
+  },
+  {
+    "path": "app/Services/Fleet/MaintenanceCostSummary.php",
+    "sha256": "C98144E33F76EA12D91F16499AAB7F89B1B0505BA40CB526670A4FF4CFA7312A",
+    "gitBlob": "9f95398aaf546b7b90569437614c142b5bb0e8e6"
+  },
+  {
+    "path": "app/Services/Fleet/MaintenanceFinanceService.php",
+    "sha256": "581742324B71593F6AF6DDCBFC80052436D1A0E8875939FD1B3636BCAD5663E5",
+    "gitBlob": "cdeb6467ce544db9d532d54fc70ddc371270f4c0"
+  },
+  {
+    "path": "app/Services/Fleet/MaintenanceTransitionService.php",
+    "sha256": "D3CEB36C2AED06FD563E2A08D93C9DF5C48DD7BB623A2F973A500CEC646124AF",
+    "gitBlob": "95f140a21ca19a96cdd9fd2c3bac7470a4fdb7ab"
+  },
+  {
+    "path": "app/Services/Fleet/VehicleDocumentService.php",
+    "sha256": "3284A3BAC08E4D3721E0364CE58330E08E0985975056C4A42D62B416C7F3074E",
+    "gitBlob": "78bb7c846fd66895795bedb7b759c9532ac422ec"
+  },
+  {
+    "path": "app/Services/Fleet/VehicleFinancePresenter.php",
+    "sha256": "5DB136A5932244A0804CB05648F26D0F668AD79DC3E5D8225B4DB46408A39242",
+    "gitBlob": "7ba548bb2a452126b663ca9c6c8ce4e8a81ba236"
+  },
+  {
+    "path": "app/Services/Fleet/VehicleFinanceReviewQueue.php",
+    "sha256": "F77DDAA6ED073A760B2AC7AEDF7A7F6D3403673693239F236C72D4CF1366C9CC",
+    "gitBlob": "27420fc43df0fa6ca2c550115899124b14c8528d"
+  },
+  {
+    "path": "app/Services/Fleet/VehicleFinanceService.php",
+    "sha256": "3CBE67911AEF6D5BBCA2DF26BDC0C4D303544DE9DB0C4E9A359516FE6F8C83E4",
+    "gitBlob": "bee6ef8fa3d7f6991f371f088d93867ba4cc50d0"
+  },
+  {
+    "path": "app/Services/Tasks/Providers/FleetFinanceReviewProvider.php",
+    "sha256": "530B5A5D3952ECB54AC6F8D268BC26B9763AD6EB7C9F527659D01D5A9A583DFE",
+    "gitBlob": "2523682d2d17d6f4381ced079c44146732dd1fa4"
+  },
+  {
+    "path": "build/pdfjs-assets.ts",
+    "sha256": "8ACA8943D90E12C711DC51FBAE595B2E5572CFDA3B1633DCFE2A6DEFC23AD6E0",
+    "gitBlob": "72f2c427ac092e4780ff7745cb31a7261b8dd0a5"
+  },
+  {
+    "path": "database/migrations/2026_09_27_000100_complete_finance_review_workflow.php",
+    "sha256": "A5C1543609EE986E6335B0798C15FCD1FE83DAC4F03CDCE746BF78677F2F95D6",
+    "gitBlob": "d4523e6e9e888153d4c13e8ebc8c658c526a7148"
+  },
+  {
+    "path": "package-lock.json",
+    "sha256": "6FA0B1DBA35CADB2AFD7F5943B1A75F462ED39810343B85FFED8EF1DD8C2598A",
+    "gitBlob": "252d4eb4411911c357c765fdc2eb90e1943d6646"
+  },
+  {
+    "path": "resources/css/maintenance-work-record.css",
+    "sha256": "2C92DE5849FED7AA3B3AB93BDDD53014877E216950A490B0FD9C02F420075C3A",
+    "gitBlob": "cdd1d3e136ae9701796a3d2e256cdadbd8fb1e5b"
+  },
+  {
+    "path": "resources/js/components/finance/bill-review.tsx",
+    "sha256": "92D33CE61EF7D6406146F92C0C514FBD41EF1F8ACC31259508E798C96B2B6108",
+    "gitBlob": "9a5a82fe8e840dad242aa10e31ba9b5974fa204c"
+  },
+  {
+    "path": "resources/js/components/finance/bill-workspace.tsx",
+    "sha256": "570699D710B1B294C0155D311351D10DE3B83315434F0D81BF3A3D740C646075",
+    "gitBlob": "176350575b0c01ebb353a5bbb5297bfa965b5bd7"
+  },
+  {
+    "path": "resources/js/components/finance/document-preview.test.tsx",
+    "sha256": "23ECE5D8741208F205EFC556D2601A2C27DDFA4DBCC6E9A8BDA32E62C58830BE",
+    "gitBlob": "0f8da74cf321a148f4ee6b7e178c907ca7594d7c"
+  },
+  {
+    "path": "resources/js/components/finance/document-preview.tsx",
+    "sha256": "E5849519BA0E71523A9F5B0B658C295E4B257349241BDF286EC22C3B801B70D6",
+    "gitBlob": "e1947e8c3afc858d1d8ca729f84fdd4bf3dcca66"
+  },
+  {
+    "path": "resources/js/components/finance/new-bill-dialog.tsx",
+    "sha256": "FD9E4F1A027D1065D040D42978A2D03AFC2676F496811B63F54AA4E3ABB15FF0",
+    "gitBlob": "b9a2e4c0a4864668be8772aa0a1e788f70233242"
+  },
+  {
+    "path": "resources/js/components/finance/record-batch-wizard.test.tsx",
+    "sha256": "33ABAC481339AEB6B928F1C77791D0B8B0F68386B35B6079630367945DE5CA80",
+    "gitBlob": "0cdce7c99146991e40983a2ad2de6476e02948f6"
+  },
+  {
+    "path": "resources/js/components/finance/record-batch-wizard.tsx",
+    "sha256": "17BF881B12CBB0BCA0754579ABD09132AA82DEB57C9530ACDFDCE421E74ED52F",
+    "gitBlob": "742a58e95e775011a96118c28a03bf009e3cc7f0"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/maintenance/cost-workspace.test.tsx",
+    "sha256": "3FC3E8D118EF9E854E327BC30FD1B878AF20150A1C6B36DD746D8A0686E870C7",
+    "gitBlob": "2ace419826ba477ac3f027e3ff0d4643eacba678"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/maintenance/cost-workspace.tsx",
+    "sha256": "BEE2BB8B1A4C3D2319AB9A1E5867365EBD0FE5F0AB5B1A38D4F8B5435FAA5F97",
+    "gitBlob": "89ac6d8cb85821dd7bf7b3eeabcf9052bdae7aad"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-command-results.ts",
+    "sha256": "22924283258E9F2FE6C6BFF413793652EC02C62C2FA228ED4F2F54154F317C54",
+    "gitBlob": "54ffe9e59d8082b2875345ffca0df72a201537bb"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-shared.tsx",
+    "sha256": "409C31544B76FC0FFC70B0904B824E03CB82766DAA3AFAE61EFF595AD389528E",
+    "gitBlob": "b16b849bd4c1320b0af63c2272495051adce9387"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-studio.test.tsx",
+    "sha256": "523923FDE9E6683E103BEB6597FC525C71106F2F75B6102E9DA384F3665809F0",
+    "gitBlob": "1c1d16addd997e4c95dfc83e27235642fd91d887"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-studio.tsx",
+    "sha256": "CFA493959E0D2A871C0F7B471717D5C3C088A51CF7184F2A1B30C7E33BC196AF",
+    "gitBlob": "13821fee0b843cb16224b68c5e1f2fdb782aece7"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-types.ts",
+    "sha256": "BFA2BA3E1157DE69DF91D329B1A3B0A63F692BF6476A36FC758AF23696CB89D0",
+    "gitBlob": "47d7c44324680d4319cca1cb0b9d2523230f1be2"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-wizards.tsx",
+    "sha256": "E606E16A94A0E2FCE482D05969202FA6DCE0B4F11A334AF2166293415618C526",
+    "gitBlob": "87f1e7664ed1b243b24632cc8daab2a84375f7be"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/record-command.test.tsx",
+    "sha256": "4B6CEB87A828472DF1C3D2B4698531CAB8D781B74DB0291D05FB99CB5AE3676C",
+    "gitBlob": "34133a8f845030639a6a644ee09aa0b41b9a17d7"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/record-command.ts",
+    "sha256": "CAA67A9E6F3D634EA37938F423A5F9719F658ECB586C970552E659746D02A74B",
+    "gitBlob": "780786fa0e2f035e9c0fd433fba318a633f00d8c"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/wizard-kit.tsx",
+    "sha256": "147D69BC409D8B3093620B1B4F05AD75BD3B5023C3EC8E78E2E9E9B64A6C8E53",
+    "gitBlob": "44239bd8833abda8bd59d69175b14d80ba0241ae"
+  },
+  {
+    "path": "resources/js/pages/finance/bills/Index.tsx",
+    "sha256": "79D02AC865FCCC5A364FD41BA7F8C629F03636F4231986B0A5C9A0569B06ED96",
+    "gitBlob": "a693742cbdbdcacd3f9c6590de493b43ac633560"
+  },
+  {
+    "path": "resources/js/pages/finance/bills/Show.test.tsx",
+    "sha256": "39F9DD88AA60FAC542D80D159C13F1B82AAC4B344928798BB2B125002D131A6B",
+    "gitBlob": "dfa496db12e17a9905d0de3be0c9685ec96e7ee6"
+  },
+  {
+    "path": "resources/js/pages/finance/bills/Show.tsx",
+    "sha256": "33ECF3F525227F3E0EAFB8F349EA336B59CC4251A52A1D3A7E731481818EDB60",
+    "gitBlob": "248d01ea32188f217040741b3df59ea69181defd"
+  },
+  {
+    "path": "resources/js/pages/finance/journals/Show.tsx",
+    "sha256": "60961AC86899B1454EFAEB3C79490C655B5A0E5D0142D87B3160748A25685CF8",
+    "gitBlob": "b2ca846211030a4106cffe8333e2c5ed5fa4a412"
+  },
+  {
+    "path": "resources/js/pages/finance/vehicle-reviews/_dialogs.tsx",
+    "sha256": "9615AAB51465382EED7A13C68E877CB999B00CE5CAA6B98F07A5EF147E53A84D",
+    "gitBlob": "679f2097b9ad5748ded49be6d79ab35015f95ec5"
+  },
+  {
+    "path": "resources/js/pages/finance/vehicle-reviews/history.test.tsx",
+    "sha256": "B95C4E38094E1FB45F75F6FCA58C25E8C73FC84EF26AAD4DC209C9A4D0C0F0C0",
+    "gitBlob": "de4940e1b5a37991d3f1c07c1ca6fa3384fad432"
+  },
+  {
+    "path": "resources/js/pages/finance/vehicle-reviews/index.tsx",
+    "sha256": "C66A8D92A6AE804CA6A946B6206BFB2DD342AB113B16C5A26C077E5B1E14E827",
+    "gitBlob": "96ca3ec8200bd50fc37d0b70864ddda170c04c98"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/maintenance/work-orders/index.tsx",
+    "sha256": "A46017F8C5FBCFBCE6905745D8CC597505D3C9CB5FF2F7EC74CD028833329D23",
+    "gitBlob": "6ea689d4b3af6bc0239c6a095561ae12a28f62af"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+    "sha256": "C3A18849930CD5330181D5250E7FE590AEE24366EAC8085C0FB64EC1A892B6EC",
+    "gitBlob": "bfa185f48c6f8a9306b19f51851a93a7d6974fe7"
+  },
+  {
+    "path": "routes/console.php",
+    "sha256": "17A8D37404E0274156B986D33853F6E7B9ED7168884E1474694C53D73FCE0BF5",
+    "gitBlob": "a044531a3345ddcd3272f736fc53b2828c7f4e59"
+  },
+  {
+    "path": "routes/finance.php",
+    "sha256": "77FAC1BFB676C8FE92C7050E2FF798F9C08E3B2B8F74D09AD69411F417A175BD",
+    "gitBlob": "d97d1fdc8056eb257dda4e8d85c9045942878736"
+  },
+  {
+    "path": "routes/fleet-assets.php",
+    "sha256": "143B06D6911D1F3B53AF96ABFF4C3E2B04D2DA539313B3247DE58A80C68E46CA",
+    "gitBlob": "c784b895b58d8255fc3f6c18e87fd11a826ca277"
+  },
+  {
+    "path": "tests/Feature/Finance/BillApprovalSnapshotTest.php",
+    "sha256": "39064FFCD84191705CB334E7FF8EAABED2AE4E5B530A734C5AF152468EC51036",
+    "gitBlob": "52fcb6331483808f3e4d8dca552e9ae2223d785a"
+  },
+  {
+    "path": "tests/Feature/Finance/BillSpendApprovalGateTest.php",
+    "sha256": "670F3726EE5BA62DBF43CEF9DE7D36FC1D2975DFBEECEA273CFA5D805F510A70",
+    "gitBlob": "c4e3d630f02c35db00af8e35209bbe92dd9212d2"
+  },
+  {
+    "path": "tests/Feature/FleetAssets/Pkg02bVehicleFinanceTest.php",
+    "sha256": "622F2512D140B65A98D68EDD7B0F2AF3B3614C8093D658280B496E8F100BC7E6",
+    "gitBlob": "4ed473efe91f1e2bfa92a653be851f39954b9749"
+  },
+  {
+    "path": "tests/Feature/FleetAssets/Pkg06bAssetProfileTest.php",
+    "sha256": "E404AB7E54700C9CCAE8EE2ADB7D78E0A4EB0CE6A868CD4E366DD4E5E3601BB6",
+    "gitBlob": "88dc422bfbe4014e63d7757b6d922b5a0aa57053"
+  },
+  {
+    "path": "tests/Unit/FleetAssets/MaintenanceCostSummaryTest.php",
+    "sha256": "2EA32AD934EE0E3E53CDF383D10D57398E63FA15FEE3E7BB8796ED2630D79C3C",
+    "gitBlob": "5170f234f7360e23c1e944d452525256e6f90e67"
+  },
+  {
+    "path": "vite.config.ts",
+    "sha256": "437271C5905D3C19CA6A263F5426E8DB7CE6BC0D2420F9E3EC3F096F0DE29808",
+    "gitBlob": "9ab27ea98ba17c78f6ad252b55349d2649af36e8"
+  }
+]

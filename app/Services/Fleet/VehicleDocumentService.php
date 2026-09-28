@@ -159,6 +159,7 @@ class VehicleDocumentService
                 return [$prior, $prior->files()->where('request_key', 'like', $requestKey.':%')->orderBy('id')->get()->all()];
             }
             $this->assertSource($asset, $meta['source_type'], $meta['source_id']);
+            app(FinanceReviewEvidence::class)->changing($asset->id, $meta['source_type'], $meta['source_id']);
             $set = AssetDocumentSet::query()->create([
                 'asset_id' => $asset->id, 'category' => $meta['category'], 'reference' => $meta['reference'],
                 'document_date' => $meta['document_date'], 'expires_on' => $meta['expires_on'],
@@ -202,6 +203,7 @@ class VehicleDocumentService
             if ($this->replayed($set, $requestKey, $fingerprint)) {
                 return [$set, $set->files()->where('request_key', 'like', $requestKey.':%')->orderBy('id')->get()->all()];
             }
+            app(FinanceReviewEvidence::class)->changing($asset->id, $set->source_type, $set->source_id);
             abort_unless($set->lock_version === $expectedVersion, 409, 'This document changed while you were editing. Reload before replacing it.');
             abort_if($set->archived_at !== null, 409, 'This document is archived.');
             $revision = (int) $set->files()->max('revision') + 1;
@@ -230,6 +232,7 @@ class VehicleDocumentService
             if ($this->replayed($set, $requestKey, $fingerprint)) {
                 return $set;
             }
+            app(FinanceReviewEvidence::class)->changing($asset->id, $set->source_type, $set->source_id);
             abort_unless($set->lock_version === $expectedVersion, 409, 'This document changed while you were editing. Reload before saving.');
             abort_if($set->archived_at !== null, 409, 'This document is archived.');
             $before = $this->snapshot($set);
@@ -263,6 +266,7 @@ class VehicleDocumentService
             if ($this->replayed($set, $requestKey, $fingerprint)) {
                 return $document;
             }
+            app(FinanceReviewEvidence::class)->changing($asset->id, $document->source_type, $document->source_id);
             abort_if($document->archived_at !== null, 409, 'This file is already archived.');
             abort_if((int) DB::table('assets')->where('id', $asset->id)->value('profile_photo_document_id') === $document->id, 409,
                 'This file is the vehicle photo. Choose another photo first.');
@@ -354,7 +358,7 @@ class VehicleDocumentService
         AuditLogger::log('fleet.vehicle.document.download', $document, ['asset_id' => $assetId]);
         $mime = $document->detected_mime ?: ($document->mime_type ?: 'application/octet-stream');
         $name = self::safeName((string) ($document->original_name ?: 'vehicle-document'));
-        $inline = $inline && str_starts_with($mime, 'image/');
+        $inline = $inline && in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'], true);
 
         return $disk->response($document->storage_path, $name, [
             'Content-Type' => $mime,
@@ -636,7 +640,7 @@ class VehicleDocumentService
                 ->where('asset_id', $asset->id)->exists(),
             // Files can only be added while Finance has not yet decided the request.
             'finance_review_request' => DB::table('fleet_finance_review_requests')->where('id', $id)
-                ->where('asset_id', $asset->id)->where('status', 'submitted')->exists(),
+                ->where('asset_id', $asset->id)->whereIn('status', ['preparing', 'submitted', 'changes_requested'])->exists(),
             'checklist_run' => DB::table('fleet_checklist_runs')->where('id', $id)->where('asset_id', $asset->id)
                 ->whereNotNull('submitted_at')->exists(),
             'speed_limit' => DB::table('fleet_speed_limits')->where('id', $id)->where('asset_id', $asset->id)

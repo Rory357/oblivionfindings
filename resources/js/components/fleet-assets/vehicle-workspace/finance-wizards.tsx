@@ -39,6 +39,10 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { uploadSummary } from './evidence-upload';
 import {
+    isFinanceLinksResponse,
+    isReviewRequestResponse,
+} from './finance-command-results';
+import {
     FinanceNotice,
     requestSourceValue,
     useFinanceEvidenceUpload,
@@ -499,7 +503,7 @@ export function LinkFinanceWizard({
     const [step, setStep] = useState(0);
     const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
     const [saved, setSaved] = useState(false);
-    const command = useVehicleRecordCommand(isJsonObject);
+    const command = useVehicleRecordCommand(isFinanceLinksResponse);
     const errors = { ...command.errors, ...localErrors };
     const fixedChanged =
         !locked && (fixedAsset?.id ?? null) !== (initialFixed?.id ?? null);
@@ -804,8 +808,12 @@ export function FinanceReviewWizard({
     const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
     const [formError, setFormError] = useState('');
     const [saved, setSaved] = useState<string | null>(null);
-    const command = useVehicleRecordCommand(isJsonObject);
+    const command = useVehicleRecordCommand(isReviewRequestResponse);
     const uploads = useFinanceEvidenceUpload(vehicle.id);
+    const [createdRequest, setCreatedRequest] = useState<Record<
+        string,
+        unknown
+    > | null>(null);
     const errors = { ...command.errors, ...localErrors };
     const hasEvidence = files.length > 0 || form.existing !== 'none';
     const typeLabel =
@@ -873,7 +881,11 @@ export function FinanceReviewWizard({
             else if (
                 finance.requests.some(
                     (request) =>
-                        request.status === 'submitted' &&
+                        [
+                            'preparing',
+                            'submitted',
+                            'changes_requested',
+                        ].includes(request.status) &&
                         request.type === form.request_type &&
                         requestSourceValue(request) === form.source,
                 )
@@ -887,24 +899,29 @@ export function FinanceReviewWizard({
     };
 
     const submit = async () => {
-        if (!command.uncertain && !validateStep(0)) {
+        if (!createdRequest && !command.uncertain && !validateStep(0)) {
             setStep(0);
             return;
         }
-        const result = await command.submit(
-            `/fleet-assets/vehicles/${vehicle.id}/finance/review-requests`,
-            {
-                request_type: form.request_type,
-                source: form.source,
-                amount: form.amount.trim() || null,
-                note: form.note.trim(),
-                existing_document_id:
-                    form.existing === 'none' ? null : Number(form.existing),
-            },
-        );
-        const created =
-            result && isJsonObject(result.request) ? result.request : null;
+        const result = createdRequest
+            ? null
+            : await command.submit(
+                  `/fleet-assets/vehicles/${vehicle.id}/finance/review-requests`,
+                  {
+                      expected_file_count: files.length,
+                      request_type: form.request_type,
+                      source: form.source,
+                      amount: form.amount.trim() || null,
+                      note: form.note.trim(),
+                      existing_document_id:
+                          form.existing === 'none'
+                              ? null
+                              : Number(form.existing),
+                  },
+              );
+        const created = createdRequest ?? result?.request;
         if (!created) return;
+        setCreatedRequest(created);
         const reference =
             typeof created.reference === 'string'
                 ? created.reference
@@ -916,15 +933,23 @@ export function FinanceReviewWizard({
                   requestId: Number(created.id),
               })
             : null;
+        if (files.length && !outcome) return;
         setSaved(
-            `${reference} is now in the Finance queue. Finance users see it in All Tasks; no email or external notification is sent.${uploadSummary(outcome, files.length)}`,
+            files.length
+                ? `${reference} is saved while its evidence is prepared. Open the request, finish any file checks, then submit the evidence to Finance.${uploadSummary(outcome, files.length)}`
+                : `${reference} is ready for Finance review. The notification is queued for delivery.`,
         );
         onSaved();
     };
     const state = {
-        ...command,
+        ...(createdRequest ? uploads.command : command),
+        message:
+            createdRequest && !saved
+                ? `The review request is saved. ${uploads.command.message || 'Preparing its supporting files.'}`
+                : command.message,
         processing: command.processing || uploads.command.processing,
-        locked: command.locked || uploads.command.processing,
+        locked:
+            command.locked || uploads.command.locked || createdRequest !== null,
     };
     const pct = Math.round(
         ([
@@ -956,10 +981,17 @@ export function FinanceReviewWizard({
                 files.length > 0
             }
             saved={saved !== null}
-            submitLabel="Create Finance review request"
+            submitLabel={
+                createdRequest
+                    ? 'Retry supporting file upload'
+                    : 'Create Finance review request'
+            }
             onValidateStep={validateStep}
             onSubmit={submit}
-            onClose={onClose}
+            onClose={() => {
+                if (createdRequest && !saved) onSaved();
+                onClose();
+            }}
             onReload={() => {
                 onSaved();
                 onClose();

@@ -132,6 +132,10 @@ function finance(
                 decided_at: null,
                 decision_note: null,
                 lock_version: 1,
+                evidence_token: 'fixture-token',
+                can_submit: false,
+                due_on: null,
+                response_note: null,
                 history: [
                     {
                         id: 1,
@@ -470,100 +474,144 @@ describe('vehicle Overview › Finance', () => {
         ).toBeInTheDocument();
     });
 
-    it('saves a review request, then uploads its supporting files privately', async () => {
-        const calls: Array<{ url: string; init: RequestInit }> = [];
-        vi.stubGlobal(
-            'fetch',
-            vi.fn(async (url: string, init: RequestInit) => {
-                calls.push({ url, init });
-                const body = url.endsWith('/finance/review-requests')
-                    ? {
-                          request: {
-                              id: 9,
-                              reference: 'FRQ-2026-0002',
-                              type_label: 'Supplier invoice review',
-                              status: 'submitted',
-                              lock_version: 1,
-                          },
-                      }
-                    : {
-                          set: { id: 4, lock_version: 1, current_revision: 1 },
-                          files: [
-                              {
-                                  id: 31,
-                                  name: 'quote.pdf',
-                                  state: 'available',
-                                  archived: false,
+    it.each([false, true, 'incomplete upload response'])(
+        'saves one review request and privately uploads files (retry=%s)',
+        async (retryUpload) => {
+            const calls: Array<{ url: string; init: RequestInit }> = [];
+            vi.stubGlobal(
+                'fetch',
+                vi.fn(async (url: string, init: RequestInit) => {
+                    calls.push({ url, init });
+                    if (
+                        retryUpload === 'incomplete upload response' &&
+                        calls.length === 2
+                    )
+                        return {
+                            ok: true,
+                            status: 200,
+                            json: async () => ({ files: [] }),
+                        };
+                    if (retryUpload && calls.length === 2)
+                        throw new Error('Upload response lost');
+                    const body = url.endsWith('/finance/review-requests')
+                        ? {
+                              request: {
+                                  id: 9,
+                                  reference: 'FRQ-2026-0002',
+                                  type_label: 'Supplier invoice review',
+                                  status: 'submitted',
+                                  lock_version: 1,
                               },
-                          ],
-                      };
-                return { ok: true, status: 200, json: async () => body };
-            }),
-        );
-        const onChanged = vi.fn();
-        render(
-            <FinanceStudio
-                workspace={workspace}
-                finance={finance()}
-                onChanged={onChanged}
-            />,
-        );
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Request Finance review' }),
-        );
-        const dialog = screen.getByRole('dialog');
-        fireEvent.change(
-            within(dialog).getByLabelText('What Finance needs to review'),
-            { target: { value: 'The invoice is above the quote.' } },
-        );
-        fireEvent.change(
-            dialog.querySelector('input[type="file"]') as HTMLInputElement,
-            {
-                target: {
-                    files: [
-                        new File(['%PDF-1.4'], 'quote.pdf', {
-                            type: 'application/pdf',
-                        }),
-                    ],
+                          }
+                        : {
+                              set: {
+                                  id: 4,
+                                  lock_version: 1,
+                                  current_revision: 1,
+                              },
+                              files: [
+                                  {
+                                      id: 31,
+                                      name: 'quote.pdf',
+                                      state: 'available',
+                                      archived: false,
+                                  },
+                              ],
+                          };
+                    return { ok: true, status: 200, json: async () => body };
+                }),
+            );
+            const onChanged = vi.fn();
+            render(
+                <FinanceStudio
+                    workspace={workspace}
+                    finance={finance()}
+                    onChanged={onChanged}
+                />,
+            );
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Request Finance review' }),
+            );
+            const dialog = screen.getByRole('dialog');
+            fireEvent.change(
+                within(dialog).getByLabelText('What Finance needs to review'),
+                { target: { value: 'The invoice is above the quote.' } },
+            );
+            fireEvent.change(
+                dialog.querySelector('input[type="file"]') as HTMLInputElement,
+                {
+                    target: {
+                        files: [
+                            new File(['%PDF-1.4'], 'quote.pdf', {
+                                type: 'application/pdf',
+                            }),
+                        ],
+                    },
                 },
-            },
-        );
-        fireEvent.click(
-            within(dialog).getByRole('button', { name: 'Continue' }),
-        );
-        fireEvent.click(
-            within(dialog).getByRole('button', {
-                name: 'Create Finance review request',
-            }),
-        );
+            );
+            fireEvent.click(
+                within(dialog).getByRole('button', { name: 'Continue' }),
+            );
+            fireEvent.click(
+                within(dialog).getByRole('button', {
+                    name: 'Create Finance review request',
+                }),
+            );
 
-        expect(
-            await screen.findByText('Finance review requested'),
-        ).toBeInTheDocument();
-        expect(
-            screen.getByText(/FRQ-2026-0002 is now in the Finance queue/),
-        ).toBeInTheDocument();
-        expect(calls).toHaveLength(2);
-        expect(calls[0].url).toBe(
-            '/fleet-assets/vehicles/14/finance/review-requests',
-        );
-        expect(JSON.parse(String(calls[0].init.body))).toEqual({
-            request_type: 'supplier_invoice_review',
-            source: 'vehicle',
-            amount: null,
-            note: 'The invoice is above the quote.',
-            existing_document_id: null,
-        });
-        expect(
-            (calls[0].init.headers as Record<string, string>)[
-                'Idempotency-Key'
-            ],
-        ).toBeTruthy();
-        expect(calls[1].url).toBe('/fleet-assets/vehicles/14/documents');
-        const form = calls[1].init.body as FormData;
-        expect(form.get('source_type')).toBe('finance_review_request');
-        expect(form.get('source_id')).toBe('9');
-        expect(form.get('category')).toBe('Supplier invoice review');
-        expect(onChanged).toHaveBeenCalled();
-    });
+            if (retryUpload) {
+                fireEvent.click(
+                    await screen.findByRole('button', {
+                        name: 'Retry this submission',
+                    }),
+                );
+            }
+            expect(
+                await screen.findByText('Finance review requested'),
+            ).toBeInTheDocument();
+            expect(
+                screen.getByText(
+                    /FRQ-2026-0002 is saved while its evidence is prepared/,
+                ),
+            ).toBeInTheDocument();
+            expect(calls).toHaveLength(retryUpload ? 3 : 2);
+            if (retryUpload) {
+                expect(
+                    (calls[2].init.headers as Record<string, string>)[
+                        'Idempotency-Key'
+                    ],
+                ).toBe(
+                    (calls[1].init.headers as Record<string, string>)[
+                        'Idempotency-Key'
+                    ],
+                );
+            }
+            expect(
+                calls.filter((call) =>
+                    call.url.endsWith('/finance/review-requests'),
+                ),
+            ).toHaveLength(1);
+            expect(calls[0].url).toBe(
+                '/fleet-assets/vehicles/14/finance/review-requests',
+            );
+            expect(JSON.parse(String(calls[0].init.body))).toEqual({
+                expected_file_count: 1,
+                request_type: 'supplier_invoice_review',
+                source: 'vehicle',
+                amount: null,
+                note: 'The invoice is above the quote.',
+                existing_document_id: null,
+            });
+            expect(
+                (calls[0].init.headers as Record<string, string>)[
+                    'Idempotency-Key'
+                ],
+            ).toBeTruthy();
+            expect(calls[1].url).toBe('/fleet-assets/vehicles/14/documents');
+            const form = calls[1].init.body as FormData;
+            expect(form.get('source_type')).toBe('finance_review_request');
+            expect(form.get('source_id')).toBe('9');
+            expect(form.get('category')).toBe('Supplier invoice review');
+            expect(onChanged).toHaveBeenCalled();
+        },
+    );
 });

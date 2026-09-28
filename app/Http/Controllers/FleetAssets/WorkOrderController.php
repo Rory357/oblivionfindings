@@ -2,20 +2,32 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
+use App\Domain\Finance\Models\FinBill;
+use App\Domain\Finance\Models\FinVendor;
+use App\Domain\Finance\Services\BillSiteScope;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
+use App\Models\FleetChecklistRun;
+use App\Models\FleetChecklistTemplate;
 use App\Models\FleetWorkOrder;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Fleet\MaintenanceAccessService;
-use App\Services\Fleet\MaintenanceReportService;
+use App\Services\Fleet\MaintenanceAttachmentService;
 use App\Services\Fleet\MaintenanceCheckService;
+use App\Services\Fleet\MaintenanceCostPresenter;
 use App\Services\Fleet\MaintenanceFinanceService;
+use App\Services\Fleet\MaintenanceLocalTime;
 use App\Services\Fleet\MaintenancePolicyService;
+use App\Services\Fleet\MaintenanceReportService;
 use App\Services\Fleet\MaintenanceTransitionService;
+use App\Services\Fleet\VehicleChecksPresenter;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class WorkOrderController extends Controller
@@ -61,6 +73,7 @@ class WorkOrderController extends Controller
         // CSV export
         if ($request->input('export') === 'csv') {
             $exportQuery = (clone $query)->latest();
+
             return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Title', 'Asset', 'Priority', 'Status', 'Assigned To', 'Due Date', 'Created']);
@@ -124,8 +137,12 @@ class WorkOrderController extends Controller
         $allowedSorts = ['created_at', 'priority', 'status', 'title', 'due_at'];
         $sort = $request->input('sort', 'created_at');
         $direction = $request->input('direction', 'desc');
-        if (!in_array($sort, $allowedSorts)) $sort = 'created_at';
-        if (!in_array($direction, ['asc', 'desc'])) $direction = 'desc';
+        if (! in_array($sort, $allowedSorts)) {
+            $sort = 'created_at';
+        }
+        if (! in_array($direction, ['asc', 'desc'])) {
+            $direction = 'desc';
+        }
 
         $workOrders = $query->reorder()->orderBy($sort, $direction)->paginate(25)->withQueryString();
         $visibleAssetIds = $workOrders->getCollection()->pluck('asset_id')->filter()->all();
@@ -169,7 +186,7 @@ class WorkOrderController extends Controller
                 $assets->prepend($selectedAsset);
             }
         }
-        $checklistRuns = \App\Models\FleetChecklistRun::query()
+        $checklistRuns = FleetChecklistRun::query()
             ->where(fn ($q) => $q->where('passed', false)->orWhere('outcome', 'needs_assessment')
                 ->orWhere('id', $request->integer('checklist_run_id')))
             ->whereHas('asset', fn ($q) => $q->whereNotNull('site_id')->whereIn('site_id', $siteIds))
@@ -195,6 +212,7 @@ class WorkOrderController extends Controller
         return Inertia::render('fleet-assets/maintenance/work-orders/index', [
             'work_orders' => [
                 'data' => $workOrders->getCollection()->map(fn ($wo) => [
+                    'version' => (int) $wo->version,
                     'id' => $wo->id,
                     'reference_number' => $wo->reference_number,
                     'title' => $wo->title,
@@ -257,7 +275,7 @@ class WorkOrderController extends Controller
             ]);
         }
 
-        return redirect()->to('/fleet-assets/maintenance/work-orders?' . http_build_query(array_filter([
+        return redirect()->to('/fleet-assets/maintenance/work-orders?'.http_build_query(array_filter([
             'new' => 1,
             'asset_id' => $request->input('asset_id'),
             'checklist_run_id' => $request->input('checklist_run_id'),
@@ -271,21 +289,24 @@ class WorkOrderController extends Controller
         $actor = $request->user();
         abort_unless($actor && $this->access()->canReport($actor), 403);
         $data = $request->validate([
-            'type' => ['required', 'in:assets,users,work_orders,finance_bills'],
+            'type' => ['required', 'in:assets,users,work_orders,finance_bills,finance_vendors'],
             'q' => ['required', 'string', 'min:2', 'max:100'],
             'asset_id' => ['nullable', 'integer'],
         ]);
         abort_unless($data['type'] === 'assets' || $this->access()->canManage($actor), 403);
-        if ($data['type'] === 'finance_bills') {
+        if (in_array($data['type'], ['finance_bills', 'finance_vendors'], true)) {
             abort_unless($actor->canDo('finance.ap.view'), 403);
         }
 
         $term = $data['q'];
         $siteIds = $this->access()->approvedSiteIds($actor);
-        if ($data['type'] === 'finance_bills') {
+        if ($data['type'] === 'finance_vendors') {
+            $results = FinVendor::query()->active()->where('name', 'like', '%'.addcslashes($term, '%_\\').'%')
+                ->orderBy('name')->limit(30)->get(['id', 'name']);
+        } elseif ($data['type'] === 'finance_bills') {
             abort_unless(! empty($data['asset_id']), 422);
             $asset = $this->access()->asset($actor, (int) $data['asset_id']);
-            $results = \App\Domain\Finance\Models\FinBill::query()
+            $results = app(BillSiteScope::class)->apply(FinBill::query(), $actor)
                 ->where('asset_id', $asset->id)->where('site_id', $asset->site_id)
                 ->whereNotIn('id', DB::table('fleet_maintenance_fin_bill_links')->select('fin_bill_id'))
                 ->where('bill_number', 'like', "%{$term}%")
@@ -349,10 +370,10 @@ class WorkOrderController extends Controller
 
         if (! empty($data['observed_local'])) {
             try {
-                $data['observed_at'] = \App\Services\Fleet\MaintenanceLocalTime::toUtc(
+                $data['observed_at'] = MaintenanceLocalTime::toUtc(
                     $data['observed_local'], $data['observed_offset'] ?? null);
-            } catch (\Illuminate\Validation\ValidationException $error) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
+            } catch (ValidationException $error) {
+                throw ValidationException::withMessages([
                     'observed_local' => $error->errors()['time'][0] ?? 'Choose an unambiguous Auckland date and time.',
                 ]);
             }
@@ -369,7 +390,7 @@ class WorkOrderController extends Controller
                 ->where('work_order_id', $workOrder->id)->value('id');
             abort_unless($reportId, 404);
             foreach ($files as $index => $item) {
-                app(\App\Services\Fleet\MaintenanceAttachmentService::class)->upload(
+                app(MaintenanceAttachmentService::class)->upload(
                     $actor, (int) $workOrder->id, 'report', (int) $reportId,
                     'report-file-'.substr(hash('sha256', $data['request_key'].':'.$index), 0, 40),
                     $item['file'], $item['category'] ?? null, $item['description'] ?? null,
@@ -407,6 +428,7 @@ class WorkOrderController extends Controller
             ->join('users as actor', 'actor.id', '=', 'action.actor_user_id')
             ->leftJoin('users as target', 'target.id', '=', 'action.target_user_id')
             ->where('action.work_order_id', $workOrder->id)
+            ->when(! app(MaintenanceCostPresenter::class)->canView($user, (int) $asset->site_id), fn ($query) => $query->where('action.action_type', '!=', 'record_cost_estimate'))
             ->when(! $canManage && ! $canReview, fn ($query) => $query
                 ->whereIn('action.action_type', ['propose_handover', 'accept_handover',
                     'propose_custody', 'acknowledge_custody']))
@@ -423,7 +445,7 @@ class WorkOrderController extends Controller
                 'target_name' => $row->target_name,
                 'policy_version_id' => $row->policy_version_id ? (int) $row->policy_version_id : null,
                 'payload' => json_decode((string) $row->payload_json, true) ?: [],
-                'occurred_at' => \Illuminate\Support\Carbon::parse($row->occurred_at, 'UTC')->toISOString(),
+                'occurred_at' => Carbon::parse($row->occurred_at, 'UTC')->toISOString(),
                 'version' => (int) $row->resulting_version,
             ]);
         $linkedCheckIds = DB::table('fleet_maintenance_reports')->where('work_order_id', $workOrder->id)
@@ -434,7 +456,7 @@ class WorkOrderController extends Controller
                 'corrects_run_id', 'presented_template_json', 'rule_version_id']);
         // Maintenance's "no issue found — release for use" decision on a check,
         // shown beside its original outcome (which never changes).
-        $checkAssessments = $checkRows->isEmpty() || ! \Illuminate\Support\Facades\Schema::hasTable('fleet_maintenance_check_assessments')
+        $checkAssessments = $checkRows->isEmpty() || ! Schema::hasTable('fleet_maintenance_check_assessments')
             ? collect()
             : DB::table('fleet_maintenance_check_assessments as assessment')
                 ->leftJoin('users as assessor', 'assessor.id', '=', 'assessment.assessed_by_user_id')
@@ -443,21 +465,21 @@ class WorkOrderController extends Controller
                     'assessment.assessed_at', 'assessor.name as assessed_by'])
                 ->keyBy('check_run_id');
         $checks = $checkRows->map(fn ($row) => [
-                'id' => (int) $row->id, 'kind' => $row->check_kind,
-                'outcome' => $row->outcome ?? 'needs_assessment',
-                'submitted_at' => $row->submitted_at
-                    ? \Illuminate\Support\Carbon::parse($row->submitted_at, 'UTC')->toISOString() : null,
-                'corrects_run_id' => $row->corrects_run_id,
-                'presented_template' => json_decode((string) $row->presented_template_json, true),
-                'rule_version_id' => $row->rule_version_id,
-                'assessment' => ($assessment = $checkAssessments->get($row->id)) ? [
-                    'decision' => (string) $assessment->decision,
-                    'label' => \App\Services\Fleet\VehicleChecksPresenter::NO_ISSUE_LABEL,
-                    'reason' => (string) $assessment->reason,
-                    'assessed_by' => $assessment->assessed_by,
-                    'assessed_at' => \Illuminate\Support\Carbon::parse($assessment->assessed_at, 'UTC')->toISOString(),
-                ] : null,
-            ]);
+            'id' => (int) $row->id, 'kind' => $row->check_kind,
+            'outcome' => $row->outcome ?? 'needs_assessment',
+            'submitted_at' => $row->submitted_at
+                ? Carbon::parse($row->submitted_at, 'UTC')->toISOString() : null,
+            'corrects_run_id' => $row->corrects_run_id,
+            'presented_template' => json_decode((string) $row->presented_template_json, true),
+            'rule_version_id' => $row->rule_version_id,
+            'assessment' => ($assessment = $checkAssessments->get($row->id)) ? [
+                'decision' => (string) $assessment->decision,
+                'label' => VehicleChecksPresenter::NO_ISSUE_LABEL,
+                'reason' => (string) $assessment->reason,
+                'assessed_by' => $assessment->assessed_by,
+                'assessed_at' => Carbon::parse($assessment->assessed_at, 'UTC')->toISOString(),
+            ] : null,
+        ]);
         $reports = DB::table('fleet_maintenance_reports as report')
             ->join('users as reporter', 'reporter.id', '=', 'report.submitted_by_user_id')
             ->where('report.work_order_id', $workOrder->id)->orderBy('report.id')
@@ -467,9 +489,9 @@ class WorkOrderController extends Controller
                 'report.corrects_report_id'])
             ->map(function ($row): array {
                 $data = (array) $row;
-                $data['submitted_at'] = \Illuminate\Support\Carbon::parse($row->submitted_at, 'UTC')->toISOString();
+                $data['submitted_at'] = Carbon::parse($row->submitted_at, 'UTC')->toISOString();
                 $data['observed_at'] = $row->observed_at
-                    ? \Illuminate\Support\Carbon::parse($row->observed_at, 'UTC')->toISOString() : null;
+                    ? Carbon::parse($row->observed_at, 'UTC')->toISOString() : null;
 
                 return $data;
             });
@@ -506,10 +528,10 @@ class WorkOrderController extends Controller
         $checkPolicy = $policy->current((int) $asset->site_id, (string) $asset->category, 'check');
         $holdPolicy = $policy->current((int) $asset->site_id, (string) $asset->category, 'hold');
         $templateId = (int) ($retest['rules']['template_id'] ?? 0);
-        $template = $templateId ? \App\Models\FleetChecklistTemplate::query()
+        $template = $templateId ? FleetChecklistTemplate::query()
             ->whereKey($templateId)->first(['id', 'name', 'items']) : null;
         $checkTemplateId = (int) ($checkPolicy['rules']['template_id'] ?? 0);
-        $checkTemplate = $checkTemplateId ? \App\Models\FleetChecklistTemplate::query()
+        $checkTemplate = $checkTemplateId ? FleetChecklistTemplate::query()
             ->whereKey($checkTemplateId)->first(['id', 'name', 'items']) : null;
         $taskInHorizon = $workOrder->due_at && $workOrder->due_at->lessThanOrEqualTo(now()->addDays(7));
         $taskLink = $taskInHorizon && $this->access()->canRead($user)
@@ -553,6 +575,7 @@ class WorkOrderController extends Controller
             'attachments' => $attachments,
             'finance' => $canDetails
                 ? app(MaintenanceFinanceService::class)->projection($user, (int) $workOrder->id) : [],
+            'cost_workspace' => $canDetails ? app(MaintenanceCostPresenter::class)->present($user, $workOrder) : null,
             'release_policy' => $policy->current((int) $asset->site_id, (string) $asset->category, 'release'),
             'repair_policy' => $canManage || $canReview ? $repairPolicy : null,
             'release_readiness' => [
@@ -589,8 +612,9 @@ class WorkOrderController extends Controller
         // 404 rather than disclosed by validation errors. The transition service
         // still decides who may act on an order inside the boundary.
         $this->access()->asset($actor, (int) $workOrder->asset_id);
+        $request->merge(['request_key' => $request->input('request_key') ?: $request->header('Idempotency-Key')]);
         $data = $request->validate([
-            'operation' => ['required', 'string', 'in:start,hold,resume,complete,cancel,update_next_action,note,propose_handover,accept_handover,place_restriction,review_booking_impact,attest_repair,plan_provider,record_provider_confirmation,record_provider_cancellation,record_provider_completion,propose_custody,acknowledge_custody,release'],
+            'operation' => ['required', 'string', 'in:record_cost_estimate,start,hold,resume,complete,cancel,update_next_action,note,propose_handover,accept_handover,place_restriction,review_booking_impact,attest_repair,plan_provider,record_provider_confirmation,record_provider_cancellation,record_provider_completion,propose_custody,acknowledge_custody,release'],
             'version' => ['required', 'integer', 'min:0'],
             'request_key' => ['required', 'string', 'min:8', 'max:100'],
             'waiting_reason' => ['nullable', 'string', 'max:64'],
@@ -615,14 +639,24 @@ class WorkOrderController extends Controller
             'provider_reference' => ['nullable', 'string', 'max:255'],
             'reason' => ['nullable', 'string', 'max:1000'],
             'service_summary' => ['nullable', 'string', 'max:5000'],
+            'vendor_id' => ['nullable', 'integer'],
+            'quote_reference' => ['nullable', 'string', 'max:120'],
+            'amount' => ['nullable', 'numeric'],
+            'cost_centre_id' => ['nullable', 'integer'],
+            'document_ids' => ['sometimes', 'array', 'max:20'],
+            'document_ids.*' => ['integer', 'distinct'],
         ]);
 
         $payload = collect($data)->only(['waiting_reason', 'next_action', 'due_at', 'due_local', 'due_offset', 'note', 'target_user_id',
             'restriction_kind', 'source_run_id', 'booking_impact_id', 'review_note', 'summary', 'received', 'provider_name', 'starts_local', 'ends_local',
             'starts_offset', 'ends_offset',
-            'response_method', 'provider_reference', 'reason', 'service_summary'])->all();
-        $this->transitionService()->execute($actor, (int) $workOrder->id,
+            'response_method', 'provider_reference', 'reason', 'service_summary', 'vendor_id', 'quote_reference', 'amount', 'cost_centre_id', 'document_ids'])->all();
+        $saved = $this->transitionService()->execute($actor, (int) $workOrder->id,
             $data['operation'], (int) $data['version'], $data['request_key'], $payload);
+
+        if ($request->expectsJson() && ! $request->header('X-Inertia')) {
+            return response()->json(['saved' => true, 'version' => $saved->version]);
+        }
 
         return back()->with('success', 'Work order updated.');
     }
@@ -672,6 +706,10 @@ class WorkOrderController extends Controller
         app(MaintenanceFinanceService::class)->linkBill($actor, (int) $workOrder->id,
             (int) $data['fin_bill_id']);
 
+        if ($request->expectsJson() && ! $request->header('X-Inertia')) {
+            return response()->json(['saved' => true]);
+        }
+
         return back()->with('success', 'Finance bill linked. Finance retains approval and posting authority.');
     }
 
@@ -713,6 +751,6 @@ class WorkOrderController extends Controller
             }
         }, 3);
 
-        return back()->with('success', 'Bulk action applied to ' . count($data['ids']) . ' work order(s).');
+        return back()->with('success', 'Bulk action applied to '.count($data['ids']).' work order(s).');
     }
 }

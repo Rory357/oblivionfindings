@@ -15,6 +15,7 @@ use App\Domain\Finance\Jobs\SyncAccountingIntegrationJob;
 use App\Domain\Finance\Jobs\SyncBankFeedsJob;
 use App\Domain\Finance\Jobs\SyncBudgetActualsJob;
 use App\Domain\Finance\Models\FinAccountingIntegration;
+use App\Domain\Governance\Jobs\CaptureRiskHeatmapSnapshot;
 use App\Domain\Governance\Jobs\SendBoardDigest;
 use App\Domain\Hr\Jobs\ArchiveCandidateDataJob;
 use App\Domain\Hr\Jobs\CalculateWellbeingIndicatorsJob;
@@ -49,6 +50,7 @@ use App\Jobs\CheckLoneWorkerOverdueJob;
 use App\Jobs\CheckOverdueCorrectiveActionsJob;
 use App\Jobs\CheckOverdueInvestigationsJob;
 use App\Jobs\CheckRiskAssessmentReviewsJob;
+use App\Jobs\DeliverFinanceReviewNotice;
 use App\Jobs\DetectFleetOfflineDevices;
 use App\Jobs\EnforceDataRetentionJob;
 use App\Jobs\EscalateUnresolvedEligibilityJob;
@@ -71,13 +73,16 @@ use App\Jobs\SendEventReminderJob;
 use App\Jobs\ShiftAutoAlertJob;
 use App\Jobs\ShiftTaskDueJob;
 use App\Jobs\SyncResourceCalendarsJob;
+use App\Jobs\SyncWorkCalendarsJob;
 use App\Models\MedicationIdempotencyResult;
+use App\Services\Fleet\FinanceReviewNotices;
 use App\Services\MedicationAlertService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 
-app(Schedule::class)->job(new \App\Jobs\SyncWorkCalendarsJob)->everyFifteenMinutes()->withoutOverlapping();
+app(Schedule::class)->job(new SyncWorkCalendarsJob)->everyFifteenMinutes()->withoutOverlapping();
 
 if (config('fleet_maintenance.effects_enabled', false)) {
     app(Schedule::class)->command('maintenance:dispatch-effects --limit=25')
@@ -779,7 +784,7 @@ app(Schedule::class)
 
 // Monthly risk register snapshot for Risk trends: 1st of the month at 06:00
 app(Schedule::class)
-    ->job(new \App\Domain\Governance\Jobs\CaptureRiskHeatmapSnapshot)
+    ->job(new CaptureRiskHeatmapSnapshot)
     ->timezone('Pacific/Auckland')
     ->monthlyOn(1, '06:00')
     ->withoutOverlapping();
@@ -940,3 +945,17 @@ app(Schedule::class)
 
 // Canonical commercial follow-ups; no generic notification or external send.
 app(Schedule::class)->command('vendors:check-renewals')->dailyAt('00:05')->timezone(config('app.worker_timezone'))->withoutOverlapping();
+
+// Finance review delivery uses a retained intent and rechecks current access in the worker.
+Artisan::command('finance:review-notices', function () {
+    DB::table('fleet_finance_review_notices')->whereNull('delivered_at')->where('available_at', '<=', now())->orderBy('id')->chunkById(100, function ($rows) {
+        foreach ($rows as $row) {
+            DeliverFinanceReviewNotice::dispatch($row->id);
+        }
+    });
+});
+Artisan::command('finance:review-reminders', function () {
+    app(FinanceReviewNotices::class)->reminders();
+});
+app(Schedule::class)->command('finance:review-notices')->everyMinute()->withoutOverlapping();
+app(Schedule::class)->command('finance:review-reminders')->dailyAt('08:30')->timezone('Pacific/Auckland')->withoutOverlapping();

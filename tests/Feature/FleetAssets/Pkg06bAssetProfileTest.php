@@ -26,6 +26,8 @@ use App\Services\Assets\AssetProfileSources;
 use App\Services\Files\MalwareScanDisposition;
 use App\Services\Files\MalwareScanner;
 use App\Services\Files\MalwareScanResult;
+use App\Services\Fleet\FinanceReviewEvidence;
+use App\Services\Fleet\FinanceReviewNotices;
 use App\Services\Fleet\VehicleFinanceReviewQueue;
 use App\Services\Fleet\VehicleFinanceService;
 use App\Support\SchemaCache;
@@ -198,6 +200,45 @@ class Pkg06bAssetProfileTest extends TestCase
         $this->assertSame('/fleet-assets/assets/'.$this->asset->id.'#view=overview&section=finance', $queue['requests'][0]['vehicle']['url']);
         $this->assertSame(1, FleetFinanceReviewRequest::where('asset_id', $this->asset->id)->count());
         $this->assertSame('active', $this->asset->fresh()->status);
+    }
+
+    public function test_asset_finance_outcomes_retain_source_notices_without_an_unsupported_correction_state(): void
+    {
+        $requester = $this->user([$this->origin], ['assets.viewAny', 'assets.update', 'finance.assets.view']);
+        $reviewer = $this->user([$this->origin], ['finance.assets.view', 'finance.assets.manage']);
+        $review = app(VehicleFinanceService::class)->createRequest($requester, $this->asset->id, [
+            'request_type' => 'replacement_review', 'source' => 'vehicle', 'note' => 'Review replacement',
+        ], (string) Str::uuid(), true);
+        $row = app(VehicleFinanceReviewQueue::class)->present($reviewer, [])['requests'][0];
+        $this->assertFalse($row['can_request_changes']);
+        $payload = ['decision' => 'changes_requested', 'note' => 'Needs a new request', 'expected_version' => 1,
+            'request_key' => (string) Str::uuid(), 'evidence_token' => app(FinanceReviewEvidence::class)->token($review)];
+        $url = '/finance/vehicle-reviews/'.$review->id.'/decision';
+        $this->actingAs($reviewer)->postJson($url, $payload)->assertUnprocessable()->assertJsonValidationErrors('decision');
+        $this->assertSame('submitted', $review->fresh()->status);
+        $this->postJson($url, [...$payload, 'decision' => 'declined', 'request_key' => (string) Str::uuid()])->assertOk();
+        $notice = DB::table('fleet_finance_review_notices')->where('review_request_id', $review->id)->where('kind', 'declined')->value('id');
+        app(FinanceReviewNotices::class)->deliver($notice);
+        app(FinanceReviewNotices::class)->deliver($notice);
+        $notifications = DB::table('notifications')->where('notifiable_id', $requester->id)->get();
+        $this->assertCount(1, $notifications);
+        $this->assertSame('/fleet-assets/assets/'.$this->asset->id.'#view=overview&section=finance', json_decode($notifications[0]->data, true)['url']);
+        $this->assertSame('active', $this->asset->fresh()->status);
+    }
+
+    public function test_asset_finance_outcome_notice_rechecks_current_source_access(): void
+    {
+        $requester = $this->user([$this->origin], ['assets.viewAny', 'assets.update', 'finance.assets.view']);
+        $reviewer = $this->user([$this->origin], ['finance.assets.view', 'finance.assets.manage']);
+        $finance = app(VehicleFinanceService::class);
+        $review = $finance->createRequest($requester, $this->asset->id, [
+            'request_type' => 'replacement_review', 'source' => 'vehicle', 'note' => 'Review replacement',
+        ], (string) Str::uuid(), true);
+        $finance->decide($reviewer, $this->asset->id, $review->id, 'resolved', 'Recorded next step', 1, (string) Str::uuid());
+        $this->asset->update(['site_id' => $this->destination->id, 'home_site_id' => $this->destination->id]);
+        $notice = DB::table('fleet_finance_review_notices')->where('review_request_id', $review->id)->where('kind', 'resolved')->value('id');
+        app(FinanceReviewNotices::class)->deliver($notice);
+        $this->assertSame(0, DB::table('notifications')->where('notifiable_id', $requester->id)->count());
     }
 
     public function test_schema_probe_stays_in_the_configured_application_schema(): void

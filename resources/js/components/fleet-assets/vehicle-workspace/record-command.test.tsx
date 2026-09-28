@@ -19,6 +19,32 @@ afterEach(() => {
 });
 
 describe('vehicle record command recovery', () => {
+    it('retains the original multipart bytes and metadata after an uncertain upload', async () => {
+        const request = vi
+            .fn()
+            .mockRejectedValueOnce(new Error('lost response'))
+            .mockResolvedValueOnce(response(200, { id: 41 }));
+        vi.stubGlobal('fetch', request);
+        const { result } = renderHook(() => useVehicleRecordCommand(isSaved));
+        const form = new FormData();
+        form.append('document_date', '2026-09-27');
+        form.append('file', new File(['original'], 'invoice.pdf'));
+        await act(async () => {
+            await result.current.submit('/vehicle/evidence', form);
+        });
+        form.set('document_date', '2026-09-28');
+        form.set('file', new File(['replacement'], 'different.pdf'));
+        await act(async () => {
+            await result.current.submit('/vehicle/evidence', form);
+        });
+        const retry = request.mock.calls[1][1];
+        expect(retry.body.get('document_date')).toBe('2026-09-27');
+        expect(retry.body.get('file').name).toBe('invoice.pdf');
+        expect(retry.headers['Idempotency-Key']).toBe(
+            request.mock.calls[0][1].headers['Idempotency-Key'],
+        );
+    });
+
     it('retains multipart values, files, URL and method after an uncertain upload', async () => {
         const request = vi
             .fn()
@@ -63,13 +89,23 @@ describe('vehicle record command recovery', () => {
         vi.stubGlobal('fetch', request);
         const { result } = renderHook(() => useVehicleRecordCommand(isSaved));
         await act(async () => {
-            await result.current.submit('/vehicle/evidence', { value: 120 });
+            await result.current.submit(
+                '/vehicle/evidence',
+                { value: 120 },
+                { method: 'PUT' },
+            );
         });
         expect(result.current.uncertain).toBe(true);
         expect(result.current.locked).toBe(true);
         await act(async () => {
-            await result.current.submit('/vehicle/evidence', { value: 999 });
+            await result.current.submit(
+                '/different-endpoint',
+                { value: 999 },
+                { method: 'DELETE' },
+            );
         });
+        expect(request.mock.calls[1][0]).toBe('/vehicle/evidence');
+        expect(request.mock.calls[1][1].method).toBe('PUT');
         expect(request.mock.calls[1][1].body).toBe(
             request.mock.calls[0][1].body,
         );
@@ -137,5 +173,28 @@ describe('vehicle record command recovery', () => {
         });
         expect(saved).toBeNull();
         expect(result.current.uncertain).toBe(true);
+    });
+
+    it('keeps a malformed success recoverable using the same original command', async () => {
+        const request = vi
+            .fn()
+            .mockResolvedValueOnce(response(200, { message: 'Saved' }))
+            .mockResolvedValueOnce(response(200, { id: 41 }));
+        vi.stubGlobal('fetch', request);
+        const { result } = renderHook(() => useVehicleRecordCommand(isSaved));
+        await act(async () => {
+            await result.current.submit('/vehicle/evidence', { value: 120 });
+        });
+        expect(result.current.uncertain).toBe(true);
+        await act(async () => {
+            await result.current.submit('/vehicle/evidence', { value: 999 });
+        });
+        expect(request.mock.calls[1][1].body).toBe(
+            request.mock.calls[0][1].body,
+        );
+        expect(request.mock.calls[1][1].headers['Idempotency-Key']).toBe(
+            request.mock.calls[0][1].headers['Idempotency-Key'],
+        );
+        expect(result.current.uncertain).toBe(false);
     });
 });

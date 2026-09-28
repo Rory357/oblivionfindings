@@ -56,6 +56,7 @@ export function WorkspaceWizard({
     onReload,
     success,
     errorKey,
+    discardDescription = 'Unsent changes will be removed.',
     freeNavigation = false,
     maxWidth,
     children,
@@ -81,6 +82,7 @@ export function WorkspaceWizard({
     success: ReactNode;
     /** Changes whenever the visible errors change; moves focus to the first invalid field. */
     errorKey: string;
+    discardDescription?: string;
     /** Section navigation is free; Continue and Submit still validate. */
     freeNavigation?: boolean;
     maxWidth?: string;
@@ -126,6 +128,7 @@ export function WorkspaceWizard({
                 pct={pct}
                 footerStart={
                     <Button
+                        className="min-h-[44px] sm:min-h-9"
                         variant="outline"
                         disabled={command.processing}
                         onClick={close}
@@ -137,6 +140,7 @@ export function WorkspaceWizard({
                     <>
                         {step > 0 && !command.requiresReload && (
                             <Button
+                                className="min-h-[44px] sm:min-h-9"
                                 variant="outline"
                                 disabled={command.locked}
                                 onClick={() => setStep(step - 1)}
@@ -145,11 +149,15 @@ export function WorkspaceWizard({
                             </Button>
                         )}
                         {command.requiresReload ? (
-                            <Button onClick={onReload}>
+                            <Button
+                                className="min-h-[44px] sm:min-h-9"
+                                onClick={onReload}
+                            >
                                 Review latest record
                             </Button>
                         ) : !last && !command.uncertain ? (
                             <Button
+                                className="min-h-[44px] sm:min-h-9"
                                 disabled={command.processing}
                                 onClick={() => {
                                     if (onValidateStep(step)) setStep(step + 1);
@@ -159,6 +167,7 @@ export function WorkspaceWizard({
                             </Button>
                         ) : (
                             <Button
+                                className="min-h-[44px] sm:min-h-9"
                                 disabled={command.processing}
                                 onClick={onSubmit}
                             >
@@ -194,7 +203,7 @@ export function WorkspaceWizard({
                 <fieldset
                     ref={fields}
                     disabled={command.locked}
-                    className="min-w-0"
+                    className="min-w-0 max-sm:[&_button]:min-h-[44px] max-sm:[&_input:not([type=checkbox])]:min-h-[44px] max-sm:[&_select]:min-h-[44px]"
                 >
                     <WizardStepPane key={step}>
                         <h2 className="text-section-title mb-2">
@@ -212,7 +221,7 @@ export function WorkspaceWizard({
                     onClose();
                 }}
                 title="Discard this draft?"
-                description="Unsent changes will be removed."
+                description={discardDescription}
                 confirmText="Discard draft"
                 cancelText="Keep editing"
             />

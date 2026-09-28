@@ -20,8 +20,11 @@ use App\Models\User;
 use App\Services\Files\MalwareScanDisposition;
 use App\Services\Files\MalwareScanner;
 use App\Services\Files\MalwareScanResult;
+use App\Services\Fleet\FinanceReviewEvidence;
+use App\Services\Fleet\FinanceReviewNotices;
 use App\Services\Fleet\VehicleCalendarService;
 use App\Services\Fleet\VehicleFinancePresenter;
+use App\Services\Fleet\VehicleFinanceService;
 use App\Services\Fleet\VehicleWorkspacePresenter;
 use App\Services\Sites\Calendar\Providers\FleetVehicleReminderObligationProvider;
 use App\Services\Tasks\TaskAggregator;
@@ -169,7 +172,7 @@ class Pkg02bVehicleFinanceTest extends TestCase
             ->assertNotFound();
         $otherSite = $this->bill(['site_id' => $this->foreignSite->id]);
         $this->actingAs($manager)->postJson($url, [...$payload, 'record_id' => $otherSite->id], ['Idempotency-Key' => 'link-4'])
-            ->assertUnprocessable()->assertJsonValidationErrors('record_id');
+            ->assertNotFound();
         $otherVehicle = $this->bill(['site_id' => $this->site->id, 'asset_id' => $foreign->id]);
         $this->actingAs($manager)->postJson($url, [...$payload, 'record_id' => $otherVehicle->id], ['Idempotency-Key' => 'link-5'])
             ->assertUnprocessable()->assertJsonValidationErrors(['record_id' => 'Finance records this invoice against another vehicle or asset.']);
@@ -451,7 +454,7 @@ class Pkg02bVehicleFinanceTest extends TestCase
         $remoteFinance = $this->siteUser([$this->foreignSite], ['fleet.viewAny', 'finance.assets.view', 'finance.ap.manage']);
         $request = $this->reviewRequest($manager, $vehicle);
         $url = "/fleet-assets/vehicles/{$vehicle->id}/finance/review-requests/{$request['id']}/decision";
-        $decision = ['decision' => 'resolved', 'note' => 'Credit note requested from the supplier.', 'expected_version' => 1];
+        $decision = ['evidence_token' => app(FinanceReviewEvidence::class)->token(FleetFinanceReviewRequest::findOrFail($request['id'])), 'decision' => 'resolved', 'note' => 'Credit note requested from the supplier.', 'expected_version' => 1];
 
         $this->assertFalse($this->present($manager, $vehicle)['requests'][0]['can_decide']);
         $this->assertTrue($this->present($finance, $vehicle)['requests'][0]['can_decide']);
@@ -489,7 +492,7 @@ class Pkg02bVehicleFinanceTest extends TestCase
         $finance = $this->siteUser([$this->site], ['fleet.viewAny', 'finance.assets.view', 'finance.ap.view', 'finance.ap.manage']);
         $request = $this->reviewRequest($requester, $vehicle);
         $url = "/fleet-assets/vehicles/{$vehicle->id}/finance/review-requests/{$request['id']}/decision";
-        $decision = ['decision' => 'resolved', 'note' => 'Quote and invoice match.', 'expected_version' => 1];
+        $decision = ['evidence_token' => app(FinanceReviewEvidence::class)->token(FleetFinanceReviewRequest::findOrFail($request['id'])), 'decision' => 'resolved', 'note' => 'Quote and invoice match.', 'expected_version' => 1];
 
         $this->assertFalse($this->present($requester, $vehicle)['requests'][0]['can_decide']);
         $this->actingAs($requester)->postJson($url, $decision, ['Idempotency-Key' => 'own-review-decision'])
@@ -517,6 +520,12 @@ class Pkg02bVehicleFinanceTest extends TestCase
             'source_type' => 'finance_review_request', 'source_id' => $request['id'], 'request_key' => 'finance-page-file',
             'files' => [$this->pdf('service-invoice.pdf')],
         ], ['Accept' => 'application/json'])->assertOk()->json('files.0');
+
+        $prepared = FleetFinanceReviewRequest::findOrFail($request['id']);
+        app(VehicleFinanceService::class)->submitEvidence($manager, $vehicle->id, $prepared->id, $prepared->lock_version, '', 'finance-page-submit');
+        foreach (DB::table('fleet_finance_review_notices')->pluck('id') as $noticeId) {
+            app(FinanceReviewNotices::class)->deliver($noticeId);
+        }
 
         // Finance is told where to decide it; the requester and other Sites aren't.
         $notified = fn (User $user): bool => DB::table('notifications')->where('notifiable_id', $user->id)->pluck('data')
@@ -560,7 +569,7 @@ class Pkg02bVehicleFinanceTest extends TestCase
 
         // Deciding: a note is required, only Finance with authority at the Site decides, once.
         $url = "/finance/vehicle-reviews/{$request['id']}/decision";
-        $decision = ['decision' => 'resolved', 'note' => 'Credit note requested from the supplier.', 'expected_version' => 1];
+        $decision = ['evidence_token' => app(FinanceReviewEvidence::class)->token(FleetFinanceReviewRequest::findOrFail($request['id'])), 'decision' => 'resolved', 'note' => 'Credit note requested from the supplier.', 'expected_version' => 3];
         $this->actingAs($viewOnly)->post($url, $decision + ['request_key' => 'finance-page-view'])->assertForbidden();
         $this->actingAs($remote)->from('/finance/vehicle-reviews')->post($url, $decision + ['request_key' => 'finance-page-remote'])->assertNotFound();
         $this->actingAs($finance)->from('/finance/vehicle-reviews')->post($url, ['note' => ''] + $decision + ['request_key' => 'finance-page-empty'])
@@ -574,6 +583,86 @@ class Pkg02bVehicleFinanceTest extends TestCase
             ->assertRedirect('/finance/vehicle-reviews')->assertSessionHasErrors('decision');
         // The requester sees Finance's decision on the vehicle.
         $this->assertSame('Resolved', $this->present($manager, $vehicle)['requests'][0]['status_label']);
+    }
+
+    public function test_finance_queue_pages_beyond_one_hundred_records_without_losing_scope_or_filters(): void
+    {
+        $vehicle = $this->vehicle($this->site);
+        $hiddenVehicle = $this->vehicle($this->foreignSite);
+        $finance = $this->siteUser([$this->site], ['finance.assets.view', 'finance.ap.view']);
+        $ids = [];
+        foreach (range(1, 110) as $number) {
+            $record = FleetFinanceReviewRequest::create([
+                'reference_number' => 'FRQ-PAGE-'.$number, 'asset_id' => $vehicle->id,
+                'source_type' => 'vehicle', 'source_id' => $vehicle->id, 'source_label' => $vehicle->name,
+                'request_type' => 'supplier_invoice_review', 'note' => 'Paged supplier enquiry',
+                'status' => 'submitted', 'requested_by_user_id' => $finance->id,
+                'request_key' => 'page-'.$number, 'request_fingerprint' => str_repeat('a', 64),
+            ]);
+            $ids[] = $record->id;
+        }
+        $hidden = FleetFinanceReviewRequest::create([
+            'reference_number' => 'FRQ-PAGE-HIDDEN', 'asset_id' => $hiddenVehicle->id,
+            'source_type' => 'vehicle', 'source_id' => $hiddenVehicle->id, 'source_label' => $hiddenVehicle->name,
+            'request_type' => 'supplier_invoice_review', 'note' => 'Paged supplier enquiry',
+            'status' => 'submitted', 'requested_by_user_id' => $finance->id,
+            'request_key' => 'page-hidden', 'request_fingerprint' => str_repeat('b', 64),
+        ]);
+        $this->actingAs($finance);
+        $seen = [];
+        foreach (range(1, 5) as $pageNumber) {
+            $this->get('/finance/vehicle-reviews?search=Paged&status=all&page='.$pageNumber)
+                ->assertOk()->assertInertia(function (Assert $page) use ($pageNumber, &$seen): void {
+                    $page->where('total', 110)->where('pagination.current_page', $pageNumber)
+                        ->where('pagination.last_page', 5)->has('requests', $pageNumber === 5 ? 10 : 25)
+                        ->where('filters.search', 'Paged')->where('filters.status', 'all')
+                        ->where('requests', function ($rows) use (&$seen): bool {
+                            $seen = [...$seen, ...collect($rows)->pluck('id')->all()];
+
+                            return true;
+                        })
+                        ->where('pagination.links', fn ($links): bool => collect($links)->whereNotNull('url')
+                            ->every(fn ($link): bool => str_contains($link['url'], 'search=Paged') && str_contains($link['url'], 'status=all')));
+                });
+        }
+        $this->assertCount(110, array_unique($seen));
+        $this->assertEqualsCanonicalizing($ids, $seen);
+        $this->assertNotContains($hidden->id, $seen);
+        $this->get('/finance/vehicle-reviews?page=999&request='.$ids[0])->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('pagination.current_page', 5)->where('focus.id', $ids[0]));
+        $this->get('/finance/vehicle-reviews?search=no-match&page=999')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('total', 0)->where('pagination.current_page', 1)->has('requests', 0));
+    }
+
+    public function test_finance_queue_bounds_each_history_and_pages_older_events_with_site_checks(): void
+    {
+        $vehicle = $this->vehicle($this->site);
+        $finance = $this->siteUser([$this->site], ['finance.assets.view']);
+        $outside = $this->siteUser([$this->foreignSite], ['finance.assets.view']);
+        $records = [];
+        foreach (range(1, 2) as $number) {
+            $record = FleetFinanceReviewRequest::create([
+                'reference_number' => 'FRQ-HISTORY-'.$number, 'asset_id' => $vehicle->id,
+                'source_type' => 'vehicle', 'source_id' => $vehicle->id, 'source_label' => $vehicle->name,
+                'request_type' => 'supplier_invoice_review', 'note' => 'History page check',
+                'status' => 'submitted', 'requested_by_user_id' => $finance->id,
+                'request_key' => 'history-'.$number, 'request_fingerprint' => str_repeat('c', 64),
+            ]);
+            foreach (range(1, 25) as $event) {
+                $record->events()->create(['action' => 'submitted', 'actor_user_id' => $finance->id, 'note' => 'Event '.$event, 'occurred_at' => now()]);
+            }
+            $records[] = $record;
+        }
+        $this->actingAs($finance)->get('/finance/vehicle-reviews')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->has('requests', 2)->has('requests.0.history', 10)->has('requests.1.history', 10)
+            ->where('requests.0.history.0.note', 'Event 16')->where('requests.1.history.0.note', 'Event 16'));
+        $record = $records[0];
+        $before = $record->events()->orderByDesc('id')->skip(9)->firstOrFail()->id;
+        $url = '/finance/vehicle-reviews/'.$record->id.'/history';
+        $response = $this->getJson($url.'?before='.$before)->assertOk()->assertJsonCount(10, 'history')->assertJsonPath('history.0.note', 'Event 6');
+        $this->getJson($url.'?before='.$response->json('history_next_before'))->assertOk()
+            ->assertJsonCount(5, 'history')->assertJsonPath('history.0.note', 'Event 1')->assertJsonPath('history_next_before', null);
+        $this->actingAs($outside)->getJson($url)->assertNotFound();
     }
 
     public function test_open_review_requests_reach_finance_in_all_tasks(): void
@@ -600,6 +689,7 @@ class Pkg02bVehicleFinanceTest extends TestCase
             ->assertOk()->assertJsonPath('item.id', $id);
 
         $this->actingAs($finance)->postJson("/fleet-assets/vehicles/{$vehicle->id}/finance/review-requests/{$request['id']}/decision", [
+            'evidence_token' => app(FinanceReviewEvidence::class)->token(FleetFinanceReviewRequest::findOrFail($request['id'])),
             'decision' => 'declined', 'note' => 'Not a Finance matter; raise it with Maintenance.', 'expected_version' => 1,
         ], ['Idempotency-Key' => 'decision-tasks'])->assertOk();
         $this->assertNull(collect((new TaskAggregator)->itemsFor($this->fresh($finance), []))->firstWhere('id', $id));
@@ -653,6 +743,208 @@ class Pkg02bVehicleFinanceTest extends TestCase
     }
 
     /** @param array<string,mixed> $attributes */
+    public function test_prepared_evidence_correction_resubmission_and_immutable_decision_manifest(): void
+    {
+        $vehicle = $this->vehicle($this->site);
+        $requester = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage', 'assets.viewAny', 'assets.documents.manage', 'finance.assets.view']);
+        $reviewer = $this->siteUser([$this->site], ['finance.ap.view', 'finance.ap.manage']);
+        $service = app(VehicleFinanceService::class);
+        $evidence = app(FinanceReviewEvidence::class);
+        $record = $service->createRequest($requester, $vehicle->id, ['request_type' => 'supplier_invoice_review', 'source' => 'vehicle', 'note' => 'Check this invoice', 'expected_file_count' => 1], 'prepared-request');
+        $this->assertSame('preparing', $record->status);
+        $this->assertDatabaseCount('fleet_finance_review_notices', 0);
+        $submitUrl = "/fleet-assets/vehicles/{$vehicle->id}/finance/review-requests/{$record->id}/submit";
+        $this->actingAs($requester)->postJson($submitUrl, ['expected_version' => 1], ['Idempotency-Key' => 'too-early'])->assertStatus(409);
+        $upload = $this->postJson("/fleet-assets/vehicles/{$vehicle->id}/documents", [
+            'category' => 'Invoice', 'document_date' => '2026-09-23', 'reason' => 'Evidence', 'source_type' => 'finance_review_request',
+            'source_id' => $record->id, 'files' => [$this->pdf('evidence.pdf')],
+        ], ['Idempotency-Key' => 'prepared-file'])->assertOk()->json('files.0');
+        $record->refresh();
+        $this->postJson($submitUrl, ['expected_version' => $record->lock_version], ['Idempotency-Key' => 'ready'])->assertOk()->assertJsonPath('request.status', 'submitted');
+        $record->refresh();
+        $token = $evidence->token($record);
+        $url = '/finance/vehicle-reviews/'.$record->id.'/decision';
+        $this->actingAs($reviewer)->postJson($url, ['decision' => 'resolved', 'note' => 'Checked', 'expected_version' => $record->lock_version, 'evidence_token' => str_repeat('a', 64)], ['Idempotency-Key' => 'wrong-evidence'])->assertStatus(409);
+        $this->postJson($url, ['decision' => 'changes_requested', 'note' => 'Explain the additional charge.', 'expected_version' => $record->lock_version, 'evidence_token' => $token], ['Idempotency-Key' => 'correction'])->assertOk();
+        $record->refresh();
+        $this->assertSame('changes_requested', $record->status);
+        $this->actingAs($requester)->postJson($submitUrl, ['expected_version' => $record->lock_version, 'note' => ''], ['Idempotency-Key' => 'missing-response'])->assertUnprocessable();
+        $payload = ['expected_version' => $record->lock_version, 'note' => 'The additional charge was the callout fee.'];
+        $this->postJson($submitUrl, $payload, ['Idempotency-Key' => 'response'])->assertOk();
+        $this->postJson($submitUrl, $payload, ['Idempotency-Key' => 'response'])->assertOk();
+        $record->refresh();
+        $service->decide($reviewer, $vehicle->id, $record->id, 'resolved', 'Confirmed against the quote.', $record->lock_version, 'final-decision', $evidence->token($record));
+        $record->refresh();
+        $this->assertSame(2, $record->submission_count);
+        $this->assertSame($upload['id'], $record->decision_evidence[0]['id']);
+        $this->assertSame(2, $record->events()->whereNotNull('evidence')->count());
+        $this->postJson("/fleet-assets/vehicles/{$vehicle->id}/documents", [
+            'category' => 'Invoice', 'document_date' => '2026-09-23', 'reason' => 'Late replacement', 'source_type' => 'finance_review_request',
+            'source_id' => $record->id, 'files' => [$this->pdf('late.pdf')],
+        ], ['Idempotency-Key' => 'late-after-decision'])->assertUnprocessable();
+        $this->postJson("/fleet-assets/vehicles/{$vehicle->id}/document-files/{$upload['id']}/archive", [
+            'reason' => 'Attempt to change decided evidence', 'pause_renewal' => false,
+        ], ['Idempotency-Key' => 'archive-decided'])->assertUnprocessable()->assertJsonValidationErrors('source_id');
+        $this->assertNull(AssetDocument::findOrFail($upload['id'])->archived_at);
+        $this->assertSame($upload['id'], $record->fresh()->decision_evidence[0]['id']);
+    }
+
+    public function test_assignment_reminders_and_delivery_are_scoped_durable_and_deduplicated(): void
+    {
+        $vehicle = $this->vehicle($this->site);
+        $requester = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage', 'finance.assets.view']);
+        $reviewer = $this->siteUser([$this->site], ['finance.ap.view', 'finance.ap.manage']);
+        $remote = $this->siteUser([$this->foreignSite], ['finance.ap.view', 'finance.ap.manage']);
+        $record = FleetFinanceReviewRequest::findOrFail($this->reviewRequest($requester, $vehicle)['id']);
+        $service = app(VehicleFinanceService::class);
+        $notices = app(FinanceReviewNotices::class);
+        $url = '/finance/vehicle-reviews/'.$record->id.'/assignment';
+        $this->actingAs($reviewer)->postJson($url, ['assigned_to_user_id' => $remote->id, 'expected_version' => $record->lock_version], ['Idempotency-Key' => 'wrong-reviewer'])->assertUnprocessable();
+        $assigned = $service->assign($reviewer, $record->id, $reviewer->id, today('Pacific/Auckland')->toDateString(), $record->lock_version, 'assignment');
+        $service->assign($reviewer, $record->id, $reviewer->id, today('Pacific/Auckland')->toDateString(), $record->lock_version, 'assignment');
+        $this->assertSame($reviewer->id, $assigned->assigned_to_user_id);
+        $notices->reminders();
+        $notices->reminders();
+        $this->assertSame(1, DB::table('fleet_finance_review_notices')->where('kind', 'due')->count());
+        foreach (DB::table('fleet_finance_review_notices')->pluck('id') as $id) {
+            $notices->deliver($id);
+            $notices->deliver($id);
+        }
+        $this->assertSame(2, DB::table('notifications')->where('notifiable_id', $reviewer->id)->count());
+        $this->assertSame(0, DB::table('notifications')->where('notifiable_id', $remote->id)->count());
+        $this->assertSame(0, DB::table('fleet_finance_review_notices')->whereNull('delivered_at')->count());
+    }
+
+    public function test_vehicle_and_review_surfaces_conceal_bill_details_after_its_site_changes(): void
+    {
+        $vehicle = $this->vehicle($this->site);
+        $requester = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage', 'finance.assets.view', 'finance.ap.view']);
+        $reviewer = $this->siteUser([$this->site], ['finance.ap.view', 'finance.ap.manage']);
+        $bill = $this->bill(['asset_id' => $vehicle->id, 'site_id' => $this->site->id]);
+        app(VehicleFinanceService::class)->createRequest($requester, $vehicle->id, [
+            'request_type' => 'supplier_invoice_review', 'source' => 'bill:'.$bill->id, 'note' => 'Check the source invoice.',
+        ], 'site-moved-bill');
+        $bill->update(['site_id' => $this->foreignSite->id]);
+        $view = $this->present($requester, $vehicle);
+        $row = collect($view['records'])->firstWhere('id', $bill->id);
+        $this->assertTrue($row['restricted']);
+        $this->assertNull($row['reference']);
+        $this->assertNull($row['href']);
+        $this->assertStringContainsString('accounts payable access needed', $view['requests'][0]['source']['label']);
+        $this->actingAs($reviewer)->get('/finance/vehicle-reviews')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('requests.0.bill_url', null)
+            ->where('requests.0.source', 'Supplier invoice · accounts payable access needed'));
+    }
+
+    public function test_due_notices_recheck_changed_dates_and_reviewers_before_delivery(): void
+    {
+        $vehicle = $this->vehicle($this->site);
+        $requester = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage', 'finance.assets.view']);
+        $reviewer = $this->siteUser([$this->site], ['finance.ap.view', 'finance.ap.manage']);
+        $replacement = $this->siteUser([$this->site], ['finance.ap.view', 'finance.ap.manage']);
+        $record = FleetFinanceReviewRequest::findOrFail($this->reviewRequest($requester, $vehicle)['id']);
+        $service = app(VehicleFinanceService::class);
+        $notices = app(FinanceReviewNotices::class);
+        $due = today('Pacific/Auckland')->toDateString();
+        foreach ([today('Pacific/Auckland')->addDay()->toDateString(), null] as $index => $changedDue) {
+            $record = $service->assign($reviewer, $record->id, $reviewer->id, $due, $record->lock_version, 'due-'.$index);
+            $notices->reminders();
+            $notice = DB::table('fleet_finance_review_notices')->where('kind', 'due')->latest('id')->first();
+            $record = $service->assign($reviewer, $record->id, $reviewer->id, $changedDue, $record->lock_version, 'postpone-'.$index);
+            $notices->deliver($notice->id);
+            $this->assertDatabaseCount('notifications', 0);
+            $this->assertNotNull(DB::table('fleet_finance_review_notices')->where('id', $notice->id)->value('delivered_at'));
+        }
+        $record = $service->assign($reviewer, $record->id, $reviewer->id, $due, $record->lock_version, 'original-reviewer');
+        $notices->reminders();
+        $oldNotice = DB::table('fleet_finance_review_notices')->where('kind', 'due')->latest('id')->value('id');
+        $record = $service->assign($reviewer, $record->id, $replacement->id, $due, $record->lock_version, 'replacement-reviewer');
+        $notices->deliver($oldNotice);
+        $this->assertDatabaseCount('notifications', 0);
+        $notices->reminders();
+        $notices->reminders();
+        $this->assertSame(4, DB::table('fleet_finance_review_notices')->where('kind', 'due')->count());
+        $latest = DB::table('fleet_finance_review_notices')->where('kind', 'due')->latest('id')->value('id');
+        $notices->deliver($latest);
+        $notices->deliver($latest);
+        $this->assertDatabaseCount('notifications', 1);
+        $this->assertDatabaseHas('notifications', ['notifiable_id' => $replacement->id]);
+    }
+
+    public function test_a_queued_correction_notice_is_obsolete_after_the_requester_resubmits(): void
+    {
+        $vehicle = $this->vehicle($this->site);
+        $requester = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage', 'finance.assets.view']);
+        $reviewer = $this->siteUser([$this->site], ['finance.ap.view', 'finance.ap.manage']);
+        $record = FleetFinanceReviewRequest::findOrFail($this->reviewRequest($requester, $vehicle)['id']);
+        $service = app(VehicleFinanceService::class);
+        $record = $service->decide($reviewer, $vehicle->id, $record->id, 'changes_requested', 'Explain the callout fee.', $record->lock_version, 'correction-notice');
+        $notice = DB::table('fleet_finance_review_notices')->where('kind', 'changes_requested')->value('id');
+        $service->submitEvidence($requester, $vehicle->id, $record->id, $record->lock_version, 'The fee covers the after-hours visit.', 'response-notice');
+        app(FinanceReviewNotices::class)->deliver($notice);
+        $this->assertDatabaseCount('notifications', 0);
+        $this->assertNotNull(DB::table('fleet_finance_review_notices')->where('id', $notice)->value('delivered_at'));
+    }
+
+    public function test_missing_selected_vehicle_evidence_blocks_submission_and_decision(): void
+    {
+        $vehicle = $this->vehicle($this->site);
+        $foreign = $this->vehicle($this->foreignSite);
+        $requester = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage', 'assets.viewAny', 'assets.documents.manage', 'finance.assets.view']);
+        $reviewer = $this->siteUser([$this->site], ['finance.ap.view', 'finance.ap.manage']);
+        $file = $this->actingAs($requester)->postJson("/fleet-assets/vehicles/{$vehicle->id}/documents", [
+            'category' => 'Invoice', 'document_date' => '2026-09-23', 'reason' => 'Supporting evidence', 'files' => [$this->pdf('selected.pdf')],
+        ], ['Idempotency-Key' => 'selected-file'])->assertOk()->json('files.0');
+        $record = app(VehicleFinanceService::class)->createRequest($requester, $vehicle->id, [
+            'request_type' => 'supplier_invoice_review', 'source' => 'vehicle', 'note' => 'Check invoice', 'existing_document_id' => $file['id'],
+        ], 'selected-request');
+        // A canonical ownership change must not silently turn a selected document into no evidence.
+        DB::table('asset_documents')->where('id', $file['id'])->update(['asset_id' => $foreign->id]);
+        $this->actingAs($reviewer)->postJson('/finance/vehicle-reviews/'.$record->id.'/decision', [
+            'decision' => 'resolved', 'note' => 'Checked', 'expected_version' => $record->lock_version,
+            'evidence_token' => app(FinanceReviewEvidence::class)->token($record),
+        ], ['Idempotency-Key' => 'missing-selected-decision'])->assertStatus(409);
+        $this->assertSame('submitted', $record->fresh()->status);
+        $record->forceFill(['status' => 'preparing'])->save();
+        $submitUrl = "/fleet-assets/vehicles/{$vehicle->id}/finance/review-requests/{$record->id}/submit";
+        $this->actingAs($requester)->postJson($submitUrl, ['expected_version' => $record->lock_version], ['Idempotency-Key' => 'missing-selected-submit'])->assertStatus(409);
+        DB::table('asset_documents')->where('id', $file['id'])->update(['asset_id' => $vehicle->id]);
+        $this->postJson($submitUrl, ['expected_version' => $record->lock_version], ['Idempotency-Key' => 'restored-selected-submit'])->assertOk();
+    }
+
+    public function test_submit_affordance_and_endpoint_follow_current_fleet_permission(): void
+    {
+        $vehicle = $this->vehicle($this->site);
+        $requester = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage', 'finance.assets.view']);
+        $record = app(VehicleFinanceService::class)->createRequest($requester, $vehicle->id, [
+            'request_type' => 'supplier_invoice_review', 'source' => 'vehicle', 'note' => 'Check invoice', 'expected_file_count' => 1,
+        ], 'permission-preparing');
+        $this->assertTrue($this->present($requester, $vehicle)['requests'][0]['can_submit']);
+        $permission = Permission::where('key', 'fleet.manage')->firstOrFail();
+        $requester->permissionOverrides()->updateExistingPivot($permission->id, ['allowed' => false]);
+        $this->assertFalse($this->present($requester->fresh(), $vehicle)['requests'][0]['can_submit']);
+        $this->actingAs($requester->fresh())->postJson("/fleet-assets/vehicles/{$vehicle->id}/finance/review-requests/{$record->id}/submit", [
+            'expected_version' => $record->lock_version,
+        ], ['Idempotency-Key' => 'revoked-submit'])->assertForbidden();
+    }
+
+    public function test_delivery_reaches_eligible_reviewers_after_the_first_200_users_and_rechecks_revoked_access(): void
+    {
+        User::factory()->count(205)->create(['approved_at' => now(), 'role' => 'worker']);
+        $vehicle = $this->vehicle($this->site);
+        $requester = $this->siteUser([$this->site], ['fleet.viewAny', 'fleet.manage', 'finance.assets.view']);
+        $reviewer = $this->siteUser([$this->site], ['finance.ap.view', 'finance.ap.manage']);
+        $revoked = $this->siteUser([$this->site], ['finance.ap.view', 'finance.ap.manage']);
+        $record = FleetFinanceReviewRequest::findOrFail($this->reviewRequest($requester, $vehicle)['id']);
+        $permission = Permission::where('key', 'finance.ap.manage')->firstOrFail();
+        $revoked->permissionOverrides()->updateExistingPivot($permission->id, ['allowed' => false]);
+        $id = DB::table('fleet_finance_review_notices')->where('review_request_id', $record->id)->value('id');
+        app(FinanceReviewNotices::class)->deliver($id);
+        app(FinanceReviewNotices::class)->deliver($id);
+        $this->assertSame(1, DB::table('notifications')->where('notifiable_id', $reviewer->id)->count());
+        $this->assertSame(0, DB::table('notifications')->where('notifiable_id', $revoked->id)->count());
+    }
+
     private function bill(array $attributes = []): FinBill
     {
         return FinBill::factory()->create([

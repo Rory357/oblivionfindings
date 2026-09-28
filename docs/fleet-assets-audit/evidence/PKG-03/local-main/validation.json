@@ -1,0 +1,60 @@
+{
+  "candidate": "0a48cd37c1a5fe465025435433a0eb85db0bef54",
+  "base": "a6b9fae6a73516548b02e64c41cf1fc94ce43f01",
+  "localMainIntegrated": false,
+  "remotePushed": false,
+  "deployed": false,
+  "frontend": {
+    "tests": 36,
+    "files": 7,
+    "pint": 0,
+    "typescript": 0,
+    "exitCode": 0,
+    "build": 0,
+    "eslint": 0,
+    "modules": 5371
+  },
+  "backend": {
+    "tests": 76,
+    "skipped": 0,
+    "schemaCache": "Table structure and migration ledger only; per-process isolated test database",
+    "failures": 0,
+    "exitCode": 0,
+    "warnings": 72,
+    "errors": 0,
+    "assertions": 1399
+  },
+  "browser": {
+    "reviewSelfDecisionBlocked": true,
+    "realLaravel": true,
+    "liveScannerVerified": false,
+    "url": "http://127.0.0.1:8772",
+    "productionBuild": true,
+    "paidAmount": "0.00",
+    "realFortifyLogin": true,
+    "fixtureTransport": false,
+    "operationalRecordsUsed": false
+  },
+  "frozenFiles": 311,
+  "frozenFilesChanged": 0,
+  "reconciliation": {
+    "source": "063ab0fc111208ce22c6abf7e5822bd138a7f296",
+    "changedManifestFiles": 2,
+    "frontendTests": 74,
+    "frontendFiles": 10,
+    "typescriptExit": 0,
+    "eslintExit": 0,
+    "backendCases": 90,
+    "backendAssertions": 2009,
+    "backendFailures": 1,
+    "pkg03CasesPassing": 76,
+    "failure": "Published Transport allocation test omits required client_id; reported to Main",
+    "browserAndBuildEvidenceSource": "20281ab99d4f7cb6db01e823cebe84eac5c6c2e9"
+  },
+  "lintOnlyFollowup": {
+    "commit": "a6b9fae6a73516548b02e64c41cf1fc94ce43f01",
+    "sourceHashesUnchanged": 72,
+    "eslintExit": 0,
+    "cleanup": "cleanup.json"
+  }
+}

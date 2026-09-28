@@ -9,6 +9,7 @@ use App\Domain\Finance\Http\Controllers\BankingController;
 use App\Domain\Finance\Http\Controllers\BankReconciliationController;
 use App\Domain\Finance\Http\Controllers\BankTransactionController;
 use App\Domain\Finance\Http\Controllers\BillController;
+use App\Domain\Finance\Http\Controllers\BillDocumentController;
 use App\Domain\Finance\Http\Controllers\BillingController;
 use App\Domain\Finance\Http\Controllers\BudgetActualsController;
 use App\Domain\Finance\Http\Controllers\BudgetForecastApiController;
@@ -254,6 +255,12 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::post('/purchase-orders/{purchaseOrder}/convert-to-bill', [PurchaseOrderController::class, 'convertToBill'])
         ->name('purchase-orders.convert-to-bill')
         ->middleware('permission:finance.ap.manage');
+
+    Route::post('/bills/{bill}/documents', [BillDocumentController::class, 'store'])->name('bills.documents.store')->middleware('permission:finance.ap.manage');
+    Route::post('/bills/{bill}/documents/{document}/retry', [BillDocumentController::class, 'retry'])->name('bills.documents.retry')->middleware('permission:finance.ap.manage');
+    Route::post('/bills/{bill}/documents/{document}/withdraw', [BillDocumentController::class, 'withdraw'])->name('bills.documents.withdraw')->middleware('permission:finance.ap.manage');
+    Route::get('/bills/{bill}/documents/{document}', [BillDocumentController::class, 'show'])->name('bills.documents.show')->middleware('permission:finance.ap.view');
+    Route::get('/bills/{bill}/work-evidence/{document}', [BillDocumentController::class, 'workEvidence'])->whereNumber('document')->name('bills.work-evidence')->middleware('permission:finance.ap.view');
 
     // ── Bills ───────────────────────────────────────────────────────────
     // Create/edit are WizardShell modals on the index/show pages; the retired
@@ -557,6 +564,8 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/vehicle-reviews', [VehicleReviewRequestController::class, 'index'])
         ->name('vehicle-reviews.index')
         ->middleware('permission:finance.assets.view|finance.ap.view');
+    Route::post('/vehicle-reviews/{reviewRequest}/assignment', [VehicleReviewRequestController::class, 'assign'])->whereNumber('reviewRequest')->name('vehicle-reviews.assignment')->middleware('permission:finance.assets.manage|finance.ap.manage');
+    Route::get('/vehicle-reviews/{reviewRequest}/reviewers', [VehicleReviewRequestController::class, 'reviewers'])->whereNumber('reviewRequest')->name('vehicle-reviews.reviewers')->middleware('permission:finance.assets.manage|finance.ap.manage');
     Route::post('/vehicle-reviews/{reviewRequest}/decision', [VehicleReviewRequestController::class, 'decide'])
         ->whereNumber('reviewRequest')
         ->name('vehicle-reviews.decision')
@@ -564,6 +573,10 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::get('/vehicle-reviews/{reviewRequest}/files/{document}', [VehicleReviewRequestController::class, 'file'])
         ->whereNumber(['reviewRequest', 'document'])
         ->name('vehicle-reviews.file')
+        ->middleware('permission:finance.assets.view|finance.ap.view');
+    Route::get('/vehicle-reviews/{reviewRequest}/history', [VehicleReviewRequestController::class, 'history'])
+        ->whereNumber('reviewRequest')
+        ->name('vehicle-reviews.history')
         ->middleware('permission:finance.assets.view|finance.ap.view');
 
     // ── Fixed Assets ────────────────────────────────────────────────────

@@ -1,8 +1,9 @@
 import PageShell from '@/components/page-shell';
+import { WorkCostMeters, WorkCostWorkspace, type CostWorkspaceData } from '@/components/fleet-assets/maintenance/cost-workspace';
 import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import '@/../css/maintenance-work-record.css';
 import { PageHeader, PageHeaderMeterBig, PageHeaderMeterBlock, PageHeaderMeterCaption,
-    PageHeaderPrimaryButton, PageHeaderRail, PageHeaderSearch, PageHeaderStatusChip,
+    PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderRail, PageHeaderSearch, PageHeaderStatusChip,
     type PageHeaderRailItem } from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,7 @@ import { formatDateTime } from '@/lib/fleet-utils';
 import { formatDateOnly } from '@/lib/datetime';
 import { fleetReturnFromLocation } from '@/lib/fleet-return';
 import { Head, Link, router } from '@inertiajs/react';
-import { CalendarDays, ClipboardCheck, Clock, Eye, FileText, History, MessageSquare, ShieldCheck, Truck, UserRound, Wrench } from 'lucide-react';
+import { CalendarDays, ClipboardCheck, Clock, Eye, FileText, History, MessageSquare, ReceiptText, ShieldCheck, Truck, UserRound, Wrench } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 type WorkOrder = {
@@ -42,6 +43,7 @@ type Check = { id: number; kind: string; outcome: string; submitted_at: string; 
 type Attachment = { id: number; action_id: number | null; original_name: string; byte_size: number };
 type Rule = { id: number; rules: { questions?: ConfiguredQuestion[]; requires_custody?: boolean } & Record<string, unknown> } | null;
 type Props = {
+    cost_workspace?: CostWorkspaceData | null;
     work_order: WorkOrder; actions: Action[]; checks: Check[];
     reports: Array<{ id: number; title: string; description: string | null; reporter_name: string; submitted_at: string;
         estimated_start_date: string | null; estimated_end_date: string | null; corrects_report_id: number | null }>;
@@ -65,7 +67,7 @@ const WORK_TABS: PageHeaderRailItem<WorkTab>[] = [
     { key: 'checks', label: 'Checks & evidence', icon: ClipboardCheck },
     { key: 'release', label: 'Release review', icon: ShieldCheck },
     { key: 'bookings', label: 'Booking impact', icon: Truck },
-    { key: 'finance', label: 'Finance', icon: FileText },
+    { key: 'finance', label: 'Cost & evidence', icon: FileText },
     { key: 'history', label: 'History', icon: CalendarDays },
 ];
 const RELEASE_STEPS: readonly WizardStep[] = [
@@ -111,8 +113,9 @@ function vehicleReturn(): string | null {
 
 export default function WorkOrderShow({ work_order: work, actions, checks, reports, restrictions, asset_active_restriction_ids, booking_impacts, attachments,
     finance, release_policy, repair_policy, release_readiness, retest_policy, retest_template, check_policy, check_template, hold_policy,
-    task_link, task_scope_message, current_user_id, can }: Props) {
+    task_link, task_scope_message, current_user_id, can, cost_workspace = null }: Props) {
     const [reportOpen, setReportOpen] = useState(false);
+    const [estimateOpen, setEstimateOpen] = useState(false);
     const [correctingReport, setCorrectingReport] = useState<number | null>(null);
     const [busy, setBusy] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -167,8 +170,6 @@ export default function WorkOrderShow({ work_order: work, actions, checks, repor
     const [impactNotes, setImpactNotes] = useState<Record<number, string>>({});
     const [custodySearch, setCustodySearch] = useState('');
     const [custodyOptions, setCustodyOptions] = useState<Array<{ id: number; name: string }>>([]);
-    const [billSearch, setBillSearch] = useState('');
-    const [billOptions, setBillOptions] = useState<Array<{ id: number; bill_number: string; status: string }>>([]);
     const activeHold = restrictions.some((restriction) => restriction.state === 'active');
     const assetHeld = asset_active_restriction_ids.length > 0;
     const otherHoldCount = asset_active_restriction_ids.filter((id) => !restrictions.some((restriction) => restriction.id === id)).length;
@@ -264,20 +265,6 @@ export default function WorkOrderShow({ work_order: work, actions, checks, repor
         ? <p role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{Object.values(errors).join(' ')} Your entries are kept; correct the details and retry.</p> : null;
     const peopleFeedback = peopleSearchError ? <p role="alert" className="mt-2 text-sm text-destructive">{peopleSearchError}</p>
         : peopleSearching ? <p role="status" className="mt-2 text-sm text-muted-foreground">Searching current staff…</p> : null;
-    const searchBills = (query: string) => {
-        if (query.trim().length < 2) { setBillOptions([]); return; }
-        fetch(`/fleet-assets/maintenance/work-orders/options/search?type=finance_bills&asset_id=${work.asset.id}&q=${encodeURIComponent(query)}`,
-            { credentials: 'same-origin' })
-            .then((response) => response.ok ? response.json() : Promise.reject(response))
-            .then((body: { results: Array<{ id: number; bill_number: string; status: string }> }) => setBillOptions(body.results))
-            .catch(() => setBillOptions([]));
-    };
-    const linkBill = (billId: number) => {
-        setBusy(true); setErrors({});
-        router.post(`/fleet-assets/maintenance/work-orders/${work.id}/finance-bills`, { fin_bill_id: billId },
-            { preserveScroll: true, onSuccess: () => { setBillSearch(''); setBillOptions([]); },
-                onError: (validation) => setErrors(validation), onFinish: () => setBusy(false) });
-    };
     const uploadEvidence = () => {
         if (!repair || !evidenceFile) return;
         const body = new FormData();
@@ -339,11 +326,17 @@ export default function WorkOrderShow({ work_order: work, actions, checks, repor
         <Head title={`${work.reference_number ?? 'Work order'} · ${work.title}`} />
         <PageShell>
             <PageHeader variant="profile" icon={Wrench} backHref={fleetReturnFromLocation() ?? vehicleReturn() ?? '/fleet-assets/maintenance/work-orders'} wrapTitle className="overflow-clip!"
-                title={work.reference_number ?? `WO-${work.id}`}
+                title={activeTab === 'finance' ? work.title : work.reference_number ?? `WO-${work.id}`}
                 titleChip={<PageHeaderStatusChip variant={assetHeld ? 'critical' : work.status === 'completed' ? 'success' : 'warning'}>
                     {assetHeld ? 'Restricted' : label(work.status)}</PageHeaderStatusChip>}
-                subline={`${work.asset.name} · ${work.asset.asset_tag ?? work.asset.registration_number ?? 'Asset'} · ${label(work.priority)} priority`}
-                actions={<>
+                subline={activeTab === 'finance'
+                    ? `${work.reference_number ?? `WO-${work.id}`} · ${work.asset.name} · ${cost_workspace?.site_name ?? work.asset.asset_tag ?? 'Maintenance'}`
+                    : `${work.asset.name} · ${work.asset.asset_tag ?? work.asset.registration_number ?? 'Asset'} · ${label(work.priority)} priority`}
+                actions={activeTab === 'finance' ? <>
+                    <PageHeaderGlassButton className="min-h-[44px] sm:min-h-9" onClick={() => setActiveTab('detail')} icon={Wrench}>Work detail</PageHeaderGlassButton>
+                    {can.finance_view && <PageHeaderGlassButton className="min-h-[44px] sm:min-h-9" onClick={() => router.visit('/finance/vehicle-reviews')} icon={ClipboardCheck}>Vehicle reviews</PageHeaderGlassButton>}
+                    {cost_workspace?.can.estimate && <PageHeaderPrimaryButton className="min-h-[44px] sm:min-h-9" icon={ReceiptText} onClick={() => setEstimateOpen(true)}>Record estimate</PageHeaderPrimaryButton>}
+                </> : <>
                     <PageHeaderSearch value={workSearch} onChange={setWorkSearch} placeholder="Search this work…" />
                     <Link href={assetHref} aria-label={`View ${work.asset.name}`} title={`View ${work.asset.name}`} className="rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 px-3.5 py-2 text-[13px] font-semibold text-primary-foreground hover:bg-primary-foreground/20">{work.asset.asset_tag ?? work.asset.registration_number ?? 'Resource'}</Link>
                     {task_link ? <Link href={task_link} aria-label={`${work.reference_number ?? `WO-${work.id}`} in All Tasks`}
@@ -351,7 +344,7 @@ export default function WorkOrderShow({ work_order: work, actions, checks, repor
                         : <span title={task_scope_message ?? undefined} className="rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 px-3.5 py-2 text-[13px] font-semibold text-primary-foreground/80">All Tasks: outside scope</span>}
                     {can.manage && <PageHeaderPrimaryButton icon={Wrench} onClick={() => { setCorrectingReport(null); setReportOpen(true); }}>Report a problem</PageHeaderPrimaryButton>}
                 </>}
-                meters={<>
+                meters={activeTab === 'finance' && cost_workspace ? <WorkCostMeters data={cost_workspace} /> : <>
                     <PageHeaderMeterBlock label="Restriction" tone={assetHeld ? 'critical' : 'success'} onClick={() => setActiveTab('release')}>
                         <PageHeaderMeterBig>{assetHeld ? 'Hold active' : 'No active hold'}</PageHeaderMeterBig>
                         <PageHeaderMeterCaption>{assetHeld ? `${asset_active_restriction_ids.length} active on this resource` : 'Current restriction state'}</PageHeaderMeterCaption>
@@ -572,26 +565,12 @@ export default function WorkOrderShow({ work_order: work, actions, checks, repor
                         {booking_impacts.length === 0 && <p>{can.manage || can.review
                             ? 'No existing bookings were flagged for this work.' : 'Booking follow-up details are restricted for this role.'}</p>}
                     </CardContent></Card>
-                    <Card className={activeTab === 'finance' ? '' : 'hidden'}><CardHeader><CardTitle><span className="work-section-icon"><FileText className="size-4" /></span>Evidence and Finance</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">
-                        {attachments.map((attachment) => <Link key={attachment.id} href={`/fleet-assets/maintenance/work-orders/${work.id}/attachments/${attachment.id}`} className="flex items-center gap-2 text-primary hover:underline"><FileText className="size-4" />{attachment.original_name}</Link>)}
-                        {attachments.length === 0 && <p className="text-muted-foreground">{can.details ? 'No saved files visible to you.' : 'Private file details are restricted for this role.'}</p>}
-                        <div className="border-t pt-3"><strong>Finance</strong>
-                            {finance.length ? finance.map((bill, index) => <div key={index} className="mt-2 rounded-md border p-2">
-                                {bill.id ? <Link href={`/finance/bills/${bill.id}`} className="font-medium text-primary hover:underline">{bill.reference ?? 'Linked bill'}</Link>
-                                    : <strong>Linked bill</strong>} · {label(bill.status)}
-                                {bill.id && <p className="text-xs text-muted-foreground">{bill.approved_at ? 'Approved in Finance' : 'Awaiting Finance approval'} · {bill.journal_id ? 'Journal recorded' : 'No journal recorded'}
-                                    {bill.total_amount ? ` · ${bill.total_amount}` : ''}</p>}</div>)
-                                : <p className="text-muted-foreground">{can.finance_view
-                                    ? 'No Finance bill linked. Estimates and completion do not post costs.'
-                                    : 'Finance details are restricted for this role.'}</p>}
-                            {can.finance_link && <div className="mt-3 space-y-2"><Label htmlFor="finance-bill-search">Link existing Finance bill</Label>
-                                <Input id="finance-bill-search" value={billSearch} onChange={(event) => { setBillSearch(event.target.value); searchBills(event.target.value); }} placeholder="Search bill number for this resource and site" />
-                                {billOptions.map((bill) => <Button key={bill.id} variant="outline" size="sm" className="w-full justify-start" disabled={busy}
-                                    onClick={() => linkBill(bill.id)}>{bill.bill_number} · {label(bill.status)}</Button>)}
-                                <p className="text-xs text-muted-foreground">Linking shows Finance's current status. It does not approve, post or copy a cost.</p>
-                            </div>}
-                        </div>
-                    </CardContent></Card>
+                    {activeTab === 'finance' && <WorkCostWorkspace work={work} data={cost_workspace} canManage={can.manage}
+                        showHeading={false} estimateOpen={estimateOpen} onEstimateClose={() => setEstimateOpen(false)}
+                        safetyHeld={assetHeld} onRelease={() => setActiveTab('release')}
+                        currentUserId={current_user_id} attachments={attachments}
+                        notes={actions.filter(action => action.type === 'note').map(action => ({id:action.id,text:String(action.payload.note ?? ''),actor:action.actor_name,at:action.occurred_at}))}
+                        onWork={() => setActiveTab('detail')} onComplete={() => {setReleaseStep(0);setReleaseOpen(true);}} />}
                 </div>
             </div>}
 

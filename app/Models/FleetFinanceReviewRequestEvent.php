@@ -11,11 +11,11 @@ class FleetFinanceReviewRequestEvent extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'review_request_id', 'action', 'actor_user_id', 'note', 'request_key', 'request_fingerprint', 'occurred_at',
+        'evidence', 'review_request_id', 'action', 'actor_user_id', 'note', 'request_key', 'request_fingerprint', 'occurred_at',
     ];
 
     protected $casts = [
-        'occurred_at' => 'datetime',
+        'occurred_at' => 'datetime', 'evidence' => 'array',
     ];
 
     protected static function booted(): void

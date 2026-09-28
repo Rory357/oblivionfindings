@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
+use App\Domain\Finance\Exceptions\StaleBillApprovalException;
 use App\Domain\Finance\Http\Requests\StoreBillRequest;
 use App\Domain\Finance\Http\Requests\UpdateBillRequest;
 use App\Domain\Finance\Models\FinAccount;
@@ -11,9 +12,14 @@ use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinPurchaseOrder;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Finance\Services\AccountsPayableService;
+use App\Domain\Finance\Services\BillApprovalSnapshot;
+use App\Domain\Finance\Services\BillSiteScope;
+use App\Domain\Finance\Services\BillWorkContext;
 use App\Http\Controllers\Controller;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class BillController extends Controller
 {
@@ -25,6 +31,7 @@ class BillController extends Controller
 
     public function __construct(
         private AccountsPayableService $service,
+        private BillSiteScope $sites,
     ) {}
 
     public function index(Request $request)
@@ -33,7 +40,7 @@ class BillController extends Controller
 
         $orgId = $request->user()->organization_id;
 
-        $query = FinBill::forOrganization($orgId)
+        $query = $this->sites->apply(FinBill::forOrganization($orgId), $request->user())
             ->with([
                 'vendor:id,name',
                 // Lines power the in-place Edit modal's prefill for draft bills.
@@ -93,23 +100,19 @@ class BillController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        // Whole-register figures for the header meter row — never the current
-        // page of results (DESIGN.md "Page-local counts labelled as totals").
-        $allBills = FinBill::forOrganization($orgId)->get();
-        $unpaid = $allBills->whereIn('status', self::UNPAID_STATUSES);
-        $overdue = $unpaid->filter(fn ($b) => $b->due_date < now());
-        $dueThisWeek = $unpaid->filter(fn ($b) => $b->due_date >= now() && $b->due_date <= now()->addDays(7));
-        $awaiting = $allBills->whereIn('status', self::AWAITING_STATUSES);
-        $summary = [
-            'total_unpaid' => $unpaid->sum(fn ($b) => $b->total_amount - $b->amount_paid),
-            'unpaid_count' => $unpaid->count(),
-            'total_overdue' => $overdue->sum(fn ($b) => $b->total_amount - $b->amount_paid),
-            'overdue_count' => $overdue->count(),
-            'due_this_week' => $dueThisWeek->sum(fn ($b) => $b->total_amount - $b->amount_paid),
-            'due_this_week_count' => $dueThisWeek->count(),
-            'awaiting_total' => $awaiting->sum(fn ($b) => $b->total_amount),
-            'awaiting_count' => $awaiting->count(),
-        ];
+        $summaryQuery = $this->sites->apply(FinBill::forOrganization($orgId), $request->user());
+        $unpaid = "status IN ('approved', 'partially_paid')";
+        $awaiting = "status IN ('draft', 'awaiting_approval')";
+        $calendarToday = today(config('app.worker_timezone', 'Pacific/Auckland'));
+        $summary = $summaryQuery->selectRaw("COALESCE(SUM(CASE WHEN {$unpaid} THEN total_amount - amount_paid ELSE 0 END), 0) AS total_unpaid,
+            COUNT(CASE WHEN {$unpaid} THEN 1 END) AS unpaid_count,
+            COALESCE(SUM(CASE WHEN {$unpaid} AND due_date < ? THEN total_amount - amount_paid ELSE 0 END), 0) AS total_overdue,
+            COUNT(CASE WHEN {$unpaid} AND due_date < ? THEN 1 END) AS overdue_count,
+            COALESCE(SUM(CASE WHEN {$unpaid} AND due_date BETWEEN ? AND ? THEN total_amount - amount_paid ELSE 0 END), 0) AS due_this_week,
+            COUNT(CASE WHEN {$unpaid} AND due_date BETWEEN ? AND ? THEN 1 END) AS due_this_week_count,
+            COALESCE(SUM(CASE WHEN {$awaiting} THEN total_amount ELSE 0 END), 0) AS awaiting_total,
+            COUNT(CASE WHEN {$awaiting} THEN 1 END) AS awaiting_count",
+            [$calendarToday->toDateString(), $calendarToday->toDateString(), $calendarToday->toDateString(), $calendarToday->copy()->addDays(7)->toDateString(), $calendarToday->toDateString(), $calendarToday->copy()->addDays(7)->toDateString()])->first()->getAttributes();
 
         $canManage = (bool) $request->user()?->canDo('finance.ap.manage');
 
@@ -119,6 +122,7 @@ class BillController extends Controller
             'filters' => $request->only(['status', 'vendor_id', 'search', 'date_from', 'date_to']),
             'summary' => $summary,
             'canManage' => $canManage,
+            'sites' => $this->sites->options($request->user()),
             // Expense/asset accounts for the New Bill modal (each line needs one).
             'accounts' => $canManage
                 ? FinAccount::forOrganization($orgId)
@@ -176,7 +180,7 @@ class BillController extends Controller
 
         $orgId = $request->user()->organization_id;
 
-        $query = FinBill::forOrganization($orgId)
+        $query = $this->sites->apply(FinBill::forOrganization($orgId), $request->user())
             ->with('vendor:id,name')
             ->orderBy('bill_date', 'desc');
 
@@ -236,6 +240,8 @@ class BillController extends Controller
     public function show(Request $request, FinBill $bill)
     {
         $this->authorize('view', $bill);
+        $bill->load('documents', 'site:id,name');
+        $bill->setAttribute('site_name', $bill->site?->name);
 
         $bill->load([
             'vendor',
@@ -244,18 +250,22 @@ class BillController extends Controller
             'lines.fundingStream:id,code,name',
             'approvedBy:id,name',
             'journal:id,journal_number,status,posted_at',
-            'purchaseOrder:id,po_number',
+            'purchaseOrder:id,po_number,total_amount,status',
             'paymentAllocations' => function ($query) {
                 $query->orderBy('payment_date', 'desc');
             },
         ]);
 
         $orgId = $request->user()->organization_id;
-        $canManage = (bool) $request->user()?->canDo('finance.ap.manage');
+        $canManage = $request->user()->can('update', $bill);
 
         return Inertia::render('finance/bills/Show', [
             'bill' => $bill,
+            'approvalSnapshot' => BillApprovalSnapshot::token($bill),
+            'workContext' => app(BillWorkContext::class)->present($request->user(), $bill),
+            'duplicateBills' => $this->duplicates($request, $bill),
             'canManage' => $canManage,
+            'sites' => $this->sites->options($request->user()),
             // Reference data for the Edit Bill modal (draft bills only).
             'vendors' => $canManage
                 ? FinVendor::forOrganization($orgId)->active()->orderBy('name')
@@ -288,6 +298,10 @@ class BillController extends Controller
         try {
             $this->service->updateBill($bill, $validated, $request->user());
         } catch (\InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage(), 'errors' => ['bill' => [$e->getMessage()]]], 422);
+            }
+
             return back()->withErrors(['bill' => $e->getMessage()]);
         }
 
@@ -298,17 +312,57 @@ class BillController extends Controller
     public function approve(Request $request, FinBill $bill)
     {
         $this->authorize('approve', $bill);
+        $validated = $request->validate([
+            'approval_snapshot' => ['required', 'string', 'regex:/\\A[a-f0-9]{64}\\z/'],
+        ], [
+            'approval_snapshot.required' => 'Load the current bill and review it before approving.',
+            'approval_snapshot.regex' => 'Load the current bill and review it before approving.',
+        ]);
 
         try {
-            $this->service->approveBill($bill, $request->user()->id);
+            $approved = $this->service->approveBill($bill, $request->user()->id, $validated['approval_snapshot']);
+        } catch (StaleBillApprovalException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage()], 409);
+            }
+
+            return back()->withErrors(['approval_snapshot' => $e->getMessage()]);
         } catch (\InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage(), 'errors' => ['bill' => [$e->getMessage()]]], 422);
+            }
+
             return back()->withErrors(['bill' => $e->getMessage()]);
         } catch (\Exception $e) {
-            return back()->withErrors(['bill' => 'Failed to approve bill: '.$e->getMessage()]);
+            if ($e instanceof AuthorizationException || $e instanceof HttpExceptionInterface) {
+                throw $e;
+            }
+            report($e);
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Approval could not be confirmed. Retry the same approval.'], 503);
+            }
+
+            return back()->withErrors(['bill' => 'Approval could not be confirmed. Retry the same approval.']);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['receipt' => $approved->approval_receipt]);
         }
 
         return redirect()->route('finance.bills.show', $bill)
             ->with('success', 'Bill approved and journal posted successfully.');
+    }
+
+    private function duplicates(Request $request, FinBill $bill): array
+    {
+        if (! filled($bill->vendor_reference)) {
+            return [];
+        }
+
+        return $this->sites->apply(FinBill::query(), $request->user())
+            ->where('vendor_id', $bill->vendor_id)->whereKeyNot($bill->id)->where('status', '!=', 'cancelled')
+            ->whereRaw('LOWER(TRIM(vendor_reference)) = ?', [mb_strtolower(trim($bill->vendor_reference))])
+            ->orderByDesc('id')->limit(10)->get(['id', 'bill_number', 'total_amount', 'status'])->toArray();
     }
 
     public function cancel(Request $request, FinBill $bill)
@@ -316,8 +370,12 @@ class BillController extends Controller
         $this->authorize('update', $bill);
 
         try {
-            $this->service->cancelBill($bill);
+            $this->service->cancelBill($bill, $request->user());
         } catch (\InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage(), 'errors' => ['bill' => [$e->getMessage()]]], 422);
+            }
+
             return back()->withErrors(['bill' => $e->getMessage()]);
         }
 

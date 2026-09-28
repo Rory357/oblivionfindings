@@ -6,6 +6,7 @@ use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinCostCentre;
 use App\Domain\Finance\Models\FinFixedAsset;
 use App\Domain\Finance\Models\FinPurchaseOrder;
+use App\Domain\Finance\Services\BillSiteScope;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
 use App\Models\AssetDocument;
@@ -14,7 +15,6 @@ use App\Models\FleetFinanceReviewRequestEvent;
 use App\Models\FleetVehicleFinanceLink;
 use App\Models\FleetWorkOrder;
 use App\Models\User;
-use App\Notifications\AppEventNotification;
 use App\Services\AuditLogger;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,7 +24,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
-use Throwable;
 
 /**
  * The vehicle's connection to Finance: links to existing Finance records and
@@ -41,7 +40,7 @@ class VehicleFinanceService
     public const SEARCH_LIMIT = 20;
 
     /** Central Finance oversight: these open every Site's review requests to Finance. */
-    public const FINANCE_SITE_BYPASS = ['sites.viewAll', 'finance.insights.viewAllSites', 'finance.payments.viewAllSites'];
+    public const FINANCE_SITE_BYPASS = ['sites.viewAll', 'finance.insights.viewAllSites', 'finance.payments.viewAllSites', 'finance.payments.manageAllSites'];
 
     public const KINDS = [
         'fixed_asset' => 'Fixed asset',
@@ -241,6 +240,9 @@ class VehicleFinanceService
                     ->where('bill_number', 'like', $like)->orWhere('vendor_reference', 'like', $like)
                     ->orWhereHas('vendor', fn (Builder $vendor): Builder => $vendor->where('name', 'like', $like)))),
         };
+        if ($type === 'bill') {
+            app(BillSiteScope::class)->apply($query, $current);
+        }
         if ($type === 'purchase_order' && $search === '') {
             $centre = $this->siteCostCentre($asset);
             $scope = $centre ? 'site_cost_centre' : 'none';
@@ -297,7 +299,7 @@ class VehicleFinanceService
             $documentId = $values['existing_document_id'] === null
                 ? null
                 : $this->existingDocument($current, $asset, $values['existing_document_id']);
-            $open = FleetFinanceReviewRequest::query()->where('asset_id', $asset->id)->where('status', 'submitted')
+            $open = FleetFinanceReviewRequest::query()->where('asset_id', $asset->id)->whereIn('status', ['preparing', 'submitted', 'changes_requested'])
                 ->where('request_type', $values['request_type'])->where('source_type', $sourceType)
                 ->when($sourceId === null, fn (Builder $query): Builder => $query->whereNull('source_id'), fn (Builder $query): Builder => $query->where('source_id', $sourceId))
                 ->lockForUpdate()->first(['id']);
@@ -313,13 +315,19 @@ class VehicleFinanceService
                 'amount' => $values['amount'],
                 'note' => $values['note'],
                 'existing_document_id' => $documentId,
-                'status' => 'submitted',
+                'status' => $values['expected_file_count'] > 0 ? 'preparing' : 'submitted',
+                'expected_file_count' => $values['expected_file_count'],
+                'evidence_ready_at' => $values['expected_file_count'] > 0 ? null : now(),
                 'lock_version' => 1,
                 'requested_by_user_id' => $current->id,
                 'request_key' => $requestKey,
                 'request_fingerprint' => $fingerprint,
             ]);
-            $this->event($request, $current, 'submitted', null, $requestKey, $fingerprint);
+            $this->event($request, $current, $request->status, null, $requestKey, $fingerprint);
+            if ($request->status === 'submitted') {
+                app(FinanceReviewEvidence::class)->assertReady($request);
+                app(FinanceReviewNotices::class)->record($request, 'submitted');
+            }
             AuditLogger::logOrFail('fleet.vehicle.finance.review_request', $asset, [
                 'asset_id' => $asset->id,
                 'review_request_id' => $request->id,
@@ -330,11 +338,6 @@ class VehicleFinanceService
 
             return $request;
         }, 3), 'This request was saved while you were working. Reload to check it.');
-
-        // A new request (not a retry) tells Finance where to decide it.
-        if ($request->wasRecentlyCreated) {
-            $this->notifyFinance($request, $actor);
-        }
 
         return $request;
     }
@@ -351,59 +354,22 @@ class VehicleFinanceService
         return $this->siteAccess->accessibleSiteIds($actor, self::FINANCE_SITE_BYPASS);
     }
 
-    /** In-app notice to the Finance people who can decide the request, except the requester. */
-    private function notifyFinance(FleetFinanceReviewRequest $request, User $requester): void
-    {
-        $asset = Asset::query()->find($request->asset_id, ['id', 'name', 'registration_number', 'site_id']);
-        if (! $asset) {
-            return;
-        }
-        $keys = ['finance.assets.manage', 'finance.ap.manage'];
-        $recipients = User::query()->whereNotNull('approved_at')->whereKeyNot($requester->id)
-            ->where(fn (Builder $query): Builder => $query
-                ->whereHas('roles.permissions', fn (Builder $permission): Builder => $permission->whereIn('key', $keys))
-                ->orWhereHas('permissionOverrides', fn (Builder $permission): Builder => $permission->whereIn('permissions.key', $keys)))
-            ->limit(200)->get()
-            ->filter(fn (User $user): bool => $this->canDecide($user)
-                && ($user->canDo('finance.assets.view') || $user->canDo('finance.ap.view'))
-                && in_array((int) $asset->site_id, $this->financeSiteIds($user), true));
-        $vehicle = trim($asset->name.($asset->registration_number ? ' · '.$asset->registration_number : ''));
-        foreach ($recipients as $recipient) {
-            try {
-                $recipient->notify(new AppEventNotification([
-                    'kind' => 'fleet_finance_review_request',
-                    'event_key' => 'fleet.vehicle.finance.review_request',
-                    'action' => 'review',
-                    'entity' => 'Vehicle review request',
-                    'entity_id' => $request->id,
-                    'title' => $request->typeLabel().' requested · '.$vehicle,
-                    'body' => 'Resolve or decline it in Finance › Asset & vehicle reviews. It changes no Finance record by itself.',
-                    'url' => '/finance/vehicle-reviews?request='.$request->id,
-                    'actor' => ['id' => $requester->id, 'name' => $requester->name],
-                ]));
-            } catch (Throwable $exception) {
-                // The request stands; it is also listed in All Tasks.
-                report($exception);
-            }
-        }
-    }
-
     /**
      * Finance resolves or declines a request with a note, from Finance ›
      * Vehicle reviews or the vehicle's Finance view. The vehicle is resolved
      * under Finance's Site rule (financeSiteIds), so Finance needs no Fleet
      * access to decide.
      */
-    public function decide(User $actor, int $assetId, int $requestId, string $decision, string $note, int $expectedVersion, string $requestKey): FleetFinanceReviewRequest
+    public function decide(User $actor, int $assetId, int $requestId, string $decision, string $note, int $expectedVersion, string $requestKey, ?string $evidenceToken = null): FleetFinanceReviewRequest
     {
         self::assertKey($requestKey);
         if (! in_array($decision, FleetFinanceReviewRequest::DECISIONS, true)) {
             throw ValidationException::withMessages(['decision' => 'Choose whether to resolve or decline the request.']);
         }
         $note = self::requiredText($note, 'note', 'Record the Finance decision and any next step.');
-        $fingerprint = MaintenanceFingerprint::of(['actor' => (int) $actor->id, 'request' => $requestId, 'decision' => $decision, 'note' => $note]);
+        $fingerprint = MaintenanceFingerprint::of(['actor' => (int) $actor->id, 'request' => $requestId, 'decision' => $decision, 'note' => $note, 'evidence' => $evidenceToken]);
 
-        return DB::transaction(function () use ($actor, $assetId, $requestId, $decision, $note, $expectedVersion, $requestKey, $fingerprint): FleetFinanceReviewRequest {
+        return DB::transaction(function () use ($actor, $assetId, $requestId, $decision, $note, $expectedVersion, $requestKey, $fingerprint, $evidenceToken): FleetFinanceReviewRequest {
             $current = User::query()->findOrFail($actor->id);
             abort_unless($this->canDecide($current), 403);
             $asset = Asset::query()->whereKey($assetId)->whereNotNull('site_id')
@@ -416,19 +382,29 @@ class VehicleFinanceService
                 return $request;
             }
             abort_unless($request->lock_version === $expectedVersion, 409, 'This review request changed while you were deciding. Reload before saving.');
-            abort_unless($request->isOpen(), 409, 'Finance has already decided this review request.');
+            abort_unless($request->isOpen(), 409, 'This request is not ready for a Finance decision.');
+            if ($decision === 'changes_requested' && ! Asset::vehicles()->whereKey($asset->id)->exists()) {
+                throw ValidationException::withMessages(['decision' => 'This asset profile supports Resolve or Decline. Record the required next step in your decision note.']);
+            }
+            $evidence = app(FinanceReviewEvidence::class);
+            if ($evidenceToken !== null) {
+                abort_unless(hash_equals($evidence->token($request), $evidenceToken), 409, 'The supporting evidence changed. Reload and review it again.');
+            }
+            $manifest = $evidence->assertReady($request);
             // Separation of duties: the person who asked for the review can't decide it.
             if ((int) $request->requested_by_user_id === (int) $current->id) {
                 throw ValidationException::withMessages(['decision' => 'Someone other than the person who asked for this review must decide it.']);
             }
             $request->forceFill([
                 'status' => $decision,
+                'decision_evidence' => $manifest,
                 'decided_by_user_id' => $current->id,
                 'decided_at' => now(),
                 'decision_note' => $note,
                 'lock_version' => $request->lock_version + 1,
             ])->save();
             $this->event($request, $current, $decision, $note, $requestKey, $fingerprint);
+            app(FinanceReviewNotices::class)->record($request, $decision);
             AuditLogger::logOrFail('fleet.vehicle.finance.review_decision', $asset, [
                 'asset_id' => $asset->id,
                 'review_request_id' => $request->id,
@@ -436,6 +412,74 @@ class VehicleFinanceService
                 'reason' => $note,
                 'actor_id' => $current->id,
             ]);
+
+            return $request;
+        }, 3);
+    }
+
+    public function submitEvidence(User $actor, int $assetId, int $requestId, int $version, string $note, string $key): FleetFinanceReviewRequest
+    {
+        self::assertKey($key);
+        $fingerprint = MaintenanceFingerprint::of(['actor' => $actor->id, 'request' => $requestId, 'version' => $version, 'note' => $note, 'action' => 'submit']);
+
+        return DB::transaction(function () use ($actor, $assetId, $requestId, $version, $note, $key, $fingerprint): FleetFinanceReviewRequest {
+            [$current, $asset] = $this->resolve($actor, $assetId, 'fleet.manage');
+            $request = FleetFinanceReviewRequest::where('asset_id', $asset->id)->whereKey($requestId)->lockForUpdate()->firstOrFail();
+            abort_unless((int) $request->requested_by_user_id === (int) $current->id, 403);
+            $prior = $request->events()->where('request_key', $key)->first();
+            if ($prior) {
+                abort_unless(hash_equals($prior->request_fingerprint, $fingerprint), 409);
+
+                return $request;
+            }
+            abort_unless($request->lock_version === $version, 409, 'This request changed. Reload before submitting evidence.');
+            abort_unless(in_array($request->status, ['preparing', 'changes_requested'], true), 409, 'This request cannot be submitted again.');
+            $correction = $request->status === 'changes_requested';
+            if ($correction) {
+                $note = self::requiredText($note, 'note', 'Explain how you addressed the requested changes.');
+            }
+            app(FinanceReviewEvidence::class)->assertReady($request);
+            $request->forceFill(['status' => 'submitted', 'evidence_ready_at' => now(), 'response_note' => $note ?: null,
+                'submission_count' => $request->submission_count + ($correction ? 1 : 0),
+                'lock_version' => $request->lock_version + 1])->save();
+            $this->event($request, $current, $correction ? 'resubmitted' : 'submitted', $note ?: null, $key, $fingerprint);
+            app(FinanceReviewNotices::class)->record($request, 'submitted');
+
+            return $request;
+        }, 3);
+    }
+
+    public function assign(User $actor, int $requestId, ?int $assigneeId, ?string $due, int $version, string $key): FleetFinanceReviewRequest
+    {
+        self::assertKey($key);
+        Validator::make(['due_on' => $due], ['due_on' => ['nullable', 'date_format:Y-m-d']])->validate();
+        $fingerprint = MaintenanceFingerprint::of(['actor' => $actor->id, 'request' => $requestId, 'assignee' => $assigneeId, 'due' => $due, 'version' => $version]);
+
+        return DB::transaction(function () use ($actor, $requestId, $assigneeId, $due, $version, $key, $fingerprint): FleetFinanceReviewRequest {
+            $current = User::findOrFail($actor->id);
+            abort_unless($this->canDecide($current), 403);
+            $request = app(VehicleFinanceReviewQueue::class)->scoped($current)->findOrFail($requestId);
+            $asset = Asset::whereKey($request->asset_id)->lockForUpdate()->firstOrFail();
+            abort_unless(in_array((int) $asset->site_id, $this->financeSiteIds($current), true), 404);
+            $request = FleetFinanceReviewRequest::whereKey($requestId)->lockForUpdate()->firstOrFail();
+            $prior = $request->events()->where('request_key', $key)->first();
+            if ($prior) {
+                abort_unless(hash_equals($prior->request_fingerprint, $fingerprint), 409);
+
+                return $request;
+            }
+            abort_unless($request->lock_version === $version && ! in_array($request->status, ['resolved', 'declined'], true), 409, 'This request changed. Reload before assigning it.');
+            if ($assigneeId) {
+                $assignee = User::whereNotNull('approved_at')->find($assigneeId);
+                abort_unless($assignee && $this->canDecide($assignee)
+                    && ($assignee->canDo('finance.assets.view') || $assignee->canDo('finance.ap.view'))
+                    && (int) $request->requested_by_user_id !== $assigneeId
+                    && in_array((int) $asset->site_id, $this->financeSiteIds($assignee), true), 422, 'Choose a reviewer with access to this Site, other than the requester.');
+            }
+            $request->forceFill(['assigned_to_user_id' => $assigneeId, 'due_on' => $due,
+                'lock_version' => $request->lock_version + 1])->save();
+            $this->event($request, $current, 'assigned', 'Reviewer: '.($assigneeId ? $assignee->name : 'Unassigned').'. Due: '.($due ?: 'Not set').'.', $key, $fingerprint);
+            app(FinanceReviewNotices::class)->record($request, 'assigned');
 
             return $request;
         }, 3);
@@ -571,6 +615,9 @@ class VehicleFinanceService
             throw ValidationException::withMessages(['record_id' => $type === 'bill' ? 'Choose a supplier invoice from Finance.' : 'Choose a purchase order from Finance.']);
         }
         $problem = $record instanceof FinBill ? $this->billProblem($asset, $record) : $this->purchaseOrderProblem($record);
+        if ($record instanceof FinBill) {
+            Gate::forUser($actor)->authorize('view', $record);
+        }
         if ($problem !== null) {
             throw ValidationException::withMessages(['record_id' => $problem]);
         }
@@ -632,6 +679,7 @@ class VehicleFinanceService
             'amount' => ['nullable', 'numeric', 'min:0', 'max:99999999.99', 'decimal:0,2'],
             'note' => ['required', 'string', 'max:2000'],
             'existing_document_id' => ['nullable', 'integer', 'min:1'],
+            'expected_file_count' => ['sometimes', 'integer', 'min:0', 'max:20'],
         ], [
             'request_type.required' => 'Choose the Finance request type.',
             'request_type.in' => 'Choose the Finance request type.',
@@ -643,6 +691,7 @@ class VehicleFinanceService
         $amount = $data['amount'] ?? null;
 
         return [
+            'expected_file_count' => (int) ($data['expected_file_count'] ?? 0),
             'request_type' => (string) $data['request_type'],
             'source' => trim((string) $data['source']),
             'amount' => $amount === null || $amount === '' ? null : number_format((float) $amount, 2, '.', ''),
@@ -685,6 +734,9 @@ class VehicleFinanceService
             default => FinBill::query()->with('vendor:id,name')->find($id),
         };
         if (! $record) {
+            throw $invalid;
+        }
+        if ($record instanceof FinBill && ! $actor->can('view', $record)) {
             throw $invalid;
         }
 
@@ -743,6 +795,7 @@ class VehicleFinanceService
         FleetFinanceReviewRequestEvent::query()->create([
             'review_request_id' => $request->id, 'action' => $action, 'actor_user_id' => $actor->id, 'note' => $note,
             'request_key' => $key, 'request_fingerprint' => $fingerprint, 'occurred_at' => now(),
+            'evidence' => in_array($action, FleetFinanceReviewRequest::DECISIONS, true) ? $request->decision_evidence : null,
         ]);
     }
 

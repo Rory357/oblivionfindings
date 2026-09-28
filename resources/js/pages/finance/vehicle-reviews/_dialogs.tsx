@@ -1,31 +1,31 @@
 import { formatMoney } from '@/components/finance';
-import InputError from '@/components/input-error';
-import { Button } from '@/components/ui/button';
+import { DocumentPreview } from '@/components/finance/document-preview';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+    isSavedResponse,
+    useVehicleRecordCommand,
+} from '@/components/fleet-assets/vehicle-workspace/record-command';
+import { WorkspaceWizard } from '@/components/fleet-assets/vehicle-workspace/wizard-kit';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { TilePicker } from '@/components/wizard/primitives';
+import { WizardSuccessPane } from '@/components/wizard/shell';
 import { formatDateTime } from '@/lib/datetime';
-import { useForm } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import {
     Car,
     CheckCircle2,
     FileText,
-    Loader2,
+    History,
+    Undo2,
+    UserRound,
     XCircle,
-    type LucideIcon,
 } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export type ReviewFile = {
+    mime?: string | null;
     id: number;
     name: string | null;
     url: string | null;
@@ -36,7 +36,12 @@ export type ReviewRequest = {
     id: number;
     reference: string | null;
     type_label: string;
-    status: 'submitted' | 'resolved' | 'declined';
+    status:
+        | 'preparing'
+        | 'submitted'
+        | 'changes_requested'
+        | 'resolved'
+        | 'declined';
     status_label: string;
     tone: 'success' | 'warning' | 'neutral';
     vehicle: {
@@ -55,6 +60,18 @@ export type ReviewRequest = {
     decided_at: string | null;
     decision_note: string | null;
     lock_version: number;
+    evidence_token?: string;
+    assigned_to_user_id?: number | null;
+    assigned_to?: string | null;
+    due_on?: string | null;
+    response_note?: string | null;
+    can_assign?: boolean;
+    bill_url?: string | null;
+    decision_evidence?: Array<{
+        id: number;
+        original_name: string;
+        sha256: string;
+    }> | null;
     files: ReviewFile[];
     history: Array<{
         id: number;
@@ -63,38 +80,36 @@ export type ReviewRequest = {
         note: string | null;
         occurred_at: string | null;
     }>;
+    history_next_before: number | null;
     own_request: boolean;
     can_decide: boolean;
+    can_request_changes?: boolean;
 };
-
-type Decision = 'resolved' | 'declined';
-
-const DECISIONS: Array<{
-    value: Decision;
-    label: string;
-    detail: string;
-    icon: LucideIcon;
-}> = [
-    {
-        value: 'resolved',
-        label: 'Resolve',
-        detail: 'Finance has dealt with it, or will through its own records.',
-        icon: CheckCircle2,
-    },
-    {
-        value: 'declined',
-        label: 'Decline',
-        detail: 'Not a Finance matter, or not agreed. Say what happens next.',
-        icon: XCircle,
-    },
-];
 
 export const vehicleLabel = (request: ReviewRequest) =>
     [request.vehicle.name, request.vehicle.registration, request.vehicle.site]
         .filter(Boolean)
         .join(' · ');
-
-/** One review request: what Fleet asked, its evidence, and Finance's decision. */
+const steps = [
+    {
+        key: 'request',
+        label: 'Request',
+        blurb: 'Context and ownership',
+        icon: Car,
+    },
+    {
+        key: 'evidence',
+        label: 'Evidence',
+        blurb: 'Files and history',
+        icon: FileText,
+    },
+    {
+        key: 'decision',
+        label: 'Decision',
+        blurb: 'Outcome and next step',
+        icon: CheckCircle2,
+    },
+];
 export function ReviewRequestDialog({
     request,
     onClose,
@@ -102,30 +117,14 @@ export function ReviewRequestDialog({
     request: ReviewRequest | null;
     onClose: () => void;
 }) {
-    return (
-        <Dialog
-            open={request !== null}
-            onOpenChange={(open) => !open && onClose()}
-        >
-            <DialogContent
-                className="max-h-[90vh] overflow-y-auto"
-                style={{
-                    maxWidth: 'min(92vw, 720px)',
-                    width: 'min(92vw, 720px)',
-                }}
-            >
-                {request && (
-                    <ReviewRequestBody
-                        key={`${request.id}-${request.lock_version}`}
-                        request={request}
-                        onClose={onClose}
-                    />
-                )}
-            </DialogContent>
-        </Dialog>
-    );
+    return request ? (
+        <ReviewRequestBody
+            key={request.id}
+            request={request}
+            onClose={onClose}
+        />
+    ) : null;
 }
-
 function ReviewRequestBody({
     request,
     onClose,
@@ -133,281 +132,572 @@ function ReviewRequestBody({
     request: ReviewRequest;
     onClose: () => void;
 }) {
-    const [requestKey] = useState(() => crypto.randomUUID());
-    const form = useForm<{
-        decision: Decision | '';
-        note: string;
-        expected_version: number;
-        request_key: string;
-    }>({
-        decision: '',
-        note: '',
-        expected_version: request.lock_version,
-        request_key: requestKey,
+    const [reviewed, setReviewed] = useState({
+        version: request.lock_version,
+        token: request.evidence_token,
     });
-    const open = request.status === 'submitted';
-
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
-        // Show every missing field at once; the server checks them again.
-        const missing: Partial<Record<'decision' | 'note', string>> = {};
-        if (!form.data.decision) {
-            missing.decision =
-                'Choose whether to resolve or decline the request.';
+    const [step, setStep] = useState(0);
+    const [decision, setDecision] = useState('');
+    const [note, setNote] = useState('');
+    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState('');
+    const [preview, setPreview] = useState<ReviewFile | null>(null);
+    const [assigning, setAssigning] = useState(false);
+    const command = useVehicleRecordCommand(isSavedResponse);
+    const [history, setHistory] = useState(request.history);
+    const [historyBefore, setHistoryBefore] = useState(
+        request.history_next_before,
+    );
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyError, setHistoryError] = useState('');
+    const historyRequest = useRef<AbortController | null>(null);
+    useEffect(() => () => historyRequest.current?.abort(), []);
+    const loadOlderHistory = async () => {
+        if (!historyBefore || historyRequest.current) return;
+        const controller = new AbortController();
+        historyRequest.current = controller;
+        setHistoryLoading(true);
+        setHistoryError('');
+        try {
+            const response = await fetch(
+                `/finance/vehicle-reviews/${request.id}/history?before=${historyBefore}`,
+                {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                    signal: controller.signal,
+                },
+            );
+            if (!response.ok) throw new Error('History unavailable');
+            const page: Pick<ReviewRequest, 'history' | 'history_next_before'> =
+                await response.json();
+            setHistory((current) => [
+                ...page.history.filter(
+                    (entry) =>
+                        !current.some((existing) => existing.id === entry.id),
+                ),
+                ...current,
+            ]);
+            setHistoryBefore(page.history_next_before);
+        } catch {
+            if (!controller.signal.aborted)
+                setHistoryError(
+                    'Older history could not be loaded. Try again.',
+                );
+        } finally {
+            if (!controller.signal.aborted) {
+                setHistoryLoading(false);
+                historyRequest.current = null;
+            }
         }
-        if (!form.data.note.trim()) {
-            missing.note = 'Record the Finance decision and any next step.';
-        }
-        if (Object.keys(missing).length > 0) {
-            form.setError(missing);
-            return;
-        }
-        form.post(`/finance/vehicle-reviews/${request.id}/decision`, {
-            preserveScroll: true,
-            preserveState: true,
-            onSuccess: () => onClose(),
-        });
     };
 
+    const submit = async () => {
+        if (!request.can_decide) {
+            onClose();
+            return;
+        }
+        if (!command.uncertain && (!decision || !note.trim())) {
+            setError('Choose a decision and record the reason and next step.');
+            setStep(2);
+            return;
+        }
+        const result = await command.submit(
+            '/finance/vehicle-reviews/' + request.id + '/decision',
+            {
+                decision,
+                note: note.trim(),
+                expected_version: reviewed.version,
+                evidence_token: reviewed.token,
+            },
+        );
+        if (result?.saved) setSaved(true);
+    };
+    const close = () => {
+        onClose();
+        if (saved) router.reload();
+    };
     return (
-        <form onSubmit={submit}>
-            <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                    <Car className="h-4 w-4 text-primary" aria-hidden />
-                    {request.type_label}
-                    {request.reference ? ` · ${request.reference}` : ''}
-                </DialogTitle>
-                <DialogDescription>
-                    {open
-                        ? 'Record Finance’s decision with a note. It changes no Finance record by itself; the requester sees it on the source profile.'
-                        : 'Finance’s decision on this request, kept with its history.'}
-                </DialogDescription>
-            </DialogHeader>
-
-            <div className="mt-3 grid gap-3">
-                <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3">
-                    <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
-                        <Car className="h-4 w-4 text-primary" aria-hidden />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-medium">
-                                {vehicleLabel(request)}
-                            </span>
-                            <StatusBadge variant={request.tone}>
-                                {request.status_label}
-                            </StatusBadge>
-                        </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                            Requested by {request.requested_by ?? 'Fleet'}
-                            {request.requested_at
-                                ? ` · ${formatDateTime(request.requested_at)}`
-                                : ''}
-                        </p>
-                    </div>
-                </div>
-
-                <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                    <div>
-                        <dt className="text-xs text-muted-foreground">
-                            Amount
-                        </dt>
-                        <dd className="font-medium tabular-nums">
-                            {request.amount === null
-                                ? 'Not given'
-                                : formatMoney(request.amount)}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt className="text-xs text-muted-foreground">About</dt>
-                        <dd className="font-medium">
-                            {request.source ?? 'The vehicle'}
-                        </dd>
-                    </div>
-                    <div className="sm:col-span-2">
-                        <dt className="text-xs text-muted-foreground">
-                            Review requested
-                        </dt>
-                        <dd className="whitespace-pre-line">
+        <>
+            <WorkspaceWizard
+                title="Review Finance request"
+                description="Review the evidence and record Finance’s response. The requester sees the outcome on the source profile."
+                railIcon={Car}
+                railSub={request.reference ?? 'Finance review'}
+                steps={steps}
+                step={step}
+                setStep={setStep}
+                pct={decision && note.trim() ? 100 : 0}
+                context={{
+                    name: request.type_label,
+                    detail: vehicleLabel(request),
+                }}
+                command={{
+                    ...command,
+                    message:
+                        command.message ||
+                        error ||
+                        Object.values(command.errors).join(' '),
+                }}
+                dirty={!!decision || !!note}
+                saved={saved}
+                submitLabel={
+                    request.can_decide ? 'Record decision' : 'Close review'
+                }
+                onValidateStep={() => true}
+                onSubmit={submit}
+                onClose={close}
+                onReload={() =>
+                    router.reload({
+                        onSuccess: (page) => {
+                            const props = page.props as unknown as {
+                                requests: ReviewRequest[];
+                                focus: ReviewRequest | null;
+                            };
+                            const current =
+                                props.requests.find(
+                                    (item) => item.id === request.id,
+                                ) ?? props.focus;
+                            if (current?.id === request.id) {
+                                setReviewed({
+                                    version: current.lock_version,
+                                    token: current.evidence_token,
+                                });
+                                command.reset();
+                                setError('');
+                                setStep(0);
+                            }
+                        },
+                    })
+                }
+                errorKey={JSON.stringify(command.errors)}
+                success={
+                    <WizardSuccessPane
+                        title="Decision recorded"
+                        blurb="The outcome and reviewed evidence are retained in the request history. The requester’s notification is queued."
+                        actions={
+                            <Button onClick={close}>Back to reviews</Button>
+                        }
+                    />
+                }
+            >
+                {step === 0 && (
+                    <div className="space-y-4">
+                        <p>
+                            <strong>Review requested:</strong>{' '}
                             {request.note ?? 'No note recorded.'}
-                        </dd>
-                    </div>
-                </dl>
-
-                <section aria-label="Evidence">
-                    <h3 className="text-xs text-muted-foreground">Evidence</h3>
-                    {request.files.length === 0 ? (
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            No files were attached.
                         </p>
-                    ) : (
-                        <ul className="mt-1 grid gap-1.5">
-                            {request.files.map((file) => (
-                                <li
-                                    key={file.id}
-                                    className="flex items-center gap-2 text-sm"
+                        {request.vehicle.url && (
+                            <Button variant="outline" asChild>
+                                <a href={request.vehicle.url}>
+                                    Open source profile
+                                </a>
+                            </Button>
+                        )}
+                        <p>
+                            <strong>Source:</strong> {request.source}{' '}
+                            {request.bill_url && (
+                                <a
+                                    className="text-primary underline"
+                                    href={request.bill_url}
                                 >
-                                    <FileText
-                                        className="h-4 w-4 shrink-0 text-muted-foreground"
-                                        aria-hidden
-                                    />
-                                    {file.url ? (
-                                        <a
-                                            href={file.url}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="truncate text-primary underline-offset-4 hover:underline"
-                                        >
-                                            {file.name ?? 'File'}
-                                        </a>
-                                    ) : (
-                                        <span className="truncate">
-                                            {file.name ?? 'File'}
-                                        </span>
-                                    )}
-                                    {!file.url && (
-                                        <span className="text-xs text-muted-foreground">
-                                            {file.waiting
-                                                ? 'Waiting for its virus check'
-                                                : 'Can’t be opened'}
-                                        </span>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </section>
-
-                {!open && (
-                    <section
-                        aria-label="Decision"
-                        className="rounded-xl border border-border p-3 text-sm"
-                    >
-                        <p className="font-medium">
-                            {request.status_label}
-                            {request.decided_by
-                                ? ` by ${request.decided_by}`
-                                : ''}
-                            {request.decided_at
-                                ? ` · ${formatDateTime(request.decided_at)}`
-                                : ''}
+                                    Open bill, journal and payments
+                                </a>
+                            )}
                         </p>
+                        <p>
+                            <strong>Amount:</strong>{' '}
+                            {request.amount === null
+                                ? 'Not supplied'
+                                : formatMoney(request.amount)}
+                        </p>
+                        <p>
+                            <strong>Requester:</strong>{' '}
+                            {request.requested_by ?? 'Not recorded'}
+                        </p>
+                        <p>
+                            <strong>Reviewer:</strong>{' '}
+                            {request.assigned_to ?? 'Unassigned'} ·{' '}
+                            <strong>Due:</strong> {request.due_on ?? 'Not set'}
+                        </p>
+                        {request.can_assign && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setAssigning(true)}
+                            >
+                                <UserRound className="size-4" />
+                                Assign reviewer / due date
+                            </Button>
+                        )}
+                        <p>{request.status_label}</p>
+                        {request.response_note && (
+                            <p>
+                                <strong>Requester’s response:</strong>{' '}
+                                {request.response_note}
+                            </p>
+                        )}
                         {request.decision_note && (
-                            <p className="mt-1 whitespace-pre-line text-muted-foreground">
+                            <p>
+                                <strong>Previous decision:</strong>{' '}
                                 {request.decision_note}
                             </p>
                         )}
-                    </section>
+                    </div>
                 )}
-
-                {open && request.own_request && (
-                    <p className="rounded-xl border border-border p-3 text-sm text-muted-foreground">
-                        You asked for this review, so someone else in Finance
-                        decides it.
-                    </p>
+                {step === 1 && (
+                    <div className="space-y-4">
+                        {!request.files.length && (
+                            <p>No files were attached.</p>
+                        )}
+                        {request.files.map((file) => (
+                            <div
+                                key={file.id}
+                                className="flex flex-wrap items-center gap-3 border-b py-3"
+                            >
+                                <FileText className="size-4" />
+                                <span>{file.name ?? 'File'}</span>
+                                {file.url ? (
+                                    <>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => setPreview(file)}
+                                        >
+                                            Preview
+                                        </Button>
+                                        <a
+                                            className="text-primary underline"
+                                            href={file.url}
+                                        >
+                                            Download
+                                        </a>
+                                    </>
+                                ) : (
+                                    <span>
+                                        {file.waiting
+                                            ? 'Waiting for virus check'
+                                            : 'File unavailable'}
+                                    </span>
+                                )}
+                            </div>
+                        ))}
+                        {preview?.url && (
+                            <section aria-label="File preview">
+                                <div className="flex items-center justify-between">
+                                    <strong>{preview.name}</strong>
+                                    <Button
+                                        variant="ghost"
+                                        onClick={() => setPreview(null)}
+                                    >
+                                        Close preview
+                                    </Button>
+                                </div>
+                                <DocumentPreview
+                                    url={preview.url + '?inline=1'}
+                                    name={preview.name ?? 'Evidence'}
+                                    mime={preview.mime}
+                                />
+                                <a
+                                    className="text-primary underline"
+                                    href={preview.url + '?inline=1'}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                >
+                                    Open preview in a new tab
+                                </a>
+                            </section>
+                        )}
+                        {request.decision_evidence?.length ? (
+                            <p>
+                                {request.decision_evidence.length} file
+                                identities and checksums retained with the
+                                latest decision.
+                            </p>
+                        ) : null}
+                        <section aria-label="History">
+                            <h3 className="flex items-center gap-2 font-semibold">
+                                <History className="size-4" />
+                                History
+                            </h3>
+                            <ol className="space-y-3">
+                                {history.map((entry) => (
+                                    <li key={entry.id}>
+                                        <strong>{entry.label}</strong> ·{' '}
+                                        {entry.actor ?? 'System'}
+                                        {entry.occurred_at
+                                            ? ' · ' +
+                                              formatDateTime(entry.occurred_at)
+                                            : ''}
+                                        <p>{entry.note}</p>
+                                    </li>
+                                ))}
+                            </ol>
+                            {historyError && <p role="alert">{historyError}</p>}
+                            {historyBefore && (
+                                <Button
+                                    variant="outline"
+                                    disabled={historyLoading}
+                                    onClick={loadOlderHistory}
+                                >
+                                    {historyLoading
+                                        ? 'Loading…'
+                                        : 'Load older history'}
+                                </Button>
+                            )}
+                        </section>
+                    </div>
                 )}
-
-                {request.can_decide && (
-                    <>
-                        <fieldset>
-                            <legend className="text-sm font-medium">
-                                Decision{' '}
-                                <span className="text-status-critical">*</span>
-                            </legend>
-                            <div className="mt-1.5">
-                                <TilePicker
-                                    value={form.data.decision}
-                                    onChange={(value) => {
-                                        form.setData(
-                                            'decision',
-                                            value as Decision,
-                                        );
-                                        form.clearErrors('decision');
+                {step === 2 &&
+                    (request.can_decide ? (
+                        <div className="space-y-5">
+                            <TilePicker
+                                value={decision}
+                                onChange={(value) => {
+                                    setDecision(value);
+                                    setError('');
+                                }}
+                                options={[
+                                    {
+                                        key: 'resolved',
+                                        label: 'Resolve',
+                                        description:
+                                            'Record how Finance has addressed it.',
+                                        icon: CheckCircle2,
+                                    },
+                                    {
+                                        key: 'changes_requested',
+                                        label: 'Return for correction',
+                                        description:
+                                            'Ask the requester to correct or explain the evidence.',
+                                        icon: Undo2,
+                                    },
+                                    {
+                                        key: 'declined',
+                                        label: 'Decline',
+                                        description:
+                                            'Explain why and record the next step.',
+                                        icon: XCircle,
+                                    },
+                                ].filter(
+                                    (option) =>
+                                        option.key !== 'changes_requested' ||
+                                        request.can_request_changes !== false,
+                                )}
+                            />
+                            <div>
+                                <Label htmlFor="finance-decision-note">
+                                    Decision note *
+                                </Label>
+                                <Textarea
+                                    id="finance-decision-note"
+                                    value={note}
+                                    maxLength={2000}
+                                    rows={5}
+                                    aria-invalid={
+                                        !!error || !!command.errors.note
+                                    }
+                                    onChange={(event) => {
+                                        setNote(event.target.value);
+                                        setError('');
                                     }}
-                                    options={DECISIONS.map((option) => ({
-                                        key: option.value,
-                                        label: option.label,
-                                        description: option.detail,
-                                        icon: option.icon,
-                                    }))}
                                 />
                             </div>
-                            <InputError
-                                className="mt-1 text-xs"
-                                message={form.errors.decision}
-                            />
-                        </fieldset>
-                        <div>
-                            <Label htmlFor="vehicle-review-note">
-                                Decision note{' '}
-                                <span className="text-status-critical">*</span>
-                            </Label>
-                            <Textarea
-                                id="vehicle-review-note"
-                                className="mt-1.5"
-                                rows={3}
-                                maxLength={5000}
-                                placeholder="e.g. Credit note requested from the supplier; the bill is on hold until it arrives."
-                                value={form.data.note}
-                                aria-invalid={Boolean(form.errors.note)}
-                                onChange={(event) => {
-                                    form.setData('note', event.target.value);
-                                    form.clearErrors('note');
-                                }}
-                            />
-                            <InputError
-                                className="mt-1 text-xs"
-                                message={form.errors.note}
-                            />
+                            <p className="text-sm text-muted-foreground">
+                                This records Finance’s response. Spend approval,
+                                journal posting and payment remain separate
+                                actions.
+                            </p>
                         </div>
-                    </>
-                )}
-
-                {request.history.length > 0 && (
-                    <section aria-label="History">
-                        <h3 className="text-xs text-muted-foreground">
-                            History
-                        </h3>
-                        <ol className="mt-1 grid gap-1 text-sm">
-                            {request.history.map((entry) => (
-                                <li key={entry.id}>
-                                    <span className="font-medium">
-                                        {entry.label}
-                                    </span>
-                                    {entry.actor ? ` · ${entry.actor}` : ''}
-                                    {entry.occurred_at
-                                        ? ` · ${formatDateTime(entry.occurred_at)}`
-                                        : ''}
-                                    {entry.note && (
-                                        <span className="block text-xs text-muted-foreground">
-                                            {entry.note}
-                                        </span>
-                                    )}
-                                </li>
-                            ))}
-                        </ol>
-                    </section>
-                )}
-            </div>
-
-            <DialogFooter className="mt-4">
-                <Button type="button" variant="outline" onClick={onClose}>
-                    {request.can_decide ? 'Cancel' : 'Close'}
+                    ) : (
+                        <p>
+                            {request.own_request
+                                ? 'Another Finance reviewer must decide your request.'
+                                : request.status_label}
+                            {request.decision_note
+                                ? ' · ' + request.decision_note
+                                : ''}
+                        </p>
+                    ))}
+            </WorkspaceWizard>
+            {assigning && (
+                <AssignmentWizard
+                    request={request}
+                    onClose={() => setAssigning(false)}
+                />
+            )}
+        </>
+    );
+}
+function AssignmentWizard({
+    request,
+    onClose,
+}: {
+    request: ReviewRequest;
+    onClose: () => void;
+}) {
+    const command = useVehicleRecordCommand(isSavedResponse);
+    const [assignee, setAssignee] = useState(
+        request.assigned_to_user_id ? String(request.assigned_to_user_id) : '',
+    );
+    const [due, setDue] = useState(request.due_on ?? '');
+    const [search, setSearch] = useState('');
+    const [choices, setChoices] = useState<Array<{ id: number; name: string }>>(
+        [],
+    );
+    const [next, setNext] = useState<number | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [saved, setSaved] = useState(false);
+    const load = async (after = 0) => {
+        setLoading(true);
+        setError('');
+        try {
+            const response = await fetch(
+                '/finance/vehicle-reviews/' +
+                    request.id +
+                    '/reviewers?search=' +
+                    encodeURIComponent(search) +
+                    '&after=' +
+                    after,
+                { headers: { Accept: 'application/json' } },
+            );
+            if (!response.ok) throw new Error();
+            const data = (await response.json()) as {
+                reviewers: typeof choices;
+                next_after: number | null;
+            };
+            setChoices((previous) =>
+                after ? [...previous, ...data.reviewers] : data.reviewers,
+            );
+            setNext(data.next_after);
+        } catch {
+            setError('Reviewers could not be loaded. Try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+    const submit = async () => {
+        const result = await command.submit(
+            '/finance/vehicle-reviews/' + request.id + '/assignment',
+            {
+                assigned_to_user_id: assignee ? Number(assignee) : null,
+                due_on: due || null,
+                expected_version: request.lock_version,
+            },
+        );
+        if (result?.saved) setSaved(true);
+    };
+    const close = () => {
+        onClose();
+        if (saved) router.reload();
+    };
+    return (
+        <WorkspaceWizard
+            title="Assign review"
+            description="Choose who will review this request and when it is due."
+            railIcon={UserRound}
+            railSub={request.reference ?? 'Finance review'}
+            steps={[
+                {
+                    key: 'assignment',
+                    label: 'Reviewer and due date',
+                    blurb: 'Both optional',
+                    icon: UserRound,
+                },
+            ]}
+            step={0}
+            setStep={() => {}}
+            pct={100}
+            context={{
+                name: request.type_label,
+                detail: vehicleLabel(request),
+            }}
+            command={command}
+            dirty={
+                assignee !== String(request.assigned_to_user_id ?? '') ||
+                due !== (request.due_on ?? '')
+            }
+            saved={saved}
+            submitLabel="Save assignment"
+            onValidateStep={() => true}
+            onSubmit={submit}
+            onClose={close}
+            onReload={() => router.reload({ onSuccess: command.reset })}
+            errorKey={JSON.stringify(command.errors)}
+            success={
+                <WizardSuccessPane
+                    title="Assignment saved"
+                    blurb="Any due reminders use the date you chose."
+                    actions={<Button onClick={close}>Back to review</Button>}
+                />
+            }
+        >
+            <div className="space-y-4">
+                <Label htmlFor="reviewer-search">Find reviewer</Label>
+                <Input
+                    id="reviewer-search"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                />
+                <Button
+                    variant="outline"
+                    disabled={loading}
+                    onClick={() => load()}
+                >
+                    Find eligible reviewers
                 </Button>
-                {request.vehicle.url && (
-                    <Button type="button" variant="outline" asChild>
-                        <a href={request.vehicle.url}>Open source profile</a>
+                {error && <p role="alert">{error}</p>}
+                <TilePicker
+                    value={assignee}
+                    onChange={setAssignee}
+                    options={[
+                        {
+                            key: '',
+                            label: 'Unassigned',
+                            description:
+                                'The Finance queue remains responsible.',
+                            icon: UserRound,
+                        },
+                        ...(request.assigned_to_user_id &&
+                        !choices.some(
+                            (choice) =>
+                                choice.id === request.assigned_to_user_id,
+                        )
+                            ? [
+                                  {
+                                      key: String(request.assigned_to_user_id),
+                                      label:
+                                          request.assigned_to ??
+                                          'Current reviewer',
+                                      description: 'Current assignment',
+                                      icon: UserRound,
+                                  },
+                              ]
+                            : []),
+                        ...choices.map((choice) => ({
+                            key: String(choice.id),
+                            label: choice.name,
+                            description: 'Eligible reviewer',
+                            icon: UserRound,
+                        })),
+                    ]}
+                />
+                {next !== null && (
+                    <Button
+                        variant="outline"
+                        disabled={loading}
+                        onClick={() => load(next)}
+                    >
+                        More reviewers
                     </Button>
                 )}
-                {request.can_decide && (
-                    <Button type="submit" disabled={form.processing}>
-                        {form.processing && (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        )}
-                        Record decision
-                    </Button>
-                )}
-            </DialogFooter>
-        </form>
+                <Label htmlFor="review-due">Due date (optional)</Label>
+                <Input
+                    id="review-due"
+                    type="date"
+                    value={due}
+                    onChange={(event) => setDue(event.target.value)}
+                />
+            </div>
+        </WorkspaceWizard>
     );
 }

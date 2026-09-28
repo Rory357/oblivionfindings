@@ -3,7 +3,9 @@
 namespace App\Domain\Finance\Policies;
 
 use App\Domain\Finance\Models\FinBill;
+use App\Domain\Finance\Services\BillSiteScope;
 use App\Models\User;
+use Illuminate\Auth\Access\Response;
 
 class FinBillPolicy
 {
@@ -12,9 +14,9 @@ class FinBillPolicy
         return $user->canDo('finance.ap.view');
     }
 
-    public function view(User $user, FinBill $bill): bool
+    public function view(User $user, FinBill $bill): Response
     {
-        return $user->canDo('finance.ap.view');
+        return $this->record($user, $bill, false);
     }
 
     public function create(User $user): bool
@@ -22,13 +24,23 @@ class FinBillPolicy
         return $user->canDo('finance.ap.manage');
     }
 
-    public function update(User $user, FinBill $bill): bool
+    public function update(User $user, FinBill $bill): Response
     {
-        return $user->canDo('finance.ap.manage');
+        return $this->record($user, $bill, true);
     }
 
-    public function approve(User $user, FinBill $bill): bool
+    public function approve(User $user, FinBill $bill): Response
     {
-        return $user->canDo('finance.ap.manage');
+        return $this->record($user, $bill, true);
+    }
+
+    private function record(User $user, FinBill $bill, bool $manage): Response
+    {
+        if (! $user->canDo($manage ? 'finance.ap.manage' : 'finance.ap.view')) {
+            return Response::deny();
+        }
+
+        return app(BillSiteScope::class)->allows($user, $bill, $manage)
+            ? Response::allow() : Response::denyAsNotFound();
     }
 }

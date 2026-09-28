@@ -5,8 +5,8 @@ type PendingCommand = {
     key: string;
     signature: string;
     url: string;
-    method: 'POST' | 'PUT' | 'DELETE';
     body: string | FormData;
+    method: 'POST' | 'PUT' | 'DELETE';
 };
 type CommandOptions = { method?: 'POST' | 'PUT' | 'DELETE' };
 
@@ -60,11 +60,12 @@ export function useVehicleRecordCommand<T>(
     ): Promise<T | null> {
         if (busy.current || requiresReload) return null;
         const signature = signatureOf(data);
+        const method = options.method ?? 'POST';
         if (
             !uncertain &&
             (pending.current?.signature !== signature ||
                 pending.current?.url !== url ||
-                pending.current?.method !== (options.method ?? 'POST'))
+                pending.current?.method !== method)
         ) {
             const body = data instanceof FormData ? new FormData() : signature;
             if (body instanceof FormData && data instanceof FormData) {
@@ -75,7 +76,7 @@ export function useVehicleRecordCommand<T>(
                 signature,
                 url,
                 body,
-                method: options.method ?? 'POST',
+                method,
             };
         }
         const command = pending.current;
@@ -194,6 +195,10 @@ export const isJsonObject = (
     value: unknown,
 ): value is Record<string, unknown> =>
     !!value && typeof value === 'object' && !Array.isArray(value);
+
+/** A command is confirmed only when the endpoint explicitly acknowledges its save. */
+export const isSavedResponse = (value: unknown): value is { saved: true } =>
+    isJsonObject(value) && value.saved === true;
 
 /**
  * A one-shot JSON write outside a dialog (e.g. Undo from a toast), with the

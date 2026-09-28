@@ -10,9 +10,15 @@ export type FinanceRequestType =
     | 'fixed_asset_update'
     | 'cost_allocation_correction';
 
-export type FinanceRequestStatus = 'submitted' | 'resolved' | 'declined';
+export type FinanceRequestStatus =
+    | 'preparing'
+    | 'submitted'
+    | 'changes_requested'
+    | 'resolved'
+    | 'declined';
 
 export type FinanceFile = {
+    mime?: string | null;
     id: number;
     name: string;
     state: string | null;
@@ -79,6 +85,10 @@ export type FinanceReviewRequest = {
     decided_at: string | null;
     decision_note: string | null;
     lock_version: number;
+    evidence_token: string;
+    can_submit: boolean;
+    due_on: string | null;
+    response_note: string | null;
     history: FinanceRequestEvent[];
     files: FinanceFile[];
     can_decide: boolean;

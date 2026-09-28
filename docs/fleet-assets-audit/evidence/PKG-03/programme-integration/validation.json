@@ -1,0 +1,53 @@
+{
+  "applicationCandidate": "e693f4269591c6db3ab29a94e466db9bc86ae266",
+  "base": "926b4981b0289da08a20baca0995117fb53e413e",
+  "changedSourceFiles": 72,
+  "localMainIntegrated": false,
+  "remotePushed": false,
+  "deployed": false,
+  "backend": {
+    "cases": 82,
+    "warnings": 78,
+    "exitCode": 0,
+    "failures": 0,
+    "errors": 0,
+    "assertions": 1523,
+    "skipped": 0
+  },
+  "frontend": {
+    "files": 12,
+    "initialEnvironmentFailureRetained": true,
+    "cases": 53,
+    "exitCode": 0
+  },
+  "typescriptExit": 0,
+  "eslintExit": 0,
+  "pintExit": 0,
+  "build": {
+    "largeChunkWarnings": true,
+    "modules": 5450,
+    "exitCode": 0,
+    "actualViteConfig": true
+  },
+  "browser": {
+    "consoleErrors": 0,
+    "pdfRendered": true,
+    "focusRestored": true,
+    "productionAssets": true,
+    "workNavigation": true,
+    "actual125PercentZoomVerified": false,
+    "tabClosed": true,
+    "syntheticInertia": true,
+    "consoleWarnings": 0,
+    "cssWidths": [
+      1440,
+      1280
+    ],
+    "viewportReset": true,
+    "freshAuthenticatedCheck": false
+  },
+  "frozenFilesMatched": 311,
+  "readOnlyReferencesMatched": 3,
+  "nonVehicleAssetCorrections": "Unavailable; server rejects unsupported correction state and UI retains Resolve/Decline",
+  "remoteScope": "Main must explicitly resolve publication authority"
+}

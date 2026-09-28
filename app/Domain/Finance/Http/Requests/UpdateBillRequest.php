@@ -4,18 +4,22 @@ namespace App\Domain\Finance\Http\Requests;
 
 use App\Domain\Finance\Services\AccountsPayableService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Validator;
 
 class UpdateBillRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('update', $this->route('bill'));
+        Gate::forUser($this->user())->authorize('update', $this->route('bill'));
+
+        return true;
     }
 
     public function rules(): array
     {
         return [
+            'site_id' => ['required', 'integer', 'min:1'],
             'vendor_id' => 'sometimes|required|exists:fin_vendors,id',
             'vendor_reference' => 'nullable|string|max:255',
             'bill_date' => 'sometimes|required|date',
