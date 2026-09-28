@@ -1,5 +1,7 @@
 // Read-only execution of the submitted Fleet Month-move callback and its actual helpers.
 import fs from 'node:fs';
+import { Buffer } from 'node:buffer';
+import process from 'node:process';
 import crypto from 'node:crypto';
 import ts from 'typescript';
 

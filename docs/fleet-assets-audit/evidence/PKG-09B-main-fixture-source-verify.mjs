@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs';
+import process from 'node:process';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 const main = 'C:/Users/steph/Herd/oblivionfindings';

@@ -1,5 +1,6 @@
 // Execute the candidate's actual callback and helpers; no application writes.
 import fs from 'node:fs';
+import process from 'node:process';
 import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
 import ts from 'typescript';

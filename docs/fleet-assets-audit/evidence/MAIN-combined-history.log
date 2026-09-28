@@ -1,0 +1,25 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\phpunit.xml
+
+..[41;37mF[0m                                                                 3 / 3 (100%)
+
+Time: 06:31.776, Memory: 118.00 MB
+
+There was 1 failure:
+
+1) PKGConsolidationMainHistoryReviewTest::test_staff_history_is_session_bound_and_never_restarts_collection
+Failed asserting that two strings are identical.
+--- Expected
++++ Actual
+@@ @@
+-'ready'
++'queued'
+
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\AssertableJsonString.php:243
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:873
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\tests\Feature\Reporting\OperationalReportsTest.php:316
+
+[37;41mFAILURES![0m
+[37;41mTests: 3[0m[37;41m, Assertions: 17[0m[37;41m, Failures: 1[0m[37;41m.[0m

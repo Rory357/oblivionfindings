@@ -1,5 +1,7 @@
 // Read-only reproduction against the submitted Transport helper, not a copied implementation.
 import fs from 'node:fs';
+import { Buffer } from 'node:buffer';
+import process from 'node:process';
 import crypto from 'node:crypto';
 import ts from 'typescript';
 

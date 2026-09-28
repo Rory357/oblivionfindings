@@ -1,0 +1,78 @@
+{
+  "checkedAt": "2026-09-28T05:13:28.085690+00:00",
+  "candidate": "29a83522d596787320495b920f0af40322494ea3",
+  "parents": [
+    "a3cb72895ce6682bcf39fe6276ce38955987bd7d",
+    "2f788b0b880e9b838c0b89b3c8eba2ecd57bf097"
+  ],
+  "sourceChecks": [
+    {
+      "path": "resources/js/pages/fleet-assets/settings/_maps.tsx",
+      "sha256": "a8ee1445b2ac57e4d16ae86848c4682ae9142624e39aa2cd0670185e25dff244",
+      "matchesReviewedFocus": true
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/settings/_ui.tsx",
+      "sha256": "6a2282273398f26ce4e4017cd5ad112d7550780d7dce51567e6529ace8d166bf",
+      "matchesReviewedFocus": true
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/settings/maps-focus.test.tsx",
+      "sha256": "0c29332aafe9423f8a6319cc9a4650469803cb25dce7c752770a9427989565ae",
+      "matchesReviewedFocus": true
+    }
+  ],
+  "changedExistingPaths": [
+    "resources/js/pages/fleet-assets/settings/_maps.tsx",
+    "resources/js/pages/fleet-assets/settings/_ui.tsx"
+  ],
+  "preservedBasePaths": 22431,
+  "preservedDocumentationPaths": 12535,
+  "ownerFrontendTestsPassed": 15,
+  "ownerScopedLintErrors": 0,
+  "ownerScopedLintWarnings": 0,
+  "ownerFullTypesExit": 0,
+  "ownerProductionBuildExit": 0,
+  "reusedBackendTests": 494,
+  "reusedBackendAssertions": 5905,
+  "newBrowserRun": false,
+  "actualZoomEvidence": "MAIN-chrome-125-verification-20260928.md",
+  "evidenceHashes": {
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/.gitattributes": "45fb6649fd891d590100736ba94acef426f23223920447c41da4a7d7f276217b",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/README.md": "99ba47f6a297aca750bdfc4b4170de066c54988506395170126b9db1a33b792f",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/build-assets.json": "474214fb6bbf3974669947f5ee43e869ed641a7d8c22385069a76a78a2b5aa11",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/build-manifest.json": "30c08fc56a74024b98f67d3341d687c1fe53811410e8515c700291421590380c",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/build-result.json": "0f83e0adf65c01f34bc5258a5a8e5a52a0c7a477d42ef532f518996a17400654",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/build.log": "5f488ef50dd9489a13597943ddfc259100d11435a49868bf77ad07f85b1dd915",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/eslint.json": "167f2558b546dc5596baaf62261d94aa83aa878834403e324c552c67a6995e52",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/final-focus-qa.cjs": "11f64b8463dc04e0925d9d8f154032eef0a623df95af4dfa75f0475382663f25",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/final-focus-vite-worker.mjs": "448a4c47b6e816d74c7cba1c7ecd4d097082b3e9116d14f403f38e484ba953e4",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/lint-result.json": "e9ce2c5b4342a941934485dcc5a0e98c1a928063899798b815181e908f4aae94",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/preflight.json": "e3285535db612e99c7007c41b50dfd40eb1760befc770be7b8e32a979bc66df3",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/preservation.json": "879eddf270ed07d33781ee877784378dc7456d992e43cf30198f2acf65c9dfd3",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/qa.json": "813e03d85545aebe4d070a4615e26e19c6a41eadef470629d7e30801a4c8bc46",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/source-manifest.json": "5c8d393ece87fde81446ff32ace8b40d24b984c1d71aeabeea023ca3b46c1cb7",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/tests-final-result.json": "169670cc7472c3f94ffe834aa9799a25101b21f7610e7d1aa7c92e5f8ec570d3",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/tests-final.json": "2a5cde0c46efb3e8f31a5f83090bc01c723ff0f6f34c0a15209b5385919dcb0f",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/tests-final.log": "691af90b419839fdc749313e175d7a261223704d2b3d23257fb62444e6d3b2db",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/tests-result.json": "22479187f91b3a0f586aa065adabd889fb8592b7b26cb5b2e058c739220f0461",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/tests.log": "77fe05bf265d4441ec128e6c1fd444f56ecd3eafac3a76172cd47c2396a663f8",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/toolchain.json": "b8b23e20ed99c22b958b970e3fa1e54ab617af5e7496f8aa587113cc2e111c52",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/types-result.json": "b5e1745b7c17e89fbf4975f2c84ab009f2146cfccfa3f514c2031c821a220565",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/vite-manifest.json": "4021ec927a3670f5b91be36f8a8880b251de0587c32fc01dfb4853f76f0ad648",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/focus-correction/README.md": "51a7b2bab13ad45036a9c12fb8c83524a8d20e584a314b63846cfe624c8f59c4",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/focus-correction/after-tests.json": "9325d22a124230ce441c5f5a89a8c2c25efb3e1f68976bc3fb094cbff9aa62aa",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/focus-correction/before-tests.json": "a58b93776ee580883583a314acc3adb9a607daa408bf8b112c330529d75738e4",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/focus-correction/eslint.json": "167f2558b546dc5596baaf62261d94aa83aa878834403e324c552c67a6995e52",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/focus-correction/qa.json": "36c4e70888c22403c68e809d856722d5409e12321b227b50681f7583af123f28",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/focus-correction/source-manifest.json": "1105f7c21e946579f8dd157f8d56d3c0659620efe2728421e84ff2aacd61e789",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/focus-correction/typecheck-initial-result.json": "b847f31aaabbf88f85b840659d1340d714df8b9d6752eea6ae5924446a43e5ed",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/focus-correction/typecheck-initial.txt": "b90f4a35b8797e190487fc0dd9e4825abe5ae35e42544502b6a478ec71f14afb",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/focus-correction/typecheck-result.json": "a291043a3d6d5d094008ad650c18508e2d689abc5e76bc5d8eaca34dea26e58f",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/focus-correction/typecheck.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "unexpectedPaths": [],
+  "sourceOrTestEditsByMain": false
+}

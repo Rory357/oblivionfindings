@@ -1,0 +1,37 @@
+{
+  "checkedAt": "2026-09-28T05:45:32.356220+00:00",
+  "applicationMain": "29a83522d596787320495b920f0af40322494ea3",
+  "actualRemote": "29a83522d596787320495b920f0af40322494ea3",
+  "reviewedAncestors": {
+    "PKG-03": "fbb0eda96586ca751b73382eb90720abd6b8721a",
+    "PKG-08 original": "38239d35506bf97c4b6f865a13aa10933b4cb439",
+    "OPS-PL01": "352ce7006098b227b945a47c4d55400c9aeff429",
+    "PKG-09B original": "50716b9cca0473ee4082e329ce6ff1347833f714",
+    "Combined QA": "a3cb72895ce6682bcf39fe6276ce38955987bd7d",
+    "Settings focus": "2f788b0b880e9b838c0b89b3c8eba2ecd57bf097"
+  },
+  "allAncestorsIncluded": true,
+  "sourceWorkingDiff": [],
+  "protectedDesignChangesFromReviewedBase": [],
+  "finalFocusFiles": {
+    "resources/js/pages/fleet-assets/settings/_maps.tsx": {
+      "sha256": "a8ee1445b2ac57e4d16ae86848c4682ae9142624e39aa2cd0670185e25dff244",
+      "gitEntry": "100644 blob ad98941fb7d8d22157e569059505a237d133e8be",
+      "bytes": 32576
+    },
+    "resources/js/pages/fleet-assets/settings/_ui.tsx": {
+      "sha256": "6a2282273398f26ce4e4017cd5ad112d7550780d7dce51567e6529ace8d166bf",
+      "gitEntry": "100644 blob ffff005ccbd0bdd2f673a52f1195faf7ff186bef",
+      "bytes": 4276
+    },
+    "resources/js/pages/fleet-assets/settings/maps-focus.test.tsx": {
+      "sha256": "0c29332aafe9423f8a6319cc9a4650469803cb25dce7c752770a9427989565ae",
+      "gitEntry": "100644 blob f795147376e8133ed463cf563570a0298c3c888e",
+      "bytes": 4247
+    }
+  },
+  "canonicalMasterSha256": "b2ec6cab1d0047a2b1dfc724e37b2a356beb356093b9cc0934f4352ca1748114",
+  "qaReusedOnIdenticalSource": true,
+  "finalPageAcceptance": "Pending Stephan; no unpinning or operating activation",
+  "repositoryWideCi": "Not certified green; scoped QA and baseline failures recorded separately"
+}

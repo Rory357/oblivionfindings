@@ -1,0 +1,7 @@
+# Preserve the original raw Main test output and JUnit bytes in this audit.
+MAIN-combined-history.log -text
+MAIN-combined-history.xml -text
+MAIN-combined-map.log -text
+MAIN-combined-map.xml -text
+MAIN-combined-staff-corrected.log -text
+MAIN-combined-staff-corrected.xml -text
