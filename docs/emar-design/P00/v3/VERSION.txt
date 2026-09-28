@@ -1,0 +1,12 @@
+eMAR P00 v3 — Medication rules & states (design mockup)
+Recorded 29 September 2026 NZDT · baseline 52dafa6728ebe343631453d4863f645d97c59506 · branch claude/vigilant-mclaren-233129
+Supersedes v2 (6f4242337, frozen). Aligned with P0 fixes on claude/friendly-greider-b40f6d (not yet accepted).
+Approval applies to exactly these files (SHA-256):
+
+3aaed61352ec36f1254d1cea3e29664f123a6390383da8f36c158159f40e5da8 *index.html
+93e2c0ed5504ea5db9adbace5a9b48a67c319b1dad8d6435546705386c1c9410 *mockup.css
+3478cfdc2ed13d1a0932404626b96f975a40a38c43522ae60b276943f9d72162 *mockup.js
+1ac6115747efdc75a1119d8838de5f25a68ba5cf2a985e95fd966c2e7d1315f5 *serve.mjs
+73377b495824987ce02c6d493f548e6b4e4e75824fcb18371059a88b887942f3 *README.md
+
+Screenshots (evidence, not part of the approved design surface): 79 PNG files in screenshots/
