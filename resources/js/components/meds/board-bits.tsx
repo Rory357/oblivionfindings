@@ -6,7 +6,7 @@ import { avatarHueStyle } from '@/components/rostering/avatar-hue';
 import { Badge } from '@/components/ui/badge';
 import { InfoCard } from '@/components/wizard/primitives';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, Info, MapPin } from 'lucide-react';
+import { AlertTriangle, MapPin } from 'lucide-react';
 
 import {
     clientHue,
@@ -162,7 +162,9 @@ export function ClientAllergyNotice({
     }
 
     return (
-        <InfoCard icon={Info}>
+        // Absence of a record is a safety surface: fixed amber, never the
+        // brand tint (DESIGN.md non-negotiable #6).
+        <InfoCard icon={AlertTriangle} tone="warn">
             No allergies recorded for {name} — check the health profile before
             giving.
         </InfoCard>

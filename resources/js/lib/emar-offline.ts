@@ -90,7 +90,7 @@ type LegacyOfflineQueueEntry = {
 };
 
 const CONNECTION_REQUIRED_MESSAGE =
-    'Stay on this screen and reconnect before retrying. The same request ID has been kept.';
+    'Stay on this screen and reconnect. Check the chart before trying again. Trying again won’t create a duplicate.';
 
 const EMAR_QUEUE_STORAGE_KEY = 'emar-offline-queue:v1';
 const EMAR_DEVICE_STORAGE_KEY = 'emar-offline-device-id:v1';
@@ -252,7 +252,7 @@ function requiresConnectionResult<T>(
 }
 
 const UNCONFIRMED_SERVER_RESPONSE_MESSAGE =
-    'The server did not confirm this was saved, so it is not shown as recorded. Check the record before retrying — a retry reuses the same request ID.';
+    'The server did not confirm this was saved, so it is not shown as recorded. Check the chart before trying again. Trying again won’t create a duplicate.';
 
 /**
  * Only a JSON body with a confirmed `sync.status` counts as success. A

@@ -103,7 +103,7 @@ describe('OfflineStatusBanner', () => {
         render(<OfflineStatusBanner />);
 
         expect(screen.getByRole('status')).toHaveTextContent(
-            /manual retry.*original request ID/i,
+            /need.*attention.*Trying again won’t create a duplicate/i,
         );
         expect(
             screen.getByRole('button', { name: 'Retry safely' }),
@@ -139,7 +139,7 @@ describe('OfflineStatusBanner', () => {
         render(<OfflineStatusBanner />);
 
         expect(screen.getByRole('alert')).toHaveTextContent(
-            'A saved medication action was NOT recorded: PRN limit reached (4 of 4 in 24 hours).',
+            'A saved medication action was not recorded: PRN limit reached (4 of 4 in 24 hours).',
         );
 
         fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));

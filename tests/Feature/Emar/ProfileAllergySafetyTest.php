@@ -119,7 +119,10 @@ class ProfileAllergySafetyTest extends TestCase
         $this->assertSame('Penicillin', $allergyWarnings[0]['details']['allergen']);
         $this->assertSame('health_profile', $allergyWarnings[0]['details']['source']);
         $this->assertNull($allergyWarnings[0]['details']['severity']);
-        $this->assertStringContainsString('severity not recorded', $allergyWarnings[0]['message']);
+        $this->assertSame(
+            'Possible allergy match — Amoxicillin 500mg capsule matches recorded Penicillin allergy (health profile)',
+            $allergyWarnings[0]['message'],
+        );
 
         $this->assertCount(0, collect(
             $safety->performSafetyCheck($this->client, $paracetamol)['warnings'],
@@ -139,7 +142,10 @@ class ProfileAllergySafetyTest extends TestCase
 
         $check = app(MedicationSafetyService::class)->performSafetyCheck($this->client, $amoxicillin);
         $this->assertTrue($check['blocked']);
-        $this->assertStringContainsString('Recorded allergy to Penicillin', (string) $check['block_reason']);
+        $this->assertStringStartsWith(
+            'Possible allergy match — Amoxicillin 500mg capsule matches recorded Penicillin allergy (health profile).',
+            (string) $check['block_reason'],
+        );
 
         $this->actingAs($this->worker)
             ->from('/meds/today')

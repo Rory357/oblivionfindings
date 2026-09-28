@@ -376,7 +376,7 @@ export default function ShiftMedicationCard({
         } catch (error: unknown) {
             if (needsWitness && axios.isAxiosError(error) && !error.response) {
                 toast.error(
-                    'Reconnect and retry this witnessed medication action. The same request ID has been kept.',
+                    'Reconnect to record this witnessed medication action. Check the chart before trying again. Trying again won’t create a duplicate.',
                 );
                 return;
             }

@@ -67,6 +67,27 @@ class MedicationSafetyPolicySettings
         return $values;
     }
 
+    /**
+     * Which rules someone has deliberately saved. A rule with no stored row is
+     * still on its default and shows "Default — not yet reviewed".
+     *
+     * @return array<string, bool>
+     */
+    public function reviewed(): array
+    {
+        $stored = AppSetting::query()
+            ->whereIn('key', array_keys(self::DEFAULTS))
+            ->pluck('key')
+            ->all();
+
+        $reviewed = [];
+        foreach (array_keys(self::DEFAULTS) as $key) {
+            $reviewed[$key] = in_array($key, $stored, true);
+        }
+
+        return $reviewed;
+    }
+
     /** @param  array<string, string>  $values  Validated against OPTIONS by the caller. */
     public function save(array $values): void
     {

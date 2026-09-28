@@ -15,6 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { router } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -25,6 +26,9 @@ export type SafetyPolicyValues = {
 };
 
 type Field = keyof SafetyPolicyValues;
+
+/** false = still on its default; nobody has deliberately saved a choice. */
+export type SafetyPolicyReviewed = Record<Field, boolean>;
 
 const RULES: {
     field: Field;
@@ -77,15 +81,21 @@ const RULES: {
 
 export function SafetyPolicyCard({
     values,
+    reviewed,
     canManage,
 }: {
     values: SafetyPolicyValues;
+    reviewed: SafetyPolicyReviewed;
     canManage: boolean;
 }) {
     const [draft, setDraft] = useState<SafetyPolicyValues>(values);
     const [confirming, setConfirming] = useState(false);
     const [saving, setSaving] = useState(false);
-    const changed = RULES.filter((r) => draft[r.field] !== values[r.field]);
+    // Saving confirms every rule shown, so an unreviewed default can be
+    // confirmed without changing it.
+    const changed = RULES.filter(
+        (r) => draft[r.field] !== values[r.field] || !reviewed[r.field],
+    );
 
     function save() {
         router.put('/emar/settings/safety-policy', draft, {
@@ -116,9 +126,16 @@ export function SafetyPolicyCard({
                         className="grid gap-2 md:grid-cols-[1fr_minmax(0,22rem)] md:items-start"
                     >
                         <div>
-                            <Label htmlFor={`safety-${rule.field}`}>
-                                {rule.label}
-                            </Label>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Label htmlFor={`safety-${rule.field}`}>
+                                    {rule.label}
+                                </Label>
+                                {!reviewed[rule.field] ? (
+                                    <StatusBadge variant="warning">
+                                        Default — not yet reviewed
+                                    </StatusBadge>
+                                ) : null}
+                            </div>
                             <p className="text-caption mt-1">{rule.help}</p>
                         </div>
                         <Select
@@ -159,8 +176,8 @@ export function SafetyPolicyCard({
                     </div>
                 ) : (
                     <p className="text-caption">
-                        Only someone who manages eMAR settings for all sites can
-                        change these rules.
+                        Only someone who manages medication settings for all
+                        sites can change these rules.
                     </p>
                 )}
             </CardContent>

@@ -70,10 +70,12 @@ class MedicationSafetyService
                     === ClientAllergyRecordService::SOURCE_PROFILE;
 
                 if ($fromProfile) {
+                    // Plain-language copy approved in P00 v2 (no emoji, no capitals).
+                    $matchLine = "Possible allergy match — {$medication->name} matches recorded {$allergy->allergen} allergy (health profile)";
                     $warning = [
                         'type' => 'allergy',
                         'severity' => $blockUnratedProfileMatches ? 'danger' : 'warning',
-                        'message' => "⚠️ ALLERGY ALERT: Client has a recorded allergy to {$allergy->allergen} (health profile — severity not recorded)",
+                        'message' => $matchLine,
                         'details' => [
                             'allergen' => $allergy->allergen,
                             'reaction' => null,
@@ -84,8 +86,7 @@ class MedicationSafetyService
 
                     if ($blockUnratedProfileMatches) {
                         $blocked = true;
-                        $warning['message'] .= ' - ADMINISTRATION BLOCKED';
-                        $blockReason = "Recorded allergy to {$allergy->allergen} (health profile, severity not recorded). Check with the prescriber before giving.";
+                        $blockReason = $matchLine.'. Your organisation blocks allergy matches, so this can’t be recorded as given. Check with the prescriber.';
                     }
 
                     $warnings[] = $warning;

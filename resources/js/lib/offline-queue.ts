@@ -938,9 +938,9 @@ export async function submitOffline(
 }
 
 const REJECTED_REPLAY_FALLBACK_MESSAGE =
-    'The server refused this saved action, so it was NOT recorded.';
+    'The server refused this saved action, so it was not recorded.';
 const UNCONFIRMED_REPLAY_MESSAGE =
-    'The server did not confirm this saved action. It is kept with the same request ID for a safe manual retry.';
+    'The server did not confirm this saved action. Check the chart before trying again. Trying again won’t create a duplicate.';
 
 /**
  * Keep a server-refused item on the device, flagged as not recorded, so the
@@ -1124,14 +1124,14 @@ export async function replayOfflineQueue(): Promise<void> {
     }
     if (rejected > 1) {
         toast.error(
-            `${rejected} queued items were NOT recorded. They stay on this device until you dismiss them.`,
+            `${rejected} queued items were not recorded. They stay on this device until you dismiss them.`,
         );
     }
     if (needsAttention > 0) {
         toast.error(
             needsAttention === 1
-                ? 'A queued item needs a manual retry. It remains safely stored with the same request ID.'
-                : `${needsAttention} queued items need a manual retry. They remain safely stored with their original request IDs.`,
+                ? 'A queued item needs a manual retry. Check the chart before trying again. Trying again won’t create a duplicate.'
+                : `${needsAttention} queued items need a manual retry. Check the chart before trying again. Trying again won’t create a duplicate.`,
         );
     }
 }

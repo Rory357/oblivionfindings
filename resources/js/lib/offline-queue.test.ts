@@ -741,7 +741,7 @@ describe('offline queue', () => {
         });
         expect(storage.items()[0].payload).toEqual(queuedSubmission().payload);
         expect(toast.error).toHaveBeenCalledWith(
-            expect.stringContaining('same request ID'),
+            expect.stringContaining('Trying again won’t create a duplicate'),
         );
     });
 

@@ -238,6 +238,16 @@ class CompetencyRestrictionRulesTest extends TestCase
 
         $orgManager = $this->siteStaff(['medications.settings.manage', 'sites.viewAll']);
         $this->actingAs($orgManager)
+            ->get('/emar/settings')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('safetyPolicy.reviewed', [
+                    'profile_allergy_match' => false,
+                    'restricted_competency' => false,
+                    'competency_areas' => false,
+                ]));
+
+        $this->actingAs($orgManager)
             ->from('/emar/settings')
             ->put('/emar/settings/safety-policy', [...$payload, 'competency_areas' => 'always'])
             ->assertSessionHasErrors('competency_areas');
@@ -264,6 +274,11 @@ class CompetencyRestrictionRulesTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('emar/Settings')
                 ->where('safetyPolicy.values', $payload)
+                ->where('safetyPolicy.reviewed', [
+                    'profile_allergy_match' => true,
+                    'restricted_competency' => true,
+                    'competency_areas' => true,
+                ])
                 ->where('safetyPolicy.can_manage', true));
     }
 

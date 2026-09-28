@@ -215,8 +215,13 @@ describe('controlled mutation dialog replay contracts', () => {
             'client_request_uuid: submissionReplay.current.uuid,',
         );
         expect(prnWizardSource).toContain('submitEmarMutation(');
+        // A witnessed medicine, or a restricted worker's co-signed dose
+        // (NF-03), needs a live credential and is never queued offline.
         expect(prnWizardSource).toContain(
-            'allowQueueWhenOffline: !med.requires_witness',
+            'const needsWitness = !!med?.requires_witness || cosignerOnly;',
+        );
+        expect(prnWizardSource).toContain(
+            'allowQueueWhenOffline: !needsWitness',
         );
         expect(prnWizardSource).toContain(
             'if (!emarMutationWasAccepted(result.status)) return;',

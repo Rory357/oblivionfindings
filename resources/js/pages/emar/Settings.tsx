@@ -37,6 +37,7 @@ import { toast } from 'sonner';
 
 import {
     SafetyPolicyCard,
+    type SafetyPolicyReviewed,
     type SafetyPolicyValues,
 } from './_safety-policy-card';
 
@@ -56,7 +57,11 @@ type Rule = {
 };
 
 type Props = {
-    safetyPolicy: { values: SafetyPolicyValues; can_manage: boolean };
+    safetyPolicy: {
+        values: SafetyPolicyValues;
+        reviewed: SafetyPolicyReviewed;
+        can_manage: boolean;
+    };
     rules: Rule[];
     sites: { id: number; name: string }[];
     observationOptions: Option[];
@@ -201,6 +206,7 @@ export default function EmarSettings({
             <PageShell>
                 <SafetyPolicyCard
                     values={safetyPolicy.values}
+                    reviewed={safetyPolicy.reviewed}
                     canManage={safetyPolicy.can_manage}
                 />
                 <div className="mb-4 flex items-center justify-between gap-4">

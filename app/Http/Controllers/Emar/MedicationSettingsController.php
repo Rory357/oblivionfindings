@@ -86,8 +86,10 @@ class MedicationSettingsController extends Controller
     }
 
     /**
-     * @param  array<string, string>  $values  Keyed by app_settings key.
-     * @return array<string, string> Keyed by request field.
+     * @template T of string|bool
+     *
+     * @param  array<string, T>  $values  Keyed by app_settings key.
+     * @return array<string, T> Keyed by request field.
      */
     private function safetyPolicyRequestValues(array $values): array
     {
@@ -140,6 +142,8 @@ class MedicationSettingsController extends Controller
         return Inertia::render('emar/Settings', [
             'safetyPolicy' => [
                 'values' => $this->safetyPolicyRequestValues($this->safetyPolicy->all()),
+                // false = still the default, never deliberately saved.
+                'reviewed' => $this->safetyPolicyRequestValues($this->safetyPolicy->reviewed()),
                 'can_manage' => $canManageGlobal,
             ],
             'rules' => $rules,

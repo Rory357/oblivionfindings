@@ -50,8 +50,9 @@ export default function OfflineStatusBanner() {
                     <AlertTriangle aria-hidden className="h-4 w-4" />
                     <span>
                         {rejectedCount === 1
-                            ? 'A saved medication action was NOT recorded'
-                            : `${rejectedCount} saved medication actions were NOT recorded`}
+                            ? 'A saved medication action was '
+                            : `${rejectedCount} saved medication actions were `}
+                        <strong>not</strong> recorded
                         {reason ? `: ${reason}` : '.'}
                     </span>
                     <button
@@ -90,7 +91,7 @@ export default function OfflineStatusBanner() {
     if (needsAttentionCount > 0) {
         message = offline
             ? `${needsAttentionCount} queued item${needsAttentionCount === 1 ? '' : 's'} will need a manual retry after reconnecting.`
-            : `${needsAttentionCount} queued item${needsAttentionCount === 1 ? '' : 's'} need${needsAttentionCount === 1 ? 's' : ''} attention. A manual retry will reuse the original request ID.`;
+            : `${needsAttentionCount} queued item${needsAttentionCount === 1 ? '' : 's'} need${needsAttentionCount === 1 ? 's' : ''} attention. Check the chart before trying again. Trying again won’t create a duplicate.`;
     } else if (offline && pendingCount === 0) {
         message =
             'You\u2019re offline. We\u2019ll send anything you save when you\u2019re back.';

@@ -821,10 +821,10 @@ export function PrnWizard({
                             <div role="alert" data-test="meds-prn-rejected">
                                 <InfoCard icon={AlertTriangle} tone="crit">
                                     <strong>
-                                        Not recorded — this PRN dose was not
-                                        saved.
+                                        Not recorded — this dose was not saved.
                                     </strong>{' '}
-                                    {submitError}
+                                    {submitError} The chart doesn’t show this
+                                    dose.
                                 </InfoCard>
                             </div>
                         ) : err('reason') ? (
