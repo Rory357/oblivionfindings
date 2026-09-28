@@ -73,6 +73,17 @@ export interface ClientInfo {
     allergy_status?: 'recorded' | 'none_recorded' | 'unavailable';
 }
 
+/**
+ * The organisation's restricted-competency rule as it applies to the signed-in
+ * worker (NF-03). Null/absent when no rule applies. The server enforces it
+ * when a dose is signed; this only shows the reason up front.
+ */
+export interface CompetencyNotice {
+    requires_cosigner: boolean;
+    blocked: boolean;
+    message: string;
+}
+
 export interface SiteInfo {
     id: number;
     name: string;
@@ -199,6 +210,7 @@ export interface MedsTodayProps {
         med_competent: boolean;
         controlled_record: boolean;
         cd_witness: boolean;
+        competency_notice?: CompetencyNotice | null;
     };
     board_can: {
         view_emar: boolean;

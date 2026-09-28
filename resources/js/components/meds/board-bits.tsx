@@ -12,6 +12,7 @@ import {
     clientHue,
     clientInitials,
     type ClientInfo,
+    type CompetencyNotice,
     type DoseStatus,
 } from '@/pages/meds/today/types';
 
@@ -164,6 +165,29 @@ export function ClientAllergyNotice({
         <InfoCard icon={Info}>
             No allergies recorded for {name} — check the health profile before
             giving.
+        </InfoCard>
+    );
+}
+
+/**
+ * The signed-in worker's restricted-competency rule (NF-03), shown before
+ * they sign so a server refusal is never a surprise.
+ */
+export function CompetencyRestrictionNotice({
+    notice,
+}: {
+    notice: CompetencyNotice | null | undefined;
+}) {
+    if (!notice) return null;
+
+    return (
+        <InfoCard icon={AlertTriangle} tone={notice.blocked ? 'crit' : 'warn'}>
+            <strong>
+                {notice.blocked
+                    ? 'You can’t sign doses as given.'
+                    : 'Co-signer required.'}
+            </strong>{' '}
+            {notice.message}
         </InfoCard>
     );
 }

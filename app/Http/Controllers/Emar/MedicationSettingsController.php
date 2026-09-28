@@ -8,7 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Models\MedicationAdminRule;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationSafetyPolicySettings;
 use App\Services\MedicationRuleService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -33,7 +35,66 @@ class MedicationSettingsController extends Controller
         private readonly UserSiteAccessService $siteAccess,
         private readonly MedicationRuleService $ruleService,
         private readonly PeopleMutationLockService $peopleLocks,
+        private readonly MedicationSafetyPolicySettings $safetyPolicy,
     ) {}
+
+    /**
+     * Request field → app_settings key for the organisation-wide safety rules
+     * (EM-07 profile allergies, NF-03 competency). Short request names keep
+     * dotted setting keys out of the validator.
+     */
+    private const SAFETY_POLICY_FIELDS = [
+        'profile_allergy_match' => MedicationSafetyPolicySettings::PROFILE_ALLERGY_MATCH,
+        'restricted_competency' => MedicationSafetyPolicySettings::RESTRICTED_COMPETENCY,
+        'competency_areas' => MedicationSafetyPolicySettings::COMPETENCY_AREAS,
+    ];
+
+    /**
+     * Organisation-wide medication safety rules. They apply to every Site, so
+     * only an eMAR settings manager with organisation-wide authority may
+     * change them; every change is audited.
+     */
+    public function updateSafetyPolicy(Request $request)
+    {
+        $actor = $request->user();
+        abort_unless($this->canManageSettings($actor) && $this->canManageGlobalRules($actor), 403);
+
+        $validated = $request->validate(collect(self::SAFETY_POLICY_FIELDS)
+            ->mapWithKeys(fn (string $key, string $field) => [
+                $field => ['required', 'string', Rule::in(MedicationSafetyPolicySettings::OPTIONS[$key])],
+            ])
+            ->all());
+
+        DB::transaction(function () use ($actor, $validated): void {
+            $lockedActor = $this->lockCurrentRuleActor($actor);
+            abort_unless($this->canManageGlobalRules($lockedActor), 403);
+
+            $before = $this->safetyPolicy->all();
+            $after = collect(self::SAFETY_POLICY_FIELDS)
+                ->mapWithKeys(fn (string $key, string $field) => [$key => $validated[$field]])
+                ->all();
+            $this->safetyPolicy->save($after);
+
+            AuditLogger::logOrFail('medications.safety_policy.updated', null, [
+                'actor_id' => $lockedActor->id,
+                'before' => $this->safetyPolicyRequestValues($before),
+                'after' => $this->safetyPolicyRequestValues($this->safetyPolicy->all()),
+            ]);
+        }, 3);
+
+        return redirect()->back()->with('success', 'Medication safety rules saved.');
+    }
+
+    /**
+     * @param  array<string, string>  $values  Keyed by app_settings key.
+     * @return array<string, string> Keyed by request field.
+     */
+    private function safetyPolicyRequestValues(array $values): array
+    {
+        return collect(self::SAFETY_POLICY_FIELDS)
+            ->mapWithKeys(fn (string $key, string $field) => [$field => $values[$key]])
+            ->all();
+    }
 
     /**
      * Observation tokens must match EnhancedMarService::validateRequiredObservations().
@@ -77,6 +138,10 @@ class MedicationSettingsController extends Controller
             ]);
 
         return Inertia::render('emar/Settings', [
+            'safetyPolicy' => [
+                'values' => $this->safetyPolicyRequestValues($this->safetyPolicy->all()),
+                'can_manage' => $canManageGlobal,
+            ],
             'rules' => $rules,
             'sites' => Site::query()
                 ->whereIn('id', $siteIds)

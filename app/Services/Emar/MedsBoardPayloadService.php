@@ -11,6 +11,7 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\User;
 use App\Services\MarScheduleService;
 use App\Services\Medication\ClientAllergyRecordService;
+use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
@@ -495,7 +496,23 @@ class MedsBoardPayloadService
             'med_competent' => $user->canDo('medications.administer.record'),
             'controlled_record' => $user->canDo('medications.controlled.record'),
             'cd_witness' => $user->canDo('medications.controlled.witness'),
+            // NF-03: the organisation's restricted-competency rule, shown to
+            // the worker before they sign (null when no rule applies).
+            'competency_notice' => $this->competencyNoticeFor($user),
         ];
+    }
+
+    /** @return array{requires_cosigner: bool, blocked: bool, message: string}|null */
+    public function competencyNoticeFor(User $user): ?array
+    {
+        try {
+            return app(MedicationCompetencyRestrictionRules::class)->noticeFor($user, null, now());
+        } catch (\Throwable $e) {
+            report($e);
+
+            // The server still enforces the rule when the dose is signed.
+            return null;
+        }
     }
 
     public function rawUtcInstant(ClientMedicationAdministration $administration, string $column): Carbon

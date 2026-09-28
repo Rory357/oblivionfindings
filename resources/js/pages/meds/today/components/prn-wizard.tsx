@@ -10,6 +10,7 @@ import {
     ClientAllergyNotice,
     ClientAvatar,
     ClientSummaryCard,
+    CompetencyRestrictionNotice,
 } from '@/components/meds/board-bits';
 import {
     MedsWizardDialog,
@@ -57,7 +58,12 @@ import {
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 
-import type { ClientInfo, PrnMedication, WitnessOption } from '../types';
+import type {
+    ClientInfo,
+    CompetencyNotice,
+    PrnMedication,
+    WitnessOption,
+} from '../types';
 
 type Severity = 'mild' | 'moderate' | 'severe';
 
@@ -122,7 +128,11 @@ export function PrnWizard({
     /** Board date (Y-m-d) — recorded times are anchored to this day. */
     date: string;
     witnesses: WitnessOption[];
-    signedAs: { name: string; role_label: string | null };
+    signedAs: {
+        name: string;
+        role_label: string | null;
+        competency_notice?: CompetencyNotice | null;
+    };
     initialMedId?: number | null;
     onClose: () => void;
 }) {
@@ -154,6 +164,12 @@ export function PrnWizard({
         [medications, medId],
     );
     const client = med ? clients.get(med.client_id) : undefined;
+    // NF-03: in the organisation's co-signer mode a restricted worker needs
+    // the witness attestation for every PRN dose, as for a witnessed medicine.
+    const cosignerOnly =
+        !med?.requires_witness &&
+        !!signedAs.competency_notice?.requires_cosigner;
+    const needsWitness = !!med?.requires_witness || cosignerOnly;
     const reasonChips = useMemo(() => reasonChipsFor(med), [med]);
 
     const form = useForm({
@@ -192,10 +208,12 @@ export function PrnWizard({
             if (med?.is_controlled && form.data.quantity_administered === '')
                 e.quantity_administered = 'Record how many units were given';
             if (!form.data.time) e.time = 'Enter the time';
-            if (med?.requires_witness && !form.data.witnessed_by)
-                e.witnessed_by = 'A witness is required for this medication';
+            if (needsWitness && !form.data.witnessed_by)
+                e.witnessed_by = cosignerOnly
+                    ? 'A co-signer is required because your competency is restricted'
+                    : 'A witness is required for this medication';
             if (
-                med?.requires_witness &&
+                needsWitness &&
                 form.data.witnessed_by &&
                 !form.data.witness_credential
             )
@@ -259,7 +277,7 @@ export function PrnWizard({
                 payload,
                 {
                     action: 'prn',
-                    allowQueueWhenOffline: !med.requires_witness,
+                    allowQueueWhenOffline: !needsWitness,
                     successMessage: 'PRN administration recorded.',
                     queuedMessage:
                         'PRN saved on this device — we’ll send it when you’re back online.',
@@ -418,6 +436,11 @@ export function PrnWizard({
                         title="Which as-needed med?"
                         blurb="Only PRN meds for the clients on your shift are shown."
                     />
+                    <div className="mb-3 empty:hidden">
+                        <CompetencyRestrictionNotice
+                            notice={signedAs.competency_notice}
+                        />
+                    </div>
                     <div className="grid gap-2">
                         {medications.map((m) => {
                             const active = medId === m.id;
@@ -651,10 +674,14 @@ export function PrnWizard({
                                 />
                             </Field>
                         ) : null}
-                        {med.requires_witness ? (
+                        {needsWitness ? (
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <Field
-                                    label="Witnessed by"
+                                    label={
+                                        cosignerOnly
+                                            ? 'Co-signed by'
+                                            : 'Witnessed by'
+                                    }
                                     required
                                     error={err('witnessed_by')}
                                 >
@@ -671,7 +698,11 @@ export function PrnWizard({
                                     />
                                 </Field>
                                 <Field
-                                    label="Witness password"
+                                    label={
+                                        cosignerOnly
+                                            ? 'Co-signer password'
+                                            : 'Witness password'
+                                    }
                                     required
                                     hint="entered by the witness"
                                     error={err('witness_credential')}
@@ -767,9 +798,11 @@ export function PrnWizard({
                                 label="Time given"
                                 value={form.data.time}
                             />
-                            {med.requires_witness ? (
+                            {needsWitness ? (
                                 <SummaryRow
-                                    label="Witness"
+                                    label={
+                                        cosignerOnly ? 'Co-signer' : 'Witness'
+                                    }
                                     value={witnessName ?? '—'}
                                 />
                             ) : null}

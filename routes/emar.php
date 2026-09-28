@@ -277,6 +277,8 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::post('/settings/rules', [MedicationSettingsController::class, 'store'])->name('emar.settings.rules.store');
         Route::put('/settings/rules/{rule}', [MedicationSettingsController::class, 'update'])->name('emar.settings.rules.update');
         Route::delete('/settings/rules/{rule}', [MedicationSettingsController::class, 'destroy'])->name('emar.settings.rules.destroy');
+        // Organisation-wide safety rules (EM-07 profile allergies, NF-03 competency).
+        Route::put('/settings/safety-policy', [MedicationSettingsController::class, 'updateSafetyPolicy'])->name('emar.settings.safety_policy.update');
     });
 
     // ─── End CRUD Routes ────────────────────────────────────

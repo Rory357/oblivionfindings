@@ -16,6 +16,7 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
+use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
@@ -47,6 +48,7 @@ class EnhancedMarService
         MedicationRuleService $ruleService,
         protected MedicationAdministratorCompetencyPolicy $medicationCompetencyPolicy,
         protected MedicationGovernanceScopeService $medicationGovernanceScope,
+        protected MedicationCompetencyRestrictionRules $competencyRestrictions,
     ) {
         $this->scheduleService = $scheduleService;
         $this->safetyService = $safetyService;
@@ -768,8 +770,22 @@ class EnhancedMarService
             }
         }
 
+        // NF-03: in co-signer mode a restricted administrator's "given" dose
+        // needs the same present, qualified witness attestation. Read before
+        // the transaction so it pins no snapshot; it only decides which users
+        // to lock. The locked competency check below stays authoritative.
+        $recorderForRules = ($data['status'] ?? null) === 'given'
+            ? User::query()->find($userId)
+            : null;
+        $requiresCosigner = $recorderForRules !== null
+            && $this->competencyRestrictions->requiresCosigner(
+                $recorderForRules,
+                $client->site_id ? (int) $client->site_id : null,
+                $adminAt,
+            );
+
         try {
-            $result = DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $scheduledFor, $adminAt, $windowCheck, $clientRequestUuid, $requestFingerprint, $includeControlled, $prelockedPresenceShifts) {
+            $result = DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $scheduledFor, $adminAt, $windowCheck, $clientRequestUuid, $requestFingerprint, $includeControlled, $prelockedPresenceShifts, $requiresCosigner) {
                 $client = Client::query()->whereKey($client->id)->lockForUpdate()->firstOrFail();
 
                 // Medication governance lock order is parent-first everywhere:
@@ -868,7 +884,7 @@ class EnhancedMarService
                     return $currentObservationValidation;
                 }
                 $requiresWitness = ($data['status'] ?? null) === 'given'
-                    && ($medication->requiresWitness() || ($currentAdminRules['requires_countersign'] ?? false));
+                    && ($medication->requiresWitness() || ($currentAdminRules['requires_countersign'] ?? false) || $requiresCosigner);
                 $authorizationUserIds = [$userId];
                 if ($requiresWitness && is_numeric($data['witnessed_by'] ?? null)) {
                     $authorizationUserIds[] = (int) $data['witnessed_by'];
@@ -956,6 +972,7 @@ class EnhancedMarService
                     $adminAt,
                     $lockedAuthorizationUsers,
                     $lockedPresenceShifts,
+                    $requiresCosigner,
                 );
                 if (! ($witnessValidation['success'] ?? false)) {
                     return $witnessValidation;
@@ -971,6 +988,8 @@ class EnhancedMarService
                     $lockedActor,
                     $adminAt,
                     true,
+                    $medication,
+                    $witnessValidation['witnessed_by'] ?? null,
                 );
                 if ($competencyValidation !== null) {
                     return $competencyValidation;
@@ -1210,6 +1229,8 @@ class EnhancedMarService
                     $lockedActor,
                     $adminAt,
                     true,
+                    $medication,
+                    $witnessValidation['witnessed_by'] ?? null,
                 );
                 if ($competencyValidation !== null) {
                     return $competencyValidation;
@@ -1913,6 +1934,8 @@ class EnhancedMarService
         User|int $user,
         CarbonInterface $effectiveAt,
         bool $lockForUpdate = false,
+        ?ClientMedication $medication = null,
+        ?int $confirmedCosignerId = null,
     ): ?array {
         if (($data['status'] ?? null) !== 'given') {
             return null;
@@ -1934,15 +1957,33 @@ class EnhancedMarService
             $lockForUpdate,
         );
 
-        if ($decision['allowed']) {
+        if (! $decision['allowed']) {
+            return [
+                'success' => false,
+                'error' => 'You cannot sign this dose as given — '.$decision['message'].' Ask a competency assessor to reassess you before administering medications.',
+                'error_field' => 'status',
+                'competency_state' => $decision['state'],
+            ];
+        }
+
+        // NF-03: the organisation's restriction and task-area rules (all off
+        // by default) apply to the assessment the policy just accepted.
+        $violation = $medication === null ? null : $this->competencyRestrictions->violation(
+            $decision,
+            $medication,
+            $client->site_id ? (int) $client->site_id : null,
+            $effectiveAt,
+            $confirmedCosignerId,
+        );
+        if ($violation === null) {
             return null;
         }
 
         return [
             'success' => false,
-            'error' => 'You cannot sign this dose as given — '.$decision['message'].' Ask a competency assessor to reassess you before administering medications.',
-            'error_field' => 'status',
-            'competency_state' => $decision['state'],
+            'error' => $violation['message'],
+            'error_field' => $violation['error_field'],
+            'competency_state' => $violation['state'],
         ];
     }
 
@@ -1985,8 +2026,10 @@ class EnhancedMarService
         Carbon $effectiveAt,
         Collection $lockedWitnessUsers,
         Collection $lockedPresenceShifts,
+        bool $requireCosigner = false,
     ): array {
-        $requiresWitness = $medication->requiresWitness() || ($adminRules['requires_countersign'] ?? false);
+        $medicationRequiresWitness = $medication->requiresWitness() || ($adminRules['requires_countersign'] ?? false);
+        $requiresWitness = $medicationRequiresWitness || $requireCosigner;
 
         if (($data['status'] ?? null) !== 'given' || ! $requiresWitness) {
             return ['success' => true];
@@ -1995,7 +2038,9 @@ class EnhancedMarService
         if (empty($data['witnessed_by'])) {
             return [
                 'success' => false,
-                'error' => 'Witness is required for this medication.',
+                'error' => $medicationRequiresWitness
+                    ? 'Witness is required for this medication.'
+                    : 'A co-signer is required: your medication competency assessment is restricted. Choose a present, qualified co-signer and ask them to enter their password.',
                 'error_field' => 'witnessed_by',
             ];
         }

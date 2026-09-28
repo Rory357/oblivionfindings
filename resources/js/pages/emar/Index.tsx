@@ -63,6 +63,7 @@ import {
 import { RecordDoseWizard } from '@/pages/meds/today/components/record-dose-wizard';
 import type {
     ClientInfo,
+    CompetencyNotice,
     NotGivenReasonOption,
     ScheduleRow,
 } from '@/pages/meds/today/types';
@@ -242,7 +243,11 @@ type Props = {
     medicationOptions: MedicationOption[];
     witnesses: WitnessOption[];
     notGivenReasons: NotGivenReasonOption[];
-    signedAs: { name: string; role_label: string | null };
+    signedAs: {
+        name: string;
+        role_label: string | null;
+        competency_notice?: CompetencyNotice | null;
+    };
     can: MedicationCapabilities;
     canManageSettings?: boolean;
 };

@@ -1136,6 +1136,7 @@ class EmarController extends Controller
                 'signedAs' => [
                     'name' => $user?->name,
                     'role_label' => $user && $user->role ? Str::headline($user->role) : null,
+                    'competency_notice' => $user ? $this->boardPayload->competencyNoticeFor($user) : null,
                 ],
             ]
         ));

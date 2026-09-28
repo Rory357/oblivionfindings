@@ -10,6 +10,7 @@ import {
     CdBadge,
     ClientAllergyNotice,
     ClientSummaryCard,
+    CompetencyRestrictionNotice,
     StatusPill,
 } from '@/components/meds/board-bits';
 import {
@@ -56,6 +57,7 @@ import { useMemo, useRef, useState } from 'react';
 
 import type {
     ClientInfo,
+    CompetencyNotice,
     NotGivenReasonOption,
     ScheduleRow,
     WitnessOption,
@@ -135,14 +137,23 @@ export function RecordDoseWizard({
     date: string;
     witnesses: WitnessOption[];
     notGivenReasons: NotGivenReasonOption[];
-    signedAs: { name: string; role_label: string | null };
+    signedAs: {
+        name: string;
+        role_label: string | null;
+        competency_notice?: CompetencyNotice | null;
+    };
     initialOutcome?: Outcome;
     onClose: () => void;
 }) {
     const [stepIndex, setStepIndex] = useState(0);
     const [rights, setRights] = useState<string[]>([]);
     const [errors, setErrors] = useState<Record<string, string>>({});
-    const doseReplay = useRef(createMedicationMutationReplayState());
+    // The first request ID is created once for the form's initial value
+    // (render must not read the ref); submit handlers rotate it via the ref.
+    const [initialReplay] = useState(() =>
+        createMedicationMutationReplayState(),
+    );
+    const doseReplay = useRef(initialReplay);
 
     const form = useForm({
         client_medication_id: row.medication_id,
@@ -160,12 +171,18 @@ export function RecordDoseWizard({
         blood_pressure_systolic: '',
         blood_pressure_diastolic: '',
         notes: '',
-        client_request_uuid: doseReplay.current.uuid,
+        client_request_uuid: initialReplay.uuid,
     });
 
     const outcome = form.data.status;
     const isGiven = outcome === 'given';
-    const needsWitness = row.requires_witness && isGiven;
+    // NF-03: a restricted worker in the organisation's co-signer mode needs
+    // the same witness attestation for every dose they sign as given.
+    const cosignerOnly =
+        isGiven &&
+        !row.requires_witness &&
+        !!signedAs.competency_notice?.requires_cosigner;
+    const needsWitness = (row.requires_witness && isGiven) || cosignerOnly;
     const needsBalance = row.is_controlled && isGiven;
     const selectedReason = useMemo(
         () => notGivenReasons.find((r) => r.value === form.data.reason_code),
@@ -205,7 +222,9 @@ export function RecordDoseWizard({
             if (needsLateReason && !form.data.reason.trim())
                 e.reason = 'Explain why this dose is being recorded late';
             if (needsWitness && !form.data.witnessed_by)
-                e.witnessed_by = 'A witness is required for this medication';
+                e.witnessed_by = cosignerOnly
+                    ? 'A co-signer is required because your competency is restricted'
+                    : 'A witness is required for this medication';
             if (
                 needsWitness &&
                 form.data.witnessed_by &&
@@ -450,6 +469,9 @@ export function RecordDoseWizard({
                             client={client}
                             fallbackName={row.client_name}
                         />
+                        <CompetencyRestrictionNotice
+                            notice={signedAs.competency_notice}
+                        />
 
                         <div>
                             <SubHead icon={ClipboardCheck}>
@@ -593,23 +615,37 @@ export function RecordDoseWizard({
 
                         {needsWitness ? (
                             <>
-                                <InfoCard icon={ShieldAlert} tone="warn">
-                                    <strong>
+                                {cosignerOnly ? (
+                                    <InfoCard icon={ShieldAlert} tone="warn">
+                                        <strong>Co-signer required.</strong>{' '}
+                                        Your medication competency is
+                                        restricted, so a present, qualified
+                                        colleague must confirm this dose. They
+                                        confirm by entering their own password.
+                                    </InfoCard>
+                                ) : (
+                                    <InfoCard icon={ShieldAlert} tone="warn">
+                                        <strong>
+                                            {row.is_controlled
+                                                ? 'Controlled drug.'
+                                                : 'Witness required.'}
+                                        </strong>{' '}
+                                        A second med-competent staff member must
+                                        witness this administration
                                         {row.is_controlled
-                                            ? 'Controlled drug.'
-                                            : 'Witness required.'}
-                                    </strong>{' '}
-                                    A second med-competent staff member must
-                                    witness this administration
-                                    {row.is_controlled
-                                        ? ' and the register balance'
-                                        : ''}
-                                    . They confirm by entering their own
-                                    password.
-                                </InfoCard>
+                                            ? ' and the register balance'
+                                            : ''}
+                                        . They confirm by entering their own
+                                        password.
+                                    </InfoCard>
+                                )}
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <Field
-                                        label="Witnessed by"
+                                        label={
+                                            cosignerOnly
+                                                ? 'Co-signed by'
+                                                : 'Witnessed by'
+                                        }
                                         required
                                         error={err('witnessed_by')}
                                     >
@@ -626,7 +662,11 @@ export function RecordDoseWizard({
                                         />
                                     </Field>
                                     <Field
-                                        label="Witness password"
+                                        label={
+                                            cosignerOnly
+                                                ? 'Co-signer password'
+                                                : 'Witness password'
+                                        }
                                         required
                                         hint="entered by the witness"
                                         error={err('witness_credential')}
@@ -904,7 +944,9 @@ export function RecordDoseWizard({
                             ) : null}
                             {needsWitness ? (
                                 <SummaryRow
-                                    label="Witness"
+                                    label={
+                                        cosignerOnly ? 'Co-signer' : 'Witness'
+                                    }
                                     value={witnessName ?? '—'}
                                 />
                             ) : null}
