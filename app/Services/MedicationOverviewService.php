@@ -17,6 +17,7 @@ use App\Models\MedicationReview;
 use App\Models\MedicationRound;
 use App\Models\MedicationSyringeDriver;
 use App\Models\User;
+use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
@@ -46,7 +47,17 @@ class MedicationOverviewService
 
     private bool $includeControlled = true;
 
-    public function __construct(private readonly MedicationGovernanceScopeService $governanceScope) {}
+    /** "Now" on the worker's (NZ) clock, fixed for one payload build. */
+    private ?Carbon $workerNow = null;
+
+    /** @var array<string, array<int, array<string, mixed>>> Scheduled dose slots per worker date. */
+    private array $scheduledDoses = [];
+
+    public function __construct(
+        private readonly MedicationGovernanceScopeService $governanceScope,
+        private readonly MedsBoardPayloadService $boardPayload,
+        private readonly MarScheduleService $schedule,
+    ) {}
 
     /**
      * Full Inertia payload for the merged eMAR home page.
@@ -67,7 +78,10 @@ class MedicationOverviewService
                 ->all();
         }
 
-        $date = ($date ?? today())->copy()->startOfDay();
+        // The dashboard day and clock are the worker's (NZ) day and clock —
+        // the same ones Meds today and the MAR use — never the UTC date.
+        $now = $this->workerNow();
+        $date = $this->workerDate($date);
 
         $stats = $this->stats($date);
         $trend = $this->trend($date);
@@ -75,9 +89,9 @@ class MedicationOverviewService
 
         return [
             'date' => $date->toDateString(),
-            'isToday' => $date->isSameDay(today()),
+            'isToday' => $date->isSameDay($now),
             'dateTitle' => $date->translatedFormat('l j F'),
-            'nowLabel' => now()->format('g:i A'),
+            'nowLabel' => $now->format('g:i A'),
             'stats' => $stats,
             'trend' => $trend,
             'complianceTrend' => $this->complianceTrend($trend),
@@ -99,6 +113,56 @@ class MedicationOverviewService
             'witnesses' => $this->witnesses(),
             'notGivenReasons' => NotGivenReason::options(),
         ];
+    }
+
+    private function workerNow(): Carbon
+    {
+        return ($this->workerNow ??= Carbon::now($this->schedule->workerTimezone()))->copy();
+    }
+
+    /** The caller's calendar date as a worker-timezone day (default: worker today). */
+    private function workerDate(?Carbon $date): Carbon
+    {
+        return $date === null
+            ? $this->workerNow()->startOfDay()
+            : Carbon::parse($date->toDateString(), $this->schedule->workerTimezone())->startOfDay();
+    }
+
+    /** @return array{0: Carbon, 1: Carbon} UTC bounds of one worker day, for UTC timestamp columns. */
+    private function utcDay(Carbon $date): array
+    {
+        return $this->schedule->utcDayWindow($this->workerDate($date));
+    }
+
+    /**
+     * Every scheduled (non-PRN) dose slot for the reader's clients on one
+     * worker day — the same slots, statuses and recorded matches that Meds
+     * today and the MAR build (MedsBoardPayloadService::scheduleForDate).
+     * Status: given/refused/withheld/missed when recorded; otherwise overdue
+     * (time passed), due (within the hour) or upcoming.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function scheduledDoses(Carbon $date): array
+    {
+        $date = $this->workerDate($date);
+        $key = $date->toDateString();
+
+        if (! array_key_exists($key, $this->scheduledDoses)) {
+            $clientIds = $this->allowedClientIds();
+            $bySlot = $this->boardPayload->slotIndex(
+                $this->boardPayload->administrationsForDay($clientIds, $date, $this->includeControlled),
+            );
+            $this->scheduledDoses[$key] = $this->boardPayload->scheduleForDate(
+                $clientIds,
+                $date,
+                $this->workerNow(),
+                $bySlot,
+                $this->includeControlled,
+            );
+        }
+
+        return $this->scheduledDoses[$key];
     }
 
     /** @return array<int, int> */
@@ -201,33 +265,32 @@ class MedicationOverviewService
 
     public function stats(Carbon $date): array
     {
-        $admins = $this->effectiveAdministrationRows(ClientMedicationAdministration::query())
-            ->whereIn('client_id', $this->allowedClientIds())
-            ->where(fn ($query) => $query
-                ->whereDate('scheduled_for', $date)
-                ->orWhereDate('administered_at', $date))
-            ->selectRaw("
-                COUNT(*) as total,
-                SUM(CASE WHEN status = 'given' THEN 1 ELSE 0 END) as given,
-                SUM(CASE WHEN status = 'refused' THEN 1 ELSE 0 END) as refused,
-                SUM(CASE WHEN status = 'withheld' THEN 1 ELSE 0 END) as withheld,
-                SUM(CASE WHEN status = 'missed' THEN 1 ELSE 0 END) as missed,
-                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
-            ")->first();
-
-        $total = (int) ($admins->total ?? 0);
-        $given = (int) ($admins->given ?? 0);
-        $pending = (int) ($admins->pending ?? 0);
-
-        $overdue = $this->effectiveAdministrationRows(ClientMedicationAdministration::query())
-            ->where('status', 'pending')
-            ->whereIn('client_id', $this->allowedClientIds())
-            ->where('scheduled_for', '<', now()->subMinutes(60))
-            ->whereDate('scheduled_for', $date)
+        // EM-01: dose counts come from the scheduled slots Meds today and the
+        // MAR use. Production never writes `pending` administration rows, so
+        // counting them made "due now" and "overdue" structurally zero.
+        $doses = collect($this->scheduledDoses($date));
+        $countStatus = fn (string ...$statuses): int => $doses
+            ->filter(fn (array $row): bool => in_array($row['status'], $statuses, true))
             ->count();
 
+        $total = $doses->count();
+        $given = $countStatus('given');
+        $overdue = $countStatus('overdue');
+        $dueWithinHour = $countStatus('due');
+        $notYetRecorded = $countStatus('overdue', 'due', 'upcoming');
+
+        // Admin rate = given ÷ eligible scheduled doses: slots already
+        // recorded or whose time has come. Nothing eligible is "n/a" (null),
+        // never a reassuring 0 %.
+        $now = $this->workerNow();
+        $eligible = $doses
+            ->filter(fn (array $row): bool => $row['recorded'] !== null
+                || Carbon::parse($row['scheduled_for'])->lte($now))
+            ->count();
+
+        [$dayStartUtc, $dayEndUtc] = $this->utcDay($date);
         $prnToday = $this->effectiveAdministrationRows(ClientMedicationAdministration::query())
-            ->whereDate('administered_at', $date)
+            ->whereBetween('administered_at', [$dayStartUtc, $dayEndUtc])
             ->whereIn('client_id', $this->allowedClientIds())
             ->where('status', 'given')
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
@@ -243,9 +306,10 @@ class MedicationOverviewService
             ->whereDate('scheduled_date', '<=', $date->copy()->addDays(7)->toDateString())
             ->count();
 
+        $workerToday = $this->workerNow()->startOfDay();
         $expiringCompetencies = $this->competencyAssessmentQuery()
             ->where('status', 'passed')
-            ->whereBetween('expiry_date', [today()->toDateString(), today()->copy()->addDays(30)->toDateString()])
+            ->whereBetween('expiry_date', [$workerToday->toDateString(), $workerToday->copy()->addDays(30)->toDateString()])
             ->count();
 
         $allowedClientIds = $this->allowedClientIds();
@@ -265,14 +329,15 @@ class MedicationOverviewService
         return [
             'totalToday' => $total,
             'givenToday' => $given,
-            'refusedToday' => (int) ($admins->refused ?? 0),
-            'withheldToday' => (int) ($admins->withheld ?? 0),
-            'missedToday' => (int) ($admins->missed ?? 0),
-            'pendingToday' => $pending,
-            'adminRate' => $total > 0 ? round(($given / $total) * 100, 1) : 0.0,
-            'dueNow' => $pending,
+            'refusedToday' => $countStatus('refused'),
+            'withheldToday' => $countStatus('withheld'),
+            'missedToday' => $countStatus('missed'),
+            'pendingToday' => $notYetRecorded,
+            'eligibleToday' => $eligible,
+            'adminRate' => $eligible > 0 ? round(($given / $eligible) * 100, 1) : null,
+            'dueNow' => $overdue + $dueWithinHour,
             'overdue' => $overdue,
-            'missed' => (int) ($admins->missed ?? 0),
+            'missed' => $countStatus('missed'),
             'prnToday' => $prnToday,
             'controlledCount' => ClientMedication::active()->controlled()->whereIn('client_id', $allowedClientIds)->count(),
             'cdDue' => ClientMedication::active()->controlled()->whereIn('client_id', $allowedClientIds)->count(),
@@ -298,8 +363,8 @@ class MedicationOverviewService
                     ->active()
                     ->when(! $this->includeControlled, fn ($query) => $query->where('controlled_drug', false)))
                 ->count(),
-            'roundsToday' => MedicationRound::forDate($date)->whereIn('site_id', $this->allowedSiteIds())->count(),
-            'roundsCompleted' => MedicationRound::forDate($date)->whereIn('site_id', $this->allowedSiteIds())->where('status', 'completed')->count(),
+            'roundsToday' => MedicationRound::forDate($date->toDateString())->whereIn('site_id', $this->allowedSiteIds())->count(),
+            'roundsCompleted' => MedicationRound::forDate($date->toDateString())->whereIn('site_id', $this->allowedSiteIds())->where('status', 'completed')->count(),
             'givenTrend' => array_map(fn ($d) => $d['given'], $trend),
         ];
     }
@@ -311,11 +376,12 @@ class MedicationOverviewService
         $trend = [];
         for ($i = 6; $i >= 0; $i--) {
             $day = $date->copy()->subDays($i);
+            [$dayStartUtc, $dayEndUtc] = $this->utcDay($day);
             $dayStats = $this->effectiveAdministrationRows(ClientMedicationAdministration::query())
                 ->whereIn('client_id', $this->allowedClientIds())
                 ->where(fn ($query) => $query
-                    ->whereDate('scheduled_for', $day)
-                    ->orWhereDate('administered_at', $day))
+                    ->whereBetween('scheduled_for', [$dayStartUtc, $dayEndUtc])
+                    ->orWhereBetween('administered_at', [$dayStartUtc, $dayEndUtc]))
                 ->selectRaw("
                     SUM(CASE WHEN status = 'given' THEN 1 ELSE 0 END) as given,
                     SUM(CASE WHEN status = 'refused' THEN 1 ELSE 0 END) as refused,
@@ -353,9 +419,13 @@ class MedicationOverviewService
 
     public function outcomeBreakdown(array $stats): array
     {
+        // Scheduled doses only (PRN is counted separately in prnToday). An
+        // unrecorded past slot is "overdue — not recorded", distinct from a
+        // recorded "missed".
         $segments = [
             ['key' => 'given', 'label' => 'Given', 'count' => $stats['givenToday'], 'tone' => 'success'],
-            ['key' => 'pending', 'label' => 'Pending', 'count' => $stats['pendingToday'], 'tone' => 'muted'],
+            ['key' => 'overdue', 'label' => 'Overdue — not recorded', 'count' => $stats['overdue'], 'tone' => 'critical'],
+            ['key' => 'pending', 'label' => 'Not yet due', 'count' => max(0, $stats['pendingToday'] - $stats['overdue']), 'tone' => 'muted'],
             ['key' => 'refused', 'label' => 'Refused', 'count' => $stats['refusedToday'], 'tone' => 'warning'],
             ['key' => 'missed', 'label' => 'Missed', 'count' => $stats['missedToday'], 'tone' => 'critical'],
             ['key' => 'withheld', 'label' => 'Withheld', 'count' => $stats['withheldToday'], 'tone' => 'slate'],
@@ -378,7 +448,7 @@ class MedicationOverviewService
             ->whereIn('status', ['refused', 'withheld', 'missed'])
             ->whereIn('client_id', $this->allowedClientIds())
             ->whereNotNull('reason_code')
-            ->whereDate('scheduled_for', '>=', $date->copy()->subDays(6)->toDateString())
+            ->where('scheduled_for', '>=', $this->utcDay($date->copy()->subDays(6))[0])
             ->selectRaw('reason_code, COUNT(*) as c')
             ->groupBy('reason_code')
             ->pluck('c', 'reason_code');
@@ -428,24 +498,47 @@ class MedicationOverviewService
 
     private function overdueDoseItems(Carbon $date): Collection
     {
-        return $this->overdueMedications($date)->map(fn ($admin) => [
-            'id' => 'dose-'.$admin->id,
+        $overdue = $this->overdueMedications($date);
+        $clients = collect($this->boardPayload->clientsPayload(
+            $overdue->pluck('client_id')->map(fn ($id): int => (int) $id)->unique()->values()->all(),
+        ))->keyBy('id');
+        $now = $this->workerNow();
+
+        return $overdue->map(fn (array $row) => [
+            'id' => 'dose-'.$row['key'],
             'type' => 'overdue_dose',
             'category' => 'doses',
             'code' => 'MED',
             'severity' => 'critical',
-            'client' => $this->clientName($admin->client),
-            'client_id' => $admin->client_id,
-            'is_controlled' => (bool) $admin->medication?->controlled_drug,
-            'title' => $this->clientName($admin->client).' — '.($admin->medication->name ?? 'Medication')
-                .($admin->medication->dosage ? ' '.$admin->medication->dosage : ''),
+            'client' => $row['client_name'],
+            'client_id' => $row['client_id'],
+            'is_controlled' => (bool) $row['is_controlled'],
+            'title' => $row['client_name'].' — '.$row['medication_name']
+                .($row['dose'] ? ' '.$row['dose'] : ''),
             'status' => 'Overdue',
-            'summary' => 'Scheduled '.optional($admin->scheduled_for)->format('H:i')
-                .($admin->scheduled_for ? ' · '.$admin->scheduled_for->diffForHumans(now(), ['parts' => 1]) : ''),
+            'summary' => 'Scheduled '.$row['time'].' · '
+                .Carbon::parse($row['scheduled_for'])->diffForHumans($now, ['parts' => 1]),
             'action' => 'Record',
             'action_type' => 'record',
-            'opened_at' => optional($admin->scheduled_for)->toIso8601String(),
-            'record' => $this->buildRecordContext($admin, $date),
+            'opened_at' => $row['scheduled_for'],
+            // The shared RecordDoseWizard opens inline on /emar with the same
+            // ScheduleRow + ClientInfo Meds today builds; writes still go
+            // through POST /meds/today/record → EnhancedMarService.
+            'record' => [
+                'row' => $row,
+                'client' => $clients->get($row['client_id']) ?? [
+                    'id' => $row['client_id'],
+                    'name' => $row['client_name'],
+                    'preferred' => null,
+                    'nhi' => null,
+                    'dob' => null,
+                    'age' => null,
+                    'site_id' => null,
+                    'site_name' => null,
+                    'allergies' => [],
+                    'allergy_status' => 'unavailable',
+                ],
+            ],
         ]);
     }
 
@@ -538,7 +631,7 @@ class MedicationOverviewService
                 ->whereIn('client_id', $this->allowedClientIds()),
             false,
         )
-            ->whereDate('recorded_at', $date)
+            ->whereBetween('recorded_at', $this->utcDay($date))
             ->pluck('client_medication_id')
             ->filter()
             ->all();
@@ -577,14 +670,15 @@ class MedicationOverviewService
         )
             ->where(function ($q) {
                 $q->whereColumn('on_hand', '<=', 'reorder_level')
-                    ->orWhere('expiry_date', '<=', today()->copy()->addDays(30)->toDateString());
+                    ->orWhere('expiry_date', '<=', $this->workerNow()->addDays(30)->toDateString());
             })
             ->with('medication:id,client_id,name,controlled_drug', 'medication.client:id,first_name,last_name')
             ->limit(12)
             ->get()
             ->map(function ($stock) {
-                $expired = $stock->expiry_date && $stock->expiry_date->isPast();
-                $expiring = $stock->expiry_date && ! $expired && $stock->expiry_date->lte(today()->copy()->addDays(30));
+                $expiryDate = $stock->expiry_date?->toDateString();
+                $expired = $expiryDate !== null && $expiryDate < $this->workerNow()->toDateString();
+                $expiring = $expiryDate !== null && ! $expired && $expiryDate <= $this->workerNow()->addDays(30)->toDateString();
 
                 return [
                     'id' => 'stock-'.$stock->id,
@@ -704,14 +798,18 @@ class MedicationOverviewService
         return MedicationReview::due()
             ->whereIn('client_id', $this->allowedClientIds())
             ->with('client:id,first_name,last_name')
-            ->whereDate('scheduled_date', '<=', today()->copy()->addDays(30)->toDateString())
+            ->whereDate('scheduled_date', '<=', $this->workerNow()->addDays(30)->toDateString())
             ->orderBy('scheduled_date')
             ->limit(8)
             ->get()
             ->map(function ($review) {
-                $scheduled = $review->scheduled_date;
-                $overdueDays = $scheduled && $scheduled->isPast() ? $scheduled->diffInDays(today()) : 0;
-                $isToday = $scheduled && $scheduled->isToday();
+                // scheduled_date is a calendar date: compare on the worker's day.
+                $workerToday = Carbon::parse($this->workerNow()->toDateString());
+                $scheduled = $review->scheduled_date
+                    ? Carbon::parse($review->scheduled_date->toDateString())
+                    : null;
+                $overdueDays = $scheduled && $scheduled->lt($workerToday) ? (int) $scheduled->diffInDays($workerToday) : 0;
+                $isToday = $scheduled && $scheduled->equalTo($workerToday);
 
                 return [
                     'id' => $review->id,
@@ -720,7 +818,7 @@ class MedicationOverviewService
                     'cadence' => $review->review_type ?: 'Review',
                     'scheduled_date' => optional($scheduled)->format('j M'),
                     'status' => $overdueDays > 0 ? 'overdue' : ($isToday ? 'today' : 'upcoming'),
-                    'status_label' => $overdueDays > 0 ? $overdueDays.'d overdue' : ($isToday ? 'Today' : 'In '.(today()->diffInDays($scheduled)).'d'),
+                    'status_label' => $overdueDays > 0 ? $overdueDays.'d overdue' : ($isToday ? 'Today' : 'In '.((int) $workerToday->diffInDays($scheduled)).'d'),
                 ];
             })
             ->all();
@@ -746,9 +844,11 @@ class MedicationOverviewService
         // 30-day daily trend of reported errors.
         $reported = $this->medicationErrorRows($includeControlled, true)
             ->whereIn('client_id', $this->allowedClientIds())
-            ->where('reported_at', '>=', $date->copy()->subDays(29)->startOfDay())
+            ->where('reported_at', '>=', $this->utcDay($date->copy()->subDays(29))[0])
             ->get(['reported_at'])
-            ->groupBy(fn ($e) => optional($e->reported_at)->toDateString());
+            ->groupBy(fn ($e) => $e->reported_at
+                ? $e->reported_at->copy()->timezone($this->schedule->workerTimezone())->toDateString()
+                : null);
 
         $trend = [];
         for ($i = 29; $i >= 0; $i--) {
@@ -785,7 +885,8 @@ class MedicationOverviewService
 
     public function clientBoard(Carbon $date): array
     {
-        $dateString = $date->toDateString();
+        // Per-person counts come from the same scheduled slots as stats().
+        $dosesByClient = collect($this->scheduledDoses($date))->groupBy('client_id');
 
         return Client::query()
             ->whereIn('id', $this->allowedClientIds())
@@ -795,20 +896,26 @@ class MedicationOverviewService
                 'medications as active_medications_count' => fn ($q) => $q
                     ->active()
                     ->when(! $this->includeControlled, fn ($query) => $query->where('controlled_drug', false)),
-                'medicationAdministrations as given_today' => fn ($q) => $this->effectiveAdministrationRows($q)->whereDate('administered_at', $dateString)->where('status', 'given'),
-                'medicationAdministrations as pending_today' => fn ($q) => $this->effectiveAdministrationRows($q)->whereDate('scheduled_for', $dateString)->where('status', 'pending'),
-                'medicationAdministrations as missed_today' => fn ($q) => $this->effectiveAdministrationRows($q)->whereDate('scheduled_for', $dateString)->where('status', 'missed'),
             ])
             ->having('active_medications_count', '>', 0)
             ->orderBy('last_name')
             ->limit(12)
             ->get()
-            ->map(function ($client) {
-                $given = (int) $client->given_today;
-                $pending = (int) $client->pending_today;
-                $missed = (int) $client->missed_today;
-                $total = $given + $pending + $missed;
-                $status = $missed > 0 ? 'attention' : ($pending === 0 && $total > 0 ? 'complete' : 'in_progress');
+            ->map(function ($client) use ($dosesByClient) {
+                $doses = $dosesByClient->get($client->id, collect());
+                $count = fn (string ...$statuses): int => $doses
+                    ->filter(fn (array $row): bool => in_array($row['status'], $statuses, true))
+                    ->count();
+
+                $given = $count('given');
+                $missed = $count('missed');
+                $overdue = $count('overdue');
+                $pending = $count('due', 'upcoming');
+                $recorded = $count('given', 'refused', 'withheld', 'missed');
+                $total = $doses->count();
+                $status = $missed > 0 || $overdue > 0
+                    ? 'attention'
+                    : ($total > 0 && $recorded === $total ? 'complete' : 'in_progress');
 
                 return [
                     'id' => $client->id,
@@ -817,10 +924,11 @@ class MedicationOverviewService
                     'meds' => (int) $client->active_medications_count,
                     'given' => $given,
                     'pending' => $pending,
+                    'overdue' => $overdue,
                     'missed' => $missed,
                     'total' => $total,
-                    'done' => $given,
-                    'percent' => $total > 0 ? (int) round(($given / $total) * 100) : 0,
+                    'done' => $recorded,
+                    'percent' => $total > 0 ? (int) round(($recorded / $total) * 100) : 0,
                     'status' => $status,
                 ];
             })
@@ -829,81 +937,26 @@ class MedicationOverviewService
 
     // ─── Reused dashboard bits ─────────────────────────────
 
+    /**
+     * Unrecorded scheduled doses whose time has passed (the Meds today
+     * "overdue" definition), oldest first, as ScheduleRow payloads.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
     public function overdueMedications(Carbon $date): Collection
     {
-        return $this->effectiveAdministrationRows(ClientMedicationAdministration::query())
-            ->where('status', 'pending')
-            ->whereIn('client_id', $this->allowedClientIds())
-            ->where('scheduled_for', '<', now()->subMinutes(60))
-            ->whereDate('scheduled_for', $date)
-            ->with([
-                'client:id,first_name,last_name,preferred_name,nhi_number,date_of_birth,site_id',
-                'client.site:id,name',
-                'client.medicationAllergies' => fn ($q) => $q->whereNull('deleted_at'),
-                'medication:id,client_id,name,dosage,route,controlled_drug,witness_required',
-            ])
-            ->orderBy('scheduled_for')
-            ->limit(10)
-            ->get();
-    }
-
-    /**
-     * Build the meds/today ScheduleRow + ClientInfo for an overdue dose so the
-     * shared RecordDoseWizard can open inline on /emar (same shape WorkerMeds
-     * builds — see clientsPayload()/scheduleForDate()). Writes still go through
-     * POST /meds/today/record → EnhancedMarService; no second pipeline.
-     */
-    private function buildRecordContext(ClientMedicationAdministration $admin, Carbon $date): array
-    {
-        $tz = config('app.worker_timezone', config('app.timezone'));
-        $client = $admin->client;
-        $med = $admin->medication;
-        $scheduled = $admin->scheduled_for;
-        $dob = $client?->date_of_birth;
-
-        return [
-            'row' => [
-                'key' => 'emar-'.$admin->id,
-                'client_id' => $admin->client_id,
-                'client_name' => $this->clientName($client),
-                'medication_id' => $admin->client_medication_id,
-                'medication_name' => $med?->name ?? 'Medication',
-                'dose' => $med?->dosage,
-                'route' => $med?->route,
-                'is_controlled' => (bool) ($med?->controlled_drug ?? false),
-                'requires_witness' => (bool) ($med?->witness_required ?? false) || (bool) ($med?->controlled_drug ?? false),
-                'scheduled_for' => optional($scheduled)->toIso8601String(),
-                'time' => $scheduled ? $scheduled->copy()->timezone($tz)->format('H:i') : '',
-                'round_label' => '',
-                'status' => 'overdue',
-                'recorded' => null,
-                'mar_url' => '/emar/mar?client_id='.$admin->client_id.'&date='.$date->toDateString(),
-            ],
-            'client' => [
-                'id' => $client?->id,
-                'name' => $this->clientName($client),
-                'preferred' => $client?->preferred_name ?: $client?->first_name,
-                'nhi' => $client?->nhi_number,
-                'dob' => $dob?->format('j M Y'),
-                'age' => $dob ? (int) $dob->copy()->timezone($tz)->diffInYears(now($tz)) : null,
-                'site_id' => $client?->site_id,
-                'site_name' => $client?->site?->name,
-                'allergies' => $client
-                    ? $client->medicationAllergies
-                        ->map(fn ($a) => trim((string) $a->allergen))
-                        ->filter()
-                        ->values()
-                        ->all()
-                    : [],
-            ],
-        ];
+        return collect($this->scheduledDoses($date))
+            ->filter(fn (array $row): bool => $row['status'] === 'overdue')
+            ->sortBy('scheduled_for')
+            ->take(10)
+            ->values();
     }
 
     public function nextRound(Carbon $date)
     {
         return MedicationRound::where('status', 'pending')
             ->whereIn('site_id', $this->allowedSiteIds())
-            ->whereDate('round_date', $date)
+            ->whereDate('round_date', $this->workerDate($date)->toDateString())
             ->orderBy('scheduled_time')
             ->with('assignedTo:id,name')
             ->first();
@@ -958,9 +1011,9 @@ class MedicationOverviewService
     public function complianceSnapshot(): array
     {
         return [
-            'competencyExpiring' => $this->competencyAssessmentQuery()->where('expiry_date', '<=', now()->addDays(30))->where('expiry_date', '>', now())->count(),
-            'competencyExpired' => $this->competencyAssessmentQuery()->where('expiry_date', '<', now())->count(),
-            'pendingReviews' => MedicationReview::whereIn('client_id', $this->allowedClientIds())->where('status', 'scheduled')->where('scheduled_date', '<=', now())->count(),
+            'competencyExpiring' => $this->competencyAssessmentQuery()->where('expiry_date', '<=', $this->workerNow()->addDays(30)->toDateString())->where('expiry_date', '>=', $this->workerNow()->toDateString())->count(),
+            'competencyExpired' => $this->competencyAssessmentQuery()->where('expiry_date', '<', $this->workerNow()->toDateString())->count(),
+            'pendingReviews' => MedicationReview::whereIn('client_id', $this->allowedClientIds())->where('status', 'scheduled')->where('scheduled_date', '<=', $this->workerNow()->toDateString())->count(),
             'overdueReviews' => MedicationReview::whereIn('client_id', $this->allowedClientIds())->where('status', 'overdue')->count(),
         ];
     }

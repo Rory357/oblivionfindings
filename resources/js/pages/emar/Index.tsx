@@ -105,7 +105,8 @@ type ActionItem = {
 };
 
 type Stats = {
-    adminRate: number;
+    /** Given ÷ eligible scheduled doses; null when none are due yet. */
+    adminRate: number | null;
     dueNow: number;
     overdue: number;
     missed: number;
@@ -154,6 +155,8 @@ type ClientBoardItem = {
     given: number;
     pending: number;
     missed: number;
+    /** Scheduled doses whose time has passed with nothing recorded. */
+    overdue: number;
     total: number;
     done: number;
     percent: number;
@@ -490,6 +493,8 @@ export default function EmarHome(props: Props) {
               )
             : 0;
     const deltaUp = complianceDelta >= 0;
+    const adminRateLabel =
+        stats.adminRate === null ? 'n/a' : `${stats.adminRate}%`;
     const deltaLabel = `${deltaUp ? '▲' : '▼'} ${Math.abs(complianceDelta)}`;
 
     // 6-segment severity bar for the "Doses due now" KPI card.
@@ -626,7 +631,7 @@ export default function EmarHome(props: Props) {
     ].filter(Boolean) as PageHeroBadge[];
 
     const heroStats = [
-        { label: 'Admin rate', value: `${stats.adminRate}%` },
+        { label: 'Admin rate', value: adminRateLabel },
         {
             label: 'Due now',
             value: stats.dueNow,
@@ -797,7 +802,11 @@ export default function EmarHome(props: Props) {
                             {stats.overdue > 0
                                 ? ` (${stats.overdue} overdue)`
                                 : ''}{' '}
-                            and {stats.adminRate}% recorded so far.{' '}
+                            and{' '}
+                            {stats.adminRate === null
+                                ? 'no doses due yet'
+                                : `${stats.adminRate}% of due doses given so far`}
+                            .{' '}
                             {can.view_controlled ? (
                                 <>
                                     {stats.activeDiscrepancies} controlled-drug
@@ -899,7 +908,7 @@ export default function EmarHome(props: Props) {
                     <KpiCard
                         icon={TrendingUp}
                         tone="success"
-                        value={`${stats.adminRate}%`}
+                        value={adminRateLabel}
                         label="Admin rate · target 95%"
                         pill={{
                             label: deltaLabel,
@@ -1210,7 +1219,7 @@ export default function EmarHome(props: Props) {
                             <CardContent>
                                 <div className="flex items-end gap-2">
                                     <span className="text-3xl font-bold tracking-tight">
-                                        {stats.adminRate}%
+                                        {adminRateLabel}
                                     </span>
                                     <span
                                         className={cn(
@@ -1493,7 +1502,7 @@ export default function EmarHome(props: Props) {
                                             <div
                                                 className="h-full bg-status-critical"
                                                 style={{
-                                                    width: `${c.total ? (c.missed / c.total) * 100 : 0}%`,
+                                                    width: `${c.total ? ((c.missed + c.overdue) / c.total) * 100 : 0}%`,
                                                 }}
                                             />
                                         </div>
@@ -1504,6 +1513,11 @@ export default function EmarHome(props: Props) {
                                             {c.pending > 0 ? (
                                                 <span className="rounded-full bg-muted px-1.5 py-0.5 font-semibold text-muted-foreground">
                                                     {c.pending} pending
+                                                </span>
+                                            ) : null}
+                                            {c.overdue > 0 ? (
+                                                <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 font-semibold text-status-critical">
+                                                    {c.overdue} overdue
                                                 </span>
                                             ) : null}
                                             {c.missed > 0 ? (

@@ -5,7 +5,6 @@ use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
-use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationReview;
 use App\Models\Site;
 use App\Models\User;
@@ -198,33 +197,40 @@ it('builds a complete dashboard payload with all merged keys', function () {
     expect($payload['outcomeBreakdown'])->toHaveKeys(['total', 'givenPct', 'segments']);
 });
 
-it('computes admin rate from the day\'s administrations', function () {
-    $payload = app(MedicationOverviewService::class)->payload(today());
+it('reports the admin rate as not applicable when no scheduled dose is eligible yet', function () {
+    $payload = app(MedicationOverviewService::class)->payload();
 
-    // No administrations seeded → rate is 0, not a divide-by-zero error.
-    expect($payload['stats']['adminRate'])->toBe(0.0);
+    // No scheduled doses → "n/a" (null), never a reassuring 0 %.
+    expect($payload['stats']['adminRate'])->toBeNull()
+        ->and($payload['stats']['eligibleToday'])->toBe(0)
+        ->and($payload['date'])->toBe('2026-06-14')
+        ->and($payload['isToday'])->toBeTrue()
+        ->and($payload['nowLabel'])->toBe('11:15 AM');
 });
 
-it('attaches a RecordDoseWizard context to overdue dose action items', function () {
+it('attaches a RecordDoseWizard context to an unrecorded past scheduled dose', function () {
+    // EM-01: an overdue dose is an unrecorded scheduled slot whose time has
+    // passed — no `pending` administration row exists in production.
     $client = makeOverviewClient();
     $med = ClientMedication::factory()->create([
         'client_id' => $client->id,
         'name' => 'Clozapine',
         'dosage' => '200 mg',
         'route' => 'Oral',
+        'frequency' => 'Daily',
+        'dose_times' => ['09:00'],
+        // The factory's random start/end dates can fall outside today.
+        'start_date' => null,
+        'end_date' => null,
         'controlled_drug' => false,
         'is_prn' => false,
+        'active' => true,
+        'state' => 'active',
     ]);
 
-    ClientMedicationAdministration::create([
-        'client_id' => $client->id,
-        'client_medication_id' => $med->id,
-        'status' => 'pending',
-        'scheduled_for' => today()->setTime(9, 0),
-        'administered_by' => User::factory()->create()->id,
-    ]);
-
-    $feed = app(MedicationOverviewService::class)->actionCentre(today());
+    $service = app(MedicationOverviewService::class);
+    $workerToday = Carbon::now('Pacific/Auckland')->startOfDay();
+    $feed = $service->actionCentre($workerToday);
     $dose = collect($feed)->firstWhere('type', 'overdue_dose');
 
     expect($dose)->not->toBeNull()
@@ -233,6 +239,13 @@ it('attaches a RecordDoseWizard context to overdue dose action items', function 
         ->and($dose['record']['row']['medication_name'])->toBe('Clozapine')
         ->and($dose['record']['row']['client_name'])->toBe('Margaret Sole')
         ->and($dose['record']['row']['status'])->toBe('overdue')
+        ->and($dose['record']['row']['time'])->toBe('09:00')
         ->and($dose['record']['client']['name'])->toBe('Margaret Sole')
-        ->and($dose['record']['client']['allergies'])->toBe([]);
+        ->and($dose['record']['client']['allergies'])->toBe([])
+        ->and($dose['record']['client']['allergy_status'])->toBe('none_recorded');
+
+    $stats = $service->stats($workerToday);
+    expect($stats['overdue'])->toBe(1)
+        ->and($stats['dueNow'])->toBe(1)
+        ->and($stats['adminRate'])->toBe(0.0);
 });
