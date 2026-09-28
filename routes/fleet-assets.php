@@ -80,6 +80,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     Route::middleware('permission:fleet.viewAny|assets.viewAny|assets.viewAssigned')->group(function () {
         Route::get('/', DashboardController::class)->name('fleet-assets.dashboard');
         Route::get('/compliance', [ComplianceController::class, 'index'])->name('fleet-assets.compliance.index');
+        Route::get('/compliance/vehicles/{asset}', [ComplianceController::class, 'context'])->whereNumber('asset')->name('fleet-assets.compliance.context');
         Route::get('/daily-check', [DailyCheckController::class, 'index'])->name('fleet-assets.daily-check.index');
         Route::post('/daily-check', [DailyCheckController::class, 'store'])->name('fleet-assets.daily-check.store');
     });
@@ -293,6 +294,7 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     // Alerts — read
     Route::middleware('permission:assets.viewAny|assets.alerts.view')->group(function () {
         Route::get('/alerts', [AlertController::class, 'index'])->name('fleet-assets.alerts.index');
+        Route::get('/alerts/{alert}/snapshot', [AlertController::class, 'snapshot'])->whereNumber('alert')->name('fleet-assets.alerts.snapshot');
     });
 
     // Alerts — write through the canonical Control Room lifecycle.

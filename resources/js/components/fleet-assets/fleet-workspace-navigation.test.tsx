@@ -234,7 +234,10 @@ describe('Fleet workspace navigation', () => {
 
     it.each([
         ['/fleet-assets/trips/12/playback?site_id=7', '/fleet-assets/vehicles'],
-        ['/fleet-assets/transports/12/pre-check', '/fleet-assets/transports/overview'],
+        [
+            '/fleet-assets/transports/12/pre-check',
+            '/fleet-assets/transports/overview',
+        ],
         ['/fleet-assets/handovers/12', '/fleet-assets/vehicles'],
         ['/fleet-assets/assets/12?tab=documents', '/fleet-assets/assets'],
         [
@@ -284,7 +287,9 @@ describe('Fleet workspace navigation', () => {
     it('keeps connected transport sources discoverable in the dedicated workspace', () => {
         fixture.url = '/fleet-assets/transports/overview';
         render(<FleetWorkspaceNavigation />);
-        const trigger = screen.getByRole('button', { name: 'Connected records pages' });
+        const trigger = screen.getByRole('button', {
+            name: 'Connected records pages',
+        });
         fireEvent.keyDown(trigger, { key: 'Enter' });
         const menu = within(
             screen.getByRole('menu', { name: 'Connected records pages' }),
@@ -308,7 +313,7 @@ describe('Fleet workspace navigation', () => {
         render(<FleetWorkspaceNavigation />);
         expect(screen.getByRole('link', { name: 'Vehicles' })).toHaveAttribute(
             'href',
-            '/fleet-assets/vehicles',
+            '/fleet-assets/vehicles?site_id=7',
         );
         fireEvent.keyDown(
             screen.getByRole('button', { name: 'Operating records pages' }),

@@ -58,6 +58,8 @@ export function WorkspaceWizard({
     errorKey,
     discardDescription = 'Unsent changes will be removed.',
     freeNavigation = false,
+    open = true,
+    onKeepDraft,
     maxWidth,
     children,
 }: {
@@ -85,6 +87,8 @@ export function WorkspaceWizard({
     discardDescription?: string;
     /** Section navigation is free; Continue and Submit still validate. */
     freeNavigation?: boolean;
+    open?: boolean;
+    onKeepDraft?: () => void;
     maxWidth?: string;
     children: ReactNode;
 }) {
@@ -110,7 +114,7 @@ export function WorkspaceWizard({
     return (
         <>
             <WizardShell
-                open
+                open={open}
                 maxWidth={maxWidth}
                 onClose={close}
                 title={title}
@@ -213,18 +217,72 @@ export function WorkspaceWizard({
                     </WizardStepPane>
                 </fieldset>
             </WizardShell>
-            <ConfirmDialog
-                open={discard}
-                onClose={() => setDiscard(false)}
-                onConfirm={() => {
-                    setDiscard(false);
-                    onClose();
-                }}
-                title="Discard this draft?"
-                description={discardDescription}
-                confirmText="Discard draft"
-                cancelText="Keep editing"
-            />
+            {onKeepDraft ? (
+                <Dialog open={discard} onOpenChange={setDiscard}>
+                    <DialogContent
+                        style={{
+                            width: 'min(92vw, 480px)',
+                            maxWidth: 'min(92vw, 480px)',
+                        }}
+                        onOpenAutoFocus={(event) => {
+                            event.preventDefault();
+                            document
+                                .getElementById('fleet-continue-editing')
+                                ?.focus();
+                        }}
+                    >
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <AlertCircle className="size-4" />
+                                Keep this draft?
+                            </DialogTitle>
+                            <DialogDescription>
+                                Keep unsent changes and staged files until you
+                                leave this page, or discard them.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="flex-wrap">
+                            <Button
+                                id="fleet-continue-editing"
+                                variant="outline"
+                                onClick={() => setDiscard(false)}
+                            >
+                                Continue editing
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                onClick={() => {
+                                    setDiscard(false);
+                                    onClose();
+                                }}
+                            >
+                                Discard draft
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    setDiscard(false);
+                                    onKeepDraft();
+                                }}
+                            >
+                                Keep draft & close
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            ) : (
+                <ConfirmDialog
+                    open={discard}
+                    onClose={() => setDiscard(false)}
+                    onConfirm={() => {
+                        setDiscard(false);
+                        onClose();
+                    }}
+                    title="Discard this draft?"
+                    description={discardDescription}
+                    confirmText="Discard draft"
+                    cancelText="Keep editing"
+                />
+            )}
         </>
     );
 }

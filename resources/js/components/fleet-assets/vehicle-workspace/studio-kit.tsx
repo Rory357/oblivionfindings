@@ -115,6 +115,9 @@ export function PlanAppointmentDialog({
     presetType,
     workOrderId,
     startLocal,
+    source,
+    open = true,
+    onKeepDraft,
     onClose,
     onSaved,
 }: {
@@ -122,6 +125,9 @@ export function PlanAppointmentDialog({
     presetType?: string;
     workOrderId?: number;
     startLocal?: string;
+    source?: { type: 'service_schedule' | 'compliance_record'; id: number };
+    open?: boolean;
+    onKeepDraft?: () => void;
     onClose: () => void;
     onSaved: () => void;
 }) {
@@ -129,19 +135,27 @@ export function PlanAppointmentDialog({
     if (summary) {
         return (
             <AppointmentWizard
+                open={open}
+                onKeepDraft={onKeepDraft}
                 vehicle={vehicle}
                 summary={summary}
                 presetType={presetType}
                 workOrderId={workOrderId}
                 startLocal={startLocal}
+                source={source}
                 onClose={onClose}
                 onSaved={onSaved}
             />
         );
     }
     return (
-        <Dialog open onOpenChange={(next) => !next && onClose()}>
-            <DialogContent className="max-w-sm">
+        <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+            <DialogContent
+                style={{
+                    width: 'min(92vw, 480px)',
+                    maxWidth: 'min(92vw, 480px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle>Plan appointment</DialogTitle>
                     <DialogDescription>

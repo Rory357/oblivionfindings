@@ -1,4 +1,5 @@
 /* eslint-disable no-restricted-syntax -- Map markers, filter segments and dense list selectors use compact button layouts; shared Button remains the standard action control. */
+import { FleetQueueActions } from '@/components/fleet-assets/fleet-queue-actions';
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
 import {
     EntityContextMenu,
@@ -1526,6 +1527,7 @@ export default function FleetAssetsDashboard({ overview, saved_views }: Props) {
                     <PageHeader
                         icon={Car}
                         title="Fleet & Assets"
+                        wrapTitle
                         titleChip={
                             <PageHeaderStatusChip variant="neutral">
                                 Overview
@@ -1539,6 +1541,7 @@ export default function FleetAssetsDashboard({ overview, saved_views }: Props) {
                                     onChange={(q) => update({ q })}
                                     placeholder="Find records…"
                                 />
+                                <FleetQueueActions siteId={filters.site} />
                                 <PageHeaderGlassButton
                                     icon={RefreshCw}
                                     aria-label="Refresh overview"

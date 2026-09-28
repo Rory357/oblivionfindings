@@ -44,6 +44,7 @@ import {
     type GroupedProfileNavTab,
 } from '@/components/page/grouped-profile-nav';
 import AppLayout from '@/layouts/app-layout';
+import { fleetQueueReturn } from '@/lib/fleet-queue-context';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
@@ -130,10 +131,7 @@ export default function VehicleShow({
             ? null
             : new URLSearchParams(window.location.search).get('return_to');
     const returnHref =
-        returnCandidate &&
-        /^\/fleet-assets\/vehicles(?:\?|$)/.test(returnCandidate)
-            ? returnCandidate
-            : '/fleet-assets/vehicles';
+        fleetQueueReturn(returnCandidate) ?? '/fleet-assets/vehicles';
     const tiers = tierTabs(workspace);
     // A link to a section this person can't open falls back to its tab's first section.
     const permitted = useCallback(

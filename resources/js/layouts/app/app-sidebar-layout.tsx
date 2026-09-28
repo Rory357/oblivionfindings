@@ -1,11 +1,9 @@
 import { AppHeader } from '@/components/app-header';
 import { AppSidebar, AppSidebarMobile } from '@/components/app-sidebar';
 import { Breadcrumbs } from '@/components/breadcrumbs';
-import { FleetWorkspaceNavigation } from '@/components/fleet-assets/fleet-workspace-navigation';
 import { Sheet } from '@/components/ui/sheet';
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { fleetWorkspaceForUrl } from '@/lib/fleet-navigation';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
@@ -62,9 +60,7 @@ export default function AppSidebarLayout({
 }: PropsWithChildren<AppSidebarLayoutProps>) {
     const page = usePage<SharedData>();
     const defaultSidebarOpen = page.props.sidebarOpen ?? true;
-    const fleetWorkspace = fleetWorkspaceForUrl(page.url);
-    const hasBreadcrumbStrip =
-        breadcrumbs.length > 1 || Boolean(fleetWorkspace);
+    const hasBreadcrumbStrip = breadcrumbs.length > 1;
     const { collapsed, setExpanded } = useAppSidebarState(defaultSidebarOpen);
     const isMobile = useIsMobile();
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -112,21 +108,8 @@ export default function AppSidebarLayout({
                                    * 2026-09-06 — the strip's one exception to
                                    * the 20px rhythm); the content wrapper
                                    * drops its top padding beneath it. */
-                                  <div
-                                      className={cn(
-                                          'flex items-center px-5 py-2.5 text-muted-foreground',
-                                          fleetWorkspace &&
-                                              'flex-wrap justify-between gap-x-5 gap-y-1',
-                                      )}
-                                  >
-                                      {breadcrumbs.length > 1 && (
-                                          <Breadcrumbs
-                                              breadcrumbs={breadcrumbs}
-                                          />
-                                      )}
-                                      {fleetWorkspace && (
-                                          <FleetWorkspaceNavigation />
-                                      )}
+                                  <div className="flex items-center px-5 py-2.5 text-muted-foreground">
+                                      <Breadcrumbs breadcrumbs={breadcrumbs} />
                                   </div>
                               )
                             : header}

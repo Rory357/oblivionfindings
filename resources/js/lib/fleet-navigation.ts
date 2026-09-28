@@ -84,14 +84,22 @@ export const FLEET_WORKSPACES: FleetWorkspace[] = [
                 links: [link('Overview', '', canSeeFleetNavigation)],
             },
             {
-                label: 'Alerts & safety',
+                label: 'Fleet alerts',
                 links: [
                     link('Fleet alerts', 'alerts', (can) =>
                         Boolean(
                             can?.assets?.viewAny || can?.assets?.alertsView,
                         ),
                     ),
-                    link('Fleet incidents', 'incidents'),
+                ],
+            },
+            {
+                label: 'Fleet incidents',
+                links: [link('Fleet incidents', 'incidents')],
+            },
+            {
+                label: 'Control Room',
+                links: [
                     link('Control Room', '/control-room', (can) =>
                         Boolean(can?.controlRoom?.viewAny),
                     ),
@@ -112,11 +120,14 @@ export const FLEET_WORKSPACES: FleetWorkspace[] = [
             { label: 'Vehicles', links: [link('Vehicles', 'vehicles', fleet)] },
             { label: 'Bookings', links: [link('Bookings', 'bookings')] },
             {
+                label: 'Compliance & renewals',
+                links: [link('Compliance & renewals', 'compliance', fleet)],
+            },
+            {
                 label: 'Operating records',
                 links: [
                     link('Trips', 'trips', fleet),
                     link('Fuel logs', 'fuel', fleet),
-                    link('Compliance', 'compliance', fleet),
                 ],
             },
             {

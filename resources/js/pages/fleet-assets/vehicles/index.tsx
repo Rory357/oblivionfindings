@@ -1,3 +1,4 @@
+import { FleetQueueActions } from '@/components/fleet-assets/fleet-queue-actions';
 import {
     BookingWizard,
     defaultBookingStart,
@@ -517,6 +518,7 @@ export default function VehiclesIndex({
             <PageHeader
                 icon={Truck}
                 title="Fleet"
+                wrapTitle
                 titleChip={
                     <PageHeaderStatusChip variant="neutral">
                         {sites?.find(
@@ -527,6 +529,7 @@ export default function VehiclesIndex({
                 subline="Vehicles, use and bookings · Pacific/Auckland"
                 actions={
                     <>
+                        <FleetQueueActions siteId={filters.site_id} />
                         {isCalendar ? (
                             <div className="contents" ref={setActionTarget} />
                         ) : (
@@ -774,7 +777,7 @@ export default function VehiclesIndex({
                             ].map(([label, due, expired]) => (
                                 <a
                                     key={String(label)}
-                                    href="/fleet-assets/compliance"
+                                    href={`/fleet-assets/compliance${filters.site_id ? `?site_id=${encodeURIComponent(filters.site_id)}` : ''}`}
                                 >
                                     <StatusBadge
                                         variant={
@@ -796,7 +799,9 @@ export default function VehiclesIndex({
                                     </StatusBadge>
                                 </a>
                             ))}
-                            <a href="/fleet-assets/alerts">
+                            <a
+                                href={`/fleet-assets/alerts${filters.site_id ? `?site_id=${encodeURIComponent(filters.site_id)}` : ''}`}
+                            >
                                 <StatusBadge
                                     variant={
                                         compliance.critical_alerts

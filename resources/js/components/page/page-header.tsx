@@ -180,7 +180,7 @@ export function PageHeader({
                             <div
                                 className={cn(
                                     'flex shrink-0 flex-wrap items-center gap-2 lg:justify-end',
-                                    wrapTitle && 'lg:ml-auto',
+                                    wrapTitle && 'max-w-full lg:ml-auto',
                                 )}
                             >
                                 {actions}

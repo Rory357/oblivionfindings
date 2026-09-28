@@ -75,6 +75,8 @@ export function AppointmentWizard({
     appointment,
     presetType,
     source,
+    open = true,
+    onKeepDraft,
     onClose,
     onSaved,
 }: {
@@ -89,6 +91,8 @@ export function AppointmentWizard({
     presetType?: string;
     /** "Plan linked appointment": the schedule or compliance record new work is reported from. */
     source?: { type: 'service_schedule' | 'compliance_record'; id: number };
+    open?: boolean;
+    onKeepDraft?: () => void;
     onClose: () => void;
     onSaved: () => void;
 }) {
@@ -340,6 +344,16 @@ export function AppointmentWizard({
 
     return (
         <WorkspaceWizard
+            open={open}
+            onKeepDraft={
+                (JSON.stringify(form) !== JSON.stringify(initial) ||
+                    files.length > 0) &&
+                !command.locked
+                    ? onKeepDraft
+                    : undefined
+            }
+            freeNavigation
+            maxWidth="min(92vw, 900px)"
             title={
                 manage
                     ? 'Manage appointment'
