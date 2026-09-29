@@ -9,6 +9,8 @@
 
 **v1 is frozen.** Any further change goes in `P01/v2/` and needs its own approval.
 
+**Later the same day, Stephan wrote to this design session directly:** “approved if you find any issues gaps please recitify them. just keep in mind the button sizes”. The fixes are in [`../v2/`](../v2/README.md): the approved carry-overs drawn, the gaps found, and one 44 px button size. v2 goes to the review session and then back to Stephan for its own exact-version approval. v1 stays approved as recorded above.
+
 ## Stephan’s answers
 
 | # | Question | Answer |
