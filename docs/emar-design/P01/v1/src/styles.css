@@ -1,0 +1,11 @@
+/* eMAR P01 v1 preview styles: the app's own stylesheet plus explicit Tailwind
+ * sources. This worktree sits under the parent repo's ignored .claude/ folder,
+ * so Tailwind's automatic source detection skips it; these @source lines make
+ * the real components' utilities generate exactly as in the app. No tokens or
+ * utilities are defined here. */
+@import '../../../../../resources/css/app.css';
+@source './';
+@source '../../../../../resources/js/components';
+@source '../../../../../resources/js/pages/my-day/components';
+@source '../../../../../resources/js/pages/sites/calendar';
+@source '../../../../../resources/js/lib';
