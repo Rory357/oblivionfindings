@@ -8,7 +8,7 @@ Everything v3 passed still passes: sections A–H and Main's inspection in `../v
 
 - **`reuse-check.mjs`**: all checks pass. That covers P00 wording, the 26 real app modules imported, no shared file changed, no hex colours, raw palette classes or `dark:` pairs, and no browser dialogs or network calls. Buttons use default, outline, destructive, ghost or link only, and are never restyled.
 - **Route sweep**: 266 routes × 1440, 1280 and 200 % zoom. It checks for console and page errors, page-level horizontal overflow, and that every `?open=` link opens a dialog. **0 problems.**
-- **Interaction run**: 127 checks in headless Chromium at 1440. **127 of 127 pass, with 0 console errors.** 25 checks are new for v4.
+- **Interaction run**: 128 checks in headless Chromium at 1440. **128 of 128 pass, with 0 console errors.** 26 checks are new for v4.
 - **Truncation check** (Still to decide identity names): **0 truncated at 1440, 0 at 1280.**
 - **Type check** (`tsc --noEmit`): **0 errors.**
 - **Screenshots**: 194 in `screenshots/`.
@@ -41,3 +41,29 @@ Everything v3 passed still passes: sections A–H and Main's inspection in `../v
 ## Questions for Stephan
 
 See `AUDIT.md` §4.
+
+## Main's inspection of the Delivery tab (5fce692b1), 29 September 2026: pass, with 2 fixes (done in v4)
+
+Main confirmed the grounding on origin/main:
+- the overdue alert is sent once (`Cache::add`);
+- `emar:send-alerts` runs every 15 minutes, so the 15-minute floor is right;
+- `MedicationDashboardAlert` has `acknowledged_by` and `acknowledged_at`.
+
+Main also confirmed:
+- the chips are the real `ChipMulti`;
+- new behaviour starts off, with empty numbers;
+- the privacy default is right under HIPC;
+- the timeline is a good addition.
+
+1. **Fixed: "↗" jumps use Fleet's `variant="link"`.** This covers the Overview cards (done in `4e8540e35`) and now every in-page jump:
+   - Delivery's "Alerts ↗" and "N of 2 houses ↗";
+   - Controlled drugs' "Current overrides";
+   - Competency's and Exemption limit's links to Staff eligibility;
+   - Staff eligibility's links back to Settings and to witness overrides;
+   - Meds today's "Open round templates".
+
+   Dialog footers keep their buttons. `reuse-check.mjs` allows link and ghost, and refuses restyled Buttons.
+2. **Fixed: the timeline merges same-time steps.** At 1 hour it reads "Re-alert and escalate — the same people again, plus House lead and On-call person (from the roster)". It also says that re-alerts after an escalation reach **everyone told so far**, and the Re-alert hint says the same.
+   - Checks: "preview merges a re-alert and escalation at the same time into one step", "re-alerts after an escalation reach everyone told so far".
+
+Main's build notes are in `AUDIT.md` §2: one shared "attended" record per alert, and pinning in the bell is a shared-component change (Q13).

@@ -288,7 +288,7 @@ function ControlledDrugs({ ctx }: { ctx: Ctx }) {
                     <GroupRow id="cw-longest" label="Longest override" hint="Overrides end by themselves." state={rowState(m, 'cdw', 'longest')} hidden={!visible(ctx, false, isDirty(m, 'cdw', 'longest'), 'Longest override')}>
                         <Choice value={d.longest} options={CDW_OPTS.longest.map(([v, l]) => [v, l.replace(' (default)', '')]) as [string, string][]} disabled={dis} onChange={(v) => edit('cdw', 'longest', v)} />
                     </GroupRow>
-                    <GroupRow id="cw-open" label="Current overrides" hint="Grant, end or review overrides in Safety & oversight." control={<Button variant="outline" size="sm" onClick={() => go('#/safety/overrides')}>Open<ArrowUpRight /></Button>} />
+                    <GroupRow id="cw-open" label="Current overrides" hint="Grant, end or review overrides in Safety & oversight." control={<Button variant="link" onClick={() => go('#/safety/overrides')}>Open<ArrowUpRight className="size-4" /></Button>} />
                 </SettingGroup>
                 <SettingGroup id="headsup" icon={Bell} title="Single staffing" caption="Before a shift with one person at a house that holds controlled drugs">
                     <GroupRow id="cw-suggest" label="Heads-up for managers" hint="Offers to set up an override in advance. Never switches anything on." state={rowState(m, 'cdw', 'suggest')} hidden={!visible(ctx, false, isDirty(m, 'cdw', 'suggest'), 'Heads-up')}
@@ -417,7 +417,7 @@ function Competency({ ctx }: { ctx: Ctx }) {
     );
     const obsOn = !!d.obsNeeded || !!m.pendingOn['elig.obsNeeded'];
     return (
-        <Section id="sc-comp" title="Medication competency" caption="Used by the assessment form and the register" right={<Button variant="outline" size="sm" onClick={() => go(eligHref())}>Open Staff eligibility<ArrowUpRight /></Button>}>
+        <Section id="sc-comp" title="Medication competency" caption="Used by the assessment form and the register" right={<Button variant="link" onClick={() => go(eligHref())}>Open Staff eligibility<ArrowUpRight className="size-4" /></Button>}>
             <GroupGrid empty={<NoMatches ctx={ctx} />}>
                 <SettingGroup id="assessment" icon={ClipboardCheck} title="Assessment" caption="How long it lasts and what passes">
                     {num('validity', 'Stays current for', 'The assessor can choose an earlier end date.')}
@@ -451,7 +451,7 @@ function Exemptions({ ctx }: { ctx: Ctx }) {
     const { go } = useNav();
     const d = m.draft.elig, dis = ro('elig');
     return (
-        <Section id="sc-ex" title="Exemption limit" caption="Applies to every exemption" right={<Button variant="outline" size="sm" onClick={() => go(eligHref('exemptions'))}>Open exemptions<ArrowUpRight /></Button>}>
+        <Section id="sc-ex" title="Exemption limit" caption="Applies to every exemption" right={<Button variant="link" onClick={() => go(eligHref('exemptions'))}>Open exemptions<ArrowUpRight className="size-4" /></Button>}>
             <GroupGrid empty={<NoMatches ctx={ctx} />}>
                 <SettingGroup id="limit" icon={ShieldCheck} title="Limit" caption="Every exemption needs an end date within this">
                     <GroupRow id="el-longestEx" label="Longest exemption" hint="For the clinical lead to confirm." state={rowState(m, 'elig', 'longestEx')} error={ctx.errs.longestEx} errorId="el-longestEx-error" hidden={!visible(ctx, !reviewedBy(m, 'elig', 'longestEx'), isDirty(m, 'elig', 'longestEx'), ELIG_L.longestEx[0])}
@@ -681,14 +681,14 @@ function Delivery({ ctx }: { ctx: Ctx }) {
         <GroupRow key={k} id={`dl-${k}`} label={DELIVERY_L[k]} hint={hint} state={st(k)} hidden={!vis(k)}
             control={<OnOff id={`dl-${k}`} checked={(d as unknown as Record<string, string>)[k] === 'yes'} disabled={dis} onChange={(v) => edit('delivery', k, v ? 'yes' : 'no')} />} />
     );
-    const toAlerts = <Button variant="outline" size="sm" onClick={() => go(settingsHref('alerts', 'alerts'))}>Alerts<ArrowUpRight /></Button>;
+    const toAlerts = <Button variant="link" onClick={() => go(settingsHref('alerts', 'alerts'))}>Alerts<ArrowUpRight className="size-4" /></Button>;
     return (
         <>
         <Section id="sc-delivery" title="Delivery & follow-up" caption="How alerts reach people, and what happens if nobody attends" right={<EntityChip icon={Building2}>Every house</EntityChip>}>
             {fu.length && !reOn && !escOn ? <InfoCard icon={Info}><b>Follow up is on for {fu.length} alert types, but re-alerting and escalation are both off.</b> Each alert is still sent once, as today.</InfoCard> : null}
             <GroupGrid empty={<NoMatches ctx={ctx} />}>
                 <SettingGroup id="realert" icon={BellRing} title="Re-alert until attended" caption={`For the ${fu.length} alert ${fu.length === 1 ? 'type' : 'types'} with Follow up on`}>
-                    <GroupRow id="dl-reon" label={DELIVERY_L.realertEvery} hint={reOn ? `Sent again to the same people every ${d.realertEvery || '…'} minutes, up to ${d.realertMax || '…'} times, until someone attends.` : 'Off — each alert is sent once (today).'} state={st('realertEvery')} error={ctx.errs['dl-realertEvery'] || ctx.errs['dl-realertMax']} errorId="dl-realert-error" hidden={!vis('realertEvery', 're-alert', 'repeat')}
+                    <GroupRow id="dl-reon" label={DELIVERY_L.realertEvery} hint={reOn ? `Sent again to everyone told so far every ${d.realertEvery || '…'} minutes, up to ${d.realertMax || '…'} times, until someone attends.` : 'Off — each alert is sent once (today).'} state={st('realertEvery')} error={ctx.errs['dl-realertEvery'] || ctx.errs['dl-realertMax']} errorId="dl-realert-error" hidden={!vis('realertEvery', 're-alert', 'repeat')}
                         control={<OnOff id="dl-reon" checked={reOn} disabled={dis} onChange={(v) => { toggleNumber('delivery', 'realertEvery', v); toggleNumber('delivery', 'realertMax', v); ctx.clearErr('dl-realertEvery'); ctx.clearErr('dl-realertMax'); }} />}>
                         {reOn ? (
                             <span className="inline-flex flex-wrap items-center gap-2">
@@ -741,7 +741,7 @@ function Delivery({ ctx }: { ctx: Ctx }) {
                     {sw('pinned', 'Alerts with Follow up on stay at the top of the bell until someone attends.')}
                 </SettingGroup>
                 <SettingGroup id="afterhours" icon={Phone} title="After hours" caption="Nobody is phoned automatically">
-                    <GroupRow id="dl-oncall" label="On-call contacts" hint="Follows the roster: on-call shift, then the team lead on shift, then a backup person." hidden={!link('On-call contacts', 'after hours')} control={<Button variant="outline" size="sm" onClick={() => go(settingsHref('alerts', 'oncall'))}>{oc} of {HOUSE_KEYS.length} houses<ArrowUpRight /></Button>} />
+                    <GroupRow id="dl-oncall" label="On-call contacts" hint="Follows the roster: on-call shift, then the team lead on shift, then a backup person." hidden={!link('On-call contacts', 'after hours')} control={<Button variant="link" onClick={() => go(settingsHref('alerts', 'oncall'))}>{oc} of {HOUSE_KEYS.length} houses<ArrowUpRight className="size-4" /></Button>} />
                     <GroupRow id="dl-oncallgets" label="Alerts that go to the on-call person" hint={toOnCall.length ? toOnCall.map((a) => a.l).join(', ') : d.escalateTo.includes('onCall') && escOn ? 'Only through escalation.' : 'None yet — add them in an alert’s groups, or escalate to them.'} hidden={!link('Alerts that go to the on-call person', 'on-call')} control={toAlerts} />
                 </SettingGroup>
                 <FollowUpPreview />
@@ -760,10 +760,17 @@ function FollowUpPreview() {
     const via = [x.inapp && 'in-app', x.email && 'email', x.push && 'push'].filter(Boolean).join(', ').replace(/, ([^,]*)$/, ' and $1') || 'no channel';
     const quiet = /^\d{2}:\d{2}$/.test(d.quietFrom) && /^\d{2}:\d{2}$/.test(d.quietUntil);
     const first = [...x.groups.map(glabel), ...x.people].join(', ') || 'Nobody';
-    const ev: [number, string, string][] = [];
-    if (x.followUp && every && max) for (let i = 1; i <= max; i++) ev.push([every * i, 'Re-alert', `The same people, ${via}`]);
-    if (x.followUp && after && d.escalateTo.length) ev.push([after, 'Escalate', `${d.escalateTo.map(glabel).join(', ')}, ${via}`]);
-    ev.sort((p, q) => p[0] - q[0] || (p[1] === 'Escalate' ? 1 : -1));
+    // One row per moment: a re-alert and an escalation at the same time are one step. After an escalation,
+    // re-alerts go to everyone told so far — the first people and the escalated groups.
+    const esc = x.followUp && after && d.escalateTo.length ? d.escalateTo.map(glabel).join(', ') : '';
+    const reAt = x.followUp && every && max ? Array.from({ length: max }, (_, i) => every * (i + 1)) : [];
+    const times = [...new Set([...reAt, ...(esc ? [after] : [])])].sort((p, q) => p - q);
+    const ev: [number, string, string][] = times.map((t) => {
+        const re = reAt.includes(t), up = !!esc && t === after, since = !!esc && t > after;
+        if (re && up) return [t, 'Re-alert and escalate', `The same people again, plus ${esc} · ${via}`];
+        if (up) return [t, 'Escalate', `${esc} · ${via}`];
+        return [t, 'Re-alert', since ? `Everyone told so far, including ${esc} · ${via}` : `The same people · ${via}`];
+    });
     const shown = ev.slice(0, 5);
     const stop = ATTENDED_OPTS.find((o) => o[0] === d.attended)![1].toLowerCase();
     return (

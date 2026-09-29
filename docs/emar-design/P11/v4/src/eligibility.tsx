@@ -193,7 +193,7 @@ function Exemptions({ f }: { f: F }) {
     const B: Record<Exemption['status'], [ 'info' | 'neutral', string]> = { active: ['info', 'Active'], ended: ['neutral', 'Ended'], revoked: ['neutral', 'Ended early'] };
     return (
         <Section id="xl" title="Exemptions" caption={`${list.length} shown · longest ${m.saved.elig.longestEx} days`} right={canExempt(p) ? <Button size="sm" onClick={() => open({ kind: 'xw', arg: 'new' })}><Plus />Grant an exemption</Button> : null}>
-            <p className="text-subtle">One house, a reason and an end date within {m.saved.elig.longestEx} days ({m.setBy.elig.longestEx ? 'set' : 'default — not yet reviewed'}). The restricted and area rules still apply during an exemption. Never a witness. <Button variant="outline" size="sm" className="ml-2" onClick={() => go(settingsHref('staff', 'exemptions'))}>Longest exemption setting<ArrowUpRight /></Button></p>
+            <p className="text-subtle">One house, a reason and an end date within {m.saved.elig.longestEx} days ({m.setBy.elig.longestEx ? 'set' : 'default — not yet reviewed'}). The restricted and area rules still apply during an exemption. Never a witness. <Button variant="link" className="ml-2" onClick={() => go(settingsHref('staff', 'exemptions'))}>Longest exemption setting<ArrowUpRight className="size-4" /></Button></p>
             {list.length ? (
                 <EntityTable<Exemption>
                     rows={list} rowKey={(e) => e.id} identityLabel="Person" identityWidth="1.2fr" minWidth={1000} rowHeight="content"
@@ -231,7 +231,7 @@ function Witnesses({ f }: { f: F }) {
                                 {on.map((x) => { const w = witnessAbility(m, x); return <li key={x.id} className="flex items-start justify-between gap-3 p-3 text-[13px]"><span><b>{x.name}</b><span className="text-caption block">{x.shift}</span></span><span className="text-caption max-w-[55%] text-right">{w.v === 'yes' ? 'Can witness' : w.why!.join(' · ')}</span></li>; })}
                             </ul>
                             <p className="text-caption">{ok.length ? '' : `Next witness-eligible: ${next[h]}. `}Checked against the roster and clock-ins at {NOW_LABEL}.{!ok.length && leadCap(p) ? ' Controlled doses due before then need a witness override.' : ''}</p>
-                            {!ok.length && leadCap(p) ? <div><Button variant="outline" size="sm" onClick={() => go('#/safety/overrides')}>Open witness overrides<ArrowUpRight /></Button></div> : null}
+                            {!ok.length && leadCap(p) ? <div><Button variant="link" onClick={() => go('#/safety/overrides')}>Open witness overrides<ArrowUpRight className="size-4" /></Button></div> : null}
                         </Card>
                     );
                 })}

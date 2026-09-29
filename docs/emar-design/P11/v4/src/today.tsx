@@ -50,7 +50,7 @@ export function MedsTodayPage() {
             {view.key === 'rounds' && has(p, 'orders.manage') && has(p, 'settings.manage') ? (
                 <Card className="flex flex-row flex-wrap items-center justify-between gap-4 p-4">
                     <div><p className="text-sm font-semibold">Round templates have moved to Settings</p><p className="text-caption mt-1">Add, change, pause or retire templates, and create rounds for a day, in Settings › Rounds &amp; timing. Today’s rounds stay here.</p></div>
-                    <Button variant="outline" size="sm" onClick={() => go(settingsHref('rounds', 'templates'))}>Open round templates<ArrowUpRight /></Button>
+                    <Button variant="link" onClick={() => go(settingsHref('rounds', 'templates'))}>Open round templates<ArrowUpRight className="size-4" /></Button>
                 </Card>
             ) : null}
             <EmptyState icon={view.icon} title={`${view.label} is designed in ${view.pkg}`} description="It isn’t part of this preview. Use the My eligibility block above." />

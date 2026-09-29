@@ -30,6 +30,9 @@ This carries forward `../v3/AUDIT.md` (and through it `../v2/AUDIT.md`), and add
 | Cellphone consent | No consent field. | "Show my personal cellphone when I'm on call" in the person's account, with the date they agreed. | A new per-person preference, recorded when it changes. The on-call resolver uses `work_phone`, else `cellphone` only with consent (Q10). |
 | Restore from history | Change history (this design) records before and after text. | Put the earlier value back into the draft. | Store the structured earlier value with each saved change. |
 | Review the defaults | "Keep today's value" one at a time (v2). | A walkthrough over Still to decide. | The same audited action as "Keep today's value", in a batch. |
+| "Attended" (Main's build note) | The bell's database notifications only have a per-user `read_at`. `MedicationDashboardAlert` holds `acknowledged_by` / `acknowledged_at`. | Re-alerts and escalation stop once the alert is attended (opened, acknowledged or dealt with). | The build needs **one "attended" record per alert, shared by every recipient**. When anyone attends, re-alerts stop for everyone, and the alert log shows who attended. |
+| Re-alerts after escalation | — | The preview says re-alerts after an escalation go to **everyone told so far**: the first people plus the escalated groups. A re-alert and an escalation at the same moment are one step. | The follow-up scheduler keeps a growing recipient list per alert. |
+| Keep unattended alerts at the top of the bell (Main's build note) | The bell is shared by the whole app. | A switch in Delivery › In-app, off by default. | This changes a **shared component**, the app-wide bell, so it needs Stephan's OK (Q13). |
 
 ## 3. Bugs found
 
@@ -57,3 +60,4 @@ These are unchanged from v3 §3:
 - **Q7 (end-date warning):** 7 days or 14 days?
 - **Q11 (alert log retention):** how long is the alert log kept? **Recommendation:** the same as the audit log, because it is evidence of who was told.
 - **Q12 (quiet hours scope):** quiet hours are organisation-wide in this design. Should a house be able to set its own? **Recommendation:** organisation-wide for now, and add per-house times only if a house asks.
+- **Q13 (shared bell):** "Keep unattended alerts at the top of the bell" changes the app-wide bell. OK to change that shared component when P11 is built, or should the switch be dropped? **Recommendation:** keep it off by default, and build it with the bell's owner.
