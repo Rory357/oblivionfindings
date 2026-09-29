@@ -1,3 +1,4 @@
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +24,11 @@ import {
     submitEmarMutation,
 } from '@/lib/emar-offline';
 import { createOfflineRequestUuid } from '@/lib/offline-queue';
+import {
+    witnessIsSelectable,
+    witnessOptionLabel,
+    type WitnessPickerOption,
+} from '@/lib/witness-pin';
 import { Link, router, useForm } from '@inertiajs/react';
 import axios from 'axios';
 import { AlertTriangle, QrCode, ShieldCheck } from 'lucide-react';
@@ -98,7 +104,7 @@ type Props = {
     canRecord: boolean;
     canRecordControlled: boolean;
     summary: MedicationSummary;
-    witnesses: Array<{ id: number; name: string }>;
+    witnesses: WitnessPickerOption[];
 };
 
 function toLocalDateTimeInput(iso?: string | null) {
@@ -904,34 +910,34 @@ export default function ShiftMedicationCard({
                                                         value={String(
                                                             witness.id,
                                                         )}
+                                                        disabled={
+                                                            !witnessIsSelectable(
+                                                                witness,
+                                                            )
+                                                        }
                                                     >
-                                                        {witness.name}
+                                                        {witnessOptionLabel(
+                                                            witness,
+                                                        )}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="space-y-1">
-                                        <Label>Witness password or PIN</Label>
-                                        <Input
-                                            type="password"
-                                            autoComplete="off"
-                                            value={
-                                                adminForm.data
-                                                    .witness_credential
-                                            }
-                                            onChange={(event) =>
-                                                adminForm.setData(
-                                                    'witness_credential',
-                                                    event.target.value,
-                                                )
-                                            }
-                                        />
-                                        <div className="text-xs text-muted-foreground">
-                                            Entered by the witness and never
-                                            saved on this device.
-                                        </div>
-                                    </div>
+                                    <WitnessPinInput
+                                        label="Witness’s witness PIN"
+                                        required={false}
+                                        value={
+                                            adminForm.data.witness_credential
+                                        }
+                                        onChange={(v) =>
+                                            adminForm.setData(
+                                                'witness_credential',
+                                                v,
+                                            )
+                                        }
+                                        className="space-y-1"
+                                    />
                                 </div>
                             ) : null}
 

@@ -7,12 +7,17 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\Staff;
 use App\Models\User;
+use App\Models\UserWitnessPin;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 class SystemUsersSeeder extends Seeder
 {
     private const DEFAULT_TENANT_ID = 1;
+
+    /** Demo witness PIN for the seeded demo staff (local and fresh demo installs only). */
+    public const DEMO_WITNESS_PIN = '482915';
 
     public function run(): void
     {
@@ -155,6 +160,22 @@ class SystemUsersSeeder extends Seeder
             $staff = $staffUser->staffProfile;
             $this->upsertHrEmployeeProfile($staffUser, $staff);
         });
+
+        // PIN-1: demo staff can witness and co-sign straight away with the
+        // documented demo witness PIN. A PIN someone already chose is kept.
+        // Deploys skip seeders: on an existing site each person sets their own
+        // PIN in Settings › Witness PIN.
+        if (Schema::hasTable('user_witness_pins')) {
+            $demoPinHash = Hash::make(self::DEMO_WITNESS_PIN);
+            User::query()
+                ->where('email', 'like', '%@demo.test')
+                ->whereNotIn('role', ['client', 'next_of_kin'])
+                ->get(['id'])
+                ->each(fn (User $demoUser) => UserWitnessPin::query()->firstOrCreate(
+                    ['user_id' => $demoUser->id],
+                    ['pin_hash' => $demoPinHash, 'set_at' => now()],
+                ));
+        }
 
         // Create a board member
         $boardUser = User::query()->firstOrNew(['email' => 'board@demo.test']);

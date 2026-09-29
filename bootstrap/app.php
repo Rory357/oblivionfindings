@@ -111,6 +111,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'witness_1_credential',
             'witness_2_credential',
             'waiver_approver_credential',
+            // PIN-1 account settings › Witness PIN
+            'current_pin',
+            'pin',
+            'pin_confirmation',
         ]);
 
         $exceptions->render(function (

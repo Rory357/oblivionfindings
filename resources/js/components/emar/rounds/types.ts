@@ -1,5 +1,6 @@
 /* Shared types for the redesigned eMAR Medication Rounds page (`/emar/rounds`).
  * Shapes mirror EmarController@rounds + GuidedRoundService. */
+import type { WitnessPinStatus } from '@/lib/witness-pin';
 
 export type RoundStatus =
     | 'pending'
@@ -176,6 +177,8 @@ export interface ActivityItem {
 export interface StaffOption {
     id: number;
     name: string;
+    /** PIN-1: witness PIN status; unusable PINs are listed but can't be chosen. */
+    witness_pin?: WitnessPinStatus;
 }
 
 /** Live tallies derived from a round's cells (mirrors the design prototype). */

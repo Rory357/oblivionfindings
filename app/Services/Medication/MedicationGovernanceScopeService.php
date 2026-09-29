@@ -334,7 +334,7 @@ final class MedicationGovernanceScopeService
             return collect();
         }
 
-        return $this->currentStaff->currentUsersQuery()
+        $rows = $this->currentStaff->currentUsersQuery()
             ->with('hrEmployeeProfile:id,user_id,primary_site_id,secondary_site_ids')
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'role', 'approved_at'])
@@ -373,15 +373,26 @@ final class MedicationGovernanceScopeService
                     'site_ids' => $assignedSiteIds,
                 ];
             });
+
+        // PIN-1: the read-back witness confirms with their witness PIN, so people
+        // without a usable PIN are listed but can't be chosen.
+        $pinStatuses = app(WitnessPinService::class)->statuses($rows->pluck('id'));
+
+        return $rows->map(fn (array $row): array => [
+            ...$row,
+            'witness_pin' => $pinStatuses[$row['id']] ?? WitnessPinService::STATUS_NOT_SET,
+        ]);
     }
 
     /** @param array<int, int> $siteIds */
     public function controlledWitnessPicker(array $siteIds, ?int $excludedUserId = null): Collection
     {
-        return $this->controlledWitnesses
-            ->eligibleWitnessesForSites($siteIds, now(), $excludedUserId)
-            ->values()
-            ->map(fn (User $user) => $user->only(['id', 'name']));
+        // PIN-1: people without a usable witness PIN are listed but can't be chosen.
+        return app(WitnessPinService::class)->pickerRows(
+            $this->controlledWitnesses
+                ->eligibleWitnessesForSites($siteIds, now(), $excludedUserId)
+                ->values(),
+        );
     }
 
     public function forClient(

@@ -11,6 +11,8 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationSafetyPolicySettings;
+use App\Services\Medication\WitnessPinService;
+use App\Services\Medication\WitnessPinSettings;
 use App\Services\MedicationRuleService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -36,7 +38,109 @@ class MedicationSettingsController extends Controller
         private readonly MedicationRuleService $ruleService,
         private readonly PeopleMutationLockService $peopleLocks,
         private readonly MedicationSafetyPolicySettings $safetyPolicy,
+        private readonly WitnessPinSettings $witnessPinSettings,
+        private readonly WitnessPinService $witnessPins,
     ) {}
+
+    /** Request field → app_settings key for the witness PIN rules (PIN-1). */
+    private const WITNESS_PIN_FIELDS = [
+        'max_attempts' => WitnessPinSettings::MAX_ATTEMPTS,
+        'lockout_minutes' => WitnessPinSettings::LOCKOUT_MINUTES,
+        'renewal_months' => WitnessPinSettings::RENEWAL_MONTHS,
+    ];
+
+    /** Permissions that make someone a possible second person (witness, co-signer, read-back, waiver). */
+    private const SECOND_PERSON_PERMISSIONS = [
+        'medications.controlled.witness',
+        'medications.administer.record',
+        'medications.orders.verify',
+    ];
+
+    /**
+     * Witness PIN rules apply at every Site: organisation-wide eMAR settings
+     * managers only, audited, like the safety rules.
+     */
+    public function updateWitnessPinRules(Request $request)
+    {
+        $actor = $request->user();
+        abort_unless($this->canManageSettings($actor) && $this->canManageGlobalRules($actor), 403);
+
+        $validated = $request->validate(collect(self::WITNESS_PIN_FIELDS)
+            ->mapWithKeys(fn (string $key, string $field) => [
+                $field => ['required', 'string', Rule::in(WitnessPinSettings::OPTIONS[$key])],
+            ])
+            ->all());
+
+        DB::transaction(function () use ($actor, $validated): void {
+            $lockedActor = $this->lockCurrentRuleActor($actor);
+            abort_unless($this->canManageGlobalRules($lockedActor), 403);
+
+            $before = $this->witnessPinSettings->all();
+            $this->witnessPinSettings->save(collect(self::WITNESS_PIN_FIELDS)
+                ->mapWithKeys(fn (string $key, string $field) => [$key => $validated[$field]])
+                ->all());
+
+            AuditLogger::logOrFail('medications.witness_pin_rules.updated', null, [
+                'actor_id' => $lockedActor->id,
+                'before' => $this->witnessPinRequestValues($before),
+                'after' => $this->witnessPinRequestValues($this->witnessPinSettings->all()),
+            ]);
+        }, 3);
+
+        return redirect()->back()->with('success', 'Witness PIN rules saved.');
+    }
+
+    /**
+     * Reset another person's witness PIN: they must choose a new one before
+     * they can witness or co-sign. Nobody sees the old or new PIN. Audited.
+     */
+    public function resetWitnessPin(Request $request, User $user)
+    {
+        $actor = $request->user();
+        abort_unless($actor?->canDo('medications.witness_pin.reset'), 403);
+        abort_if((int) $user->id === (int) $actor->id, 403);
+        abort_unless($this->witnessPinStaff($actor)->contains('id', (int) $user->id), 404);
+
+        $this->witnessPins->resetByAdmin($user, $actor);
+
+        return redirect()->back()->with('success', $user->name.'’s witness PIN was reset. They must choose a new one before they can co-sign or witness.');
+    }
+
+    /**
+     * Staff in the actor's approved Sites who may be chosen as a second person.
+     *
+     * @return Collection<int, User>
+     */
+    private function witnessPinStaff(User $actor): Collection
+    {
+        $query = User::query()->staff()->whereNotNull('approved_at')->orderBy('name');
+        if (! $this->canManageGlobalRules($actor)) {
+            $siteIds = $this->siteAccess->accessibleSiteIds($actor, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS);
+            if ($siteIds === []) {
+                return collect();
+            }
+            $query->where(function (Builder $scoped) use ($siteIds): void {
+                foreach ($siteIds as $siteId) {
+                    $scoped->orWhere(fn (Builder $site) => $this->siteAccess->applyFleetRecipientEligibility($site, (int) $siteId));
+                }
+            });
+        }
+
+        return $query->limit(500)->get(['id', 'name', 'approved_at', 'role'])
+            ->filter(fn (User $user): bool => collect(self::SECOND_PERSON_PERMISSIONS)->contains(fn (string $key): bool => $user->canDo($key)))
+            ->values();
+    }
+
+    /**
+     * @param  array<string, string|bool>  $values  Keyed by app_settings key.
+     * @return array<string, string|bool> Keyed by request field.
+     */
+    private function witnessPinRequestValues(array $values): array
+    {
+        return collect(self::WITNESS_PIN_FIELDS)
+            ->mapWithKeys(fn (string $key, string $field) => [$field => $values[$key]])
+            ->all();
+    }
 
     /**
      * Request field → app_settings key for the organisation-wide safety rules
@@ -116,7 +220,34 @@ class MedicationSettingsController extends Controller
     public function index(Request $request)
     {
         $actor = $request->user();
-        abort_unless($this->canManageSettings($actor), 403);
+        $canResetPins = (bool) $actor?->canDo('medications.witness_pin.reset');
+        abort_unless($this->canManageSettings($actor) || $canResetPins, 403);
+
+        $witnessPin = [
+            'values' => $this->witnessPinRequestValues($this->witnessPinSettings->all()),
+            // false = still the shipped default, never deliberately saved.
+            'reviewed' => $this->witnessPinRequestValues($this->witnessPinSettings->reviewed()),
+            'can_manage' => $this->canManageSettings($actor) && $this->canManageGlobalRules($actor),
+            'can_reset' => $canResetPins,
+            'staff' => $this->witnessPins->statusRows($this->witnessPinStaff($actor))
+                ->reject(fn (array $row): bool => $row['id'] === (int) $actor->id)
+                ->values(),
+        ];
+
+        // House leads can reset staff PINs without managing medication rules:
+        // they see only the second-person confirmation section.
+        if (! $this->canManageSettings($actor)) {
+            return Inertia::render('emar/Settings', [
+                'witnessPin' => $witnessPin,
+                'settingsAccess' => false,
+                'safetyPolicy' => null,
+                'rules' => [],
+                'sites' => [],
+                'observationOptions' => self::OBSERVATION_OPTIONS,
+                'matchTypes' => self::MATCH_TYPES,
+                'can' => ['manage' => false, 'manage_global' => false],
+            ]);
+        }
 
         $siteIds = $this->accessibleSiteIds($actor);
         $canManageGlobal = $this->canManageGlobalRules($actor);
@@ -140,6 +271,8 @@ class MedicationSettingsController extends Controller
             ]);
 
         return Inertia::render('emar/Settings', [
+            'witnessPin' => $witnessPin,
+            'settingsAccess' => true,
             'safetyPolicy' => [
                 'values' => $this->safetyPolicyRequestValues($this->safetyPolicy->all()),
                 // false = still the default, never deliberately saved.

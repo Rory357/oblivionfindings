@@ -49,6 +49,7 @@ use App\Services\Medication\MedicationOrderLifecycleService;
 use App\Services\Medication\MedicationRoundGenerationService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationOverviewService;
@@ -64,7 +65,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -4034,7 +4034,7 @@ class EmarController extends Controller
                     );
                     if (blank($validated['read_back_witness_credential'] ?? null)) {
                         throw ValidationException::withMessages([
-                            'read_back_witness_credential' => 'The read-back witness must enter their password or PIN.',
+                            'read_back_witness_credential' => 'The read-back witness must enter their 6-digit witness PIN.',
                         ]);
                     }
                     $rateLimitKey = $this->prescriptionReadBackRateLimitKey(
@@ -4054,19 +4054,34 @@ class EmarController extends Controller
                             RateLimiter::attempts($rateLimitKey),
                         );
                     }
-                    if (! Hash::check((string) $validated['read_back_witness_credential'], (string) $readBackWitness->password)) {
-                        RateLimiter::hit($rateLimitKey, self::PRESCRIPTION_READ_BACK_DECAY_SECONDS);
-                        $this->rejectPrescriptionReadBackCredential(
-                            $user,
+                    // PIN-1: the read-back witness confirms with their witness PIN,
+                    // not their login password. The per-witness PIN lock applies on
+                    // top of this surface's own attempt throttle.
+                    try {
+                        app(WitnessPinService::class)->verify(
                             $readBackWitness,
-                            $scope->client,
-                            'mismatch',
-                            RateLimiter::attempts($rateLimitKey),
+                            (string) $validated['read_back_witness_credential'],
+                            'read_back_witness_credential',
+                            ['site_id' => (int) $scope->client->site_id, 'surface' => 'prescription_read_back'],
                         );
+                    } catch (ValidationException $rejected) {
+                        RateLimiter::hit($rateLimitKey, self::PRESCRIPTION_READ_BACK_DECAY_SECONDS);
+                        Log::warning('Medication prescriber-order read-back witness credential rejected.', [
+                            'security_event' => 'medication_prescriber_order_read_back_credential_rejected',
+                            'outcome' => 'mismatch',
+                            'actor_id' => (int) $user->id,
+                            'witness_id' => (int) $readBackWitness->id,
+                            'client_id' => (int) $scope->client->id,
+                            'site_id' => (int) $scope->client->site_id,
+                            'attempts' => RateLimiter::attempts($rateLimitKey),
+                            'attempt_limit' => self::PRESCRIPTION_READ_BACK_ATTEMPT_LIMIT,
+                        ]);
+
+                        throw $rejected;
                     }
                     RateLimiter::clear($rateLimitKey);
                     $readBackWitnessedAt = now();
-                    $readBackVerificationMethod = MedicationPrescriberOrder::READ_BACK_VERIFICATION_METHOD_PASSWORD;
+                    $readBackVerificationMethod = MedicationPrescriberOrder::READ_BACK_VERIFICATION_METHOD_WITNESS_PIN;
                 } else {
                     unset(
                         $validated['read_back_confirmed'],
@@ -5267,7 +5282,7 @@ class EmarController extends Controller
                 'commenced_by' => $lockedActor->id,
                 'witnessed_by' => $witness?->id,
                 'witnessed_at' => $witness ? now() : null,
-                'witness_method' => $witness ? 'password' : null,
+                'witness_method' => $witness ? WitnessPinService::METHOD : null,
                 'rate' => $validated['rate'] ?? null,
                 'rate_unit' => $validated['rate_unit'] ?? null,
                 'duration_hours' => $validated['duration_hours'] ?? null,
@@ -6478,7 +6493,7 @@ class EmarController extends Controller
                 'witness_1_id' => $witness1?->id,
                 'witness_2_id' => $witness2?->id,
                 'witness_method' => $witness1
-                    ? (! empty($payload['is_controlled_drug']) ? 'password' : 'site_staff_record')
+                    ? (! empty($payload['is_controlled_drug']) ? WitnessPinService::METHOD : 'site_staff_record')
                     : null,
                 'witnessed_at' => $witness1 ? now()->toIso8601String() : null,
                 'on_hand_before' => $before,
@@ -7174,7 +7189,7 @@ class EmarController extends Controller
                     'on_hand_before' => $authoritativeBefore,
                     'on_hand_after' => $expectedAfter,
                     'witnessed_by' => $witness->id,
-                    'witness_method' => 'password',
+                    'witness_method' => WitnessPinService::METHOD,
                 ]);
 
                 $this->governanceScope->rememberIdempotencyResult(
@@ -7895,14 +7910,21 @@ class EmarController extends Controller
                 $scope->siteId,
                 $this->siteAccess()->accessibleSiteIds($approver, ['clinical.accessAllSites', 'sites.viewAll']),
                 true,
-            )
-            && Hash::check((string) $validated['waiver_approver_credential'], (string) $approver->password);
+            );
 
         if (! $approverIsEligible) {
             throw ValidationException::withMessages([
                 'waiver_approver_credential' => 'The emergency waiver approval could not be verified.',
             ]);
         }
+
+        // PIN-1: the approver confirms with their witness PIN, not their login password.
+        app(WitnessPinService::class)->verify(
+            $approver,
+            (string) $validated['waiver_approver_credential'],
+            'waiver_approver_credential',
+            ['site_id' => (int) $scope->siteId, 'surface' => 'verification_waiver'],
+        );
 
         return $approver;
     }
@@ -8231,7 +8253,7 @@ class EmarController extends Controller
                     'stock_id' => $stock->id,
                     'entry_type' => $entryType,
                     'witnessed_by' => $witness->id,
-                    'witness_method' => 'password',
+                    'witness_method' => WitnessPinService::METHOD,
                     'witnessed_at' => now()->toIso8601String(),
                     'on_hand_before' => $onHandBefore,
                     'on_hand_after' => $onHandAfter,
@@ -8491,7 +8513,7 @@ class EmarController extends Controller
                     'stock_id' => $stock->id,
                     'discrepancy_id' => $discrepancy?->id,
                     'witnessed_by' => $witness->id,
-                    'witness_method' => 'password',
+                    'witness_method' => WitnessPinService::METHOD,
                     'witnessed_at' => now()->toIso8601String(),
                     'on_hand_before' => $expectedBalance,
                     'on_hand_after' => $actualBalance,

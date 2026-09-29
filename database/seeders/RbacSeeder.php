@@ -300,6 +300,7 @@ class RbacSeeder extends Seeder
             ['key' => 'medications.controlled.record', 'description' => 'Record controlled drug register entries', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.controlled.witness', 'description' => 'Witness controlled drug administrations', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.controlled.override', 'description' => 'Override controlled drug discrepancy blocks', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.witness_pin.reset', 'description' => 'Reset another person\'s witness PIN (they must choose a new one; nobody sees the PIN)', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.audit.view', 'description' => 'View medication-focused audit log', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.reports.export', 'description' => 'Export MAR/audit/medications reports', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.breakglass', 'description' => 'Use break-glass emergency access', 'group' => 'medications', 'module' => 'Clinical'],
@@ -912,7 +913,7 @@ class RbacSeeder extends Seeder
             'clinical.assessments.viewAny', 'clinical.assessments.record',
             'clinical.protocols.viewAny',
             'clinical.dashboard',
-            'medications.view', 'medications.orders.verify',
+            'medications.view', 'medications.orders.verify', 'medications.witness_pin.reset',
             'progress_notes.viewAny', 'progress_notes.create', 'progress_notes.update', 'progress_notes.review',
         ]);
 
@@ -991,7 +992,7 @@ class RbacSeeder extends Seeder
             'clinical.protocols.viewAny', 'clinical.protocols.manage',
             'clinical.dashboard', 'clinical.accessAllSites',
             'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage',
-            'medications.administer.record', 'medications.administer.override_safety', 'medications.competency.exempt', 'medications.audit.view',
+            'medications.administer.record', 'medications.administer.override_safety', 'medications.competency.exempt', 'medications.audit.view', 'medications.witness_pin.reset',
             'clients.viewAny',
         ]);
 

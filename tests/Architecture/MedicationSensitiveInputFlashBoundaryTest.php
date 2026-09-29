@@ -14,6 +14,9 @@ it('excludes every medication witness credential from flashed input', function (
         "'witness_1_credential'",
         "'witness_2_credential'",
         "'waiver_approver_credential'",
+        "'current_pin'",
+        "'pin'",
+        "'pin_confirmation'",
     );
 });
 

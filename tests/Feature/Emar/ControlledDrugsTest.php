@@ -18,6 +18,8 @@ use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Models\UserWitnessPin;
+use App\Services\Medication\WitnessPinService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
@@ -25,6 +27,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use RuntimeException;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 /**
  * The redesigned Controlled Drugs page resolves the active site's brand colour,
@@ -109,7 +112,7 @@ class ControlledDrugsTest extends TestCase
                 'on_hand_before' => 10,
                 'on_hand_after' => 9, // should be 8
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasErrors('on_hand_after');
 
@@ -131,11 +134,71 @@ class ControlledDrugsTest extends TestCase
                 'on_hand_before' => 10,
                 'on_hand_after' => 8,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasNoErrors();
 
         $this->assertSame(1, ClientControlledDrugEntry::count());
+    }
+
+    /**
+     * PIN-1: the witness confirms with their own witness PIN, never their
+     * login password. Wrong PINs are counted even though the request's
+     * transaction rolls back, lock the PIN at the limit, and are audited.
+     */
+    public function test_cd_witness_confirms_with_their_witness_pin_not_their_login_password(): void
+    {
+        ['user' => $user, 'witness' => $witness, 'client' => $client, 'med' => $med] = $this->setupCd();
+        $entry = fn (string $credential, int $before) => $this->actingAs($user)
+            ->from('/emar/controlled')
+            ->post('/emar/controlled/entries', [
+                'client_medication_id' => $med->id,
+                'client_id' => $client->id,
+                'medication_name' => 'Morphine sulfate',
+                'entry_type' => 'administration',
+                'quantity' => 1,
+                'on_hand_before' => $before,
+                'on_hand_after' => $before - 1,
+                'witnessed_by' => $witness->id,
+                'witness_credential' => $credential,
+            ]);
+
+        // Their login password is no longer accepted.
+        $entry('password', 10)->assertSessionHasErrors(['witness_credential' => WitnessPinService::INCORRECT]);
+        $this->assertSame(1, (int) UserWitnessPin::query()->where('user_id', $witness->id)->value('failed_attempts'));
+        $this->assertSame(1, AuditLog::query()->where('action', 'medications.witness_pin.failed')->count());
+        $this->assertSame(0, ClientControlledDrugEntry::count());
+
+        // The right PIN records the entry, stamps the method and clears the count.
+        $entry(UserFactory::TEST_WITNESS_PIN, 10)->assertSessionHasNoErrors();
+        $this->assertSame(1, ClientControlledDrugEntry::count());
+        $this->assertSame(WitnessPinService::METHOD, AuditLog::query()
+            ->where('action', 'medications.controlled.entry.record')
+            ->sole()
+            ->meta['witness_method']);
+        $this->assertSame(0, (int) UserWitnessPin::query()->where('user_id', $witness->id)->value('failed_attempts'));
+
+        // Five wrong PINs lock it; even the right PIN is refused until it unlocks.
+        foreach (range(1, 5) as $attempt) {
+            $entry('000001', 9)->assertSessionHasErrors('witness_credential');
+        }
+        $this->assertTrue(UserWitnessPin::query()->where('user_id', $witness->id)->value('locked_until') !== null);
+        $this->assertSame(1, AuditLog::query()->where('action', 'medications.witness_pin.locked')->count());
+        $entry(UserFactory::TEST_WITNESS_PIN, 9)->assertSessionHasErrors('witness_credential');
+        $this->assertStringContainsString(
+            'witness PIN is locked after too many wrong attempts',
+            session('errors')->first('witness_credential'),
+        );
+        $this->travel(16)->minutes();
+        $entry(UserFactory::TEST_WITNESS_PIN, 9)->assertSessionHasNoErrors();
+        $this->assertSame(2, ClientControlledDrugEntry::count());
+
+        // A colleague who hasn't set a PIN can't witness yet.
+        UserWitnessPin::query()->where('user_id', $witness->id)->delete();
+        $entry(UserFactory::TEST_WITNESS_PIN, 8)->assertSessionHasErrors([
+            'witness_credential' => $witness->name.' hasn’t set a witness PIN yet. They can set one in Settings › Witness PIN, or choose someone else.',
+        ]);
+        $this->assertSame(2, ClientControlledDrugEntry::count());
     }
 
     public function test_manual_controlled_entry_rejects_incomplete_or_contradictory_offline_provenance(): void
@@ -150,7 +213,7 @@ class ControlledDrugsTest extends TestCase
             'on_hand_before' => 10,
             'on_hand_after' => 8,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ];
         $validUuid = 'f5904d4e-74ca-4719-b922-3a16a09bd04b';
         $validCapturedAt = now()->subMinutes(5)->toIso8601String();
@@ -214,7 +277,7 @@ class ControlledDrugsTest extends TestCase
             'expected_balance' => 10,
             'actual_balance' => 10,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ];
         $validUuid = 'ace1032d-7954-45ca-8235-bbd0c6c721c3';
         $validCapturedAt = now()->subMinutes(5)->toIso8601String();
@@ -274,7 +337,7 @@ class ControlledDrugsTest extends TestCase
             'on_hand_before' => 10,
             'on_hand_after' => 8,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => '203a73cc-306a-4648-9390-e11e611bf4b0',
         ];
         $balancePayload = [
@@ -284,7 +347,7 @@ class ControlledDrugsTest extends TestCase
             'expected_balance' => 8,
             'actual_balance' => 8,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => 'e2c696cb-70f1-42cb-a3d1-5e6f419cb1c1',
         ];
 
@@ -333,7 +396,7 @@ class ControlledDrugsTest extends TestCase
             'on_hand_before' => 10,
             'on_hand_after' => 8,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => '674fc9fa-b1ca-4272-9441-80a02382ee0f',
         ];
         $balancePayload = [
@@ -343,7 +406,7 @@ class ControlledDrugsTest extends TestCase
             'expected_balance' => 8,
             'actual_balance' => 8,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => '9b5ee527-524e-4e5b-9a67-da8e4e6a9e04',
         ];
         $lossPayload = [
@@ -399,7 +462,7 @@ class ControlledDrugsTest extends TestCase
             'on_hand_before' => '10.00',
             'on_hand_after' => '8.00',
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => $entryRequestUuid,
             'captured_offline_at' => $entryCapturedAt,
             'origin_device_id' => 'cd-trolley-01',
@@ -412,7 +475,7 @@ class ControlledDrugsTest extends TestCase
             'expected_balance' => '8.00',
             'actual_balance' => '8.00',
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => $balanceRequestUuid,
             'captured_offline_at' => $balanceCapturedAt,
             'origin_device_id' => 'cd-trolley-02',
@@ -548,7 +611,7 @@ class ControlledDrugsTest extends TestCase
             'on_hand_before' => '10.00',
             'on_hand_after' => '8.00',
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => '3fe2f570-9174-413f-b7f6-fefee4b45d98',
             'captured_offline_at' => now()->subMinutes(20)->toIso8601String(),
             'origin_device_id' => 'cd-trolley-audit-failure',
@@ -575,7 +638,7 @@ class ControlledDrugsTest extends TestCase
             'expected_balance' => '10.00',
             'actual_balance' => '10.00',
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => '69fcebe9-0c00-456d-9eef-a9771a621616',
             'captured_offline_at' => now()->subMinutes(10)->toIso8601String(),
             'origin_device_id' => 'cd-trolley-audit-failure',
@@ -1128,7 +1191,7 @@ class ControlledDrugsTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 8,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Two tablets unaccounted for.',
                 'immediate_action_taken' => 'Remaining stock was secured and the client was checked while a recount began.',
             ]);
@@ -1168,7 +1231,7 @@ class ControlledDrugsTest extends TestCase
                 'expected_balance' => '10.00',
                 'actual_balance' => '100000000.00',
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasErrors('actual_balance');
 
@@ -1219,7 +1282,7 @@ class ControlledDrugsTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 8,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Two tablets unaccounted for.',
             ])
             ->assertSessionHasErrors('immediate_action_taken');
@@ -1272,7 +1335,7 @@ class ControlledDrugsTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasNoErrors();
 
@@ -1322,7 +1385,7 @@ class ControlledDrugsTest extends TestCase
                 'on_hand_before' => 10,
                 'on_hand_after' => 8,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'cd_schedule' => 2,
             ])
             ->assertSessionHasNoErrors();

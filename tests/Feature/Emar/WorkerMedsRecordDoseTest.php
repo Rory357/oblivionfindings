@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\Cache;
 use Inertia\Testing\AssertableInertia as Assert;
 use RuntimeException;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 /**
  * Desktop medication board — scheduled-dose recording (Record Dose wizard),
@@ -389,7 +390,7 @@ class WorkerMedsRecordDoseTest extends TestCase
                 'scheduled_for' => $scheduledFor->toIso8601String(),
                 'status' => 'given',
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'quantity_administered' => 0.015,
                 'cd_balance' => 9.999,
             ])
@@ -407,7 +408,7 @@ class WorkerMedsRecordDoseTest extends TestCase
                 'scheduled_for' => $scheduledFor->toIso8601String(),
                 'status' => 'given',
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'quantity_administered' => 0.5,
                 'cd_balance' => 9.5,
             ])
@@ -446,7 +447,7 @@ class WorkerMedsRecordDoseTest extends TestCase
             'scheduled_for' => $scheduledFor->toIso8601String(),
             'status' => 'given',
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'quantity_administered' => 0.5,
             'cd_balance' => 9.5,
         ];
@@ -501,7 +502,7 @@ class WorkerMedsRecordDoseTest extends TestCase
             'scheduled_for' => Carbon::parse('2026-04-30 09:30', config('app.worker_timezone'))->toIso8601String(),
             'status' => 'given',
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'quantity_administered' => 0.5,
             'cd_balance' => 9.5,
             'client_request_uuid' => $uuid,
@@ -617,7 +618,7 @@ class WorkerMedsRecordDoseTest extends TestCase
             'dose_given' => '0.25 mL',
             'quantity_administered' => 0.25,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => $uuid,
             'captured_offline_at' => $capturedAt,
             'origin_device_id' => 'worker-device-prn',
@@ -1020,7 +1021,7 @@ class WorkerMedsRecordDoseTest extends TestCase
                     'scheduled_for' => now()->toIso8601String(),
                     'status' => 'given',
                     'witnessed_by' => $witness->id,
-                    'witness_credential' => 'password',
+                    'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                     'quantity_administered' => 0.5,
                     'cd_balance' => 9.5,
                     'client_request_uuid' => '12977c24-0150-452d-8365-52ad214e12df',
@@ -1102,7 +1103,7 @@ class WorkerMedsRecordDoseTest extends TestCase
             'status' => 'given',
             'quantity_administered' => 0.5,
             'cd_balance' => 9.5,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ];
 
         $concealedWitnessIds = [

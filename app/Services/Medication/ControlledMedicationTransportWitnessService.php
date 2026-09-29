@@ -15,7 +15,6 @@ use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 
@@ -25,6 +24,7 @@ final class ControlledMedicationTransportWitnessService
         private readonly ResidentTransportJourneyScope $scope,
         private readonly MedicationAdministratorCompetencyPolicy $competency,
         private readonly AuthorizationEvidenceLockService $authorizationEvidence,
+        private readonly WitnessPinService $witnessPins,
     ) {}
 
     /** @return Collection<int, User> */
@@ -137,21 +137,18 @@ final class ControlledMedicationTransportWitnessService
         abort_unless($qualification, 404);
         $beforeCredentialCheck?->__invoke($witness);
 
-        if (blank($credential)) {
-            throw ValidationException::withMessages([
-                $credentialErrorKey => 'The second checker must enter their password or PIN.',
-            ]);
-        }
-        if (! Hash::check($credential, (string) $witness->password)) {
-            throw ValidationException::withMessages([
-                $credentialErrorKey => 'The second checker password or PIN did not match.',
-            ]);
-        }
+        // PIN-1: the second checker confirms with their personal witness PIN,
+        // never their login password (Stephan, 29 Sep 2026). Wrong PINs count
+        // towards that person's lock across every screen.
+        $this->witnessPins->verify($witness, $credential, $credentialErrorKey, [
+            'site_id' => $siteId,
+            'surface' => $credentialErrorKey,
+        ]);
 
         return [
             'witness' => $witness,
             'witnessed_at' => Carbon::instance($effectiveAt)->copy(),
-            'method' => 'password',
+            'method' => WitnessPinService::METHOD,
             ...$qualification,
         ];
     }

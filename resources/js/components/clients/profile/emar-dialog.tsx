@@ -5,6 +5,7 @@
  * indication and controlled-drug witness — submitting to the client-scoped
  * administration endpoint. The full RecordAdministrationDialog (safety
  * checks, scanning, vitals) remains on the Medical/MAR pages. */
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -29,6 +30,12 @@ import {
     prepareMedicationMutationReplayState,
 } from '@/lib/emar-offline';
 import { cn } from '@/lib/utils';
+import {
+    WITNESS_PIN_LENGTH,
+    witnessIsSelectable,
+    witnessOptionLabel,
+    type WitnessPickerOption,
+} from '@/lib/witness-pin';
 import { router } from '@inertiajs/react';
 import {
     Check,
@@ -112,7 +119,7 @@ export function EmarRecordDialog({
     medications,
     canRecord,
     canRecordControlled,
-    staffOptions,
+    witnessOptions,
     initialMedicationId,
 }: {
     open: boolean;
@@ -122,7 +129,8 @@ export function EmarRecordDialog({
     medications: EmarMedication[];
     canRecord: boolean;
     canRecordControlled: boolean;
-    staffOptions: { value: string; label: string }[];
+    /** Eligible witnesses at the client's Site, with their witness PIN status. */
+    witnessOptions: WitnessPickerOption[];
     initialMedicationId?: number;
 }) {
     const [medicationId, setMedicationId] = useState<string>(
@@ -214,8 +222,13 @@ export function EmarRecordDialog({
             toast.error('Select the authorised witness.');
             return;
         }
-        if (needsWitness && !witnessCredential.trim()) {
-            toast.error('Enter the witness password or PIN.');
+        if (
+            needsWitness &&
+            witnessCredential.trim().length !== WITNESS_PIN_LENGTH
+        ) {
+            toast.error(
+                'The witness confirms by typing their 6-digit witness PIN.',
+            );
             return;
         }
         const initialPayload = {
@@ -474,36 +487,34 @@ export function EmarRecordDialog({
                                             <SelectValue placeholder="Second signature…" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {staffOptions.map((s) => (
-                                                <SelectItem
-                                                    key={s.value}
-                                                    value={s.value}
-                                                >
-                                                    {s.label}
-                                                </SelectItem>
-                                            ))}
+                                            {witnessOptions.length === 0 ? (
+                                                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                                                    No eligible witness at this
+                                                    house
+                                                </div>
+                                            ) : (
+                                                witnessOptions.map((w) => (
+                                                    <SelectItem
+                                                        key={w.id}
+                                                        value={String(w.id)}
+                                                        disabled={
+                                                            !witnessIsSelectable(
+                                                                w,
+                                                            )
+                                                        }
+                                                    >
+                                                        {witnessOptionLabel(w)}
+                                                    </SelectItem>
+                                                ))
+                                            )}
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div>
-                                    <Label className="mb-1.5 block">
-                                        Witness password / PIN{' '}
-                                        <span className="text-status-critical">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Input
-                                        type="password"
-                                        autoComplete="off"
-                                        value={witnessCredential}
-                                        onChange={(event) =>
-                                            setWitnessCredential(
-                                                event.target.value,
-                                            )
-                                        }
-                                        placeholder="Witness confirms identity"
-                                    />
-                                </div>
+                                <WitnessPinInput
+                                    required
+                                    value={witnessCredential}
+                                    onChange={setWitnessCredential}
+                                />
                             </div>
                         ) : null}
                     </div>

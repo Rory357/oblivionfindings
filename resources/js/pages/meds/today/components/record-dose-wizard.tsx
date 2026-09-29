@@ -6,6 +6,7 @@
  * write goes through POST /meds/today/record → EnhancedMarService, so witness
  * rules, CD register entries and the audit trail run exactly like the admin
  * recording path. */
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import {
     CdBadge,
     ClientAllergyNotice,
@@ -36,6 +37,7 @@ import {
     prepareMedicationMutationReplayState,
 } from '@/lib/emar-offline';
 import { cn } from '@/lib/utils';
+import { witnessIsSelectable, witnessOptionLabel } from '@/lib/witness-pin';
 import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -231,7 +233,7 @@ export function RecordDoseWizard({
                 !form.data.witness_credential
             )
                 e.witness_credential =
-                    'The witness confirms by entering their password';
+                    'The witness confirms by typing their 6-digit witness PIN';
             if (needsBalance && form.data.quantity_administered === '')
                 e.quantity_administered = 'Record how many units were given';
             if (needsBalance && form.data.cd_balance === '')
@@ -621,7 +623,8 @@ export function RecordDoseWizard({
                                         Your medication competency is
                                         restricted, so a present, qualified
                                         colleague must confirm this dose. They
-                                        confirm by entering their own password.
+                                        confirm by typing their own witness PIN
+                                        — never their login password.
                                     </InfoCard>
                                 ) : (
                                     <InfoCard icon={ShieldAlert} tone="warn">
@@ -635,7 +638,8 @@ export function RecordDoseWizard({
                                         {row.is_controlled
                                             ? ' and the register balance'
                                             : ''}
-                                        . They confirm by entering their own
+                                        . They confirm by typing their own
+                                        witness PIN — never their login
                                         password.
                                     </InfoCard>
                                 )}
@@ -657,32 +661,28 @@ export function RecordDoseWizard({
                                             placeholder="Choose a witness…"
                                             options={witnesses.map((w) => ({
                                                 value: String(w.id),
-                                                label: w.name,
+                                                label: witnessOptionLabel(w),
+                                                disabled:
+                                                    !witnessIsSelectable(w),
                                             }))}
                                         />
                                     </Field>
-                                    <Field
+                                    <WitnessPinInput
                                         label={
                                             cosignerOnly
-                                                ? 'Co-signer password'
-                                                : 'Witness password'
+                                                ? 'Co-signer’s witness PIN'
+                                                : 'Witness’s witness PIN'
                                         }
-                                        required
-                                        hint="entered by the witness"
+                                        value={form.data.witness_credential}
+                                        onChange={(v) =>
+                                            form.setData(
+                                                'witness_credential',
+                                                v,
+                                            )
+                                        }
                                         error={err('witness_credential')}
-                                    >
-                                        <Input
-                                            type="password"
-                                            autoComplete="off"
-                                            value={form.data.witness_credential}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'witness_credential',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </Field>
+                                        atCupboard={row.is_controlled}
+                                    />
                                 </div>
                             </>
                         ) : null}

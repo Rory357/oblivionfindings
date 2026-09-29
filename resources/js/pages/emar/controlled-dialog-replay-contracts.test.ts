@@ -64,7 +64,9 @@ describe('controlled mutation dialog replay contracts', () => {
     it('keeps CD entry and balance checks online for ephemeral witness verification', () => {
         for (const dialog of credentialDialogs) {
             expect(dialog).toContain("witness_credential: ''");
-            expect(dialog).toContain('Witness password or PIN');
+            // PIN-1: the witness types their own witness PIN, never a password.
+            expect(dialog).toContain('<WitnessPinInput');
+            expect(dialog).not.toContain('password or PIN');
             expect(dialog).toContain(
                 'client_medication_id: Number(medicationId)',
             );
@@ -80,9 +82,9 @@ describe('controlled mutation dialog replay contracts', () => {
     it.each(credentialDialogs)(
         'keeps exact witnessed retries stable and rotates after material edits',
         (dialog) => {
-            expect(dialog).toContain(
-                'useRef(createMedicationMutationReplayState())',
-            );
+            // The replay ref is seeded once from state (never read in render).
+            expect(dialog).toContain('createMedicationMutationReplayState()');
+            expect(dialog).toMatch(/useRef\(initial(Entry|Balance)Replay\)/);
             expect(dialog).toContain('prepareMedicationMutationReplayState(');
             expect(dialog).toContain('witness_credential: _witnessCredential');
             if (dialog.includes('BalanceCheckDialog')) {
@@ -259,7 +261,8 @@ describe('controlled mutation dialog replay contracts', () => {
             'emarMutationWasAccepted(result.status)',
         );
         expect(shiftMedicationSource).toContain("witness_credential: ''");
-        expect(shiftMedicationSource).toContain('Witness password or PIN');
+        expect(shiftMedicationSource).toContain('<WitnessPinInput');
+        expect(shiftMedicationSource).not.toContain('password or PIN');
         expect(shiftMedicationSource).toContain(
             'witness_credential: witnessCredential',
         );

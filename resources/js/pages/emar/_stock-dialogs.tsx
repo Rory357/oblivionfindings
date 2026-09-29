@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- wizard position/variance panes are custom-layout
    bordered surfaces inside the wizard shell, not Card components; all colours are tokens. */
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,11 @@ import {
     type MedicationScanVerification,
 } from '@/lib/medication-scan';
 import { createOfflineRequestUuid } from '@/lib/offline-queue';
+import {
+    witnessIsSelectable,
+    witnessOptionLabel,
+    type WitnessPinStatus,
+} from '@/lib/witness-pin';
 import { router, useForm } from '@inertiajs/react';
 import {
     Barcode,
@@ -100,7 +106,12 @@ export type StockRow = {
     scan_verification?: MedicationScanVerification | null;
     movements: StockMovement[];
 };
-export type StaffOpt = { id: number; name: string };
+export type StaffOpt = {
+    id: number;
+    name: string;
+    /** PIN-1: unusable witness PINs are listed but can't be chosen. */
+    witness_pin?: WitnessPinStatus;
+};
 export type ClientOpt = { id: number; first_name: string; last_name: string };
 
 const STORAGE_OPTIONS = [
@@ -814,7 +825,11 @@ export function ControlledPharmacyDeliveryDialog({
     onClose: () => void;
 }) {
     const [step, setStep] = useState(0);
-    const deliveryReplay = useRef(createMedicationMutationReplayState());
+    // Seed the replay ref from state so render never reads ref.current.
+    const [initialDeliveryReplay] = useState(() =>
+        createMedicationMutationReplayState(),
+    );
+    const deliveryReplay = useRef(initialDeliveryReplay);
     const form = useForm({
         quantity_received:
             order.quantity_ordered !== null
@@ -823,7 +838,7 @@ export function ControlledPharmacyDeliveryDialog({
         witnessed_by: '',
         witness_credential: '',
         delivery_notes: '',
-        client_request_uuid: deliveryReplay.current.uuid,
+        client_request_uuid: initialDeliveryReplay.uuid,
     });
     const onHandBefore = String(stockItem.on_hand);
     const onHandAfter = addMedicationStockQuantities(
@@ -1019,28 +1034,20 @@ export function ControlledPharmacyDeliveryDialog({
                                 placeholder="Select witness…"
                                 options={witnesses.map((witness) => ({
                                     value: String(witness.id),
-                                    label: witness.name,
+                                    label: witnessOptionLabel(witness),
+                                    disabled: !witnessIsSelectable(witness),
                                 }))}
                             />
                         </Field>
-                        <Field
-                            label="Witness password"
-                            required
+                        <WitnessPinInput
+                            label="Witness’s witness PIN"
+                            value={form.data.witness_credential}
+                            onChange={(v) =>
+                                form.setData('witness_credential', v)
+                            }
                             error={form.errors.witness_credential}
-                        >
-                            <Input
-                                type="password"
-                                autoComplete="current-password"
-                                value={form.data.witness_credential}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'witness_credential',
-                                        event.target.value,
-                                    )
-                                }
-                                placeholder="Witness enters their password"
-                            />
-                        </Field>
+                            atCupboard
+                        />
                         <Field
                             label="Delivery note"
                             span
@@ -1419,24 +1426,20 @@ export function StockCountDialog({
                                     placeholder="Select witness…"
                                     options={witnesses.map((w) => ({
                                         value: String(w.id),
-                                        label: w.name,
+                                        label: witnessOptionLabel(w),
+                                        disabled: !witnessIsSelectable(w),
                                     }))}
                                 />
                             </Field>
-                            <Field label="Witness password" required>
-                                <Input
-                                    type="password"
-                                    value={form.data.witness_credential}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'witness_credential',
-                                            e.target.value,
-                                        )
-                                    }
-                                    autoComplete="current-password"
-                                    placeholder="Witness enters their password"
-                                />
-                            </Field>
+                            <WitnessPinInput
+                                label="Witness’s witness PIN"
+                                value={form.data.witness_credential}
+                                onChange={(v) =>
+                                    form.setData('witness_credential', v)
+                                }
+                                error={form.errors.witness_credential}
+                                atCupboard
+                            />
                         </>
                     )}
                     <Field label="Reconciliation note" span>

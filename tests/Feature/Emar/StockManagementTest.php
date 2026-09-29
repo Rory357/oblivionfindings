@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
 use RuntimeException;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 /**
  * The redesigned Stock Management page resolves the active site's brand colour,
@@ -925,7 +926,7 @@ class StockManagementTest extends TestCase
             'on_hand_before' => '12.00',
             'on_hand_after' => '12.50',
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'delivery_notes' => 'Sealed pack checked against the order.',
             'client_request_uuid' => '13410594-34f1-4650-b5b7-e99038437aad',
             'queued_offline' => false,

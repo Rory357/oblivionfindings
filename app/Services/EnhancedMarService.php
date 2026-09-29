@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\WitnessPinService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -2040,7 +2041,7 @@ class EnhancedMarService
                 'success' => false,
                 'error' => $medicationRequiresWitness
                     ? 'Witness is required for this medication.'
-                    : 'A co-signer is required: your medication competency assessment is restricted. Choose a present, qualified co-signer and ask them to enter their password.',
+                    : 'A co-signer is required: your medication competency assessment is restricted. Choose a present, qualified co-signer and ask them to type their own witness PIN.',
                 'error_field' => 'witnessed_by',
             ];
         }
@@ -2068,7 +2069,7 @@ class EnhancedMarService
             'success' => true,
             'witnessed_by' => $witness->id,
             'witnessed_at' => now(),
-            'witness_method' => 'password',
+            'witness_method' => WitnessPinService::METHOD,
         ];
     }
 

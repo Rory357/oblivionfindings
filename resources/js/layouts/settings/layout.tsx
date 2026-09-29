@@ -15,6 +15,7 @@ import {
     FileText,
     Inbox,
     Key,
+    KeyRound,
     Lock,
     Mail,
     MailCheck,
@@ -61,6 +62,13 @@ const navSections: NavSection[] = [
                 icon: ShieldCheck,
                 title: 'Two-Factor Authentication',
                 href: show(),
+            },
+            {
+                // PIN-1: personal witness PIN for medication second-person checks.
+                icon: KeyRound,
+                title: 'Witness PIN',
+                href: '/settings/witness-pin',
+                permission: 'medications.witnessPin',
             },
         ],
     },

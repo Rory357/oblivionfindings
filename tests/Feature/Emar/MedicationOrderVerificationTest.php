@@ -13,6 +13,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\MedicationScanVerificationService;
 use Carbon\Carbon;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -463,13 +464,13 @@ class MedicationOrderVerificationTest extends TestCase
             ->post("/emar/medications/{$medication->id}/verify", [
                 'waiver_reason' => 'Urgent first dose while the on-call verifier travels to site.',
                 'waiver_approved_by' => $unqualifiedApprover->id,
-                'waiver_approver_credential' => 'wrong-role-secret',
+                'waiver_approver_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasErrors('waiver_approver_credential');
         $oldInput = session()->getOldInput();
         $this->assertArrayNotHasKey('waiver_approver_credential', $oldInput);
         $this->assertStringNotContainsString(
-            'wrong-role-secret',
+            UserFactory::TEST_WITNESS_PIN,
             json_encode($oldInput, JSON_THROW_ON_ERROR),
         );
         $this->assertSame('pending_verification', $medication->refresh()->approval_status);
@@ -478,7 +479,7 @@ class MedicationOrderVerificationTest extends TestCase
             ->post("/emar/medications/{$medication->id}/verify", [
                 'waiver_reason' => 'Urgent first dose while the on-call verifier travels to site.',
                 'waiver_approved_by' => $approver->id,
-                'waiver_approver_credential' => 'approver-secret',
+                'waiver_approver_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertRedirect();
 
