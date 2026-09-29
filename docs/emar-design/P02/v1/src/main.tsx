@@ -12,6 +12,7 @@ import { createRoot } from 'react-dom/client';
 import { P02DialogHost } from './dialogs';
 import { ContractPage } from './pages/contract';
 import { ClientProfilePage } from './pages/client-profile';
+import { HubPage } from './pages/hub';
 import { RecordPage } from './pages/record';
 import { DialogHost as P01DialogHost } from './p01/doses';
 import { StoreProvider as P01StoreProvider } from './p01/store';
@@ -19,7 +20,6 @@ import { Shell } from './shell';
 import { P02Provider, useP02 } from './store';
 
 const LATER: Record<string, [string, string]> = {
-    '/emar/mar-hub': ['MAR & medicines (the cross-person hub)', 'The hub’s views (MAR charts board, Medicines, As-needed history, Support & self-administration) are not in P02 — its rows open this record.'],
     '/meds/today': ['Meds today', 'Designed in P01 (v1, awaiting approval). Its rows’ “Open … medication record” lands on this record.'],
     '/emar/prescriptions': ['Orders & reviews', 'Designed in P04. Orders are added, changed, checked and stopped there — never on the medication record.'],
     '/operations/clients': ['Clients', 'The clients list is the Clients module’s and unchanged.'],
@@ -42,7 +42,12 @@ function Router() {
     const s = useP02();
     const p = s.route.path;
     let page;
-    if (p === '/emar/mar') page = <RecordPage />;
+    const person = s.route.q.has('client_id') || s.route.q.has('client');
+    if (p === '/emar/mar' && person) page = <RecordPage />;
+    else if (p === '/emar/mar') page = <HubPage view="charts" />;
+    else if (p === '/emar/medications') page = <HubPage view="medicines" />;
+    else if (p === '/emar/prn') page = <HubPage view="asneeded" />;
+    else if (p === '/emar/self-admin') page = <HubPage view="selfadmin" />;
     else if (/^\/operations\/clients\/\d+$/.test(p)) page = <ClientProfilePage />;
     else if (p === '/p02/contract') page = <ContractPage />;
     else page = <Later />;

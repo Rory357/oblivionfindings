@@ -40,7 +40,10 @@ const short = (name: string) => {
     return b ? `${a} ${b[0]}.` : a;
 };
 export function useToday(pid: PersonId) {
-    const s01 = useStore01();
+    return todayCells(pid, useStore01());
+}
+/** Pure form for lists of people (the hub board). */
+export function todayCells(pid: PersonId, s01: ReturnType<typeof useStore01>) {
     const cells: TodayCell[] = [];
     for (const med of medsOf(pid).filter((m) => m.kind === 'scheduled' && m.status !== 'stopped')) {
         for (const id of med.doseIds) {

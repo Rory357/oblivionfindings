@@ -183,7 +183,7 @@ function Record({ pid }: { pid: PersonId }) {
 
     const crumbs = frontline(s.route.persona)
         ? [{ title: 'Home', href: '/dashboard' }, { title: 'Meds today', href: '/meds/today' }, { title: p.legal }]
-        : [{ title: 'Home', href: '/dashboard' }, { title: 'Medication', href: '/emar/mar-hub' }, { title: 'MAR & medicines', href: '/emar/mar-hub' }, { title: p.legal }];
+        : [{ title: 'Home', href: '/dashboard' }, { title: 'Medication', href: '/emar/mar' }, { title: 'MAR & medicines', href: '/emar/mar' }, { title: p.legal }];
 
     const groups: GroupedProfileNavGroup[] = RAIL.map((r) => ({
         key: r.key,
@@ -305,7 +305,7 @@ function Record({ pid }: { pid: PersonId }) {
         <PageHeader
             variant="profile"
             wrapTitle
-            backHref={hrefFor(frontline(s.route.persona) ? '/meds/today' : '/emar/mar-hub', {}, s.route)}
+            backHref={hrefFor(frontline(s.route.persona) ? '/meds/today' : '/emar/mar', {}, s.route)}
             mark={
                 <span className="eh-mark-ring overflow-hidden p-0">
                     <PersonMark pid={pid} size={44} />

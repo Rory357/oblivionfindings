@@ -20,7 +20,7 @@ Grounded on `origin/main` **`ddb8d3af4`** (fetched 30 September 2026). Paths are
 
 | Dialog | Today | Status | In P02 |
 |---|---|---|---|
-| `RecordInrDialog` | Form fields `inr_value, tested_on, target_range_low/high, dose_mg, next_test_date, notes` — **no `client_medication_id`**. The server accepts it as nullable. | **Verified** `MGD:147-170`, `EC:5125-5160` | Record INR pre-selects the warfarin order; “Not linked” is a labelled choice |
+| `RecordInrDialog` | Form fields `inr_value, tested_on, target_range_low/high, dose_mg, next_test_date, notes` — **no `client_medication_id`**. The server accepts it as nullable. | **Verified** `MGD:147-170`, `EC:5125-5160` | Record INR links the result to the anticoagulant: one pre-chosen, several in a picker, none → “No medicine linked” with a reason |
 | `SyringeDriverDialog` | The server requires `contents.*.client_medication_id`; the form sends `{ name, dose, unit, requires_witness }` only — **every start is refused**. No check or finish UI on the page. | **Verified** `EC:5222-5234`, `MGD:303-340` | Start wizard picks contents from orders; checks list; record a check; finish (needs ≥ 1 check, today’s rule) |
 | `ManageAlertsDialog` | Add-only (no list, edit or resolve although the routes exist); suppression block with basis `capacity_assessment · mdt_decision · clinical_judgement · client_preference`; the attention bar returns nothing at 0 alerts, so the first alert can’t be added from the page. | **Verified** `MGD:483-620`, `EC:5037-5071`, `routes/emar.php:196-199`; bar reported (`attention-bar.tsx:37-39`) | Alerts list + Add/Edit/Resolve; the suppression becomes a Switch “Due and late dose alerts” whose Off needs basis + reason + a destructive “Loosens this check” confirm |
 | `WarningsDialog` | “Acknowledge & continue” only closes; nothing is stored. | **Verified** `MGD:1008-1016` | “I’ve read them” records who and when (new: one acknowledgement row per person per day) |
@@ -58,6 +58,13 @@ Grounded on `origin/main` **`ddb8d3af4`** (fetched 30 September 2026). Paths are
 | 5.2 | The tab reads its own queries in `ClientController`, not the eMAR payload, so it can disagree with the record. | Reported `ClientController.php:750-788, 887-892, 1649-1659` |
 | 5.3 | Allergy banner only when non-empty — no “none recorded” or “couldn’t load” state. | **Verified** `tabs/mar.tsx:94-116` |
 | 5.4 | Four link buttons (Daily MAR, eMAR Dashboard, Controlled Drugs, Reviews), a stock card, per-medicine Sign / Give PRN buttons and a purple “Scheduled Medications” header. | Live |
+
+## 5b. The MAR & medicines hub today
+
+| # | Finding | Status |
+|---|---|---|
+| 5b.1 | `/emar/mar` with no `client_id` never shows a cross-person board: it opens the last-viewed client (session) or the first viewable one. | **Verified** `EC:1216-1219`, `EC:1296-1312` |
+| 5b.2 | `/emar/medications` and `/emar/prn` are separate legacy pages with their own headers; the register’s Discontinue shows for any active medicine without a controlled-capability gate (server may still enforce). | Reported (`pages/emar/Medications.tsx`, memory note on the dead-page cleanup) |
 
 ## 6. Bugs found (for the build, not fixed here)
 

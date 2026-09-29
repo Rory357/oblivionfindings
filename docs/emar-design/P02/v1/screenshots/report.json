@@ -1,6 +1,6 @@
 {
   "base": "http://127.0.0.1:4383/",
-  "when": "2026-09-29T20:48:28.567Z",
+  "when": "2026-09-29T21:07:54.127Z",
   "shots": [
     {
       "shot": "01-chart-day",
@@ -2320,6 +2320,303 @@
         "sublineLines": 2,
         "truncatedCaptions": []
       },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "140-hub-mar-charts",
+      "size": "1440",
+      "file": "1440-140-hub-mar-charts.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "140-hub-mar-charts",
+      "size": "1280",
+      "file": "1280-140-hub-mar-charts.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "140-hub-mar-charts",
+      "size": "zoom200",
+      "file": "zoom200-140-hub-mar-charts.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "141-hub-mar-charts-late",
+      "size": "1440",
+      "file": "1440-141-hub-mar-charts-late.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "142-hub-mar-charts-concealed",
+      "size": "1440",
+      "file": "1440-142-hub-mar-charts-concealed.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "142-hub-mar-charts-concealed",
+      "size": "1280",
+      "file": "1280-142-hub-mar-charts-concealed.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "142-hub-mar-charts-concealed",
+      "size": "zoom200",
+      "file": "zoom200-142-hub-mar-charts-concealed.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "143-hub-rimu-house-scope",
+      "size": "1440",
+      "file": "1440-143-hub-rimu-house-scope.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "143-hub-rimu-house-scope",
+      "size": "1280",
+      "file": "1280-143-hub-rimu-house-scope.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "143-hub-rimu-house-scope",
+      "size": "zoom200",
+      "file": "zoom200-143-hub-rimu-house-scope.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "144-hub-row-menu",
+      "size": "1440",
+      "file": "1440-144-hub-row-menu.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "145-hub-medicines",
+      "size": "1440",
+      "file": "1440-145-hub-medicines.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "145-hub-medicines",
+      "size": "1280",
+      "file": "1280-145-hub-medicines.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "145-hub-medicines",
+      "size": "zoom200",
+      "file": "zoom200-145-hub-medicines.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "146-hub-medicines-concealed",
+      "size": "1440",
+      "file": "1440-146-hub-medicines-concealed.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "147-hub-medicines-waiting-to-check",
+      "size": "1440",
+      "file": "1440-147-hub-medicines-waiting-to-check.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "148-hub-as-needed-history",
+      "size": "1440",
+      "file": "1440-148-hub-as-needed-history.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "148-hub-as-needed-history",
+      "size": "1280",
+      "file": "1280-148-hub-as-needed-history.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "148-hub-as-needed-history",
+      "size": "zoom200",
+      "file": "zoom200-148-hub-as-needed-history.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "149-hub-as-needed-7-days",
+      "size": "1440",
+      "file": "1440-149-hub-as-needed-7-days.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "150-hub-self-admin-boundary",
+      "size": "1440",
+      "file": "1440-150-hub-self-admin-boundary.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "151-hub-loading",
+      "size": "1440",
+      "file": "1440-151-hub-loading.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "152-hub-couldnt-load",
+      "size": "1440",
+      "file": "1440-152-hub-couldnt-load.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "153-hub-empty",
+      "size": "1440",
+      "file": "1440-153-hub-empty.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "154-hub-no-access",
+      "size": "1440",
+      "file": "1440-154-hub-no-access.png",
+      "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },

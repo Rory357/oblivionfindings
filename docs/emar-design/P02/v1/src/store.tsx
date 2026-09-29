@@ -165,8 +165,9 @@ export function P02Provider({ children }: { children: ReactNode }) {
     const pid = useMemo<PersonId | null>(() => {
         const byKey = route.q.get('client');
         if (byKey && FACTS[byKey as PersonId]) return byKey as PersonId;
-        const id = Number(route.q.get('client_id') ?? (route.path.startsWith('/operations/clients/') ? route.path.split('/')[3] : '201'));
-        return personByClientId(id);
+        const raw = route.q.get('client_id') ?? (route.path.startsWith('/operations/clients/') ? route.path.split('/')[3] : null);
+        // No person on /emar/mar = the MAR & medicines hub (cross-person).
+        return raw ? personByClientId(Number(raw)) : null;
     }, [route]);
 
     const go = useCallback((path: string, params: Record<string, string | undefined> = {}) => {

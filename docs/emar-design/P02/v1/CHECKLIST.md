@@ -1,6 +1,6 @@
 # P02 v1 — Mockup design-rules checklist (self-check with evidence)
 
-Checklist: `docs/emar-audit-2026-09-28/claude-second-review/Mockup-design-rules-checklist.md` (29 Sep 2026) plus the brief’s §5 review findings. Evidence files are in `screenshots/` as `{1440|1280|zoom200}-{state}.png` (198 captures: 94 states at 1440, 52 core states also at 1280 and 200 %; overflow 0, console errors 0, every step completed); `screenshots/report.json` records, for every capture, horizontal overflow, console errors, whether the scripted steps completed, each header’s subline line count and any truncated meter caption. Source paths are relative to `src/`.
+Checklist: `docs/emar-audit-2026-09-28/claude-second-review/Mockup-design-rules-checklist.md` (29 Sep 2026) plus the brief’s §5 review findings. Evidence files are in `screenshots/` as `{1440|1280|zoom200}-{state}.png` (223 captures: 109 states at 1440, 57 core states also at 1280 and 200 %; overflow 0, console errors 0, every step completed); `screenshots/report.json` records, for every capture, horizontal overflow, console errors, whether the scripted steps completed, each header’s subline line count and any truncated meter caption. Source paths are relative to `src/`.
 
 Legend: **Pass** · **Pass (note)** = passes with a stated limitation · **N/A** = not in P02’s scope.
 
@@ -22,7 +22,7 @@ Legend: **Pass** · **Pass (note)** = passes with a stated limitation · **N/A**
 | Item | Result | Evidence |
 |---|---|---|
 | `PageHeader`, not `PageHero` | Pass | `1440-01-chart-day.png` (today’s page is a PageHero — AUDIT 1.1) |
-| Plain title, one StatusBadge chip, fact subline | Pass (note) | “Aroha Mere Ngata” + “Active”. The subline is **two lines**, as `PAGE_HEADER_STYLE_GUIDE.md` §4 requires for record profiles and as the live Fleet vehicle profile and client profile do (identity line · record line). The brief’s one-line rule came from index pages (P01 Meds today). `report.json` `header.sublineLines` = 2 on the record and profile; 0 truncated meter captions at 1440 and 1280; at 200 % only the client-profile frame’s real Medications caption truncates (live wording; `zoom200-120…`, `-121…`, `-126…`, `-127…`) |
+| Plain title, one StatusBadge chip, fact subline | Pass (note) | **Hub (index page): one-line subline** at 1440, 1280 and 200 % (`140`, `145`, `148`; report.json `sublineLines` = 1). **Record / profile:** “Aroha Mere Ngata” + “Active”. The subline is **two lines**, as `PAGE_HEADER_STYLE_GUIDE.md` §4 requires for record profiles and as the live Fleet vehicle profile and client profile do (identity line · record line). The brief’s one-line rule came from index pages (P01 Meds today). `report.json` `header.sublineLines` = 2 on the record and profile; 0 truncated meter captions at 1440 and 1280; at 200 % only the client-profile frame’s real Medications caption truncates (live wording; `zoom200-120…`, `-121…`, `-126…`, `-127…`) |
 | No greetings, no LIVE/refreshed eyebrows | Pass | Replaces today’s “LIVE MEDICATION CHART” eyebrow; the refresh time is a filter-row chip “As at 9:12 am · Pacific/Auckland” (Fleet pattern) |
 | One meter row of 4–6 blocks; each links; real data; graph form; n/a and Unavailable | Pass | 6 blocks: Due now · Late · Recorded today (donut) · Medicines · Allergies · INR (Syringe driver for Grace). Each switches to its view. `1440-111-no-medicines.png` (n/a), `1440-112-couldnt-load.png` (Unavailable), `1440-110-loading.png` (—, “Loading…”); concealed count “+1 controlled — hidden” (`1440-100…`) |
 | Search and primary filters inside the header; nothing between header and content | Pass | “Find in this record…” search (opens the section palette, `1440-118-find-in-record.png`); every rail view has real filter pills: Day/Week + day · limit-reached · type + needs attention · support · show resolved · range · range + outcome. Only the tier-2 strip sits below the band (record-page rule) |
@@ -42,7 +42,7 @@ Legend: **Pass** · **Pass (note)** = passes with a stated limitation · **N/A**
 
 | Item | Result | Evidence |
 |---|---|---|
-| EntityTable contracts; identity first, kebab last | Pass | Medicines, Stopped, Photos, Support, Allergies, Chart alerts, Interactions, INR, Checks, Observations, Doses, Corrections, All changes. The chart is a time grid on `ui/table` (medicine first, ⋯ last) |
+| EntityTable contracts; identity first, kebab last | Pass | Hub: MAR charts board by house, Medicines, As-needed history (`140`–`149`, row menu `144`). Record: Medicines, Stopped, Photos, Support, Allergies, Chart alerts, Interactions, INR, Checks, Observations, Doses, Corrections, All changes. The chart is a time grid on `ui/table` (medicine first, ⋯ last) |
 | ⋯ menu + same menu on right-click (+ Shift+F10); row click opens | Pass (note) | One `MenuItem[]` per row feeds ⋯ and `EntityContextMenu` (`1440-11-chart-row-menu.png`). Every chart **cell** has its own menu (`1440-05…`, `-06…`); keyboard: the menu key on a focused cell opens it (`report.json` → `keyboard`). Headless Chrome doesn’t synthesise Shift+F10’s context-menu event; the handler treats any keyboard-origin context menu the same (as P01) |
 | Server-style pagination | Pass | Doses: `LaravelPagination` (`1440-81-history-page-2.png`) |
 | Empty / loading / error use the shared components | Pass | `EmptyState` (`111`, `32`, `42`, `67`), `SkeletonTable` / `SkeletonCard` (`110`), `ErrorState` (`112`, `124`) |
@@ -105,8 +105,8 @@ Legend: **Pass** · **Pass (note)** = passes with a stated limitation · **N/A**
 | No codes in product copy | Pass |
 | Real button variants only | Pass |
 | Honest states | Pass |
-| Controlled-drug concealment everywhere | Pass — chart rows and week rows, medicines, support, photos, alerts, interactions, INR/driver (driver hidden whole), history, corrections, all changes, captions, search palette (sections only), dialogs (notice only), printout (“left out”), profile MAR tab: `100`–`105`, `71`, `122` |
-| House scope; no access vs not found | Pass — `114`, `115`, `116`, `117` |
+| Controlled-drug concealment everywhere | Pass — chart rows and week rows, medicines, support, photos, alerts, interactions, INR/driver (driver hidden whole), history, corrections, all changes, captions, search palette (sections only), dialogs (notice only), printout (“left out”), profile MAR tab, and the hub (left out, counted in captions): `100`–`105`, `71`, `122`, `142`, `146` |
+| House scope; no access vs not found | Pass — `114`, `115`, `116`, `117`; hub house scope `143`, hub no access `154` |
 | Loosening is destructive, “Loosens this check” | Pass — `49`, `50` |
 | Destructive ConfirmDialog renders purple | Noted — real component used (PR #15) |
 | Reference frames mirror origin/main | Pass — fetched `ddb8d3af4` |

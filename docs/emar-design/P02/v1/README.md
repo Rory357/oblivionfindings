@@ -19,7 +19,7 @@ node docs/emar-design/P02/v1/serve.mjs
 
 Then open **http://127.0.0.1:4383/** — port **4383**, not the 4382 the brief suggested: 4382 is already serving `docs/emar-design/P01/v2/` from another session. The hatched bar is the **mockup viewer, not product UI**: *Signed in as* (Priya Shah support worker · Jordan Tipene house lead · Hana Kereama clinical lead without controlled-medicine access · Mereana Walsh auditor · Rangi Parata provider manager · Sione Taufa Rimu House lead · Tui Morgan HR without medication access), *Person* (Aroha, Tama, Mele, Grace, Sam, Ben — each carries a state, named in the list) and *Page state* (normal, loading, no medicines, couldn’t load, out of date, INR test overdue, INR saved with no medicine linked, two anticoagulant orders). Changes made in the preview survive persona switches and reset on reload. The clock is P01’s: **Monday 28 September 2026, 9:12 am NZDT**.
 
-**The contract** (`#/p02/contract`) states the decisions, the one place each fact is edited, who sees what, and deep-links every state and all eight dialogs.
+The viewer’s page links also open the **MAR & medicines hub**. **The contract** (`#/p02/contract`) states the decisions, the one place each fact is edited, who sees what, and deep-links every state and all eight dialogs.
 
 Rebuild: `npm ci`, then `node node_modules/vite/bin/vite.js build --config docs/emar-design/P02/v1/vite.config.mjs`. Evidence: `node docs/emar-design/P02/v1/tools/verify.mjs` (headless Chrome over CDP; writes `screenshots/` and `screenshots/report.json`).
 
@@ -60,7 +60,20 @@ It reads the same payload as the record: allergies (with review line), chart ale
 | INR, syringe-driver checks | Clinical on the record |
 | Pack photos | Stock receipt (P06) |
 
-### 5. States
+### 5. The MAR & medicines hub (added at the review session’s request, 30 Sep)
+
+The cross-person hub (plan §2.2 hub 2, §4.1), on the index PageHeader with a one-line subline, six linked meters (Due now · Late · Needs help · Recorded today · Medicines · As needed in 24 hours), a scoped search and **Record as-needed dose** (P01’s dialog) for people who record. Every row opens the person’s record — it is not a second people directory:
+
+| Rail view (URL kept) | What it shows | Filters |
+|---|---|---|
+| **MAR charts** (`/emar/mar` with no person) | A board by house: one row per person with medication work today — due now, late, needs help (with the reason), recorded today, next due, allergy status | House · Show (due / late / needs help) · As at |
+| **Medicines** (`/emar/medications`) | Every person’s medicines (current, waiting to be checked, stopped), each opening the record’s medicine details | House · Type · Order · As at |
+| **As-needed history** (`/emar/prn`) | As-needed doses with amount, reason, who and the effect-check status (checks are P08a’s) | House · Range · As at |
+| Support & self-administration (`/emar/self-admin`) | Link-only boundary — designed in P03 | House · As at |
+
+House scope follows the signed-in person’s approved houses (Sione Taufa sees Rimu House only). In these cross-person lists, controlled medicines and doses are **left out** — not listed as redacted rows — for people without controlled-medicine access, because a redacted row would still show who takes one; the captions count them (“2 controlled not shown”). Inside a person’s own record they stay as redacted rows.
+
+### 6. States
 
 Allergies recorded and reviewed (Aroha) · recorded, **not reviewed** (Mele) · **none recorded** (Tama) · **couldn’t load** (Grace) · **no known allergies** (Sam); **controlled medicines concealed** for Hana and the auditor in the chart, week, medicines, support, photos, alerts, interactions, INR/driver (a driver with a controlled medicine is hidden whole), history, corrections, all changes, captions, dialogs and the printout, using P11 v4’s “Details need controlled-medicine access”; the **correction chain** (waiting, approved, declined; the two-person rule shown before anyone tries; controlled records can’t be corrected here); **stale INR** (test overdue); **INR and its anticoagulant** — one order pre-chosen, two orders chosen in a picker (and linked afterwards), no anticoagulant (Tama) giving “No medicine linked” with the reason, linked and unlinked results side by side (NF-23); the **house move** (Ben: Rimu House sees the move banner and a House column; Kōwhai staff get “We can’t show this record”); **no access** (page) vs **not found** (record); **loading, no medicines, couldn’t load, out of date**; **read-only** auditor; pause dose alerts and stop-showing-on-open as **loosening** with a destructive “Loosens this check” confirm.
 
@@ -84,7 +97,7 @@ These go to the review session for the Approval record.
 5. **Readings taken with a dose** (blood sugar before insulin): also show them in the client’s Health monitoring (recommended: stored once, shown in both), or keep them in the dose record only?
 6. **Sections on the rail (layout):** the record follows the Fleet vehicle profile — sections on the header rail, sub-views on the tier-2 strip — rather than the plan’s single tier-2 row. OK?
 
-Also for the review session (not Stephan): which package designs the **MAR & medicines hub** itself (the cross-person chart board with no person chosen)? P02’s breadcrumb and back chip point there; the preview shows a boundary page.
+The review session’s question about who owns the MAR & medicines hub is answered: P02 (§5).
 
 ## Deviations declared
 
@@ -97,7 +110,7 @@ Also for the review session (not Stephan): which package designs the **MAR & med
 
 ## Verification (30 September 2026)
 
-- `tools/verify.mjs`: **198 captures** — all 94 states at 1440 × 900 and the 52 core states also at 1280 × 800 and 200 % (720 × 450 CSS px at device scale 2). **Horizontal overflow 0, console errors 0, every scripted step completed** (`screenshots/report.json`). Header sublines are two lines (record and profile). Meter captions: none truncated at 1440 or 1280; at 200 % only the client-profile frame’s real Medications caption (“active meds · no pending alerts”, live wording) truncates.
+- `tools/verify.mjs`: **223 captures** — all 109 states at 1440 × 900 and the 57 core states also at 1280 × 800 and 200 % (720 × 450 CSS px at device scale 2). **Horizontal overflow 0, console errors 0, every scripted step completed** (`screenshots/report.json`). Header sublines: one line on the hub (index), two on the record and profile. Meter captions: none truncated at 1440 or 1280; at 200 % only the client-profile frame’s real Medications caption (“active meds · no pending alerts”, live wording) truncates.
 - Keyboard (real key events over CDP): Enter on a focused chart cell opens P01’s dialog; Tab stays inside it; Escape closes it and focus returns to the same cell; the keyboard menu key on a cell opens the same menu as right-click.
 - `tsc` clean for `src/`; the app’s ESLint config: 24 files, 0 errors, 0 warnings.
 - Compared at 1440 in the browser with the live Fleet vehicle profile (`/fleet-assets/vehicles/11`), the live client profile MAR tab and today’s `/emar/mar`, as Demo Admin on oblivionfindings.test.

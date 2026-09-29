@@ -46,6 +46,7 @@ function Viewer() {
     const cid = String(FACTS[pid].clientId);
     const pages: [string, string, Record<string, string | undefined>][] = [
         ['/emar/mar', 'Medication record', { client_id: cid }],
+        ['/emar/mar', 'MAR & medicines hub', {}],
         [`/operations/clients/${cid}`, 'Client profile › MAR', { tab: 'mar' }],
         [`/operations/clients/${cid}`, 'Client profile › Medical', { tab: 'medical' }],
         ['/p02/contract', 'The contract', {}],
@@ -123,7 +124,7 @@ function Viewer() {
                         href={hrefFor(p, params, r)}
                         className={cn(
                             'rounded px-1.5 py-0.5 underline-offset-2 hover:underline',
-                            r.path === p && (params.tab ? r.q.get('tab') === params.tab : true) && 'bg-card font-semibold text-foreground',
+                            r.path === p && (params.tab ? r.q.get('tab') === params.tab : p === '/emar/mar' ? r.q.has('client_id') === !!params.client_id : true) && 'bg-card font-semibold text-foreground',
                         )}
                     >
                         {l}
@@ -225,7 +226,7 @@ function Sidebar() {
     const r = s.route;
     const persona = r.persona;
     const outside = (what: string) => () => s.toast('info', `${what} — outside this preview.`);
-    const onRecord = r.path === '/emar/mar';
+    const onRecord = ['/emar/mar', '/emar/medications', '/emar/prn', '/emar/self-admin'].includes(r.path);
     // Plan §3: which hubs each seeded role sees (auditor: three read hubs; no medication access: none).
     const hubs: [string, string | null, boolean][] = [
         ['Meds today', null, true],
@@ -258,7 +259,7 @@ function Sidebar() {
                         .map(([label, path]) => (
                             <a
                                 key={label}
-                                href={path ? hrefFor('/emar/mar-hub', {}, r) : undefined}
+                                href={path ? hrefFor('/emar/mar', {}, r) : undefined}
                                 onClick={path ? undefined : (e) => (e.preventDefault(), s.toast('info', `${label} is designed in another package — outside P02.`))}
                                 role={path ? undefined : 'button'}
                                 tabIndex={0}

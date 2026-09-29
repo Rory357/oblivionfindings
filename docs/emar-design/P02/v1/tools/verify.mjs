@@ -148,6 +148,22 @@ const SHOTS = [
     { name: '126-health-profile-allergy-card', hash: CP(201, 'tab=medical&as=lead'), steps: `window.scrollTo(0, 420); await wait(300);`, core: true },
     { name: '127-review-allergies', hash: CP(203, 'tab=medical&as=lead&dlg=allergy-review'), core: true },
     { name: '128-review-allergies-no-known', hash: CP(202, 'tab=medical&as=lead&dlg=allergy-review'), steps: `document.querySelector('#ar-none').click(); await wait(300);` },
+    // The MAR & medicines hub (cross-person; rows open the record)
+    { name: '140-hub-mar-charts', hash: '#/emar/mar?as=lead', core: true },
+    { name: '141-hub-mar-charts-late', hash: '#/emar/mar?as=lead&show=late' },
+    { name: '142-hub-mar-charts-concealed', hash: '#/emar/mar?as=clinical', steps: `window.scrollTo(0, 300); await wait(300);`, core: true },
+    { name: '143-hub-rimu-house-scope', hash: '#/emar/mar?as=rimu', core: true },
+    { name: '144-hub-row-menu', hash: '#/emar/mar?as=lead', steps: `const r=[...document.querySelectorAll('[role=row]')].find(x=>x.textContent.includes('Aroha')); r.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:700,clientY:r.getBoundingClientRect().y+20})); await wait(400);` },
+    { name: '145-hub-medicines', hash: '#/emar/medications?as=lead', core: true },
+    { name: '146-hub-medicines-concealed', hash: '#/emar/medications?as=clinical' },
+    { name: '147-hub-medicines-waiting-to-check', hash: '#/emar/medications?as=lead&status=awaiting' },
+    { name: '148-hub-as-needed-history', hash: '#/emar/prn?as=lead', core: true },
+    { name: '149-hub-as-needed-7-days', hash: '#/emar/prn?as=lead&range=7d' },
+    { name: '150-hub-self-admin-boundary', hash: '#/emar/self-admin?as=lead' },
+    { name: '151-hub-loading', hash: '#/emar/mar?as=lead&state=loading' },
+    { name: '152-hub-couldnt-load', hash: '#/emar/mar?as=lead&state=unavailable' },
+    { name: '153-hub-empty', hash: '#/emar/mar?as=lead&state=empty' },
+    { name: '154-hub-no-access', hash: '#/emar/mar?as=hr' },
     { name: '130-contract-page', hash: '#/p02/contract', core: true },
 ];
 
