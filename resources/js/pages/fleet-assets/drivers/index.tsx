@@ -1,5 +1,12 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,16 +19,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/fleet-utils';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-    HeroSummaryMetric,
-    HeroSummaryStrip,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, router } from '@inertiajs/react';
 import {
     Car,
@@ -209,101 +207,78 @@ export default function DriversIndex({
         >
             <Head title="Drivers" />
             <PageShell>
-                <HeroShell
-                    footer={
-                        <HeroSummaryStrip label="Licence compliance">
-                            <HeroSummaryMetric
-                                tone={
-                                    heroStats.licence_expired > 0
-                                        ? 'critical'
-                                        : 'success'
-                                }
-                            >
-                                {heroStats.licence_expired > 0
-                                    ? `${heroStats.licence_expired} licence${heroStats.licence_expired !== 1 ? 's' : ''} expired`
-                                    : 'No expired licences'}
-                            </HeroSummaryMetric>
-                            <HeroSummaryMetric
-                                tone={
-                                    heroStats.expiring_30 > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                            >
-                                {heroStats.expiring_30 > 0
-                                    ? `${heroStats.expiring_30} expiring within 30 days`
-                                    : 'None expiring within 30 days'}
-                            </HeroSummaryMetric>
-                            <HeroSummaryMetric tone="neutral">
-                                {heroStats.active} of {heroStats.total} drivers
-                                fully eligible
-                            </HeroSummaryMetric>
-                        </HeroSummaryStrip>
+                <PageHeader
+                    wrapTitle
+                    title="Drivers"
+                    icon={ShieldCheck}
+                    subline={
+                        <>
+                            Manage fleet drivers, licences, and assignments ·{' '}
+                            {heroStats.licence_expired} expired licences ·{' '}
+                            {heroStats.sessions_today} sessions today
+                        </>
                     }
-                >
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={ShieldCheck} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Driver compliance · licence watch
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Drivers
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Manage fleet drivers, licences, and assignments.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
-                                href="/fleet-assets/drivers?status=eligible"
+                    actions={
+                        <PageHeaderGlassButton
+                            icon={Download}
+                            onClick={() => window.location.assign(exportHref)}
+                        >
+                            Export CSV
+                        </PageHeaderGlassButton>
+                    }
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
                                 label="Active drivers"
-                                value={fmt(heroStats.active)}
-                                caption="eligible to drive"
+                                href={'/fleet-assets/drivers?status=eligible'}
                                 tone={
                                     heroStats.active > 0 ? 'success' : 'warning'
                                 }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/drivers?status=expiring_30"
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(heroStats.active)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    eligible to drive
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
                                 label="Expiring 30d"
-                                value={fmt(heroStats.expiring_30)}
-                                caption="licences due to renew"
+                                href={
+                                    '/fleet-assets/drivers?status=expiring_30'
+                                }
                                 tone={
                                     heroStats.expiring_30 > 0
                                         ? 'warning'
                                         : 'success'
                                 }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/drivers?status=at_risk"
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(heroStats.expiring_30)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    licences due to renew
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
                                 label="Expired / suspended"
-                                value={fmt(heroStats.at_risk)}
-                                caption="must not drive"
+                                href={'/fleet-assets/drivers?status=at_risk'}
                                 tone={
                                     heroStats.at_risk > 0
                                         ? 'critical'
                                         : 'success'
                                 }
-                            />
-                            <HeroClusterTile
-                                label="Sessions today"
-                                value={fmt(heroStats.sessions_today)}
-                                caption="driving sessions started"
-                                tone="neutral"
-                            />
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <FleetHeroAction
-                            href={exportHref}
-                            icon={Download}
-                            external
-                        >
-                            Export CSV
-                        </FleetHeroAction>
-                    </div>
-                </HeroShell>
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(heroStats.at_risk)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    must not drive
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
+                />
 
                 {/* Search & Filters */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

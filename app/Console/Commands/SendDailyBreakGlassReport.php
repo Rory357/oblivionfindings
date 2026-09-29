@@ -42,6 +42,9 @@ class SendDailyBreakGlassReport extends Command
 
         // Notify managers via the existing internal notification stream.
         app(NotificationService::class)->notifyCrud(null, 'daily', 'break-glass report', null, null, [
+            // The derived key would be break_glass_report.daily, which no
+            // routing rule, preference or escalation setting uses.
+            'event_key' => 'breakglass.daily_report',
             'title' => $title,
             'body' => $body,
             'url' => url('/medications/audit'),

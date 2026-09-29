@@ -1,10 +1,13 @@
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, router } from '@inertiajs/react';
 import {
     CheckCircle,
@@ -163,11 +166,22 @@ export default function TransportPreCheck({
         >
             <Head title={`Pre-Check - Transport #${t.id ?? ''}`} />
             <PageShell>
-                <FleetCompactHero
-                    pill={`Transport #${t.id ?? ''} · ${t.resident_name ?? '---'}`}
-                    title="Pre-Transport Safety Check"
+                <PageHeader
+                    wrapTitle
+                    variant="profile"
+                    icon={Shield}
+                    title="Pre-transport check"
                     backHref={`/fleet-assets/transports/${t.id}`}
-                    backLabel="Transport"
+                    titleChip={
+                        <PageHeaderStatusChip
+                            variant={
+                                pre_check_completed ? 'success' : 'warning'
+                            }
+                        >
+                            {pre_check_completed ? 'Completed' : 'To complete'}
+                        </PageHeaderStatusChip>
+                    }
+                    subline={`Transport #${t.id ?? ''} · ${t.resident_name ?? 'Person unavailable'}`}
                 />
 
                 {pre_check_completed && (

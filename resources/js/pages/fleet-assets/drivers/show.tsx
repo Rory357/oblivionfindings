@@ -1,5 +1,13 @@
 import { FLEET_COLORS, HalfMoonGauge } from '@/components/fleet-charts';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -18,11 +26,6 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDateTime, formatDistance } from '@/lib/fleet-utils';
 import { cn } from '@/lib/utils';
-import {
-    CompactHeroStat,
-    FleetCompactHero,
-} from '@/pages/fleet-assets/components/fleet-compact-hero';
-import { FleetHeroAction } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -230,59 +233,71 @@ export default function DriverShow({
         >
             <Head title={`Driver: ${driver?.name ?? 'Driver'}`} />
             <PageShell>
-                <FleetCompactHero
-                    pill={`Driver · ${driverStatus.replace(/_/g, ' ')}`}
+                <PageHeader
+                    variant="profile"
+                    icon={Shield}
                     title={driver?.name ?? 'Driver'}
+                    wrapTitle
                     backHref="/fleet-assets/drivers"
-                    backLabel="Drivers"
-                    stats={
-                        <>
-                            <CompactHeroStat
-                                label="Safety score"
-                                value={
-                                    aggregatedMetrics.score === null
-                                        ? 'Not recorded'
-                                        : String(aggregatedMetrics.score)
-                                }
-                                tone={
-                                    aggregatedMetrics.score === null
-                                        ? 'neutral'
-                                        : aggregatedMetrics.score >= 80
-                                          ? 'success'
-                                          : aggregatedMetrics.score >= 60
-                                            ? 'warning'
-                                            : 'critical'
-                                }
-                            />
-                            {driver.hr_status ? (
-                                <CompactHeroStat
-                                    label="HR status"
-                                    value={driver.hr_status.replace(/_/g, ' ')}
-                                    tone={
-                                        driver.hr_status === 'active'
-                                            ? 'success'
-                                            : 'warning'
-                                    }
-                                />
-                            ) : null}
-                        </>
+                    titleChip={
+                        <PageHeaderStatusChip
+                            variant={
+                                driverStatus === 'active'
+                                    ? 'success'
+                                    : 'warning'
+                            }
+                        >
+                            {driverStatus.replace(/_/g, ' ')}
+                        </PageHeaderStatusChip>
+                    }
+                    subline={
+                        driver.hr_status
+                            ? `HR status · ${driver.hr_status.replace(/_/g, ' ')}`
+                            : 'Driver profile'
+                    }
+                    meters={
+                        <PageHeaderMeterBlock
+                            label="Safety score"
+                            tone={
+                                aggregatedMetrics.score === null
+                                    ? 'brand'
+                                    : aggregatedMetrics.score >= 80
+                                      ? 'success'
+                                      : aggregatedMetrics.score >= 60
+                                        ? 'warning'
+                                        : 'critical'
+                            }
+                            onClick={() => openTab('scorecard')}
+                            ariaLabel="Open driver scorecard"
+                        >
+                            <PageHeaderMeterBig>
+                                {aggregatedMetrics.score === null
+                                    ? '—'
+                                    : aggregatedMetrics.score}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {aggregatedMetrics.score === null
+                                    ? 'Not recorded'
+                                    : 'Driving safety'}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
                     }
                     actions={
                         <>
-                            <FleetHeroAction
+                            <PageHeaderPrimaryButton
                                 icon={Gauge}
                                 onClick={() => openTab('scorecard')}
-                                emphasis
                             >
                                 Scorecard
-                            </FleetHeroAction>
+                            </PageHeaderPrimaryButton>
                             {driver.hr_profile_href ? (
-                                <FleetHeroAction
-                                    icon={ExternalLink}
+                                <Link
                                     href={driver.hr_profile_href}
+                                    className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 px-3.5 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20 focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
                                 >
+                                    <ExternalLink className="size-4" />
                                     HR profile
-                                </FleetHeroAction>
+                                </Link>
                             ) : null}
                         </>
                     }

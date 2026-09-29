@@ -1,4 +1,8 @@
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,20 +24,13 @@ import {
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDistance } from '@/lib/fleet-utils';
-import {
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import {
     InspectionCreateWizard,
     type WizardPreTripResult,
     type WizardVehicle,
 } from '@/pages/fleet-assets/inspections/create-wizard';
-import { HeroActionButton } from '@/pages/fleet-assets/maintenance/components/hero-action-button';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     CheckCircle,
@@ -66,8 +63,13 @@ type Inspection = {
 type Props = {
     inspections: Inspection[];
     vehicles: WizardVehicle[];
-    work_orders: Array<{ id: number; asset_id: number; reference_number: string | null; title: string;
-        attachments: Array<{ id: number; original_name: string }> }>;
+    work_orders: Array<{
+        id: number;
+        asset_id: number;
+        reference_number: string | null;
+        title: string;
+        attachments: Array<{ id: number; original_name: string }>;
+    }>;
     filters: {
         search?: string;
         vehicle_id?: string;
@@ -177,63 +179,29 @@ export default function InspectionsIndex({
         >
             <Head title="Vehicle Inspections" />
             <PageShell>
-                <HeroShell>
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={ClipboardCheck} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Maintenance · inspections
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Vehicle Inspections
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Pre-trip and post-trip vehicle checks.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-3 gap-2 lg:ml-auto lg:max-w-xl">
-                            <HeroClusterTile
-                                label="Runs 30d"
-                                value={fmt(heroStats.runs_30d)}
-                                caption="inspections logged"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                label="Failed 30d"
-                                value={fmt(heroStats.failed_30d)}
-                                caption="need follow-up"
-                                tone={
-                                    heroStats.failed_30d > 0
-                                        ? 'critical'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                label="Pass rate"
-                                value={fmt(heroStats.pass_rate, '%')}
-                                caption="last 30 days"
-                                tone={
-                                    heroStats.pass_rate === null
-                                        ? 'neutral'
-                                        : heroStats.pass_rate >= 90
-                                          ? 'success'
-                                          : 'warning'
-                                }
-                            />
-                        </div>
-                    </div>
-                    {can.manage ? (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <HeroActionButton
-                                onClick={() => setWizardOpen(true)}
+                <PageHeader
+                    wrapTitle
+                    title="Vehicle Inspections"
+                    icon={ClipboardCheck}
+                    subline={
+                        <>
+                            Pre-trip and post-trip vehicle checks ·{' '}
+                            {fmt(heroStats.runs_30d)} runs in 30 days ·{' '}
+                            {fmt(heroStats.failed_30d)} failed ·{' '}
+                            {fmt(heroStats.pass_rate, '%')} pass rate
+                        </>
+                    }
+                    actions={
+                        can.manage ? (
+                            <PageHeaderPrimaryButton
                                 icon={Plus}
-                                emphasis
+                                onClick={() => setWizardOpen(true)}
                             >
                                 New inspection
-                            </HeroActionButton>
-                        </div>
-                    ) : null}
-                </HeroShell>
+                            </PageHeaderPrimaryButton>
+                        ) : undefined
+                    }
+                />
 
                 {/* Filters */}
                 <Card>
