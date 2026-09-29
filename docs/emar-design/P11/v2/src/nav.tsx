@@ -7,7 +7,7 @@ export type Route = { page: Page; view: string; sec: string; q: URLSearchParams 
 export const SET_VIEWS: Record<string, { label: string; secs: [string, string][] }> = {
     rules: { label: 'Medication rules', secs: [['medicines', 'Medicine rules'], ['safety', 'Safety checks'], ['controlled', 'Controlled drugs'], ['photos', 'Medicine photos']] },
     rounds: { label: 'Rounds & timing', secs: [['templates', 'Round templates'], ['timing', 'Dose timing']] },
-    staff: { label: 'Staff & PINs', secs: [['competency', 'Competency'], ['exemptions', 'Exemptions'], ['pins', 'Witness PINs'], ['status', 'PIN status']] },
+    staff: { label: 'Staff & PINs', secs: [['competency', 'Competency'], ['exemptions', 'Exemption limit'], ['pins', 'Witness PINs'], ['status', 'PIN status']] },
     alerts: { label: 'Alerts & access', secs: [['oncall', 'On-call contacts'], ['recipients', 'Who gets alerts'], ['emergency', 'Emergency access']] },
     history: { label: 'Change history', secs: [['decide', 'Still to decide'], ['changes', 'All changes']] },
 };

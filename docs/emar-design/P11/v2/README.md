@@ -44,7 +44,7 @@ Open http://127.0.0.1:4372/. The server is GET/HEAD only and no application API 
 |---|---|
 | Medication rules | Medicine rules (P00 v5; house rules kept for house managers), Safety checks, Controlled drugs, Medicine photos |
 | Rounds & timing | Round templates (moved from Meds today › Rounds), Dose timing |
-| Staff & PINs | Competency, Exemptions, Witness PINs, PIN status |
+| Staff & PINs | Competency, Exemption limit, Witness PINs, PIN status |
 | Alerts & access | On-call contacts, Who gets alerts, Emergency access |
 | Change history | Still to decide, All changes |
 

@@ -457,7 +457,7 @@ function Competency({ ctx }: { ctx: Ctx }) {
         </div>
     );
 }
-/* ── Staff & PINs › Exemptions (answer 8 — NF-03: today there’s no screen and no maximum) ── */
+/* ── Staff & PINs › Exemption limit (answer 8 — NF-03: today there’s no screen and no maximum) ── */
 function Exemptions({ ctx }: { ctx: Ctx }) {
     const { m, ro, edit } = useEdit();
     const { go } = useNav();
@@ -469,7 +469,7 @@ function Exemptions({ ctx }: { ctx: Ctx }) {
             meta={<Reviewed by={reviewedBy(m, 'elig', 'longestEx')} />} />);
     return (
         <div className="space-y-5">
-            <Section id="sc-ex" title="Exemptions" caption="The limit for every exemption" right={<StatusBadge variant="neutral" size="sm">NF-03</StatusBadge>}>
+            <Section id="sc-ex" title="Exemption limit" caption="Applies to every exemption" right={<StatusBadge variant="neutral" size="sm">NF-03</StatusBadge>}>
                 {row || <NoMatches ctx={ctx} />}
             </Section>
             <Section id="sc-exfacts" title="How exemptions work" caption="Read-only" right={<Button variant="outline" size="sm" onClick={() => go(eligHref('exemptions'))}>Open exemptions<ArrowUpRight /></Button>}>
@@ -731,13 +731,12 @@ function StillToDecide({ ctx }: { ctx: Ctx }) {
             <p className="text-subtle">“Not configured” means screens give no value. “Default — not yet reviewed” means today’s behaviour carries on until someone saves a choice — or confirms it with “Keep today’s value” in the ⋯ menu.</p>
             {reg.length ? (
                 <EntityTable<PendingRow>
-                    rows={reg} rowKey={(r) => `${r.view}-${r.label}`} identityLabel="Setting" identityWidth="2.1fr" minWidth={900} rowHeight="content"
-                    identity={(r) => ({ icon: HelpCircle, name: r.label, subline: r.scope })}
+                    rows={reg} rowKey={(r) => `${r.view}-${r.label}`} identityLabel="Setting" identityWidth="3fr" minWidth={1000} rowHeight="content"
+                    identity={(r) => ({ icon: HelpCircle, name: r.label, subline: `${r.scope} · decision ${r.dec}` })}
                     columns={[
-                        { key: 'where', label: 'Where', width: '1.1fr', cell: (r) => <span className="text-[13px]">{VIEW_LABEL[r.view]} › {SET_VIEWS[r.view].secs.find(([k]) => k === r.sec)![1]}</span> },
+                        { key: 'where', label: 'Where', width: '1.2fr', cell: (r) => <span className="py-2 text-[12.5px]">{VIEW_LABEL[r.view]} › {SET_VIEWS[r.view].secs.find(([k]) => k === r.sec)![1]}</span> },
                         { key: 'state', label: 'State', width: '1fr', cell: (r) => (r.state === 'nc' ? <NotConfigured /> : <Reviewed by={null} />) },
-                        { key: 'until', label: 'Until it’s decided', width: '1.4fr', cell: (r) => <span className="py-2 text-[12.5px]">{r.until}</span> },
-                        { key: 'dec', label: 'Decision', width: '0.6fr', cell: (r) => <StatusBadge variant="neutral" size="sm">{r.dec}</StatusBadge> },
+                        { key: 'until', label: 'Until it’s decided', width: '1.5fr', cell: (r) => <span className="py-2 text-[12.5px]">{r.until}</span> },
                     ]}
                     actionsFor={actions} onOpen={(r) => go(settingsHref(r.view, r.sec))} onRowContextMenu={menu.open}
                 />

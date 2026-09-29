@@ -264,7 +264,7 @@ export function ExemptionWizard({ who: who0, seed }: { who?: string; seed?: Reco
                                 <Field label="From" required hint="Pacific/Auckland"><DatePicker id="xw-from" label="From" value={X.from} onChange={(v) => up({ from: v })} /></Field>
                                 <Field label="Until" required error={errs.until} hint={`On or before ${fmtDate(last)}`}><DatePicker id="xw-until" label="Until" value={X.until} invalid={!!errs.until} onChange={(v) => { up({ until: v }); setErrs({ ...errs, until: '' }); }} /></Field>
                             </div>
-                            <p className="text-caption">The longest exemption is set in Settings › Staff &amp; PINs › Exemptions ({m.setBy.elig.longestEx ? 'set' : 'default — not yet reviewed'}).</p>
+                            <p className="text-caption">The longest exemption is set in Settings › Staff &amp; PINs › Exemption limit ({m.setBy.elig.longestEx ? 'set' : 'default — not yet reviewed'}).</p>
                         </div>
                     ) : (
                         <div className="space-y-4">

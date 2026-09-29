@@ -1,24 +1,24 @@
 P11 v2 — Medication settings and staff eligibility (synthetic design preview)
-Built 2026-09-29T05:12Z on branch claude/serene-aryabhata-d0e908. SHA-256 of every file in this version (screenshots listed separately below).
+Built 2026-09-29T05:29Z on branch claude/serene-aryabhata-d0e908 (after Main's inspection fixes). SHA-256 of every file in this version (screenshots listed separately below).
 
 40a46bc75b7ecabee1e3ec58944b40c456fbd86ebea4bbaa27b6b8f42cf9fe47 *./.gitignore
 770012c3cff083c2fe042539f106303ce9dd7499d8ab15ed8dc24943682543d7 *./AUDIT.md
-8a729219ac37790419534c83cda976b38ceb5f2493912f850ecfc85132fada34 *./CHECKLIST.md
-53ea3c0c9663b27bf18f5a5f67a4f349d5300b10b393cce0c4dda2d99b94c180 *./README.md
-113bda24d46dd8cd0030420c4ef0a70ffd3e512fa9d1c8b197ad2236effc22ab *./dist/assets/index-D8-yzZsU.js
+fbc1c68f5dd7076e9802475c08a1c74c4a37a8027967d23cc013bc42e1b790bb *./CHECKLIST.md
+934975fc4e8371d624cb97bc3ed88ccaed9f1abcd3f42f7b6187dfc2e05f761c *./README.md
+d7eb14d3b6faa1012f7418c0901239b72cec36a18a3ee9b31476b36b3222a91e *./dist/assets/index-BRlW9x6Q.js
 e34c74972aec46418bcff0aacb21e12e3ab31cd7248dfcf759ba00127184ac40 *./dist/assets/index-DnmeANpo.css
-432b0ba21cbb23744b79863060874547ae1c998ec012bcefb188c6c9ba6d41f5 *./dist/index.html
+5422fd92e95a30b30e644dc8596e8dadb0448ccaa3f7110ef513eee6918c9c3e *./dist/index.html
 98f6c0c6d64492dc2e8c126972e895385b7036b8b9b658c4c38e8981bae5074b *./index.html
 84d0cc78d1ec4125cca9232025c65301827269bd517d42d986a6a10159ebea1d *./reuse-check.mjs
 bbad7b0ed42ce97095d90868b7a038f19ae1c11488688399ef8ef0af26d5378a *./serve.mjs
 7ba63074b58026884c4b6a39937fa5a328c45fe7bd67ca8943e9825ae4662da2 *./src/data.ts
-98340ae6b8b1c00b753347cc234524cfdb784c57c021d75bd77ff460b0ff852d *./src/dialogs-elig.tsx
-8f0bb1b521453d7b47413b489266dd61d6dfc91c2ff545a579fcb924cf8c44ca *./src/dialogs-settings.tsx
+6c54fbf101ad536ebd7393ae5fbda252fa95991f3e281e2f6d55bd174007bcad *./src/dialogs-elig.tsx
+fb11fc954ab71554e96981166b4d4695a2cbdf692421320dd55c1fad054f1fe6 *./src/dialogs-settings.tsx
 6caf243147b082d799eefaf62d0d2917e5cfa510cdeb8e559fea8739110212c8 *./src/eligibility.tsx
 90df26b11ddf802aed8f6b1654c595a7dd9085b579bbb4c3cb1c0abd730fd011 *./src/main.tsx
 de4947ce797582b935b3e4b6fde2b46aeefefeed839ab1b482d7937304e1d75d *./src/model.tsx
-f9b63546d77c028bd043715211021da00b3aa80d9e25295d334ab2d8e831df95 *./src/nav.tsx
-b885855972169c72e5630f42718d114d202d37bbf669086f3936721aa90cc787 *./src/settings.tsx
+daa7391e2a9b25aac628697030c902f78e0a9847e757276b284eacdbe792beca *./src/nav.tsx
+3e645012a8ddb12011b99cf0b0b2d30d49b41a844f4c3af434b97200f8d2ec3a *./src/settings.tsx
 8d35b31752c7c7957cc994db01234b9f8ff060b2ac9916802c97b56424643db4 *./src/styles.css
 77b1cce2d5513ca7186945ad285725a40ef1b52eedea759a850090bfc99d4f08 *./src/today.tsx
 3df6a7330b9e77fd917d0b1b00d386c92422f58ea359cef4c2561ad801b5aa73 *./src/ui.tsx
@@ -26,4 +26,4 @@ b885855972169c72e5630f42718d114d202d37bbf669086f3936721aa90cc787 *./src/settings
 6907ef9056364e92648d14dcf70e245b8a7655adc753276c79fd68cd98adc465 *./vite.config.mjs
 
 screenshots/ (142 files) — combined SHA-256 of the sorted per-file hashes:
-6dd5612c6c1e1d71cc1f7781f1f39e407de0fc7c3669818851043cec84c248ed
+3a9d905c51451c52f8306a8edf53e4b3662096fdcdf452406d42675d3e48ec28

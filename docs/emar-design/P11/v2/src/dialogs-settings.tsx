@@ -176,16 +176,16 @@ export function RuleWizard({ id }: { id: string }) {
                         <div className="space-y-5">
                             <StepHead icon={Pill} title="What it applies to" blurb="Choose the medicines and where the rule applies." />
                             <Field label="Match medicines by" required>
-                                <TilePicker value={r.match} cols={3} onChange={(v) => up({ match: v, value: '' })} options={Object.entries(MATCH).map(([key, x]) => ({ key, label: x.l, description: x.d, meta: x.isNew, icon: key === 'controlled' ? Shield : key === 'cls' ? Layers : Pill }))} />
+                                <TilePicker value={r.match} cols={3} onChange={(v) => up({ match: v, value: '' })} options={Object.entries(MATCH).map(([key, x]) => ({ key, label: x.l, description: x.d, icon: key === 'controlled' ? Shield : key === 'cls' ? Layers : Pill }))} />
                             </Field>
+                            <div className="flex flex-wrap gap-2" aria-label="Design notes">{Object.values(MATCH).filter((x) => x.isNew).map((x) => <StatusBadge key={x.l} variant="info" size="sm">Design note — {x.l}: {x.isNew!.replace(/^New — /, 'new, ')}</StatusBadge>)}</div>
                             {r.match === 'name' ? <RecordPicker id="rw-v" label="Medicine" required value={r.value} items={medItems} onChange={(v) => up({ value: v })} placeholder="Search and choose a medicine" search="Search medicines…" error={err === 'value' ? 'Choose which medicines this rule applies to.' : undefined} foot="Matches the medicine’s name on the order." />
                                 : r.match === 'controlled' ? <InfoCard icon={Shield}><b>Any controlled medicine</b> — from the order’s controlled flag.</InfoCard>
                                     : <Field label={r.match === 'route' ? 'Route' : r.match === 'nzulm' ? 'Product (NZULM code)' : 'Type or class'} required error={err === 'value' ? 'Choose which medicines this rule applies to.' : undefined}>
                                         <SelectInput value={r.value} onChange={(v) => up({ value: v })} placeholder="Choose" options={(r.match === 'route' ? ROUTES.map((x) => [x, x]) : r.match === 'nzulm' ? NZULM.map(([c, n]) => [c, `${c} — ${n} (test code)`]) : CLASSES.map((x) => [x, x])).map(([value, label]) => ({ value, label }))} />
                                     </Field>}
                             <RecordPicker id="rw-scope" label="Where it applies" required value={r.scope} items={scopeItems} onChange={(v) => up({ scope: v as Rule['scope'] })} placeholder="Choose where" search="Search houses…" foot={canOrg(p) ? 'All houses, or one house.' : 'You can add rules for your own houses. Rules for all houses need all-sites authority.'} />
-                            <InfoCard icon={Check}><b>{ruleSentence(r)}</b></InfoCard>
-                            <RulePreview r={r} />
+                            {valueOk ? <><InfoCard icon={Check}><b>{ruleSentence(r)}</b></InfoCard><RulePreview r={r} /></> : <InfoCard icon={Users}>Choose {r.match === 'name' ? 'a medicine' : r.match === 'route' ? 'a route' : r.match === 'nzulm' ? 'a product' : 'a type or class'} to see who this rule affects.</InfoCard>}
                         </div>
                     ) : step === 1 ? (
                         <div className="space-y-4">

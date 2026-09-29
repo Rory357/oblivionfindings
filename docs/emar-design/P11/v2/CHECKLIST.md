@@ -119,3 +119,16 @@ Status legend:
 - **Q1 (shared component):** Promote Fleet Settings' `Modal` and `Notice` to a shared `components/settings/*` when P11 is built?
 - **Q2 (two-answer choices):** Keep Segmented for "When a lead countersigns" and "Who gets the follow-up", or reword each as a switch?
 - **Q3–Q7:** see `AUDIT.md` §4 (one owner per alert, more than ordered, more settings, after-hours alerts, end-date warning).
+
+## Main's inspection, 29 September 2026: pass, with three fixes (all done)
+
+1. **No fake zero in the rule wizard.** Before a medicine, route, product or class is chosen, step 1 says "Choose a medicine to see who this rule affects". The rule sentence and the "Would apply now to …" preview only appear once there's a choice (`screenshots/1440-dlg-rule-new.png`). The package notes on the Match-by tiles ("New — needs a medicine classification on orders (P04)", "New — uses the order's controlled flag") are now design-note chips, not tile copy.
+2. **No two tabs called "Exemptions".** The settings tab is now **Exemption limit** (Staff & PINs), and it keeps the "Open exemptions ↗" link. Staff eligibility keeps **Exemptions** for the records (`1440-set-staff-exemptions.png`).
+3. **Still to decide no longer truncates.** The real `EntityTable` always truncates its identity name, so the identity column was widened and the decision code moved into the subline. Measured in the rows: 0 truncated names at 1440 and at 1280 (`1440-set-history-decide.png`).
+
+Re-checked after the fixes: `reuse-check.mjs` 21/21; interaction run 69/69 with 0 console errors; sweep 217 routes × 3 sizes with 0 problems; screenshots retaken (142).
+
+**Build notes from Main (no change to the mockup):**
+- At 200 % zoom the sticky save bar covers about 40 % of the viewport. This comes from Fleet `_notifications.tsx:528`. When building, make it sticky only while there are unsaved changes, and raise the same change for Fleet.
+- Hide "Co-signer" and "Block unless the prescriber confirmed" until their backend exists (hide-unbuilt rule).
+- The TimePicker's "08:00 AM" format comes from the real PKG-01 component; leave it.
