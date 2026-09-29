@@ -1,12 +1,16 @@
 {
   "base": "http://127.0.0.1:4381/",
-  "when": "2026-09-29T05:43:03.093Z",
+  "when": "2026-09-29T08:39:56.296Z",
   "shots": [
     {
       "shot": "01-meds-today-schedule",
       "size": "1440",
       "file": "1440-01-meds-today-schedule.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -15,6 +19,10 @@
       "size": "1280",
       "file": "1280-01-meds-today-schedule.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -23,6 +31,10 @@
       "size": "zoom200",
       "file": "zoom200-01-meds-today-schedule.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -31,6 +43,10 @@
       "size": "1440",
       "file": "1440-02-schedule-scrolled.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -39,6 +55,10 @@
       "size": "1440",
       "file": "1440-03-schedule-by-person.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -47,6 +67,10 @@
       "size": "1440",
       "file": "1440-04-rounds.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -55,6 +79,10 @@
       "size": "1280",
       "file": "1280-04-rounds.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -63,6 +91,10 @@
       "size": "zoom200",
       "file": "zoom200-04-rounds.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -71,6 +103,10 @@
       "size": "1440",
       "file": "1440-05-guided-round.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -79,6 +115,10 @@
       "size": "1280",
       "file": "1280-05-guided-round.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -87,6 +127,10 @@
       "size": "zoom200",
       "file": "zoom200-05-guided-round.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -95,6 +139,10 @@
       "size": "1440",
       "file": "1440-06-as-needed.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -103,6 +151,10 @@
       "size": "1280",
       "file": "1280-06-as-needed.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -111,6 +163,10 @@
       "size": "zoom200",
       "file": "zoom200-06-as-needed.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -119,6 +175,10 @@
       "size": "1440",
       "file": "1440-07-activity-paginated.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -127,6 +187,10 @@
       "size": "1440",
       "file": "1440-08-follow-ups-link-only.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -135,6 +199,10 @@
       "size": "1440",
       "file": "1440-09-row-context-menu.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -143,6 +211,10 @@
       "size": "1440",
       "file": "1440-10-record-step1.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -151,6 +223,10 @@
       "size": "1280",
       "file": "1280-10-record-step1.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -159,6 +235,10 @@
       "size": "zoom200",
       "file": "zoom200-10-record-step1.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -167,6 +247,10 @@
       "size": "1440",
       "file": "1440-11-record-step1-medicine-photo.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -175,6 +259,10 @@
       "size": "1440",
       "file": "1440-12-record-step2-validation.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -183,6 +271,10 @@
       "size": "1280",
       "file": "1280-12-record-step2-validation.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -191,6 +283,10 @@
       "size": "zoom200",
       "file": "zoom200-12-record-step2-validation.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -199,6 +295,10 @@
       "size": "1440",
       "file": "1440-13-record-step2-given.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -207,6 +307,10 @@
       "size": "1280",
       "file": "1280-13-record-step2-given.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -215,6 +319,10 @@
       "size": "zoom200",
       "file": "zoom200-13-record-step2-given.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -223,6 +331,10 @@
       "size": "1440",
       "file": "1440-14-record-review.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -231,6 +343,10 @@
       "size": "1280",
       "file": "1280-14-record-review.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -239,6 +355,10 @@
       "size": "zoom200",
       "file": "zoom200-14-record-review.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -247,6 +367,10 @@
       "size": "1440",
       "file": "1440-15-record-sending.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -255,6 +379,10 @@
       "size": "1440",
       "file": "1440-16-record-success.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -263,6 +391,10 @@
       "size": "1280",
       "file": "1280-16-record-success.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -271,6 +403,10 @@
       "size": "zoom200",
       "file": "zoom200-16-record-success.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -279,6 +415,10 @@
       "size": "1440",
       "file": "1440-17-row-after-recording.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -287,6 +427,10 @@
       "size": "1440",
       "file": "1440-18-controlled-witness.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -295,6 +439,10 @@
       "size": "1280",
       "file": "1280-18-controlled-witness.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -303,6 +451,10 @@
       "size": "zoom200",
       "file": "zoom200-18-controlled-witness.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -311,6 +463,10 @@
       "size": "1440",
       "file": "1440-19-witness-picker.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -319,6 +475,10 @@
       "size": "1280",
       "file": "1280-19-witness-picker.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -327,6 +487,10 @@
       "size": "zoom200",
       "file": "zoom200-19-witness-picker.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -335,6 +499,10 @@
       "size": "1440",
       "file": "1440-20-wrong-pin.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -343,6 +511,10 @@
       "size": "1440",
       "file": "1440-21-insulin-rules-step1.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -351,6 +523,10 @@
       "size": "1280",
       "file": "1280-21-insulin-rules-step1.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -359,6 +535,10 @@
       "size": "zoom200",
       "file": "zoom200-21-insulin-rules-step1.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -367,6 +547,10 @@
       "size": "1440",
       "file": "1440-22-insulin-reading-and-second-person.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -375,6 +559,10 @@
       "size": "1440",
       "file": "1440-23-insulin-reading-field.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -383,6 +571,10 @@
       "size": "1440",
       "file": "1440-24-amount-less-colleague.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -391,6 +583,10 @@
       "size": "1280",
       "file": "1280-24-amount-less-colleague.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -399,6 +595,10 @@
       "size": "zoom200",
       "file": "zoom200-24-amount-less-colleague.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -407,6 +607,10 @@
       "size": "1440",
       "file": "1440-25-amount-less-nobody.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -415,6 +619,10 @@
       "size": "1280",
       "file": "1280-25-amount-less-nobody.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -423,6 +631,10 @@
       "size": "zoom200",
       "file": "zoom200-25-amount-less-nobody.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -431,6 +643,10 @@
       "size": "1440",
       "file": "1440-26-amount-more-than-ordered.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -439,6 +655,10 @@
       "size": "1280",
       "file": "1280-26-amount-more-than-ordered.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -447,6 +667,10 @@
       "size": "zoom200",
       "file": "zoom200-26-amount-more-than-ordered.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -455,6 +679,10 @@
       "size": "1440",
       "file": "1440-27-prescriber-instruction.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -463,6 +691,10 @@
       "size": "1280",
       "file": "1280-27-prescriber-instruction.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -471,6 +703,10 @@
       "size": "zoom200",
       "file": "zoom200-27-prescriber-instruction.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -479,6 +715,10 @@
       "size": "1440",
       "file": "1440-28-forgotten-pin-fallback.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -487,6 +727,10 @@
       "size": "1280",
       "file": "1280-28-forgotten-pin-fallback.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -495,6 +739,10 @@
       "size": "zoom200",
       "file": "zoom200-28-forgotten-pin-fallback.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -503,6 +751,10 @@
       "size": "1440",
       "file": "1440-29-allergy-warn.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -511,6 +763,10 @@
       "size": "1280",
       "file": "1280-29-allergy-warn.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -519,6 +775,10 @@
       "size": "zoom200",
       "file": "zoom200-29-allergy-warn.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -527,6 +787,10 @@
       "size": "1440",
       "file": "1440-30-allergy-block-unless-confirmed.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -535,6 +799,10 @@
       "size": "1440",
       "file": "1440-31-not-given-while-blocked.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -543,6 +811,10 @@
       "size": "1280",
       "file": "1280-31-not-given-while-blocked.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -551,6 +823,10 @@
       "size": "zoom200",
       "file": "zoom200-31-not-given-while-blocked.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -559,6 +835,10 @@
       "size": "1440",
       "file": "1440-32-re-offer.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -567,6 +847,10 @@
       "size": "1280",
       "file": "1280-32-re-offer.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -575,6 +859,10 @@
       "size": "zoom200",
       "file": "zoom200-32-re-offer.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -583,6 +871,10 @@
       "size": "1440",
       "file": "1440-33-prompt-brand-changed.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -591,6 +883,10 @@
       "size": "1440",
       "file": "1440-34-prompt-outcomes.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -599,6 +895,10 @@
       "size": "1440",
       "file": "1440-35-covert-plan.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -607,6 +907,10 @@
       "size": "1440",
       "file": "1440-36-late-dose.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -615,6 +919,10 @@
       "size": "1280",
       "file": "1280-36-late-dose.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -623,6 +931,10 @@
       "size": "zoom200",
       "file": "zoom200-36-late-dose.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -631,6 +943,10 @@
       "size": "1440",
       "file": "1440-37-late-reason.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -639,6 +955,10 @@
       "size": "1440",
       "file": "1440-38-order-changed-mid-round.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -647,6 +967,10 @@
       "size": "1280",
       "file": "1280-38-order-changed-mid-round.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -655,6 +979,10 @@
       "size": "zoom200",
       "file": "zoom200-38-order-changed-mid-round.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -663,6 +991,10 @@
       "size": "1440",
       "file": "1440-39-as-needed-dose.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -671,6 +1003,10 @@
       "size": "1280",
       "file": "1280-39-as-needed-dose.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -679,6 +1015,10 @@
       "size": "zoom200",
       "file": "zoom200-39-as-needed-dose.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -687,6 +1027,10 @@
       "size": "1440",
       "file": "1440-40-as-needed-limit.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -695,6 +1039,10 @@
       "size": "1440",
       "file": "1440-41-as-needed-picker.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -703,6 +1051,10 @@
       "size": "1440",
       "file": "1440-50-not-clocked-in.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -711,6 +1063,10 @@
       "size": "1280",
       "file": "1280-50-not-clocked-in.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -719,6 +1075,10 @@
       "size": "zoom200",
       "file": "zoom200-50-not-clocked-in.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -727,6 +1087,10 @@
       "size": "1440",
       "file": "1440-51-why-not-clocked-in.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -735,6 +1099,10 @@
       "size": "1440",
       "file": "1440-52-not-on-shift-section.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -743,6 +1111,10 @@
       "size": "1440",
       "file": "1440-53-why-not-on-shift.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -751,6 +1123,10 @@
       "size": "1440",
       "file": "1440-54-why-site-not-approved.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -759,6 +1135,10 @@
       "size": "1440",
       "file": "1440-55-why-competency-expired.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -767,6 +1147,10 @@
       "size": "1280",
       "file": "1280-55-why-competency-expired.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -775,6 +1159,10 @@
       "size": "zoom200",
       "file": "zoom200-55-why-competency-expired.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -783,6 +1171,10 @@
       "size": "1440",
       "file": "1440-56-why-restricted.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -791,6 +1183,10 @@
       "size": "1440",
       "file": "1440-57-why-awaiting-verification.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -799,6 +1195,10 @@
       "size": "1440",
       "file": "1440-58-why-covert-missing.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -807,6 +1207,10 @@
       "size": "1440",
       "file": "1440-59-why-no-witness.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -815,6 +1219,10 @@
       "size": "1280",
       "file": "1280-59-why-no-witness.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -823,6 +1231,10 @@
       "size": "zoom200",
       "file": "zoom200-59-why-no-witness.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -831,6 +1243,10 @@
       "size": "1440",
       "file": "1440-60-witness-override-request.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -839,6 +1255,10 @@
       "size": "1280",
       "file": "1280-60-witness-override-request.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -847,6 +1267,10 @@
       "size": "zoom200",
       "file": "zoom200-60-witness-override-request.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -855,6 +1279,7 @@
       "size": "1440",
       "file": "1440-61-manager-one-screen-approval.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -863,6 +1288,7 @@
       "size": "1280",
       "file": "1280-61-manager-one-screen-approval.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -871,6 +1297,7 @@
       "size": "zoom200",
       "file": "zoom200-61-manager-one-screen-approval.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -879,6 +1306,7 @@
       "size": "1440",
       "file": "1440-62-manager-decline.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -887,6 +1315,10 @@
       "size": "1440",
       "file": "1440-63-my-eligibility.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -895,6 +1327,10 @@
       "size": "1440",
       "file": "1440-70-not-recorded.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -903,6 +1339,10 @@
       "size": "1280",
       "file": "1280-70-not-recorded.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -911,6 +1351,10 @@
       "size": "zoom200",
       "file": "zoom200-70-not-recorded.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -919,6 +1363,10 @@
       "size": "1440",
       "file": "1440-71-not-confirmed.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -927,6 +1375,10 @@
       "size": "1280",
       "file": "1280-71-not-confirmed.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -935,6 +1387,10 @@
       "size": "zoom200",
       "file": "zoom200-71-not-confirmed.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -943,6 +1399,10 @@
       "size": "1440",
       "file": "1440-72-already-recorded.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -951,6 +1411,10 @@
       "size": "1280",
       "file": "1280-72-already-recorded.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -959,6 +1423,10 @@
       "size": "zoom200",
       "file": "zoom200-72-already-recorded.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -967,6 +1435,10 @@
       "size": "1440",
       "file": "1440-73-offline-saved-on-device.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -975,6 +1447,10 @@
       "size": "1280",
       "file": "1280-73-offline-saved-on-device.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -983,6 +1459,10 @@
       "size": "zoom200",
       "file": "zoom200-73-offline-saved-on-device.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -991,6 +1471,10 @@
       "size": "1440",
       "file": "1440-74-offline-item-refused-banner.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -999,6 +1483,10 @@
       "size": "1280",
       "file": "1280-74-offline-item-refused-banner.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1007,6 +1495,10 @@
       "size": "zoom200",
       "file": "zoom200-74-offline-item-refused-banner.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1015,6 +1507,10 @@
       "size": "1440",
       "file": "1440-75-offline-item-refused-dialog.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1023,6 +1519,10 @@
       "size": "1440",
       "file": "1440-76-recorded-and-reported.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1031,6 +1531,10 @@
       "size": "1440",
       "file": "1440-80-loading.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1039,6 +1543,10 @@
       "size": "1280",
       "file": "1280-80-loading.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1047,6 +1555,10 @@
       "size": "zoom200",
       "file": "zoom200-80-loading.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1055,6 +1567,10 @@
       "size": "1440",
       "file": "1440-81-no-work-left.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1063,6 +1579,10 @@
       "size": "1280",
       "file": "1280-81-no-work-left.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1071,6 +1591,10 @@
       "size": "zoom200",
       "file": "zoom200-81-no-work-left.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1079,6 +1603,10 @@
       "size": "1440",
       "file": "1440-82-couldnt-load.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1087,6 +1615,10 @@
       "size": "1280",
       "file": "1280-82-couldnt-load.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1095,6 +1627,10 @@
       "size": "zoom200",
       "file": "zoom200-82-couldnt-load.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1103,6 +1639,10 @@
       "size": "1440",
       "file": "1440-83-out-of-date.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1111,6 +1651,7 @@
       "size": "1440",
       "file": "1440-84-no-access.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1119,6 +1660,7 @@
       "size": "1280",
       "file": "1280-84-no-access.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1127,6 +1669,7 @@
       "size": "zoom200",
       "file": "zoom200-84-no-access.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1135,6 +1678,7 @@
       "size": "1440",
       "file": "1440-85-not-found.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1143,6 +1687,7 @@
       "size": "1280",
       "file": "1280-85-not-found.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1151,6 +1696,7 @@
       "size": "zoom200",
       "file": "zoom200-85-not-found.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1159,6 +1705,10 @@
       "size": "1440",
       "file": "1440-90-my-day.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1167,6 +1717,10 @@
       "size": "1280",
       "file": "1280-90-my-day.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1175,6 +1729,13 @@
       "size": "zoom200",
       "file": "zoom200-90-my-day.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [
+          "Given or outcome recorded",
+          "Aroha · Tama · Mele · Grace · Sam"
+        ]
+      },
       "errors": [],
       "stepError": null
     },
@@ -1183,6 +1744,10 @@
       "size": "1440",
       "file": "1440-91-my-day-medicines-card.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1191,6 +1756,10 @@
       "size": "1440",
       "file": "1440-92-my-day-couldnt-load.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1199,6 +1768,10 @@
       "size": "1440",
       "file": "1440-93-colleague-were-you-there.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1207,6 +1780,10 @@
       "size": "1280",
       "file": "1280-93-colleague-were-you-there.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1215,6 +1792,13 @@
       "size": "zoom200",
       "file": "zoom200-93-colleague-were-you-there.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [
+          "Given or outcome recorded",
+          "Aroha · Tama · Mele · Grace · Sam"
+        ]
+      },
       "errors": [],
       "stepError": null
     },
@@ -1223,6 +1807,10 @@
       "size": "1440",
       "file": "1440-94-colleague-answer-dialog.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1231,6 +1819,7 @@
       "size": "1440",
       "file": "1440-95-all-tasks-support-worker.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1239,6 +1828,7 @@
       "size": "1280",
       "file": "1280-95-all-tasks-support-worker.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1247,6 +1837,7 @@
       "size": "zoom200",
       "file": "zoom200-95-all-tasks-support-worker.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1255,6 +1846,7 @@
       "size": "1440",
       "file": "1440-96-all-tasks-house-lead.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1263,6 +1855,7 @@
       "size": "1280",
       "file": "1280-96-all-tasks-house-lead.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1271,6 +1864,7 @@
       "size": "zoom200",
       "file": "zoom200-96-all-tasks-house-lead.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1279,6 +1873,10 @@
       "size": "1440",
       "file": "1440-97-my-calendar.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1287,6 +1885,10 @@
       "size": "1280",
       "file": "1280-97-my-calendar.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1295,6 +1897,10 @@
       "size": "zoom200",
       "file": "zoom200-97-my-calendar.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1303,6 +1909,10 @@
       "size": "1440",
       "file": "1440-100-mar-chart.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1311,6 +1921,10 @@
       "size": "1280",
       "file": "1280-100-mar-chart.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1319,6 +1933,10 @@
       "size": "zoom200",
       "file": "zoom200-100-mar-chart.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1327,6 +1945,10 @@
       "size": "1440",
       "file": "1440-101-mar-mark-given-menu.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1335,6 +1957,10 @@
       "size": "1280",
       "file": "1280-101-mar-mark-given-menu.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1343,6 +1969,10 @@
       "size": "zoom200",
       "file": "zoom200-101-mar-mark-given-menu.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1351,6 +1981,10 @@
       "size": "1440",
       "file": "1440-102-mar-full-record-menu.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1359,6 +1993,10 @@
       "size": "1440",
       "file": "1440-103-client-profile.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1367,6 +2005,10 @@
       "size": "1280",
       "file": "1280-103-client-profile.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1375,6 +2017,10 @@
       "size": "zoom200",
       "file": "zoom200-103-client-profile.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1383,6 +2029,10 @@
       "size": "1440",
       "file": "1440-104-client-profile-choose-dose.png",
       "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -1391,6 +2041,7 @@
       "size": "1440",
       "file": "1440-105-transport.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1399,6 +2050,7 @@
       "size": "1280",
       "file": "1280-105-transport.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1407,6 +2059,7 @@
       "size": "zoom200",
       "file": "zoom200-105-transport.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1415,6 +2068,7 @@
       "size": "1440",
       "file": "1440-106-transport-record.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1423,6 +2077,7 @@
       "size": "1280",
       "file": "1280-106-transport-record.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1431,6 +2086,7 @@
       "size": "zoom200",
       "file": "zoom200-106-transport-record.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1439,6 +2095,7 @@
       "size": "1440",
       "file": "1440-110-contract-page.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1447,6 +2104,7 @@
       "size": "1280",
       "file": "1280-110-contract-page.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -1455,6 +2113,7 @@
       "size": "zoom200",
       "file": "zoom200-110-contract-page.png",
       "overflow": 0,
+      "header": null,
       "errors": [],
       "stepError": null
     }

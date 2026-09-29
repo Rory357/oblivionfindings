@@ -157,7 +157,6 @@ export function MedicinesCard() {
                     <CountChip label="Due now" n={c.due.length} onClick={link('open')} />
                     <CountChip label="Late" n={c.late.length} tone={c.late.length ? 'warning' : undefined} onClick={link('open')} />
                     <CountChip label="Needs help" n={c.needsHelp.length} tone={c.needsHelp.length ? 'critical' : undefined} onClick={link('help')} icon={Lock} />
-                    <CountChip label="Recorded" n={`${c.recordedN} of ${c.denom}`} onClick={() => s.go('/meds/today', { view: 'activity' })} />
                 </div>
             )}
             {attention.length ? (

@@ -12,7 +12,7 @@ import { createRoot } from 'react-dom/client';
 import { isFrontline } from './data';
 import { DialogHost } from './doses';
 import { ContractPage } from './pages/contract';
-import { ClientProfilePage, MarPage, TransportPage } from './pages/entry-points';
+import { ClientProfilePage, MarPage, TransportPage, TransportPreCheckPage } from './pages/entry-points';
 import { MedsTodayPage } from './pages/meds-today';
 import { MyCalendarPage } from './pages/my-calendar';
 import { MyDayPage } from './pages/my-day';
@@ -57,6 +57,7 @@ function Router() {
     else if (p === '/my-calendar') page = <MyCalendarPage />;
     else if (p === '/emar/mar') page = <MarPage />;
     else if (p.startsWith('/operations/clients')) page = <ClientProfilePage />;
+    else if (p.endsWith('/pre-check')) page = <TransportPreCheckPage />;
     else if (p.startsWith('/fleet-assets/transports')) page = <TransportPage />;
     else if (p === '/p01/contract') page = <ContractPage />;
     else if (p === '/emar/prescriptions') page = isFrontline(s.route.persona) ? <NoAccess what="Orders & reviews" /> : <LaterPackage what="Orders & reviews" pkg="P04" />;

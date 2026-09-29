@@ -139,8 +139,12 @@ function TopBar() {
         <header className="relative grid h-[58px] shrink-0 grid-cols-[1fr_auto_1fr] items-center bg-sidebar px-4 text-sidebar-foreground">
             <div className="flex items-center gap-6">
                 <EventHorizonWordmark />
-                <span className="absolute left-[256px] hidden text-[14px] xl:inline">
+                {/* APP_SHELL_STYLE_GUIDE §2: full date ≥ 1320 px, short form 1140–1320 px, hidden below. */}
+                <span className="absolute left-[256px] hidden text-[14px] min-[1320px]:inline">
                     <span className="font-semibold text-sidebar-accent-foreground">Monday</span> 28 September 2026
+                </span>
+                <span className="absolute left-[256px] hidden text-[14px] min-[1140px]:inline min-[1320px]:hidden">
+                    <span className="font-semibold text-sidebar-accent-foreground">Mon</span> 28 Sep
                 </span>
             </div>
             <button type="button" aria-label="Search or jump to" onClick={outside('Command search')} className="grid size-8 place-items-center rounded-md outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring lg:hidden">

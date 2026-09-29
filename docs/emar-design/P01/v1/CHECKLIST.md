@@ -21,12 +21,12 @@ Legend: **Pass** · **Pass (note)** = passes with a stated limitation · **N/A**
 | Item | Result | Evidence |
 |---|---|---|
 | `PageHeader`, not `PageHero` | Pass | `1440-01-meds-today-schedule.png`; `pages/meds-today.tsx` |
-| Plain title, one StatusBadge chip, one-line fact subline | Pass | “Meds today” + “On shift” (“Not clocked in” in `1440-50-not-clocked-in.png`) + “Monday 28 September 2026 · Kōwhai House · your shift 7:00 am–3:00 pm · times in NZDT (Pacific/Auckland)” — the day is stated (Stephan, P00 v4) |
+| Plain title, one StatusBadge chip, one-line fact subline | Pass | “Meds today” + “On shift” (“Not clocked in” in `1440-50-not-clocked-in.png`) + “Mon 28 Sep 2026 · Kōwhai House · shift 7:00 am–3:00 pm” — one line at 1440 and 1280 (review fix 4; measured); the day is stated (Stephan, P00 v4); the NZDT zone shows in the header’s filter row on every view |
 | No greetings, no LIVE/refreshed eyebrows | Pass | Replaces today’s “Kia ora …” PageHero. The refresh time is a filter-row control, not an eyebrow |
-| One meter row of 4–6 blocks; every block links; real data; graph form where one exists; n/a and Unavailable | Pass | 6 blocks: Due now · Late · Needs help · Recorded (donut) · Follow-ups · My eligibility (opens My eligibility). `1440-81-no-work-left.png` (Recorded **n/a**), `1440-82-couldnt-load.png` (**Unavailable**, “—”), `1440-80-loading.png` (skeleton). Counts come from the one shared schedule (`store.tsx` `useCounts`) |
+| One meter row of 4–6 blocks; every block links; real data; graph form where one exists; n/a and Unavailable | Pass | Captions fit at 1440 and 1280 (Late “Oldest due 8:00 am”, review fix 5; others shortened — `report.json` `header.truncatedCaptions` is empty at 1440 and 1280. At 200 % only the real My Day header’s own two captions truncate — the shared component, not changed). 6 blocks: Due now · Late · Needs help · Recorded (donut) · Follow-ups · My eligibility (opens My eligibility). `1440-81-no-work-left.png` (Recorded **n/a**), `1440-82-couldnt-load.png` (**Unavailable**, “—”), `1440-80-loading.png` (skeleton). Counts come from the one shared schedule (`store.tsx` `useCounts`) |
 | Search and primary filters inside the header; nothing between header and content | Pass | Search “Search people or medicines…”; every rail view has real filter pills (states, group by, rounds state, person, range, outcome) plus the refresh chip |
 | `PageHeaderRail` connected tabs, one line, ≤ 8, overflow to More, Find chip, no shadow | Pass | 7 views + Find (`1440-01…`); at 1280 the shared rail folds Stock alerts and Activity into “More” (`1280-01…`). Follow-ups / Controlled checks / Stock alerts are link-only tabs for P08a / P07a / P06 (`1440-08-follow-ups-link-only.png`) |
-| Breadcrumbs rooted at Home | Pass | Real `Breadcrumbs`: Home › Meds today (support worker); Home › Medication › Meds today (leads); Home › My Day; Home › All Tasks; Home › Clients › Aroha Mere Ngata; Home › Fleet & assets › Transports › Tama to physio |
+| Breadcrumbs rooted at Home | Pass | Real `Breadcrumbs`: Home › Meds today (support worker); Home › Medication › Meds today (leads); Home › My Day; Home › All Tasks; Home › Clients › Aroha Mere Ngata; Home › Fleet & Assets › Transport Logs › Transport #12 (as on the live transport page) |
 
 ### B. Layout
 
@@ -34,8 +34,8 @@ Legend: **Pass** · **Pass (note)** = passes with a stated limitation · **N/A**
 |---|---|---|
 | Only the shell gutter; `gap-5` between sections | Pass | `shell.tsx` main `px-5 pb-5 gap-5`, crumbs `py-2.5`; pages add no outer padding |
 | Full-width body, no `max-w` cap | Pass | All pages |
-| A number lives once, in the meter row | Pass (note) | Meds today: no body KPI cards. **My Day:** the brief asks the Medicines card to show “the same counts as Meds today”, so “Recorded x of y” is in My Day’s header meter and in the card — raised as README Q10 |
-| Desktop only; 1440, 1280 and 200 %; no horizontal page scroll | Pass | `report.json`: overflow 0 on all 182 captures. At 200 % the shell uses its icon rail (`zoom200-01…`); wide tables scroll inside their own container |
+| A number lives once, in the meter row | Pass | Meds today: no body KPI cards. My Day: the Medicines card shows Due now / Late / Needs help; “Recorded” lives once, in My Day’s header meter (review fix 1) |
+| Desktop only; 1440, 1280 and 200 %; no horizontal page scroll | Pass | Top bar date follows the shell guide (full ≥ 1320 px, “Mon 28 Sep” 1140–1320 px, hidden below). `report.json`: overflow 0 on all 182 captures. At 200 % the shell uses its icon rail (`zoom200-01…`); wide tables scroll inside their own container |
 
 ### C. Lists
 
@@ -91,6 +91,7 @@ Legend: **Pass** · **Pass (note)** = passes with a stated limitation · **N/A**
 |---|---|---|
 | No dead or decorative actions or meter blocks; unbuilt things hidden | Pass (note) | Actions that belong to other packages or global chrome say so in a toast (“… — outside this preview”), which is the mockup boundary, not product behaviour. Link-only tabs are the brief’s instruction and are labelled |
 | Synthetic data clearly labelled | Pass | Hatched viewer bar: “mockup viewer — not product UI · Synthetic data”; photos say “synthetic placeholder” |
+| Reference frames owned by other modules | Pass | Transport uses Fleet’s real `FleetCompactHero` as on the live page, with no meter tiles invented (review fix 2); its row action says “Record” (fix 3) |
 | Views approved earlier reused unchanged unless an approved change says otherwise | Pass (note) | P00 v5 states, wording and dialogs reused (blocked reasons, allergy notices, amount paths, witness override, “Recorded and reported”, app-wide banners, My Day card, rostered tasks), restyled with the real components as the brief asks. P01 additions are listed in the README |
 
 ## 3. Process

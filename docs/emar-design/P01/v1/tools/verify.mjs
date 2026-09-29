@@ -215,10 +215,11 @@ for (const shot of SHOTS.filter((s) => !only || s.name.includes(only))) {
             stepError = String(e.message ?? e).slice(0, 300);
         }
         const overflow = await evaluate(`return document.documentElement.scrollWidth - document.documentElement.clientWidth;`);
+        const header = await evaluate(`const p = document.querySelector('header.eh-header p'); if (!p) return null; const lh = parseFloat(getComputedStyle(p).lineHeight) || 16; return { sublineLines: Math.round(p.getBoundingClientRect().height / lh), truncatedCaptions: [...document.querySelectorAll('.eh-meter span.truncate')].filter((c) => c.scrollWidth > c.clientWidth).map((c) => c.textContent) };`);
         const shotPng = await send('Page.captureScreenshot', { format: 'png' });
         const file = `${size.key}-${shot.name}.png`;
         writeFileSync(path.join(outDir, file), Buffer.from(shotPng.data, 'base64'));
-        const row = { shot: shot.name, size: size.key, file, overflow, errors: errors.slice(before), stepError };
+        const row = { shot: shot.name, size: size.key, file, overflow, header, errors: errors.slice(before), stepError };
         report.shots.push(row);
         process.stdout.write(`${row.stepError || row.errors.length || row.overflow > 0 ? '✗' : '✓'} ${size.key} ${shot.name}${overflow > 0 ? ` overflow=${overflow}` : ''}${row.errors.length ? ` errors=${row.errors.length}` : ''}${stepError ? ` step: ${stepError}` : ''}\n`);
     }

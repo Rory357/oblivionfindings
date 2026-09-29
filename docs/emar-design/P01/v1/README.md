@@ -44,7 +44,7 @@ Every entry point opens **one** WizardShell dialog — *Safety checks → Record
 | Guided round (`GuidedRoundDialog`) | One tick for identity; no time, allergy or co-signer; window always overridden | A round walker on the Rounds view that opens the shared dialog dose by dose (“Next in the round”) — the separate round dialog retires; `/emar/rounds?guided=` keeps working |
 | MAR one-click “Mark given” (`dose-context-menu`) | Posts “given” with no safety display for non-CD, non-witness, non-observation doses | Offered **only for simple doses** (list below); otherwise “Record dose” and “Why no one-click Mark given?” |
 | Client profile › Record dose (`emar-dialog`) | Its own 9 reasons; no amount; no scheduled time; refuses every offline save | Choose the dose, then the shared dialog; `emar-dialog` retires |
-| Fleet transport › Administer (`transport-medication-dialogs`) | Given only; no time, reasons, allergies or observations; prescribed dose as given | The shared dialog with the transport locked and the pack check kept; one record whichever screen makes it |
+| Fleet transport › Administer (`transport-medication-dialogs`) | Given only; no time, reasons, allergies or observations; prescribed dose as given | The shared dialog with the transport locked and the pack check kept; one record whichever screen makes it. The row action says **Record**, like every other entry point. The transport header is Fleet’s own `FleetCompactHero`, as on the live page |
 | My Day (`/my-day/medications/*/administer|refuse|snooze`, unmounted `stream-context-menu`) | Live routes with no screen (NF-14) | **Retired** (recommended, Q1). My Day shows counts and links; recording opens the shared dialog |
 | Mobile API (`/api/medications/*`) | Its own validation | Must take the same requirements and outcomes (API contract; no screen — web only, D7) |
 
@@ -69,9 +69,23 @@ Sending (row and dialog), Recorded (success pane with “Next due”), Not recor
 
 ### 4. My Day, rostered tasks and My Calendar
 
-- **My Day** is the real screen: the real header (its “Meds today” meter now uses the same counts as Meds today) and the real day list. The new **Medicines card** shows Due now · Late · Needs help · Recorded (the Meds today numbers, each opening Meds today), the doses due or late now, the worker’s own follow-ups, any “Were you there?” answer, and Open meds / Open follow-ups — no separate “mark as given” path.
+- **My Day** is the real screen: the real header (its “Meds today” meter now uses the same counts as Meds today) and the real day list. The new **Medicines card** shows Due now · Late · Needs help (the Meds today numbers, each opening Meds today; “Recorded” lives once, in My Day’s header meter), the doses due or late now, the worker’s own follow-ups, any “Were you there?” answer, and Open meds / Open follow-ups — no separate “mark as given” path.
 - **Rostered tasks:** one task per dose time per house for everyone rostered on a covering shift; it completes by itself when every dose has an outcome; a lead can assign it to one person (P00 v4/v5). Shown in My Day’s list and as the All Tasks provider rows (All Tasks keeps its own design).
 - **My Calendar:** the real shared calendar; only the Meds source changes, to the medication slots on your rostered shifts, opening Meds today.
+
+## Review fixes before Stephan (29 September 2026)
+
+The review session inspected `e0a9600ce` and asked for five fixes, all made in this version:
+
+1. My Day no longer repeats a number: the Medicines card drops “Recorded” (Q10 closed by the rule).
+2. Transport: the two link tiles dressed as meters are gone; the header is Fleet’s real `FleetCompactHero` as on the live page; the links are buttons in the Medicines section; no two-line subline or repeated count.
+3. Transport row action says “Record” (pack check kept); the Fleet wording question is in Q9.
+4. Meds today subline is one line at 1440 and 1280: “Mon 28 Sep 2026 · Kōwhai House · shift 7:00 am–3:00 pm” (the day stays, per P00 v4). At 1280 the header’s action cluster leaves 332 px, so the time zone moved to the header’s filter row, where “Updated 9:12 am NZDT” shows on every view. Three other captions that truncated at 1280 were shortened (Due now “3 people · by 10:00 am”, Follow-ups “Oldest 11:30 pm Sunday”, My eligibility “To 14 Mar 2027”).
+5. The Late meter caption is “Oldest due 8:00 am”.
+
+Also found while re-checking: the top bar’s full date touched the search at 1280, so the shell replica now follows the shell guide’s date rule (full date from 1320 px, “Mon 28 Sep” from 1140 px). The harness now records each header’s subline line count and any truncated meter caption.
+
+Added to the questions: DateTimeField’s always-on “Clear date and time” (Q8) and the allergy tones (Q11).
 
 ## Verification (29 September 2026)
 
@@ -89,9 +103,10 @@ Sending (row and dialog), Recorded (success pane with “Next due”), Not recor
 5. **D6 — support vocabulary:** on a Prompt medicine, is “Took it without a prompt” the right outcome for self-management that day?
 6. **P01 — MAR “Mark given” eligibility:** confirm the list in §1.
 7. **NF-26 — My Day privacy:** v1 keeps My Day’s rule (only people the worker may view). Show the pointer “You have medication work for people not shown here — open Meds today” when that applies?
-8. **Shared components (no edit made):** `entity-menu`’s `MenuItem` has no disabled state, so the P00 “disabled item with its reason” can’t be shown; v1 omits the item and adds “Why can’t I record this?” / “Why no one-click Mark given?”. `WizardShell` keeps its 248 px rail above 640 CSS px, so at 200 % the dialog body is narrower. Change either later?
-9. **Fleet owner — transport parity:** confirm transport doses record against the scheduled slot, with refusal and withhold available on the trip.
-10. **My Day card:** the brief asks for the same counts as Meds today, so “Recorded x of y” appears in both My Day’s header meter and the card (the checklist’s “a number lives once” rule). Keep the card’s count row, or drop Recorded from the card?
+8. **Shared components (no edit made):** `entity-menu`’s `MenuItem` has no disabled state, so the P00 “disabled item with its reason” can’t be shown; v1 omits the item and adds “Why can’t I record this?” / “Why no one-click Mark given?”. `WizardShell` keeps its 248 px rail above 640 CSS px, so at 200 % the dialog body is narrower. `DateTimeField` always shows “Clear date and time” once it has a value, including on the required Given time (`date-time-field.tsx` has no prop to hide it) — proposed: a `clearable={false}` prop at build. Change any of these later?
+9. **Fleet owner — transport parity:** confirm transport doses record against the scheduled slot, with refusal and withhold available on the trip. v1 labels the row action “Record”, like every other entry point; should Fleet keep its word “Administer”?
+10. ~~My Day card count~~ — **closed by the standing rule** (checklist B, “a number lives once”): Recorded is dropped from the card; it stays in My Day’s header meter.
+11. **Allergy tones (P00 v5 approved them):** the recorded-allergy list is the solid critical banner, but a real health-profile match in Warn mode is the amber card — so a list with no match is louder than an actual match. Should a match always use the critical surface, even in Warn mode? (Not changed in v1.)
 
 Still open from earlier packages (not changed here): D1, D3 (insulin and the unsupervised flag), D9, D10, D11, D13, and the on-call contact per house (shown as “Not configured”).
 

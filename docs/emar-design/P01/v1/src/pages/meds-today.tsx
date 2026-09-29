@@ -75,15 +75,16 @@ export function MedsTodayPage() {
 
     /* ── meters: one row, every block a link, honest n/a and Unavailable ── */
     const eligibility = (() => {
-        if (scn === 'competencyExpired') return { big: 'Expired', cap: 'Competency ended 14 Sep 2026', tone: 'critical' as const };
+        if (scn === 'competencyExpired') return { big: 'Expired', cap: 'Ended 14 Sep 2026', tone: 'critical' as const };
         if (scn === 'restrictedBlock') return { big: 'Restricted', cap: 'Can’t sign doses as given', tone: 'critical' as const };
-        return { big: 'Current', cap: 'To 14 Mar 2027 · can witness', tone: 'success' as const };
+        return { big: 'Current', cap: 'To 14 Mar 2027', tone: 'success' as const };
     })();
     const blockedCaption = [...new Set(c.needsHelp.map(({ d }) => {
         const q = requirementsFor(d, s.ctx);
         const k = q.blockAll ?? q.blockGiven;
         return ({ notClockedIn: 'not clocked in', notOnShift: 'not on your shift', siteNotApproved: 'house not in your access', awaitingVerification: 'order to check', covertMissing: 'no covert plan', noWitness: 'no witness on shift', allergyNotConfirmed: 'allergy not confirmed' } as Record<string, string>)[k ?? ''] ?? 'blocked';
-    }))].join(' · ');
+    }))];
+    const blockedKinds = blockedCaption;
     const meters = loading ? (
         ['Due now', 'Late', 'Needs help', 'Recorded', 'Follow-ups', 'My eligibility'].map((l) => (
             <PageHeaderMeterBlock key={l} label={l} ariaLabel={`${l}: loading`} onClick={() => undefined}>
@@ -107,27 +108,27 @@ export function MedsTodayPage() {
         <>
             <PageHeaderMeterBlock label="Due now" href={link('schedule', { state: 'open' })} ariaLabel={`View ${c.due.length} doses due now`}>
                 <PageHeaderMeterBig>{c.due.length}</PageHeaderMeterBig>
-                <PageHeaderMeterCaption>{c.due.length ? `${[...new Set(c.due.map(({ d }) => PEOPLE[d.pid].pref))].join(', ')} · 9:00 am` : empty ? 'Next: none today' : 'Next: 12:00 pm'}</PageHeaderMeterCaption>
+                <PageHeaderMeterCaption>{c.due.length ? `${new Set(c.due.map(({ d }) => d.pid)).size} people · by 10:00 am` : empty ? 'Next: none today' : 'Next: 12:00 pm'}</PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
             <PageHeaderMeterBlock label="Late" tone={c.late.length ? 'warning' : 'brand'} href={link('schedule', { state: 'open' })} ariaLabel={`View ${c.late.length} late doses`}>
                 <PageHeaderMeterBig>{c.late.length}</PageHeaderMeterBig>
-                <PageHeaderMeterCaption>{c.late.length ? 'Oldest due 8:00 am · window ended 9:00 am' : 'Nothing late'}</PageHeaderMeterCaption>
+                <PageHeaderMeterCaption>{c.late.length ? 'Oldest due 8:00 am' : 'Nothing late'}</PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
             <PageHeaderMeterBlock label="Needs help" tone={c.needsHelp.length ? (c.needsHelp.some(({ d }) => requirementsFor(d, s.ctx).blockGiven === 'allergyNotConfirmed' || requirementsFor(d, s.ctx).blockGiven === 'covertMissing') ? 'critical' : 'warning') : 'brand'} href={link('schedule', { state: 'help' })} ariaLabel={`View ${c.needsHelp.length} doses you can’t record as given`}>
                 <PageHeaderMeterBig>{c.needsHelp.length}</PageHeaderMeterBig>
-                <PageHeaderMeterCaption>{c.needsHelp.length ? blockedCaption.charAt(0).toUpperCase() + blockedCaption.slice(1) : 'Nothing blocked'}</PageHeaderMeterCaption>
+                <PageHeaderMeterCaption>{c.needsHelp.length ? (blockedKinds.length > 1 ? `${blockedKinds.length} reasons — see the list` : blockedKinds[0].charAt(0).toUpperCase() + blockedKinds[0].slice(1)) : 'Nothing blocked'}</PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
             <PageHeaderMeterBlock label="Recorded" value={c.denom ? `${c.recordedN} of ${c.denom}` : undefined} href={link('activity')} ariaLabel={c.denom ? `View activity, ${c.recordedN} of ${c.denom} recorded` : 'Recorded: not applicable, no doses were due'}>
                 {c.denom ? <PageHeaderMeterDonut percent={(c.recordedN / c.denom) * 100} caption="Due so far on your shift" /> : (
                     <>
                         <PageHeaderMeterBig>n/a</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>No doses were due on your shift</PageHeaderMeterCaption>
+                        <PageHeaderMeterCaption>None due this shift</PageHeaderMeterCaption>
                     </>
                 )}
             </PageHeaderMeterBlock>
             <PageHeaderMeterBlock label="Follow-ups" value={empty ? undefined : String(openFu.length)} tone={overdueFu && !empty ? 'critical' : 'brand'} href={link('followups')} ariaLabel={`View follow-ups, ${overdueFu} overdue`}>
                 <PageHeaderMeterBig>{empty ? '0' : overdueFu ? `${overdueFu} overdue` : String(openFu.length)}</PageHeaderMeterBig>
-                <PageHeaderMeterCaption>{empty ? 'None open' : overdueFu ? 'Oldest due 11:30 pm Sunday' : 'None overdue'}</PageHeaderMeterCaption>
+                <PageHeaderMeterCaption>{empty ? 'None open' : overdueFu ? 'Oldest 11:30 pm Sunday' : 'None overdue'}</PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
             <EligibilityMeter e={eligibility} />
         </>
@@ -145,7 +146,7 @@ export function MedsTodayPage() {
             Offline · last updated 9:05 am NZDT
         </PageHeaderFilterButton>
     ) : (
-        <PageHeaderFilterButton icon={RefreshCw} onClick={() => s.toast('info', 'Refreshed at 9:12 am NZDT (mockup).')}>
+        <PageHeaderFilterButton icon={RefreshCw} title="All times are NZDT (Pacific/Auckland). Refresh." onClick={() => s.toast('info', 'Refreshed at 9:12 am NZDT (mockup).')}>
             Updated 9:12 am NZDT
         </PageHeaderFilterButton>
     );
@@ -197,7 +198,7 @@ export function MedsTodayPage() {
             icon={Pill}
             title="Meds today"
             titleChip={notClocked ? <PageHeaderStatusChip variant="warning" icon={LogIn}>Not clocked in</PageHeaderStatusChip> : <PageHeaderStatusChip variant="success" icon={CheckCircle2}>On shift</PageHeaderStatusChip>}
-            subline={<>Monday 28 September 2026 · Kōwhai House · your shift 7:00 am–3:00 pm · times in <abbr title="Pacific/Auckland" className="no-underline">NZDT</abbr> (Pacific/Auckland)</>}
+            subline="Mon 28 Sep 2026 · Kōwhai House · shift 7:00 am–3:00 pm"
             actions={
                 <>
                     <PageHeaderSearch value={search} onChange={setSearch} placeholder="Search people or medicines…" />

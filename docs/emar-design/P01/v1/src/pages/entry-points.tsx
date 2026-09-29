@@ -4,7 +4,7 @@
  *   MAR chart (P02 owns the page): the REAL MarGrid; its cell menu offers the
  *     one-click "Mark given" only for simple, non-controlled doses.
  *   Client profile › Medical (Clients owns it): Record dose → the same steps.
- *   Fleet transport (Fleet owns it): Administer → the same steps, parity. */
+ *   Fleet transport (Fleet owns it): the carried dose's Record → the same steps, parity. */
 import { EntityContextMenu, compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import { EntityTable } from '@/components/lists/entity-table';
 import { ListCaption } from '@/components/lists/list-caption';
@@ -20,7 +20,6 @@ import {
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { StatusBadge } from '@/components/ui/status-badge';
 import type { DoseStatus, ScheduleRow } from '@/pages/meds/today/types';
 import {
     Activity,
@@ -29,16 +28,15 @@ import {
     HeartPulse,
     History,
     Home,
-    MapPin,
     Pill,
     Printer,
     ShieldAlert,
     Stethoscope,
-    Truck,
-    UserRound,
     Users,
     Zap,
 } from 'lucide-react';
+import { Link } from '@inertiajs/react';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { useState, type MouseEvent } from 'react';
 import { requirementsFor, type DoseState } from '../contract';
 import { PEOPLE, doseById, type Dose } from '../data';
@@ -172,7 +170,7 @@ export function MarPage() {
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock label="Allergies" tone={person.allergy.status === 'recorded' ? 'critical' : 'warning'} href={hrefFor('/operations/clients/201', {}, s.route)} ariaLabel="View allergies on the client profile">
                             <PageHeaderMeterBig>{person.allergy.status === 'recorded' ? 'Recorded' : person.allergy.status === 'nkda' ? 'None known' : person.allergy.status === 'none' ? 'Not recorded' : 'Unavailable'}</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>{person.allergy.list ?? 'Check the health profile'}</PageHeaderMeterCaption>
+                            <PageHeaderMeterCaption>{person.allergy.status === 'recorded' ? 'Listed on the record' : 'Check the health profile'}</PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                     </>
                 }
@@ -242,7 +240,7 @@ export function ClientProfilePage() {
                     <>
                         <PageHeaderMeterBlock label="Next shift" href={hrefFor('/my-calendar', {}, s.route)} ariaLabel="View the next shift in My Calendar">
                             <PageHeaderMeterBig>3:00 pm</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>Jordan Tipene · Kōwhai House</PageHeaderMeterCaption>
+                            <PageHeaderMeterCaption>Jordan Tipene</PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock label="Safety" tone="critical" onClick={() => document.getElementById('p01-mar-card')?.focus()} ariaLabel="View recorded allergies">
                             <PageHeaderMeterBig>2</PageHeaderMeterBig>
@@ -254,7 +252,7 @@ export function ClientProfilePage() {
                         </PageHeaderMeterBlock>
                         <PageHeaderMeterBlock label="Due now" tone={due.length ? 'warning' : 'brand'} onClick={() => document.getElementById('p01-mar-card')?.focus()} ariaLabel="View Aroha’s doses due now">
                             <PageHeaderMeterBig>{due.length}</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>Record from the MAR card below</PageHeaderMeterCaption>
+                            <PageHeaderMeterCaption>See the MAR card</PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                     </>
                 }
@@ -305,60 +303,54 @@ export function ClientProfilePage() {
     );
 }
 
-/* ───────────── Fleet transport — Administer (parity) ───────────── */
+/* ───────────── Fleet transport — Record (parity; was “Administer”) ───────────── */
 export function TransportPage() {
     const s = useStore();
     const menu = useDoseMenu();
     const ctx = useRowContext();
     const d = doseById('r2');
     const open = useOpen();
+    const linkCls =
+        'inline-flex h-[30px] items-center gap-1.5 rounded-lg border border-primary-foreground/25 bg-primary-foreground/10 px-2.5 text-[12px] font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20';
     return (
-        <Shell crumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Fleet & assets', href: '/fleet-assets' }, { title: 'Transports', href: '/fleet-assets/transports' }, { title: 'Tama to physio' }]}>
-            <PageHeader
-                variant="profile"
+        <Shell crumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Fleet & Assets', href: '/fleet-assets' }, { title: 'Transport Logs', href: '/fleet-assets/transports' }, { title: 'Transport #12' }]}>
+            {/* Fleet's own header on transports/show.tsx, rendered with its real component. */}
+            <FleetCompactHero
+                pill="Resident transports · in progress"
+                title="Transport #12"
                 backHref="/fleet-assets/transports"
-                icon={Truck}
-                title="Tama to physio"
-                titleChip={<PageHeaderStatusChip variant="info">In progress</PageHeaderStatusChip>}
-                subline={<>Kōwhai van · left Kōwhai House 8:15 am · driver Priya Shah<br />Transport · 1 passenger · 1 medicine carried</>}
-                meters={
+                backLabel="Transport Logs"
+                actions={
                     <>
-                        <PageHeaderMeterBlock label="Medicines carried" onClick={() => document.getElementById('p01-carried')?.focus()} ariaLabel="View medicines carried">
-                            <PageHeaderMeterBig>1</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>Packed 8:05 am</PageHeaderMeterCaption>
-                        </PageHeaderMeterBlock>
-                        <PageHeaderMeterBlock label="To record" tone={['due', 'late'].includes(s.stateOf(d)) ? 'warning' : 'success'} onClick={() => document.getElementById('p01-carried')?.focus()} ariaLabel="View doses still to record on this trip">
-                            <PageHeaderMeterBig>{['due', 'late'].includes(s.stateOf(d)) ? 1 : 0}</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>{['due', 'late'].includes(s.stateOf(d)) ? 'Tama · levetiracetam 8:00 am' : 'Nothing left to record'}</PageHeaderMeterCaption>
-                        </PageHeaderMeterBlock>
-                        <PageHeaderMeterBlock label="Tama’s chart" href={hrefFor('/emar/mar', { client: 'tama' }, s.route)} ariaLabel="Open Tama’s medication record">
-                            <PageHeaderMeterBig>Today</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>Medication record</PageHeaderMeterCaption>
-                        </PageHeaderMeterBlock>
-                        <PageHeaderMeterBlock label="Meds today" href={hrefFor('/meds/today', {}, s.route)} ariaLabel="Open Meds today">
-                            <PageHeaderMeterBig>Kōwhai</PageHeaderMeterBig>
-                            <PageHeaderMeterCaption>The same dose, the same record</PageHeaderMeterCaption>
-                        </PageHeaderMeterBlock>
+                        <Link href={hrefFor('/fleet-assets/transports/12', {}, s.route)} className={linkCls}>
+                            <Pill className="h-3.5 w-3.5" />
+                            Medication Transit
+                        </Link>
+                        <Link href={hrefFor('/fleet-assets/transports/12/pre-check', {}, s.route)} className={linkCls}>
+                            <ClipboardList className="h-3.5 w-3.5" />
+                            Pre-Transport Check
+                        </Link>
                     </>
                 }
             />
-            <TierTwoTabs
-                tabs={[
-                    { key: 'overview', label: 'Overview', icon: MapPin },
-                    { key: 'passengers', label: 'Passengers', icon: UserRound },
-                    { key: 'medicines', label: 'Medicines', icon: Pill },
-                ]}
-                activeTab="medicines"
-                onTab={(k) => k !== 'medicines' && s.toast('info', 'The transport record is Fleet’s — outside P01.')}
-                ariaLabel="Transport sections"
-                testIdPrefix="p01-transport"
-                renderLink={tabsRender((k) => k !== 'medicines' && s.toast('info', 'The transport record is Fleet’s — outside P01.'))}
-            />
             <DesignNote title="Reference frame — the transport record is Fleet’s">
-                <p>Parity: “Administer” opens the same recording steps as Meds today, with the transport locked as context and the pack check kept (today’s scan check). It records against the scheduled 8:00 am dose, so there is one record wherever it’s made — once it has an outcome here, Meds today shows it too, and vice versa. Outcomes are no longer “given” only: a refusal or withhold can be recorded on the trip, with the time and amount given.</p>
+                <p>The header is Fleet’s own (FleetCompactHero, as on the live transport page; its migration is Fleet’s). P01 changes only how a carried dose is recorded: the row’s action opens the same recording steps as Meds today, with the transport locked as context and the pack check kept (today’s scan check). It records against the scheduled 8:00 am dose, so there is one record wherever it’s made — once it has an outcome here, Meds today shows it too, and vice versa. Outcomes are no longer “given” only: a refusal or withhold can be recorded on the trip, with the time and amount given. The button says “Record”, like every other entry point (Fleet may keep “Administer” — README Q9).</p>
             </DesignNote>
             <section id="p01-carried" tabIndex={-1} className="flex flex-col gap-2.5 rounded-[14px] outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Medicines carried">
-                <ListCaption title="Medicines carried" caption="1 of 1 shown" />
+                <ListCaption
+                    title="Medicines carried"
+                    caption="1 of 1 shown · Kōwhai van · left 8:15 am · driver Priya Shah"
+                    right={
+                        <>
+                            <Button variant="outline" size="sm" onClick={() => s.go('/emar/mar', { client: 'tama' })}>
+                                <ClipboardList className="size-4" /> Tama’s medication record
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => s.go('/meds/today')}>
+                                <Pill className="size-4" /> Meds today
+                            </Button>
+                        </>
+                    }
+                />
                 <EntityTable<Dose>
                     rows={[d]}
                     rowKey={(x) => x.id}
@@ -370,15 +362,27 @@ export function TransportPage() {
                         { key: 'm', label: 'Medicine', width: '1.6fr', cell: (x) => <MedicineCell d={x} /> },
                         { key: 'p', label: 'Packed', width: '1fr', cell: () => <span className="text-[12.5px]">8:05 am by Priya Shah</span> },
                         { key: 's', label: 'State', width: '1.8fr', cell: (x) => <DoseStateCell d={x} /> },
-                        { key: 'a', label: '', width: '160px', align: 'right', cell: (x) => (['due', 'late'].includes(s.stateOf(x)) ? <Button data-return={x.id} size="sm" className="frontline-tap" onClick={(e) => (e.stopPropagation(), open(`record:${x.id}`, { from: 'transport' }))}>Administer</Button> : <DoseActionCell d={x} from="transport" />) },
+                        { key: 'a', label: '', width: '160px', align: 'right', cell: (x) => <DoseActionCell d={x} from="transport" /> },
                     ]}
                     actionsFor={(x) => menu(x, 'transport')}
                     onOpen={(x) => (['due', 'late'].includes(s.stateOf(x)) ? open(`record:${x.id}`, { from: 'transport' }) : open(`detail:${x.id}`))}
                     onRowContextMenu={(e, x) => ctx.openAt(e, `${PEOPLE[x.pid].pref} · ${x.med}`, menu(x, 'transport'))}
                 />
-                <p className="text-caption">Controlled medicines carried on a transport keep their witness step, the same as at the house (the transport witness flow itself is P07a).</p>
+                <p className="text-caption">Controlled medicines carried on a transport keep their witness step, the same as at the house.</p>
             </section>
             {ctx.node}
+        </Shell>
+    );
+}
+
+/* Fleet's pre-transport check is unchanged — the header link lands on a boundary note. */
+export function TransportPreCheckPage() {
+    return (
+        <Shell crumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Fleet & Assets', href: '/fleet-assets' }, { title: 'Transport Logs', href: '/fleet-assets/transports' }, { title: 'Transport #12', href: '/fleet-assets/transports/12' }, { title: 'Pre-transport check' }]}>
+            <Card className="gap-2 p-6">
+                <h1 className="text-section-title">The pre-transport check is Fleet’s and unchanged</h1>
+                <p className="text-subtle">Outside P01. The app keeps today’s screen.</p>
+            </Card>
         </Shell>
     );
 }
