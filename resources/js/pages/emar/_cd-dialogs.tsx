@@ -477,7 +477,7 @@ export function RecordCdEntryDialog({
                             />
                         </Field>
                         <WitnessPinInput
-                            label="Witness’s witness PIN"
+                            label="Their witness PIN"
                             value={form.data.witness_credential}
                             onChange={(v) =>
                                 form.setData('witness_credential', v)
@@ -794,7 +794,7 @@ export function BalanceCheckDialog({
                     />
                 </Field>
                 <WitnessPinInput
-                    label="Witness’s witness PIN"
+                    label="Their witness PIN"
                     value={form.data.witness_credential}
                     onChange={(v) => form.setData('witness_credential', v)}
                     error={form.errors.witness_credential}
@@ -1815,7 +1815,7 @@ export function RecordDestructionDialog({
                         </Field>
                         {isCd && (
                             <WitnessPinInput
-                                label="Witness 1’s witness PIN"
+                                label="Witness 1’s PIN"
                                 value={form.data.witness_1_credential}
                                 onChange={(v) =>
                                     form.setData('witness_1_credential', v)
@@ -1846,7 +1846,7 @@ export function RecordDestructionDialog({
                         )}
                         {isCd && (
                             <WitnessPinInput
-                                label="Witness 2’s witness PIN"
+                                label="Witness 2’s PIN"
                                 value={form.data.witness_2_credential}
                                 onChange={(v) =>
                                     form.setData('witness_2_credential', v)

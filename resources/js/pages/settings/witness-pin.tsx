@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { InfoCard } from '@/components/wizard/primitives';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { formatDateOnly, formatTime } from '@/lib/datetime';
+import { formatDateLong, formatTime } from '@/lib/datetime';
 import {
     sanitiseWitnessPin,
     WITNESS_PIN_LENGTH,
@@ -142,7 +142,7 @@ export default function WitnessPin({ witnessPin, rules }: Props) {
                             <InfoCard icon={CheckCircle2} tone="info">
                                 <strong>Your witness PIN is set.</strong>
                                 {witnessPin.setAt
-                                    ? ` Last changed ${formatDateOnly(witnessPin.setAt)}.`
+                                    ? ` Last changed ${formatDateLong(witnessPin.setAt)}.`
                                     : null}
                             </InfoCard>
                         ) : null}
@@ -163,7 +163,7 @@ export default function WitnessPin({ witnessPin, rules }: Props) {
                                     .
                                 </strong>{' '}
                                 {witnessPin.resetAt
-                                    ? `Reset on ${formatDateOnly(witnessPin.resetAt)} at ${formatTime(witnessPin.resetAt)}. `
+                                    ? `Reset on ${formatDateLong(witnessPin.resetAt)} at ${formatTime(witnessPin.resetAt)}. `
                                     : ''}
                                 Set a new one before you can co-sign or witness.
                             </InfoCard>
@@ -195,16 +195,34 @@ export default function WitnessPin({ witnessPin, rules }: Props) {
                                 autoComplete="off"
                             >
                                 {status === 'set' ? (
-                                    <PinField
-                                        id="current_pin"
-                                        label="Current PIN"
-                                        value={setForm.data.current_pin}
-                                        onChange={(v) =>
-                                            setForm.setData('current_pin', v)
-                                        }
-                                        error={setForm.errors.current_pin}
-                                        autoComplete="off"
-                                    />
+                                    <div className="space-y-1">
+                                        <PinField
+                                            id="current_pin"
+                                            label="Current PIN"
+                                            value={setForm.data.current_pin}
+                                            onChange={(v) =>
+                                                setForm.setData(
+                                                    'current_pin',
+                                                    v,
+                                                )
+                                            }
+                                            error={setForm.errors.current_pin}
+                                            autoComplete="off"
+                                        />
+                                        <p className="text-caption">
+                                            Or{' '}
+                                            <Button
+                                                type="button"
+                                                variant="link"
+                                                className="h-auto p-0 text-xs"
+                                                onClick={() =>
+                                                    setResetting(true)
+                                                }
+                                            >
+                                                confirm your login instead
+                                            </Button>
+                                        </p>
+                                    </div>
                                 ) : null}
                                 <PinField
                                     id="pin"

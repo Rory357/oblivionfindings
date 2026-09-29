@@ -668,11 +668,6 @@ export function RecordDoseWizard({
                                         />
                                     </Field>
                                     <WitnessPinInput
-                                        label={
-                                            cosignerOnly
-                                                ? 'Co-signer’s witness PIN'
-                                                : 'Witness’s witness PIN'
-                                        }
                                         value={form.data.witness_credential}
                                         onChange={(v) =>
                                             form.setData(

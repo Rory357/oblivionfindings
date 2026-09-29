@@ -925,7 +925,7 @@ export default function ShiftMedicationCard({
                                         </Select>
                                     </div>
                                     <WitnessPinInput
-                                        label="Witness’s witness PIN"
+                                        label="Their witness PIN"
                                         required={false}
                                         value={
                                             adminForm.data.witness_credential

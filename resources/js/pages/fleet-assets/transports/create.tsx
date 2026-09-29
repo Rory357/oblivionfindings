@@ -1243,7 +1243,7 @@ export function TransportWizard({
                                                                 </SelectContent>
                                                             </Select>
                                                             <WitnessPinInput
-                                                                label="Second checker’s witness PIN"
+                                                                label="Their witness PIN"
                                                                 ariaLabel={`Second checker’s witness PIN for ${med.name}`}
                                                                 value={
                                                                     witnessCredentials[

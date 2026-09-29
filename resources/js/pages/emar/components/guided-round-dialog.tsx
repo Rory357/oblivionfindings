@@ -799,7 +799,7 @@ function ConfirmPanel(props: DosePaneProps) {
                         />
                     </Field>
                     <WitnessPinInput
-                        label="Witness’s witness PIN"
+                        label="Their witness PIN"
                         value={witnessCredential}
                         onChange={setWitnessCredential}
                         atCupboard

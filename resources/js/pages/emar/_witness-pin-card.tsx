@@ -20,7 +20,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { formatDateOnly, formatTime } from '@/lib/datetime';
+import { formatDateLong, formatTime } from '@/lib/datetime';
 import {
     WITNESS_PIN_STATUS_LABEL,
     type WitnessPinStatus,
@@ -110,7 +110,7 @@ function statusDetail(row: WitnessPinStaffRow): string {
         return `Locked until ${formatTime(row.locked_until)} after wrong attempts`;
     }
     if (row.status === 'reset' && row.reset_at) {
-        return `Reset ${formatDateOnly(row.reset_at)} — must set a new one`;
+        return `Reset on ${formatDateLong(row.reset_at)} — can’t co-sign or witness yet`;
     }
     if (row.status === 'not_set') {
         return 'Can’t be chosen to co-sign or witness';
@@ -119,7 +119,7 @@ function statusDetail(row: WitnessPinStaffRow): string {
         return 'Must choose a new PIN before co-signing or witnessing';
     }
 
-    return row.set_at ? `Last changed ${formatDateOnly(row.set_at)}` : '';
+    return row.set_at ? `Last changed ${formatDateLong(row.set_at)}` : '';
 }
 
 export function WitnessPinCard({

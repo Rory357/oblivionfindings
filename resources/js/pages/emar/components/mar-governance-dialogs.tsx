@@ -459,7 +459,7 @@ function SyringeDriverDialog({
                                 />
                             </Field>
                             <WitnessPinInput
-                                label="Witness’s witness PIN"
+                                label="Their witness PIN"
                                 value={form.data.witness_credential}
                                 onChange={(v) =>
                                     form.setData('witness_credential', v)

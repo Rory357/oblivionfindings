@@ -406,9 +406,9 @@ export function CdRegisterModal({
                             }))}
                         />
                     </Field>
-                    <Field label="Witness’s witness PIN" required span>
+                    <Field label="Their witness PIN" required span>
                         <WitnessPinInput
-                            label="Witness’s witness PIN"
+                            label="Their witness PIN"
                             hideLabel
                             required={false}
                             value={witnessCredential}

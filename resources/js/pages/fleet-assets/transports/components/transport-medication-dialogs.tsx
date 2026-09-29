@@ -700,7 +700,7 @@ export function PackMedicationWizard({
                                         </div>
                                         <WitnessPinInput
                                             id="pack-witness-credential"
-                                            label="Second checker’s witness PIN"
+                                            label="Their witness PIN"
                                             required={false}
                                             value={form.data.witness_credential}
                                             onChange={(value) => {
@@ -1065,7 +1065,7 @@ export function CorrectPackingAttestationWizard({
                         </div>
                         <WitnessPinInput
                             id="correct-pack-witness-credential"
-                            label="Second checker’s witness PIN"
+                            label="Their witness PIN"
                             required={false}
                             value={form.data.witness_credential}
                             onChange={(value) => {
