@@ -4,13 +4,16 @@ import {
     outcomeTone,
 } from '@/components/fleet-assets/vehicle-workspace/checks-model';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatDistance } from '@/lib/fleet-utils';
 import { cn } from '@/lib/utils';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, Link } from '@inertiajs/react';
 import {
     Car,
@@ -48,7 +51,16 @@ type Inspection = {
     overall_condition: string | null;
     responses: Record<string, ChecklistItem> | null;
     answer_outcomes: Record<string, string>;
-    presented_template: { name: string; items: Array<{ id?: string; key?: string; label?: string; section?: string; options?: unknown }> } | null;
+    presented_template: {
+        name: string;
+        items: Array<{
+            id?: string;
+            key?: string;
+            label?: string;
+            section?: string;
+            options?: unknown;
+        }>;
+    } | null;
     completed_at: string | null;
     created_at: string | null;
 };
@@ -101,17 +113,43 @@ export default function InspectionShow({ inspection, can_report }: Props) {
         { key: string; label: string; item: ChecklistItem; options: unknown }[]
     > = {};
     const snapshot = insp.presented_template;
-    const presented: Array<{ key: string; label: string; section: string; item: ChecklistItem; options: unknown }> = snapshot?.items?.map((question, index) => {
-        // Items without an id are answered by position, as the checklist runner and vehicle checks record them.
-        const key = String(question.id ?? question.key ?? index);
-        return { key, label: question.label ?? `Question ${key}`, section: question.section ?? 'Checklist',
-            item: { ...(responses[key] ?? { result: 'unknown' }), assessment: insp.answer_outcomes[key] ?? 'needs_assessment' }, options: question.options ?? null };
-    }) ?? Object.entries(responses).map(([key, item]) => ({
-        key, label: `Question ${key} (original wording unavailable)`, section: 'Legacy responses', item, options: null,
-    }));
+    const presented: Array<{
+        key: string;
+        label: string;
+        section: string;
+        item: ChecklistItem;
+        options: unknown;
+    }> =
+        snapshot?.items?.map((question, index) => {
+            // Items without an id are answered by position, as the checklist runner and vehicle checks record them.
+            const key = String(question.id ?? question.key ?? index);
+            return {
+                key,
+                label: question.label ?? `Question ${key}`,
+                section: question.section ?? 'Checklist',
+                item: {
+                    ...(responses[key] ?? { result: 'unknown' }),
+                    assessment: insp.answer_outcomes[key] ?? 'needs_assessment',
+                },
+                options: question.options ?? null,
+            };
+        }) ??
+        Object.entries(responses).map(([key, item]) => ({
+            key,
+            label: `Question ${key} (original wording unavailable)`,
+            section: 'Legacy responses',
+            item,
+            options: null,
+        }));
     for (const key of Object.keys(responses)) {
         if (snapshot && !presented.some((question) => question.key === key)) {
-            presented.push({ key, label: `Unmapped response ${key}`, section: 'Needs assessment', item: responses[key], options: null });
+            presented.push({
+                key,
+                label: `Unmapped response ${key}`,
+                section: 'Needs assessment',
+                item: responses[key],
+                options: null,
+            });
         }
     }
     for (const { key, label, section, item, options } of presented) {
@@ -120,7 +158,16 @@ export default function InspectionShow({ inspection, can_report }: Props) {
     }
 
     // Count pass/fail/na
-    const assessment = (item: ChecklistItem) => daily ? 'recorded' : item.assessment === 'passed' ? 'pass' : item.assessment === 'failed' ? 'fail' : item.assessment === 'not_applicable' ? 'na' : 'unknown';
+    const assessment = (item: ChecklistItem) =>
+        daily
+            ? 'recorded'
+            : item.assessment === 'passed'
+              ? 'pass'
+              : item.assessment === 'failed'
+                ? 'fail'
+                : item.assessment === 'not_applicable'
+                  ? 'na'
+                  : 'unknown';
     const counts = presented.reduce(
         (acc, { item }) => {
             if (assessment(item) === 'pass') acc.pass++;
@@ -143,16 +190,43 @@ export default function InspectionShow({ inspection, can_report }: Props) {
         >
             <Head title={`Inspection #${insp.id ?? ''}`} />
             <PageShell>
-                <FleetCompactHero
-                    pill={`${daily ? 'Daily check' : 'Asset check'} · ${resultLabel.toLowerCase()}`}
+                <PageHeader
+                    wrapTitle
+                    variant="profile"
+                    icon={CheckCircle}
                     title={`Inspection #${insp.id ?? ''}`}
                     backHref="/fleet-assets/inspections"
-                    backLabel="Inspections"
+                    titleChip={
+                        <PageHeaderStatusChip
+                            variant={
+                                passed
+                                    ? 'success'
+                                    : failed
+                                      ? 'critical'
+                                      : 'warning'
+                            }
+                        >
+                            {resultLabel}
+                        </PageHeaderStatusChip>
+                    }
+                    subline={`${daily ? 'Daily check' : 'Asset check'} · ${insp.asset?.name ?? 'Asset unavailable'}`}
                 />
-                {can_report && insp.asset && <Card className="flex-row items-center justify-between gap-4 p-4">
-                    <p className="text-sm text-muted-foreground">Found a problem? Send a linked report for assessment. These original answers and evidence are retained.</p>
-                    <Button asChild><Link href={`/fleet-assets/maintenance/work-orders/create?asset_id=${insp.asset.id}&checklist_run_id=${insp.id}`}>Report a problem</Link></Button>
-                </Card>}
+                {can_report && insp.asset && (
+                    <Card className="flex-row items-center justify-between gap-4 p-4">
+                        <p className="text-sm text-muted-foreground">
+                            Found a problem? Send a linked report for
+                            assessment. These original answers and evidence are
+                            retained.
+                        </p>
+                        <Button asChild>
+                            <Link
+                                href={`/fleet-assets/maintenance/work-orders/create?asset_id=${insp.asset.id}&checklist_run_id=${insp.id}`}
+                            >
+                                Report a problem
+                            </Link>
+                        </Button>
+                    </Card>
+                )}
 
                 {/* Result Banner */}
                 <div
@@ -160,7 +234,9 @@ export default function InspectionShow({ inspection, can_report }: Props) {
                         'rounded-lg border px-5 py-4',
                         passed
                             ? 'border-primary bg-primary/10 text-primary dark:border-primary/30 dark:bg-primary/30 dark:text-primary/70'
-                            : failed ? 'border-status-critical/30 bg-status-critical-bg text-status-critical' : 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+                            : failed
+                              ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
+                              : 'border-status-warning/30 bg-status-warning-bg text-status-warning',
                     )}
                 >
                     <div className="flex items-center justify-between">
@@ -273,36 +349,40 @@ export default function InspectionShow({ inspection, can_report }: Props) {
                                     Maintenance can assess an issue.
                                 </p>
                             ) : (
-                            <div className="grid grid-cols-4 gap-3">
-                                <div className="rounded-lg bg-status-success-bg p-3 text-center">
-                                    <div className="text-2xl font-bold text-status-success">
-                                        {counts.pass}
+                                <div className="grid grid-cols-4 gap-3">
+                                    <div className="rounded-lg bg-status-success-bg p-3 text-center">
+                                        <div className="text-2xl font-bold text-status-success">
+                                            {counts.pass}
+                                        </div>
+                                        <div className="mt-1 text-xs text-muted-foreground">
+                                            Passed
+                                        </div>
                                     </div>
-                                    <div className="mt-1 text-xs text-muted-foreground">
-                                        Passed
+                                    <div className="rounded-lg bg-status-critical-bg p-3 text-center">
+                                        <div className="text-2xl font-bold text-status-critical">
+                                            {counts.fail}
+                                        </div>
+                                        <div className="mt-1 text-xs text-muted-foreground">
+                                            Failed
+                                        </div>
+                                    </div>
+                                    <div className="rounded-lg bg-muted p-3 text-center dark:bg-muted/20">
+                                        <div className="text-2xl font-bold text-muted-foreground">
+                                            {counts.na}
+                                        </div>
+                                        <div className="mt-1 text-xs text-muted-foreground">
+                                            N/A
+                                        </div>
+                                    </div>
+                                    <div className="rounded-lg bg-status-warning-bg p-3 text-center">
+                                        <div className="text-2xl font-bold text-status-warning">
+                                            {counts.unknown}
+                                        </div>
+                                        <div className="mt-1 text-xs text-muted-foreground">
+                                            Unknown
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="rounded-lg bg-status-critical-bg p-3 text-center">
-                                    <div className="text-2xl font-bold text-status-critical">
-                                        {counts.fail}
-                                    </div>
-                                    <div className="mt-1 text-xs text-muted-foreground">
-                                        Failed
-                                    </div>
-                                </div>
-                                <div className="rounded-lg bg-muted p-3 text-center dark:bg-muted/20">
-                                    <div className="text-2xl font-bold text-muted-foreground">
-                                        {counts.na}
-                                    </div>
-                                    <div className="mt-1 text-xs text-muted-foreground">
-                                        N/A
-                                    </div>
-                                </div>
-                                <div className="rounded-lg bg-status-warning-bg p-3 text-center">
-                                    <div className="text-2xl font-bold text-status-warning">{counts.unknown}</div>
-                                    <div className="mt-1 text-xs text-muted-foreground">Unknown</div>
-                                </div>
-                            </div>
                             )}
                             <div className="mt-4 rounded-md bg-muted/40 p-3">
                                 <div className="text-xs text-muted-foreground">
@@ -347,16 +427,58 @@ export default function InspectionShow({ inspection, can_report }: Props) {
                                         <ResultIcon result={assessment(item)} />
                                         <span className="flex-1 text-sm font-medium">
                                             {label}
-                                            <small className="mt-1 block font-normal text-muted-foreground">Recorded answer: {item.result === 'unknown' ? 'Not supplied' : item.result}</small>
-                                            {Array.isArray(options) && options.length > 0 && <small className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                                                Presented options: {options.map((option: unknown) => typeof option === 'string' ? option
-                                                    : option && typeof option === 'object' && 'label' in option ? String(option.label) : '').filter(Boolean).join(', ')}
-                                            </small>}
+                                            <small className="mt-1 block font-normal text-muted-foreground">
+                                                Recorded answer:{' '}
+                                                {item.result === 'unknown'
+                                                    ? 'Not supplied'
+                                                    : item.result}
+                                            </small>
+                                            {Array.isArray(options) &&
+                                                options.length > 0 && (
+                                                    <small className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                                        Presented options:{' '}
+                                                        {options
+                                                            .map(
+                                                                (
+                                                                    option: unknown,
+                                                                ) =>
+                                                                    typeof option ===
+                                                                    'string'
+                                                                        ? option
+                                                                        : option &&
+                                                                            typeof option ===
+                                                                                'object' &&
+                                                                            'label' in
+                                                                                option
+                                                                          ? String(
+                                                                                option.label,
+                                                                            )
+                                                                          : '',
+                                                            )
+                                                            .filter(Boolean)
+                                                            .join(', ')}
+                                                    </small>
+                                                )}
                                         </span>
-                                        <StatusBadge variant={ANSWER_BADGES[assessment(item)].tone}>
-                                            {ANSWER_BADGES[assessment(item)].label}
+                                        <StatusBadge
+                                            variant={
+                                                ANSWER_BADGES[assessment(item)]
+                                                    .tone
+                                            }
+                                        >
+                                            {
+                                                ANSWER_BADGES[assessment(item)]
+                                                    .label
+                                            }
                                         </StatusBadge>
-                                        {item.evidence && <a className="text-xs font-medium text-primary underline" href={item.evidence.url}>{item.evidence.name}</a>}
+                                        {item.evidence && (
+                                            <a
+                                                className="text-xs font-medium text-primary underline"
+                                                href={item.evidence.url}
+                                            >
+                                                {item.evidence.name}
+                                            </a>
+                                        )}
                                         {item.notes && (
                                             <span className="max-w-[200px] truncate text-xs text-muted-foreground italic">
                                                 {item.notes}

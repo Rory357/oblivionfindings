@@ -1,4 +1,11 @@
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,14 +28,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/fleet-utils';
 import { cn } from '@/lib/utils';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -1059,62 +1059,64 @@ export default function HandoverIndex({
             <Head title="Shift Handovers" />
             <PageShell>
                 {/* ── Hero ── */}
-                <HeroShell>
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={ArrowLeftRight} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Vehicle changeovers · accountability
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Shift Handovers
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Record and accept vehicle condition at every
-                                shift change.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
+                <PageHeader
+                    wrapTitle
+                    title="Shift Handovers"
+                    icon={ArrowLeftRight}
+                    subline={
+                        <>
+                            Record and accept vehicle condition at shift change
+                            · {fmt(completed7d)} completed in 7 days ·{' '}
+                            {fmt(totalCount)} total
+                        </>
+                    }
+                    actions={
+                        can.manage ? (
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
+                                onClick={() =>
+                                    router.visit(
+                                        '/fleet-assets/handovers?new=1',
+                                    )
+                                }
+                            >
+                                New handover
+                            </PageHeaderPrimaryButton>
+                        ) : undefined
+                    }
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
                                 label="Pending acceptance"
-                                value={fmt(pendingCount)}
-                                caption="awaiting sign-off"
+                                href={
+                                    '/fleet-assets/handovers?status=pending_acceptance'
+                                }
                                 tone={pendingCount > 0 ? 'warning' : 'success'}
-                            />
-                            <HeroClusterTile
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(pendingCount)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    awaiting sign-off
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
                                 label="Disputed"
-                                value={fmt(disputedCount)}
-                                caption="needs review"
+                                href={'/fleet-assets/handovers?status=disputed'}
                                 tone={
                                     disputedCount > 0 ? 'critical' : 'success'
                                 }
-                            />
-                            <HeroClusterTile
-                                label="Completed 7d"
-                                value={fmt(completed7d)}
-                                caption="accepted this week"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                label="Total"
-                                value={fmt(totalCount)}
-                                caption="all records"
-                                tone="neutral"
-                            />
-                        </div>
-                    </div>
-                    {can.manage && (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <FleetHeroAction
-                                href="/fleet-assets/handovers?new=1"
-                                icon={Plus}
-                                emphasis
                             >
-                                New handover
-                            </FleetHeroAction>
-                        </div>
-                    )}
-                </HeroShell>
+                                <PageHeaderMeterBig>
+                                    {fmt(disputedCount)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    needs review
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
+                />
 
                 {/* Filters */}
                 <div className="flex flex-wrap items-end gap-3">

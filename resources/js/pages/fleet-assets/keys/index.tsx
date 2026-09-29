@@ -1,4 +1,5 @@
 import PageShell from '@/components/page-shell';
+import { PageHeader } from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,13 +13,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/fleet-utils';
-import {
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -216,51 +211,20 @@ export default function KeyManagement({
         >
             <Head title="Key Management" />
             <PageShell>
-                <HeroShell>
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={KeyRound} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>Key ledger · live</HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Key Management
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Track vehicle key check-outs, returns, and
-                                transfers.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
-                                label="Keys tracked"
-                                value={fmt(heroStats.tracked)}
-                                caption="vehicles in the ledger"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                label="Checked out"
-                                value={fmt(heroStats.checked_out)}
-                                caption="with drivers now"
-                                tone={
-                                    heroStats.checked_out > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                label="In key safe"
-                                value={fmt(heroStats.in_safe)}
-                                caption="returned and secured"
-                                tone="success"
-                            />
-                            <HeroClusterTile
-                                label="Activity today"
-                                value={fmt(heroStats.activity_today)}
-                                caption="ledger entries logged"
-                                tone="neutral"
-                            />
-                        </div>
-                    </div>
-                </HeroShell>
+                <PageHeader
+                    wrapTitle
+                    title="Key Management"
+                    icon={KeyRound}
+                    subline={
+                        <>
+                            Track vehicle key check-outs, returns, and transfers
+                            · {fmt(heroStats.tracked)} tracked ·{' '}
+                            {fmt(heroStats.checked_out)} checked out ·{' '}
+                            {fmt(heroStats.in_safe)} in safe ·{' '}
+                            {fmt(heroStats.activity_today)} entries today
+                        </>
+                    }
+                />
 
                 {/* Action Buttons */}
                 {can.manage ? (

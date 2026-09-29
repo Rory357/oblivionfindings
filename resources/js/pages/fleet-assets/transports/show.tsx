@@ -1,5 +1,9 @@
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +12,6 @@ import AppLayout from '@/layouts/app-layout';
 import { toDatetimeLocal } from '@/lib/datetime';
 import { formatDateTime, formatDuration } from '@/lib/fleet-utils';
 import { cn } from '@/lib/utils';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -336,11 +339,30 @@ export default function TransportShow({
         >
             <Head title={`Transport #${t.id ?? ''}`} />
             <PageShell>
-                <FleetCompactHero
-                    pill={`Resident transports · ${(t.status ?? 'record').replace(/_/g, ' ')}`}
+                <PageHeader
+                    wrapTitle
+                    variant="profile"
+                    icon={Car}
                     title={`Transport #${t.id ?? ''}`}
                     backHref="/fleet-assets/transports"
-                    backLabel="Transport Logs"
+                    titleChip={
+                        <PageHeaderStatusChip
+                            variant={
+                                t.status === 'completed'
+                                    ? 'success'
+                                    : t.status === 'cancelled'
+                                      ? 'critical'
+                                      : t.status === 'in_progress'
+                                        ? 'info'
+                                        : 'neutral'
+                            }
+                        >
+                            {(t.status ?? 'record').replace(/_/g, ' ')}
+                        </PageHeaderStatusChip>
+                    }
+                    subline={[t.resident_name, t.transport_type]
+                        .filter(Boolean)
+                        .join(' · ')}
                     actions={
                         t.status === 'in_progress' ? (
                             <>

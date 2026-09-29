@@ -2,6 +2,14 @@ import { FLEET_COLORS, HalfMoonGauge } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import ResidentMap from '@/components/resident-tracking/resident-map';
 import ResidentSidebar from '@/components/resident-tracking/resident-sidebar';
 import type { Geofence, Resident } from '@/components/resident-tracking/types';
@@ -34,14 +42,7 @@ import {
     statusColor,
 } from '@/lib/fleet-utils';
 import { cn } from '@/lib/utils';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -1185,78 +1186,80 @@ export default function ResidentTrackingIndex({
             <Head title="Resident Tracking" />
             <PageShell>
                 {/* ── Hero ── */}
-                <HeroShell>
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={Shield} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Safety command centre · live
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Resident Tracking
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Monitor tracked residents, wandering alerts and
-                                panic events in real time.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
-                                label="Residents tracked"
-                                value={fmt(safeStats.tracked ?? 0)}
-                                caption={`${fmt(safeStats.online ?? 0)} online`}
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
+                <PageHeader
+                    wrapTitle
+                    title="Resident Tracking"
+                    icon={Shield}
+                    subline={
+                        <>
+                            Monitor tracked residents, wandering alerts and
+                            panic events · {fmt(safeStats.tracked ?? 0)} tracked
+                            · {fmt(safeStats.online ?? 0)} online ·{' '}
+                            {fmt(safeStats.panic_7d ?? 0)} panic events in 7
+                            days
+                        </>
+                    }
+                    actions={
+                        <>
+                            {can.manage && (
+                                <PageHeaderPrimaryButton
+                                    icon={UserPlus}
+                                    onClick={() =>
+                                        router.visit(
+                                            '/fleet-assets/resident-tracking?new=1',
+                                        )
+                                    }
+                                >
+                                    Assign tracker
+                                </PageHeaderPrimaryButton>
+                            )}
+                            <PageHeaderGlassButton
+                                icon={Radio}
+                                onClick={() =>
+                                    router.visit('/fleet-assets/devices')
+                                }
+                            >
+                                Tracking devices
+                            </PageHeaderGlassButton>
+                        </>
+                    }
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
                                 label="Active alerts"
-                                value={fmt(activeAlertCount)}
-                                caption="open right now"
+                                onClick={() => switchTab('wandering')}
                                 tone={
                                     activeAlertCount > 0
                                         ? 'critical'
                                         : 'success'
                                 }
-                            />
-                            <HeroClusterTile
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(activeAlertCount)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    open right now
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
                                 label="Wandering 7d"
-                                value={fmt(safeStats.wandering_7d ?? 0)}
-                                caption="zone breaches"
+                                onClick={() => switchTab('wandering')}
                                 tone={
                                     (safeStats.wandering_7d ?? 0) > 0
                                         ? 'warning'
                                         : 'success'
                                 }
-                            />
-                            <HeroClusterTile
-                                label="Panic 7d"
-                                value={fmt(safeStats.panic_7d ?? 0)}
-                                caption="SOS events"
-                                tone={
-                                    (safeStats.panic_7d ?? 0) > 0
-                                        ? 'critical'
-                                        : 'success'
-                                }
-                            />
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        {can.manage && (
-                            <FleetHeroAction
-                                href="/fleet-assets/resident-tracking?new=1"
-                                icon={UserPlus}
-                                emphasis
                             >
-                                Assign tracker
-                            </FleetHeroAction>
-                        )}
-                        <FleetHeroAction
-                            href="/fleet-assets/devices"
-                            icon={Radio}
-                        >
-                            Tracking devices
-                        </FleetHeroAction>
-                    </div>
-                </HeroShell>
+                                <PageHeaderMeterBig>
+                                    {fmt(safeStats.wandering_7d ?? 0)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    zone breaches
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
+                />
 
                 {/* ── Tab strip ── */}
                 <div className="inline-flex w-fit items-center gap-1 rounded-lg border bg-muted/40 p-1">
