@@ -1,13 +1,13 @@
 // eMAR P01 v2 — read-only local preview server for the built mockup (dist/).
 // GET/HEAD only; no application API; synthetic data. Run from any directory:
-//   node docs/emar-design/P01/v2/serve.mjs   →   http://127.0.0.1:4382/
+//   node docs/emar-design/P01/v2/serve.mjs   →   http://127.0.0.1:4384/
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const dist = path.join(path.dirname(fileURLToPath(import.meta.url)), 'dist');
-const PORT = Number(process.env.PORT) || 4382;
+const PORT = Number(process.env.PORT) || 4384;
 const TYPES = {
     '.html': 'text/html; charset=utf-8',
     '.js': 'text/javascript; charset=utf-8',

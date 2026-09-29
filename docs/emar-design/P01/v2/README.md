@@ -14,7 +14,7 @@
 node docs/emar-design/P01/v2/serve.mjs
 ```
 
-Then open http://127.0.0.1:4382/ (4381 is v1, 4371 is P11). The Code tab’s Browser pane can open it too (`emar-p01-v2` in `.claude/launch.json`). The hatched bar is the **mockup viewer, not product UI**: *Signed in as*, *Scenario* (now 20: “My Day doesn’t show someone” is new) and *Allergy rule*. The synthetic clock is fixed at **Monday 28 September 2026, 9:12 am NZDT**. The contract page is `#/p01/contract`.
+Then open http://127.0.0.1:4384/ (4381 is v1, 4371 is P11, 4382 is P02, 4383 is P07a). The Code tab’s Browser pane can open it too (`emar-p01-v2` in `.claude/launch.json`). The hatched bar is the **mockup viewer, not product UI**: *Signed in as*, *Scenario* (now 20: “My Day doesn’t show someone” is new) and *Allergy rule*. The synthetic clock is fixed at **Monday 28 September 2026, 9:12 am NZDT**. The contract page is `#/p01/contract`.
 
 To rebuild: `npm ci` in this worktree, then `node node_modules/vite/bin/vite.js build --config docs/emar-design/P01/v2/vite.config.mjs`. Evidence: `node docs/emar-design/P01/v2/tools/verify.mjs` (writes `screenshots/` and `screenshots/report.json`).
 
@@ -92,7 +92,7 @@ Stephan: “just keep in mind the button sizes”.
   - all 91 states at 1440 × 900;
   - the 53 core states also at 1280 × 800 and at 200 % zoom (720 × 450 CSS px at device scale 2).
 
-  All 197 have horizontal overflow 0 and no console errors, and every scripted flow completed (`screenshots/report.json`).
+  All 197 have horizontal overflow 0 and no console errors, and every scripted flow completed (`screenshots/report.json`). The run served the preview on port 4382, so `report.json` records that address. After the review, the port moved to 4384 because 4382 belongs to P02. Only `serve.mjs`, `tools/verify.mjs` and these docs changed; the build and screenshots are the same.
   - New states: 28b–28e (Q2), 38b–38c (the changed order) and 91b (the My Day pointer).
   - The header subline is one line on every P01 page at 1440 and 1280. The two-line sublines are only on the MAR and client-profile reference frames, which are those pages’ existing headers, the same as in v1.
   - No meter caption truncates at 1440 or 1280. At 200 % only the real My Day header’s own captions truncate, as in v1.

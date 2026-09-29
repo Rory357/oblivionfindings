@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(here, '..', 'screenshots');
 mkdirSync(outDir, { recursive: true });
-const BASE = process.env.P01_URL ?? 'http://127.0.0.1:4382/';
+const BASE = process.env.P01_URL ?? 'http://127.0.0.1:4384/';
 const CHROME = process.env.CHROME ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const PORT = 9348;
 const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7);

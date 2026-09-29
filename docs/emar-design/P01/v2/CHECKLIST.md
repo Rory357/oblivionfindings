@@ -21,7 +21,7 @@ Legend: **Pass** · **Pass (note)** = passes with a stated limitation · **N/A**
 
 | Item | Result | Evidence |
 |---|---|---|
-| Vite + React preview in `docs/emar-design/P01/v2/`, scaffold copied from Fleet PKG-02B v13 (`vite.config.mjs` with `@` → `resources/js` and `@tailwindcss/vite`, `index.html`, `main.tsx`, `serve.mjs`) | Pass | `vite.config.mjs`, `index.html`, `src/main.tsx`, `serve.mjs` (port 4382) |
+| Vite + React preview in `docs/emar-design/P01/v2/`, scaffold copied from Fleet PKG-02B v13 (`vite.config.mjs` with `@` → `resources/js` and `@tailwindcss/vite`, `index.html`, `main.tsx`, `serve.mjs`) | Pass | `vite.config.mjs`, `index.html`, `src/main.tsx`, `serve.mjs` (port 4384) |
 | Real primitives, never hand-rolled: PageHeader, Switch, Dialog, WizardShell, StatusBadge, EntityTable, FileDropzone, DateTimeField | Pass (note) | As v1. Switch and FileDropzone: N/A (no settings or uploads in P01). |
 | Synthetic only; no application API; fixed clock in Pacific/Auckland | Pass | `src/data.ts`, `src/clock.ts` (Monday 28 Sep 2026, 9:12 am NZDT); the shim never sends; `serve.mjs` is GET/HEAD only |
 | No edits to shared components *(v2)* | Pass (note) | `git diff --stat origin/main` touches only `docs/emar-design/P01/**` (plus the git-ignored `.claude/launch.json` entry). `src/styles.css` *previews* two build changes in the preview only, each labelled in the file: the `.frontline-tap` 44 px fix (Q-v2-1) and Q8's `clearable={false}` on required times (approved). |

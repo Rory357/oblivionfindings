@@ -1,11 +1,11 @@
 eMAR P01 v2 — Record a dose (all entry points)
-Branch claude/goofy-noyce-ae9936 · built on the approved v1 (3ac640485; approval record f5104956a) · 30 September 2026 (NZDT) · Stephan's approved carry-overs Q2, Q7, Q8 (DateTimeField), Q11 + gaps found + one 44 px button size
+Branch claude/goofy-noyce-ae9936 · built on the approved v1 (3ac640485; approval record f5104956a) · 30 September 2026 (NZDT) · Stephan's approved carry-overs Q2, Q7, Q8 (DateTimeField), Q11 + gaps found + one 44 px button size · preview port 4384 (review session, 30 Sep)
 SHA-256 of every file that makes up this version (approval applies to these hashes only).
 Screenshots are evidence, not part of the approved version: 197 PNG files; report.json sha256 4b70e35d5f58894b3e8b02891ade1765995a542e7cf60b2851ac21117f55fb27.
 
 61c029353a5536fde2426303726b3e32452aa828cd2f7c51dcb924b9890393ec *.gitignore
-ef942b008062d6190a322780b8108458bcc56d45a6d300a3d1b4c5edc61b8926 *CHECKLIST.md
-87c558d36bc8075b23c096d25ac929287d110759ecf30c25ff87691e2aa28cea *README.md
+864ed9ef6e7d27a4dbd821966932f8230d3aa96039e2e9104138802dd1c1e620 *CHECKLIST.md
+157d9221cc9f8d32e7b4ab04c072407ec85e316dca41e98ff27274778b7fca99 *README.md
 f7cb181a4ad26d71a804bad0f99d86aef804b4de17ed2903c724dff27d6929a1 *dist/assets/index-BFYzUTbm.css
 0a5572d974d989dfcf679d0c68f4bbe0281626829674746c3d084b2ceed07a7e *dist/assets/index-DZc9l_-O.js
 b87c98af0a4fddae0ebce650bf2289c7870a2cba94bf73b94f0569f8b2556cbf *dist/assets/pdf-YYBQA8p7.js
@@ -26,7 +26,7 @@ ab5c4ffcfea9cdac2cec5eadda3768ade11843b101b1c0d6cf826f66e36adf13 *dist/photos/vi
 8d919aaf42bcab8d556d9697702c4b7f591f0f7e0c5d39d3f35babef09710b0d *public/photos/paracetamol.png
 f71650fe52b4d988239d575c00b33b8cccdd2e59fd3d0eca6b671a2d0edbea38 *public/photos/sertraline.png
 ab5c4ffcfea9cdac2cec5eadda3768ade11843b101b1c0d6cf826f66e36adf13 *public/photos/vitamin-d.png
-d0ce283795d932258e75fde9b3a73ede351f7e427cc45e2101cf25b97917857b *serve.mjs
+467a1dff7f583e0f7ce460c8f3b339dc4ea63b6e2192d3996fca4db8ffa705ec *serve.mjs
 b915df6fa04b3c8867fa4b5467ea18e354e420f60fc7c6ae94c66df932db2fe1 *src/clock.ts
 cacde1227f6b3647f23447f01ca6fc50b6e1fe9ae0076c1c5ba0edf44be4ba17 *src/contract.ts
 c6fd1d2c5a2e2542cd554d7722ced6bff46663b9872389c93c5517bfd8a9d5e7 *src/data.ts
@@ -47,6 +47,6 @@ e9ad343ab8993b4e60bf9bb45b4c2291a1dee1dcced901df94b75121dcb6cf40 *src/store.tsx
 b86a183883e098116e55926f0eb55f4a127782da62c2743ed9fa90146848251a *src/tasks-model.tsx
 89c295fa0e86d97809e22083d3f4fe517db4232e4c917e576e5a0065dab46bad *src/ui.tsx
 600bad470bc97dc530480eae5fc89a07ece6bfc49dfd09bd694e28dadca4861c *tools/make-photos.mjs
-8c89ec99f82546fb13ca9992cac92232032ff4bcde00ea17f39091b895b4f48f *tools/verify.mjs
+aada2ddb1b223ffff68323c2c9bc498f97acfbc535def48e16df7d6935a58d45 *tools/verify.mjs
 61a2fe6693c5031f03552eb4509360d39d9e1845f005fb1273e890949e523e6e *tsconfig.json
 bdfe9cba3e8d70677ac682938d226de3fd35d7fc7d47ab358e4d470f3dc71601 *vite.config.mjs
