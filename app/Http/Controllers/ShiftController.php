@@ -434,6 +434,12 @@ class ShiftController extends Controller
                     ->all(),
                 'recent_history' => array_slice($shiftMedicationSummary['administrations'] ?? [], 0, 10),
                 'by_status' => $shiftMedicationSummary['by_status'] ?? [],
+                // The same effective window the administration endpoint
+                // enforces, so the card asks for a reason at the same times.
+                'dose_window' => [
+                    'early_minutes' => (int) $mar['settings']['window_before_minutes'],
+                    'late_minutes' => (int) $mar['settings']['window_after_minutes'],
+                ],
             ];
         }
 
