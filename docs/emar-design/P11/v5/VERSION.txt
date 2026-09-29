@@ -1,0 +1,31 @@
+P11 v5 — Medication settings and staff eligibility (synthetic design preview)
+Built 2026-09-29T19:42Z on branch claude/serene-aryabhata-d0e908. SHA-256 of every file in this version (screenshots listed separately below).
+
+40a46bc75b7ecabee1e3ec58944b40c456fbd86ebea4bbaa27b6b8f42cf9fe47 *./.gitignore
+df31a683d34714f07506e8200b07e52fb4a5f219d0278a1ecf2efc32e0d04376 *./AUDIT.md
+1764f98da7701caffcaae1272e360eea57b019239b79609ee5558e25f73157dc *./CHECKLIST.md
+361cb50479dfd0748a5fc10b7d2eddac0ad2b534cc74baee3e19f06b02c148d6 *./README.md
+8d32e12eefb786e542e80d8b5bdac31b6abe0277f6523d2aafac23afd3ac9a96 *./dist/assets/index-B_t9WLoW.css
+2f5f050837792d7b480822657626cbd57deb950bf50617df5be2498c021c2eb2 *./dist/assets/index-BfS_Cqen.js
+0d705c1aef297631b5fcf83987d431cfb45091487f6faa28575c37b206b5a43c *./dist/index.html
+b1f75a8090b1074f1a342cb3f08a670a4beee477279ac5bafbfbea9934258fef *./index.html
+dc8f8bb99532ddd3cafcb4bfdebfd6b86a5e38bfb25b5177a9a5bc8c74e68274 *./reuse-check.mjs
+22e7c28fd9037b591b6998ee7b5c964aa11bdff227b82a64115040ea378e76bb *./serve.mjs
+3f3cad83c737b0b07680f9f97d6e25aa3181f49f3e47a1372763bd00694239e9 *./src/data.ts
+3fd61a6e1b61e2973ff07909184c1634c7df74a0155bd9c4acba85a3fc0bee2c *./src/dialogs-elig.tsx
+de373d572947727fd5ddbcac1a6bb14b3bfba563969d670926d273a1a11a056e *./src/dialogs-settings.tsx
+bf8e84715633ad64bb392727583c4189003c232e215ee5c85f2337f2cd1173ce *./src/dialogs-v4.tsx
+f1b60264fc8f006cbc8b601a05169063b67beb7a9d284bbe8d2422204f99d3b4 *./src/dialogs-v5.tsx
+73b4eb03cbc55cad88fafefd14f9173a925204404de277d82152582b1a3ca3b6 *./src/eligibility.tsx
+d2e45ad109b39be923eb517650ef0d74020cd2d9f6fefc27c883055caca62f64 *./src/main.tsx
+c98839674a7d025d89e4c8351639619c7bfb688dc7a8016c61fb9aa9e86daa5e *./src/model.tsx
+51f2f68b6b55dfa1f1bc2f78eeeeeccb614c32157e79f6eb253f7b813d4571d4 *./src/nav.tsx
+85c727585109a110b9a1d8e2dddc5762c4244d7dcb7979c5f59d010787f2e636 *./src/settings.tsx
+8d35b31752c7c7957cc994db01234b9f8ff060b2ac9916802c97b56424643db4 *./src/styles.css
+34ed0e337b46ecaa5068869db83e3d76954f3da186ea6d2e27837462803df231 *./src/today.tsx
+341372922e990cd9742d0558c286b3223fd0e67687a7672728a33ef18e6254fb *./src/ui.tsx
+6d9708820d8929074a842946a203b06da5303fe7bd6244761402a46355750fd2 *./tsconfig.json
+6907ef9056364e92648d14dcf70e245b8a7655adc753276c79fd68cd98adc465 *./vite.config.mjs
+
+screenshots/ (222 files) — combined SHA-256 of the sorted per-file hashes:
+8b1017c21b33b075cdcdb1c036f5c9cd7f2382e1bec563ff5fad9d7029a02c55
