@@ -187,7 +187,7 @@ export function ChartTab({ pid, view }: { pid: PersonId; view: string }) {
                     description="Nothing is scheduled or available as needed. New orders are added and checked in Orders & reviews."
                     action={
                         s.can('orders.manage') ? (
-                            <Button variant="outline" onClick={() => s.go('/emar/prescriptions', { client_id: String(FACTS[pid].clientId) })}>
+                            <Button variant="link" onClick={() => s.go('/emar/prescriptions', { client_id: String(FACTS[pid].clientId) })}>
                                 Add a medicine in Orders & reviews <ArrowUpRight className="size-4" aria-hidden="true" />
                             </Button>
                         ) : undefined

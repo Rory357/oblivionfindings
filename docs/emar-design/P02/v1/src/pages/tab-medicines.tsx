@@ -82,7 +82,7 @@ export function MedicinesTab({ pid, view }: { pid: PersonId; view: string }) {
                         <ConcealedCaption n={hidden} />
                     </>
                 }
-                right={s.can('orders.manage') ? <Button size="sm" variant="outline" onClick={() => s.go('/emar/prescriptions', { client_id: String(FACTS[pid].clientId) })}>Add or change an order <ArrowUpRight className="size-4" aria-hidden="true" /></Button> : null}
+                right={s.can('orders.manage') ? <Button size="sm" variant="link" onClick={() => s.go('/emar/prescriptions', { client_id: String(FACTS[pid].clientId) })}>Add or change an order <ArrowUpRight className="size-4" aria-hidden="true" /></Button> : null}
             />
             {rows.length ? (
                 <EntityTable<Medicine>
@@ -217,7 +217,7 @@ export function SupportTab({ pid, view }: { pid: PersonId; view: string }) {
     const toP03 = () => s.toast('info', 'Support & self-administration (assessment, agreement, reassessment) is designed in P03 — outside this preview.');
     if (view === 'assessment')
         return a ? (
-            <SectionCard eyebrow="Self-administration assessment" title={a.outcome} icon={ClipboardList} right={<Button variant="outline" onClick={toP03}>Open in Support &amp; self-administration <ArrowUpRight className="size-4" aria-hidden="true" /></Button>}>
+            <SectionCard eyebrow="Self-administration assessment" title={a.outcome} icon={ClipboardList} right={<Button variant="link" onClick={toP03}>Open in Support &amp; self-administration <ArrowUpRight className="size-4" aria-hidden="true" /></Button>}>
                 <FactStrip
                     items={[
                         { label: 'Assessed', value: `${a.assessed} · ${a.by}` },
@@ -233,7 +233,7 @@ export function SupportTab({ pid, view }: { pid: PersonId; view: string }) {
             </SectionCard>
         ) : (
             <Card className="p-2">
-                <EmptyState icon={ClipboardList} title={`No self-administration assessment for ${PEOPLE[pid].pref}`} description="Until one is done, staff give every medicine (Administer). Leads start an assessment in Support & self-administration." action={s.can('orders.manage') ? <Button variant="outline" onClick={toP03}>Start an assessment <ArrowUpRight className="size-4" aria-hidden="true" /></Button> : undefined} />
+                <EmptyState icon={ClipboardList} title={`No self-administration assessment for ${PEOPLE[pid].pref}`} description="Until one is done, staff give every medicine (Administer). Leads start an assessment in Support & self-administration." action={s.can('orders.manage') ? <Button variant="link" onClick={toP03}>Start an assessment <ArrowUpRight className="size-4" aria-hidden="true" /></Button> : undefined} />
             </Card>
         );
     const meds = medsOf(pid).filter((m) => m.status !== 'stopped' && (!sup || m.support === sup));

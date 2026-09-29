@@ -434,7 +434,7 @@ function Medicines({ meds, search, empty }: { meds: Medicine[]; search: string; 
                 }
                 right={
                     s.can('orders.manage') ? (
-                        <Button size="sm" variant="outline" onClick={() => s.go('/emar/prescriptions')}>
+                        <Button size="sm" variant="link" onClick={() => s.go('/emar/prescriptions')}>
                             Add or change an order <ArrowUpRight className="size-4" aria-hidden="true" />
                         </Button>
                     ) : null
@@ -526,7 +526,7 @@ function SelfAdminBoundary() {
             <h2 className="text-section-title">Support &amp; self-administration is designed in P03</h2>
             <p className="text-subtle max-w-[70ch]">The register of self-administration assessments, agreements and reassessments keeps its URL (/emar/self-admin) and its own design package. Each person’s support is already shown on their record’s Support plan tab.</p>
             <div>
-                <Button variant="outline" onClick={() => s.go('/emar/mar', { client_id: '201', tab: 'support', house: undefined })}>
+                <Button variant="link" onClick={() => s.go('/emar/mar', { client_id: '201', tab: 'support', house: undefined })}>
                     See a Support plan tab <ArrowUpRight className="size-4" aria-hidden="true" />
                 </Button>
             </div>

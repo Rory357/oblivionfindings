@@ -54,7 +54,7 @@ function Allergies({ pid }: { pid: PersonId }) {
     const toProfile = (dlg?: string) => s.go(`/operations/clients/${cid}`, { tab: 'medical', dlg });
     const canReview = s.can('clients.update') && s.can('orders.manage');
     const action = canReview ? (
-        <Button size="sm" variant="outline" onClick={() => toProfile('allergy-review')}>
+        <Button size="sm" variant="link" onClick={() => toProfile('allergy-review')}>
             <CheckCircle2 className="size-4" /> Review on the health profile <ArrowUpRight className="size-4" aria-hidden="true" />
         </Button>
     ) : (
@@ -240,7 +240,7 @@ function Interactions({ pid }: { pid: PersonId }) {
                             <ConcealedCaption n={hidden} />
                         </>
                     }
-                    right={s.can('orders.manage') ? <Button size="sm" variant="outline" onClick={() => s.go('/emar/prescriptions', { client_id: String(FACTS[pid].clientId) })}>Recorded with the order in Orders &amp; reviews <ArrowUpRight className="size-4" aria-hidden="true" /></Button> : null}
+                    right={s.can('orders.manage') ? <Button size="sm" variant="link" onClick={() => s.go('/emar/prescriptions', { client_id: String(FACTS[pid].clientId) })}>Recorded with the order in Orders &amp; reviews <ArrowUpRight className="size-4" aria-hidden="true" /></Button> : null}
                 />
                 {all.length ? (
                     <EntityTable<Interaction>

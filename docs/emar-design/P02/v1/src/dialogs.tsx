@@ -191,7 +191,7 @@ function MedicineDialog({ pid, medKey, section, onClose }: { pid: PersonId; medK
             footerEnd={
                 <>
                     {s.can('orders.manage') ? (
-                        <Button variant="outline" onClick={() => s.go('/emar/prescriptions', { client_id: String(FACTS[pid].clientId) })}>
+                        <Button variant="link" onClick={() => s.go('/emar/prescriptions', { client_id: String(FACTS[pid].clientId) })}>
                             Change or stop in Orders &amp; reviews <ArrowUpRight className="size-4" aria-hidden="true" />
                         </Button>
                     ) : null}

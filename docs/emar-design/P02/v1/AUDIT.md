@@ -77,3 +77,11 @@ Grounded on `origin/main` **`ddb8d3af4`** (fetched 30 September 2026). Paths are
 7. MedicationEventDrawer drops the person — §2.
 8. Page gates that disagree with their routes — 1.5.
 9. Profile MAR tab numbers repeated from the header; allergy states missing — 5.1, 5.3.
+
+## 7. Build notes (confirmed by the review session, 30 Sep)
+
+1. **Controlled medicines for people without `medications.controlled.view`:**
+   - **Cross-person lists leave the rows out.** This covers the hub's MAR charts board, Medicines and As-needed history. The list caption counts the missing rows, for example "2 controlled not shown — needs controlled-medicine access". A redacted row would still show who takes a controlled drug.
+   - **The person's own record redacts them.** This covers the chart, medicines, support, alerts, interactions, history, corrections and all changes. Each row is still listed as "Controlled medicine · Details need controlled-medicine access" and counted in the caption, and dialogs show only a notice.
+   - **The rule reaches beyond the lists:** counts, search, exports and the printout ("Controlled medicines are left out").
+2. **"↗" jumps use `variant="link"`**, as Fleet does (`_owners.tsx`). Outline stays for actions that change something.
