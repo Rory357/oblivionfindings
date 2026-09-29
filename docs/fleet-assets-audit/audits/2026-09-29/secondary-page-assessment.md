@@ -59,7 +59,7 @@ The local synthetic Fleet manager session rendered all 17 list/overview pages be
 - `fleet-assets/transports/medications`: transport-scope return, controlled-drug context and three transit counts remain.
 - `fleet-assets/trips/index`: day and after-hours meters retain their date scopes; export and chart/table content remain. Charts scroll within their cards at narrow width.
 
-The nine record or process pages use the profile header and retain their state and contextual actions. `maintenance/checklists/run` and `trips/playback` rendered in the local browser without document overflow. The other seven had no matching synthetic record in the local list views, so their populated browser state is **not verified**; source, TypeScript, lint and production-build checks cover the conversion.
+The nine record or process pages use the profile header and retain their state and contextual actions. `maintenance/checklists/run` and `trips/playback` rendered in the first local browser sweep without document overflow. The other seven initially had no matching synthetic record; the fixture-backed continuation below covers their populated state.
 
 - `fleet-assets/drivers/show`: eligibility, scorecard and HR profile actions; the safety score opens the scorecard tab.
 - `fleet-assets/handovers/show`: handover status, vehicle context and acceptance workflow.
@@ -71,7 +71,21 @@ The nine record or process pages use the profile header and retain their state a
 - `fleet-assets/transports/show`: journey status and medication/pre-check links remain.
 - `fleet-assets/trips/playback`: consent and route state, close/delete guards, and trip-detail facts remain.
 
-The shared header guide and approved Fleet workflows were read as source rules. No source-of-truth guide, `DESIGN.md`, historical mockup, eMAR file, or single-tenant boundary was changed. This source and local-browser assessment does not assert hosted deployment, genuine browser zoom, or populated/denied-state acceptance for the seven unseeded record pages.
+### Fixture-backed detail continuation
+
+An isolated synthetic MySQL schema was populated with North and South records for the seven remaining routes. A North-site viewer opened all seven North records at the narrow browser viewport. Each rendered one shared header and one main heading, with no document-width overflow after two banner wrapping corrections. The consented North resident history completed its asynchronous privacy check before showing the tracker and empty movement history. The same viewer received 404 for the six South driver, inspection, outing, resident-history and transport URLs, including transport pre-check; the South handover returned the existing tested 403 site denial. No South record content appeared.
+
+The first populated transport pre-check visit returned 500 because its emergency-contact query selected nonexistent `relation` rather than the canonical `relationship` column. The query now selects `relationship` and maps it to the existing `relation` UI prop. The page rendered on recheck, and a focused feature test with an emergency contact passed (16 assertions). The inspection and transport detail banners wrapped their status badges on the narrow viewport. Scoped ESLint, Prettier, PHP syntax, production Vite build, and `git diff --check` passed; the focused TypeScript result is recorded in the JSON evidence.
+
+This continuation used the local production manifest at `http://127.0.0.1:8798`, a separate synthetic database, and synthetic logins. The browser viewport override requested 390×844; measured CSS document width was approximately 300–312 pixels on this host. That is a narrow-layout test, not genuine 125% browser zoom.
+
+### Hosted release and CI disposition
+
+Authenticated Chrome showed `https://oblivionfindings.com/fleet-assets/bookings` still using the earlier gradient hero, with `app-DpCHbvaC.js`, while the local release build used a newer manifest. The pushed header migration had not reached the hosted site at this check. The repository has no deployment workflow; `scripts/deploy-server.sh` is a broad server-side release operation involving migrations, queues, SSR and monitoring services. No configured server access, backup/recovery point or reviewed release window was established here, so hosted deployment and visual acceptance remain open.
+
+GitHub Actions for `cbd9b3c` passed database bootstrap and failed full-repository lint, tests and visual regression. Lint reported 3,340 problems across the repository without a Fleet path in the captured log. Test shards failed first in unrelated Compliance, Control Room, Catering, Auth, Attendance and Security Devices suites; those first-batch failures do not prove all later Fleet tests ran. Captured visual failures were non-Fleet snapshots. These failures are not claimed to be caused or repaired by this focused Fleet change.
+
+The shared header guide and approved Fleet workflows were read as source rules. No source-of-truth guide, `DESIGN.md`, historical mockup, eMAR file, or single-tenant boundary was changed. Hosted deployment and genuine 125% browser zoom remain unverified.
 
 ## Inactive legacy branches
 

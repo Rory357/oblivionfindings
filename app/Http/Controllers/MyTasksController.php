@@ -468,7 +468,9 @@ class MyTasksController extends Controller
         try {
             $openSession = HrAttendanceSession::query()
                 ->with([
-                    'shift.client:id,first_name,last_name,profile_photo_path',
+                    // site_id: workerShiftPayload resolves a site-less
+                    // shift's Site through its client.
+                    'shift.client:id,first_name,last_name,profile_photo_path,site_id',
                     'shift.serviceContext:id,name',
                     'shift.tasks',
                     'breakEvents',
@@ -757,7 +759,9 @@ class MyTasksController extends Controller
                 ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $user))
                 ->visibleToFrontline()
                 ->whereBetween('starts_at', [$today, $tomorrowEnd])
-                ->with(['client:id,first_name,last_name,profile_photo_path', 'serviceContext:id,name', 'tasks'])
+                // site_id: workerShiftPayload resolves a site-less shift's
+                // Site through its client.
+                ->with(['client:id,first_name,last_name,profile_photo_path,site_id', 'serviceContext:id,name', 'tasks'])
                 ->orderBy('starts_at')
                 ->get()
                 ->map(function (Shift $shift) use ($workerNow, $user) {

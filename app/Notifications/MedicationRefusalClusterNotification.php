@@ -14,6 +14,7 @@ class MedicationRefusalClusterNotification extends Notification
         public string $medication,
         public int $count,
         public ?int $clientId = null,
+        public ?int $clientMedicationId = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -33,6 +34,7 @@ class MedicationRefusalClusterNotification extends Notification
             'medication' => $this->medication,
             'count' => $this->count,
             'client_id' => $this->clientId,
+            'client_medication_id' => $this->clientMedicationId,
         ];
     }
 }
