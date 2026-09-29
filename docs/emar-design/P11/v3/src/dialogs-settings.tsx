@@ -573,7 +573,7 @@ export function KeepDefault({ spec }: { spec: string }) {
     return (
         <ConfirmDialog open onClose={close} variant="default" title="Keep today’s value?" confirmText="Keep this value"
             description={<><p><b className="text-foreground">{label}</b>: {value}.</p><p className="mt-2">Nothing changes in how doses are recorded. The setting shows as reviewed by you, and this is recorded in the change history and the audit log.</p>{g === 'ea' ? <p className="mt-2">The emergency access policy is reviewed as a whole.</p> : null}</>}
-            onConfirm={() => { set((d) => { if (g === 'ea') d.eaSaved = stamp(d); else { d.setBy[g][k] = stamp(d); if (g === 'timing' && k === 'escalN') d.setBy.timing.escalDays = stamp(d); } logChange(d, { area: G.view as 'rules', sec: G.sec(k), scope: 'All houses', what: `Reviewed — ${label}`, from: 'Default — not yet reviewed', to: `Kept: ${value}`, ev: G.ev }); }); flash(`Kept today’s value for “${label}”. It now shows as reviewed.`); }} />
+            onConfirm={() => { set((d) => { if (g === 'ea') d.eaSaved = stamp(d); else { d.setBy[g][k] = stamp(d); if (g === 'timing' && k === 'escalN') d.setBy.timing.escalDays = stamp(d); if (g === 'delivery' && k === 'realertEvery') d.setBy.delivery.realertMax = stamp(d); if (g === 'delivery' && k === 'escalateAfter') d.setBy.delivery.escalateTo = stamp(d); } logChange(d, { area: G.view as 'rules', sec: G.sec(k), scope: 'All houses', what: `Reviewed — ${label}`, from: 'Default — not yet reviewed', to: `Kept: ${value}`, ev: G.ev }); }); flash(`Kept today’s value for “${label}”. It now shows as reviewed.`); }} />
     );
 }
 

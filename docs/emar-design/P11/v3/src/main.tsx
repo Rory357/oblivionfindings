@@ -36,6 +36,8 @@ function applyQuery(m0: Model, q: URLSearchParams): Model {
         if (q.get('draft') === '1') { d.draft.safety.phoneRx = 'leads'; d.draft.timing.late = '45'; d.draft.pin.confirmLimit = '20'; }
         if (q.get('draft') === 'bad') { d.draft.timing.late = '0'; d.draft.timing.escalDays = ''; }
         if (q.get('oncall') === '1' && !d.oncall.kowhai) d.oncall.kowhai = { mode: 'roster', teamLead: true, person: 'hana', by: 'Jordan Tipene', when: '29 Sep 2026' };
+        // A manager part-way through setting follow-up (a draft, not saved) — for the preview and screenshots.
+        if (q.get('dlv') === '1') Object.assign(d.draft.delivery, { realertEvery: '30', realertMax: '3', escalateAfter: '60', escalateTo: ['houseLead', 'onCall'] });
         if (q.get('ack')) d.myAck = q.get('ack') === '1';
         if (q.get('exdemo') === '1' && !d.exemptions.length) d.exemptions.push({ id: 'x1', who: 'aisha', house: 'kowhai', reason: 'Renewal booked for 3 October — the assessor is on leave until then', from: '29 Sep 2026', until: '3 Oct 2026', by: 'Hana Kereama', at: '29 Sep 2026 8:40 am', status: 'active' });
     });

@@ -15,16 +15,16 @@ import { EmptyError, EmptyState } from '@/components/ui/empty-state';
 import { SkeletonTable } from '@/components/ui/skeleton-table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
-import { InfoCard } from '@/components/wizard/primitives';
+import { ChipMulti, InfoCard, SelectInput } from '@/components/wizard/primitives';
 import { Sections } from '@/pages/fleet-assets/settings/_ui';
 import {
-    Activity, AlarmClock, AlertTriangle, ArrowUpRight, Bell, Building2, CalendarDays, Camera, ClipboardCheck, Clock, Eye, FileText, HelpCircle, History, Home, Info, KeyRound, Layers,
+    Activity, BellRing, Siren, Timer, AlarmClock, AlertTriangle, ArrowUpRight, Bell, Building2, CalendarDays, Camera, ClipboardCheck, Clock, Eye, FileText, HelpCircle, History, Home, Info, KeyRound, Layers,
     ListChecks, LockKeyhole, Mail, Pause, Pencil, Phone, Pill, Play, Plus, RefreshCw, Repeat, RotateCcw, Scale, Settings as SettingsIcon, Shield, ShieldCheck, Trash2, User, UserCheck, Users, WifiOff,
 } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ALERTS, ALERT_PEOPLE, CDW_OPTS, HOUSES, HOUSE_KEYS, ONCALL_ROSTER, employee, resolveOnCall, PIN_RULES, RECIPIENT_GROUPS, SAFETY_RULES, SAFETY_SWITCH, STAFF, type HouseKey, type Rule, type Tpl } from './data';
 import {
-    EA_L, ELIG_L, GROUPS, PHOTO_LABEL, PHOTO_OPTS, TIMING_L, VIEW_LABEL, allChanges, allHistory, canEaPolicy, canHouse, canOrg, canRuleScope,
+    ATTENDED_OPTS, DELIVERY_L, EA_L, ELIG_L, GROUPS, alertById, PHOTO_LABEL, PHOTO_OPTS, TIMING_L, VIEW_LABEL, allChanges, allHistory, canEaPolicy, canHouse, canOrg, canRuleScope,
     canTemplates, daysText, decisionRegistry, fmtMin, fmtT, isDirty, leadCap, myHouses, readOnlyAudit, reviewedBy, ruleNeeds, ruleOverlaps,
     ruleWhat, useStore, validateView, viewChanges, type AlertSetting, type GroupKey, type Model, type ViewKey,
 } from './model';
@@ -32,7 +32,7 @@ import { SET_VIEWS, settingsHref, eligHref, useNav } from './nav';
 import { Changed, Choice, DefaultNotReviewed, Flash, GroupGrid, GroupRow, KV, NotConfigured, Note, NumberInput, OnOff, Overview, RowMenu, SaveBar, Section, SettingGroup, type PickItem } from './ui';
 
 const VIEW_ICON: Record<string, typeof Pill> = { rules: Pill, rounds: Repeat, staff: UserCheck, alerts: Bell, history: History };
-const SEC_ICON: Record<string, typeof Pill> = { overview: Activity, alerts: Bell, channels: Mail, medicines: Pill, safety: Shield, controlled: LockKeyhole, photos: FileText, templates: Repeat, timing: Clock, competency: ClipboardCheck, exemptions: ShieldCheck, pins: KeyRound, status: Users, oncall: Bell, recipients: Users, emergency: LockKeyhole, decide: HelpCircle, changes: History };
+const SEC_ICON: Record<string, typeof Pill> = { overview: Activity, alerts: Bell, delivery: BellRing, medicines: Pill, safety: Shield, controlled: LockKeyhole, photos: FileText, templates: Repeat, timing: Clock, competency: ClipboardCheck, exemptions: ShieldCheck, pins: KeyRound, status: Users, oncall: Bell, recipients: Users, emergency: LockKeyhole, decide: HelpCircle, changes: History };
 const match = (q: string, ...s: (string | undefined)[]) => !q || s.some((x) => (x || '').toLowerCase().includes(q.toLowerCase()));
 const DirtyDot = () => <span role="img" aria-label="Unsaved changes" className="size-2 rounded-full bg-status-warning" />;
 
@@ -58,7 +58,7 @@ export function SettingsPage() {
         setErrs(e);
         if (Object.keys(e).length) {
             const k = Object.keys(e)[0];
-            const target = view === 'staff' ? (['attempts', 'lockout', 'confirmLimit', 'renewal'].includes(k) ? 'pins' : k === 'longestEx' ? 'exemptions' : 'competency') : view === 'alerts' ? (k.startsWith('al-') ? 'alerts' : 'emergency') : view === 'rules' && sec === 'overview' ? 'safety' : view === 'rounds' && sec === 'overview' ? 'timing' : sec;
+            const target = view === 'staff' ? (['attempts', 'lockout', 'confirmLimit', 'renewal'].includes(k) ? 'pins' : k === 'longestEx' ? 'exemptions' : 'competency') : view === 'alerts' ? (k.startsWith('al-') ? 'alerts' : k.startsWith('dl-') ? 'delivery' : 'emergency') : view === 'rules' && sec === 'overview' ? 'safety' : view === 'rounds' && sec === 'overview' ? 'timing' : sec;
             if (target !== sec) go(settingsHref(view, target));
             return;
         }
@@ -634,13 +634,14 @@ function Alerts({ ctx }: { ctx: Ctx }) {
             {errs.length ? <div role="alert" className="space-y-1">{errs.map(([k, v]) => <p key={k} className="flex items-center gap-1 text-xs text-status-critical"><AlertTriangle className="size-3" />{v}</p>)}</div> : null}
             {rows.length ? (
                 <EntityTable<AlertRowT>
-                    rows={rows} rowKey={(a) => a.k} identityLabel="Alert" identityWidth="2.3fr" minWidth={980} rowHeight="content"
+                    rows={rows} rowKey={(a) => a.k} identityLabel="Alert" identityWidth="2fr" minWidth={1000} rowHeight="content"
                     identity={(a) => ({ icon: Bell, name: a.l, subline: a.sub })}
                     columns={[
-                        { key: 'inapp', label: 'In-app', width: '0.8fr', cell: (a) => { const locked = !!a.locked; return <div onClick={(e) => e.stopPropagation()} data-setting={`al-${a.k}`}><OnOff id={`al-${a.k}-inapp`} checked={m.draft.alerts[a.k].inapp} disabled={orgRo || locked} label={`${a.l}: in-app`} onChange={(v) => setCh(a.k, 'inapp', v)} />{locked ? <p className="text-caption mt-1 flex items-center gap-1"><LockKeyhole className="size-3" />Always on</p> : null}</div>; } },
-                        { key: 'email', label: 'Email', width: '0.8fr', cell: (a) => <div onClick={(e) => e.stopPropagation()}><OnOff id={`al-${a.k}-email`} checked={m.draft.alerts[a.k].email} disabled={orgRo} label={`${a.l}: email`} onChange={(v) => setCh(a.k, 'email', v)} /></div> },
-                        { key: 'to', label: 'Goes to', width: '1.6fr', cell: (a) => <span className="py-2 text-[12.5px]">{goesTo(m.draft.alerts[a.k], extrasFor(a.k))}</span> },
-                        { key: 'state', label: 'Status', width: '1.1fr', cell: (a) => (isDirty(m, 'alerts', a.k) || HOUSE_KEYS.some((h) => isDirty(m, 'alertExtra', `${h}.${a.k}`)) ? <Changed /> : reviewedBy(m, 'alerts', a.k) ? <StatusBadge variant="neutral" size="sm">Reviewed</StatusBadge> : <DefaultNotReviewed />) },
+                        { key: 'inapp', label: 'In-app', width: '0.65fr', cell: (a) => { const locked = !!a.locked; return <div onClick={(e) => e.stopPropagation()} data-setting={`al-${a.k}`}><OnOff id={`al-${a.k}-inapp`} checked={m.draft.alerts[a.k].inapp} disabled={orgRo || locked} label={`${a.l}: in-app`} onChange={(v) => setCh(a.k, 'inapp', v)} />{locked ? <p className="text-caption mt-1 flex items-center gap-1"><LockKeyhole className="size-3" />Always on</p> : null}</div>; } },
+                        { key: 'email', label: 'Email', width: '0.65fr', cell: (a) => <div onClick={(e) => e.stopPropagation()}><OnOff id={`al-${a.k}-email`} checked={m.draft.alerts[a.k].email} disabled={orgRo} label={`${a.l}: email`} onChange={(v) => setCh(a.k, 'email', v)} /></div> },
+                        { key: 'fu', label: 'Follow up', width: '0.7fr', cell: (a) => <div onClick={(e) => e.stopPropagation()}><OnOff id={`al-${a.k}-fu`} checked={m.draft.alerts[a.k].followUp} disabled={orgRo} label={`${a.l}: follow up until attended`} onChange={(v) => set((d) => { d.draft.alerts[a.k].followUp = v; })} /></div> },
+                        { key: 'to', label: 'Goes to', width: '1.4fr', cell: (a) => <span className="py-2 text-[12.5px]">{goesTo(m.draft.alerts[a.k], extrasFor(a.k))}</span> },
+                        { key: 'state', label: 'Status', width: '1.3fr', cell: (a) => (isDirty(m, 'alerts', a.k) || HOUSE_KEYS.some((h) => isDirty(m, 'alertExtra', `${h}.${a.k}`)) ? <Changed /> : reviewedBy(m, 'alerts', a.k) ? <StatusBadge variant="neutral" size="sm">Reviewed</StatusBadge> : <DefaultNotReviewed />) },
                     ]}
                     actionsFor={actions} onOpen={(a) => open({ kind: 'alertwho', arg: a.k })} onRowContextMenu={menu.open}
                 />
@@ -648,36 +649,109 @@ function Alerts({ ctx }: { ctx: Ctx }) {
             <RowMenu ctx={menu.ctx} close={menu.close} icon={Bell} title={(a) => a.l} items={actions} />
             <div className="text-subtle flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                 <span className="inline-flex items-center gap-2"><Shield className="size-3.5" />Alerts about controlled medicines only reach people with controlled-medicine access. Control Room shows these alerts in its queue; who is told is set here.</span>
-                <Button variant="outline" size="sm" onClick={() => go(settingsHref('alerts', 'channels'))}>Review channels<ArrowUpRight /></Button>
+                <Button variant="outline" size="sm" onClick={() => go(settingsHref('alerts', 'delivery'))}>Review delivery & follow-up<ArrowUpRight /></Button>
             </div>
         </Section>
     );
 }
-/* ── Alerts & access › Channels (Fleet “Delivery & channels”) ── */
-function Channels() {
-    const { m } = useStore();
+/* ── Alerts & access › Delivery (Fleet “Delivery & channels”, made interactive). Stephan, 29 Sep 2026: “why is it not
+ * interactive like … re-alert, attended”. Verified on main: medication alerts are in-app only, each is sent once
+ * (no re-alert), `emar:send-alerts` runs every 15 minutes, and dashboard alerts record who acknowledged them.
+ * So re-alerting and escalation are new and start off (today’s behaviour), marked “not yet reviewed”. ── */
+const FOLLOW_TO = ['houseLead', 'onCall', 'clinicalLead', 'providerManager'];
+const glabel = (g: string) => RECIPIENT_GROUPS[g].l;
+function Delivery({ ctx }: { ctx: Ctx }) {
+    const { m, set, ro, edit, toggleNumber } = useEdit();
     const { go } = useNav();
-    const inapp = ALERTS.filter((a) => m.saved.alerts[a.k].inapp).length, email = ALERTS.filter((a) => m.saved.alerts[a.k].email).length;
+    const d = m.draft.delivery, dis = ro('delivery');
+    const inapp = ALERTS.filter((a) => m.draft.alerts[a.k].inapp).length, email = ALERTS.filter((a) => m.draft.alerts[a.k].email).length;
+    const fu = ALERTS.filter((a) => m.draft.alerts[a.k].followUp), toOnCall = ALERTS.filter((a) => m.draft.alerts[a.k].groups.includes('onCall'));
+    const reOn = d.realertEvery !== '' || !!m.pendingOn['delivery.realertEvery'], escOn = d.escalateAfter !== '' || !!m.pendingOn['delivery.escalateAfter'];
+    const oc = HOUSE_KEYS.filter((h) => m.oncall[h]).length;
+    const st = (k: string) => rowState(m, 'delivery', k);
+    const vis = (k: string, ...t: string[]) => visible(ctx, !reviewedBy(m, 'delivery', k), isDirty(m, 'delivery', k), DELIVERY_L[k], ...t);
+    const link = (label: string, ...t: string[]) => visible(ctx, false, false, label, ...t);
+    const sw = (k: string, hint: string) => (
+        <GroupRow key={k} id={`dl-${k}`} label={DELIVERY_L[k]} hint={hint} state={st(k)} hidden={!vis(k)}
+            control={<OnOff id={`dl-${k}`} checked={(d as unknown as Record<string, string>)[k] === 'yes'} disabled={dis} onChange={(v) => edit('delivery', k, v ? 'yes' : 'no')} />} />
+    );
+    const toAlerts = <Button variant="outline" size="sm" onClick={() => go(settingsHref('alerts', 'alerts'))}>Alerts<ArrowUpRight /></Button>;
     return (
-        <Section id="sc-channels" title="Delivery & channels" caption="How alerts reach people">
-            <div className="grid gap-5 lg:grid-cols-2">
-                <ReviewCard icon={Bell} title="In-app">
-                    <p className="text-subtle">The bell menu and the Tasks inbox. On for {inapp} of {ALERTS.length} alert types.</p>
-                    <StatusBadge variant="info" size="sm" className="mt-3">Configured</StatusBadge>
-                </ReviewCard>
-                <ReviewCard icon={Mail} title="Email">
-                    <p className="text-subtle">Sent to each person’s work email. On for {email} of {ALERTS.length} alert types — off until a manager turns it on.</p>
-                    <StatusBadge variant="info" size="sm" className="mt-3">Configured</StatusBadge>
-                </ReviewCard>
-                <ReviewCard icon={User} title="Personal email copies">
-                    <p className="text-subtle">Anyone who gets an alert can also have it emailed to themselves, in their account › Notifications. They can’t switch off what the organisation requires.</p>
-                </ReviewCard>
-                <ReviewCard icon={Phone} title="After hours">
-                    <p className="text-subtle">Each house’s on-call contact follows the roster: whoever is on an on-call shift, then the team lead on shift, then a backup person. They’re shown on screens and can get alerts. Nobody is phoned automatically.</p>
-                    <Button variant="outline" size="sm" className="mt-3" onClick={() => go(settingsHref('alerts', 'oncall'))}>Review on-call contacts<ArrowUpRight /></Button>
-                </ReviewCard>
-            </div>
+        <Section id="sc-delivery" title="Delivery & follow-up" caption="How alerts reach people, and what happens if nobody attends" right={<EntityChip icon={Building2}>Every house</EntityChip>}>
+            {fu.length && !reOn && !escOn ? <InfoCard icon={Info}><b>Follow up is on for {fu.length} alert types, but re-alerting and escalation are both off.</b> Each alert is still sent once, as today.</InfoCard> : null}
+            <GroupGrid empty={<NoMatches ctx={ctx} />}>
+                <SettingGroup id="realert" icon={BellRing} title="Re-alert until attended" caption={`For the ${fu.length} alert ${fu.length === 1 ? 'type' : 'types'} with Follow up on`}>
+                    <GroupRow id="dl-reon" label={DELIVERY_L.realertEvery} hint={reOn ? `Sent again to the same people every ${d.realertEvery || '…'} minutes, up to ${d.realertMax || '…'} times, until someone attends.` : 'Off — each alert is sent once (today).'} state={st('realertEvery')} error={ctx.errs['dl-realertEvery'] || ctx.errs['dl-realertMax']} errorId="dl-realert-error" hidden={!vis('realertEvery', 're-alert', 'repeat')}
+                        control={<OnOff id="dl-reon" checked={reOn} disabled={dis} onChange={(v) => { toggleNumber('delivery', 'realertEvery', v); toggleNumber('delivery', 'realertMax', v); ctx.clearErr('dl-realertEvery'); ctx.clearErr('dl-realertMax'); }} />}>
+                        {reOn ? (
+                            <span className="inline-flex flex-wrap items-center gap-2">
+                                <span className="text-subtle">Every</span>
+                                <NumberInput id="dl-realertEvery" label="Minutes between re-alerts" value={d.realertEvery} unit="minutes, up to" min={15} max={1440} disabled={dis} error={ctx.errs['dl-realertEvery']} onChange={(v) => { edit('delivery', 'realertEvery', v); ctx.clearErr('dl-realertEvery'); }} />
+                                <NumberInput id="dl-realertMax" label="Most re-alerts" value={d.realertMax} unit="times" min={1} max={10} disabled={dis} error={ctx.errs['dl-realertMax']} onChange={(v) => { edit('delivery', 'realertMax', v); ctx.clearErr('dl-realertMax'); }} />
+                            </span>
+                        ) : null}
+                    </GroupRow>
+                    <GroupRow id="dl-attended" label={DELIVERY_L.attended} hint="Stops re-alerts and escalation. Recorded with the person’s name and the time." state={st('attended')} hidden={!vis('attended', 'acknowledge')}>
+                        <Choice value={d.attended} disabled={dis} onChange={(v) => edit('delivery', 'attended', v)} options={ATTENDED_OPTS} />
+                    </GroupRow>
+                    <GroupRow id="dl-fu" label="Alerts followed up" hint={fu.length ? fu.map((a) => a.l).join(', ') : 'None — turn on Follow up in the Alerts table.'} hidden={!link('Alerts followed up', 'follow up')} control={toAlerts} />
+                </SettingGroup>
+                <SettingGroup id="escalate" icon={Siren} title="Escalate if still not attended" caption="Tells more people, as well as the first ones">
+                    <GroupRow id="dl-escon" label={DELIVERY_L.escalateAfter} hint={escOn ? `After ${d.escalateAfter || '…'} minutes with nobody attending.` : 'Off — nobody else is told (today).'} state={st('escalateAfter')} error={ctx.errs['dl-escalateAfter']} errorId="dl-escalateAfter-error" hidden={!vis('escalateAfter', 'escalate')}
+                        control={<OnOff id="dl-escon" checked={escOn} disabled={dis} onChange={(v) => { toggleNumber('delivery', 'escalateAfter', v); if (!v) set((dd) => { dd.draft.delivery.escalateTo = [...dd.saved.delivery.escalateTo]; }); ctx.clearErr('dl-escalateAfter'); ctx.clearErr('dl-escalateTo'); }} />}>
+                        {escOn ? <NumberInput id="dl-escalateAfter" label="Minutes before escalating" value={d.escalateAfter} unit="minutes" min={15} max={1440} disabled={dis} error={ctx.errs['dl-escalateAfter']} onChange={(v) => { edit('delivery', 'escalateAfter', v); ctx.clearErr('dl-escalateAfter'); }} /> : null}
+                    </GroupRow>
+                    {escOn ? (
+                        <GroupRow id="dl-escalateTo" label={DELIVERY_L.escalateTo} hint="After hours, the on-call person is whoever the roster says." state={st('escalateTo')} error={ctx.errs['dl-escalateTo']} errorId="dl-escalateTo-error" hidden={!vis('escalateTo', 'escalate')}>
+                            {dis ? <p className="text-[13px]">{d.escalateTo.map(glabel).join(', ') || 'Nobody chosen'}</p>
+                                : <ChipMulti values={d.escalateTo.map(glabel)} options={FOLLOW_TO.map(glabel)} onChange={(v) => { edit('delivery', 'escalateTo', FOLLOW_TO.filter((g) => v.includes(glabel(g)))); ctx.clearErr('dl-escalateTo'); }} />}
+                        </GroupRow>
+                    ) : null}
+                </SettingGroup>
+                <SettingGroup id="email" icon={Mail} title="Email" caption="Sent to each person’s work email">
+                    <GroupRow id="dl-emailn" label="Alert types sent by email" hint="Turn email on per alert in the Alerts table." hidden={!link('Alert types sent by email', 'email')} control={<span className="inline-flex items-center gap-3"><span className="text-subtle">{email} of {ALERTS.length}</span>{toAlerts}</span>} />
+                    {sw('digest', d.digest === 'yes' ? 'One email an hour lists every alert since the last one.' : 'Each alert is emailed straight away.')}
+                    {sw('private', 'Emails say what happened and link to the app. The details stay in the app.')}
+                    {sw('copies', 'In their account › Notifications. They can’t switch off what the organisation requires.')}
+                </SettingGroup>
+                <SettingGroup id="inapp" icon={Bell} title="In-app" caption="The bell and the Tasks inbox">
+                    <GroupRow id="dl-inappn" label="Alert types sent in-app" hint="Decided alerts are always in-app." hidden={!link('Alert types sent in-app', 'in-app')} control={<span className="inline-flex items-center gap-3"><span className="text-subtle">{inapp} of {ALERTS.length}</span>{toAlerts}</span>} />
+                    {sw('pinned', 'Alerts with Follow up on stay at the top of the bell until someone attends.')}
+                </SettingGroup>
+                <SettingGroup id="afterhours" icon={Phone} title="After hours" caption="Nobody is phoned automatically">
+                    <GroupRow id="dl-oncall" label="On-call contacts" hint="Follows the roster: on-call shift, then the team lead on shift, then a backup person." hidden={!link('On-call contacts', 'after hours')} control={<Button variant="outline" size="sm" onClick={() => go(settingsHref('alerts', 'oncall'))}>{oc} of {HOUSE_KEYS.length} houses<ArrowUpRight /></Button>} />
+                    <GroupRow id="dl-oncallgets" label="Alerts that go to the on-call person" hint={toOnCall.length ? toOnCall.map((a) => a.l).join(', ') : d.escalateTo.includes('onCall') && escOn ? 'Only through escalation.' : 'None yet — add them in an alert’s groups, or escalate to them.'} hidden={!link('Alerts that go to the on-call person', 'on-call')} control={toAlerts} />
+                </SettingGroup>
+                <FollowUpPreview />
+            </GroupGrid>
         </Section>
+    );
+}
+/** What happens if nobody attends — worked out from the draft, like Fleet’s “Check saved choices”. Nothing is sent. */
+function FollowUpPreview() {
+    const { m } = useStore();
+    const [k, setK] = useState('overdue');
+    const a = alertById(k), x = m.draft.alerts[k], d = m.draft.delivery;
+    const every = Number(d.realertEvery) || 0, max = Number(d.realertMax) || 0, after = Number(d.escalateAfter) || 0;
+    const via = [x.inapp && 'in-app', x.email && 'email'].filter(Boolean).join(' and ') || 'no channel';
+    const first = [...x.groups.map(glabel), ...x.people].join(', ') || 'Nobody';
+    const ev: [number, string, string][] = [];
+    if (x.followUp && every && max) for (let i = 1; i <= max; i++) ev.push([every * i, 'Re-alert', `The same people, ${via}`]);
+    if (x.followUp && after && d.escalateTo.length) ev.push([after, 'Escalate', `${d.escalateTo.map(glabel).join(', ')}, ${via}`]);
+    ev.sort((p, q) => p[0] - q[0] || (p[1] === 'Escalate' ? 1 : -1));
+    const shown = ev.slice(0, 5);
+    const stop = ATTENDED_OPTS.find((o) => o[0] === d.attended)![1].toLowerCase();
+    return (
+        <ReviewCard icon={Timer} title="What happens if nobody attends" span>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-subtle">Worked out from your draft, for one alert. Nothing is sent.</p>
+                <div className="w-72"><SelectInput value={k} onChange={setK} placeholder="Choose an alert" ariaLabel="Alert to preview" options={ALERTS.map((y) => ({ value: y.k, label: y.l }))} /></div>
+            </div>
+            <ReviewRow label="When it happens" value={<span className="text-right"><b>{first}</b><span className="text-caption block">{via === 'no channel' ? 'Nobody is told — turn on in-app or email' : `By ${via}`}</span></span>} />
+            {shown.map(([t, what, who]) => <ReviewRow key={`${t}-${what}`} label={`After ${fmtMin(String(t))}`} value={<span className="text-right"><b>{what}</b><span className="text-caption block">{who}</span></span>} />)}
+            {ev.length > shown.length ? <ReviewRow label="Then" value={`${ev.length - shown.length} more re-alerts, up to ${max} in all`} /> : null}
+            <ReviewRow label="Stops" value={!x.followUp ? `Follow up is off for “${a.l}” — it’s sent once.` : !ev.length ? 'Sent once — re-alerting and escalation are off.' : `When ${stop}. The alert itself stays ${a.until.toLowerCase()}.`} />
+        </ReviewCard>
     );
 }
 
@@ -836,7 +910,7 @@ function AlertsOverview({ q }: { q: string }) {
     return (
         <Overview q={q} title="Alerts & access" caption="Who is told, how, and who to call" cards={[
             { icon: Bell, title: 'Alerts', lines: [`${ALERTS.length} alert types · in-app on for ${ALERTS.filter((a) => m.saved.alerts[a.k].inapp).length} · email on for ${email}.`, 'Choose who gets each alert, at every house and per house.'], badge: notReviewed(countOpen(m, 'alerts', ALERTS.map((a) => a.k))), cta: 'Review alerts', onClick: () => go(settingsHref('alerts', 'alerts')) },
-            { icon: Mail, title: 'Channels', lines: ['In-app and email are configured.', 'People can add email copies for themselves.'], cta: 'Review channels', onClick: () => go(settingsHref('alerts', 'channels')) },
+            { icon: BellRing, title: 'Delivery & follow-up', lines: [m.saved.delivery.realertEvery ? `Re-alerts every ${m.saved.delivery.realertEvery} minutes until attended${m.saved.delivery.escalateAfter ? `; escalates after ${m.saved.delivery.escalateAfter} minutes` : ''}.` : 'Each alert is sent once — no re-alerts or escalation yet.', `Email: ${m.saved.delivery.digest === 'yes' ? 'an hourly summary' : 'sent straight away'}${m.saved.delivery.private === 'yes' ? ', without client names or medicines' : ''}.`], badge: notReviewed(countOpen(m, 'delivery', ['realertEvery', 'attended', 'escalateAfter', 'digest', 'private', 'pinned'])), cta: 'Review delivery & follow-up', onClick: () => go(settingsHref('alerts', 'delivery')) },
             { icon: Phone, title: 'On-call contacts', lines: [`${oc} of ${HOUSE_KEYS.length} houses have one · ${HOUSE_KEYS.filter((h) => m.oncall[h]?.mode === 'roster').length} follow the roster.`, 'Whoever is rostered on call is shown after hours, with a backup person.'], badge: oc < HOUSE_KEYS.length ? <StatusBadge variant="warning" size="sm">{HOUSE_KEYS.length - oc} not configured</StatusBadge> : undefined, cta: 'Review on-call contacts', onClick: () => go(settingsHref('alerts', 'oncall')) },
             { icon: LockKeyhole, title: 'Emergency access', lines: [`A grant lasts ${fmtMin(ea.def)}; the longest is ${fmtMin(ea.max)}.`, `Flags repeat use at ${ea.repeatN} grants within ${ea.repeatDays} days.`], badge: m.eaSaved ? undefined : <DefaultNotReviewed />, cta: 'Review emergency access', onClick: () => go(settingsHref('alerts', 'emergency')) },
         ]} />
@@ -847,7 +921,7 @@ const SECTION: Record<string, (ctx: Ctx) => ReactNode> = {
     'rules/overview': (c) => <RulesOverview q={c.q} />, 'rules/medicines': (c) => <MedicineRules ctx={c} />, 'rules/safety': (c) => <SafetyChecks ctx={c} />, 'rules/controlled': (c) => <ControlledDrugs ctx={c} />, 'rules/photos': (c) => <MedicinePhotos ctx={c} />,
     'rounds/overview': (c) => <RoundsOverview q={c.q} />, 'rounds/templates': (c) => <RoundTemplates ctx={c} />, 'rounds/timing': (c) => <DoseTiming ctx={c} />,
     'staff/overview': (c) => <StaffOverview q={c.q} />, 'staff/competency': (c) => <Competency ctx={c} />, 'staff/exemptions': (c) => <Exemptions ctx={c} />, 'staff/pins': (c) => <WitnessPins ctx={c} />, 'staff/status': (c) => <PinStatus ctx={c} />,
-    'alerts/overview': (c) => <AlertsOverview q={c.q} />, 'alerts/alerts': (c) => <Alerts ctx={c} />, 'alerts/channels': () => <Channels />, 'alerts/oncall': (c) => <OnCallContacts ctx={c} />, 'alerts/emergency': (c) => <EmergencyAccess ctx={c} />,
+    'alerts/overview': (c) => <AlertsOverview q={c.q} />, 'alerts/alerts': (c) => <Alerts ctx={c} />, 'alerts/delivery': (c) => <Delivery ctx={c} />, 'alerts/oncall': (c) => <OnCallContacts ctx={c} />, 'alerts/emergency': (c) => <EmergencyAccess ctx={c} />,
     'history/decide': (c) => <StillToDecide ctx={c} />, 'history/changes': (c) => <AllChanges ctx={c} />,
 };
 

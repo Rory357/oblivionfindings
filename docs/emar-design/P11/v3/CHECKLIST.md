@@ -11,10 +11,10 @@ Checked on 29 September 2026 against `docs/emar-audit-2026-09-28/claude-second-r
   - every `?open=` deep link opening a dialog.
 
   Result: **0 problems.**
-- **Interaction run**: 87 checks in headless Chromium at 1440. **87 of 87 pass, with 0 console errors.**
+- **Interaction run**: 102 checks in headless Chromium at 1440. **102 of 102 pass, with 0 console errors.**
 - **Truncation check** on the Still to decide identity names: **0 truncated at 1440, 0 at 1280.**
 - **Type check**: `tsc --noEmit` on the preview, **0 errors.**
-- **Screenshots**: 164 in `screenshots/`. Each name is the size followed by the screen.
+- **Screenshots**: 171 in `screenshots/`. Each name is the size followed by the screen.
 
 ## Stephan's third correction (v2 → v3)
 
@@ -25,6 +25,7 @@ Checked on 29 September 2026 against `docs/emar-audit-2026-09-28/claude-second-r
 | "the border over the time is an issue" | Pass | The round time and "Doses due within" are plain side-by-side fields. The time zone is in the label ("Round time · Pacific/Auckland"), and there is no bordered fieldset (`1440-dlg-tpl-new.png`). Interaction run: "round time has no bordered box around it". |
 | "still no dropdown for on call, it will be a staff member employed" | Pass | On-call contacts use a searchable dropdown of **employed staff with access to the house**. Each person's phone number comes from their staff record. Someone with no phone number is listed but can't be chosen, and the dropdown says why. Screenshots: `1440-dlg-oncall-picker.png`, `1440-dlg-oncall-rimu-no-phone.png`. Interaction run: "staff dropdown lists employed staff…", "phone comes from the staff record", "staff without a phone number can't be chosen". |
 | "on call to follow the on call manager from rostering … team lead … auto decide the on call after hours" | Pass | Three steps: **Follow the roster** (on-call shift), then **Then the team lead on shift** (switch), then **If nobody is rostered** (backup). A preview lists who staff will see on each of the next three nights, and why (`1440-dlg-oncall-set.png`, `1440-dlg-oncall-no-team-lead.png`). Houses can switch the roster off and name one on-call person (`1440-dlg-oncall-fixed-person.png`). Rostering has on-call shifts and a `team_lead` role but no "on-call manager" field (see `AUDIT.md` §2). |
+| "why is it not interactive like for example re-alert attended to all those type of things" (Delivery tab) | Pass | The static Channels cards are replaced by **Delivery** (`1440-set-alerts-delivery*.png`). Every row is a setting:<br>• **Re-alert until attended**: switch, every [ ] minutes, up to [ ] times;<br>• **An alert counts as attended when**: opens / acknowledges / dealt with;<br>• **Escalate if still not attended**: switch, after [ ] minutes, to chosen groups including the on-call person;<br>• **Email**: hourly summary, keep client details out of emails, personal copies;<br>• **In-app**: keep unattended alerts at the top of the bell.<br>A **What happens if nobody attends** timeline is worked out from the draft, and each alert has a **Follow up** switch.<br>Everything new starts off (today each alert is sent once), and numbers are never invented.<br>Interaction run (15 new checks): "turning re-alert on asks for numbers — nothing invented", "empty re-alert numbers are caught and focused", "re-alert under 15 minutes is refused", "preview shows the re-alerts from the draft", "escalation needs someone to escalate to", "attended choice changes when follow-up stops", "review lists the delivery changes", "follow up switch per alert…", "house lead: delivery read-only". |
 | No internal codes on screen | Pass | `plain()` strips decision codes from help text. "Decided" chips, "(answer n)" and "(fixed in code)" are removed from the UI and kept in these notes. |
 
 ## 1. Build method

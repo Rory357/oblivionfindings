@@ -8,12 +8,12 @@ export const SET_VIEWS: Record<string, { label: string; secs: [string, string][]
     rules: { label: 'Medication rules', secs: [['overview', 'Overview'], ['medicines', 'Medicine rules'], ['safety', 'Safety checks'], ['controlled', 'Controlled drugs'], ['photos', 'Medicine photos']] },
     rounds: { label: 'Rounds & timing', secs: [['overview', 'Overview'], ['templates', 'Round templates'], ['timing', 'Dose timing']] },
     staff: { label: 'Staff & PINs', secs: [['overview', 'Overview'], ['competency', 'Competency'], ['exemptions', 'Exemption limit'], ['pins', 'Witness PINs'], ['status', 'PIN status']] },
-    alerts: { label: 'Alerts & access', secs: [['overview', 'Overview'], ['alerts', 'Alerts'], ['channels', 'Channels'], ['oncall', 'On-call contacts'], ['emergency', 'Emergency access']] },
+    alerts: { label: 'Alerts & access', secs: [['overview', 'Overview'], ['alerts', 'Alerts'], ['delivery', 'Delivery'], ['oncall', 'On-call contacts'], ['emergency', 'Emergency access']] },
     history: { label: 'Change history', secs: [['decide', 'Still to decide'], ['changes', 'All changes']] },
 };
 // v1 and v2 addresses keep working.
 const ALIAS: Record<string, [string, string]> = { templates: ['rounds', 'templates'], secondperson: ['staff', 'pins'], eligrules: ['staff', 'competency'], eapolicy: ['alerts', 'emergency'] };
-const SEC_ALIAS: Record<string, string> = { recipients: 'alerts' };
+const SEC_ALIAS: Record<string, string> = { recipients: 'alerts', channels: 'delivery' };
 export const ELIG_SECS: [string, string][] = [['register', 'Register'], ['renewals', 'Renewals'], ['exemptions', 'Exemptions'], ['witness', 'Witnesses & PINs']];
 
 export function parseRoute(hash: string): Route {

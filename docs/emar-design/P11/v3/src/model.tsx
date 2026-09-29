@@ -6,7 +6,7 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import {
     ALERTS, ALERT_PEOPLE, AREAS, CDW_LABEL, CDW_OPTS, HIST_SEED, RECIPIENT_GROUPS, HOUSES, HOUSE_KEYS, MEDLIST, NZULM, OBS, ONSHIFT_NOW, PERSONAS, PIN_RULES, RULES_SEED,
-    SAFETY_RULES, STAFF, STAFF_PINS, TEMPLATES_SEED, type HouseKey, type Hist, type Perm, type PersonaId, type PinState, type Rule, type Staff, type Tpl, type OnCallRule,
+    SAFETY_RULES, STAFF, STAFF_PINS, TEMPLATES_SEED, type HouseKey, type Hist, type Perm, type PersonaId, type PinState, type Rule, type Staff, type Tpl, type OnCallRule, FOLLOW_UP_DEFAULT,
 } from './data';
 
 /* ── Permissions (today’s gates, plus answers 1–6) ── */
@@ -38,10 +38,13 @@ export type Settings = {
     alerts: Record<string, AlertSetting>;
     /** Extra people a house manager adds for their own house, keyed `${house}.${alert}`. */
     alertExtra: Record<string, string[]>;
+    /** How alerts are delivered and followed up until someone attends (organisation-wide). */
+    delivery: DeliverySettings;
 };
+export type DeliverySettings = { realertEvery: string; realertMax: string; attended: string; escalateAfter: string; escalateTo: string[]; digest: string; private: string; copies: string; pinned: string };
 export type GroupKey = keyof Settings;
 /** How an alert is sent (organisation-wide) and who gets it. People can also add email copies for themselves. */
-export type AlertSetting = { inapp: boolean; email: boolean; groups: string[]; people: string[] };
+export type AlertSetting = { inapp: boolean; email: boolean; followUp: boolean; groups: string[]; people: string[] };
 export const alertById = (k: string) => ALERTS.find((a) => a.k === k)!;
 export { ALERT_PEOPLE, RECIPIENT_GROUPS };
 export const INITIAL_SETTINGS: Settings = {
@@ -55,8 +58,10 @@ export const INITIAL_SETTINGS: Settings = {
     // Stephan’s PIN answers, 29 Sep 2026.
     pin: { attempts: '5', lockout: '15', renewal: '', fallback: 'yes', fallbackCd: 'no', resetRoles: 'both', confirmLimit: '30', routeTo: 'lead-house' },
     ea: { def: '60', max: '240', ext: '30', reason: 'yes', repeatN: '4', repeatDays: '7' },
-    alerts: Object.fromEntries(ALERTS.map((a) => [a.k, { inapp: true, email: false, groups: [...a.def], people: [] }])),
+    alerts: Object.fromEntries(ALERTS.map((a) => [a.k, { inapp: true, email: false, followUp: FOLLOW_UP_DEFAULT.includes(a.k), groups: [...a.def], people: [] }])),
     alertExtra: Object.fromEntries(HOUSE_KEYS.flatMap((h) => ALERTS.map((a) => [`${h}.${a.k}`, [] as string[]]))),
+    // Today (verified on main): alerts are sent once, in-app only. Re-alerting and escalation are new and start off.
+    delivery: { realertEvery: '', realertMax: '', attended: 'ack', escalateAfter: '', escalateTo: [], digest: 'no', private: 'yes', copies: 'yes', pinned: 'no' },
 };
 const S29 = 'Stephan’s decision, 29 Sep 2026';
 export const INITIAL_SETBY: Record<GroupKey, Record<string, string>> = {
@@ -69,6 +74,7 @@ export const INITIAL_SETBY: Record<GroupKey, Record<string, string>> = {
     ea: {},
     alerts: {}, // Stephan, 29 Sep 2026: email starts off as a default not yet reviewed, so every alert is still to review
     alertExtra: {},
+    delivery: { copies: S29 }, // Stephan: people can add email copies for themselves
 };
 
 const opt = (list: [string, string][], v: string) => (list.find((o) => o[0] === v) || ['', v])[1];
@@ -76,6 +82,8 @@ export const PHOTO_OPTS: Record<string, [string, string][]> = { who: [['stock', 
 export const PHOTO_LABEL: Record<string, string> = { who: 'Who can take or replace a medicine photo', prompt: 'Prompt for a photo when a new medicine or brand is received' };
 export const TIMING_L: Record<string, [string, string]> = { early: ['Doses can be given from', 'minutes before the dose time'], late: ['Doses count as late', 'minutes after the dose time'], soon: ['Doses show as due soon', 'minutes before the dose time'], reoffer: ['Remind staff to offer again after a refusal', 'minutes after the refusal'], lateIncident: ['A late dose raises an incident', 'minutes after the dose time'], escalN: ['Repeated refusals escalate', 'refusals or withholds'], escalDays: ['Repeated refusals escalate — within', 'days'] };
 export const ELIG_L: Record<string, [string, string]> = { validity: ['An assessment stays current for', 'months'], passMark: ['Pass mark', 'of the 12 areas passed'], coreMust: ['Every core area must be passed', ''], obsNeeded: ['Minimum observed administrations', 'observed administrations'], reminder: ['Renewal reminder', 'days before the end date'], longestEx: ['Longest exemption', 'days'] };
+export const DELIVERY_L: Record<string, string> = { realertEvery: 'Re-alert until someone attends', realertMax: 'Most re-alerts', attended: 'An alert counts as attended when', escalateAfter: 'Escalate if still not attended', escalateTo: 'Escalate to', digest: 'Group emails into an hourly summary', private: 'Keep client names and medicines out of emails', copies: 'People can add email copies for themselves', pinned: 'Keep unattended alerts at the top of the bell' };
+export const ATTENDED_OPTS: [string, string][] = [['open', 'Someone opens it'], ['ack', 'Someone acknowledges it'], ['done', 'It’s dealt with']];
 export const EA_L: Record<string, string> = { def: 'A grant lasts', max: 'Longest grant', ext: 'Each extension adds', reason: 'A reason is required', repeatN: 'Flag repeat use — grants', repeatDays: 'Flag repeat use — within days' };
 export const fmtMin = (v: string) => { const n = parseInt(v, 10); if (!Number.isFinite(n)) return 'Not configured'; if (n % 60 === 0 && n >= 60) return `${n / 60} ${n === 60 ? 'hour' : 'hours'}`; return `${n} minutes`; };
 
@@ -93,8 +101,9 @@ export const GROUPS: Record<GroupKey, Group> = {
     timing: { view: 'rounds', sec: () => 'timing', keys: ['early', 'late', 'soon', 'critical', 'reoffer', 'lateIncident', 'escalN', 'escalDays'], label: (k) => (k === 'critical' ? 'Time-critical medicines' : TIMING_L[k][0]), fmt: (k, v) => (k === 'critical' ? ((v as { med: string; min: string }[]).length ? (v as { med: string; min: string }[]).map((c) => `${c.med} — late after ${c.min} minutes`).join('; ') : 'None marked') : k === 'reoffer' && !v ? 'Off — no reminder' : v ? `${v} ${TIMING_L[k][1]}` : 'Not configured'), can: canOrg, effect: 'From the next dose shown on Meds today, at every house — recording is never blocked', ev: 'medications.mar_timing.updated (new — not recorded today)' },
     elig: { view: 'staff', sec: (k) => (k === 'longestEx' ? 'exemptions' : 'competency'), keys: ['validity', 'passMark', 'coreMust', 'obsNeeded', 'reminder', 'longestEx'], label: (k) => ELIG_L[k][0], fmt: (k, v) => (k === 'coreMust' ? (v === 'yes' ? 'On' : 'Off — only the pass mark counts') : k === 'obsNeeded' && !v ? 'Off — no minimum (not configured)' : v ? `${v} ${ELIG_L[k][1]}` : 'Not configured'), can: canOrg, effect: 'From the next assessment or exemption recorded, at every house — existing ones keep their end dates', ev: 'medications.competency_policy.updated (new)' },
     pin: { view: 'staff', sec: () => 'pins', keys: PIN_RULES.map((r) => r.key), label: (k) => PIN_RULES.find((r) => r.key === k)!.label, fmt: (k, v) => pinFmt(k, String(v)), can: canOrg, effect: 'From the next dose signed or witnessed, at every house', ev: 'medications.witness_pin_policy.updated (new with PIN-1)' },
-    alerts: { view: 'alerts', sec: () => 'alerts', keys: ALERTS.map((a) => a.k), label: (k) => `Who gets “${alertById(k).l}”`, fmt: (_k, v) => { const x = v as AlertSetting; return `In-app ${x.inapp ? 'on' : 'off'} · email ${x.email ? 'on' : 'off'} · ${[...x.groups.map((g) => RECIPIENT_GROUPS[g].l), ...x.people].join(', ') || 'nobody'}`; }, can: canOrg, effect: 'From the next alert sent, at every house', ev: 'medications.alert_recipients.updated (new)' },
+    alerts: { view: 'alerts', sec: () => 'alerts', keys: ALERTS.map((a) => a.k), label: (k) => `Who gets “${alertById(k).l}”`, fmt: (_k, v) => { const x = v as AlertSetting; return `In-app ${x.inapp ? 'on' : 'off'} · email ${x.email ? 'on' : 'off'} · follow up ${x.followUp ? 'on' : 'off'} · ${[...x.groups.map((g) => RECIPIENT_GROUPS[g].l), ...x.people].join(', ') || 'nobody'}`; }, can: canOrg, effect: 'From the next alert sent, at every house', ev: 'medications.alert_recipients.updated (new)' },
     alertExtra: { view: 'alerts', sec: () => 'alerts', keys: HOUSE_KEYS.flatMap((h) => ALERTS.map((a) => `${h}.${a.k}`)), label: (k) => `${alertById(k.split('.')[1]).l} — extra people at ${HOUSES[k.split('.')[0] as HouseKey]}`, fmt: (_k, v) => (v as string[]).join(', ') || 'Nobody extra', can: (p) => HOUSE_KEYS.some((h) => canHouse(h, p)), effect: 'From the next alert at that house', ev: 'medications.alert_recipients.updated (new)' },
+    delivery: { view: 'alerts', sec: () => 'delivery', keys: ['realertEvery', 'realertMax', 'attended', 'escalateAfter', 'escalateTo', 'digest', 'private', 'copies', 'pinned'], label: (k) => DELIVERY_L[k], fmt: (k, v) => (k === 'escalateTo' ? (v as string[]).map((g) => RECIPIENT_GROUPS[g].l).join(', ') || 'Nobody chosen' : k === 'attended' ? opt(ATTENDED_OPTS, String(v)) : k === 'realertEvery' ? (v ? `Every ${v} minutes` : 'Off — each alert is sent once') : k === 'realertMax' ? (v ? `Up to ${v} times` : 'Off') : k === 'escalateAfter' ? (v ? `After ${v} minutes` : 'Off — nobody else is told') : v === 'yes' ? 'On' : 'Off'), can: canOrg, effect: 'From the next alert sent, at every house', ev: 'medications.alert_delivery.updated (new)' },
     ea: { view: 'alerts', sec: () => 'emergency', keys: ['def', 'max', 'ext', 'reason', 'repeatN', 'repeatDays'], label: (k) => EA_L[k], fmt: (k, v) => (k === 'reason' ? (v === 'yes' ? 'On' : 'Off') : ['def', 'max', 'ext'].includes(k) ? fmtMin(String(v)) : String(v)), can: canEaPolicy, effect: 'From the next emergency access grant — grants already running keep their end time', ev: 'break_glass_policy.updated (new — not recorded today)' },
 };
 export const GROUP_KEYS = Object.keys(GROUPS) as GroupKey[];
@@ -191,6 +200,15 @@ export function validateView(m: Model, v: ViewKey): Record<string, string> {
         if (!whole(d.repeatN, 1, 100)) e.repeatN = 'Enter a number of grants from 1 to 100.';
         if (!whole(d.repeatDays, 1, 90)) e.repeatDays = 'Enter a number of days from 1 to 90.';
         ALERTS.forEach((a) => { const x = m.draft.alerts[a.k]; if (!x.inapp && !x.email) e[`al-${a.k}`] = `“${a.l}”: turn on in-app or email — otherwise nobody is told.`; });
+        const dl = m.draft.delivery;
+        if (dl.realertEvery !== '' || m.pendingOn['delivery.realertEvery']) {
+            if (!whole(dl.realertEvery, 15, 1440)) e['dl-realertEvery'] = 'Enter minutes from 15 to 1,440. Alerts are checked every 15 minutes.';
+            if (!whole(dl.realertMax, 1, 10)) e['dl-realertMax'] = 'Enter how many re-alerts, from 1 to 10.';
+        }
+        if (dl.escalateAfter !== '' || m.pendingOn['delivery.escalateAfter']) {
+            if (!whole(dl.escalateAfter, 15, 1440)) e['dl-escalateAfter'] = 'Enter minutes from 15 to 1,440. Alerts are checked every 15 minutes.';
+            if (!dl.escalateTo.length) e['dl-escalateTo'] = 'Choose who it escalates to.';
+        }
     }
     return e;
 }
@@ -215,6 +233,7 @@ export function decisionRegistry(m: Model): Pending[] {
     (['validity', 'passMark', 'coreMust', 'reminder', 'longestEx'] as const).forEach((k) => { if (!m.setBy.elig[k]) add('staff', k === 'longestEx' ? 'exemptions' : 'competency', ELIG_L[k][0], 'default', `Behaves as: ${GROUPS.elig.fmt(k, m.saved.elig[k])}`, 'D3', 'All houses', 'elig', k); });
     if (!m.saved.elig.obsNeeded) add('staff', 'competency', ELIG_L.obsNeeded[0], 'nc', 'No minimum is asked for', 'D3');
     if (!m.eaSaved) (['def', 'max', 'ext', 'reason', 'repeatN'] as const).forEach((k) => add('alerts', 'emergency', k === 'repeatN' ? 'Flag repeat use' : EA_L[k], 'default', `Today: ${k === 'repeatN' ? `${m.saved.ea.repeatN} grants within ${m.saved.ea.repeatDays} days` : GROUPS.ea.fmt(k, m.saved.ea[k])}`, 'P10', 'All houses', 'ea', k));
+    (['realertEvery', 'attended', 'escalateAfter', 'digest', 'private', 'pinned'] as const).forEach((k) => { if (!m.setBy.delivery[k]) add('alerts', 'delivery', DELIVERY_L[k], 'default', `${k === 'realertEvery' || k === 'escalateAfter' ? 'Today' : 'Behaves as'}: ${GROUPS.delivery.fmt(k, m.saved.delivery[k as keyof DeliverySettings])}`, 'D12', 'All houses', 'delivery', k); });
     ALERTS.forEach((a) => { if (!m.setBy.alerts[a.k]) add('alerts', 'alerts', `Alert: ${a.l}`, 'default', GROUPS.alerts.fmt(a.k, m.saved.alerts[a.k]), 'D12', 'All houses', 'alerts', a.k); });
     HOUSE_KEYS.forEach((h) => { if (!m.oncall[h]) add('alerts', 'oncall', `On-call contact — ${HOUSES[h]}`, 'nc', 'Screens say “On-call contact: Not configured” and give no number', 'D12', HOUSES[h]); });
     return out;

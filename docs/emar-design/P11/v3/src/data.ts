@@ -203,6 +203,9 @@ export const ALERTS: AlertDef[] = [
     { k: 'cdCheck', l: 'Controlled-drug balance check overdue', sub: 'No balance check for 7 days', groups: ['houseLead', 'clinicalLead'], def: ['houseLead'], until: 'Until the check is done', today: 'A dashboard alert only (7:30 am) — nobody is told.' },
     { k: 'reviewDue', l: 'Medication review due', sub: 'Chart or medicine review within 7 days; INR within 3 days', groups: ['clinicalLead', 'houseLead'], def: ['clinicalLead'], until: 'Until reviewed', today: 'A dashboard alert only — nobody is told.' },
 ];
+/** Alerts that need someone to attend: proposed for Follow up (re-alert / escalate). Nothing re-alerts until a
+ * manager turns re-alerting on — today each alert is sent once. */
+export const FOLLOW_UP_DEFAULT = ['overdue', 'followups', 'override', 'errors', 'cdDiscrepancy'];
 /* ── On-call (Stephan, 29 Sep 2026): the on-call contact is an employed staff member, and it follows the
  * roster. Rostering already marks on-call shifts per site (shifts.is_on_call / shift_type 'on_call') and has a
  * team_lead role; there is no separate “on-call manager” field. Synthetic roster for this preview. ── */
