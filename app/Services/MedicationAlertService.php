@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationSignalService;
 use App\Support\Medication\MedicationStockQuantity;
+use App\Support\WorkerClock;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -215,7 +216,7 @@ class MedicationAlertService
             return null;
         }
 
-        $daysUntilDue = now()->startOfDay()->diffInDays($latest->next_test_date->copy()->startOfDay(), false);
+        $daysUntilDue = WorkerClock::daysUntil($latest->next_test_date);
         if ($daysUntilDue > 3) {
             return null;
         }
@@ -242,7 +243,7 @@ class MedicationAlertService
         $alerts = [];
 
         if ($client->next_chart_review_date) {
-            $daysUntilReview = now()->startOfDay()->diffInDays($client->next_chart_review_date->copy()->startOfDay(), false);
+            $daysUntilReview = WorkerClock::daysUntil($client->next_chart_review_date);
             if ($daysUntilReview <= 7) {
                 $alerts[] = MedicationDashboardAlert::createOrUpdateAlert(
                     $client->id,
@@ -255,19 +256,20 @@ class MedicationAlertService
             }
         }
 
+        $reviewWindowEnd = WorkerClock::today()->addDays(7)->toDateString();
         $review = MedicationReview::query()
             ->where('client_id', $client->id)
             ->whereIn('status', ['scheduled', 'overdue'])
-            ->where(function ($query) {
-                $query->whereDate('scheduled_date', '<=', now()->addDays(7)->toDateString())
-                    ->orWhereDate('next_review_date', '<=', now()->addDays(7)->toDateString());
+            ->where(function ($query) use ($reviewWindowEnd) {
+                $query->whereDate('scheduled_date', '<=', $reviewWindowEnd)
+                    ->orWhereDate('next_review_date', '<=', $reviewWindowEnd);
             })
             ->orderByRaw('COALESCE(next_review_date, scheduled_date) asc')
             ->first();
 
         if ($review) {
             $dueDate = $review->next_review_date ?? $review->scheduled_date;
-            $daysUntilReview = now()->startOfDay()->diffInDays($dueDate->copy()->startOfDay(), false);
+            $daysUntilReview = WorkerClock::daysUntil($dueDate);
             $alerts[] = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'medication_review_due',
@@ -718,7 +720,7 @@ class MedicationAlertService
             ))
             ->when(! $canViewControlled, fn ($query) => $query->where('controlled_drug', false))
             ->whereNotNull('end_date')
-            ->where('end_date', '<=', now(config('app.worker_timezone', 'Pacific/Auckland'))->addDays(14)->toDateString())
+            ->where('end_date', '<=', WorkerClock::today()->addDays(14)->toDateString())
             ->where('end_date', '>=', now())
             ->with('client:id,first_name,last_name');
 

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +11,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Carbon;
 
 class ClientMedication extends Model
 {
@@ -456,9 +456,7 @@ class ClientMedication extends Model
             return null;
         }
 
-        $today = Carbon::parse(now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString());
-
-        return (int) $today->diffInDays($this->end_date->copy()->startOfDay());
+        return WorkerClock::daysUntil($this->end_date);
     }
 
     /**
