@@ -1,7 +1,7 @@
 /* Clinical — INR, syringe driver, observations taken with doses. Absorbs
  * RecordInrDialog and SyringeDriverDialog (both broken today, AUDIT.md). INR:
- * every reading is shown, linked to the warfarin order when there is one
- * (Stephan, 30 Sep: "follow industry standard" — a test result is never hidden). */
+ * every reading is shown; Record INR links it to the person's anticoagulant, or
+ * it reads "No medicine linked" with a reason (Stephan, 30 Sep). */
 import { EntityContextMenu, compactMenu, type MenuItem } from '@/components/lists/entity-menu';
 import { EntityTable } from '@/components/lists/entity-table';
 import { ListCaption } from '@/components/lists/list-caption';
@@ -10,9 +10,9 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SkeletonTable } from '@/components/ui/skeleton-table';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { Activity, AlertTriangle, Ban, CheckCircle2, ClipboardCheck, Info, Link2, LockKeyhole, Plus, Stethoscope, Syringe, ArrowUpRight } from 'lucide-react';
+import { Activity, AlertTriangle, Ban, CheckCircle2, ClipboardCheck, Info, Link2, LockKeyhole, Plus, Stethoscope, Syringe, Unlink, ArrowUpRight } from 'lucide-react';
 import { useState, type MouseEvent } from 'react';
-import { DRIVER, FACTS, OBSERVATIONS, medsOf, type DriverCheck, type InrReading, type PersonId } from '../data';
+import { DRIVER, FACTS, OBSERVATIONS, anticoagulantsOf, medByKey, type DriverCheck, type InrReading, type PersonId } from '../data';
 import { PEOPLE } from '../p01/data';
 import { DesignNote, Notice, NotConfigured } from '../p01/ui';
 import { useDlg, useP02 } from '../store';
@@ -51,31 +51,60 @@ export function ClinicalTab({ pid, view }: { pid: PersonId; view: string }) {
 }
 
 /* ───────────── INR ───────────── */
+/** "No medicine linked" (Stephan, 30 Sep) with its reason — never hidden. */
+export function NoMedLinked({ reason, compact = false }: { reason?: string; compact?: boolean }) {
+    return (
+        <span className="flex flex-col items-start gap-0.5">
+            <StatusBadge variant="warning" className="rounded-[8px]">
+                <Unlink className="size-3" aria-hidden="true" /> No medicine linked
+            </StatusBadge>
+            {!compact && reason ? <span className="text-[11.5px] leading-snug whitespace-normal text-muted-foreground">{reason}</span> : null}
+        </span>
+    );
+}
 function Inr({ pid }: { pid: PersonId }) {
     const s = useP02();
     const dlg = useDlg();
     const ctx = useCtx();
-    const warfarin = medsOf(pid).find((m) => m.inr && m.status !== 'stopped');
+    const orders = anticoagulantsOf(pid);
     const canManage = s.can('orders.manage');
-    if (!warfarin)
-        return (
-            <Card className="p-2">
-                <EmptyState icon={Activity} title={`${PEOPLE[pid].pref} has no medicine that needs INR tests`} description="INR results are recorded here when a medicine such as warfarin is on the chart. A result can still be recorded without one." action={canManage ? <Button variant="outline" onClick={() => dlg.open('inr:new')}>Record INR result</Button> : undefined} />
-            </Card>
-        );
-    const readings = s.inr;
+    const readings = s.inrFor(pid);
     const latest = readings.find((r) => !r.disabled);
-    const stale = s.route.state === 'inrStale';
+    const stale = s.route.state === 'inrStale' && pid === 'aroha';
     const st = latest ? inrStatus(latest) : null;
+    const medName = (k: string | null) => (k ? `${medByKey(k).name} ${medByKey(k).strength}` : '');
+    const linkedOrder = latest?.med ? medByKey(latest.med) : null;
+    const record = canManage ? (
+        <Button onClick={() => dlg.open('inr:new')}>
+            <Plus className="size-4" /> Record INR result
+        </Button>
+    ) : null;
+    const link = (r: InrReading) => {
+        if (orders.length === 1) {
+            s.linkInr(r.id, orders[0].key);
+            s.toast('success', `Linked to ${medName(orders[0].key)}.`);
+        } else dlg.open(`inr-link:${r.id}`);
+    };
     const menu = (r: InrReading): MenuItem[] =>
         compactMenu([
             { label: 'View result', icon: Info, onClick: () => dlg.open(`inr:${r.id}`) },
-            canManage && !r.linked && !r.disabled && { label: 'Link to the warfarin order', icon: Link2, onClick: () => (s.linkInr(r.id), s.toast('success', `Linked to ${warfarin.name} ${warfarin.strength}.`)) },
+            canManage && !r.med && !r.disabled && orders.length > 0 && { label: orders.length === 1 ? `Link to ${medName(orders[0].key)}` : 'Link to an anticoagulant…', icon: Link2, onClick: () => link(r) },
             { separator: true },
             canManage && !r.disabled && { label: 'Mark as entered in error…', icon: Ban, danger: true, onClick: () => dlg.open(`inr-error:${r.id}`) },
         ]);
+    if (!orders.length && !readings.length)
+        return (
+            <Card className="p-2">
+                <EmptyState icon={Activity} title={`No INR results and no anticoagulant on ${PEOPLE[pid].pref}’s chart`} description="If a result arrives anyway (for example from the hospital), record it — it’s shown with “No medicine linked” and the reason." action={record ?? undefined} />
+            </Card>
+        );
     return (
         <>
+            {!orders.length ? (
+                <Notice tone="neutral" icon={Info} title={`${PEOPLE[pid].pref} has no anticoagulant on the chart`}>
+                    Results are still shown, each labelled “No medicine linked” with the reason. If an anticoagulant is ordered later, a lead can link them.
+                </Notice>
+            ) : null}
             {stale ? (
                 <Notice tone="warning" icon={AlertTriangle} title={`INR test overdue — the next test was due ${latest?.next}`}>
                     No newer result has been recorded. Follow {PEOPLE[pid].pref}’s plan: contact the anticoagulation clinic or prescriber today, and record the result here when it comes. On-call contact: <NotConfigured />
@@ -92,14 +121,10 @@ function Inr({ pid }: { pid: PersonId }) {
                                 <StatusBadge variant={st!.variant} className="rounded-[8px]">
                                     {st!.label}
                                 </StatusBadge>
-                                {!latest.linked ? (
-                                    <StatusBadge variant="warning" className="rounded-[8px]">
-                                        Not linked to a medicine
-                                    </StatusBadge>
-                                ) : null}
+                                {!latest.med ? <NoMedLinked compact /> : null}
                             </span>
                         }
-                        right={canManage ? <Button onClick={() => dlg.open('inr:new')}><Plus className="size-4" /> Record INR result</Button> : null}
+                        right={record}
                     >
                         <p className="text-sm">
                             <span className="text-muted-foreground">Instruction · </span>
@@ -113,32 +138,54 @@ function Inr({ pid }: { pid: PersonId }) {
                             ]}
                         />
                         <p className="text-caption">
-                            {latest.linked ? `Linked to ${warfarin.name} ${warfarin.strength} · ` : 'Not linked to a medicine · '}entered by {latest.by}
+                            {latest.med ? `Linked to ${medName(latest.med)}${latest.linkedLater ? ` · ${latest.linkedLater}` : ''} · ` : `No medicine linked — ${latest.unlinkedReason ?? 'no reason recorded'} · `}entered by {latest.by}
                         </p>
                     </SectionCard>
-                    <SectionCard eyebrow="Linked order" title={`${warfarin.name} ${warfarin.strength}`} icon={Link2}>
-                        <p className="text-sm">{warfarin.when} · {warfarin.amount}</p>
-                        <p className="text-caption">{warfarin.order} · prescribed by {warfarin.prescriber}. The 5:00 pm dose follows the latest instruction above.</p>
-                        {!canManage ? <p className="text-caption">INR results are recorded by house leads and clinical leads — ask Jordan Tipene.</p> : null}
+                    <SectionCard eyebrow={linkedOrder ? 'Linked order' : 'Anticoagulant orders'} title={linkedOrder ? medName(linkedOrder.key) : orders.length ? `${orders.length} on the chart — none linked to this result` : 'None on the chart'} icon={Link2}>
+                        {linkedOrder ? (
+                            <>
+                                <p className="text-sm">{linkedOrder.when} · {linkedOrder.amount}</p>
+                                <p className="text-caption">{linkedOrder.order} · prescribed by {linkedOrder.prescriber}. The 5:00 pm dose follows the latest instruction.</p>
+                            </>
+                        ) : orders.length ? (
+                            <>
+                                <ul className="divide-y rounded-lg border text-sm">
+                                    {orders.map((o) => (
+                                        <li key={o.key} className="px-3 py-2">
+                                            {medName(o.key)} · {o.when}
+                                        </li>
+                                    ))}
+                                </ul>
+                                {canManage && !latest.disabled ? (
+                                    <Button variant="outline" onClick={() => link(latest)}>
+                                        <Link2 className="size-4" /> {orders.length === 1 ? `Link to ${medName(orders[0].key)}` : 'Link to an anticoagulant…'}
+                                    </Button>
+                                ) : null}
+                            </>
+                        ) : (
+                            <p className="text-subtle">Nothing to link. The result stays visible everywhere.</p>
+                        )}
+                        {orders.length > 1 && linkedOrder ? <p className="text-caption">{orders.length} anticoagulant orders are on the chart; each result names the one it guides.</p> : null}
+                        {!canManage ? <p className="text-caption">INR results are recorded and linked by house leads and clinical leads — ask Jordan Tipene.</p> : null}
                     </SectionCard>
                 </div>
             ) : null}
             <section aria-label="INR results" className="flex flex-col gap-2.5">
-                <ListCaption title="INR results" caption={`${readings.length} of ${readings.length} shown · newest first · last 3 months`} />
+                <ListCaption title="INR results" caption={`${readings.length} of ${readings.length} shown · newest first · ${readings.filter((r) => !r.med).length} with no medicine linked`} />
                 <EntityTable<InrReading>
                     rows={readings}
                     rowKey={(r) => r.id}
                     identityLabel="Result"
-                    identityWidth="1.2fr"
+                    identityWidth="1.1fr"
                     rowHeight="content"
-                    minWidth={1080}
+                    minWidth={1100}
                     identity={(r) => ({ icon: Activity, name: `INR ${r.value.toFixed(1)}`, subline: `Tested ${r.tested}` })}
                     columns={[
                         { key: 'st', label: 'Against the target', width: '1.4fr', cell: (r) => (r.disabled ? <StatusBadge variant="neutral" className="rounded-[8px]">Entered in error</StatusBadge> : <StatusBadge variant={inrStatus(r).variant} className="rounded-[8px]">{inrStatus(r).label} · {targetText(r)}</StatusBadge>) },
-                        { key: 'ins', label: 'Instruction', width: '1.4fr', cell: (r) => <span className="text-[12.5px]">{r.instruction}</span> },
-                        { key: 'next', label: 'Next test', width: '0.9fr', cell: (r) => <span className="text-[12.5px]">{r.next ?? 'Not set'}</span> },
-                        { key: 'link', label: 'Medicine', width: '1.1fr', cell: (r) => (r.linked ? <span className="text-[12.5px]">{warfarin.name} {warfarin.strength.replace(' tablet', '')}</span> : <StatusBadge variant="warning" className="rounded-[8px]">Not linked</StatusBadge>) },
-                        { key: 'by', label: 'Entered by', width: '1fr', cell: (r) => <span className="text-[12.5px]">{r.by}</span> },
+                        { key: 'ins', label: 'Instruction', width: '1.3fr', cell: (r) => <span className="text-[12.5px]">{r.instruction}</span> },
+                        { key: 'next', label: 'Next test', width: '0.8fr', cell: (r) => <span className="text-[12.5px]">{r.next ?? 'Not set'}</span> },
+                        { key: 'link', label: 'Medicine', width: '1.5fr', cell: (r) => (r.med ? <span className="text-[12.5px]">{medName(r.med)}{r.linkedLater ? <span className="block text-[11.5px] text-muted-foreground">{r.linkedLater}</span> : null}</span> : <NoMedLinked reason={r.unlinkedReason} />) },
+                        { key: 'by', label: 'Entered by', width: '0.9fr', cell: (r) => <span className="text-[12.5px]">{r.by}</span> },
                     ]}
                     actionsFor={menu}
                     onOpen={(r) => dlg.open(`inr:${r.id}`)}
@@ -147,15 +194,11 @@ function Inr({ pid }: { pid: PersonId }) {
                 />
                 {ctx.node}
             </section>
-            {s.route.state === 'inrUnlinked' ? (
-                <DesignNote title="Design note — NF-23, an INR saved without a medicine">
-                    <p>Today the MAR page’s Record INR never sends the medicine, and every INR list (this card, the Overview action list, the dashboard INR watch, reports) filters out results with no medicine — so this 2.4 would vanish. Here it shows, labelled “Not linked”, and a lead can link it. Stephan (30 Sep): “follow industry standard” → every result is shown; Record INR pre-selects the warfarin order. Confirm at approval.</p>
-                </DesignNote>
-            ) : (
-                <DesignNote title="Design note — INR">
-                    <p>Target and instruction come from the prescriber or anticoagulation clinic with each result — nothing is calculated. “No target recorded” is shown as that, never as “below range” (today’s mislabel). Results are never deleted; a wrong one is marked “entered in error” with a reason.</p>
-                </DesignNote>
-            )}
+            <DesignNote title="Design note — INR and the medicine it guides (NF-23)">
+                <p>
+                    Stephan (30 Sep): every INR result is shown, labelled “No medicine linked” when it has none. Record INR links the result to the person’s anticoagulant: one order is pre-chosen, several are chosen in a picker, none gives “No medicine linked” with a required reason. Today the MAR page’s Record INR never sends the medicine and every INR list drops unlinked results (the fix is on <code>claude/infallible-bhabha-5e802c</code>, not merged). Target and instruction come from the prescriber or clinic — nothing is calculated; “No target recorded” is never shown as “below range”.
+                </p>
+            </DesignNote>
         </>
     );
 }

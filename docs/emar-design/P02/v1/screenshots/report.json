@@ -1,6 +1,6 @@
 {
   "base": "http://127.0.0.1:4383/",
-  "when": "2026-09-29T20:34:47.415Z",
+  "when": "2026-09-29T20:48:28.567Z",
   "shots": [
     {
       "shot": "01-chart-day",
@@ -1059,6 +1059,102 @@
       "stepError": null
     },
     {
+      "shot": "63a-record-inr-not-for-this-medicine",
+      "size": "1440",
+      "file": "1440-63a-record-inr-not-for-this-medicine.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "63b-record-inr-choose-anticoagulant",
+      "size": "1440",
+      "file": "1440-63b-record-inr-choose-anticoagulant.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "63b-record-inr-choose-anticoagulant",
+      "size": "1280",
+      "file": "1280-63b-record-inr-choose-anticoagulant.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "63b-record-inr-choose-anticoagulant",
+      "size": "zoom200",
+      "file": "zoom200-63b-record-inr-choose-anticoagulant.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "63c-record-inr-choose-validation",
+      "size": "1440",
+      "file": "1440-63c-record-inr-choose-validation.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "63d-record-inr-no-anticoagulant",
+      "size": "1440",
+      "file": "1440-63d-record-inr-no-anticoagulant.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "63d-record-inr-no-anticoagulant",
+      "size": "1280",
+      "file": "1280-63d-record-inr-no-anticoagulant.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "63d-record-inr-no-anticoagulant",
+      "size": "zoom200",
+      "file": "zoom200-63d-record-inr-no-anticoagulant.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
       "shot": "64-record-inr-out-of-range",
       "size": "1440",
       "file": "1440-64-record-inr-out-of-range.png",
@@ -1086,6 +1182,102 @@
       "shot": "66-inr-entered-in-error",
       "size": "1440",
       "file": "1440-66-inr-entered-in-error.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "66a-inr-two-orders-no-medicine-linked",
+      "size": "1440",
+      "file": "1440-66a-inr-two-orders-no-medicine-linked.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "66a-inr-two-orders-no-medicine-linked",
+      "size": "1280",
+      "file": "1280-66a-inr-two-orders-no-medicine-linked.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "66a-inr-two-orders-no-medicine-linked",
+      "size": "zoom200",
+      "file": "zoom200-66a-inr-two-orders-no-medicine-linked.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "66b-inr-link-afterwards-picker",
+      "size": "1440",
+      "file": "1440-66b-inr-link-afterwards-picker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "66c-inr-no-anticoagulant-results",
+      "size": "1440",
+      "file": "1440-66c-inr-no-anticoagulant-results.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "66c-inr-no-anticoagulant-results",
+      "size": "1280",
+      "file": "1280-66c-inr-no-anticoagulant-results.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "66c-inr-no-anticoagulant-results",
+      "size": "zoom200",
+      "file": "zoom200-66c-inr-no-anticoagulant-results.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "66d-inr-result-no-medicine-detail",
+      "size": "1440",
+      "file": "1440-66d-inr-result-no-medicine-detail.png",
       "overflow": 0,
       "header": {
         "sublineLines": 2,

@@ -17,7 +17,7 @@ A Vite + React preview built exactly like P01 v1 (its scaffold, harness and cont
 node docs/emar-design/P02/v1/serve.mjs
 ```
 
-Then open **http://127.0.0.1:4383/** — port **4383**, not the 4382 the brief suggested: 4382 is already serving `docs/emar-design/P01/v2/` from another session. The hatched bar is the **mockup viewer, not product UI**: *Signed in as* (Priya Shah support worker · Jordan Tipene house lead · Hana Kereama clinical lead without controlled-medicine access · Mereana Walsh auditor · Rangi Parata provider manager · Sione Taufa Rimu House lead · Tui Morgan HR without medication access), *Person* (Aroha, Tama, Mele, Grace, Sam, Ben — each carries a state, named in the list) and *Page state* (normal, loading, no medicines, couldn’t load, out of date, INR test overdue, INR saved without a medicine). Changes made in the preview survive persona switches and reset on reload. The clock is P01’s: **Monday 28 September 2026, 9:12 am NZDT**.
+Then open **http://127.0.0.1:4383/** — port **4383**, not the 4382 the brief suggested: 4382 is already serving `docs/emar-design/P01/v2/` from another session. The hatched bar is the **mockup viewer, not product UI**: *Signed in as* (Priya Shah support worker · Jordan Tipene house lead · Hana Kereama clinical lead without controlled-medicine access · Mereana Walsh auditor · Rangi Parata provider manager · Sione Taufa Rimu House lead · Tui Morgan HR without medication access), *Person* (Aroha, Tama, Mele, Grace, Sam, Ben — each carries a state, named in the list) and *Page state* (normal, loading, no medicines, couldn’t load, out of date, INR test overdue, INR saved with no medicine linked, two anticoagulant orders). Changes made in the preview survive persona switches and reset on reload. The clock is P01’s: **Monday 28 September 2026, 9:12 am NZDT**.
 
 **The contract** (`#/p02/contract`) states the decisions, the one place each fact is edited, who sees what, and deep-links every state and all eight dialogs.
 
@@ -62,28 +62,27 @@ It reads the same payload as the record: allergies (with review line), chart ale
 
 ### 5. States
 
-Allergies recorded and reviewed (Aroha) · recorded, **not reviewed** (Mele) · **none recorded** (Tama) · **couldn’t load** (Grace) · **no known allergies** (Sam); **controlled medicines concealed** for Hana and the auditor in the chart, week, medicines, support, photos, alerts, interactions, INR/driver (a driver with a controlled medicine is hidden whole), history, corrections, all changes, captions, dialogs and the printout, using P11 v4’s “Details need controlled-medicine access”; the **correction chain** (waiting, approved, declined; the two-person rule shown before anyone tries; controlled records can’t be corrected here); **stale INR** (test overdue); the **NF-23** unlinked INR shown and linkable; the **house move** (Ben: Rimu House sees the move banner and a House column; Kōwhai staff get “We can’t show this record”); **no access** (page) vs **not found** (record); **loading, no medicines, couldn’t load, out of date**; **read-only** auditor; pause dose alerts and stop-showing-on-open as **loosening** with a destructive “Loosens this check” confirm.
+Allergies recorded and reviewed (Aroha) · recorded, **not reviewed** (Mele) · **none recorded** (Tama) · **couldn’t load** (Grace) · **no known allergies** (Sam); **controlled medicines concealed** for Hana and the auditor in the chart, week, medicines, support, photos, alerts, interactions, INR/driver (a driver with a controlled medicine is hidden whole), history, corrections, all changes, captions, dialogs and the printout, using P11 v4’s “Details need controlled-medicine access”; the **correction chain** (waiting, approved, declined; the two-person rule shown before anyone tries; controlled records can’t be corrected here); **stale INR** (test overdue); **INR and its anticoagulant** — one order pre-chosen, two orders chosen in a picker (and linked afterwards), no anticoagulant (Tama) giving “No medicine linked” with the reason, linked and unlinked results side by side (NF-23); the **house move** (Ben: Rimu House sees the move banner and a House column; Kōwhai staff get “We can’t show this record”); **no access** (page) vs **not found** (record); **loading, no medicines, couldn’t load, out of date**; **read-only** auditor; pause dose alerts and stop-showing-on-open as **loosening** with a destructive “Loosens this check” confirm.
 
 ## Stephan’s answers (asked before building, 30 September 2026)
 
 | # | Question | Answer | Applied as |
 |---|---|---|---|
-| A1 | An INR result saved with no medicine is hidden (NF-23) | “follow industry standard” | **A test result is never hidden:** every INR shows everywhere; Record INR pre-selects the person’s warfarin order; an unlinked result is labelled and a lead can link it. *Confirm at approval (Q1).* |
+| A1 | An INR result saved with no medicine is hidden (NF-23) | “follow industry standard”; then **decided (30 Sep, relayed by the review session): every INR result is shown, labelled “No medicine linked” when it has none** | Record INR links the result to the person’s anticoagulant: **one order → pre-chosen** (“Not for this medicine” switches to none); **several → chosen in a searchable picker**, never pre-selected; **none → “No medicine linked” with a required reason**. A lead can link a result afterwards. Clinical › INR shows linked and unlinked results side by side. |
 | A2 | Where allergies are edited | **Health profile only** | The Medical tab’s allergy card is the one place; the API-only medication allergy list is merged into it (severity, reaction) at build; the record links there. |
 | A3 | Who confirms the allergy list | **Leads confirm it** | House and clinical leads mark “reviewed” or “No known allergies”, saying how they checked; “Not reviewed” until then; review interval Not configured (clinical lead). |
-| A4 | What the old house sees after a move | “follow industry standard” | **Access follows the current house** (need-to-know): old-house staff get “We can’t show this record”; each dose keeps the house it was given at; the new house sees the move banner. *Confirm at approval (Q2).* |
+| A4 | What the old house sees after a move | “follow industry standard” | **Access follows the current house** (need-to-know): old-house staff get “We can’t show this record”; each dose keeps the house it was given at; the new house sees the move banner. *Confirm at approval (Q1).* |
 
 These go to the review session for the Approval record.
 
 ## Open questions for Stephan
 
-1. **INR (A1):** confirm “industry standard” as applied — every result shown, the warfarin order pre-selected, unlinked results labelled and linkable by a lead.
-2. **House move (A4):** confirm — access ends for the old house at the move; history keeps the house of each dose.
-3. **Who approves a correction?** Today anyone with correction access except the person who asked — including support workers. Keep that (recommended: it works on a shift with no lead), or leads only?
-4. **Syringe driver checks:** today only leads (`orders.manage`) can record a check. Let staff on shift who record doses record checks too (recommended), with leads starting and finishing a driver?
-5. **Reading chart alerts:** store “I’ve read them” (who, when, once a day) — today it isn’t saved (recommended), or keep it as a reminder only?
-6. **Readings taken with a dose** (blood sugar before insulin): also show them in the client’s Health monitoring (recommended: stored once, shown in both), or keep them in the dose record only?
-7. **Sections on the rail (layout):** the record follows the Fleet vehicle profile — sections on the header rail, sub-views on the tier-2 strip — rather than the plan’s single tier-2 row. OK?
+1. **House move (A4):** confirm — access ends for the old house at the move; history keeps the house of each dose.
+2. **Who approves a correction?** Today anyone with correction access except the person who asked — including support workers. Keep that (recommended: it works on a shift with no lead), or leads only?
+3. **Syringe driver checks:** today only leads (`orders.manage`) can record a check. Let staff on shift who record doses record checks too (recommended), with leads starting and finishing a driver?
+4. **Reading chart alerts:** store “I’ve read them” (who, when, once a day) — today it isn’t saved (recommended), or keep it as a reminder only?
+5. **Readings taken with a dose** (blood sugar before insulin): also show them in the client’s Health monitoring (recommended: stored once, shown in both), or keep them in the dose record only?
+6. **Sections on the rail (layout):** the record follows the Fleet vehicle profile — sections on the header rail, sub-views on the tier-2 strip — rather than the plan’s single tier-2 row. OK?
 
 Also for the review session (not Stephan): which package designs the **MAR & medicines hub** itself (the cross-person chart board with no person chosen)? P02’s breadcrumb and back chip point there; the preview shows a boundary page.
 
@@ -98,11 +97,11 @@ Also for the review session (not Stephan): which package designs the **MAR & med
 
 ## Verification (30 September 2026)
 
-- `tools/verify.mjs`: **182 captures** — all 86 states at 1440 × 900 and the 48 core states also at 1280 × 800 and 200 % (720 × 450 CSS px at device scale 2). **Horizontal overflow 0, console errors 0, every scripted step completed** (`screenshots/report.json`). Header sublines are two lines (record and profile). Meter captions: none truncated at 1440 or 1280; at 200 % only the client-profile frame’s real Medications caption (“active meds · no pending alerts”, live wording) truncates.
+- `tools/verify.mjs`: **198 captures** — all 94 states at 1440 × 900 and the 52 core states also at 1280 × 800 and 200 % (720 × 450 CSS px at device scale 2). **Horizontal overflow 0, console errors 0, every scripted step completed** (`screenshots/report.json`). Header sublines are two lines (record and profile). Meter captions: none truncated at 1440 or 1280; at 200 % only the client-profile frame’s real Medications caption (“active meds · no pending alerts”, live wording) truncates.
 - Keyboard (real key events over CDP): Enter on a focused chart cell opens P01’s dialog; Tab stays inside it; Escape closes it and focus returns to the same cell; the keyboard menu key on a cell opens the same menu as right-click.
 - `tsc` clean for `src/`; the app’s ESLint config: 24 files, 0 errors, 0 warnings.
 - Compared at 1440 in the browser with the live Fleet vehicle profile (`/fleet-assets/vehicles/11`), the live client profile MAR tab and today’s `/emar/mar`, as Demo Admin on oblivionfindings.test.
 
 ## Approval requested
 
-After the review session’s inspection, please approve **eMAR P02 v1** exactly as identified by the hashes in `VERSION.txt`, with answers to Q1–Q7, or list the changes for a v2.
+After the review session’s inspection, please approve **eMAR P02 v1** exactly as identified by the hashes in `VERSION.txt`, with answers to Q1–Q6, or list the changes for a v2.

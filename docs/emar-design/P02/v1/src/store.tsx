@@ -11,6 +11,7 @@ import {
     INR,
     INR_STALE,
     INR_UNLINKED,
+    INR_BY_PERSON,
     P02_PERSONAS,
     type ChartAlert,
     type Correction,
@@ -24,7 +25,7 @@ import {
 import { setSharedProps } from './p01/inertia-shim';
 import { useStore as useStore01 } from './p01/store';
 
-export type P02State = 'normal' | 'loading' | 'empty' | 'unavailable' | 'stale' | 'inrStale' | 'inrUnlinked';
+export type P02State = 'normal' | 'loading' | 'empty' | 'unavailable' | 'stale' | 'inrStale' | 'inrUnlinked' | 'inrTwoOrders';
 export const STATES: { key: P02State; label: string; group: string }[] = [
     { key: 'normal', label: 'Normal', group: 'Page' },
     { key: 'loading', label: 'Loading', group: 'Page' },
@@ -32,7 +33,8 @@ export const STATES: { key: P02State; label: string; group: string }[] = [
     { key: 'unavailable', label: 'Couldn’t load', group: 'Page' },
     { key: 'stale', label: 'Out of date', group: 'Page' },
     { key: 'inrStale', label: 'INR test overdue', group: 'Clinical' },
-    { key: 'inrUnlinked', label: 'INR saved without a medicine (NF-23)', group: 'Clinical' },
+    { key: 'inrUnlinked', label: 'INR saved with no medicine linked (NF-23)', group: 'Clinical' },
+    { key: 'inrTwoOrders', label: 'Two anticoagulant orders', group: 'Clinical' },
 ];
 export type Tab = 'chart' | 'medicines' | 'support' | 'allergies' | 'clinical' | 'history';
 export const VIEWS: Record<Tab, { key: string; label: string }[]> = {
@@ -115,10 +117,10 @@ export interface Store {
     readAlerts: (pid: string) => void;
     paused: Record<string, { basis: string; reason: string; by: string; at: string } | null>;
     setPaused: (pid: string, v: { basis: string; reason: string } | null) => void;
-    inr: InrReading[];
-    addInr: (r: InrReading) => void;
+    inrFor: (pid: string) => InrReading[];
+    addInr: (pid: string, r: InrReading) => void;
     disableInr: (id: string, reason: string) => void;
-    linkInr: (id: string) => void;
+    linkInr: (id: string, medKey: string) => void;
     corrections: Record<string, Correction>;
     setCorrection: (adminId: string, c: Correction) => void;
     reviewed: Record<string, { by: string; on: string; how: string; nkda?: boolean }>;
@@ -137,9 +139,9 @@ export function P02Provider({ children }: { children: ReactNode }) {
     const [alerts, setAlerts] = useState<ChartAlert[]>(ALERTS);
     const [alertsRead, setAlertsRead] = useState<Record<string, string>>({});
     const [paused, setPausedState] = useState<Store['paused']>({});
-    const [extraInr, setExtraInr] = useState<InrReading[]>([]);
+    const [extraInr, setExtraInr] = useState<(InrReading & { pid: string })[]>([]);
     const [disabled, setDisabled] = useState<Record<string, string>>({});
-    const [linked, setLinked] = useState<Record<string, boolean>>({});
+    const [links, setLinks] = useState<Record<string, { med: string; by: string }>>({});
     const [corrections, setCorrections] = useState<Record<string, Correction>>({});
     const [reviewed, setReviewed] = useState<Store['reviewed']>({});
     const [driverChecks, setDriverChecks] = useState<DriverCheck[]>([]);
@@ -194,12 +196,19 @@ export function P02Provider({ children }: { children: ReactNode }) {
         [route],
     );
 
-    const baseInr = route.state === 'inrStale' ? INR_STALE : route.state === 'inrUnlinked' ? INR_UNLINKED : INR;
-    const inr = [...extraInr, ...baseInr].map((r) => ({
-        ...r,
-        linked: r.linked || !!linked[r.id],
-        disabled: disabled[r.id] ? { by: me.name, reason: disabled[r.id] } : r.disabled,
-    }));
+    const inrFor = (p: string): InrReading[] => {
+        const base = p === 'aroha' ? (route.state === 'inrStale' ? INR_STALE : route.state === 'inrUnlinked' || route.state === 'inrTwoOrders' ? INR_UNLINKED : INR) : (INR_BY_PERSON[p as PersonId] ?? []);
+        return [...extraInr.filter((r) => r.pid === p), ...base].map((r) => {
+            const link = !r.med ? links[r.id] : undefined;
+            return {
+                ...r,
+                med: r.med ?? link?.med ?? null,
+                unlinkedReason: link ? undefined : r.unlinkedReason,
+                linkedLater: link ? `Linked by ${link.by} at 9:12 am today` : r.linkedLater,
+                disabled: disabled[r.id] ? { by: me.name, reason: disabled[r.id] } : r.disabled,
+            };
+        });
+    };
     const today = '9:12 am';
     const store: Store = {
         route,
@@ -216,10 +225,10 @@ export function P02Provider({ children }: { children: ReactNode }) {
         readAlerts: (p) => setAlertsRead((x) => ({ ...x, [`${route.persona}:${p}`]: today })),
         paused,
         setPaused: (p, v) => setPausedState((x) => ({ ...x, [p]: v ? { ...v, by: me.name, at: `${today} today` } : null })),
-        inr,
-        addInr: (r) => setExtraInr((x) => [r, ...x]),
+        inrFor,
+        addInr: (p, r) => setExtraInr((x) => [{ ...r, pid: p }, ...x]),
         disableInr: (id, reason) => setDisabled((x) => ({ ...x, [id]: reason })),
-        linkInr: (id) => setLinked((x) => ({ ...x, [id]: true })),
+        linkInr: (id, medKey) => setLinks((x) => ({ ...x, [id]: { med: medKey, by: me.name } })),
         corrections,
         setCorrection: (adminId, c) => setCorrections((x) => ({ ...x, [adminId]: c })),
         reviewed,

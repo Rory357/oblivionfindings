@@ -162,7 +162,7 @@ function Record({ pid }: { pid: PersonId }) {
     const soFar = visibleToday.filter((c) => !['notdue', 'selfmanaged'].includes(c.state));
     const recorded = soFar.filter((c) => c.rec);
     const onWarfarin = meds.some((m) => m.inr);
-    const latestInr = s.inr.find((r) => !r.disabled);
+    const latestInr = s.inrFor(pid).find((r) => !r.disabled);
     const pending = admins.filter((a) => a.correction?.status === 'pending' && (s.cdView || !MED_CD(a.med))).length;
     const go = (t: Tab, v?: string, extra: Record<string, string | undefined> = {}) => s.set({ tab: t === 'chart' ? undefined : t, view: v, dlg: undefined, page: undefined, ...extra });
     const empty = state === 'empty';

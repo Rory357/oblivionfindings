@@ -139,6 +139,8 @@ export interface Medicine {
     instructions: string;
     support: Support;
     kind: 'scheduled' | 'prn';
+    /** Shown only in this viewer page state (mockup fixture switch). */
+    scenario?: 'inrTwoOrders';
     /** P01 as-needed order id (PRN medicines only). */
     prn?: string;
     status: 'active' | 'awaiting' | 'stopped';
@@ -201,6 +203,11 @@ export const MEDICINES: Medicine[] = [
         supply: 'Bottle from Kōwhai Pharmacy', review: 'INR-guided · reviewed with each result',
     },
     {
+        key: 'warfarin3', pid: 'aroha', name: 'Warfarin', strength: '3 mg tablet', route: 'By mouth', when: '5:00 pm', amount: 'As instructed with each INR result — made up with the 1 mg tablets', instructions: 'The pharmacy supplies two strengths and the dose is made up from both. Follow the latest instruction on the Clinical tab.', support: 'administer', kind: 'scheduled', status: 'active', inr: true, scenario: 'inrTwoOrders',
+        order: 'Verified 18 August 2026 by Jordan Tipene', prescriber: 'Dr Lena Chen', started: '18 August 2026', doseIds: ['w2'], slots: ['5:00 pm'],
+        photos: [], supply: 'Bottle from Kōwhai Pharmacy', review: 'INR-guided · reviewed with each result',
+    },
+    {
         key: 'paracetamol', pid: 'aroha', name: 'Paracetamol', strength: '500 mg tablet', route: 'By mouth', when: 'When needed', amount: '1 or 2 tablets', instructions: 'For pain · up to 4 doses in 24 hours, at least 4 hours apart (from the prescription)', support: 'administer', kind: 'prn', prn: 'p1', status: 'active',
         order: V, prescriber: 'Dr Lena Chen', started: '1 August 2026', doseIds: [], slots: [],
         photos: [{ file: 'paracetamol.png', taken: '3 Sep 2026', by: 'Jordan Tipene', pack: 'Pharmacy bottle', state: 'current' }],
@@ -225,14 +232,27 @@ export const MEDICINES: Medicine[] = [
     { key: 'lorazepam', pid: 'grace', name: 'Lorazepam', strength: '0.5 mg tablet', route: 'By mouth', when: 'When needed', amount: '1 tablet', instructions: 'For distress as described in the support plan · up to 2 doses in 24 hours (from the prescription)', support: 'administer', kind: 'prn', prn: 'p5', status: 'active', cd: true, order: V, prescriber: 'Dr Lena Chen', started: '1 June 2026', doseIds: [], slots: [], photos: [], supply: 'Controlled-drug cupboard', review: 'Medication review due 1 February 2027' },
     { key: 'amlodipine', pid: 'ben', name: 'Amlodipine', strength: '5 mg tablet', route: 'By mouth', when: '9:00 am', amount: '1 tablet', instructions: 'Once a day', support: 'administer', kind: 'scheduled', status: 'active', order: V, prescriber: 'Dr Lena Chen', started: '1 August 2026', doseIds: ['r21'], slots: ['9:00 am'], photos: [], supply: 'Blister packs — moved with Ben from Kōwhai House', review: 'Medication review due 1 February 2027' },
 ];
-export const medsOf = (pid: string) => MEDICINES.filter((m) => m.pid === pid);
+/** The viewer's page state, read from the hash (mockup-only fixture switch). */
+export const pageState = () => {
+    try {
+        return new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('state');
+    } catch {
+        return null;
+    }
+};
+export const medsOf = (pid: string) => MEDICINES.filter((m) => m.pid === pid && (!m.scenario || m.scenario === pageState()));
+/** Anticoagulant orders (INR-guided) on the person's chart now. */
+export const anticoagulantsOf = (pid: string) => medsOf(pid).filter((m) => m.inr && m.status === 'active');
 export const medByKey = (k: string) => MEDICINES.find((m) => m.key === k)!;
 export const medForDose = (doseId: string) => MEDICINES.find((m) => m.doseIds.includes(doseId)) ?? null;
 export const doseOf = (id: string): Dose | undefined => DOSES.find((d) => d.id === id);
 export const prnOf = (pid: string) => PRN.filter((p) => p.pid === pid);
 
-/** P02-only planned dose today (not due until 4:30 pm — never opened in P01's dialog). */
-export const WARFARIN_TODAY = { id: 'w1', slot: '5:00 pm', med: 'warfarin', amount: '3 tablets (3 mg)', line: 'Window opens 4:30 pm' };
+/** P02-only planned doses today (not due until 4:30 pm — never opened in P01's dialog). */
+export const PLANNED: Record<string, { slot: string; line: string }> = {
+    w1: { slot: '5:00 pm', line: 'Window opens 4:30 pm' },
+    w2: { slot: '5:00 pm', line: 'Window opens 4:30 pm' },
+};
 
 /* ───────────── 7-day history (Tue 22 – Sun 27 Sep; today comes from P01's store) ───────────── */
 export type HOutcome = 'given' | 'prompted' | 'assisted' | 'reoffered' | 'refused' | 'withheld' | 'away' | 'selfmanaged';
@@ -366,19 +386,35 @@ export interface InrReading {
     nextIso: string | null;
     by: string;
     source: string;
-    linked: boolean;
+    /** The anticoagulant order this result guides; null shows "No medicine linked" (Stephan, 30 Sep). */
+    med: string | null;
+    /** Why no medicine is linked — required whenever med is null. */
+    unlinkedReason?: string;
+    /** Linked afterwards by a lead. */
+    linkedLater?: string;
     disabled?: { by: string; reason: string };
 }
+/** Reasons offered when a result is saved with no medicine linked. */
+export const NO_MED_REASONS = [
+    'The result came from another service (hospital or GP)',
+    'The anticoagulant isn’t ordered on this chart yet',
+    'Monitoring only — no anticoagulant',
+    'Other (say in the note)',
+];
 export const INR: InrReading[] = [
-    { id: 'i4', value: 2.4, tested: '21 Sep 2026', testedIso: '2026-09-21', target: [2, 3], instruction: '3 mg a day this week', next: '5 Oct 2026', nextIso: '2026-10-05', by: 'Jordan Tipene', source: 'Anticoagulation clinic phone call, 21 Sep 2026 2:10 pm', linked: true },
-    { id: 'i3', value: 3.4, tested: '14 Sep 2026', testedIso: '2026-09-14', target: [2, 3], instruction: '2 mg a day until the next test', next: '21 Sep 2026', nextIso: '2026-09-21', by: 'Jordan Tipene', source: 'Anticoagulation clinic phone call, 14 Sep 2026 3:05 pm', linked: true },
-    { id: 'i2', value: 2.1, tested: '31 Aug 2026', testedIso: '2026-08-31', target: [2, 3], instruction: '3 mg a day', next: '14 Sep 2026', nextIso: '2026-09-14', by: 'Mere Kahu', source: 'Lab result letter, 1 Sep 2026', linked: true },
-    { id: 'i1', value: 1.6, tested: '18 Aug 2026', testedIso: '2026-08-18', target: [2, 3], instruction: 'Start 3 mg a day', next: '31 Aug 2026', nextIso: '2026-08-31', by: 'Jordan Tipene', source: 'Dr Lena Chen, starting plan', linked: true },
+    { id: 'i4', value: 2.4, tested: '21 Sep 2026', testedIso: '2026-09-21', target: [2, 3], instruction: '3 mg a day this week', next: '5 Oct 2026', nextIso: '2026-10-05', by: 'Jordan Tipene', source: 'Anticoagulation clinic phone call, 21 Sep 2026 2:10 pm', med: 'warfarin' },
+    { id: 'i3', value: 3.4, tested: '14 Sep 2026', testedIso: '2026-09-14', target: [2, 3], instruction: '2 mg a day until the next test', next: '21 Sep 2026', nextIso: '2026-09-21', by: 'Jordan Tipene', source: 'Anticoagulation clinic phone call, 14 Sep 2026 3:05 pm', med: 'warfarin' },
+    { id: 'i2', value: 2.1, tested: '31 Aug 2026', testedIso: '2026-08-31', target: [2, 3], instruction: '3 mg a day', next: '14 Sep 2026', nextIso: '2026-09-14', by: 'Mere Kahu', source: 'Lab result letter, 1 Sep 2026', med: 'warfarin' },
+    { id: 'i1', value: 1.6, tested: '18 Aug 2026', testedIso: '2026-08-18', target: [2, 3], instruction: 'Start 3 mg a day', next: '31 Aug 2026', nextIso: '2026-08-31', by: 'Jordan Tipene', source: 'Dr Lena Chen, starting plan', med: 'warfarin' },
 ];
 /** Scenario "inrStale": the 21 Sep result was never entered; the next test was due 21 Sep. */
 export const INR_STALE: InrReading[] = INR.slice(1);
 /** Scenario "inrUnlinked" (NF-23): the latest result was saved from today's MAR page with no medicine. */
-export const INR_UNLINKED: InrReading[] = [{ ...INR[0], linked: false, by: 'Priya Shah', source: 'Entered from the MAR chart’s Record INR (no medicine chosen)' }, ...INR.slice(1)];
+export const INR_UNLINKED: InrReading[] = [{ ...INR[0], med: null, unlinkedReason: 'Saved from today’s MAR chart, whose Record INR never asks for the medicine', by: 'Priya Shah' }, ...INR.slice(1)];
+/** Tama has no anticoagulant; a hospital result is still shown, labelled "No medicine linked". */
+export const INR_BY_PERSON: Partial<Record<PersonId, InrReading[]>> = {
+    tama: [{ id: 't1', value: 1.1, tested: '10 Sep 2026', testedIso: '2026-09-10', target: null, instruction: 'No instruction — sent for information', next: null, nextIso: null, by: 'Jordan Tipene', source: 'Hospital discharge letter, 10 Sep 2026', med: null, unlinkedReason: 'The result came from another service (hospital or GP)' }],
+};
 
 /* ───────────── syringe driver (Clinical › Syringe driver) ───────────── */
 export interface DriverCheck {

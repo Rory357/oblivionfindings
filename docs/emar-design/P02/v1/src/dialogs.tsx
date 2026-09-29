@@ -10,8 +10,10 @@ import { DateTimeField } from '@/components/fleet-assets/maintenance/date-time-f
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Switch } from '@/components/ui/switch';
@@ -22,7 +24,9 @@ import {
     ArrowRight,
     BellOff,
     Brain,
+    Check,
     CheckCircle2,
+    ChevronDown,
     ClipboardCheck,
     ClipboardList,
     FileText,
@@ -36,16 +40,18 @@ import {
     Plus,
     Printer,
     RefreshCw,
+    Search,
     ShieldAlert,
     Stethoscope,
     Syringe,
     Trash2,
     TriangleAlert,
+    Unlink,
     UserCheck,
     Users,
     X, ArrowUpRight } from 'lucide-react';
 import { useRef, useState, type ReactNode } from 'react';
-import { DAYS, DRIVER, EVENTS, FACTS, HOUSES, INTERACTIONS, P02_PERSONAS, medByKey, medsOf, recorderIn01, type Admin, type ChartAlert, type HOutcome, type PersonId } from './data';
+import { DAYS, DRIVER, EVENTS, FACTS, HOUSES, INTERACTIONS, NO_MED_REASONS, P02_PERSONAS, anticoagulantsOf, medByKey, medsOf, recorderIn01, type ChartAlert, type HOutcome, type PersonId } from './data';
 import { OUTCOME_LABEL, useAdmins, useToday } from './model';
 import { RULES, PEOPLE } from './p01/data';
 import { Modal } from './p01/dialogs';
@@ -53,7 +59,7 @@ import { useOpen } from './p01/doses';
 import { DoseBadge, IdentityHeader, KV, MedicinePhoto, Notice, NotConfigured, SUPPORT, SupportChip, TilePicker, type Tile } from './p01/ui';
 import { returnFocus, useDlg, useP02 } from './store';
 import { ALERT_TYPE } from './pages/tab-allergies';
-import { inrStatus, targetText } from './pages/tab-clinical';
+import { NoMedLinked, inrStatus, targetText } from './pages/tab-clinical';
 import { changeText } from './pages/tab-history';
 import { CONCEALED, useAllergy } from './ui';
 
@@ -117,7 +123,9 @@ export function P02DialogHost() {
         case 'inr':
             return arg === 'new' ? <RecordInrDialog pid={pid} onClose={close} /> : <InrDetail pid={pid} id={arg} onClose={close} />;
         case 'inr-error':
-            return <InrError id={arg} onClose={close} />;
+            return <InrError pid={pid} id={arg} onClose={close} />;
+        case 'inr-link':
+            return <InrLinkDialog pid={pid} id={arg} onClose={close} />;
         case 'check':
             return <DriverCheckDialog onClose={close} />;
         case 'finish':
@@ -780,17 +788,146 @@ function InteractionDialog({ id, onClose }: { id: string; onClose: () => void })
 }
 
 /* ───────────── Record an INR result (RecordInrDialog, redesigned) ───────────── */
+/** The medicine an INR result guides (review session, 30 Sep): one anticoagulant on
+ *  the chart → pre-chosen; several → chosen in a searchable picker (never
+ *  auto-selected); none → “No medicine linked” with a required reason. */
+function InrMedicine({ pid, med, reason, onMed, onReason, errMed, errReason }: { pid: PersonId; med: string; reason: string; onMed: (k: string) => void; onReason: (r: string) => void; errMed?: string; errReason?: string }) {
+    const orders = anticoagulantsOf(pid);
+    const [open, setOpen] = useState(false);
+    const p = PEOPLE[pid].pref;
+    const reasonField = (
+        <Field id="inr-reason" label="Why is no medicine linked?" required error={errReason}>
+            <Select value={reason || undefined} onValueChange={onReason}>
+                <SelectTrigger id="inr-reason" aria-invalid={!!errReason}>
+                    <SelectValue placeholder="Choose…" />
+                </SelectTrigger>
+                <SelectContent>
+                    {NO_MED_REASONS.map((o) => (
+                        <SelectItem key={o} value={o}>
+                            {o}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </Field>
+    );
+    if (!orders.length)
+        return (
+            <div className="grid gap-3 sm:col-span-2">
+                <Notice tone="warning" icon={Unlink} title="No medicine linked">
+                    {p} has no anticoagulant on the chart, so this result can’t be linked. It’s still shown everywhere, with the reason you give.
+                </Notice>
+                {reasonField}
+            </div>
+        );
+    if (orders.length === 1) {
+        const o = orders[0];
+        if (med === 'none')
+            return (
+                <div className="grid gap-3 sm:col-span-2">
+                    <Notice
+                        tone="warning"
+                        icon={Unlink}
+                        title="No medicine linked"
+                        actions={
+                            <Button size="sm" variant="outline" onClick={() => onMed(o.key)}>
+                                Link to {o.name} {o.strength} instead
+                            </Button>
+                        }
+                    >
+                        The result is still shown everywhere, with the reason you give.
+                    </Notice>
+                    {reasonField}
+                </div>
+            );
+        return (
+            <div className="grid gap-1.5 sm:col-span-2">
+                <Label>Medicine this result guides</Label>
+                {/* POPUP_STYLE_GUIDE "Locked context" card: pre-chosen from the chart. */}
+                <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3">
+                    <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
+                        <Pill className="h-4 w-4 text-primary" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium">
+                                {o.name} {o.strength} · {o.when}
+                            </span>
+                            <StatusBadge variant="neutral" size="sm" className="rounded-[8px]">
+                                Pre-chosen
+                            </StatusBadge>
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">The only anticoagulant on {p}’s chart.</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => onMed('none')}>
+                        Not for this medicine
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+    const cur = med && med !== 'none' ? medByKey(med) : null;
+    return (
+        <div className="grid gap-3 sm:col-span-2">
+            <Field id="inr-med" label="Which anticoagulant does this result guide?" required error={errMed} hint={`${orders.length} anticoagulant orders are on ${p}’s chart — choose one, or “No medicine linked”.`}>
+                <Popover open={open} onOpenChange={setOpen}>
+                    <PopoverTrigger asChild>
+                        <Button id="inr-med" type="button" variant="outline" role="combobox" aria-expanded={open} aria-invalid={!!errMed} className="w-full justify-between font-normal">
+                            <span className="flex items-center gap-2 truncate">
+                                <Search className="size-4 text-muted-foreground" />
+                                {cur ? `${cur.name} ${cur.strength} · ${cur.when}` : med === 'none' ? 'No medicine linked' : 'Choose the medicine…'}
+                            </span>
+                            <ChevronDown className="size-4 opacity-60" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[440px] p-0" align="start">
+                        <Command>
+                            <CommandInput placeholder="Search anticoagulant orders…" />
+                            <CommandList>
+                                <CommandEmpty>No anticoagulant order matches.</CommandEmpty>
+                                <CommandGroup heading={`Anticoagulant orders on ${p}’s chart`}>
+                                    {orders.map((o) => (
+                                        <CommandItem key={o.key} value={`${o.name} ${o.strength}`} onSelect={() => (onMed(o.key), setOpen(false))} className="items-start">
+                                            <Pill className="mt-0.5 size-4" />
+                                            <span className="min-w-0 flex-1">
+                                                <span className="block text-sm font-medium">
+                                                    {o.name} {o.strength}
+                                                </span>
+                                                <span className="block text-xs text-muted-foreground">
+                                                    {o.when} · {o.order}
+                                                </span>
+                                            </span>
+                                            {med === o.key ? <Check className="size-4" /> : null}
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                                <CommandGroup heading="Or">
+                                    <CommandItem value="No medicine linked" onSelect={() => (onMed('none'), setOpen(false))}>
+                                        <Unlink className="size-4" /> No medicine linked — say why
+                                    </CommandItem>
+                                </CommandGroup>
+                            </CommandList>
+                        </Command>
+                    </PopoverContent>
+                </Popover>
+            </Field>
+            {med === 'none' ? reasonField : null}
+        </div>
+    );
+}
 function RecordInrDialog({ pid, onClose }: { pid: PersonId; onClose: () => void }) {
     const s = useP02();
     const me = P02_PERSONAS[s.route.persona];
-    const warfarin = medsOf(pid).find((m) => m.inr && m.status !== 'stopped');
-    const last = s.inr.find((r) => !r.disabled && r.target);
-    const [f, setF] = useState({ med: warfarin ? warfarin.key : 'none', value: '', tested: '2026-09-28', low: last ? last.target![0].toFixed(1) : '', high: last ? last.target![1].toFixed(1) : '', dose: '', instruction: '', next: '', source: '', note: '' });
+    const orders = anticoagulantsOf(pid);
+    const last = s.inrFor(pid).find((r) => !r.disabled && r.target);
+    const [f, setF] = useState({ med: orders.length === 1 ? orders[0].key : orders.length ? '' : 'none', reason: '', value: '', tested: '2026-09-28', low: last ? last.target![0].toFixed(1) : '', high: last ? last.target![1].toFixed(1) : '', dose: '', instruction: '', next: '', source: '', note: '' });
     const [err, setErr] = useState<Record<string, string | undefined>>({});
     const v = Number(f.value);
     const out = f.value && f.low && f.high && (v < Number(f.low) || v > Number(f.high));
     const save = () => {
         const e: Record<string, string | undefined> = {};
+        if (!f.med) e['inr-med'] = 'Choose the medicine this result guides, or “No medicine linked”.';
+        if (f.med === 'none' && !f.reason) e['inr-reason'] = 'Say why no medicine is linked.';
         if (!f.value || Number.isNaN(v) || v < 0.5 || v > 20) e['inr-value'] = 'Enter the INR result, between 0.5 and 20.';
         if (!f.tested) e['inr-tested'] = 'Choose the day of the test.';
         else if (f.tested > '2026-09-28') e['inr-tested'] = 'The test can’t be in the future.';
@@ -798,10 +935,10 @@ function RecordInrDialog({ pid, onClose }: { pid: PersonId; onClose: () => void 
         if (f.next && f.next < f.tested) e['inr-next'] = 'The next test must be on or after this test.';
         if (!f.source) e['inr-source'] = 'Say where the result and instruction came from.';
         setErr(e);
-        focusFirst(e, ['inr-value', 'inr-source', 'inr-tested', 'inr-next', 'inr-high']);
+        focusFirst(e, ['inr-med', 'inr-reason', 'inr-value', 'inr-source', 'inr-tested', 'inr-next', 'inr-high']);
         if (Object.values(e).some(Boolean)) return;
-        s.addInr({ id: `i-${Date.now()}`, value: v, tested: dateLabel(f.tested), testedIso: f.tested, target: f.low && f.high ? [Number(f.low), Number(f.high)] : null, instruction: f.instruction || (f.dose ? `${f.dose} mg a day` : 'No instruction recorded'), next: f.next ? dateLabel(f.next) : null, nextIso: f.next || null, by: me.name, source: f.source, linked: f.med !== 'none' });
-        s.toast(out ? 'warning' : 'success', out ? `INR ${v.toFixed(1)} saved — outside the target range. Follow ${PEOPLE[pid].pref}’s plan and tell the prescriber today.` : `INR ${v.toFixed(1)} saved.`);
+        s.addInr(pid, { id: `i-${Date.now()}`, value: v, tested: dateLabel(f.tested), testedIso: f.tested, target: f.low && f.high ? [Number(f.low), Number(f.high)] : null, instruction: f.instruction || (f.dose ? `${f.dose} mg a day` : 'No instruction recorded'), next: f.next ? dateLabel(f.next) : null, nextIso: f.next || null, by: me.name, source: f.source, med: f.med === 'none' ? null : f.med, unlinkedReason: f.med === 'none' ? f.reason : undefined });
+        s.toast(out ? 'warning' : 'success', `${out ? `INR ${v.toFixed(1)} saved — outside the target range. Follow ${PEOPLE[pid].pref}’s plan and tell the prescriber today.` : `INR ${v.toFixed(1)} saved`}${f.med === 'none' ? ' · No medicine linked.' : ` · linked to ${medByKey(f.med).name} ${medByKey(f.med).strength}.`}`);
         onClose();
     };
     return (
@@ -821,19 +958,7 @@ function RecordInrDialog({ pid, onClose }: { pid: PersonId; onClose: () => void 
             }
         >
             <div className="grid gap-3 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                    <Field id="inr-med" label="Medicine" hint={warfarin ? 'Pre-selected: the order the result guides. Every result shows, linked or not.' : 'No INR-guided medicine is on the chart. The result is still shown.'}>
-                        <Select value={f.med} onValueChange={(x) => setF({ ...f, med: x })}>
-                            <SelectTrigger id="inr-med">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {warfarin ? <SelectItem value={warfarin.key}>{warfarin.name} {warfarin.strength} · {warfarin.when}</SelectItem> : null}
-                                <SelectItem value="none">Not linked to a medicine</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </Field>
-                </div>
+                <InrMedicine pid={pid} med={f.med} reason={f.reason} onMed={(k) => (setF({ ...f, med: k }), setErr({ ...err, 'inr-med': undefined }))} onReason={(r) => (setF({ ...f, reason: r }), setErr({ ...err, 'inr-reason': undefined }))} errMed={err['inr-med']} errReason={err['inr-reason']} />
                 <Field id="inr-value" label="INR result" required error={err['inr-value']}>
                     <Input id="inr-value" inputMode="decimal" value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} placeholder="e.g. 2.4" aria-invalid={!!err['inr-value']} />
                 </Field>
@@ -871,7 +996,7 @@ function RecordInrDialog({ pid, onClose }: { pid: PersonId; onClose: () => void 
                         </Notice>
                     </div>
                 ) : null}
-                <Field id="inr-dose" label="Warfarin dose (mg a day)">
+                <Field id="inr-dose" label="Dose (mg a day)">
                     <Input id="inr-dose" inputMode="decimal" value={f.dose} onChange={(e) => setF({ ...f, dose: e.target.value })} placeholder="e.g. 3" />
                 </Field>
                 <Field id="inr-instruction" label="Instruction in their words">
@@ -894,10 +1019,16 @@ const dateLabel = (iso: string) => {
 function InrDetail({ pid, id, onClose }: { pid: PersonId; id: string; onClose: () => void }) {
     const s = useP02();
     const dlg = useDlg();
-    const r = s.inr.find((x) => x.id === id);
-    const warfarin = medsOf(pid).find((m) => m.inr);
+    const r = s.inrFor(pid).find((x) => x.id === id);
+    const orders = anticoagulantsOf(pid);
     if (!r) return null;
     const st = inrStatus(r);
+    const link = () => {
+        if (orders.length === 1) {
+            s.linkInr(r.id, orders[0].key);
+            s.toast('success', `Linked to ${orders[0].name} ${orders[0].strength}.`);
+        } else dlg.open(`inr-link:${r.id}`);
+    };
     return (
         <Modal
             title={`INR ${r.value.toFixed(1)} · tested ${r.tested}`}
@@ -911,9 +1042,9 @@ function InrDetail({ pid, id, onClose }: { pid: PersonId; id: string; onClose: (
                             <Trash2 className="size-4" /> Mark as entered in error…
                         </Button>
                     ) : null}
-                    {s.can('orders.manage') && !r.linked && !r.disabled && warfarin ? (
-                        <Button variant="outline" onClick={() => (s.linkInr(r.id), s.toast('success', `Linked to ${warfarin.name} ${warfarin.strength}.`))}>
-                            Link to the warfarin order
+                    {s.can('orders.manage') && !r.med && !r.disabled && orders.length ? (
+                        <Button variant="outline" onClick={link}>
+                            {orders.length === 1 ? `Link to ${orders[0].name} ${orders[0].strength}` : 'Link to an anticoagulant…'}
                         </Button>
                     ) : null}
                     <Button onClick={onClose} autoFocus>
@@ -924,20 +1055,71 @@ function InrDetail({ pid, id, onClose }: { pid: PersonId; id: string; onClose: (
         >
             <KV
                 rows={[
+                    ['Medicine', r.med ? <span key="m">{medByKey(r.med).name} {medByKey(r.med).strength}{r.linkedLater ? <span className="block text-caption">{r.linkedLater}</span> : null}</span> : <NoMedLinked key="n" reason={r.unlinkedReason ?? 'No reason recorded'} />],
                     ['Target (from the prescriber)', targetText(r)],
                     ['Instruction', r.instruction],
                     ['Next test', r.next ?? 'Not set'],
                     ['Where it came from', r.source],
                     ['Entered by', r.by],
-                    ['Medicine', r.linked && warfarin ? `${warfarin.name} ${warfarin.strength}` : <StatusBadge key="n" variant="warning" size="sm" className="rounded-[8px]">Not linked to a medicine</StatusBadge>],
                 ]}
             />
+            {!r.med && !orders.length ? <p className="text-caption">{PEOPLE[pid].pref} has no anticoagulant on the chart, so there’s nothing to link. The result stays visible everywhere.</p> : null}
         </Modal>
     );
 }
-function InrError({ id, onClose }: { id: string; onClose: () => void }) {
+/** Link a “No medicine linked” result afterwards (several anticoagulants on the chart). */
+function InrLinkDialog({ pid, id, onClose }: { pid: PersonId; id: string; onClose: () => void }) {
     const s = useP02();
-    const r = s.inr.find((x) => x.id === id);
+    const r = s.inrFor(pid).find((x) => x.id === id);
+    const orders = anticoagulantsOf(pid);
+    const [pick, setPick] = useState<string | null>(null);
+    const [err, setErr] = useState<string>();
+    if (!r) return null;
+    return (
+        <Modal
+            title={`Link INR ${r.value.toFixed(1)} (${r.tested}) to an anticoagulant`}
+            description={`Choose the order this result guides. ${PEOPLE[pid].pref} has ${orders.length} anticoagulant orders on the chart.`}
+            onClose={onClose}
+            onCloseAutoFocus={focusBack}
+            footer={
+                <>
+                    <Button variant="outline" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button onClick={() => (pick ? (s.linkInr(r.id, pick), s.toast('success', `Linked to ${medByKey(pick).name} ${medByKey(pick).strength}.`), onClose()) : (setErr('Choose the medicine this result guides.'), document.getElementById('il-list')?.focus()))}>Link result</Button>
+                </>
+            }
+        >
+            <Command id="il-list" tabIndex={-1} className="rounded-lg border outline-none" aria-invalid={!!err}>
+                <CommandInput placeholder="Search anticoagulant orders…" autoFocus />
+                <CommandList className="max-h-[260px]">
+                    <CommandEmpty>No anticoagulant order matches.</CommandEmpty>
+                    <CommandGroup heading={`Anticoagulant orders on ${PEOPLE[pid].pref}’s chart`}>
+                        {orders.map((o) => (
+                            <CommandItem key={o.key} value={`${o.name} ${o.strength}`} onSelect={() => (setPick(o.key), setErr(undefined))} className="items-start">
+                                <Pill className="mt-0.5 size-4" />
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-medium">
+                                        {o.name} {o.strength}
+                                    </span>
+                                    <span className="block text-xs text-muted-foreground">
+                                        {o.when} · {o.order}
+                                    </span>
+                                </span>
+                                {pick === o.key ? <Check className="size-4" /> : null}
+                            </CommandItem>
+                        ))}
+                    </CommandGroup>
+                </CommandList>
+            </Command>
+            <InputError message={err} />
+            <p className="text-caption">Saved with your name as “Linked by …”. The original “No medicine linked” reason stays in the change history.</p>
+        </Modal>
+    );
+}
+function InrError({ pid, id, onClose }: { pid: PersonId; id: string; onClose: () => void }) {
+    const s = useP02();
+    const r = s.inrFor(pid).find((x) => x.id === id);
     const [reason, setReason] = useState('');
     const [err, setErr] = useState<string>();
     if (!r) return null;

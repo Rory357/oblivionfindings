@@ -33,7 +33,7 @@ Grounded on `origin/main` **`ddb8d3af4`** (fetched 30 September 2026). Paths are
 
 | # | Finding | Evidence | Status |
 |---|---|---|---|
-| 3.1 | Every INR reader passes `allowNullMedication: false`, which keeps only rows whose `client_medication_id` matches an order — an unlinked result is dropped from the action centre, the dashboard INR watch, the MAR page’s own INR list and reports. | `GSS:199-227`; `MedicationOverviewService.php:1078-1094`; `EC:574-582` | **Verified** (reports reader reported: `MedicationReportingService.php:331`) |
+| 3.1 | (Fix on `claude/infallible-bhabha-5e802c`, not merged; Stephan 30 Sep: every result shown, labelled “No medicine linked”.) Every INR reader passes `allowNullMedication: false`, which keeps only rows whose `client_medication_id` matches an order — an unlinked result is dropped from the action centre, the dashboard INR watch, the MAR page’s own INR list and reports. | `GSS:199-227`; `MedicationOverviewService.php:1078-1094`; `EC:574-582` | **Verified** (reports reader reported: `MedicationReportingService.php:331`) |
 | 3.2 | The due/overdue alert generator *does* include unlinked results. | `MedicationAlertService.php:192-234` | **Verified** |
 | 3.3 | The INR card reads `target_range_min/max` and `medication_dose`; the server sends `target_range_low/high` and `dose_mg` — target and dose never show. | `clinical-rail.tsx:17-27`; `EC:590-600` | **Verified** |
 | 3.4 | “No target” falls into the out-of-range filter and is labelled “Below range”. | `MedicationOverviewService.php:615-625` | Reported |

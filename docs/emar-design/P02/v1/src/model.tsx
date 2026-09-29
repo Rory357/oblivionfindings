@@ -9,9 +9,9 @@ import { useStore as useStore01, type RuntimeRecord } from './p01/store';
 import {
     FACTS,
     HISTORY,
-    MEDICINES,
     SLOT_ORDER,
-    WARFARIN_TODAY,
+    PLANNED,
+    medsOf,
     type Admin,
     type HOutcome,
     type Medicine,
@@ -42,10 +42,10 @@ const short = (name: string) => {
 export function useToday(pid: PersonId) {
     const s01 = useStore01();
     const cells: TodayCell[] = [];
-    for (const med of MEDICINES.filter((m) => m.pid === pid && m.kind === 'scheduled' && m.status !== 'stopped')) {
+    for (const med of medsOf(pid).filter((m) => m.kind === 'scheduled' && m.status !== 'stopped')) {
         for (const id of med.doseIds) {
-            if (id === WARFARIN_TODAY.id) {
-                cells.push({ key: id, med, slot: WARFARIN_TODAY.slot, state: 'notdue', line: WARFARIN_TODAY.line, rec: null, planned: true });
+            if (PLANNED[id]) {
+                cells.push({ key: id, med, slot: PLANNED[id].slot, state: 'notdue', line: PLANNED[id].line, rec: null, planned: true });
                 continue;
             }
             const d = DOSES.find((x) => x.id === id) ?? null;

@@ -1,6 +1,6 @@
 # P02 v1 — Mockup design-rules checklist (self-check with evidence)
 
-Checklist: `docs/emar-audit-2026-09-28/claude-second-review/Mockup-design-rules-checklist.md` (29 Sep 2026) plus the brief’s §5 review findings. Evidence files are in `screenshots/` as `{1440|1280|zoom200}-{state}.png` (182 captures: 86 states at 1440, 48 core states also at 1280 and 200 %; overflow 0, console errors 0, every step completed); `screenshots/report.json` records, for every capture, horizontal overflow, console errors, whether the scripted steps completed, each header’s subline line count and any truncated meter caption. Source paths are relative to `src/`.
+Checklist: `docs/emar-audit-2026-09-28/claude-second-review/Mockup-design-rules-checklist.md` (29 Sep 2026) plus the brief’s §5 review findings. Evidence files are in `screenshots/` as `{1440|1280|zoom200}-{state}.png` (198 captures: 94 states at 1440, 52 core states also at 1280 and 200 %; overflow 0, console errors 0, every step completed); `screenshots/report.json` records, for every capture, horizontal overflow, console errors, whether the scripted steps completed, each header’s subline line count and any truncated meter caption. Source paths are relative to `src/`.
 
 Legend: **Pass** · **Pass (note)** = passes with a stated limitation · **N/A** = not in P02’s scope.
 
@@ -62,7 +62,7 @@ Legend: **Pass** · **Pass (note)** = passes with a stated limitation · **N/A**
 | Item | Result | Evidence |
 |---|---|---|
 | On/off settings use Switch | Pass | “Due and late dose alerts” and “Shown when the chart opens” (`45`, `46`) |
-| Growing lists use a searchable picker | Pass (note) | The record lists are all per person and short; the section palette is searchable (`118`). Witness choice in the driver wizard is the on-shift list (P01’s full picker is the recording dialog) |
+| Growing lists use a searchable picker | Pass (note) | Record INR with several anticoagulant orders uses Popover + Command, never pre-selected (`63b`, `63c`), as does “link afterwards” (`66b`); the section palette is searchable (`118`). Witness choice in the driver wizard is the on-shift list (P01’s full picker is the recording dialog) |
 | Uploads use FileDropzone | N/A | Photos are taken at stock receipt (P06); P02 displays them with `FilePreviewDialog` (`27`) |
 | Dates/times use the PKG-01 components, timezone visible | Pass | Correction time and driver start: DateTimeField (“Pacific/Auckland”); INR dates: the PKG-01 DatePicker |
 | Buttons not restyled | Pass | `Button` variants only; `link` for ↗ jumps; `ghost` for “Show every medicine” resets |
