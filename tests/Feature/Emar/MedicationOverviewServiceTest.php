@@ -82,14 +82,20 @@ it('labels an INR reading with no medicine linked instead of hiding it', functio
         ]);
     }
 
-    $inr = collect(app(MedicationOverviewService::class)->actionCentre(today()))
+    $service = app(MedicationOverviewService::class);
+    $inr = collect($service->actionCentre(today()))
         ->where('type', 'inr')
         ->keyBy('client_id');
+    // The /emar watch card labels the reading from its missing medicine link.
+    $watch = collect($service->inrWatch())->keyBy('client_id');
 
     expect($inr->keys()->sort()->values()->all())->toBe([$client->id, $linkedClient->id])
         ->and($inr[$client->id]['summary'])->toStartWith('No medicine linked · Target 2–3')
         ->and($inr[$linkedClient->id]['summary'])->toStartWith('Target 2–3')
-        ->and($inr[$linkedClient->id]['summary'])->not->toContain('No medicine linked');
+        ->and($inr[$linkedClient->id]['summary'])->not->toContain('No medicine linked')
+        ->and($watch->keys()->sort()->values()->all())->toBe([$client->id, $linkedClient->id])
+        ->and($watch[$client->id]['client_medication_id'])->toBeNull()
+        ->and($watch[$linkedClient->id]['client_medication_id'])->toBe($warfarin->id);
 });
 
 it('keeps controlled, cross-client and other-Site INR readings concealed from a scoped reader', function () {

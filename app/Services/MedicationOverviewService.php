@@ -783,6 +783,8 @@ class MedicationOverviewService
                     'id' => $r->id,
                     'client_id' => $r->client_id,
                     'client' => $this->clientName($r->client),
+                    // Null = no medicine linked; the card labels it (NF-23).
+                    'client_medication_id' => $r->client_medication_id,
                     'value' => (float) $r->inr_value,
                     'target' => $this->inrTargetLabel($r),
                     'tested_on' => optional($r->tested_on)->format('j M'),
