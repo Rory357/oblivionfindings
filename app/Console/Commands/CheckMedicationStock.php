@@ -46,7 +46,6 @@ class CheckMedicationStock extends Command
                 medicationId: $stock->client_medication_id,
             );
 
-            $stock->update(['last_reorder_alert_at' => now()]);
             $alertsCreated++;
             $this->info("  Expiring soon: {$medicationName} ({$daysUntilExpiry} days)");
         }
@@ -92,7 +91,6 @@ class CheckMedicationStock extends Command
                 );
             }
 
-            $stock->update(['last_reorder_alert_at' => now()]);
             $alertsCreated++;
             $this->info("  Expired: {$medicationName}");
         }
@@ -140,7 +138,6 @@ class CheckMedicationStock extends Command
                 );
             }
 
-            $stock->update(['last_reorder_alert_at' => now()]);
             $alertsCreated++;
             $this->info("  Low stock: {$medicationName} ({$stock->on_hand} {$stock->unit})");
         }
@@ -152,6 +149,8 @@ class CheckMedicationStock extends Command
 
     /**
      * Check if an alert of the given type already exists for this stock's medication in the last 24 hours.
+     * This is this job's only de-duplication; last_reorder_alert_at belongs to the
+     * low-stock notification in emar:send-alerts, so writing it here suppressed that.
      */
     private function hasRecentAlert(ClientMedicationStock $stock, string $alertType): bool
     {
