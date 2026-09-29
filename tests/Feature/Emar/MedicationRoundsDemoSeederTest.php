@@ -41,7 +41,7 @@ class MedicationRoundsDemoSeederTest extends TestCase
 
     public function test_seeds_todays_rounds_with_live_cells_and_recorded_statuses(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         User::factory()->create(['role' => 'support_worker']);
 
         $this->seed(MedicationRoundsDemoSeeder::class);
@@ -90,7 +90,7 @@ class MedicationRoundsDemoSeederTest extends TestCase
 
     public function test_reseeding_is_idempotent(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         User::factory()->create(['role' => 'support_worker']);
 
         $this->seed(MedicationRoundsDemoSeeder::class);

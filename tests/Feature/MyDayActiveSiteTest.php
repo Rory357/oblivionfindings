@@ -17,7 +17,7 @@ use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
-    Carbon::setTestNow(Carbon::parse('2026-05-21 09:30:00', 'Pacific/Auckland'));
+    Carbon::setTestNow(Carbon::parse('2026-05-21 09:30:00', 'Pacific/Auckland')->utc());
 });
 
 afterEach(function () {
@@ -68,7 +68,7 @@ it('exposes the active shift site with every co-resident', function () {
 });
 
 it('uses the open attendance session shift as the active site shift after the UTC date rolls over', function () {
-    Carbon::setTestNow(Carbon::parse('2026-05-23 17:30:00', 'Pacific/Auckland'));
+    Carbon::setTestNow(Carbon::parse('2026-05-23 17:30:00', 'Pacific/Auckland')->utc());
 
     $worker = User::factory()->frontlineWorker()->create();
     $site = Site::factory()->create(['name' => 'Rimu House', 'type' => 'house']);

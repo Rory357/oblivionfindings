@@ -33,7 +33,7 @@ class RoundTemplateDaysOfWeekTest extends TestCase
     public function test_template_accepts_iso_sunday_and_generates_on_sunday(): void
     {
         // 2026-05-03 is a Sunday (dayOfWeekIso = 7).
-        Carbon::setTestNow(Carbon::parse('2026-05-03 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-05-03 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $user = $this->makeRoleUser('admin');
@@ -98,7 +98,7 @@ class RoundTemplateDaysOfWeekTest extends TestCase
 
     public function test_round_templates_reject_foreign_default_assignees_and_command_skips_unscoped_or_stale_templates(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-03 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-05-03 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
         $site = Site::factory()->create(['is_active' => true]);
         $foreignSite = Site::factory()->create(['is_active' => true]);

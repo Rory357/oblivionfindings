@@ -33,7 +33,7 @@ class MedicationOrderVerificationTest extends TestCase
     {
         parent::setUp();
 
-        Carbon::setTestNow(Carbon::parse('2026-08-23 10:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-08-23 10:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $this->site = Site::factory()->create([
@@ -325,7 +325,7 @@ class MedicationOrderVerificationTest extends TestCase
         $this->assertSame('internal_emar', $audit->meta['scan_match_source']);
         $this->assertSame(substr(str_replace('-', '', $scanCode), -6), $audit->meta['entered_code_suffix']);
 
-        Carbon::setTestNow(now(config('app.worker_timezone', 'Pacific/Auckland'))->addMinute());
+        Carbon::setTestNow(now(config('app.worker_timezone', 'Pacific/Auckland'))->addMinute()->utc());
         $this->actingAs($verifier)
             ->post("/emar/medications/{$medication->id}/verify")
             ->assertRedirect();
@@ -347,7 +347,7 @@ class MedicationOrderVerificationTest extends TestCase
             ->assertJsonValidationErrors('approval_status');
 
         $medication->forceFill(['state' => 'ceased', 'active' => false])->saveQuietly();
-        Carbon::setTestNow(now(config('app.worker_timezone', 'Pacific/Auckland'))->addMinute());
+        Carbon::setTestNow(now(config('app.worker_timezone', 'Pacific/Auckland'))->addMinute()->utc());
         $this->actingAs($verifier)
             ->post("/emar/medications/{$medication->id}/verify")
             ->assertRedirect();
@@ -568,7 +568,7 @@ class MedicationOrderVerificationTest extends TestCase
         $this->assertSame($orderEvidenceHash, $audit->meta['order_evidence_sha256']);
         $this->assertSame(hash('sha256', $reason), $audit->meta['rejection_reason_sha256']);
 
-        Carbon::setTestNow(now(config('app.worker_timezone', 'Pacific/Auckland'))->addMinute());
+        Carbon::setTestNow(now(config('app.worker_timezone', 'Pacific/Auckland'))->addMinute()->utc());
         $this->actingAs($reviewer)
             ->post("/emar/medications/{$medication->id}/reject", [
                 'rejection_reason' => 'A replay must not replace the original evidence.',

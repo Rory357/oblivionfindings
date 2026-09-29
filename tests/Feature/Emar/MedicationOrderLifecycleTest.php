@@ -650,7 +650,7 @@ class MedicationOrderLifecycleTest extends TestCase
 
     public function test_future_effective_cease_cannot_be_confirmed_or_countersigned_before_the_worker_date(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-08-21 23:30:00', 'Pacific/Auckland'));
+        Carbon::setTestNow(Carbon::parse('2026-08-21 23:30:00', 'Pacific/Auckland')->utc());
         $witness = $this->scopedUser([]);
         $verifier = $this->scopedUser([
             'medications.view',

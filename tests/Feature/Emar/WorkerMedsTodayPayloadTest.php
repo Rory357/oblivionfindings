@@ -34,7 +34,7 @@ class WorkerMedsTodayPayloadTest extends TestCase
 
     public function test_worker_meds_today_payload_sorts_due_now_and_prn_limit_state(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $worker = $this->makeRoleUser('support_worker');
@@ -237,7 +237,7 @@ class WorkerMedsTodayPayloadTest extends TestCase
 
     public function test_meds_due_matches_administrations_with_a_single_query(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $worker = $this->makeRoleUser('support_worker');
@@ -313,7 +313,7 @@ class WorkerMedsTodayPayloadTest extends TestCase
     public function test_sidebar_badge_keeps_an_overnight_shift_after_midnight(): void
     {
         $timezone = config('app.worker_timezone', 'Pacific/Auckland');
-        Carbon::setTestNow(Carbon::parse('2026-05-01 00:20:00', $timezone));
+        Carbon::setTestNow(Carbon::parse('2026-05-01 00:20:00', $timezone)->utc());
         $this->seed(RbacSeeder::class);
 
         $worker = $this->makeRoleUser('support_worker');

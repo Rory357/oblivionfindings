@@ -49,7 +49,7 @@ class MedicationScopeAuthorizationTest extends TestCase
     {
         parent::setUp();
 
-        Carbon::setTestNow(Carbon::parse('2026-08-14 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-08-14 09:30:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $this->site = Site::factory()->create([
@@ -626,7 +626,7 @@ class MedicationScopeAuthorizationTest extends TestCase
                 Carbon::setTestNow(Carbon::parse(
                     '2026-08-14 09:30:00',
                     config('app.worker_timezone', 'Pacific/Auckland'),
-                ));
+                )->utc());
             }
         }
     }

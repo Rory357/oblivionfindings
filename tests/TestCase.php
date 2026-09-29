@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use PDO;
 use Symfony\Component\Process\Process;
+use Tests\Support\FrozenClockTimezone;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -51,6 +52,37 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         $this->withoutVite();
+    }
+
+    /**
+     * Runs after setUp and Pest's beforeEach, so a clock frozen there fails
+     * before the test body can pass or fail because of the skew.
+     */
+    protected function assertPreConditions(): void
+    {
+        parent::assertPreConditions();
+
+        $this->assertFrozenClockUsesDefaultTimezone();
+    }
+
+    /**
+     * Runs before tearDown and Pest's afterEach reset the clock, so a clock
+     * frozen in the test body is still visible here.
+     */
+    protected function assertPostConditions(): void
+    {
+        $this->assertFrozenClockUsesDefaultTimezone();
+
+        parent::assertPostConditions();
+    }
+
+    private function assertFrozenClockUsesDefaultTimezone(): void
+    {
+        $violation = FrozenClockTimezone::violation();
+
+        if ($violation !== null) {
+            $this->fail($violation);
+        }
     }
 
     /**

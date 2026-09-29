@@ -161,7 +161,7 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
 
     public function test_controlled_content_is_concealed_across_audit_lists_exports_and_direct_events_without_exact_permission(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-08-27 12:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-08-27 12:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
 
         try {
             $context = $this->controlledAuditContext();
@@ -310,7 +310,7 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         // The /dashboard eMAR widget counts scheduled 09:00 slots on the
         // worker (NZ) day (NF-25), so pin the clock after that slot and put
         // the recorded doses on it.
-        Carbon::setTestNow(Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland'));
+        Carbon::setTestNow(Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland')->utc());
         $context = $this->context();
         $slotUtc = Carbon::parse('2026-05-21 09:00:00', 'Pacific/Auckland')->utc();
         ClientMedicationAdministration::query()

@@ -19,7 +19,7 @@ beforeEach(function () {
     Cache::flush();
     // 10:00 NZ — dose slots at 09:00 and 13:00 both land inside the
     // controller's visibility window (now-2h .. now+4h => 08:00 .. 14:00).
-    Carbon::setTestNow(Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland'));
+    Carbon::setTestNow(Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland')->utc());
 });
 
 afterEach(function () {

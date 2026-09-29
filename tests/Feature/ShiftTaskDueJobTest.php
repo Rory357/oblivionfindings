@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
     config(['app.worker_timezone' => 'Pacific/Auckland']);
-    Carbon::setTestNow(Carbon::parse('2026-06-01 10:05:00', 'Pacific/Auckland'));
+    Carbon::setTestNow(Carbon::parse('2026-06-01 10:05:00', 'Pacific/Auckland')->utc());
 });
 
 afterEach(function () {

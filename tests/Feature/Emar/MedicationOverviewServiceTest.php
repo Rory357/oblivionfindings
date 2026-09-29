@@ -12,7 +12,7 @@ use App\Services\MedicationOverviewService;
 use Illuminate\Support\Carbon;
 
 beforeEach(function () {
-    Carbon::setTestNow(Carbon::parse('2026-06-14 11:15:00', 'Pacific/Auckland'));
+    Carbon::setTestNow(Carbon::parse('2026-06-14 11:15:00', 'Pacific/Auckland')->utc());
 });
 
 afterEach(function () {

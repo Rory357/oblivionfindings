@@ -17,7 +17,7 @@ class BoardMemberPreferenceTest extends TestCase
 
     public function test_digest_window_uses_member_timezone_and_expected_window(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-04-12 08:05:00', 'Pacific/Auckland'));
+        Carbon::setTestNow(Carbon::parse('2026-04-12 08:05:00', 'Pacific/Auckland')->utc());
 
         $preference = new BoardMemberPreference([
             'timezone' => 'Pacific/Auckland',

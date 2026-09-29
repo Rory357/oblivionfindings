@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
     Cache::flush();
-    Carbon::setTestNow(Carbon::parse('2026-06-08 11:15:00', 'Pacific/Auckland'));
+    Carbon::setTestNow(Carbon::parse('2026-06-08 11:15:00', 'Pacific/Auckland')->utc());
     Notification::fake();
 });
 

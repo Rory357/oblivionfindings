@@ -33,7 +33,7 @@ class MarChartBoardPayloadTest extends TestCase
 
     public function test_mar_chart_exposes_shared_board_payload_and_site_brand_colour(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $user = $this->makeRoleUser('admin');
@@ -102,7 +102,7 @@ class MarChartBoardPayloadTest extends TestCase
 
     public function test_mar_chart_defaults_to_first_resident_when_no_client_id(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $user = $this->makeRoleUser('admin');
@@ -147,7 +147,7 @@ class MarChartBoardPayloadTest extends TestCase
 
     public function test_mar_chart_defaults_to_last_viewed_resident(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $user = $this->makeRoleUser('admin');

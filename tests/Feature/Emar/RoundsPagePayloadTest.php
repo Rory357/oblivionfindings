@@ -36,7 +36,7 @@ class RoundsPagePayloadTest extends TestCase
 
     public function test_exact_record_worker_uses_read_only_get_and_explicit_idempotent_start(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $site = Site::factory()->create(['is_active' => true]);
@@ -95,7 +95,7 @@ class RoundsPagePayloadTest extends TestCase
 
     public function test_assigned_record_worker_sees_only_current_work_scope_clients_in_round_projection(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $site = Site::factory()->create(['is_active' => true]);
@@ -167,7 +167,7 @@ class RoundsPagePayloadTest extends TestCase
 
     public function test_guided_round_direct_objects_deny_foreign_unassigned_and_off_shift_workers(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $site = Site::factory()->create(['is_active' => true]);
@@ -209,7 +209,7 @@ class RoundsPagePayloadTest extends TestCase
 
     public function test_exact_reader_can_review_only_approved_site_completed_rounds_without_mutation(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $site = Site::factory()->create(['is_active' => true]);
@@ -245,7 +245,7 @@ class RoundsPagePayloadTest extends TestCase
 
     public function test_template_payload_reconciles_site_and_active_service_context_without_leaking_names(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $site = Site::factory()->create(['is_active' => true]);
@@ -343,7 +343,7 @@ class RoundsPagePayloadTest extends TestCase
 
     public function test_worker_board_lists_only_assigned_rounds_at_approved_sites(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $site = Site::factory()->create(['is_active' => true]);
