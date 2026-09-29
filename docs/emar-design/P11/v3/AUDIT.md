@@ -25,21 +25,23 @@ This carries forward the v2 audit (`../v2/AUDIT.md`) and adds what v3 changed an
 |---|---|---|---|
 | Alert channels | Medication alerts are in-app notifications. Email is not configured for them. | In-app and Email switches per alert. People can add email copies for themselves. | Per-alert channel storage. The personal copies are in account › Notifications. |
 | On-call contact | No field exists. | Follows the roster, with a team lead fallback and an employed backup. | Resolve at the moment an alert or screen needs it: on-call shift at the house → team lead on shift → backup. Store only the rule and the backup `user_id`, never a typed name or phone. |
-| Rostering on-call | **Verified:** `app/Models/Shift.php` has `is_on_call` (boolean), `shift_type` (`standard`, `sleepover`, `on_call`, `split`, `travel`), `site_id`, `user_id`, `starts_at`, `ends_at`. `RbacSeeder` has a `team_lead` role. There is **no "on-call manager" field or role**.<br>Control Room › Settings offers `on_call_manager` as a notify role (`control-room/settings.tsx:196`), but no role with that name is seeded, so it matches nobody. | "Follow the roster" reads on-call shifts. "Team lead on shift" means a person with the `team_lead` role on a shift at the house at that time. | No Rostering change is needed if houses roster on-call shifts. If they don't, the backup person is used. See Q8. |
+| Rostering on-call | **Verified:** `app/Models/Shift.php` has `is_on_call` (boolean), `shift_type` (`standard`, `sleepover`, `on_call`, `split`, `travel`), `site_id`, `user_id`, `starts_at`, `ends_at`. `RbacSeeder` has a `team_lead` role. There is **no "on-call manager" field or role**.<br>Control Room › Settings offers `on_call_manager` as a queue "Assigned roles" option (`control-room/settings.tsx:191-197`), but no role with that name exists, so it matches nobody. | "Follow the roster" reads on-call shifts. "Team lead on shift" means a person with the `team_lead` role on a shift at the house at that time. | No Rostering change is needed if houses roster on-call shifts. If they don't, the backup person is used. See Q8. |
 | Phone numbers | Staff records hold phone numbers (synthetic here). | Read-only in the dialog, "from their staff record". | Staff without a number can't be chosen as backup. |
 
-## 3. Bugs found (unchanged from v2)
+## 3. Bugs found
 
-Two fix sessions were started from the v2 audit, and their results are still to come:
+The v2 audit started two fix sessions. Their status:
 
-- "Verify and fix medication alert routing faults":
-  - the refusals alert queries `roles.slug`;
-  - the competency-expiring alert repeats;
+- **"Verify and fix medication alert routing faults": merged to main** (`origin/main` `88b7d3a3a`). It fixed:
+  - the refusals alert querying `roles.slug`;
+  - the repeating competency-expiring alert;
   - the emergency access report routing.
-- "Check Control Room medication signal recipients" (the `managers_core` / `coordinators` names).
-  - **New in v3, verified:** Control Room's role list also offers `on_call_manager` (`resources/js/pages/control-room/settings.tsx:196`, and the migration's `notify_roles` example). No such role is seeded (`RbacSeeder` has none), so a rule sent to it reaches nobody. With this design, it would become "the house's on-call contact", resolved from the roster.
+- **"Check Control Room medication signal recipients": fixed on a branch, not merged** (`36ee5e407` on `claude/bold-darwin-189d2f`). Seeded group names (`managers_core`, `coordinators` and others) and real role names now both resolve, Site-scoped.
+  - **Still open (verified by that session):** Control Room triage queues offer five "Assigned roles" (`control-room/settings.tsx:191-197`, used for queue `assigned_roles` at :891-903). Four of them match no role or group: `control_room_operator`, `control_room_supervisor`, `site_manager` and `on_call_manager`. Only `clinical_lead` is real.
+  - A queue set to those four roles sends its first notice, its escalation and its auto-assign to nobody. This is still true after the fix.
+  - Nothing was mapped to `on_call_manager`, because on-call resolution from Rostering isn't built. With this design, it would become "the house's on-call contact", resolved from the roster. Flagged for Stephan.
 
-The reversed dose window in `shift-medication-card.tsx` is in the v2 audit.
+The reversed dose window in `shift-medication-card.tsx` is in the v2 audit. Its fix is on `claude/objective-neumann-4aeb2f`, not merged.
 
 ## 4. Questions for Stephan
 

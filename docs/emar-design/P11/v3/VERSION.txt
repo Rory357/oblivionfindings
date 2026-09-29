@@ -2,7 +2,7 @@ P11 v3 — Medication settings and staff eligibility (synthetic design preview)
 Built 2026-09-29T06:25Z on branch claude/serene-aryabhata-d0e908. SHA-256 of every file in this version (screenshots listed separately below).
 
 40a46bc75b7ecabee1e3ec58944b40c456fbd86ebea4bbaa27b6b8f42cf9fe47 *./.gitignore
-b3895b04d1791d42825000b86beabcbf536663b58fce5e18ef1625dca61d7dd6 *./AUDIT.md
+f0bd7950b5113477a84399c3bcee65ed8f6417feb8865647976df8fafa2aac8c *./AUDIT.md
 60705c7e512082a787415b207ea996586d05a2eff5467fe1c17c7238c381e7cd *./CHECKLIST.md
 60d07e577a1ef1864708ac0a061e72581aa58eee70677324b3a0a9386c590f16 *./README.md
 8d32e12eefb786e542e80d8b5bdac31b6abe0277f6523d2aafac23afd3ac9a96 *./dist/assets/index-B_t9WLoW.css
