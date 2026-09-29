@@ -424,7 +424,10 @@ function makeWorkerAndMedication(array $medicationOverrides = []): array
     assignMedicationWorkerToSite($worker, $site);
 
     $overrides = [];
-    $permissionKeys = ['medications.administer.record'];
+    // Seeded support workers can view their assigned clients. My Day only
+    // lists medicines for clients the worker may view (NF-26), so the
+    // fixture needs that permission like a real worker.
+    $permissionKeys = ['medications.administer.record', 'clients.viewAssigned'];
     if ((bool) ($medicationOverrides['controlled_drug'] ?? false)) {
         $permissionKeys[] = 'medications.controlled.record';
     }
