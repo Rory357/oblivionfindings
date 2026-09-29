@@ -627,7 +627,8 @@ class MedicationOverviewService
                     'client_id' => $r->client_id,
                     'title' => $this->clientName($r->client).' — INR '.(float) $r->inr_value,
                     'status' => $status === 'above' ? 'Above range' : 'Below range',
-                    'summary' => 'Target '.$this->inrTargetLabel($r)
+                    'summary' => ($r->client_medication_id === null ? 'No medicine linked · ' : '')
+                        .'Target '.$this->inrTargetLabel($r)
                         .' · tested '.optional($r->tested_on)->format('j M'),
                     'action' => 'Review',
                     'action_type' => 'review',
@@ -1074,13 +1075,17 @@ class MedicationOverviewService
 
     // ─── Helpers ───────────────────────────────────────────
 
-    /** Latest active INR record per client (newest first). */
+    /**
+     * Latest active INR record per client (newest first). A reading with no
+     * medicine linked is never hidden (NF-23) — the feed labels it instead; a
+     * linked reading still needs a same-Client medication.
+     */
     private function latestInrPerClient(): Collection
     {
         $query = ClientInrRecord::active()
             ->whereIn('client_id', $this->allowedClientIds())
             ->with('client:id,first_name,last_name');
-        $this->canonicalMedicationRows($query, false);
+        $this->canonicalMedicationRows($query, true);
         if (! $this->includeControlled) {
             $this->governanceScope->scopeWithoutControlledMedicationRows($query);
         }
