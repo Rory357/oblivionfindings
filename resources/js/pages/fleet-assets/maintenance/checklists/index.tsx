@@ -3,6 +3,11 @@ import {
     outcomeTone,
 } from '@/components/fleet-assets/vehicle-workspace/checks-model';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,16 +23,8 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate } from '@/lib/fleet-utils';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
-import { HeroActionButton } from '@/pages/fleet-assets/maintenance/components/hero-action-button';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     CheckCircle,
     CircleHelp,
@@ -149,6 +146,7 @@ export default function ChecklistsIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 {
                     title: 'Checklists',
@@ -158,69 +156,46 @@ export default function ChecklistsIndex({
         >
             <Head title="Checklists" />
             <PageShell>
-                <HeroShell>
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={ClipboardList} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Maintenance · checklists
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Checklists
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Inspection and maintenance checklist templates
-                                and runs.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-3 gap-2 lg:ml-auto lg:max-w-xl">
-                            <HeroClusterTile
-                                label="Templates"
-                                value={fmt(heroStats.templates)}
-                                caption="ready to run"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                label="Runs 30d"
-                                value={fmt(heroStats.runs_30d)}
-                                caption="checks completed"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                label="Failed 30d"
-                                value={fmt(heroStats.failed_30d)}
-                                caption="need follow-up"
-                                tone={
-                                    heroStats.failed_30d > 0
-                                        ? 'critical'
-                                        : 'success'
-                                }
-                            />
-                        </div>
-                    </div>
-                    {can.manage ? (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <FleetHeroAction
-                                href="/fleet-assets/maintenance/checklists/run"
-                                icon={ClipboardCheck}
-                                emphasis
-                            >
-                                Run checklist
-                            </FleetHeroAction>
-                            {can.create_templates ? (
-                                <HeroActionButton
-                                    onClick={() => {
-                                        setTemplateStepIndex(0);
-                                        setDialogOpen(true);
-                                    }}
-                                    icon={Plus}
+                <PageHeader
+                    wrapTitle
+                    title="Checklists"
+                    icon={ClipboardList}
+                    subline={
+                        <>
+                            Inspection and maintenance templates and runs ·{' '}
+                            {fmt(heroStats.templates)} templates ·{' '}
+                            {fmt(heroStats.runs_30d)} runs in 30 days ·{' '}
+                            {fmt(heroStats.failed_30d)} failed
+                        </>
+                    }
+                    actions={
+                        can.manage ? (
+                            <>
+                                <PageHeaderPrimaryButton
+                                    icon={ClipboardCheck}
+                                    onClick={() =>
+                                        router.visit(
+                                            '/fleet-assets/maintenance/checklists/run',
+                                        )
+                                    }
                                 >
-                                    Create template
-                                </HeroActionButton>
-                            ) : null}
-                        </div>
-                    ) : null}
-                </HeroShell>
+                                    Run checklist
+                                </PageHeaderPrimaryButton>
+                                {can.create_templates && (
+                                    <PageHeaderGlassButton
+                                        icon={Plus}
+                                        onClick={() => {
+                                            setTemplateStepIndex(0);
+                                            setDialogOpen(true);
+                                        }}
+                                    >
+                                        Create template
+                                    </PageHeaderGlassButton>
+                                )}
+                            </>
+                        ) : undefined
+                    }
+                />
 
                 {can.create_templates ? (
                     <WizardShell
@@ -319,7 +294,21 @@ export default function ChecklistsIndex({
                         ) : templateStepIndex === 1 ? (
                             <WizardStepPane>
                                 <div>
-                                    {Object.keys(templateForm.errors).some((key) => key.startsWith('items')) && <p role="alert" className="text-sm text-destructive">{Object.entries(templateForm.errors).filter(([key]) => key.startsWith('items')).map(([, value]) => value).join(' ')}</p>}
+                                    {Object.keys(templateForm.errors).some(
+                                        (key) => key.startsWith('items'),
+                                    ) && (
+                                        <p
+                                            role="alert"
+                                            className="text-sm text-destructive"
+                                        >
+                                            {Object.entries(templateForm.errors)
+                                                .filter(([key]) =>
+                                                    key.startsWith('items'),
+                                                )
+                                                .map(([, value]) => value)
+                                                .join(' ')}
+                                        </p>
+                                    )}
                                     <label className="text-sm font-medium">
                                         Items
                                     </label>
@@ -358,7 +347,11 @@ export default function ChecklistsIndex({
                                                         ];
                                                         items[idx] = {
                                                             ...items[idx],
-                                                            type: v, options: v === 'select' ? [] : null,
+                                                            type: v,
+                                                            options:
+                                                                v === 'select'
+                                                                    ? []
+                                                                    : null,
                                                         };
                                                         templateForm.setData(
                                                             'items',
@@ -384,15 +377,48 @@ export default function ChecklistsIndex({
                                                         </SelectItem>
                                                     </SelectContent>
                                                 </Select>
-                                                {item.type === 'select' && <Input className="w-full" aria-label={`Options for item ${idx + 1}`}
-                                                    placeholder="Choices separated by commas, e.g. pass, fail"
-                                                    value={(item.options ?? []).join(',')}
-                                                    onChange={(event) => templateForm.setData('items', templateForm.data.items.map((entry, i) =>
-                                                        i === idx ? { ...entry, options: event.target.value.split(',') } : entry))} />}
-                                                <p className="w-full text-xs text-muted-foreground">{['text', 'number'].includes(item.type)
-                                                    ? 'Observation only. Approved pass/fail rules require yes/no or select questions.'
-                                                    : item.type === 'checkbox' ? 'Choices: yes and no. Approval determines which result passes.'
-                                                    : 'Each choice must be non-empty and unique.'}</p>
+                                                {item.type === 'select' && (
+                                                    <Input
+                                                        className="w-full"
+                                                        aria-label={`Options for item ${idx + 1}`}
+                                                        placeholder="Choices separated by commas, e.g. pass, fail"
+                                                        value={(
+                                                            item.options ?? []
+                                                        ).join(',')}
+                                                        onChange={(event) =>
+                                                            templateForm.setData(
+                                                                'items',
+                                                                templateForm.data.items.map(
+                                                                    (
+                                                                        entry,
+                                                                        i,
+                                                                    ) =>
+                                                                        i ===
+                                                                        idx
+                                                                            ? {
+                                                                                  ...entry,
+                                                                                  options:
+                                                                                      event.target.value.split(
+                                                                                          ',',
+                                                                                      ),
+                                                                              }
+                                                                            : entry,
+                                                                ),
+                                                            )
+                                                        }
+                                                    />
+                                                )}
+                                                <p className="w-full text-xs text-muted-foreground">
+                                                    {[
+                                                        'text',
+                                                        'number',
+                                                    ].includes(item.type)
+                                                        ? 'Observation only. Approved pass/fail rules require yes/no or select questions.'
+                                                        : item.type ===
+                                                            'checkbox'
+                                                          ? 'Choices: yes and no. Approval determines which result passes.'
+                                                          : 'Each choice must be non-empty and unique.'}
+                                                </p>
                                             </div>
                                         ),
                                     )}
@@ -532,11 +558,15 @@ export default function ChecklistsIndex({
                                         className="flex items-center justify-between rounded-md border p-3 text-sm"
                                     >
                                         <div className="flex items-center gap-3">
-                                            {outcomeTone(run.outcome) === 'success' ? (
+                                            {outcomeTone(run.outcome) ===
+                                            'success' ? (
                                                 <CheckCircle className="h-5 w-5 text-status-success" />
-                                            ) : outcomeTone(run.outcome) === 'critical' ? (
+                                            ) : outcomeTone(run.outcome) ===
+                                              'critical' ? (
                                                 <XCircle className="h-5 w-5 text-status-critical" />
-                                            ) : <CircleHelp className="h-5 w-5 text-status-warning" />}
+                                            ) : (
+                                                <CircleHelp className="h-5 w-5 text-status-warning" />
+                                            )}
                                             <div>
                                                 <div className="font-medium">
                                                     {run.template?.name ??
@@ -567,7 +597,9 @@ export default function ChecklistsIndex({
                                                 </div>
                                             </div>
                                         </div>
-                                        <StatusBadge variant={outcomeTone(run.outcome)}>
+                                        <StatusBadge
+                                            variant={outcomeTone(run.outcome)}
+                                        >
                                             {outcomeLabel(run.outcome)}
                                         </StatusBadge>
                                     </div>

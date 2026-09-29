@@ -3,8 +3,8 @@
 /* eMAR sign-administration popup (design: emar.jsx). A focused sign-off for
  * the profile MAR tab — outcome tiles, structured not-given reasons, PRN
  * indication and controlled-drug witness — submitting to the client-scoped
- * administration endpoint. The full RecordAdministrationDialog (safety
- * checks, scanning, vitals) remains on the Medical/MAR pages. */
+ * administration endpoint. The full dose-recording flow (safety checks,
+ * PRN follow-up) is the record-dose wizard on eMAR / Meds Today. */
 import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { Button } from '@/components/ui/button';
 import {

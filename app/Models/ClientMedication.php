@@ -441,7 +441,7 @@ class ClientMedication extends Model
             return false;
         }
 
-        return $this->end_date->diffInDays(now(), false) <= $days && $this->end_date->isFuture();
+        return now()->diffInDays($this->end_date, false) <= $days && $this->end_date->isFuture();
     }
 
     /**

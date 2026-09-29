@@ -79,9 +79,11 @@ class FleetAutoAlertJob implements ShouldQueue
     {
         // Alert at 14 days, 7 days, and 1 day before expiry
         $thresholds = [14, 7, 1];
+        $expiryTimezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $today = Carbon::now($expiryTimezone)->startOfDay();
 
         foreach ($thresholds as $days) {
-            $targetDate = now()->addDays($days)->toDateString();
+            $targetDate = $today->copy()->addDays($days)->toDateString();
 
             $assets = Asset::query()
                 ->whereNotNull('wof_expires_at')
@@ -110,7 +112,7 @@ class FleetAutoAlertJob implements ShouldQueue
         // Expired WOF
         $expired = Asset::query()
             ->whereNotNull('wof_expires_at')
-            ->where('wof_expires_at', '<', now())
+            ->where('wof_expires_at', '<', $today->toDateString())
             ->where('status', 'active')
             ->get(['id', 'name', 'wof_expires_at']);
 
@@ -122,7 +124,7 @@ class FleetAutoAlertJob implements ShouldQueue
                 'occurred_at' => now(),
                 'payload' => [
                     'expired_at' => $asset->wof_expires_at->toDateString(),
-                    'days_overdue' => $asset->wof_expires_at->diffInDays(now()),
+                    'days_overdue' => Carbon::parse($asset->wof_expires_at->toDateString(), $expiryTimezone)->diffInDays($today),
                 ],
             ]);
 
@@ -133,9 +135,10 @@ class FleetAutoAlertJob implements ShouldQueue
     private function checkRegistrationExpiring(FleetSignalService $signalService): void
     {
         $thresholds = [30, 14, 7, 1];
+        $today = Carbon::now((string) config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay();
 
         foreach ($thresholds as $days) {
-            $targetDate = now()->addDays($days)->toDateString();
+            $targetDate = $today->copy()->addDays($days)->toDateString();
 
             $assets = Asset::query()
                 ->whereNotNull('registration_expires_at')

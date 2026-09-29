@@ -1,6 +1,14 @@
+import { FleetPageMenu } from '@/components/fleet-assets/fleet-page-menu';
 import { locationUrl } from '@/components/fleet-assets/vehicle-workspace/workspace-model';
 import InputError from '@/components/input-error';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,14 +18,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
-import {
-    FleetComplianceBadges,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { FleetComplianceBadges } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -62,7 +63,7 @@ type Props = {
         open_alerts: number;
         critical_alerts: number;
     };
-    can?: { view_vehicles: boolean };
+    can?: { view_vehicles: boolean; view_alerts: boolean };
 };
 
 const without = <T,>(record: Record<number, T>, key: number) => {
@@ -99,6 +100,7 @@ export default function DailyCheck({
     // One request key per check being recorded, kept across retries so a
     // repeated submit returns the saved check instead of adding another.
     const [keys, setKeys] = useState<Record<number, string>>({});
+    const [view, setView] = useState<'all' | 'checked' | 'unchecked'>('all');
 
     const toggleCheck = (vehicleId: number) => {
         setActiveCheck(activeCheck === vehicleId ? null : vehicleId);
@@ -147,18 +149,103 @@ export default function DailyCheck({
         summary.total > 0
             ? Math.round((summary.checked / summary.total) * 100)
             : 0;
+    const visibleVehicles = vehicles.filter((vehicle) =>
+        view === 'all'
+            ? true
+            : view === 'checked'
+              ? vehicle.checked_today
+              : !vehicle.checked_today,
+    );
 
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Daily Checks', href: '/fleet-assets/daily-check' },
             ]}
         >
             <Head title="Daily Vehicle Checks" />
             <PageShell>
-                <HeroShell
-                    footer={
+                <PageHeader
+                    icon={ClipboardCheck}
+                    title="Daily Vehicle Checks"
+                    wrapTitle
+                    titleChip={
+                        <PageHeaderStatusChip
+                            variant={
+                                summary.unchecked > 0 ? 'warning' : 'success'
+                            }
+                        >
+                            {summary.unchecked} to check
+                        </PageHeaderStatusChip>
+                    }
+                    subline="Record today's visual checks for vehicles at your approved sites."
+                    actions={<FleetPageMenu />}
+                    meters={
+                        <>
+                            {(
+                                [
+                                    [
+                                        'all',
+                                        'Vehicles',
+                                        summary.total,
+                                        'in this check list',
+                                    ],
+                                    [
+                                        'checked',
+                                        'Checked today',
+                                        summary.checked,
+                                        'recorded today',
+                                    ],
+                                    [
+                                        'unchecked',
+                                        'Not checked',
+                                        summary.unchecked,
+                                        'still due',
+                                    ],
+                                ] as const
+                            ).map(([key, label, count, caption]) => (
+                                <PageHeaderMeterBlock
+                                    key={key}
+                                    label={label}
+                                    tone={
+                                        key === 'unchecked' && count > 0
+                                            ? 'warning'
+                                            : 'brand'
+                                    }
+                                    onClick={() => setView(key)}
+                                    pressed={view === key}
+                                    className={
+                                        view === key
+                                            ? 'ring-2 ring-primary-foreground/70'
+                                            : undefined
+                                    }
+                                    ariaLabel={`Show ${label.toLowerCase()} vehicles`}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {count}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {caption}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            ))}
+                        </>
+                    }
+                    filters={
+                        <span className="text-xs text-primary-foreground/75">
+                            Showing {visibleVehicles.length} ·{' '}
+                            {checkedPercentage}% complete today
+                        </span>
+                    }
+                />
+
+                <Card>
+                    <CardContent className="space-y-2 p-4">
+                        <h2 className="text-sm font-semibold">
+                            Roadworthiness and Fleet alerts
+                        </h2>
                         <FleetComplianceBadges
                             wofDue={compliance.wof_due}
                             wofExpired={compliance.wof_expired}
@@ -175,63 +262,13 @@ export default function DailyCheck({
                                 rego: '/fleet-assets/compliance',
                                 cof: '/fleet-assets/compliance',
                                 insurance: '/fleet-assets/compliance',
-                                alerts: '/fleet-assets/alerts',
+                                alerts: can?.view_alerts
+                                    ? '/fleet-assets/alerts'
+                                    : undefined,
                             }}
                         />
-                    }
-                >
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={ClipboardCheck} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Daily vehicle checks · today
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Daily Vehicle Checks
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Complete a quick visual check for each vehicle
-                                at your site.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
-                                label="Vehicles"
-                                value={fmt(summary.total)}
-                                caption="at your site"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                label="Checked today"
-                                value={fmt(summary.checked)}
-                                caption="done"
-                                tone={
-                                    summary.checked > 0 ? 'success' : 'neutral'
-                                }
-                            />
-                            <HeroClusterTile
-                                label="Not checked"
-                                value={fmt(summary.unchecked)}
-                                caption="still due"
-                                tone={
-                                    summary.unchecked > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                label="Completion"
-                                value={`${checkedPercentage}%`}
-                                caption="of today's checks"
-                                tone={
-                                    checkedPercentage === 100
-                                        ? 'success'
-                                        : 'warning'
-                                }
-                            />
-                        </div>
-                    </div>
-                </HeroShell>
+                    </CardContent>
+                </Card>
 
                 {/* Progress Bar */}
                 <div className="space-y-1">
@@ -253,12 +290,12 @@ export default function DailyCheck({
 
                 {/* Vehicle Grid (2-3 columns) */}
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                    {vehicles.length > 0 ? (
-                        vehicles.map((vehicle) => (
+                    {visibleVehicles.length > 0 ? (
+                        visibleVehicles.map((vehicle) => (
                             <Card
                                 key={vehicle.id}
                                 className={cn(
-                                    'transition-colors',
+                                    'min-w-0 transition-colors',
                                     vehicle.checked_today
                                         ? vehicle.check_result === 'good'
                                             ? 'border-primary/30 bg-primary/5'
@@ -266,9 +303,9 @@ export default function DailyCheck({
                                         : 'border-status-warning/30 bg-status-warning-bg',
                                 )}
                             >
-                                <CardContent className="p-4">
-                                    <div className="flex items-center justify-between gap-4">
-                                        <div className="flex min-w-0 items-center gap-3">
+                                <CardContent className="min-w-0 p-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div className="flex min-w-0 flex-1 items-center gap-3">
                                             {vehicle.checked_today ? (
                                                 vehicle.check_result ===
                                                 'good' ? (
@@ -280,7 +317,7 @@ export default function DailyCheck({
                                                 <Clock className="h-5 w-5 shrink-0 text-status-warning" />
                                             )}
                                             <div className="min-w-0">
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex min-w-0 flex-wrap items-center gap-2">
                                                     {can?.view_vehicles ? (
                                                         <Link
                                                             href={locationUrl(
@@ -454,11 +491,14 @@ export default function DailyCheck({
                         <div className="col-span-full flex flex-col items-center justify-center py-12 text-center">
                             <Car className="mb-4 h-12 w-12 text-muted-foreground/50" />
                             <h3 className="text-lg font-semibold">
-                                No vehicles at your site
+                                {vehicles.length === 0
+                                    ? 'No vehicles at your approved sites'
+                                    : 'No vehicles in this view'}
                             </h3>
                             <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                                Vehicles assigned to your site will appear here
-                                for daily checks.
+                                {vehicles.length === 0
+                                    ? 'Vehicles available for daily checks will appear here.'
+                                    : 'Choose another check status to see vehicles.'}
                             </p>
                         </div>
                     )}

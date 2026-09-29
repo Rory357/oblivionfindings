@@ -58,6 +58,7 @@ export default function TransportRecordPage({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 {
                     title: 'Transport',
                     href: '/fleet-assets/transports/overview',
