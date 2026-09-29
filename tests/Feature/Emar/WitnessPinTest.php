@@ -19,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -213,6 +214,7 @@ class WitnessPinTest extends TestCase
     public function test_wrong_pins_are_counted_after_nested_transactions_all_roll_back(): void
     {
         $witness = $this->siteStaff('support_worker', ['medications.controlled.witness']);
+        $recorder = $this->siteStaff('support_worker', ['medications.administer.record']);
         $pins = app(WitnessPinService::class);
 
         // Dose paths nest transactions: a savepoint rollback still leaves the
@@ -220,13 +222,15 @@ class WitnessPinTest extends TestCase
         foreach (range(1, 2) as $attempt) {
             try {
                 DB::transaction(fn () => DB::transaction(
-                    fn () => $pins->verify($witness, '000001', 'witness_credential', ['actor_id' => 999]),
+                    fn () => $pins->verify($witness, '000001', 'witness_credential', ['actor_id' => (int) $recorder->id]),
                 ));
             } catch (ValidationException) {
             }
             $this->assertSame($attempt, (int) UserWitnessPin::query()->where('user_id', $witness->id)->value('failed_attempts'));
         }
-        $this->assertSame(2, AuditLog::query()->where('action', 'medications.witness_pin.failed')->count());
+        $audits = AuditLog::query()->where('action', 'medications.witness_pin.failed')->get();
+        $this->assertCount(2, $audits);
+        $this->assertSame([$recorder->id, $recorder->id], $audits->map(fn (AuditLog $log): int => (int) $log->meta['actor_id'])->all());
 
         // A caller that catches the error and commits still gets it counted once.
         DB::transaction(function () use ($pins, $witness): void {
@@ -241,8 +245,10 @@ class WitnessPinTest extends TestCase
     public function test_one_account_cannot_try_more_pins_for_a_colleague_than_the_limit(): void
     {
         $witness = $this->siteStaff('support_worker', ['medications.controlled.witness']);
+        $recorder = $this->siteStaff('support_worker', ['medications.administer.record']);
+        $otherRecorder = $this->siteStaff('support_worker', ['medications.administer.record']);
         $pins = app(WitnessPinService::class);
-        $context = ['actor_id' => 4242];
+        $context = ['actor_id' => (int) $recorder->id];
 
         // The per-account budget is spent before the PIN is compared, so it
         // holds even if the durable count were behind (parallel requests).
@@ -262,7 +268,35 @@ class WitnessPinTest extends TestCase
             $this->assertStringContainsString('Too many PIN attempts for '.$witness->name.' from your account', $limited->errors()['witness_credential'][0]);
         }
         // Another recorder isn't affected.
-        $pins->verify($witness, UserFactory::TEST_WITNESS_PIN, 'witness_credential', ['actor_id' => 4343]);
+        $pins->verify($witness, UserFactory::TEST_WITNESS_PIN, 'witness_credential', ['actor_id' => (int) $otherRecorder->id]);
+    }
+
+    public function test_a_database_limiter_store_still_counts_attempts_after_the_caller_rolls_back(): void
+    {
+        // Laravel's default cache store is the database on the default
+        // connection: a limiter hit made inside the dose transaction would
+        // roll back with it, so it is counted after the transactions end.
+        config(['cache.limiter' => 'database']);
+        $this->app->forgetInstance(\Illuminate\Cache\RateLimiter::class);
+        RateLimiter::clearResolvedInstance(\Illuminate\Cache\RateLimiter::class);
+        $witness = $this->siteStaff('support_worker', ['medications.controlled.witness']);
+        $recorder = $this->siteStaff('support_worker', ['medications.administer.record']);
+        $context = ['actor_id' => (int) $recorder->id];
+        $pins = app(WitnessPinService::class);
+        $key = 'medication-witness-pin:'.$recorder->id.':'.$witness->id;
+
+        foreach (range(1, 2) as $attempt) {
+            try {
+                DB::transaction(fn () => DB::transaction(
+                    fn () => $pins->verify($witness, '000001', 'witness_credential', $context),
+                ));
+            } catch (ValidationException) {
+            }
+            $this->assertSame($attempt, RateLimiter::attempts($key));
+        }
+
+        $pins->verify($witness, UserFactory::TEST_WITNESS_PIN, 'witness_credential', $context);
+        $this->assertSame(0, RateLimiter::attempts($key));
     }
 
     public function test_the_optional_login_check_guards_setting_a_pin_when_none_is_usable(): void

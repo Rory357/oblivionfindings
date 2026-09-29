@@ -260,12 +260,16 @@ final class WitnessPinService
             throw ValidationException::withMessages([$errorKey => $this->lockedMessage($who, $record->locked_until)]);
         }
 
-        // Per recorder + witness: the attempt is reserved before the PIN is
-        // compared, so parallel requests from one account can't try more PINs
-        // than the organisation's limit before the durable lock lands.
+        // Per recorder + witness budget (the organisation's attempt limit). If
+        // the limiter's store survives a rollback, the attempt is reserved
+        // before the PIN is compared, so parallel requests from one account
+        // can't out-run the durable lock. A database store on the default
+        // connection would roll back with the caller, so there the attempt is
+        // counted with the durable failure write instead.
         $limiterKey = isset($context['actor_id'])
             ? 'medication-witness-pin:'.(int) $context['actor_id'].':'.(int) $witness->id
             : null;
+        $reserved = false;
         if ($limiterKey !== null) {
             if (RateLimiter::tooManyAttempts($limiterKey, $this->settings->maxAttempts())) {
                 $minutes = max(1, (int) ceil(RateLimiter::availableIn($limiterKey) / 60));
@@ -274,7 +278,10 @@ final class WitnessPinService
                     $errorKey => 'Too many PIN attempts for '.$witness->name.' from your account. Try again in '.$minutes.' minute'.($minutes === 1 ? '' : 's').'.',
                 ]);
             }
-            RateLimiter::hit($limiterKey, $this->settings->lockoutMinutes() * 60);
+            if (! $this->limiterRollsBackWithCaller()) {
+                RateLimiter::hit($limiterKey, $this->limiterDecaySeconds());
+                $reserved = true;
+            }
         }
 
         if (preg_match('/^\d{'.self::LENGTH.'}$/', (string) $pin) === 1 && Hash::check((string) $pin, $record->pin_hash)) {
@@ -288,7 +295,12 @@ final class WitnessPinService
             return;
         }
 
-        $lockedUntil = $this->recordFailureDurably((int) $witness->id, $record, $context + ['purpose' => $context['purpose'] ?? 'second_person']);
+        $lockedUntil = $this->recordFailureDurably(
+            (int) $witness->id,
+            $record,
+            $context + ['purpose' => $context['purpose'] ?? 'second_person'],
+            $reserved ? null : $limiterKey,
+        );
 
         throw ValidationException::withMessages([
             $errorKey => $lockedUntil !== null ? $this->lockedMessage($who, $lockedUntil) : self::INCORRECT,
@@ -306,21 +318,25 @@ final class WitnessPinService
      * the stored count and lock are decided under the row lock at write time.
      *
      * @param  array<string, mixed>  $context
+     * @param  string|null  $limiterKey  A per-recorder budget still to count (not reserved up front).
      * @return CarbonInterface|null When this failure locks the PIN, its unlock time.
      */
-    private function recordFailureDurably(int $witnessId, UserWitnessPin $snapshot, array $context): ?CarbonInterface
+    private function recordFailureDurably(int $witnessId, UserWitnessPin $snapshot, array $context, ?string $limiterKey = null): ?CarbonInterface
     {
         $max = $this->settings->maxAttempts();
         $attempts = $this->attemptsSoFar($snapshot) + 1;
         $lockedUntil = $attempts >= $max ? now()->addMinutes($this->settings->lockoutMinutes()) : null;
 
         $done = false;
-        $this->whenOutsideTransactions(function () use (&$done, $witnessId, $max, $context): void {
+        $this->whenOutsideTransactions(function () use (&$done, $witnessId, $max, $context, $limiterKey): void {
             if ($done) {
                 return;
             }
             $done = true;
             $this->writeFailure($witnessId, $max, $context);
+            if ($limiterKey !== null) {
+                RateLimiter::hit($limiterKey, $this->limiterDecaySeconds());
+            }
         });
 
         return $lockedUntil;
@@ -346,6 +362,27 @@ final class WitnessPinService
         };
 
         $schedule();
+    }
+
+    /**
+     * The rate limiter's cache writes share the caller's transaction when its
+     * store is the database on the default connection (Laravel's default
+     * store); a reservation there would roll back with a failed dose.
+     */
+    private function limiterRollsBackWithCaller(): bool
+    {
+        $store = (string) (config('cache.limiter') ?: config('cache.default'));
+        if (config("cache.stores.{$store}.driver") !== 'database') {
+            return false;
+        }
+        $connection = config("cache.stores.{$store}.connection");
+
+        return $connection === null || $connection === '' || $connection === config('database.default');
+    }
+
+    private function limiterDecaySeconds(): int
+    {
+        return $this->settings->lockoutMinutes() * 60;
     }
 
     /**
