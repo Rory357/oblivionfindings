@@ -260,9 +260,26 @@ class SendMedicationAlerts extends Command
                 continue;
             }
 
+            // A renewal is a new assessment; the one it replaces stays 'passed'.
+            $renewed = MedicationCompetencyAssessment::active()
+                ->where('user_id', $user->id)
+                ->where('expiry_date', '>', $assessment->expiry_date->toDateString())
+                ->exists();
+            if ($renewed) {
+                continue;
+            }
+
+            $expiryDate = $assessment->expiry_date->format('d/m/Y');
+            if ($this->alreadyNotified($user, MedicationCompetencyExpiringNotification::class, [
+                'assessment_id' => $assessment->id,
+                'expiry_date' => $expiryDate,
+            ])) {
+                continue;
+            }
+
             $user->notify(new MedicationCompetencyExpiringNotification(
                 staffName: $user->name,
-                expiryDate: $assessment->expiry_date->format('d/m/Y'),
+                expiryDate: $expiryDate,
                 assessmentId: $assessment->id,
             ));
             $count++;
@@ -296,12 +313,10 @@ class SendMedicationAlerts extends Command
             return;
         }
 
-        // Notify team leaders (users with team_leader role)
+        // Notify team leads (the seeded team_lead role; roles have no slug column)
         $siteAccess = app(UserSiteAccessService::class);
-        $teamLeaders = User::whereHas('roles', function ($q) {
-            $q->where('slug', 'team-leader')
-                ->orWhere('name', 'Team Leader');
-        })->get()
+        $teamLeaders = User::whereHas('roles', fn ($q) => $q->where('name', 'team_lead'))
+            ->get()
             ->filter(fn (User $leader) => $leader->canDo('medications.view'))
             ->map(fn (User $leader) => [
                 'user' => $leader,
@@ -335,17 +350,44 @@ class SendMedicationAlerts extends Command
                     && ! $entry['user']->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
                     continue;
                 }
+                // The cluster persists for days; remind each lead once a day.
+                if ($this->alreadyNotified($entry['user'], MedicationRefusalClusterNotification::class, [
+                    'client_id' => (int) $cluster->client_id,
+                    'client_medication_id' => $medication->id,
+                ], now()->subDay())) {
+                    continue;
+                }
                 $entry['user']->notify(new MedicationRefusalClusterNotification(
                     clientName: $clientName,
                     medication: $medicationName,
                     count: (int) $cluster->refusal_count,
                     clientId: $cluster->client_id,
+                    clientMedicationId: $medication->id,
                 ));
             }
             $count++;
         }
 
         $this->info("Sent refusal cluster alerts for {$count} medication/client combinations.");
+    }
+
+    /**
+     * Whether this recipient already holds the stored notification. The
+     * database row is the de-duplication record because cache keys are
+     * cleared on every deploy (optimize:clear) and these alerts span days.
+     *
+     * @param  array<string, int|string>  $data
+     */
+    private function alreadyNotified(User $recipient, string $type, array $data, ?Carbon $since = null): bool
+    {
+        $query = $recipient->notifications()->where('type', $type);
+        foreach ($data as $key => $value) {
+            $query->where("data->{$key}", $value);
+        }
+
+        return $query
+            ->when($since, fn ($sent) => $sent->where('created_at', '>=', $since))
+            ->exists();
     }
 
     private function canReceiveMedicationEvidence(User $recipient, int $siteId, bool $controlled): bool
