@@ -1,0 +1,12 @@
+eMAR P00 v5 — Medication rules & states (design mockup)
+Recorded 29 September 2026 NZDT · branch claude/vigilant-mclaren-233129
+Supersedes v4 (f8b2dffc1, frozen). Builds in Stephan's answers of 29 Sep 2026 (D2, D8, D12, NF-03). P0 fixes live on main (c2838f86a).
+Files (SHA-256):
+
+7f2a0b3e0075e9aff72e364687657517480c409042fcdd2268d6e001924311c8 *index.html
+4300fbbd0bc9443531f087808dfa4e89a65ccf9c4518a8a828b1212aa08d4d00 *mockup.css
+df520cf5031c0a7752d02eca0c3d83073179d434bfb5b3dd33e10796dd61bf22 *mockup.js
+2c4b1fb03f5f1e5886914ff999ac2da360ca07ac14d45747220b705b59a311f4 *serve.mjs
+fccfeb3d457e1c5a34ede52c0a15734ff22bff36cd0fbf2bdaa7c86106ba0936 *README.md
+
+Screenshots (evidence, not part of the design surface): 143 PNG files in screenshots/
