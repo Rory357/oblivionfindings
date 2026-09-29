@@ -42,8 +42,13 @@ interface Props {
         maxAttempts: number;
         lockoutMinutes: number;
         renewalMonths: number | null;
+        /** Setting a PIN while none is usable needs the login password. */
+        loginCheckToSet: boolean;
     };
 }
+
+const PIN_HELP =
+    '6 digits. Not your login password, and not an easy pattern like 123456, 890123 or 121212.';
 
 function PinField({
     id,
@@ -96,7 +101,13 @@ export default function WitnessPin({ witnessPin, rules }: Props) {
     const { status } = witnessPin;
     const [resetting, setResetting] = useState(status === 'locked');
 
-    const setForm = useForm({ current_pin: '', pin: '', pin_confirmation: '' });
+    const needsLogin = status !== 'set' && rules.loginCheckToSet;
+    const setForm = useForm({
+        current_pin: '',
+        current_password: '',
+        pin: '',
+        pin_confirmation: '',
+    });
     const resetForm = useForm({
         current_password: '',
         pin: '',
@@ -108,8 +119,7 @@ export default function WitnessPin({ witnessPin, rules }: Props) {
         setForm.put('/settings/witness-pin', {
             preserveScroll: true,
             onSuccess: () => setForm.reset(),
-            onError: () =>
-                setForm.reset('current_pin', 'pin', 'pin_confirmation'),
+            onError: () => setForm.reset(),
         });
     }
 
@@ -224,13 +234,53 @@ export default function WitnessPin({ witnessPin, rules }: Props) {
                                         </p>
                                     </div>
                                 ) : null}
+                                {needsLogin ? (
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="set_current_password">
+                                            Your login password
+                                        </Label>
+                                        <Input
+                                            id="set_current_password"
+                                            type="password"
+                                            autoComplete="current-password"
+                                            className="max-w-md"
+                                            value={
+                                                setForm.data.current_password
+                                            }
+                                            onChange={(event) =>
+                                                setForm.setData(
+                                                    'current_password',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            aria-invalid={
+                                                setForm.errors.current_password
+                                                    ? true
+                                                    : undefined
+                                            }
+                                            aria-describedby="set_current_password-help"
+                                        />
+                                        <p
+                                            id="set_current_password-help"
+                                            className="text-caption"
+                                        >
+                                            Confirms it’s you choosing your PIN,
+                                            not someone at your screen.
+                                        </p>
+                                        <InputError
+                                            message={
+                                                setForm.errors.current_password
+                                            }
+                                        />
+                                    </div>
+                                ) : null}
                                 <PinField
                                     id="pin"
                                     label="New 6-digit PIN"
                                     value={setForm.data.pin}
                                     onChange={(v) => setForm.setData('pin', v)}
                                     error={setForm.errors.pin}
-                                    help="6 digits. Not your login password, not all one digit or a simple run. Don’t share it."
+                                    help={`${PIN_HELP} Don’t share it.`}
                                 />
                                 <PinField
                                     id="pin_confirmation"
@@ -310,7 +360,7 @@ export default function WitnessPin({ witnessPin, rules }: Props) {
                                         resetForm.setData('pin', v)
                                     }
                                     error={resetForm.errors.pin}
-                                    help="6 digits. Not your login password, not all one digit or a simple run."
+                                    help={PIN_HELP}
                                 />
                                 <PinField
                                     id="reset_pin_confirmation"

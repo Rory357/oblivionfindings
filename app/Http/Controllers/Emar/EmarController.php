@@ -7923,7 +7923,7 @@ class EmarController extends Controller
             $approver,
             (string) $validated['waiver_approver_credential'],
             'waiver_approver_credential',
-            ['site_id' => (int) $scope->siteId, 'surface' => 'verification_waiver'],
+            ['site_id' => (int) $scope->siteId, 'surface' => 'verification_waiver', 'actor_id' => (int) $verifier->id],
         );
 
         return $approver;

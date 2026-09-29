@@ -19,9 +19,11 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Models\UserWitnessPin;
 use App\Services\ControlRoom\SignalProcessingService;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\Medication\MedicationSignalService;
+use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationIncidentIntegrationService;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
@@ -432,6 +434,62 @@ class WorkerMedsRecordDoseTest extends TestCase
         $this->assertSame(10.0, (float) $entry->on_hand_before);
         $this->assertSame(9.5, (float) $entry->on_hand_after);
         $this->assertSame(9.5, (float) $medication->stock->refresh()->on_hand);
+    }
+
+    /**
+     * PIN-1 review P0: the dose path nests transactions (scope decision outer,
+     * MAR service inner). Wrong witness PINs must still be counted, lock the
+     * PIN and leave their audit rows after both levels roll back.
+     */
+    public function test_wrong_witness_pins_on_the_dose_path_are_counted_and_lock_through_nested_rollbacks(): void
+    {
+        // Same instant on a UTC clock: an NZ-zoned test clock misreads stored datetimes.
+        Carbon::setTestNow(Carbon::now()->utc());
+        $medication = $this->scheduledMedication(['09:30'], [
+            'name' => 'Methylphenidate',
+            'controlled_drug' => true,
+        ]);
+        ClientMedicationStock::create([
+            'client_medication_id' => $medication->id,
+            'on_hand' => 10,
+            'unit' => 'tablets',
+        ]);
+        $scheduledFor = Carbon::parse('2026-04-30 09:30', config('app.worker_timezone'));
+        $witness = $this->currentWitnessAt($this->site, withGovernanceEvidence: true);
+        $record = fn (string $pin) => $this->actingAs($this->worker)
+            ->from('/meds/today')
+            ->post('/meds/today/record', [
+                'client_medication_id' => $medication->id,
+                'scheduled_for' => $scheduledFor->toIso8601String(),
+                'status' => 'given',
+                'witnessed_by' => $witness->id,
+                'witness_credential' => $pin,
+                'quantity_administered' => 0.5,
+                'cd_balance' => 9.5,
+            ]);
+        $failedAttempts = fn (): int => (int) UserWitnessPin::query()->where('user_id', $witness->id)->value('failed_attempts');
+
+        foreach (range(1, 4) as $attempt) {
+            $record('000001')->assertSessionHasErrors(['witness_credential' => WitnessPinService::INCORRECT]);
+            $this->assertSame($attempt, $failedAttempts(), "Wrong PIN {$attempt} must be counted.");
+        }
+
+        $record('000001')->assertSessionHasErrors('witness_credential');
+        $this->assertStringContainsString(
+            'witness PIN is locked after too many wrong attempts',
+            session('errors')->first('witness_credential'),
+        );
+        $this->assertSame(WitnessPinService::STATUS_LOCKED, app(WitnessPinService::class)->status($witness->fresh()));
+        $this->assertSame(4, AuditLog::query()->where('action', 'medications.witness_pin.failed')->count());
+        $locked = AuditLog::query()->where('action', 'medications.witness_pin.locked')->sole();
+        $this->assertSame($this->worker->id, (int) $locked->meta['actor_id']);
+
+        // Even the right PIN is refused until the lock lifts; nothing was recorded.
+        $record(UserFactory::TEST_WITNESS_PIN)->assertSessionHasErrors('witness_credential');
+        $this->assertStringContainsString('locked', session('errors')->first('witness_credential'));
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertSame(10.0, (float) $medication->stock->refresh()->on_hand);
     }
 
     public function test_controlled_dose_rejects_missing_insufficient_and_stale_stock_without_mutation(): void

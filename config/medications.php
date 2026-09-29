@@ -11,4 +11,12 @@ return [
         // When to mark a scheduled dose as "due soon" (minutes before scheduled time)
         'due_soon_minutes' => 60,
     ],
+
+    'witness_pin' => [
+        // Ask for the login password before someone sets a witness PIN while
+        // they have no usable one (not set yet, reset by a lead, or needing
+        // renewal), so a colleague at an unlocked session can't choose it for
+        // them. Off keeps the approved P00 v5 flow; waiting on Stephan.
+        'login_check_to_set' => (bool) env('MEDICATION_WITNESS_PIN_LOGIN_CHECK', false),
+    ],
 ];

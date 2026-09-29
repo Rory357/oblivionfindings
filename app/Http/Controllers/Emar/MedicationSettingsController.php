@@ -49,6 +49,8 @@ class MedicationSettingsController extends Controller
         'renewal_months' => WitnessPinSettings::RENEWAL_MONTHS,
     ];
 
+    private const WITNESS_PIN_STAFF_LIMIT = 500;
+
     /** Permissions that make someone a possible second person (witness, co-signer, read-back, waiver). */
     private const SECOND_PERSON_PERMISSIONS = [
         'medications.controlled.witness',
@@ -99,7 +101,10 @@ class MedicationSettingsController extends Controller
         $actor = $request->user();
         abort_unless($actor?->canDo('medications.witness_pin.reset'), 403);
         abort_if((int) $user->id === (int) $actor->id, 403);
-        abort_unless($this->witnessPinStaff($actor)->contains('id', (int) $user->id), 404);
+
+        $target = $this->witnessPinStaffQuery($actor)?->whereKey($user->id)->first(['id', 'name', 'approved_at', 'role']);
+        abort_unless($target !== null && $this->isSecondPerson($target), 404);
+        abort_unless($this->canResetPinOf($actor, $target), 403);
 
         $this->witnessPins->resetByAdmin($user, $actor);
 
@@ -107,17 +112,30 @@ class MedicationSettingsController extends Controller
     }
 
     /**
-     * Staff in the actor's approved Sites who may be chosen as a second person.
+     * Staff in the actor's approved Sites who may be chosen as a second person,
+     * filtered by permission before the cap so the list isn't cut short.
      *
      * @return Collection<int, User>
      */
     private function witnessPinStaff(User $actor): Collection
     {
-        $query = User::query()->staff()->whereNotNull('approved_at')->orderBy('name');
+        return $this->witnessPinStaffQuery($actor)
+            ?->lazy(200)
+            ->filter(fn (User $user): bool => $this->isSecondPerson($user))
+            ->take(self::WITNESS_PIN_STAFF_LIMIT)
+            ->collect()
+            ->values() ?? collect();
+    }
+
+    /** Null when the actor can see no Site's staff. */
+    private function witnessPinStaffQuery(User $actor): ?Builder
+    {
+        $query = User::query()->staff()->whereNotNull('approved_at')->orderBy('name')->orderBy('id')
+            ->select(['id', 'name', 'approved_at', 'role']);
         if (! $this->canManageGlobalRules($actor)) {
             $siteIds = $this->siteAccess->accessibleSiteIds($actor, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS);
             if ($siteIds === []) {
-                return collect();
+                return null;
             }
             $query->where(function (Builder $scoped) use ($siteIds): void {
                 foreach ($siteIds as $siteId) {
@@ -126,9 +144,50 @@ class MedicationSettingsController extends Controller
             });
         }
 
-        return $query->limit(500)->get(['id', 'name', 'approved_at', 'role'])
-            ->filter(fn (User $user): bool => collect(self::SECOND_PERSON_PERMISSIONS)->contains(fn (string $key): bool => $user->canDo($key)))
+        return $query;
+    }
+
+    /**
+     * Status-only rows for the staff PIN list (never the actor), each saying
+     * whether this actor may reset that person's PIN.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function witnessPinStaffRows(User $actor, bool $canResetPins): Collection
+    {
+        $staff = $this->witnessPinStaff($actor)
+            ->reject(fn (User $user): bool => (int) $user->id === (int) $actor->id)
             ->values();
+        $resettable = $canResetPins
+            ? $staff->filter(fn (User $user): bool => $this->canResetPinOf($actor, $user))->pluck('id')->flip()
+            : collect();
+
+        return $this->witnessPins->statusRows($staff)
+            ->map(fn (array $row): array => $row + ['can_reset' => $resettable->has($row['id'])])
+            ->values();
+    }
+
+    private function isSecondPerson(User $user): bool
+    {
+        return collect(self::SECOND_PERSON_PERMISSIONS)->contains(fn (string $key): bool => $user->canDo($key));
+    }
+
+    /**
+     * Organisation-wide leads may reset anyone in their list. A house lead may
+     * not reset someone with broader authority than theirs: another PIN
+     * resetter, an eMAR settings manager or an all-Sites user.
+     */
+    private function canResetPinOf(User $actor, User $target): bool
+    {
+        if ($this->canManageGlobalRules($actor)) {
+            return true;
+        }
+
+        return ! collect([
+            'medications.witness_pin.reset',
+            'medications.settings.manage',
+            ...MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+        ])->contains(fn (string $key): bool => $target->canDo($key));
     }
 
     /**
@@ -229,9 +288,7 @@ class MedicationSettingsController extends Controller
             'reviewed' => $this->witnessPinRequestValues($this->witnessPinSettings->reviewed()),
             'can_manage' => $this->canManageSettings($actor) && $this->canManageGlobalRules($actor),
             'can_reset' => $canResetPins,
-            'staff' => $this->witnessPins->statusRows($this->witnessPinStaff($actor))
-                ->reject(fn (array $row): bool => $row['id'] === (int) $actor->id)
-                ->values(),
+            'staff' => $this->witnessPinStaffRows($actor, $canResetPins),
         ];
 
         // House leads can reset staff PINs without managing medication rules:

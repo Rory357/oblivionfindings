@@ -44,6 +44,8 @@ export type WitnessPinStaffRow = {
     set_at: string | null;
     locked_until: string | null;
     reset_at: string | null;
+    /** False for people with broader authority than a house lead. */
+    can_reset: boolean;
 };
 
 export type WitnessPinProps = {
@@ -171,7 +173,10 @@ export function WitnessPinCard({
     }
 
     const actionsFor = (row: WitnessPinStaffRow): MenuItem[] =>
-        can_reset && row.status !== 'not_set' && row.status !== 'reset'
+        can_reset &&
+        row.can_reset &&
+        row.status !== 'not_set' &&
+        row.status !== 'reset'
             ? [
                   {
                       label: 'Reset PIN (they must set a new one)',
@@ -266,7 +271,8 @@ export function WitnessPinCard({
                     <p className="text-sm">
                         People with the “Reset another person’s witness PIN”
                         permission — house leads and clinical leads by default.
-                        Change it in Settings › Roles.
+                        A house lead can’t reset another lead’s or an all-sites
+                        user’s PIN. Change it in Settings › Roles.
                     </p>
                 </div>
                 {can_manage ? (

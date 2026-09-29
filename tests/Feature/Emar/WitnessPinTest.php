@@ -15,9 +15,11 @@ use Carbon\Carbon;
 use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -69,10 +71,17 @@ class WitnessPinTest extends TestCase
                 ->where('rules.renewalMonths', null));
 
         $pins = app(WitnessPinService::class);
-        foreach (['12345', '1234567', 'abcdef', '111111', '123456', '654321', '01234 '] as $weak) {
+        foreach ([
+            '12345', '1234567', 'abcdef', '01234 ',   // not six digits
+            '111111', '123456', '654321',              // one digit, runs
+            '890123', '901234', '210987',              // wraparound runs
+            '121212', '123123', '112233', '111222',    // repeats
+        ] as $weak) {
             $this->assertNotNull($pins->formatError($weak), "{$weak} must be refused");
         }
-        $this->assertNull($pins->formatError('708142'));
+        foreach (['708142', UserFactory::TEST_WITNESS_PIN, '593027'] as $fine) {
+            $this->assertNull($pins->formatError($fine), "{$fine} must be allowed");
+        }
 
         // The form refuses them too (the route allows 6 tries a minute).
         foreach (['12345', '111111', '123456'] as $weak) {
@@ -146,11 +155,16 @@ class WitnessPinTest extends TestCase
             ->from('/settings/witness-pin')
             ->post('/settings/witness-pin/reset', ['current_password' => 'not-my-password', 'pin' => '593027', 'pin_confirmation' => '593027'])
             ->assertSessionHasErrors('current_password');
+        $this->assertSame(1, AuditLog::query()->where('action', 'medications.witness_pin.login_check_failed')->count());
         $this->actingAs($worker)
             ->from('/settings/witness-pin')
             ->post('/settings/witness-pin/reset', ['current_password' => 'password', 'pin' => '593027', 'pin_confirmation' => '593027'])
             ->assertSessionHasNoErrors();
         $this->assertTrue(Hash::check('593027', UserWitnessPin::query()->where('user_id', $worker->id)->value('pin_hash')));
+        // A forgotten-PIN reset audits as a self-reset, not a plain change.
+        $selfReset = AuditLog::query()->where('action', 'medications.witness_pin.self_reset')->sole();
+        $this->assertSame(WitnessPinService::CONFIRMED_WITH_LOGIN_PASSWORD, $selfReset->meta['confirmed_with']);
+        $this->assertSame(1, AuditLog::query()->where('action', 'medications.witness_pin.changed')->count());
 
         // The PIN fields never come back to the form.
         $this->assertArrayNotHasKey('pin', session()->getOldInput());
@@ -194,6 +208,160 @@ class WitnessPinTest extends TestCase
 
         $this->expectException(ValidationException::class);
         $pins->verify($witness, UserFactory::TEST_WITNESS_PIN, 'witness_credential');
+    }
+
+    public function test_wrong_pins_are_counted_after_nested_transactions_all_roll_back(): void
+    {
+        $witness = $this->siteStaff('support_worker', ['medications.controlled.witness']);
+        $pins = app(WitnessPinService::class);
+
+        // Dose paths nest transactions: a savepoint rollback still leaves the
+        // outer one open, and the ValidationException then rolls that back too.
+        foreach (range(1, 2) as $attempt) {
+            try {
+                DB::transaction(fn () => DB::transaction(
+                    fn () => $pins->verify($witness, '000001', 'witness_credential', ['actor_id' => 999]),
+                ));
+            } catch (ValidationException) {
+            }
+            $this->assertSame($attempt, (int) UserWitnessPin::query()->where('user_id', $witness->id)->value('failed_attempts'));
+        }
+        $this->assertSame(2, AuditLog::query()->where('action', 'medications.witness_pin.failed')->count());
+
+        // A caller that catches the error and commits still gets it counted once.
+        DB::transaction(function () use ($pins, $witness): void {
+            try {
+                $pins->verify($witness, '000001', 'witness_credential');
+            } catch (ValidationException) {
+            }
+        });
+        $this->assertSame(3, (int) UserWitnessPin::query()->where('user_id', $witness->id)->value('failed_attempts'));
+    }
+
+    public function test_one_account_cannot_try_more_pins_for_a_colleague_than_the_limit(): void
+    {
+        $witness = $this->siteStaff('support_worker', ['medications.controlled.witness']);
+        $pins = app(WitnessPinService::class);
+        $context = ['actor_id' => 4242];
+
+        // The per-account budget is spent before the PIN is compared, so it
+        // holds even if the durable count were behind (parallel requests).
+        UserWitnessPin::query()->where('user_id', $witness->id)->update(['failed_attempts' => 0]);
+        foreach (range(1, 5) as $attempt) {
+            try {
+                $pins->verify($witness, '000001', 'witness_credential', $context);
+            } catch (ValidationException) {
+            }
+            UserWitnessPin::query()->where('user_id', $witness->id)->update(['failed_attempts' => 0, 'locked_until' => null]);
+        }
+
+        try {
+            $pins->verify($witness, UserFactory::TEST_WITNESS_PIN, 'witness_credential', $context);
+            $this->fail('The sixth try from one account must be refused.');
+        } catch (ValidationException $limited) {
+            $this->assertStringContainsString('Too many PIN attempts for '.$witness->name.' from your account', $limited->errors()['witness_credential'][0]);
+        }
+        // Another recorder isn't affected.
+        $pins->verify($witness, UserFactory::TEST_WITNESS_PIN, 'witness_credential', ['actor_id' => 4343]);
+    }
+
+    public function test_the_optional_login_check_guards_setting_a_pin_when_none_is_usable(): void
+    {
+        config(['medications.witness_pin.login_check_to_set' => true]);
+        $worker = $this->siteStaff('support_worker', ['medications.administer.record'], withPin: false);
+
+        $this->actingAs($worker)
+            ->get('/settings/witness-pin')
+            ->assertInertia(fn (Assert $page) => $page->where('rules.loginCheckToSet', true));
+
+        $this->actingAs($worker)
+            ->from('/settings/witness-pin')
+            ->put('/settings/witness-pin', ['pin' => '708142', 'pin_confirmation' => '708142'])
+            ->assertSessionHasErrors('current_password');
+        $this->actingAs($worker)
+            ->from('/settings/witness-pin')
+            ->put('/settings/witness-pin', ['current_password' => 'wrong', 'pin' => '708142', 'pin_confirmation' => '708142'])
+            ->assertSessionHasErrors(['current_password' => 'That isn’t your login password.']);
+        $this->assertNull(UserWitnessPin::query()->where('user_id', $worker->id)->first());
+        $failed = AuditLog::query()->where('action', 'medications.witness_pin.login_check_failed')->sole();
+        $this->assertSame('set', $failed->meta['purpose']);
+
+        $this->actingAs($worker)
+            ->from('/settings/witness-pin')
+            ->put('/settings/witness-pin', ['current_password' => 'password', 'pin' => '708142', 'pin_confirmation' => '708142'])
+            ->assertSessionHasNoErrors();
+        $set = AuditLog::query()->where('action', 'medications.witness_pin.set')->sole();
+        $this->assertSame(WitnessPinService::CONFIRMED_WITH_LOGIN_PASSWORD, $set->meta['confirmed_with']);
+
+        // Changing a usable PIN still uses the current PIN, not the password.
+        $this->actingAs($worker)
+            ->from('/settings/witness-pin')
+            ->put('/settings/witness-pin', ['current_pin' => '708142', 'pin' => '593027', 'pin_confirmation' => '593027'])
+            ->assertSessionHasNoErrors();
+        $changed = AuditLog::query()->where('action', 'medications.witness_pin.changed')->sole();
+        $this->assertSame(WitnessPinService::CONFIRMED_WITH_CURRENT_PIN, $changed->meta['confirmed_with']);
+
+        // Off (the approved v5 flow): the session alone sets a first PIN, and the audit says so.
+        config(['medications.witness_pin.login_check_to_set' => false]);
+        $other = $this->siteStaff('support_worker', ['medications.administer.record'], withPin: false);
+        $this->actingAs($other)
+            ->from('/settings/witness-pin')
+            ->put('/settings/witness-pin', ['pin' => '708142', 'pin_confirmation' => '708142'])
+            ->assertSessionHasNoErrors();
+        $sessionSet = AuditLog::query()->where('action', 'medications.witness_pin.set')->get()
+            ->sole(fn (AuditLog $log): bool => (int) $log->meta['actor_id'] === $other->id);
+        $this->assertSame(WitnessPinService::CONFIRMED_WITH_SESSION, $sessionSet->meta['confirmed_with']);
+    }
+
+    public function test_a_house_lead_cannot_reset_the_pin_of_someone_with_broader_authority(): void
+    {
+        $houseLead = $this->siteStaff('team_lead', []);
+        $otherLead = $this->siteStaff('team_lead', []);
+        $manager = $this->siteStaff('support_worker', ['medications.administer.record', 'medications.settings.manage']);
+        $worker = $this->siteStaff('support_worker', ['medications.administer.record']);
+        $clinicalLead = $this->siteStaff('clinical_lead', []);
+
+        $this->actingAs($houseLead)
+            ->get('/emar/settings')
+            ->assertInertia(fn (Assert $page) => $page->where('witnessPin.staff', function ($rows) use ($worker, $otherLead, $manager): bool {
+                $flags = collect($rows)->mapWithKeys(fn ($row) => [(int) $row['id'] => (bool) $row['can_reset']]);
+
+                return $flags->get($worker->id) === true
+                    && $flags->get($otherLead->id) === false
+                    && $flags->get($manager->id) === false;
+            }));
+
+        foreach ([$otherLead, $manager] as $protected) {
+            $this->actingAs($houseLead)->post("/emar/settings/witness-pins/{$protected->id}/reset")->assertForbidden();
+            $this->assertFalse((bool) UserWitnessPin::query()->where('user_id', $protected->id)->value('must_change'));
+        }
+        $this->actingAs($houseLead)->post("/emar/settings/witness-pins/{$worker->id}/reset")->assertRedirect();
+
+        // An organisation-wide clinical lead may reset a house lead.
+        $this->actingAs($clinicalLead)->post("/emar/settings/witness-pins/{$otherLead->id}/reset")->assertRedirect();
+        $this->assertTrue((bool) UserWitnessPin::query()->where('user_id', $otherLead->id)->value('must_change'));
+    }
+
+    public function test_witness_pins_nested_in_arrays_are_never_flashed_back_as_old_input(): void
+    {
+        Route::middleware('web')->post('/__pin1-nested-flash', fn (Request $request) => $request->validate([
+            'medications.*.witness_credential' => ['required', 'string'],
+            'medications.*.medication_id' => ['required', 'integer'],
+        ]));
+        $worker = $this->siteStaff('support_worker', ['medications.administer.record']);
+
+        $this->actingAs($worker)
+            ->from('/fleet-assets/transports/create')
+            ->post('/__pin1-nested-flash', [
+                'notes' => 'kept',
+                'medications' => [['witness_credential' => '482915', 'medication_id' => 'not-a-number']],
+            ])
+            ->assertSessionHasErrors('medications.0.medication_id');
+
+        $old = session()->getOldInput();
+        $this->assertSame('kept', $old['notes'] ?? null);
+        $this->assertArrayNotHasKey('witness_credential', $old['medications'][0] ?? []);
+        $this->assertStringNotContainsString('482915', json_encode(session()->all(), JSON_THROW_ON_ERROR));
     }
 
     public function test_the_lock_lifts_after_the_lockout_and_the_organisation_can_tighten_the_rules(): void

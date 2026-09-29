@@ -143,6 +143,7 @@ final class ControlledMedicationTransportWitnessService
         $this->witnessPins->verify($witness, $credential, $credentialErrorKey, [
             'site_id' => $siteId,
             'surface' => $credentialErrorKey,
+            'actor_id' => (int) $actor->id,
         ]);
 
         return [

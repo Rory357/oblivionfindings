@@ -6,10 +6,13 @@ use App\Models\User;
 use App\Models\UserWitnessPin;
 use App\Services\AuditLogger;
 use Carbon\CarbonInterface;
+use Closure;
+use Illuminate\Database\DatabaseTransactionsManager;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -44,19 +47,37 @@ final class WitnessPinService
 
     public function __construct(private readonly WitnessPinSettings $settings) {}
 
-    /** A PIN a person may choose: exactly 6 digits, not all one digit, not a simple run. */
+    /**
+     * A PIN a person may choose: exactly 6 digits and not an easily guessed
+     * pattern — one digit repeated, a run (including wraparound, 890123), or
+     * a repeat such as 121212, 123123, 112233 or 111222.
+     */
     public function formatError(?string $pin): ?string
     {
         if (! is_string($pin) || preg_match('/^\d{'.self::LENGTH.'}$/', $pin) !== 1) {
             return 'Enter exactly 6 digits.';
         }
-        if (count(array_unique(str_split($pin))) === 1
-            || str_contains('0123456789', $pin)
-            || str_contains('9876543210', $pin)) {
-            return 'Choose a PIN that isn’t all one digit or a simple run like 123456.';
+        if ($this->isGuessable($pin)) {
+            return 'Choose a PIN that’s harder to guess — not one digit repeated, a run like 123456 or 890123, or a pattern like 121212 or 112233.';
         }
 
         return null;
+    }
+
+    private function isGuessable(string $pin): bool
+    {
+        $digits = array_map('intval', str_split($pin));
+        $steps = [];
+        for ($i = 1; $i < count($digits); $i++) {
+            $steps[] = ($digits[$i] - $digits[$i - 1] + 10) % 10;
+        }
+        $uniformStep = count(array_unique($steps)) === 1;
+
+        return ($uniformStep && in_array($steps[0], [0, 1, 9], true)) // 111111, 123456 / 890123, 654321 / 109876
+            || preg_match('/^(\d\d)\1\1$/', $pin) === 1                // 121212
+            || preg_match('/^(\d{3})\1$/', $pin) === 1                 // 123123
+            || preg_match('/^(\d)\1(\d)\2(\d)\3$/', $pin) === 1        // 112233
+            || preg_match('/^(\d)\1\1(\d)\2\2$/', $pin) === 1;         // 111222
     }
 
     public function status(User $user): string
@@ -121,14 +142,26 @@ final class WitnessPinService
         return self::STATUS_SET;
     }
 
-    /** The owner sets or replaces their own PIN (the caller has re-checked who they are). */
-    public function set(User $owner, string $pin): void
+    /** How the owner proved who they are before setting a PIN (recorded in the audit). */
+    public const CONFIRMED_WITH_CURRENT_PIN = 'current_pin';
+
+    public const CONFIRMED_WITH_LOGIN_PASSWORD = 'login_password';
+
+    /** Signed-in session only: a first PIN, or a new one after a reset, with the login check off. */
+    public const CONFIRMED_WITH_SESSION = 'session';
+
+    /**
+     * The owner sets or replaces their own PIN; the caller has re-checked who
+     * they are as $confirmedWith. Forgotten-PIN resets (login password while a
+     * PIN was usable) audit as a self-reset, not a change.
+     */
+    public function set(User $owner, string $pin, string $confirmedWith = self::CONFIRMED_WITH_SESSION): void
     {
         if (($error = $this->formatError($pin)) !== null) {
             throw ValidationException::withMessages(['pin' => $error]);
         }
 
-        DB::transaction(function () use ($owner, $pin): void {
+        DB::transaction(function () use ($owner, $pin, $confirmedWith): void {
             $existing = UserWitnessPin::query()->where('user_id', $owner->id)->lockForUpdate()->first();
             if ($existing !== null && ! $existing->must_change && Hash::check($pin, $existing->pin_hash)) {
                 throw ValidationException::withMessages(['pin' => 'Choose a PIN you haven’t just been using.']);
@@ -146,9 +179,17 @@ final class WitnessPinService
                 ],
             );
 
-            AuditLogger::logOrFail($existing === null ? 'medications.witness_pin.set' : 'medications.witness_pin.changed', $owner, [
+            $action = match (true) {
+                $existing === null => 'medications.witness_pin.set',
+                $confirmedWith === self::CONFIRMED_WITH_LOGIN_PASSWORD
+                    && $this->statusOf($existing) !== self::STATUS_RESET => 'medications.witness_pin.self_reset',
+                default => 'medications.witness_pin.changed',
+            };
+
+            AuditLogger::logOrFail($action, $owner, [
                 'actor_id' => (int) $owner->id,
                 'after_reset' => (bool) $existing?->must_change,
+                'confirmed_with' => $confirmedWith,
             ]);
         });
     }
@@ -219,9 +260,29 @@ final class WitnessPinService
             throw ValidationException::withMessages([$errorKey => $this->lockedMessage($who, $record->locked_until)]);
         }
 
+        // Per recorder + witness: the attempt is reserved before the PIN is
+        // compared, so parallel requests from one account can't try more PINs
+        // than the organisation's limit before the durable lock lands.
+        $limiterKey = isset($context['actor_id'])
+            ? 'medication-witness-pin:'.(int) $context['actor_id'].':'.(int) $witness->id
+            : null;
+        if ($limiterKey !== null) {
+            if (RateLimiter::tooManyAttempts($limiterKey, $this->settings->maxAttempts())) {
+                $minutes = max(1, (int) ceil(RateLimiter::availableIn($limiterKey) / 60));
+
+                throw ValidationException::withMessages([
+                    $errorKey => 'Too many PIN attempts for '.$witness->name.' from your account. Try again in '.$minutes.' minute'.($minutes === 1 ? '' : 's').'.',
+                ]);
+            }
+            RateLimiter::hit($limiterKey, $this->settings->lockoutMinutes() * 60);
+        }
+
         if (preg_match('/^\d{'.self::LENGTH.'}$/', (string) $pin) === 1 && Hash::check((string) $pin, $record->pin_hash)) {
             if ($record->failed_attempts > 0) {
                 $record->forceFill(['failed_attempts' => 0, 'last_failed_at' => null])->save();
+            }
+            if ($limiterKey !== null) {
+                RateLimiter::clear($limiterKey);
             }
 
             return;
@@ -235,10 +296,14 @@ final class WitnessPinService
     }
 
     /**
-     * Count a wrong PIN so the count survives the caller's transaction rolling
-     * back (the ValidationException normally rolls it back). The write runs
-     * once: after rollback, after commit if the caller swallowed the error, or
-     * immediately when no application transaction is open.
+     * Count a wrong PIN so the count survives the caller's transactions
+     * rolling back (the ValidationException unwinds every level). The write
+     * runs once, only when no application transaction is open any more: dose
+     * paths nest transactions, and a savepoint rollback still leaves the outer
+     * transaction open — a write there would be rolled back with it.
+     *
+     * The returned unlock time predicts this failure's effect for the message;
+     * the stored count and lock are decided under the row lock at write time.
      *
      * @param  array<string, mixed>  $context
      * @return CarbonInterface|null When this failure locks the PIN, its unlock time.
@@ -250,18 +315,56 @@ final class WitnessPinService
         $lockedUntil = $attempts >= $max ? now()->addMinutes($this->settings->lockoutMinutes()) : null;
 
         $done = false;
-        $write = function () use (&$done, $witnessId, $max, $context): void {
+        $this->whenOutsideTransactions(function () use (&$done, $witnessId, $max, $context): void {
             if ($done) {
                 return;
             }
             $done = true;
             $this->writeFailure($witnessId, $max, $context);
-        };
-
-        DB::afterRollBack($write);
-        DB::afterCommit($write);
+        });
 
         return $lockedUntil;
+    }
+
+    /**
+     * Run $callback once no application transaction is open. Laravel sets the
+     * connection's new level before it runs commit/rollback callbacks, so each
+     * callback re-checks and, while an outer transaction remains, re-registers
+     * on it for whichever way it ends.
+     */
+    private function whenOutsideTransactions(Closure $callback): void
+    {
+        $schedule = function () use (&$schedule, $callback): void {
+            if (! $this->insideApplicationTransaction()) {
+                $callback();
+
+                return;
+            }
+
+            DB::afterCommit($schedule);
+            DB::afterRollBack($schedule);
+        };
+
+        $schedule();
+    }
+
+    /**
+     * True while an application transaction is open. A test's wrapping
+     * transaction doesn't count: the testing transactions manager leaves it out
+     * of the callback-applicable transactions.
+     */
+    private function insideApplicationTransaction(): bool
+    {
+        if (DB::transactionLevel() === 0) {
+            return false;
+        }
+
+        $manager = app('db.transactions');
+
+        // Without a manager, commit/rollback callbacks run straight away, so
+        // deferring would only recurse: treat it as outside.
+        return $manager instanceof DatabaseTransactionsManager
+            && $manager->callbackApplicableTransactions()->isNotEmpty();
     }
 
     /** @param  array<string, mixed>  $context */
@@ -287,7 +390,7 @@ final class WitnessPinService
                 'attempt_limit' => $max,
                 'locked' => $locks,
                 'purpose' => (string) ($context['purpose'] ?? 'second_person'),
-            ] + collect($context)->only(['site_id', 'surface'])->all();
+            ] + collect($context)->only(['site_id', 'surface', 'actor_id'])->all();
 
             Log::warning('Medication witness PIN rejected.', ['security_event' => 'medication_witness_pin_rejected'] + $meta);
             AuditLogger::log($locks ? 'medications.witness_pin.locked' : 'medications.witness_pin.failed', $pin, $meta);
