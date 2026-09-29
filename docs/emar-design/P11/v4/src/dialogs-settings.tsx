@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ALERTS, ALERT_PEOPLE, CLASSES, RECIPIENT_GROUPS, DAYS, EMPLOYED, HOUSES, HOUSE_KEYS, ONCALL_ROSTER, describeOnCall, employedAt, employee, phoneOf, phoneText, resolveOnCall, type OnCallRule, MATCH, MEDLIST, NZULM, PEOPLE, ROUTES, STAFF, type HouseKey, type Rule, type Tpl } from './data';
 import {
     GROUPS, VIEW_LABEL, allChanges, allHistory, canHouse, canOrg, canRuleScope, canTemplates, daysText, fmtT, givenAbility, has, logChange, myHouses, ruleItems,
-    ruleNeeds, ruleOverlaps, ruleSentence, ruleWhat, stamp, staffNow, toMin, tplOverlaps, useStore, viewChanges, viewGroups, type ViewKey, keepDefault,
+    ruleNeeds, ruleOverlaps, ruleSentence, ruleWhat, stamp, staffNow, toMin, tplOverlaps, useStore, viewChanges, viewGroups, type ViewKey, keepDefault, loosens,
 } from './model';
 import { SET_VIEWS, settingsHref, useNav } from './nav';
 import { peopleItems } from './settings';
@@ -35,6 +35,7 @@ export function ReviewChanges({ view }: { view: ViewKey }) {
     const ch = viewChanges(m, view);
     const byG = ch.reduce<Record<string, typeof ch>>((a, c) => { (a[c.g] = a[c.g] || []).push(c); return a; }, {});
     const cdOff = !!byG.cdw && (m.draft.cdw.org === 'off' || m.draft.cdw.kowhai === 'off' || m.draft.cdw.rimu === 'off');
+    const looser = ch.filter((c) => loosens(c.g, c.k, (m.saved[c.g] as Record<string, unknown>)[c.k], (m.draft[c.g] as Record<string, unknown>)[c.k]));
     const save = () => {
         if (m.demo.settings === 'offline') return;
         if (m.demo.save === 'fail') { setState('fail'); set((d) => { d.demo.save = 'ok'; }); return; }
@@ -55,15 +56,16 @@ export function ReviewChanges({ view }: { view: ViewKey }) {
         <Modal title={`Review ${VIEW_LABEL[view].toLowerCase()} changes`} description={`${ch.length} ${ch.length === 1 ? 'change' : 'changes'} · nothing applies until you save.`} onClose={close} onCloseAutoFocus={(e) => { if (saved.current) e.preventDefault(); }}
             footer={state === 'conflict'
                 ? <><Button variant="outline" onClick={close}>Keep editing</Button><Button onClick={() => { set((d) => { d.demo.save = 'ok'; }); close(); flash('Refreshed. Rangi Parata’s change is shown; your changes are kept — review and save again.'); }}>Refresh and review</Button></>
-                : <><Button variant="outline" onClick={close}>Keep editing</Button><Button variant={cdOff ? 'destructive' : 'default'} onClick={save} disabled={m.demo.settings === 'offline'}>{state === 'fail' ? 'Try again' : 'Save changes'}</Button></>}>
+                : <><Button variant="outline" onClick={close}>Keep editing</Button><Button variant={cdOff || looser.length ? 'destructive' : 'default'} onClick={save} disabled={m.demo.settings === 'offline'}>{state === 'fail' ? 'Try again' : 'Save changes'}</Button></>}>
             {state === 'fail' ? <Notice><span><b>Couldn’t save — nothing was changed.</b> Check your connection and try again. Your changes are kept.</span></Notice> : null}
             {state === 'conflict' ? <Notice><span><b>Settings changed elsewhere.</b> Rangi Parata saved a change in this view at 9:10 am. Your changes are kept — refresh to see theirs, then save again.</span></Notice> : null}
             {m.demo.settings === 'offline' ? <Notice><span>You’re offline — reconnect to save. Your changes are kept.</span></Notice> : null}
             {Object.entries(byG).map(([g, list]) => (
                 <ReviewCard key={g} icon={g === 'timing' ? Clock : g === 'elig' ? ClipboardCheck : g === 'pin' ? Shield : g === 'cdw' ? Shield : g === 'alerts' || g === 'alertExtra' ? Bell : Layers} title={GROUPS[g as keyof typeof GROUPS].effect}>
-                    {list.map((c) => <ReviewRow key={c.k} label={c.label} value={<><span className="text-muted-foreground line-through decoration-1">{c.from}</span> → <b>{c.to}</b></>} />)}
+                    {list.map((c) => <ReviewRow key={c.k} label={c.label} value={<><span className="text-muted-foreground line-through decoration-1">{c.from}</span> → <b>{c.to}</b>{looser.includes(c) ? <span className="text-caption block text-status-critical">Loosens this check</span> : null}</>} />)}
                 </ReviewCard>
             ))}
+            {looser.length && !cdOff ? <InfoCard icon={AlertTriangle} tone="warn"><b>{looser.length === 1 ? 'This change loosens a check' : `${looser.length} of these changes loosen a check`}.</b> Staff will be checked less than they are now. Save only if that’s intended.</InfoCard> : null}
             {cdOff ? <InfoCard icon={AlertTriangle} tone="crit"><b>Controlled doses will be recorded without a witness there.</b> Check this with clinical governance first. For a short gap, a time-limited override is safer.</InfoCard> : null}
             <Recorded />
         </Modal>

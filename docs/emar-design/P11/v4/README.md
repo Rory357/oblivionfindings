@@ -60,6 +60,12 @@ The gap review found one error in v3: the In-app group said alerts reach "the be
   - An agreed cellphone is labelled "(personal cellphone)", with the date they agreed.
   - "What staff see in their account" shows the account switch (`1440-dlg-consent.png`).
 
+### After Main's inspection of v4
+
+- **Loosening a check is flagged.** Restoring or saving a value that turns a check off, or makes it less strict, uses the destructive variant and says "This loosens a check". In Review changes, the row reads "Loosens this check".
+- **Controlled-medicine alerts keep their details.** In the alert log, anyone without controlled-medicine access (EM-12) sees "Controlled-medicine alert — Details need controlled-medicine access", with the recipients hidden.
+- **Timeline and links.** The timeline merges steps that happen at the same time, and in-page "↗" jumps use Fleet's link style.
+
 ## Run it
 
 The preview needs `node_modules` in the worktree. Here that is a **junction** to the main checkout's folder, so:
@@ -103,4 +109,4 @@ Safety & oversight › Staff eligibility and Meds today › My eligibility are u
 node docs/emar-design/P11/v4/reuse-check.mjs
 ```
 
-- **`screenshots/`** has 194 files, and **`VERSION.txt`** has the SHA-256 of every file.
+- **`screenshots/`** has 198 files, and **`VERSION.txt`** has the SHA-256 of every file.

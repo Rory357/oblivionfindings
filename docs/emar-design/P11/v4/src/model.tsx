@@ -217,6 +217,40 @@ export function validateView(m: Model, v: ViewKey): Record<string, string> {
     return e;
 }
 /** Mark a default as deliberately kept (reviewed), with its paired settings, and record it. */
+/* ── Does a change turn a check off or make it less strict? (Main, 29 Sep 2026: loosening uses the destructive
+ * variant.) Options are listed loosest → strictest; numbers say whether a higher value is looser (1) or stricter (-1).
+ * Switching a number-backed setting off ('') is the loosest value where “off” means no check. ── */
+const RANK: Record<string, string[]> = {
+    'safety.profileAllergy': ['warn', 'confirm', 'block'], 'safety.restricted': ['off', 'cosigner', 'block'], 'safety.area': ['off', 'failed', 'failed_or_not_seen'],
+    'safety.phoneRx': ['sw', 'leads', 'none'], 'safety.phoneRxBy': ['nextday', 'shift'], 'safety.amount': ['no', 'avail', 'always'],
+    'cdw.org': ['off', 'on'], 'cdw.kowhai': ['off', 'org', 'on'], 'cdw.rimu': ['off', 'org', 'on'], 'cdw.suggest': ['off', 'on'], 'cdw.longest': ['7d', '24h', 'shift'],
+    'pin.fallback': ['yes', 'nc', 'no'], 'pin.fallbackCd': ['yes', 'nc', 'no'],
+    'elig.coreMust': ['no', 'yes'], 'ea.reason': ['no', 'yes'], 'delivery.private': ['no', 'yes'],
+};
+const NUM: Record<string, 1 | -1> = {
+    'pin.attempts': 1, 'pin.lockout': -1, 'pin.confirmLimit': 1, 'pin.renewal': 1,
+    'elig.validity': 1, 'elig.passMark': -1, 'elig.reminder': -1, 'elig.obsNeeded': -1, 'elig.longestEx': 1,
+    'timing.early': 1, 'timing.late': 1, 'timing.lateIncident': 1, 'timing.escalN': 1, 'timing.escalDays': -1, 'timing.reoffer': 1,
+    'ea.def': 1, 'ea.max': 1, 'ea.ext': 1, 'ea.repeatN': 1, 'ea.repeatDays': -1,
+    'delivery.realertEvery': 1, 'delivery.realertMax': -1, 'delivery.escalateAfter': 1,
+};
+const OFF_IS_LOOSEST = ['pin.renewal', 'elig.obsNeeded', 'timing.reoffer', 'delivery.realertEvery', 'delivery.realertMax', 'delivery.escalateAfter'];
+const dropped = (a: string[], b: string[]) => a.some((x) => !b.includes(x));
+export function loosens(g: GroupKey, k: string, from: unknown, to: unknown): boolean {
+    const key = `${g}.${k}`;
+    if (g === 'alerts') { const a = from as AlertSetting, b = to as AlertSetting; return (a.inapp && !b.inapp) || (a.email && !b.email) || (a.push && !b.push) || (a.followUp && !b.followUp) || dropped(a.groups, b.groups) || dropped(a.people, b.people); }
+    if (g === 'alertExtra' || key === 'delivery.escalateTo') return dropped(from as string[], to as string[]);
+    if (key === 'pin.resetRoles') { const n = (v: string) => (v === 'both' ? 2 : v === 'nc' ? 0 : 1); return n(String(to)) > n(String(from)); } // more people can reset = looser
+    if (RANK[key]) { const r = RANK[key], i = r.indexOf(String(from)), j = r.indexOf(String(to)); return i >= 0 && j >= 0 && j < i; }
+    if (NUM[key]) {
+        const f = String(from ?? ''), t = String(to ?? '');
+        if (f !== '' && t === '') return OFF_IS_LOOSEST.includes(key);
+        if (f === '' || t === '') return false; // switching a check on is never looser
+        const d = Number(t) - Number(f);
+        return NUM[key] === 1 ? d > 0 : d < 0;
+    }
+    return false;
+}
 export function keepDefault(d: Model, g: GroupKey, k: string) {
     const G = GROUPS[g];
     const label = g === 'ea' ? 'The emergency access policy' : G.label(k);

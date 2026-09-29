@@ -9,7 +9,7 @@ import { Modal, Notice } from '@/pages/fleet-assets/settings/_ui';
 import { ArrowUpRight, Bell, CalendarX, Check, ChevronLeft, ChevronRight, History, Info, Mail, Phone, Pill, Repeat, Smartphone, UserX, Users } from 'lucide-react';
 import { useState } from 'react';
 import { ALERTS, ALERT_LOG, EMPLOYED, HOUSES, HOUSE_KEYS, ONCALL_ROSTER, phoneOf, type Employed, type Hist } from './data';
-import { GROUPS, VIEW_LABEL, alertById, allHistory, decisionRegistry, keepDefault, myHouses, readOnlyAudit, useStore, type GroupKey, type Model, type ViewKey } from './model';
+import { GROUPS, VIEW_LABEL, alertById, allHistory, decisionRegistry, has, keepDefault, loosens, myHouses, readOnlyAudit, useStore, type GroupKey, type Model, type ViewKey } from './model';
 import { settingsHref, useNav } from './nav';
 import { OnOff } from './ui';
 
@@ -32,7 +32,7 @@ export function RestoreValue({ id }: { id: string }) {
     if (!h || !canRestore(m, h)) return <Missing what="change" />;
     const g = h.g as GroupKey, k = h.k!, G = GROUPS[g];
     const now = G.fmt(k, (m.saved[g] as Record<string, unknown>)[k]), back = G.fmt(k, h.fromV);
-    const weaker = g === 'safety' && h.fromV === 'off';
+    const weaker = loosens(g, k, (m.saved[g] as Record<string, unknown>)[k], h.fromV);
     const where = VIEW_LABEL[G.view].toLowerCase();
     return (
         <ConfirmDialog open onClose={close} variant={weaker ? 'destructive' : 'default'} title="Put the earlier value back in your draft?" confirmText="Put back in draft"
@@ -40,6 +40,7 @@ export function RestoreValue({ id }: { id: string }) {
                 <p><b className="text-foreground">{G.label(k)}</b></p>
                 <p className="mt-1">Now: {now}</p>
                 <p>Earlier: <b className="text-foreground">{back}</b> — before {h.who}’s change on {h.when}.</p>
+                {weaker ? <p className="mt-2 text-status-critical"><b>This loosens a check.</b> Staff will be checked less than they are now.</p> : null}
                 {h.note ? <p className="mt-2 text-status-critical">This undoes a recorded decision: {h.note}.</p> : null}
                 <p className="mt-2">Nothing changes until you review and save {where}. Saving records it in the change history.</p>
             </>}
@@ -125,6 +126,11 @@ export function AlertLogView({ id }: { id: string }) {
     const { close, go } = useNav();
     const r = ALERT_LOG.find((x) => x.id === id && myHouses(m.persona).includes(x.house));
     if (!r) return <Missing what="alert" />;
+    if (r.cd && !has(m.persona, 'cd.view')) return (
+        <Modal title="Controlled-medicine alert" description={`${HOUSES[r.house]} · sent ${r.sent}`} onClose={close}>
+            <Notice><span><b>Only people with controlled-medicine access can see this alert’s details</b> — what it was about, who was told and what happened. The house lead or Rangi Parata can tell you more.</span></Notice>
+        </Modal>
+    );
     const a = alertById(r.k), dl = m.saved.delivery, noFollow = !dl.realertEvery && !dl.escalateAfter;
     return (
         <Modal title={a.l} description={`${r.about} · ${HOUSES[r.house]} · sent ${r.sent}`} onClose={close}>

@@ -25,7 +25,7 @@ import {
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ALERTS, ALERT_LOG, ALERT_PEOPLE, CDW_OPTS, EMPLOYED, HOUSES, HOUSE_KEYS, ONCALL_ROSTER, employee, phoneText, resolveOnCall, PIN_RULES, RECIPIENT_GROUPS, SAFETY_RULES, SAFETY_SWITCH, STAFF, type HouseKey, type Rule, type Tpl } from './data';
 import {
-    ATTENDED_OPTS, DELIVERY_L, EA_L, ELIG_L, GROUPS, alertById, PHOTO_LABEL, PHOTO_OPTS, TIMING_L, VIEW_LABEL, allChanges, allHistory, canEaPolicy, canHouse, canOrg, canRuleScope,
+    ATTENDED_OPTS, DELIVERY_L, has, EA_L, ELIG_L, GROUPS, alertById, PHOTO_LABEL, PHOTO_OPTS, TIMING_L, VIEW_LABEL, allChanges, allHistory, canEaPolicy, canHouse, canOrg, canRuleScope,
     canTemplates, daysText, decisionRegistry, fmtMin, fmtT, isDirty, leadCap, myHouses, readOnlyAudit, reviewedBy, ruleNeeds, ruleOverlaps,
     ruleWhat, useStore, validateView, viewChanges, type AlertSetting, type GroupKey, type Model, type ViewKey,
 } from './model';
@@ -897,32 +897,34 @@ function AllChanges({ ctx }: { ctx: Ctx }) {
 
 /* ── Alerts & access › Alert log: every alert, who was told, and who attended (Stephan, 29 Sep 2026) ── */
 type LogRow = (typeof ALERT_LOG)[number];
-const LOG_STATUS = (r: LogRow) => (r.status === 'open' ? <StatusBadge variant="warning" size="sm">Not attended · {r.waited}</StatusBadge> : r.status === 'attended' ? <StatusBadge variant="info" size="sm">Attended · {r.by}, {r.at}</StatusBadge> : <StatusBadge variant="success" size="sm">Dealt with · {r.at}</StatusBadge>);
+const LOG_STATUS = (r: LogRow, hide: boolean) => (r.status === 'open' ? <StatusBadge variant="warning" size="sm">Not attended · {r.waited}</StatusBadge> : r.status === 'attended' ? <StatusBadge variant="info" size="sm">Attended · {hide ? '' : `${r.by}, `}{r.at}</StatusBadge> : <StatusBadge variant="success" size="sm">Dealt with · {r.at}</StatusBadge>);
 function AlertLog({ ctx }: { ctx: Ctx }) {
     const { m } = useStore();
     const { open } = useNav();
     const menu = useEntityContextMenu<LogRow>();
-    const mine = ALERT_LOG.filter((r) => myHouses(m.persona).includes(r.house));
-    const rows = mine.filter((r) => (ctx.f.logHouse === 'all' || r.house === ctx.f.logHouse) && (ctx.f.logShow === 'all' || (ctx.f.logShow === 'open' ? r.status === 'open' : ctx.f.logShow === 'afterhours' ? !!r.afterHours : r.status !== 'open')) && match(ctx.q, alertById(r.k).l, r.about, ...r.to)).sort((a, b) => b.sort - a.sort);
-    const actions = (r: LogRow): MenuItem[] => compactMenu([{ label: 'View what happened', icon: Eye, onClick: () => open({ kind: 'alertlog', arg: r.id }) }, { label: 'Who gets this alert', icon: Users, onClick: () => open({ kind: 'alertwho', arg: r.k }) }]);
+    // Controlled-medicine alerts keep their details from anyone without controlled-medicine access (EM-12).
+    const hide = (r: LogRow) => !!r.cd && !has(m.persona, 'cd.view');
+    const mine = ALERT_LOG.filter((r) => myHouses(m.persona).includes(r.house)), nHidden = mine.filter(hide).length;
+    const rows = mine.filter((r) => (ctx.f.logHouse === 'all' || r.house === ctx.f.logHouse) && (ctx.f.logShow === 'all' || (ctx.f.logShow === 'open' ? r.status === 'open' : ctx.f.logShow === 'afterhours' ? !!r.afterHours : r.status !== 'open')) && (hide(r) ? match(ctx.q, 'Controlled-medicine alert') : match(ctx.q, alertById(r.k).l, r.about, ...r.to))).sort((a, b) => b.sort - a.sort);
+    const actions = (r: LogRow): MenuItem[] => compactMenu([{ label: 'View what happened', icon: Eye, onClick: () => open({ kind: 'alertlog', arg: r.id }) }, !hide(r) && { label: 'Who gets this alert', icon: Users, onClick: () => open({ kind: 'alertwho', arg: r.k }) }]);
     const openN = mine.filter((r) => r.status === 'open').length;
     return (
-        <Section id="sc-log" title="Alert log" caption={`${rows.length} of ${mine.length} shown · last 3 days · synthetic examples`}>
+        <Section id="sc-log" title="Alert log" caption={`${rows.length} of ${mine.length} shown · last 3 days · synthetic examples${nHidden ? ` · ${nHidden} controlled-medicine ${nHidden === 1 ? 'alert' : 'alerts'} without details` : ''}`}>
             <p className="text-subtle">Every medication alert: who was told, how, and who attended. It never changes the medication record.{openN ? ` ${openN} not attended yet.` : ''}</p>
             {rows.length ? (
                 <EntityTable<LogRow>
                     rows={rows} rowKey={(r) => r.id} identityLabel="Alert" identityWidth="2.2fr" minWidth={1000} rowHeight="content"
-                    identity={(r) => ({ icon: Bell, name: alertById(r.k).l, subline: r.about })}
+                    identity={(r) => (hide(r) ? { icon: LockKeyhole, name: 'Controlled-medicine alert', subline: 'Details need controlled-medicine access' } : { icon: Bell, name: alertById(r.k).l, subline: r.about })}
                     columns={[
                         { key: 'sent', label: 'Sent', width: '1fr', cell: (r) => <div><div className="text-[13px]">{r.sent}</div>{r.afterHours ? <div className="text-caption">After hours</div> : null}</div> },
-                        { key: 'to', label: 'Told', width: '1.3fr', cell: (r) => <div><div className="text-[13px]">{r.to.join(', ')}</div><div className="text-caption">{r.via.join(' and ')}</div></div> },
+                        { key: 'to', label: 'Told', width: '1.3fr', cell: (r) => (hide(r) ? <span className="text-caption">Hidden</span> : <div><div className="text-[13px]">{r.to.join(', ')}</div><div className="text-caption">{r.via.join(' and ')}</div></div>) },
                         { key: 'where', label: 'Where', width: '0.9fr', cell: (r) => <EntityChip icon={Home}>{HOUSES[r.house]}</EntityChip> },
-                        { key: 'status', label: 'Status', width: '1.4fr', cell: (r) => LOG_STATUS(r) },
+                        { key: 'status', label: 'Status', width: '1.4fr', cell: (r) => LOG_STATUS(r, hide(r)) },
                     ]}
                     actionsFor={actions} onOpen={(r) => open({ kind: 'alertlog', arg: r.id })} onRowContextMenu={menu.open}
                 />
             ) : <EmptyState icon={ScrollText} title="No alerts match these filters" description="Clear the filters or the search." action={<Button variant="outline" size="sm" onClick={() => { ctx.clearQ(); ctx.setF({ ...ctx.f, logShow: 'all', logHouse: 'all' }); }}>Clear filters</Button>} />}
-            <RowMenu ctx={menu.ctx} close={menu.close} icon={Bell} title={(r) => alertById(r.k).l} items={actions} />
+            <RowMenu ctx={menu.ctx} close={menu.close} icon={Bell} title={(r) => (hide(r) ? 'Controlled-medicine alert' : alertById(r.k).l)} items={actions} />
         </Section>
     );
 }

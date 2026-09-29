@@ -7,11 +7,11 @@ Everything v3 passed still passes: sections A–H and Main's inspection in `../v
 ## Evidence tools (re-run on v4)
 
 - **`reuse-check.mjs`**: all checks pass. That covers P00 wording, the 26 real app modules imported, no shared file changed, no hex colours, raw palette classes or `dark:` pairs, and no browser dialogs or network calls. Buttons use default, outline, destructive, ghost or link only, and are never restyled.
-- **Route sweep**: 266 routes × 1440, 1280 and 200 % zoom. It checks for console and page errors, page-level horizontal overflow, and that every `?open=` link opens a dialog. **0 problems.**
-- **Interaction run**: 128 checks in headless Chromium at 1440. **128 of 128 pass, with 0 console errors.** 26 checks are new for v4.
+- **Route sweep**: 270 routes × 1440, 1280 and 200 % zoom. It checks for console and page errors, page-level horizontal overflow, and that every `?open=` link opens a dialog. **0 problems.**
+- **Interaction run**: 136 checks in headless Chromium at 1440. **136 of 136 pass, with 0 console errors.** 34 checks are new for v4.
 - **Truncation check** (Still to decide identity names): **0 truncated at 1440, 0 at 1280.**
 - **Type check** (`tsc --noEmit`): **0 errors.**
-- **Screenshots**: 194 in `screenshots/`.
+- **Screenshots**: 198 in `screenshots/`.
 
 ## Stephan's v4 choices
 
@@ -67,3 +67,33 @@ Main also confirmed:
    - Checks: "preview merges a re-alert and escalation at the same time into one step", "re-alerts after an escalation reach everyone told so far".
 
 Main's build notes are in `AUDIT.md` §2: one shared "attended" record per alert, and pinning in the bell is a shared-component change (Q13).
+
+## Main's inspection of v4 (3f092fafa), 29 September 2026: 4 fixes (done)
+
+Main confirmed:
+- `sha256sum -c` passes on all 24 entries;
+- the push grounding (`PushChannel.php:30-46`, `ShiftTaskDueNotification.php:40-52`);
+- the push column starts off;
+- the alert log is house-scoped;
+- quiet hours have no default times and a validation state;
+- the consent preview;
+- "restore" goes to the draft and is hidden from auditors;
+- the "bell (notifications)" wording fix;
+- Q11 and Q12.
+
+1. **Fixed: restoring or saving a looser setting is flagged.**
+   - A new `loosens(group, key, from, to)` in `model.tsx` knows the order of every option, loosest to strictest. Examples: Warn < Block unless confirmed < Block; Off < Co-signer < Block; witness not required < follow the organisation < required; the longest override 7 days < 24 hours < one shift.
+   - It also knows which way each number loosens: more PIN attempts, a shorter lockout, a longer exemption, a later "late", fewer refusals before escalating, and so on.
+   - Switching off a check that has a number (renewal, observed minimum, re-offer, re-alert, escalation) counts as loosening, as does dropping an alert's channel, Follow up, group or person.
+   - The restore dialog uses the destructive variant and says "This loosens a check" (`1440-dlg-restore-confirm.png`).
+   - For consistency, **Review changes** now does the same. It marks each loosening row "Loosens this check", adds a warning, and makes Save destructive (`1440-dlg-review-loosening.png`).
+   - Checks: "restoring Block → Off is flagged as loosening and destructive", "a stricter change is not flagged (fewer PIN attempts)", "a looser change is flagged and the save is destructive (more PIN attempts)".
+   - **Shared-component bug found:** the real `ConfirmDialog` gets `variant="destructive"`, but its confirm button still paints purple. `AlertDialogAction` always adds `btn-soft-primary`, whose unlayered `background: linear-gradient(...)` (`app.css:575-578`) beats `bg-destructive`. This affects every destructive ConfirmDialog in the app, for example "Pause rule". A plain `<Button variant="destructive">` is red, as the Review changes save shows. It is raised as a separate fix task, because this design session can't change shared components.
+2. **Fixed: controlled-medicine alerts keep their details (EM-12).**
+   - Alert log rows for controlled medicines (the count mismatch and the witness override request) show "Controlled-medicine alert — Details need controlled-medicine access" to anyone without `cd.view`: in this preview, the clinical lead and the auditor.
+   - "Told" reads "Hidden", attended-by names are dropped, and the caption says "2 controlled-medicine alerts without details". Search can't find the hidden text, and the timeline Modal shows only a notice.
+   - People with access (the house lead, the provider manager) see everything, including "Hana Kereama wasn't told — no controlled-medicine access". The synthetic recipients now follow the rule too.
+   - Checks: "without controlled-medicine access: controlled alerts are listed without details", "the caption says how many are shown without details", "search can't find hidden details", "the timeline hides the details too", "with controlled-medicine access: full details, and who wasn't told".
+   - Screenshots: `1440-set-alerts-log.png` (clinical lead), `1440-set-alerts-log-lead.png`, `1440-dlg-alertlog-cd-no-access.png`, `1440-dlg-alertlog-cd-with-access.png`.
+3. **Fixed in `aba9c3f0d`: timeline merge.**
+4. **Fixed in `aba9c3f0d`: link-style "↗" jumps.**

@@ -61,3 +61,9 @@ These are unchanged from v3 §3:
 - **Q11 (alert log retention):** how long is the alert log kept? **Recommendation:** the same as the audit log, because it is evidence of who was told.
 - **Q12 (quiet hours scope):** quiet hours are organisation-wide in this design. Should a house be able to set its own? **Recommendation:** organisation-wide for now, and add per-house times only if a house asks.
 - **Q13 (shared bell):** "Keep unattended alerts at the top of the bell" changes the app-wide bell. OK to change that shared component when P11 is built, or should the switch be dropped? **Recommendation:** keep it off by default, and build it with the bell's owner.
+
+## 5. Main's inspection of v4: build notes
+
+- **Loosening a check.** The build should use one rule for every save and every restore, like `loosens()` in the preview: a change that turns a check off or makes it less strict needs a destructive confirmation and is labelled in the change history.
+- **Controlled-medicine alerts.** They reach only people with controlled-medicine access, and their details (what, who was told, what happened) stay hidden in the alert log from anyone without it. This applies EM-12 to the log as well as to delivery.
+- **Shared ConfirmDialog bug (found here, verified).** `AlertDialogAction` always adds `btn-soft-primary`. Its unlayered `background: linear-gradient(...)` (`resources/css/app.css:575-578`) beats `bg-destructive`, so every destructive ConfirmDialog in the app shows a purple button. This is raised as a separate fix task (a shared-component change).
