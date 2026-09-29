@@ -239,8 +239,8 @@ export default function InspectionShow({ inspection, can_report }: Props) {
                               : 'border-status-warning/30 bg-status-warning-bg text-status-warning',
                     )}
                 >
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex min-w-0 flex-wrap items-center gap-3">
                             {passed ? (
                                 <CheckCircle className="h-6 w-6 text-primary dark:text-primary" />
                             ) : (

@@ -392,8 +392,8 @@ export default function TransportShow({
                             TRANSPORT_TYPE_BANNER.other,
                     )}
                 >
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex min-w-0 flex-wrap items-center gap-3">
                             <Badge className="text-sm capitalize">
                                 {t.transport_type}
                             </Badge>
@@ -405,7 +405,7 @@ export default function TransportShow({
                                 {t.resident_name ?? '---'}
                             </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             {pre_check_status && (
                                 <Badge
                                     variant={
