@@ -1,0 +1,15 @@
+eMAR P11 v1 — Settings & staff eligibility (design mockup)
+Recorded 29 September 2026 NZDT · branch claude/serene-aryabhata-d0e908
+Built on the approved P00 v5 contract (ff3bff860, frozen). Includes Stephan's answers of 29 Sep 2026 (PIN rules, on-call contact per house, follow-up due time, timing kept, medicine photos).
+Files (SHA-256):
+
+05469ef59243f72d2ef1bfd833e5ded880d890bde467c0705e83992d343ac7ad *index.html
+4300fbbd0bc9443531f087808dfa4e89a65ccf9c4518a8a828b1212aa08d4d00 *mockup.css
+64aaf7d4d4e7ff82a88112fca54b41c071a8a7f729caed3038175a43a2ff3754 *mockup.js
+3f41de5985fdf9007aca8c299f50f7828ccf90dcbf34c80398fa9a4f87d7a3c2 *p11.css
+e7ea7abddf533320d8d92cc712971563e170bcd9902566d5855b9b89f1be716b *serve.mjs
+f42ff04fe3228c60dbe316f771daa06dc8a1cb7cd808de7231a1db853c37b196 *reuse-check.mjs
+11ee518f276d87a5bc54018f44b733210f5cbb044a0d80ff1d63657f18eaac6a *README.md
+
+mockup.css is byte-identical to P00 v5 (4300fbbd…). Check reuse with: node docs/emar-design/P11/v1/reuse-check.mjs
+Screenshots (evidence, not part of the design surface): 93 PNG files in screenshots/
