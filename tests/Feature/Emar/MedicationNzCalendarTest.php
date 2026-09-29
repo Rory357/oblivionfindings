@@ -1,21 +1,29 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationReview;
+use App\Models\Permission;
+use App\Models\ServiceContext;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\MedicationAlertService;
+use App\Services\MedicationOverviewService;
 use App\Services\MedicationSafetyService;
+use Database\Seeders\RbacSeeder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 
 /*
- * Days remaining on a medication order, and days until an INR test or a
- * review is due, are whole days on the New Zealand calendar. The app clock
- * is UTC, so from midnight to noon in New Zealand the UTC date is still
- * yesterday, and counting from it read one day high every morning.
+ * eMAR dates are New Zealand calendar dates: days remaining on an order,
+ * days until an INR test or a review is due, when a review is overdue, and
+ * the day a new order starts. The app clock is UTC, so from midnight to noon
+ * in New Zealand the UTC date is still yesterday, and every morning these
+ * read a day out.
  */
 
 afterEach(function () {
@@ -36,9 +44,54 @@ function freezeNzClock(string $nzDateTime): void
 
 function nzCalendarClient(array $attributes = []): Client
 {
-    $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+    $site = Site::factory()->create(['type' => 'house', 'is_active' => true, 'archived' => false, 'archived_at' => null]);
 
     return Client::factory()->create(array_merge(['site_id' => $site->id, 'status' => 'active'], $attributes));
+}
+
+function nzCalendarReview(Client $client, string $scheduledDate): MedicationReview
+{
+    return MedicationReview::query()->create([
+        'client_id' => $client->id,
+        'review_type' => 'Routine 6-monthly',
+        'status' => 'scheduled',
+        'scheduled_date' => $scheduledDate,
+    ]);
+}
+
+/** A staff member on shift at the client's house who can add medication orders. */
+function nzCalendarOrderManager(Client $client): User
+{
+    $manager = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $manager->permissionOverrides()->sync(
+        Permission::query()
+            ->whereIn('key', ['clients.update', 'medications.view', 'medications.orders.manage'])
+            ->pluck('id')
+            ->mapWithKeys(fn (int $id) => [$id => ['allowed' => true]])
+            ->all(),
+    );
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $manager->id,
+        'primary_site_id' => $client->site_id,
+        'secondary_site_ids' => [],
+        'start_date' => '2025-06-01',
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+    Shift::factory()->create([
+        'client_id' => $client->id,
+        'site_id' => $client->site_id,
+        'service_context_id' => $client->service_context_id,
+        'user_id' => $manager->id,
+        'starts_at' => now()->subHours(2),
+        'ends_at' => now()->addHours(2),
+        'actual_starts_at' => now()->subHour(),
+        'actual_ends_at' => null,
+        'started_by' => $manager->id,
+        'status' => 'in_progress',
+    ]);
+
+    return $manager;
 }
 
 function medicationOrderEndingOn(?string $endDate, array $attributes = []): ClientMedication
@@ -199,3 +252,64 @@ it('dates medication reviews on the New Zealand calendar', function (string $nzN
     'due in seven days' => ['2026-06-15', ['warning', 'Medication review due by 15/06/2026.']],
     'due in eight days' => ['2026-06-16', null],
 ]);
+
+it('treats a medication review as overdue from the day after it was due', function (string $nzNow) {
+    freezeNzClock($nzNow);
+    $client = nzCalendarClient();
+    $dueYesterday = nzCalendarReview($client, '2026-06-07');
+    $dueToday = nzCalendarReview($client, '2026-06-08');
+
+    $overviewReviews = collect(app(MedicationOverviewService::class)->actionCentre(now()))->where('type', 'review');
+
+    expect(MedicationReview::overdue()->pluck('id')->all())->toBe([$dueYesterday->id])
+        ->and($dueYesterday->isOverdue())->toBeTrue()
+        ->and($dueToday->isOverdue())->toBeFalse()
+        ->and($overviewReviews->pluck('meta.review_id')->all())->toBe([$dueYesterday->id]);
+})->with('new zealand clock on 8 june');
+
+it('lists upcoming medication reviews from today on the New Zealand calendar', function (string $nzNow) {
+    freezeNzClock($nzNow);
+    $client = nzCalendarClient();
+    $reviews = collect(['2026-06-07', '2026-06-08', '2026-07-08', '2026-07-09'])
+        ->mapWithKeys(fn (string $date) => [$date => nzCalendarReview($client, $date)->id]);
+
+    expect(MedicationReview::upcoming()->orderBy('scheduled_date')->pluck('id')->all())
+        ->toBe([$reviews['2026-06-08'], $reviews['2026-07-08']]);
+})->with('new zealand clock on 8 june');
+
+it('starts a new medication order on today\'s New Zealand date', function (string $nzNow) {
+    freezeNzClock($nzNow);
+    $this->seed(RbacSeeder::class);
+    $client = nzCalendarClient([
+        'first_name' => 'Mere',
+        'last_name' => 'Wilson',
+        'service_context_id' => ServiceContext::factory()->create(['type' => 'residential', 'is_active' => true])->id,
+    ]);
+    $manager = nzCalendarOrderManager($client);
+
+    $this->actingAs($manager)
+        ->post(route('emar.medications.store'), [
+            'client_id' => $client->id,
+            'medication_name' => 'Added medicine',
+            'dose' => '10 mg',
+            'frequency' => 'Once daily',
+            'controlled_drug' => false,
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+    $this->actingAs($manager)
+        ->post(route('emar.medications.import'), [
+            'csv_file' => UploadedFile::fake()->createWithContent(
+                'medications.csv',
+                "client_name,medication_name,dose,frequency,route\n"
+                ."Mere Wilson,Imported medicine,5 mg,Once daily,oral\n",
+            ),
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    $orders = ClientMedication::query()->where('client_id', $client->id)->orderBy('name')->get();
+
+    expect($orders->map(fn (ClientMedication $order) => [$order->name, $order->start_date?->toDateString()])->all())
+        ->toBe([['Added medicine', '2026-06-08'], ['Imported medicine', '2026-06-08']]);
+})->with('new zealand clock on 8 june');
