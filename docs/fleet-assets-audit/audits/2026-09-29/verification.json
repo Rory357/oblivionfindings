@@ -1,0 +1,749 @@
+{
+  "recordedAt": "2026-09-29T13:07:11.7589868+13:00",
+  "scope": "Fleet & Assets integration, operational reporting, related People Locations and consent tests",
+  "startingMain": "c2f89b358eb61036dc31795807cab64b83043611",
+  "integratedParent": "c2838f86ad1f4c3a7cad80d77dedb1fe0462322f",
+  "includedSessionCommits": [
+    "4ee973eac",
+    "ad3c031b5",
+    "e5b085628"
+  ],
+  "backend": {
+    "method": "Broad run followed by targeted corrections. Each suite uses its latest full rerun; this is not a single all-green broad rerun.",
+    "tests": 713.0,
+    "assertions": 14911.0,
+    "failures": 0.0,
+    "errors": 0.0,
+    "skipped": 0.0,
+    "runs": [
+      {
+        "file": "backend.xml",
+        "sha256": "BDB13120EC6F7A9B2310ABA942BED5A3469DAD4E38C85ACAFB3DC3D7F30AAA3A",
+        "tests": 678,
+        "failures": 4,
+        "errors": 3,
+        "assertions": 14582,
+        "seconds": 1954.065423
+      },
+      {
+        "file": "backend-corrections.xml",
+        "sha256": "01B0B21A6FAD40273AA4E0BC13887BEEA01FF0DF9EACA67DD2CA7F1692A27693",
+        "tests": 73,
+        "failures": 3,
+        "errors": 0,
+        "assertions": 971,
+        "seconds": 445.176255
+      },
+      {
+        "file": "backend-final-corrections.xml",
+        "sha256": "381ACAFD42C33103ADA85B14C81919D7009E683787DA1014CFFE71F06E3774DD",
+        "tests": 37,
+        "failures": 1,
+        "errors": 1,
+        "assertions": 204,
+        "seconds": 451.648915
+      },
+      {
+        "file": "backend-contracts-verified.xml",
+        "sha256": "FD547FBCA1837F3ED779D7F5EBC2CB9F26380ED9BA6EE02D579F2E2ADD634DD7",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "assertions": 25,
+        "seconds": 752.3498
+      }
+    ],
+    "suites": [
+      {
+        "suite": "Tests\\Feature\\Fleet\\FleetAvailabilityRecoveryTest",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 90,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\Fleet\\FleetGeocoderCommandsTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 11,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\Fleet\\FleetManagementTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 40,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\Fleet\\FleetOfflineSignalAtomicityTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 114,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\Fleet\\FleetTripPlaybackTelemetryAuditTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 5,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\Fleet\\FleetVehicleTechnologyProjectionTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 68,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\Fleet\\FleetWorkOrderSiteScopeTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 9,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\AlertControllerTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 60,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\AssetMutationBoundaryTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 209,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\AssetRegisterWorkflowTest",
+        "tests": 22,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 232,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\ComplianceAlertsQueueTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 190,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\DailyCheckRecordsTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 189,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\DashboardHeroContractTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 36,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\DeviceControllerTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 22,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\DriverWorkspaceSiteAccessTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 94,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetAlertSiteAccessTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 34,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetBoundedOptionsTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 64,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetControlRoomAlertHeroScopeTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 203,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetCostCommunityReportSiteAccessTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 152,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetDashboardResidentSiteIsolationTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 253,
+        "lastRun": "backend-corrections.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetFuelIndexSitePrivacyTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 206,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetHandoverMutationIntegrityTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 39,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetHandoverSiteIsolationTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 62,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetHeroRolloutContractTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 158,
+        "lastRun": "backend-corrections.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetIncidentSiteAccessTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 200,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetIncidentTest",
+        "tests": 18,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 107,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetKeyLedgerSiteAccessTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 185,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetLiveMapSiteAccessTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 57,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetMaintenanceWiringTest",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 44,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetModalRouteShimTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 10,
+        "lastRun": "backend-contracts-verified.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetOutingSiteAccessTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 230,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetOverviewContractTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 210,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetPermissionBoundaryTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 35,
+        "lastRun": "backend-corrections.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetRealtimePrivacyTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 26,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetReportSiteAccessTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 192,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetSiteAccessIsolationTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 113,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetTripIndexSitePrivacyTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 175,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\FleetTripPlaybackSitePrivacyTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 186,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\LegacyMapAccessTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 36,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\MapProviderSettingsTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 56,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg01CheckAssessmentTest",
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 249,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg01MaintenanceProtectedSliceTest",
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 484,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg01MaintenanceRollbackTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 39,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg02bFleetSignalSourceProvisioningTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 56,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg02bFleetVehiclesAllSitesTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 247,
+        "lastRun": "backend-corrections.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg02bLegacyAssetDocumentRoutesTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 143,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg02bMileageFeedTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 86,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg02bObligationRemindersTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 88,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg02bVehicleCalendarTest",
+        "tests": 19,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 355,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg02bVehicleChecksTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 209,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg02bVehicleDrivingAlertsTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 526,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg02bVehicleFinanceTest",
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 567,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg02bVehicleMapTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 228,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg02bVehicleReadinessTest",
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 151,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg02bVehicleTripHistoryTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 401,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg02bVehicleWorkspaceTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 211,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg02bWorkspaceRollbackTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 15,
+        "lastRun": "backend-contracts-verified.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg06bAssetProfileTest",
+        "tests": 27,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 374,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg07BoundariesTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 130,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg07MapPrivacyTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 86,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\Pkg08SettingsTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 78,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\ResidentTransportJourneySecurityTest",
+        "tests": 22,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 465,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\ResidentTransportMedicationTransitTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 159,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\TransportWorkspaceTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 639,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\VehicleBookingSitePrivacyTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 153,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetAssets\\VehiclePageContractTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 26,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\FleetTelemetryIngestTest",
+        "tests": 41,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 3242,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\Hr\\AssetFleetFederationTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 9,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\Operations\\PeopleLocationsTest",
+        "tests": 33,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 191,
+        "lastRun": "backend-final-corrections.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\Reporting\\OperationalReportPrivacyTest",
+        "tests": 23,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 531,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\Reporting\\OperationalReportsTest",
+        "tests": 22,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 277,
+        "lastRun": "backend.xml"
+      },
+      {
+        "suite": "Tests\\Feature\\SecurityDevices\\PersonalTrackingConsentWithdrawalTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "assertions": 94,
+        "lastRun": "backend-corrections.xml"
+      }
+    ]
+  },
+  "frontend": {
+    "tests": 374,
+    "passed": 374,
+    "failed": 0,
+    "skipped": 0,
+    "success": true,
+    "rawResultSha256": "176583A2B4FCA6A37BC49D54798B72381A8833B9EC7A5BD49583220E11D6B711",
+    "scope": [
+      "fleet-assets pages/components",
+      "reporting",
+      "lib/fleet",
+      "components/assets",
+      "Google helpers",
+      "maps",
+      "people-locations"
+    ]
+  },
+  "checks": {
+    "typescriptIntegratedMain": "passed",
+    "scopedEslint": "passed",
+    "scopedPrettier": "passed",
+    "scopedPint": "passed",
+    "viteBuildIntegratedMain": "passed; existing chunk-size advisory",
+    "buildManifestSha256": "B52830DF9AA5017F1102F3C0AEF1D932C3395558059AFBF158B979A1A41E9BD6",
+    "designReferenceFiles": "unchanged"
+  },
+  "browser": {
+    "origin": "http://127.0.0.1:8787",
+    "data": "isolated synthetic fixture; no application records saved during browser audit",
+    "landingPages": 8,
+    "landingResults": "browser-landings.json",
+    "menuViewportCssPixels": "312x675; document width 312; menu scrollable; override reset",
+    "actualBrowserMenuZoom125": "not independently verified in this audit",
+    "providerCalls": "none; Google remains disabled and credentials absent",
+    "consoleErrorsObserved": 0
+  },
+  "hostedCi": {
+    "baseCommit": "c2838f86ad1f4c3a7cad80d77dedb1fe0462322f",
+    "status": "existing application-wide tests failed before audit publication",
+    "runUrl": "https://github.com/Rory357/oblivionfindings/actions/runs/36496945800",
+    "deployment": "not established by a local build or Git push"
+  }
+}

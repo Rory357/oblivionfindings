@@ -4,9 +4,9 @@ namespace App\Http\Controllers\FleetAssets;
 
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
-use App\Models\ControlRoomAlert;
 use App\Models\FleetChecklistRun;
 use App\Models\FleetChecklistTemplate;
+use App\Services\Fleet\FleetAlertScope;
 use App\Services\Fleet\VehicleDailyCheckService;
 use App\Services\UserSiteAccessService;
 use Carbon\CarbonImmutable;
@@ -40,7 +40,7 @@ class DailyCheckController extends Controller
         if ($hasFleetFields && $request->user()?->site_id) {
             $query->where(function ($q) use ($request) {
                 $q->where('home_site_id', $request->user()->site_id)
-                  ->orWhere('site_id', $request->user()->site_id);
+                    ->orWhere('site_id', $request->user()->site_id);
             });
         }
 
@@ -61,6 +61,7 @@ class DailyCheckController extends Controller
         $vehicleData = $vehicles->map(function ($v) use ($todayChecks) {
             $checks = $todayChecks->get($v->id) ?? collect();
             $check = $checks->first();
+
             return [
                 'id' => $v->id,
                 'name' => $v->name,
@@ -113,8 +114,7 @@ class DailyCheckController extends Controller
                 ->where('insurance_expires_at', '<', now())
                 ->count()
             : null;
-        $alertQuery = ControlRoomAlert::query()->actionable();
-        $this->siteAccess->applyAlertScope($alertQuery, $user, ['fleet.manage']);
+        $alertQuery = app(FleetAlertScope::class)->query($user, $request->only(['site_id']))->actionable();
         $openAlerts = (clone $alertQuery)->count();
         $criticalAlerts = (clone $alertQuery)
             ->where('severity', 'critical')

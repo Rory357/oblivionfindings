@@ -1,4 +1,5 @@
 import type { Coordinate } from '@/components/client-location/types';
+import { FleetPageMenu } from '@/components/fleet-assets/fleet-page-menu';
 import { EntityCard } from '@/components/lists/entity-card';
 import {
     EntityContextMenu,
@@ -410,29 +411,36 @@ export default function MapsBoundaries({
                             subline="Plan shared areas. Review rules. Follow up with the right team."
                             actions={
                                 <>
-                                    <PageHeaderSearch
-                                        value={search}
-                                        onChange={(value) => {
-                                            setSearch(value);
-                                            if (
-                                                tab === 'map' ||
-                                                tab === 'history'
-                                            )
-                                                go({
-                                                    tab: 'boundaries',
-                                                    page: 1,
-                                                });
-                                        }}
-                                        placeholder="Search boundaries or rules…"
-                                    />
-                                    {canManage && (
-                                        <PageHeaderPrimaryButton
-                                            icon={Plus}
-                                            onClick={() => setWizard({})}
-                                        >
-                                            Create boundary
-                                        </PageHeaderPrimaryButton>
-                                    )}
+                                    <FleetPageMenu />
+                                    {
+                                        <>
+                                            <PageHeaderSearch
+                                                value={search}
+                                                onChange={(value) => {
+                                                    setSearch(value);
+                                                    if (
+                                                        tab === 'map' ||
+                                                        tab === 'history'
+                                                    )
+                                                        go({
+                                                            tab: 'boundaries',
+                                                            page: 1,
+                                                        });
+                                                }}
+                                                placeholder="Search boundaries or rules…"
+                                            />
+                                            {canManage && (
+                                                <PageHeaderPrimaryButton
+                                                    icon={Plus}
+                                                    onClick={() =>
+                                                        setWizard({})
+                                                    }
+                                                >
+                                                    Create boundary
+                                                </PageHeaderPrimaryButton>
+                                            )}
+                                        </>
+                                    }
                                 </>
                             }
                             meters={

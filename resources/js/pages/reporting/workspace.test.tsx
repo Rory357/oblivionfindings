@@ -11,6 +11,10 @@ import { ReportWorkspace } from './workspace';
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('@inertiajs/react', () => ({
+    usePage: () => ({
+        url: '/fleet-assets/reports',
+        props: { auth: { can: { fleet: { reportsView: true } } } },
+    }),
     Head: () => null,
     Link: ({ children, href }: { children: React.ReactNode; href: string }) => (
         <a href={href}>{children}</a>

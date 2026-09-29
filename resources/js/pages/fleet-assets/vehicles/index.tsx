@@ -1,3 +1,4 @@
+import { FleetPageMenu } from '@/components/fleet-assets/fleet-page-menu';
 import { FleetQueueActions } from '@/components/fleet-assets/fleet-queue-actions';
 import {
     BookingWizard,
@@ -529,39 +530,49 @@ export default function VehiclesIndex({
                 subline="Vehicles, use and bookings · Pacific/Auckland"
                 actions={
                     <>
-                        <FleetQueueActions siteId={filters.site_id} />
-                        {isCalendar ? (
-                            <div className="contents" ref={setActionTarget} />
-                        ) : (
+                        <FleetPageMenu />
+                        {
                             <>
-                                {view === 'register' && (
+                                <FleetQueueActions siteId={filters.site_id} />
+                                {isCalendar ? (
+                                    <div
+                                        className="contents"
+                                        ref={setActionTarget}
+                                    />
+                                ) : (
                                     <>
-                                        <PageHeaderSearch
-                                            value={searchTerm}
-                                            onChange={setSearchTerm}
-                                            placeholder="Search name, registration or tag"
-                                        />
-                                        <PageHeaderGlassButton
-                                            aria-label="Export permitted register CSV"
+                                        {view === 'register' && (
+                                            <>
+                                                <PageHeaderSearch
+                                                    value={searchTerm}
+                                                    onChange={setSearchTerm}
+                                                    placeholder="Search name, registration or tag"
+                                                />
+                                                <PageHeaderGlassButton
+                                                    aria-label="Export permitted register CSV"
+                                                    onClick={() =>
+                                                        window.location.assign(
+                                                            `/fleet-assets/vehicles?${new URLSearchParams({ ...Object.fromEntries(params), export: 'csv' })}`,
+                                                        )
+                                                    }
+                                                >
+                                                    <Download className="size-4" />
+                                                    Export
+                                                </PageHeaderGlassButton>
+                                            </>
+                                        )}
+                                        <PageHeaderPrimaryButton
+                                            icon={Plus}
                                             onClick={() =>
-                                                window.location.assign(
-                                                    `/fleet-assets/vehicles?${new URLSearchParams({ ...Object.fromEntries(params), export: 'csv' })}`,
-                                                )
+                                                void openBooking(null)
                                             }
                                         >
-                                            <Download className="size-4" />
-                                            Export
-                                        </PageHeaderGlassButton>
+                                            Request vehicle
+                                        </PageHeaderPrimaryButton>
                                     </>
                                 )}
-                                <PageHeaderPrimaryButton
-                                    icon={Plus}
-                                    onClick={() => void openBooking(null)}
-                                >
-                                    Request vehicle
-                                </PageHeaderPrimaryButton>
                             </>
-                        )}
+                        }
                     </>
                 }
                 meters={

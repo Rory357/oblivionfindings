@@ -7,10 +7,10 @@ use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\FleetResidentTransport;
-use App\Models\FleetWorkOrder;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -24,7 +24,7 @@ class FleetPermissionBoundaryTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
     }
 
     public function test_read_only_fleet_user_can_view_work_orders_but_cannot_create_one(): void
@@ -109,30 +109,41 @@ class FleetPermissionBoundaryTest extends TestCase
     public function test_each_geofence_management_permission_can_mutate_geofences(): void
     {
         foreach (['assets.geofences.manage', 'fleet.manage'] as $permissionKey) {
-            $user = $this->makeUserWithPermissions([$permissionKey]);
+            $site = Site::factory()->create();
+            $user = $this->makeUserWithPermissions([$permissionKey], $site);
             $name = "Boundary for {$permissionKey}";
+            $payload = [
+                'name' => $name, 'site_id' => $site->id, 'address' => 'Synthetic test address',
+                'geometry' => ['type' => 'circle', 'center' => ['lat' => -36.8485, 'lng' => 174.7633], 'radius_m' => 150],
+                'uses' => ['Vehicles'], 'verified' => true, 'reason' => 'Test boundary lifecycle',
+                'request_key' => (string) Str::uuid(),
+            ];
 
             $this->actingAs($user)
-                ->post('/fleet-assets/geofences', $this->geofencePayload($name))
-                ->assertRedirect();
+                ->postJson('/fleet-assets/geofences', $payload)
+                ->assertCreated();
 
             $geofence = AssetGeofence::query()->where('name', $name)->firstOrFail();
 
             $this->actingAs($user)
-                ->put("/fleet-assets/geofences/{$geofence->id}", $this->geofencePayload("Updated {$name}"))
-                ->assertRedirect();
+                ->putJson("/fleet-assets/geofences/{$geofence->id}", array_merge($payload, [
+                    'name' => "Updated {$name}", 'expected_revision' => $geofence->revision, 'request_key' => (string) Str::uuid(),
+                ]))->assertOk();
+            $this->assertSame("Updated {$name}", $geofence->fresh()->name);
 
             $this->actingAs($user)
                 ->post("/fleet-assets/geofences/{$geofence->id}/toggle")
-                ->assertRedirect();
+                ->assertConflict();
 
             $this->assertFalse($geofence->fresh()->is_active);
 
             $this->actingAs($user)
-                ->delete("/fleet-assets/geofences/{$geofence->id}")
-                ->assertRedirect();
+                ->deleteJson("/fleet-assets/geofences/{$geofence->id}", [
+                    'expected_revision' => $geofence->fresh()->revision, 'reason' => 'Test retirement',
+                ])->assertOk();
 
-            $this->assertDatabaseMissing('asset_geofences', ['id' => $geofence->id]);
+            $this->assertNotNull($geofence->fresh()->retired_at);
+            $this->assertDatabaseHas('asset_geofences', ['id' => $geofence->id]);
         }
     }
 

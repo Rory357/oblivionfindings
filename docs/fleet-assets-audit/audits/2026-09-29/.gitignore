@@ -1,0 +1,3 @@
+# Local raw runs include superseded failures; verification.json records outcomes.
+backend*.log
+backend*.xml

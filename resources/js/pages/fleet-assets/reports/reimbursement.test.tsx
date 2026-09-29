@@ -14,6 +14,13 @@ vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: ReactNode }) => children,
 }));
 vi.mock('@inertiajs/react', () => ({
+    usePage: () => ({
+        url: '/fleet-assets/reports/reimbursement',
+        props: { auth: { can: { fleet: { reportsView: true } } } },
+    }),
+    Link: ({ children, href }: { children: ReactNode; href: string }) => (
+        <a href={href}>{children}</a>
+    ),
     Head: () => null,
     router: { visit: vi.fn() },
 }));

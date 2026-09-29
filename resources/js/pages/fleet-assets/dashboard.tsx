@@ -1,4 +1,5 @@
 /* eslint-disable no-restricted-syntax -- Map markers, filter segments and dense list selectors use compact button layouts; shared Button remains the standard action control. */
+import { FleetPageMenu } from '@/components/fleet-assets/fleet-page-menu';
 import { FleetQueueActions } from '@/components/fleet-assets/fleet-queue-actions';
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
 import {
@@ -1536,30 +1537,37 @@ export default function FleetAssetsDashboard({ overview, saved_views }: Props) {
                         subline="Find vehicles, follow up work and plan ahead"
                         actions={
                             <>
-                                <PageHeaderSearch
-                                    value={filters.q}
-                                    onChange={(q) => update({ q })}
-                                    placeholder="Find records…"
-                                />
-                                <FleetQueueActions siteId={filters.site} />
-                                <PageHeaderGlassButton
-                                    icon={RefreshCw}
-                                    aria-label="Refresh overview"
-                                    disabled={refreshing}
-                                    onClick={refresh}
-                                />
-                                {overview.can.fleet && (
-                                    <PageHeaderPrimaryButton
-                                        onClick={() =>
-                                            router.visit(
-                                                '/fleet-assets/vehicles',
-                                            )
-                                        }
-                                    >
-                                        View fleet{' '}
-                                        <ArrowRight className="size-4" />
-                                    </PageHeaderPrimaryButton>
-                                )}
+                                <FleetPageMenu />
+                                {
+                                    <>
+                                        <PageHeaderSearch
+                                            value={filters.q}
+                                            onChange={(q) => update({ q })}
+                                            placeholder="Find records…"
+                                        />
+                                        <FleetQueueActions
+                                            siteId={filters.site}
+                                        />
+                                        <PageHeaderGlassButton
+                                            icon={RefreshCw}
+                                            aria-label="Refresh overview"
+                                            disabled={refreshing}
+                                            onClick={refresh}
+                                        />
+                                        {overview.can.fleet && (
+                                            <PageHeaderPrimaryButton
+                                                onClick={() =>
+                                                    router.visit(
+                                                        '/fleet-assets/vehicles',
+                                                    )
+                                                }
+                                            >
+                                                View fleet{' '}
+                                                <ArrowRight className="size-4" />
+                                            </PageHeaderPrimaryButton>
+                                        )}
+                                    </>
+                                }
                             </>
                         }
                         meters={

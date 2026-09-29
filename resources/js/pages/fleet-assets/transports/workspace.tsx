@@ -1,4 +1,5 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FleetPageMenu } from '@/components/fleet-assets/fleet-page-menu';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import {
     calendarPeriod,
@@ -456,16 +457,23 @@ export default function TransportWorkspace({
                 variant="index"
                 actions={
                     <>
-                        <PageHeaderSearch
-                            placeholder={`Search ${view === 'overview' ? 'transport' : tabs.find((t) => t.key === view)!.label.toLowerCase()}`}
-                            value={query}
-                            onChange={setQuery}
-                        />
-                        <PageHeaderPrimaryButton onClick={() => setCreate({})}>
-                            <Plus className="size-4" />
-                            Request transport
-                        </PageHeaderPrimaryButton>
-                        <EntityKebab actions={heroActions} />
+                        <FleetPageMenu />
+                        {
+                            <>
+                                <PageHeaderSearch
+                                    placeholder={`Search ${view === 'overview' ? 'transport' : tabs.find((t) => t.key === view)!.label.toLowerCase()}`}
+                                    value={query}
+                                    onChange={setQuery}
+                                />
+                                <PageHeaderPrimaryButton
+                                    onClick={() => setCreate({})}
+                                >
+                                    <Plus className="size-4" />
+                                    Request transport
+                                </PageHeaderPrimaryButton>
+                                <EntityKebab actions={heroActions} />
+                            </>
+                        }
                     </>
                 }
                 meters={

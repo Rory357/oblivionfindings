@@ -2,10 +2,13 @@
 
 namespace Tests\Feature\FleetAssets;
 
-use App\Models\FleetIncident;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AssetGeofence;
+use App\Models\FleetIncident;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -19,7 +22,7 @@ class FleetModalRouteShimTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
@@ -45,7 +48,17 @@ class FleetModalRouteShimTest extends TestCase
 
     public function test_geofence_edit_route_redirects_to_the_index_edit_modal(): void
     {
+        $site = Site::factory()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+        ]);
         $geofence = AssetGeofence::query()->create([
+            'site_id' => $site->id,
             'name' => 'Test geofence',
             'type' => 'custom',
             'scope' => 'site',

@@ -1,3 +1,4 @@
+import { FleetPageMenu } from '@/components/fleet-assets/fleet-page-menu';
 import { EntityChip } from '@/components/lists/entity-cells';
 import {
     PageHeader,
@@ -136,17 +137,22 @@ export default function SettingsWorkspace({
                     subline="Maps, tracking, notifications and operational setup"
                     actions={
                         <>
-                            <PageHeaderSearch
-                                value={query}
-                                onChange={setQuery}
-                                placeholder={`Search ${tabs.find((tab) => tab.key === view)?.label.toLowerCase()}`}
-                            />
-                            <PageHeaderGlassButton
-                                icon={History}
-                                onClick={() => select('history')}
-                            >
-                                Changes
-                            </PageHeaderGlassButton>
+                            <FleetPageMenu />
+                            {
+                                <>
+                                    <PageHeaderSearch
+                                        value={query}
+                                        onChange={setQuery}
+                                        placeholder={`Search ${tabs.find((tab) => tab.key === view)?.label.toLowerCase()}`}
+                                    />
+                                    <PageHeaderGlassButton
+                                        icon={History}
+                                        onClick={() => select('history')}
+                                    >
+                                        Changes
+                                    </PageHeaderGlassButton>
+                                </>
+                            }
                         </>
                     }
                     meters={

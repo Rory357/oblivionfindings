@@ -12,6 +12,10 @@ vi.mock('@/components/leaflet-map', () => ({
     default: () => <div data-testid="fleet-map" />,
 }));
 vi.mock('@inertiajs/react', () => ({
+    usePage: () => ({
+        url: '/fleet-assets/vehicles',
+        props: { auth: { can: { fleet: { viewAny: true } } } },
+    }),
     Head: () => null,
     Link: ({
         href,

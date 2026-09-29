@@ -1,3 +1,4 @@
+import { FleetPageMenu } from '@/components/fleet-assets/fleet-page-menu';
 import {
     FLEET_COLORS,
     HalfMoonGauge,
@@ -270,32 +271,37 @@ export default function FleetReports({
                     subline={`Recorded fleet activity · ${periodLabel}`}
                     actions={
                         <>
-                            <PageHeaderGlassButton
-                                icon={Download}
-                                onClick={() => {
-                                    window.location.href = `/fleet-assets/reports/export?period=${period}&type=trips`;
-                                }}
-                            >
-                                Trips CSV
-                            </PageHeaderGlassButton>
-                            <PageHeaderGlassButton
-                                icon={Download}
-                                onClick={() => {
-                                    window.location.href = `/fleet-assets/reports/export?period=${period}&type=fuel`;
-                                }}
-                            >
-                                Fuel CSV
-                            </PageHeaderGlassButton>
-                            <PageHeaderPrimaryButton
-                                icon={FileBarChart}
-                                onClick={() =>
-                                    router.visit(
-                                        '/fleet-assets/reports/builder',
-                                    )
-                                }
-                            >
-                                Build report
-                            </PageHeaderPrimaryButton>
+                            <FleetPageMenu />
+                            {
+                                <>
+                                    <PageHeaderGlassButton
+                                        icon={Download}
+                                        onClick={() => {
+                                            window.location.href = `/fleet-assets/reports/export?period=${period}&type=trips`;
+                                        }}
+                                    >
+                                        Trips CSV
+                                    </PageHeaderGlassButton>
+                                    <PageHeaderGlassButton
+                                        icon={Download}
+                                        onClick={() => {
+                                            window.location.href = `/fleet-assets/reports/export?period=${period}&type=fuel`;
+                                        }}
+                                    >
+                                        Fuel CSV
+                                    </PageHeaderGlassButton>
+                                    <PageHeaderPrimaryButton
+                                        icon={FileBarChart}
+                                        onClick={() =>
+                                            router.visit(
+                                                '/fleet-assets/reports/builder',
+                                            )
+                                        }
+                                    >
+                                        Build report
+                                    </PageHeaderPrimaryButton>
+                                </>
+                            }
                         </>
                     }
                     meters={

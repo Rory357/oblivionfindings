@@ -1,3 +1,4 @@
+import { FleetPageMenu } from '@/components/fleet-assets/fleet-page-menu';
 import { FleetQueueActions } from '@/components/fleet-assets/fleet-queue-actions';
 import {
     QueueCriteria,
@@ -299,18 +300,25 @@ export default function AlertsIndex({
                         subline="Permitted Fleet-source alerts · vehicles and assets · Control Room owns responses"
                         actions={
                             <>
-                                <FleetQueueActions siteId={filters.site_id} />
-                                <PageHeaderSearch
-                                    value={search}
-                                    onChange={onSearch}
-                                    placeholder="Search alerts or resources…"
-                                />
-                                <PageHeaderGlassButton
-                                    onClick={() => router.reload()}
-                                >
-                                    <RefreshCw className="size-4" />
-                                    Refresh
-                                </PageHeaderGlassButton>
+                                <FleetPageMenu />
+                                {
+                                    <>
+                                        <FleetQueueActions
+                                            siteId={filters.site_id}
+                                        />
+                                        <PageHeaderSearch
+                                            value={search}
+                                            onChange={onSearch}
+                                            placeholder="Search alerts or resources…"
+                                        />
+                                        <PageHeaderGlassButton
+                                            onClick={() => router.reload()}
+                                        >
+                                            <RefreshCw className="size-4" />
+                                            Refresh
+                                        </PageHeaderGlassButton>
+                                    </>
+                                }
                             </>
                         }
                         meters={

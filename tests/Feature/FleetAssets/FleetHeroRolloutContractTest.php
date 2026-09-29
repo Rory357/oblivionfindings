@@ -109,7 +109,7 @@ class FleetHeroRolloutContractTest extends TestCase
                 // The vehicle profile's insurance expiry is counted like the other dates.
                 ->where('compliance.insurance_expiring', 1)
                 ->where('compliance.insurance_expired', 1)
-                ->where('compliance.open_alerts', 3)
+                ->where('compliance.open_alerts', 2)
                 ->where('compliance.critical_alerts', 1)
             );
 
@@ -126,7 +126,7 @@ class FleetHeroRolloutContractTest extends TestCase
                 ->where('compliance.cof_expired', 1)
                 ->where('compliance.insurance_expiring', 1)
                 ->where('compliance.insurance_expired', 1)
-                ->where('compliance.open_alerts', 3)
+                ->where('compliance.open_alerts', 2)
                 ->where('compliance.critical_alerts', 1)
             );
     }

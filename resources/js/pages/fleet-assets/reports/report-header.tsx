@@ -1,3 +1,4 @@
+import { FleetPageMenu } from '@/components/fleet-assets/fleet-page-menu';
 import {
     PageHeader,
     PageHeaderGlassButton,
@@ -31,22 +32,27 @@ export function FleetReportHeader({
                 subline={description}
                 actions={
                     <>
-                        <PageHeaderGlassButton
-                            icon={ArrowLeft}
-                            onClick={() =>
-                                router.visit('/fleet-assets/reports')
-                            }
-                        >
-                            Report library
-                        </PageHeaderGlassButton>
-                        {onExport && (
-                            <PageHeaderGlassButton
-                                icon={Download}
-                                onClick={onExport}
-                            >
-                                Export CSV
-                            </PageHeaderGlassButton>
-                        )}
+                        <FleetPageMenu />
+                        {
+                            <>
+                                <PageHeaderGlassButton
+                                    icon={ArrowLeft}
+                                    onClick={() =>
+                                        router.visit('/fleet-assets/reports')
+                                    }
+                                >
+                                    Report library
+                                </PageHeaderGlassButton>
+                                {onExport && (
+                                    <PageHeaderGlassButton
+                                        icon={Download}
+                                        onClick={onExport}
+                                    >
+                                        Export CSV
+                                    </PageHeaderGlassButton>
+                                )}
+                            </>
+                        }
                     </>
                 }
                 meters={

@@ -1,3 +1,4 @@
+import { FleetPageMenu } from '@/components/fleet-assets/fleet-page-menu';
 import { FleetQueueActions } from '@/components/fleet-assets/fleet-queue-actions';
 import {
     QueueCriteria,
@@ -311,18 +312,25 @@ export default function ComplianceIndex({
                         subline="Vehicle evidence, applicability and next actions · one requirement per row"
                         actions={
                             <>
-                                <FleetQueueActions siteId={filters.site_id} />
-                                <PageHeaderSearch
-                                    value={search}
-                                    onChange={onSearch}
-                                    placeholder="Search vehicles or evidence…"
-                                />
-                                <PageHeaderGlassButton
-                                    onClick={() => router.reload()}
-                                >
-                                    <RefreshCw className="size-4" />
-                                    Refresh
-                                </PageHeaderGlassButton>
+                                <FleetPageMenu />
+                                {
+                                    <>
+                                        <FleetQueueActions
+                                            siteId={filters.site_id}
+                                        />
+                                        <PageHeaderSearch
+                                            value={search}
+                                            onChange={onSearch}
+                                            placeholder="Search vehicles or evidence…"
+                                        />
+                                        <PageHeaderGlassButton
+                                            onClick={() => router.reload()}
+                                        >
+                                            <RefreshCw className="size-4" />
+                                            Refresh
+                                        </PageHeaderGlassButton>
+                                    </>
+                                }
                             </>
                         }
                         meters={

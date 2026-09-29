@@ -9,9 +9,9 @@ describe('Fleet modal-first create workflows', () => {
         {
             name: 'geofence',
             index: 'resources/js/pages/fleet-assets/geofences/index.tsx',
-            form: 'resources/js/pages/fleet-assets/geofences/create.tsx',
-            component: 'GeofenceWizard',
-            steps: ['Scope & name', 'Draw area', 'Alerts & schedule', 'Review'],
+            form: 'resources/js/pages/fleet-assets/geofences/workspace/boundary-wizard.tsx',
+            component: 'BoundaryWizard',
+            steps: ['Location', 'Boundary', 'Name & uses', 'Review & impact'],
         },
         {
             name: 'outing',
@@ -44,7 +44,9 @@ describe('Fleet modal-first create workflows', () => {
             const formSource = read(form);
 
             expect(indexSource).toContain(component);
-            expect(indexSource).toContain("searchParams.get('new') === '1'");
+            expect(indexSource).toMatch(
+                /(?:searchParams|nav)\.get\('new'\) === '1'/,
+            );
             expect(formSource).toContain(`export function ${component}`);
             expect(formSource).toContain('<WizardShell');
             expect(formSource).not.toContain('<AppLayout');

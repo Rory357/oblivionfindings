@@ -6,41 +6,13 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-test('PKG-02B migrations roll back only while empty and never discard vehicle records', function () {
+test('PKG-02B workspace rollback never discards recorded vehicle evidence', function () {
     expect(app()->environment())->toBe('testing');
     expect(DB::connection()->getDatabaseName())->toMatch('/^oblivion_findings_(?:pkg01_2375_test|pkg02b_5b0a_test|pkg02b_final_test|codex_test)_'.preg_quote((string) getmypid(), '/').'$/');
-    // DDL runs only in this process-owned disposable schema, outside the
-    // RefreshDatabase transaction. No shared or browser database is touched.
-    while (DB::transactionLevel() > 0) {
-        DB::rollBack();
-    }
-    // Every PKG-02B migration after I1, in the order they run; a rollback
-    // undoes them in reverse, as `migrate:rollback` would.
-    $paths = glob(database_path('migrations/2026_09_23_*_pkg02b_*.php')) ?: [];
-    $paths[] = database_path('migrations/2026_09_26_000100_pkg02b_appointment_command_receipts.php');
-    sort($paths);
-    expect(count($paths))->toBeGreaterThanOrEqual(8);
-    $migrations = array_map(fn (string $path) => require $path, $paths);
-
-    foreach (array_reverse($migrations) as $migration) {
-        $migration->down();
-    }
-    expect(Schema::hasTable('fleet_vehicle_reminders'))->toBeFalse()
-        ->and(Schema::hasTable('asset_document_sets'))->toBeFalse()
-        ->and(Schema::hasTable('fleet_obligation_reminders'))->toBeFalse()
-        ->and(Schema::hasTable('fleet_vehicle_mileage_feeds'))->toBeFalse()
-        ->and(Schema::hasTable('fleet_vehicle_geofence_assignments'))->toBeFalse()
-        ->and(Schema::hasColumn('asset_documents', 'document_set_id'))->toBeFalse()
-        ->and(Schema::hasColumn('fleet_service_schedules', 'interval_months'))->toBeFalse()
-        ->and(Schema::hasColumn('assets', 'vehicle_profile_version'))->toBeFalse();
-    foreach ($migrations as $migration) {
-        $migration->up();
-    }
-    expect(Schema::hasTable('fleet_vehicle_reminder_events'))->toBeTrue()
-        ->and(Schema::hasTable('fleet_vehicle_mileage_feed_events'))->toBeTrue()
-        ->and(Schema::hasColumn('assets', 'profile_photo_document_id'))->toBeTrue();
-
-    DB::beginTransaction();
+    // Keep the current integrated schema and the test transaction intact.
+    // Later Finance history is intentionally irreversible; an old package's
+    // empty-schema round trip is no longer a supported integrated rollback.
+    $migration = require database_path('migrations/2026_09_23_000100_pkg02b_vehicle_workspace_records.php');
     $site = Site::factory()->create();
     $owner = User::factory()->create();
     $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle']);
@@ -52,7 +24,21 @@ test('PKG-02B migrations roll back only while empty and never discard vehicle re
     ]);
 
     // The first package migration refuses while its records exist, whatever runs after it.
-    expect(fn () => $migrations[0]->down())->toThrow(RuntimeException::class, 'PKG-02B vehicle records exist');
+    expect(fn () => $migration->down())->toThrow(RuntimeException::class, 'PKG-02B vehicle records exist');
     expect(Schema::hasTable('fleet_vehicle_reminders'))->toBeTrue()
+        ->and(Schema::hasTable('asset_document_sets'))->toBeTrue()
+        ->and(Schema::hasColumn('assets', 'vehicle_profile_version'))->toBeTrue()
         ->and(DB::table('fleet_vehicle_reminders')->where('id', $reminderId)->value('title'))->toBe('Synthetic rollback reminder');
+});
+
+test('integrated Finance history prevents rollback even before any review is recorded', function () {
+    $migration = require database_path('migrations/2026_09_27_000100_complete_finance_review_workflow.php');
+    expect(DB::table('fleet_finance_review_requests')->exists())->toBeFalse();
+
+    expect(fn () => $migration->down())->toThrow(RuntimeException::class, 'Finance approval receipts, evidence and review history are retained');
+
+    expect(Schema::hasTable('fleet_finance_review_requests'))->toBeTrue()
+        ->and(Schema::hasTable('fleet_finance_review_notices'))->toBeTrue()
+        ->and(Schema::hasTable('fin_bill_approval_receipts'))->toBeTrue()
+        ->and(Schema::hasTable('fleet_vehicle_geofence_assignments'))->toBeTrue();
 });

@@ -1,5 +1,7 @@
 # Fleet entry and header correction checkpoint
 
+> Historical checkpoint, superseded for publication status on 29 September 2026: Reports was integrated through `ee22de096` and Compliance through `c2f89b358`. The former approval blocker below describes the earlier state; it is not a current publication blocker. See [the integration audit](../audits/2026-09-29/README.md) for current validation and remaining acceptance work. The original checkpoint is retained below.
+
 **This is not full programme acceptance.** Work is isolated on `codex/fleet-entry-corrections`, based on `52dafa6728ebe343631453d4863f645d97c59506`. Main, the separate follow-ups directory and production have not been changed by this work.
 
 The main checkout acquired concurrent, uncommitted Fleet changes during verification, including Compliance and Alerts controllers, shared Fleet navigation, vehicle screens and routes. Those edits have been left untouched. Integration must reconcile the overlapping files with their owner before merging this branch; this checkpoint is not an instruction to overwrite or stage main's work.

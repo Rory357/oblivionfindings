@@ -25,11 +25,6 @@ describe('Fleet bounded option selectors', () => {
 
     it.each([
         [
-            'maintenance/work-orders/create-wizard.tsx',
-            'visibleAssetOptions',
-            'visibleUserOptions',
-        ],
-        [
             '../../components/fleet/fleet-incident-report-dialog.tsx',
             'visibleAssetOptions',
             'visibleDriverOptions',

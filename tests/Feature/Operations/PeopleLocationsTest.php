@@ -23,6 +23,9 @@ use Tests\Support\ClientLocationWorkspaceFixture;
 
 beforeEach(function () {
     $this->travelTo(CarbonImmutable::parse('2026-09-27 12:00:00', 'Pacific/Auckland')->utc());
+    // These HTTP contracts inspect Laravel's response, independent of a local
+    // Node SSR bundle or service left running by a frontend build.
+    config(['inertia.ssr.enabled' => false]);
     Http::preventStrayRequests();
     Queue::fake();
 });

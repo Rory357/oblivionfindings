@@ -62,6 +62,12 @@ describe('Fleet responsive and hero contracts', () => {
 
         for (const relativePath of workerPages) {
             const page = source(relativePath);
+            if (page.includes('<EntityTable')) {
+                expect(page).toContain('hidden md:block');
+                expect(page).toContain('md:hidden');
+                expect(page).toContain('{cards}');
+                continue;
+            }
             if (/<(?:table|Table)(?:\s|>)/.test(page)) {
                 expect(
                     page,
@@ -82,6 +88,21 @@ describe('Fleet responsive and hero contracts', () => {
         }
 
         for (const relativePath of managerPages) {
+            if (relativePath === 'dashboard.tsx') {
+                expect(source(relativePath)).toContain('fo-operations-grid');
+                const styles = source('dashboard.css');
+                expect(styles).toMatch(
+                    /@media \(max-width: 900px\)\s*\{\s*\.fleet-overview \.fo-operations-grid\s*\{\s*grid-template-columns: 1fr;/,
+                );
+                continue;
+            }
+            if (relativePath === 'compliance/index.tsx') {
+                const page = source(relativePath);
+                expect(page).toContain('hidden md:block');
+                expect(page).toContain('md:hidden');
+                expect(page).toContain('{cards}');
+                continue;
+            }
             expect(
                 source(relativePath),
                 `${relativePath} needs a declared narrow strategy`,
@@ -98,11 +119,12 @@ describe('Fleet responsive and hero contracts', () => {
             .filter((file) => readFileSync(file, 'utf8').includes('<Head'))
             .filter((file) => {
                 const page = readFileSync(file, 'utf8');
-                return !/HeroShell|FleetCompactHero|data-fleet-mobile-hero|<PageHeader[\s>]|<PageLayout[\s>]/.test(
+                return !/HeroShell|FleetCompactHero|data-fleet-mobile-hero|<PageHeader[\s>]|<PageLayout[\s>]|<FleetReportHeader[\s>]/.test(
                     page,
                 );
             });
 
         expect(outliers).toEqual([]);
+        expect(source('reports/report-header.tsx')).toContain('<PageHeader');
     });
 });

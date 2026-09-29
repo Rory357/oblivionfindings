@@ -199,8 +199,7 @@ class Pkg02bFleetVehiclesAllSitesTest extends TestCase
     public function test_fleet_calendar_due_entries_have_unique_stable_ids_across_vehicles(): void
     {
         $viewer = $this->siteUser($this->site, ['fleet.viewAny']);
-        $vehicles = collect(['Kōwhai van', 'Rimu van'])->map(fn (string $name) =>
-            $this->vehicle($this->site, $name, ['inspection_due_at' => now()->addDay()]));
+        $vehicles = collect(['Kōwhai van', 'Rimu van'])->map(fn (string $name) => $this->vehicle($this->site, $name, ['inspection_due_at' => now()->addDay()]));
         foreach ($vehicles as $vehicle) {
             $record = FleetVehicleComplianceRecord::query()->create(['asset_id' => $vehicle->id, 'kind' => 'wof']);
             $version = FleetVehicleComplianceVersion::query()->create([
@@ -371,15 +370,16 @@ class Pkg02bFleetVehiclesAllSitesTest extends TestCase
         $own = $this->vehicle($this->site, 'Kōwhai van');
         $other = $this->vehicle($this->otherSite, 'Rimu van');
         $ids = fn (User $user): array => collect($this->actingAs($user)->get('/fleet-assets/compliance')->assertOk()
-            ->viewData('page')['props']['vehicles'])->pluck('id')->sort()->values()->all();
+            ->viewData('page')['props']['queue']['data'])->pluck('vehicle.id')->unique()->sort()->values()->all();
 
         $this->assertSame(collect([$own->id, $other->id])->sort()->values()->all(), $ids($central));
         $this->assertSame([$own->id], $ids($local));
 
-        // With no evidence recorded, readiness blocks both: "Not ready", not "Expiring soon".
+        // Missing evidence stays explicit and both vehicles need attention.
         $page = $this->actingAs($central)->get('/fleet-assets/compliance')->viewData('page')['props'];
-        $this->assertSame(['not_ready'], collect($page['vehicles'])->pluck('status')->unique()->values()->all());
-        $this->assertSame(2, $page['summary']['not_ready']);
+        $this->assertSame(['not_recorded'], collect($page['queue']['data'])->pluck('state')->unique()->values()->all());
+        $this->assertSame(2, $page['summary']['attention']);
+        $this->assertSame(2, $page['summary']['not_recorded']);
     }
 
     public function test_the_fleet_settings_grant_migration_gives_admin_and_the_fleet_manager_role_the_permission(): void

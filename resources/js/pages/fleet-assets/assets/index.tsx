@@ -1,4 +1,5 @@
 /* eslint-disable no-restricted-syntax -- Custom connected tabs, location selectors and directory rows follow the approved workspace composition; standard actions use Button. */
+import { FleetPageMenu } from '@/components/fleet-assets/fleet-page-menu';
 import { EntityCard } from '@/components/lists/entity-card';
 import { EntityTable } from '@/components/lists/entity-table';
 import {
@@ -304,29 +305,37 @@ export default function AssetsIndex({
                     subline={info[view][1]}
                     actions={
                         <>
-                            {inventory && (
-                                <PageHeaderSearch
-                                    value={search}
-                                    onChange={setSearch}
-                                    placeholder="Search asset, tag, serial…"
-                                />
-                            )}
-                            {permissions.create && inventory && (
-                                <PageHeaderPrimaryButton
-                                    onClick={() => setWizardOpen(true)}
-                                >
-                                    <Plus className="size-4" />
-                                    Register asset
-                                </PageHeaderPrimaryButton>
-                            )}
-                            {view === 'stocktake' && permissions.count && (
-                                <PageHeaderPrimaryButton
-                                    onClick={() => setNewCount((n) => n + 1)}
-                                >
-                                    <Plus className="size-4" />
-                                    New stocktake
-                                </PageHeaderPrimaryButton>
-                            )}
+                            <FleetPageMenu />
+                            {
+                                <>
+                                    {inventory && (
+                                        <PageHeaderSearch
+                                            value={search}
+                                            onChange={setSearch}
+                                            placeholder="Search asset, tag, serial…"
+                                        />
+                                    )}
+                                    {permissions.create && inventory && (
+                                        <PageHeaderPrimaryButton
+                                            onClick={() => setWizardOpen(true)}
+                                        >
+                                            <Plus className="size-4" />
+                                            Register asset
+                                        </PageHeaderPrimaryButton>
+                                    )}
+                                    {view === 'stocktake' &&
+                                        permissions.count && (
+                                            <PageHeaderPrimaryButton
+                                                onClick={() =>
+                                                    setNewCount((n) => n + 1)
+                                                }
+                                            >
+                                                <Plus className="size-4" />
+                                                New stocktake
+                                            </PageHeaderPrimaryButton>
+                                        )}
+                                </>
+                            }
                         </>
                     }
                     meters={

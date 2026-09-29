@@ -267,16 +267,10 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
 
         $this->actingAs($user)
             ->get('/fleet-assets/map')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('fleet-assets/map')
-                ->has('geofences', 2)
-                ->where('geofences', fn ($geofences) => collect($geofences)
-                    ->pluck('id')
-                    ->sort()
-                    ->values()
-                    ->all() === collect([$local->id, $localFallback->id])->sort()->values()->all())
-            );
+            ->assertRedirect('/fleet-assets/geofences?tab=map');
+        $boundaries = $this->getJson('/fleet-assets/geofences/catalogue')->assertOk()
+            ->assertJsonCount(2, 'data')->json('data');
+        $this->assertEqualsCanonicalizing([$local->id, $localFallback->id], collect($boundaries)->pluck('id')->all());
     }
 
     public function test_dashboard_fleet_manage_is_application_wide_across_operational_sites(): void
@@ -611,15 +605,12 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
 
         $this->actingAs($user)
             ->get('/fleet-assets/map')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('fleet-assets/map')
-                ->where('geofences', function ($geofences) use ($poisonedFence): bool {
-                    $fence = collect($geofences)->firstWhere('id', $poisonedFence->id);
-
-                    return $fence !== null && $fence['asset'] === null;
-                })
-            );
+            ->assertRedirect('/fleet-assets/geofences?tab=map');
+        $boundaries = $this->getJson('/fleet-assets/geofences/catalogue')->assertOk()->json('data');
+        $fence = collect($boundaries)->firstWhere('id', $poisonedFence->id);
+        $this->assertNotNull($fence);
+        $this->assertArrayNotHasKey('asset', $fence);
+        $this->assertArrayNotHasKey('asset_id', $fence);
     }
 
     /**

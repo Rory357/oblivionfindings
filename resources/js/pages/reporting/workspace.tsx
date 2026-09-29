@@ -1,3 +1,4 @@
+import { FleetPageMenu } from '@/components/fleet-assets/fleet-page-menu';
 import { EntityTable } from '@/components/lists/entity-table';
 import {
     PageHeader,
@@ -925,64 +926,67 @@ export function ReportWorkspace(props: Props) {
                           : 'Trusted reports and a flexible report studio')
                 }
                 actions={
-                    focusedView ? (
-                        <>
+                    <>
+                        <FleetPageMenu />
+                        {focusedView ? (
+                            <>
+                                <PageHeaderGlassButton
+                                    icon={ArrowLeft}
+                                    onClick={() => navigateView('library')}
+                                >
+                                    Report library
+                                </PageHeaderGlassButton>
+                                <PageHeaderGlassButton
+                                    icon={SlidersHorizontal}
+                                    onClick={() => navigateView('builder')}
+                                >
+                                    Customise
+                                </PageHeaderGlassButton>
+                                <PageHeaderPrimaryButton
+                                    icon={Download}
+                                    disabled={
+                                        !payload ||
+                                        dirtyResult ||
+                                        busy ||
+                                        running ||
+                                        props.canExport === false
+                                    }
+                                    onClick={() => setExportOpen(true)}
+                                >
+                                    Export
+                                </PageHeaderPrimaryButton>
+                            </>
+                        ) : tab === 'builder' ? (
                             <PageHeaderGlassButton
                                 icon={ArrowLeft}
                                 onClick={() => navigateView('library')}
                             >
                                 Report library
                             </PageHeaderGlassButton>
-                            <PageHeaderGlassButton
-                                icon={SlidersHorizontal}
-                                onClick={() => navigateView('builder')}
-                            >
-                                Customise
-                            </PageHeaderGlassButton>
-                            <PageHeaderPrimaryButton
-                                icon={Download}
-                                disabled={
-                                    !payload ||
-                                    dirtyResult ||
-                                    busy ||
-                                    running ||
-                                    props.canExport === false
-                                }
-                                onClick={() => setExportOpen(true)}
-                            >
-                                Export
-                            </PageHeaderPrimaryButton>
-                        </>
-                    ) : tab === 'builder' ? (
-                        <PageHeaderGlassButton
-                            icon={ArrowLeft}
-                            onClick={() => navigateView('library')}
-                        >
-                            Report library
-                        </PageHeaderGlassButton>
-                    ) : (
-                        <>
-                            <PageHeaderSearch
-                                value={query}
-                                onChange={setQuery}
-                                placeholder="Find a saved report…"
-                                ariaLabel="Search saved reports"
-                            />
-                            <PageHeaderPrimaryButton
-                                icon={SlidersHorizontal}
-                                onClick={() =>
-                                    load(
-                                        initialDefinition(
-                                            Object.keys(sources)[0],
-                                            sources,
-                                        ),
-                                    )
-                                }
-                            >
-                                Create report
-                            </PageHeaderPrimaryButton>
-                        </>
-                    )
+                        ) : (
+                            <>
+                                <PageHeaderSearch
+                                    value={query}
+                                    onChange={setQuery}
+                                    placeholder="Find a saved report…"
+                                    ariaLabel="Search saved reports"
+                                />
+                                <PageHeaderPrimaryButton
+                                    icon={SlidersHorizontal}
+                                    onClick={() =>
+                                        load(
+                                            initialDefinition(
+                                                Object.keys(sources)[0],
+                                                sources,
+                                            ),
+                                        )
+                                    }
+                                >
+                                    Create report
+                                </PageHeaderPrimaryButton>
+                            </>
+                        )}
+                    </>
                 }
                 meters={
                     focusedView ? (
