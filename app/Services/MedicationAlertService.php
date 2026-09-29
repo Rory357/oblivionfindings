@@ -357,7 +357,7 @@ class MedicationAlertService
                 $client->id,
                 'expired',
                 'critical',
-                "{$medication->name}: Medication expired on {$medication->end_date->format('d/m/Y')}",
+                "{$medication->name}: Medication ended on {$medication->end_date->format('d/m/Y')}",
                 $medication->id
             );
 
@@ -366,7 +366,7 @@ class MedicationAlertService
                 MedicationSignalService::TYPE_EXPIRED,
                 $client->id,
                 'high',
-                "{$medication->name}: Medication expired on {$medication->end_date->format('d/m/Y')}",
+                "{$medication->name}: Medication ended on {$medication->end_date->format('d/m/Y')}",
                 [
                     'client_medication_id' => $medication->id,
                     'medication_name' => $medication->name,

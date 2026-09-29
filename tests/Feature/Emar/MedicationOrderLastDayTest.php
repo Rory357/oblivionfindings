@@ -85,8 +85,10 @@ it('blocks an order once its last day has passed', function (string $nzNow) {
     expect($order->isExpired())->toBeTrue()
         ->and($checks['safety']['blocked'])->toBeTrue()
         ->and($checks['safety']['block_reason'])->toBe('Medication has expired')
+        ->and(collect($checks['safety']['warnings'])->firstWhere('type', 'expired')['message'] ?? null)
+        ->toBe('⚠️ EXPIRED: This medication ended on 08/06/2026')
         ->and($checks['alerts']->get('expiring_soon'))->toBeNull()
-        ->and($checks['alerts']->get('expired'))->toBe('Amoxicillin 500mg: Medication expired on 08/06/2026')
+        ->and($checks['alerts']->get('expired'))->toBe('Amoxicillin 500mg: Medication ended on 08/06/2026')
         ->and($checks['widget'])->toBeNull();
 })->with([
     'just after midnight' => '2026-06-09 00:05:00',
