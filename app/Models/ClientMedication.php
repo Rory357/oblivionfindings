@@ -426,11 +426,13 @@ class ClientMedication extends Model
     }
 
     /**
-     * Check if medication has expired
+     * Check if medication has expired. The end date is the order's last day
+     * (its doses are still scheduled), so it expires once the New Zealand
+     * date is after it
      */
     public function isExpired(): bool
     {
-        return $this->end_date && $this->end_date->isPast();
+        return $this->end_date !== null && $this->daysUntilEnd() < 0;
     }
 
     /**
@@ -443,7 +445,7 @@ class ClientMedication extends Model
             return false;
         }
 
-        return $this->end_date->isFuture() && $this->daysUntilEnd() <= $days;
+        return ! $this->isExpired() && $this->daysUntilEnd() <= $days;
     }
 
     /**

@@ -721,7 +721,7 @@ class MedicationAlertService
             ->when(! $canViewControlled, fn ($query) => $query->where('controlled_drug', false))
             ->whereNotNull('end_date')
             ->where('end_date', '<=', WorkerClock::today()->addDays(14)->toDateString())
-            ->where('end_date', '>=', now())
+            ->where('end_date', '>=', WorkerClock::today()->toDateString())
             ->with('client:id,first_name,last_name');
 
         if ($clientId) {
