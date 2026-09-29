@@ -27,31 +27,11 @@ vi.mock('@/components/confirm-dialog', () => ({
     ConfirmDialog: () => null,
 }));
 
-vi.mock('@/pages/fleet-assets/components/fleet-compact-hero', () => ({
-    FleetCompactHero: ({
-        title,
-        stats,
-        actions,
-    }: {
-        title: ReactNode;
-        stats: ReactNode;
-        actions: ReactNode;
-    }) => (
-        <div>
-            {title}
-            {stats}
-            {actions}
-        </div>
-    ),
-    CompactHeroStat: ({ label, value }: { label: string; value: string }) => (
-        <div>
-            {label}: {value}
-        </div>
-    ),
-}));
-
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
+    Link: ({ children, href }: { children: ReactNode; href: string }) => (
+        <a href={href}>{children}</a>
+    ),
     router: {
         delete: vi.fn(),
         post: vi.fn(),

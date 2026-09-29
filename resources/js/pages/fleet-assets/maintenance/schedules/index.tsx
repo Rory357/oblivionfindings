@@ -6,6 +6,10 @@ import {
 } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,15 +24,8 @@ import {
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDistance } from '@/lib/fleet-utils';
-import {
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
-import { HeroActionButton } from '@/pages/fleet-assets/maintenance/components/hero-action-button';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     Activity,
@@ -153,49 +150,25 @@ function SchedulesHero({
     onCreate: () => void;
 }) {
     return (
-        <HeroShell>
-            <div className="flex flex-wrap items-center gap-4">
-                <HeroMedallion icon={CalendarClock} />
-                <div className="min-w-0">
-                    <HeroStatusPill>
-                        Maintenance · service schedules
-                    </HeroStatusPill>
-                    <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                        Service Schedules
-                    </h1>
-                    <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                        Recurring service and maintenance schedules for assets.
-                    </p>
-                </div>
-                <div className="grid flex-1 grid-cols-3 gap-2 lg:ml-auto lg:max-w-xl">
-                    <HeroClusterTile
-                        label="Due 7d"
-                        value={fmt(stats.due_7d)}
-                        caption="services this week"
-                        tone={stats.due_7d > 0 ? 'warning' : 'success'}
-                    />
-                    <HeroClusterTile
-                        label="Overdue"
-                        value={fmt(stats.overdue)}
-                        caption="past due date"
-                        tone={stats.overdue > 0 ? 'critical' : 'success'}
-                    />
-                    <HeroClusterTile
-                        label="Active"
-                        value={fmt(stats.active)}
-                        caption="schedules running"
-                        tone="neutral"
-                    />
-                </div>
-            </div>
-            {canManage ? (
-                <div className="flex flex-wrap items-center gap-2">
-                    <HeroActionButton onClick={onCreate} icon={Plus} emphasis>
+        <PageHeader
+            wrapTitle
+            title="Service Schedules"
+            icon={CalendarClock}
+            subline={
+                <>
+                    Recurring service and maintenance schedules ·{' '}
+                    {fmt(stats.due_7d)} due in 7 days · {fmt(stats.overdue)}{' '}
+                    overdue · {fmt(stats.active)} active
+                </>
+            }
+            actions={
+                canManage ? (
+                    <PageHeaderPrimaryButton icon={Plus} onClick={onCreate}>
                         Create schedule
-                    </HeroActionButton>
-                </div>
-            ) : null}
-        </HeroShell>
+                    </PageHeaderPrimaryButton>
+                ) : undefined
+            }
+        />
     );
 }
 

@@ -1,0 +1,90 @@
+{
+  "recordedAt": "2026-09-29",
+  "baseMain": "dab15310ebaa527109df63aa7b74d2d1c169e5d9",
+  "scope": "Second Fleet secondary-page presentation batch",
+  "sourceAssessment": {
+    "inventoryPages": 50,
+    "activePagesWithSharedHeaderOrReportWrapper": 48,
+    "activeLegacyHeaderPages": 0,
+    "inactiveLegacyBranches": 2,
+    "convertedInThisBatch": 26,
+    "details": "secondary-page-assessment.md"
+  },
+  "localChecks": {
+    "typescript": "passed: tsc --noEmit",
+    "eslint": "passed on all 27 edited TSX files, including the playback test",
+    "prettier": "passed on all 27 edited TSX files",
+    "vitest": {
+      "result": "passed",
+      "files": 7,
+      "tests": 21,
+      "scope": "Fleet playback, maintenance schedules and checklists, resident tracking, and three maps settings suites"
+    },
+    "viteProductionBuild": "passed after substantive source changes; only the existing large-chunk advisory",
+    "gitDiffCheck": "passed",
+    "activeLegacyComponentSearch": "no references in the 26 converted pages; the remaining references are two inactive branches and legacy component definitions"
+  },
+  "browser": {
+    "origin": "http://127.0.0.1:8797",
+    "checkout": "managed fleet-secondary-followup worktree",
+    "database": "separate local synthetic Fleet MySQL schema",
+    "signIn": "normal Laravel login with synthetic Fleet manager",
+    "assetSource": "local Vite development assets for the 17-page narrow sweep, followed by a production-manifest smoke check on six key pages; public/hot absent",
+    "indexAndOverviewPagesRendered": [
+      "bookings/index",
+      "devices/index",
+      "drivers/index",
+      "fuel/index",
+      "handovers/index",
+      "incidents/index",
+      "inspections/index",
+      "keys/index",
+      "maintenance/checklists/index",
+      "maintenance/dashboard",
+      "maintenance/schedules/index",
+      "mileage/index",
+      "outings/index",
+      "resident-tracking/index",
+      "transports/index",
+      "transports/medications",
+      "trips/index"
+    ],
+    "recordAndProcessPagesRendered": [
+      "maintenance/checklists/run",
+      "trips/playback"
+    ],
+    "recordAndProcessPagesWithoutMatchingSyntheticFixture": [
+      "drivers/show",
+      "handovers/show",
+      "inspections/show",
+      "outings/show",
+      "resident-tracking/history",
+      "transports/pre-check",
+      "transports/show"
+    ],
+    "narrowViewport": {
+      "overrideWidth": 375,
+      "measuredCssWidth": "288–300 depending on page and host device pixel ratio",
+      "documentOverflow": false,
+      "scope": "all 17 index/overview pages and the two available record/process pages"
+    },
+    "observed": [
+      "Each rendered page had one shared header and one main heading; the incident page passed on direct recheck after a transient hydration wait timeout",
+      "The long Resident Tracking heading wrapped at narrow width",
+      "The incident report launcher label had readable contrast and opened the three existing report choices",
+      "Device consent, resident wandering and booking pending meters opened their matching tabs or filters",
+      "The booking pending filter retained a truthful filtered empty state",
+      "Resident Tracking showed a Leaflet/OpenStreetMap basemap and a zero-resident empty state",
+      "Maps settings showed OpenStreetMap as default and manual address/coordinate fallback while Google capabilities were unconfigured"
+    ],
+    "productionManifestSmoke": "Bookings, incidents, resident tracking, trips, checklist run and trip playback each rendered one shared header and one main heading without document overflow at narrow width; no Vite development client was present",
+    "consoleErrors": 0,
+    "zoom125Percent": "not independently established: host device pixel ratio and viewport override are not proof of browser zoom"
+  },
+  "external": {
+    "hostedCom": "Authenticated deployment and visual acceptance on oblivionfindings.com were not available in the local browser session; the public URL redirected to login.",
+    "googleProvider": "Live Google Maps, Places, Geocoding and Routes were not called; project configuration and billing remain outside this local synthetic check.",
+    "previousMainGitHubActions": "For dab1531, public Actions showed visual-regression, linter and tests failed while database-bootstrap passed; detailed failing logs required GitHub sign-in.",
+    "applicationWideGreen": false
+  }
+}

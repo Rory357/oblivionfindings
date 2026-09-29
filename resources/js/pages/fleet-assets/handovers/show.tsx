@@ -1,11 +1,14 @@
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatDistance } from '@/lib/fleet-utils';
 import { cn } from '@/lib/utils';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -160,11 +163,29 @@ export default function HandoverShow({ handover: h, current_user_id }: Props) {
         >
             <Head title={`Handover #${h.id}`} />
             <PageShell>
-                <FleetCompactHero
-                    pill={`Shift handover · ${(h.status ?? '').replace(/_/g, ' ') || 'record'}`}
+                <PageHeader
+                    wrapTitle
+                    variant="profile"
+                    icon={ArrowLeftRight}
                     title={`Shift Handover #${h.id}`}
                     backHref="/fleet-assets/handovers"
-                    backLabel="Handovers"
+                    titleChip={
+                        <PageHeaderStatusChip
+                            variant={
+                                h.status === 'accepted'
+                                    ? 'success'
+                                    : h.status === 'disputed'
+                                      ? 'critical'
+                                      : 'warning'
+                            }
+                        >
+                            {(h.status ?? 'pending acceptance').replace(
+                                /_/g,
+                                ' ',
+                            )}
+                        </PageHeaderStatusChip>
+                    }
+                    subline={h.asset?.name ?? 'Vehicle record unavailable'}
                 />
 
                 {/* Status Banner */}

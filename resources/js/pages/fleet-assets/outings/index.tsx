@@ -2,6 +2,13 @@ import { FLEET_COLORS, MiniBarChart } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,12 +24,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDurationMinutes } from '@/lib/fleet-utils';
 import {
     FleetAttentionStrip,
-    FleetHeroAction,
     fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
 } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Head, Link, router } from '@inertiajs/react';
@@ -187,78 +189,61 @@ export default function OutingsIndex({
         >
             <Head title="Community Outings" />
             <PageShell>
-                <HeroShell>
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={MapPin} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Community access · outings
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Community Outings
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Plan and manage resident outings and community
-                                access trips.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
-                                label="Planned today"
-                                value={fmt(safeHero.planned_today)}
-                                caption="departing today"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                label="Active now"
-                                value={fmt(safeHero.active_now)}
-                                caption="out in the community"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                label="Residents out now"
-                                value={fmt(safeHero.residents_out_now)}
-                                caption={
-                                    (safeHero.past_return ?? 0) > 0
-                                        ? `${safeHero.past_return} past return`
-                                        : 'not yet returned'
-                                }
-                                tone={
-                                    (safeHero.past_return ?? 0) > 0
-                                        ? 'critical'
-                                        : 'neutral'
-                                }
-                            />
-                            <HeroClusterTile
-                                label="Completed 7d"
-                                value={fmt(safeHero.completed_7d)}
-                                caption="this week"
-                                tone="neutral"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Org-wide escalations — same band as the fleet dashboard. */}
-                    <FleetAttentionStrip
-                        overdueReturns={safeHero.overdue_returns ?? 0}
-                        outingsPastReturn={safeHero.past_return ?? 0}
-                        criticalAlerts={safeHero.critical_alerts ?? 0}
-                        hrefs={{
-                            outings: '/fleet-assets/outings?status=active',
-                        }}
-                    />
-                    {can.manage && (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <FleetHeroAction
-                                href="/fleet-assets/outings?new=1"
+                <PageHeader
+                    wrapTitle
+                    title="Community Outings"
+                    icon={MapPin}
+                    subline={
+                        <>
+                            Plan and manage resident outings ·{' '}
+                            {fmt(safeHero.planned_today)} planned today ·{' '}
+                            {fmt(safeHero.residents_out_now)} residents out now
+                            · {fmt(safeHero.completed_7d)} completed in 7 days
+                        </>
+                    }
+                    actions={
+                        can.manage ? (
+                            <PageHeaderPrimaryButton
                                 icon={Plus}
-                                emphasis
+                                onClick={() =>
+                                    router.visit('/fleet-assets/outings?new=1')
+                                }
                             >
                                 Plan outing
-                            </FleetHeroAction>
-                        </div>
-                    )}
-                </HeroShell>
+                            </PageHeaderPrimaryButton>
+                        ) : undefined
+                    }
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
+                                label="Active now"
+                                href={'/fleet-assets/outings?status=active'}
+                                tone={
+                                    safeHero.active_now > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(safeHero.active_now)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    out in the community
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
+                    filters={
+                        <FleetAttentionStrip
+                            overdueReturns={safeHero.overdue_returns ?? 0}
+                            outingsPastReturn={safeHero.past_return ?? 0}
+                            criticalAlerts={safeHero.critical_alerts ?? 0}
+                            hrefs={{
+                                outings: '/fleet-assets/outings?status=active',
+                            }}
+                        />
+                    }
+                />
 
                 {/* KPI Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -295,9 +280,9 @@ export default function OutingsIndex({
                 </div>
 
                 {/* Chart + Filters */}
-                <div className="grid gap-4 lg:grid-cols-[2fr_3fr]">
+                <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
                     {safeChartData.some((entry) => entry.value > 0) && (
-                        <Card>
+                        <Card className="min-w-0">
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-sm">
                                     Outings by Day of Week
@@ -313,7 +298,7 @@ export default function OutingsIndex({
                         </Card>
                     )}
 
-                    <Card>
+                    <Card className="min-w-0">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm">Filters</CardTitle>
                         </CardHeader>
@@ -363,7 +348,7 @@ export default function OutingsIndex({
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <div className="flex gap-2">
+                                <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
                                     <Input
                                         type="date"
                                         value={filters?.date_from ?? ''}
