@@ -433,6 +433,7 @@ export function PageHeaderMeterBlock({
     preserveState,
     preserveScroll,
     onClick,
+    pressed,
     ariaLabel,
     className,
     children,
@@ -446,6 +447,8 @@ export function PageHeaderMeterBlock({
     preserveState?: boolean;
     preserveScroll?: boolean;
     onClick?: () => void;
+    /** Mark a meter that selects the current in-page view. */
+    pressed?: boolean;
     /** Accessible name; defaults to "View <label>". */
     ariaLabel?: string;
     className?: string;
@@ -486,7 +489,12 @@ export function PageHeaderMeterBlock({
             {body}
         </Link>
     ) : (
-        <button type="button" onClick={onClick} {...shared}>
+        <button
+            type="button"
+            onClick={onClick}
+            aria-pressed={pressed}
+            {...shared}
+        >
             {body}
         </button>
     );

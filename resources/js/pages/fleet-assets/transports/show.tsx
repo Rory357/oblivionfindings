@@ -1,5 +1,9 @@
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +12,6 @@ import AppLayout from '@/layouts/app-layout';
 import { toDatetimeLocal } from '@/lib/datetime';
 import { formatDateTime, formatDuration } from '@/lib/fleet-utils';
 import { cn } from '@/lib/utils';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -328,6 +331,7 @@ export default function TransportShow({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Transport Logs', href: '/fleet-assets/transports' },
                 { title: `Transport #${t.id ?? ''}`, href: '#' },
@@ -335,11 +339,30 @@ export default function TransportShow({
         >
             <Head title={`Transport #${t.id ?? ''}`} />
             <PageShell>
-                <FleetCompactHero
-                    pill={`Resident transports · ${(t.status ?? 'record').replace(/_/g, ' ')}`}
+                <PageHeader
+                    wrapTitle
+                    variant="profile"
+                    icon={Car}
                     title={`Transport #${t.id ?? ''}`}
                     backHref="/fleet-assets/transports"
-                    backLabel="Transport Logs"
+                    titleChip={
+                        <PageHeaderStatusChip
+                            variant={
+                                t.status === 'completed'
+                                    ? 'success'
+                                    : t.status === 'cancelled'
+                                      ? 'critical'
+                                      : t.status === 'in_progress'
+                                        ? 'info'
+                                        : 'neutral'
+                            }
+                        >
+                            {(t.status ?? 'record').replace(/_/g, ' ')}
+                        </PageHeaderStatusChip>
+                    }
+                    subline={[t.resident_name, t.transport_type]
+                        .filter(Boolean)
+                        .join(' · ')}
                     actions={
                         t.status === 'in_progress' ? (
                             <>
@@ -369,8 +392,8 @@ export default function TransportShow({
                             TRANSPORT_TYPE_BANNER.other,
                     )}
                 >
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex min-w-0 flex-wrap items-center gap-3">
                             <Badge className="text-sm capitalize">
                                 {t.transport_type}
                             </Badge>
@@ -382,7 +405,7 @@ export default function TransportShow({
                                 {t.resident_name ?? '---'}
                             </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             {pre_check_status && (
                                 <Badge
                                     variant={

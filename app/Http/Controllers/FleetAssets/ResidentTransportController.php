@@ -1312,12 +1312,12 @@ class ResidentTransportController extends Controller
             ) {
                 $emergencyContacts = DB::table('client_emergency_contacts')
                     ->where('client_id', $client->id)
-                    ->select('name', 'relation', 'phone')
+                    ->select('name', 'relationship', 'phone')
                     ->limit(5)
                     ->get()
                     ->map(fn ($c) => [
                         'name' => $c->name,
-                        'relation' => $c->relation ?? '',
+                        'relation' => $c->relationship ?? '',
                         'phone' => $c->phone ?? '',
                     ])
                     ->toArray();

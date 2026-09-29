@@ -2,6 +2,12 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
 import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
+import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -16,7 +22,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatRelativeTime } from '@/lib/fleet-utils';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Calendar,
@@ -188,6 +193,7 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Outings', href: '/fleet-assets/outings' },
                 { title: safeOuting.title ?? 'Outing', href: '#' },
@@ -195,14 +201,33 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
         >
             <Head title={`Outing: ${safeOuting.title ?? ''}`} />
             <PageShell>
-                <FleetCompactHero
-                    pill={`Outing · ${statusConfig.label}`}
+                <PageHeader
+                    variant="profile"
+                    icon={Calendar}
                     title={safeOuting.title ?? 'Outing Details'}
+                    wrapTitle
                     backHref="/fleet-assets/outings"
-                    backLabel="Outings"
+                    titleChip={
+                        <PageHeaderStatusChip
+                            variant={
+                                safeOuting.status === 'completed'
+                                    ? 'success'
+                                    : safeOuting.status === 'cancelled'
+                                      ? 'critical'
+                                      : safeOuting.status === 'active'
+                                        ? 'info'
+                                        : 'warning'
+                            }
+                        >
+                            {statusConfig.label}
+                        </PageHeaderStatusChip>
+                    }
+                    subline={
+                        safeOuting.destination ?? 'Destination unavailable'
+                    }
                     actions={
                         canManage ? (
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                                 {safeOuting.status === 'planned' &&
                                     (() => {
                                         const allPreChecked =
@@ -212,9 +237,8 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
                                             );
                                         return (
                                             <>
-                                                <Button
-                                                    size="sm"
-                                                    className="bg-primary hover:bg-primary"
+                                                <PageHeaderPrimaryButton
+                                                    icon={Play}
                                                     onClick={() =>
                                                         router.post(
                                                             `/fleet-assets/outings/${safeOuting.id}/start`,
@@ -227,23 +251,20 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
                                                             : undefined
                                                     }
                                                 >
-                                                    <Play className="mr-2 h-4 w-4" />
                                                     {!allPreChecked
                                                         ? 'Pre-checks Incomplete'
                                                         : 'Start Outing'}
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
+                                                </PageHeaderPrimaryButton>
+                                                <PageHeaderGlassButton
+                                                    icon={X}
                                                     onClick={() =>
                                                         setShowCancelDialog(
                                                             true,
                                                         )
                                                     }
                                                 >
-                                                    <X className="mr-2 h-4 w-4" />
                                                     Cancel
-                                                </Button>
+                                                </PageHeaderGlassButton>
                                             </>
                                         );
                                     })()}
@@ -263,22 +284,20 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
                                         return (
                                             <>
                                                 {unreturned.length > 1 && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
+                                                    <PageHeaderGlassButton
+                                                        icon={UserCheck}
                                                         onClick={() =>
                                                             setShowReturnAllDialog(
                                                                 true,
                                                             )
                                                         }
                                                     >
-                                                        <UserCheck className="mr-2 h-4 w-4" />
                                                         Return All (
                                                         {unreturned.length})
-                                                    </Button>
+                                                    </PageHeaderGlassButton>
                                                 )}
-                                                <Button
-                                                    size="sm"
+                                                <PageHeaderPrimaryButton
+                                                    icon={Square}
                                                     onClick={() =>
                                                         router.post(
                                                             `/fleet-assets/outings/${safeOuting.id}/complete`,
@@ -291,11 +310,10 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
                                                             : undefined
                                                     }
                                                 >
-                                                    <Square className="mr-2 h-4 w-4" />
                                                     {!allReturned
                                                         ? `Complete (${returnedCount}/${totalCount} returned)`
                                                         : 'Complete Outing'}
-                                                </Button>
+                                                </PageHeaderPrimaryButton>
                                             </>
                                         );
                                     })()}
@@ -308,7 +326,7 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
                 <div
                     className={`rounded-lg border px-4 py-3 ${statusConfig.bgColor}`}
                 >
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                             <Badge
                                 className={`${statusConfig.color} border bg-transparent`}

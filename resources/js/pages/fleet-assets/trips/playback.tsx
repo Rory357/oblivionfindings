@@ -1,7 +1,12 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import LeafletMap from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -14,10 +19,6 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatDuration } from '@/lib/fleet-utils';
-import {
-    CompactHeroStat,
-    FleetCompactHero,
-} from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, router } from '@inertiajs/react';
 import { CheckCircle, Clock, MapPin, Trash2, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -126,15 +127,10 @@ export default function FleetTripPlayback({
         );
     };
 
-    const statusColors: Record<string, string> = {
-        open: 'bg-status-info-bg text-status-info',
-        closed: 'bg-status-success-bg text-status-success',
-        cancelled: 'bg-muted text-foreground',
-    };
-
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Trips', href: '/fleet-assets/trips' },
                 { title: `Trip #${trip.id}`, href: '#' },
@@ -142,72 +138,52 @@ export default function FleetTripPlayback({
         >
             <Head title={`Trip #${trip.id}`} />
             <PageShell>
-                <FleetCompactHero
-                    pill={`Trip playback · ${trip.asset?.name || 'Unknown vehicle'}`}
+                <PageHeader
+                    wrapTitle
+                    variant="profile"
+                    icon={MapPin}
                     backHref="/fleet-assets/trips"
-                    backLabel="Trips"
-                    title={
-                        <div className="flex items-center gap-3">
-                            <span>Trip #{trip.id}</span>
-                            <Badge className={statusColors[trip.status] || ''}>
-                                {trip.status}
-                            </Badge>
-                            {trip.consent_blocked && (
-                                <Badge
-                                    variant="outline"
-                                    className="border-status-warning/30 text-status-warning"
-                                >
-                                    Consent Blocked
-                                </Badge>
-                            )}
-                        </div>
+                    title={`Trip #${trip.id}`}
+                    titleChip={
+                        <PageHeaderStatusChip
+                            variant={
+                                trip.consent_blocked
+                                    ? 'warning'
+                                    : trip.status === 'closed'
+                                      ? 'success'
+                                      : trip.status === 'open'
+                                        ? 'info'
+                                        : 'neutral'
+                            }
+                        >
+                            {trip.consent_blocked
+                                ? 'Consent blocked'
+                                : trip.status}
+                        </PageHeaderStatusChip>
                     }
-                    stats={
-                        <>
-                            <CompactHeroStat
-                                label="Distance"
-                                value={
-                                    trip.distance_km
-                                        ? `${trip.distance_km} km`
-                                        : '-'
-                                }
-                                tone="neutral"
-                            />
-                            <CompactHeroStat
-                                label="Duration"
-                                value={formatDuration(trip.duration_s)}
-                                tone="neutral"
-                            />
-                            <CompactHeroStat
-                                label="Route points"
-                                value={String(points.length)}
-                                tone="neutral"
-                            />
-                        </>
-                    }
+                    subline={[
+                        trip.asset?.name ?? 'Unknown vehicle',
+                        trip.status,
+                    ].join(' · ')}
                     actions={
                         <>
                             {can.manage && trip.status === 'open' && (
-                                <Button
-                                    variant="default"
-                                    size="sm"
+                                <PageHeaderPrimaryButton
+                                    icon={CheckCircle}
                                     onClick={() => setConfirmClose(true)}
                                     disabled={processing}
                                 >
-                                    <CheckCircle className="mr-2 h-4 w-4" />
-                                    Close Trip
-                                </Button>
+                                    Close trip
+                                </PageHeaderPrimaryButton>
                             )}
                             {can.manage && (
-                                <Button
-                                    variant="destructive"
-                                    size="sm"
+                                <PageHeaderGlassButton
+                                    icon={Trash2}
                                     onClick={() => setConfirmDelete(true)}
                                     disabled={processing}
                                 >
-                                    <Trash2 className="mr-2 h-4 w-4" />
                                     Delete
-                                </Button>
+                                </PageHeaderGlassButton>
                             )}
                         </>
                     }

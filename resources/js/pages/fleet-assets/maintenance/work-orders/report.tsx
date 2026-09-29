@@ -11,7 +11,7 @@ export default function ReportMaintenance({ assets, prefill_asset_id }: { assets
     const [open, setOpen] = useState(true);
     const close = () => setOpen(false);
 
-    return <AppLayout breadcrumbs={[{ title: 'Fleet & Assets', href: '/fleet-assets' }, { title: 'Report a problem', href: '/fleet-assets/maintenance/work-orders/create' }]}>
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Fleet & Assets', href: '/fleet-assets' }, { title: 'Report a problem', href: '/fleet-assets/maintenance/work-orders/create' }]}>
         <Head title="Report a problem" />
         <PageShell>
             <PageHeader variant="profile" icon={Wrench} backHref="/fleet-assets" title="Report a problem"
