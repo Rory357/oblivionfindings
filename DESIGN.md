@@ -604,6 +604,26 @@ before.
   items use the destructive tone and offer Undo where a compensating action
   exists. Actions with no backend are hidden, never stubbed, and are listed
   in the handoff.
+- **Settings pages that copy Fleet's parts but not its structure**
+  (corrected four times, 2026-09-29, eMAR P11 Settings v1–v3). Stephan
+  rejected settings built as option-list cards, prose tables, plain lists
+  or static info cards. Settings follow `pages/fleet-assets/settings/`:
+  - one PageHeader with a short rail, sub-tabs, and a sticky save bar
+    ("Review changes") with an unsaved-draft guard;
+  - every view opens on an **Overview** of `ReviewCard`s, each with a
+    "Review … ↗" `<Button variant="link">`;
+  - settings sit in **titled groups** (icon plus caption) of compact rows;
+  - every on/off choice is a `Switch` showing its On/Off word; a segmented
+    control is used only for three or more real options;
+  - anything that notifies people gets **In-app / Email** switch columns
+    (plus Push where it applies) and a separate delivery or channels tab
+    with real controls, never badge-only cards;
+  - dialogs use the Fleet `Modal` layout, `WizardShell` or `ConfirmDialog`;
+  - a change that loosens a safety check is flagged on review, and its save
+    uses the destructive variant.
+
+  Compare every view with the live Fleet Settings at 1440 px before
+  calling it done.
 
 ## File viewing and downloading (approved by Stephan 2026-09-27)
 

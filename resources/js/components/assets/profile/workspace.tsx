@@ -132,12 +132,16 @@ export function AssetProfileWorkspace({
     useEffect(() => {
         const read = () => {
             const hash = new URLSearchParams(window.location.hash.slice(1));
+            const legacyTab = new URLSearchParams(window.location.search).get(
+                'tab',
+            );
             const requested =
                 hash.get('view') ||
-                (new URLSearchParams(window.location.search).get('tab') ===
-                'assignments'
+                (legacyTab === 'assignments'
                     ? 'custody'
-                    : null);
+                    : legacyTab === 'technology'
+                      ? 'location'
+                      : null);
             const next =
                 requested === 'components'
                     ? 'kit'
@@ -821,8 +825,9 @@ export function AssetProfileWorkspace({
                                         {formatDateTime(device.last_seen_at)}{' '}
                                         {device.detail_url && (
                                             <Link
-                                                className="text-primary"
+                                                className="text-primary focus-visible:ring-2 focus-visible:ring-ring"
                                                 href={device.detail_url}
+                                                aria-label={`Open source for ${device.name || device.device_uid}`}
                                             >
                                                 Open source{' '}
                                                 <ArrowUpRight className="inline size-4" />

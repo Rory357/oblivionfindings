@@ -3,6 +3,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/loading-state';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { Link } from '@inertiajs/react';
 import {
     ArrowUpRight,
     BatteryCharging,
@@ -170,6 +171,45 @@ export function VehicleTelemetryPanel({
                             : 'No reports yet'}
                 </StatusBadge>
             </div>
+            {data.technology.devices.length > 0 && (
+                <section
+                    className="studio-card space-y-3"
+                    aria-label="Installed devices"
+                >
+                    <h3 className="text-section-title">Installed devices</h3>
+                    <p className="text-subtle text-muted-foreground">
+                        Open a device in Security &amp; Devices to review its
+                        setup and technical work.
+                    </p>
+                    <div className="flex min-w-0 flex-wrap gap-2">
+                        {data.technology.devices.map((device) => (
+                            <Button
+                                key={device.id}
+                                variant="outline"
+                                className="h-auto min-h-11 max-w-full whitespace-normal"
+                                asChild
+                            >
+                                <Link href={device.href}>
+                                    <span className="min-w-0 break-words">
+                                        {device.name}
+                                    </span>
+                                    <ArrowUpRight
+                                        className="size-4 shrink-0"
+                                        aria-hidden
+                                    />
+                                </Link>
+                            </Button>
+                        ))}
+                    </div>
+                    {data.technology.truncated && (
+                        <Button variant="link" asChild>
+                            <Link href={data.technology.links.devices}>
+                                View more devices
+                            </Link>
+                        </Button>
+                    )}
+                </section>
+            )}
             {!isUnavailable && (
                 <div className="telemetry-sample-bar">
                     <span>

@@ -15,6 +15,7 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationSignalService;
 use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -379,12 +380,13 @@ class MedicationAlertService
 
         if ($medication->isExpiringSoon(7)) {
             // Expiring soon is dashboard-only — NOT operational
-            $daysRemaining = $medication->end_date->diffInDays(now());
+            $daysRemaining = (int) now()->startOfDay()->diffInDays($medication->end_date->copy()->startOfDay());
+            $days = Str::plural('day', $daysRemaining);
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'expiring_soon',
                 'warning',
-                "{$medication->name}: Expires in {$daysRemaining} days ({$medication->end_date->format('d/m/Y')})",
+                "{$medication->name}: Expires in {$daysRemaining} {$days} ({$medication->end_date->format('d/m/Y')})",
                 $medication->id
             );
 
@@ -734,7 +736,9 @@ class MedicationAlertService
                 'client_id' => $m->client_id,
                 'medication' => $m->name,
                 'expiry_date' => $m->end_date?->toDateString(),
-                'days_remaining' => $m->end_date?->diffInDays(now()),
+                'days_remaining' => $m->end_date
+                    ? (int) now()->startOfDay()->diffInDays($m->end_date->copy()->startOfDay())
+                    : null,
             ])->toArray(),
         ];
     }
