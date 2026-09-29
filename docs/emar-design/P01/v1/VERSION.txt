@@ -1,16 +1,16 @@
 eMAR P01 v1 — Record a dose (all entry points)
-Branch claude/goofy-noyce-ae9936 · base origin/main dab15310e · 29 September 2026 (NZDT) · includes the review session's five fixes on e0a9600ce
+Branch claude/goofy-noyce-ae9936 · base origin/main dab15310e · 29–30 September 2026 (NZDT) · review fixes applied; transport header copied from origin/main 75d5f46b8
 SHA-256 of every file that makes up this version (approval applies to these hashes only).
-Screenshots are evidence, not part of the approved version: 182 PNG files; report.json sha256 1eb1c5a04b96be2355919e517d5959935c9375fa8a35cef996f300008548af7f.
+Screenshots are evidence, not part of the approved version: 182 PNG files; report.json sha256 5b7cd3f66135afe69283d7c3f697172050f412f8f1e827269ac9885e9e4109bd.
 
 61c029353a5536fde2426303726b3e32452aa828cd2f7c51dcb924b9890393ec *.gitignore
-876fe53771b6b5a6281df3a3b6da2faf10bafaf171ee150b6752be7cfed48355 *CHECKLIST.md
-0a45f93adcae322496c05d63d90981668addd1ec1e5d69ebeae3c32b8847aa74 *README.md
-05287db830cfcb09b00dd3c9e61378c5e65d50faa07f86c07bb224fadbcbca27 *dist/assets/index-C4hoEPfe.js
+bf6dc89660db49ce031caefbb5445280a71e7219ff14f0cf5ad22fb26ef00dda *CHECKLIST.md
+66dd10749b664aaecfd5b133020e8eedd7de917b9a7d26f047c704b1a6bf4c4f *README.md
+0655f6b2a3b4790e5b8923fe6c861e53617a74d8abe1d59e99fc1fda1ba6e346 *dist/assets/index-DOfBZ10z.js
 f2bd6dd625f30fbe64f6b381a3860efef6ba69b958c86bc7024dd9c439672532 *dist/assets/index-OFMSrtNv.css
 b87c98af0a4fddae0ebce650bf2289c7870a2cba94bf73b94f0569f8b2556cbf *dist/assets/pdf-YYBQA8p7.js
 8ab0e5e30031b4a06ecfddd5ae9562f0227f830ee7ec9ed1a968b134243d2386 *dist/assets/pdf.worker.min-Dswkl-cV.mjs
-a958a7e1864bc1b1ba8938d8cda3ab8800593abbae98465202abe1e246da4248 *dist/index.html
+cf05a3c6ab41f1180e4f7b96b3d3f57e15a6e318ea0c14916696036674fa2394 *dist/index.html
 13c5d97cd04d95568b348382ef224eee70f5582374843f4c51a37fd9e85facf3 *dist/photos/clonazepam.png
 6b71105471bac5b17acae6af143127f3a4dc53408d9b55b12a3b9152bbe07a97 *dist/photos/insulin.png
 841c25fb5955d26a37212666e35e91af644524383bb426b8084e1737b3a479f6 *dist/photos/losartan.png
@@ -35,7 +35,7 @@ fd5e4e04593051669a3ea0f61f2cb1fec4aec122fa4d5e6b4ba67b2f6484ab0f *src/dialogs.ts
 5d0243b99e82da7f05d76603f8df096f18ff075922c856b760a7473737e40e43 *src/inertia-shim.tsx
 3f284753251f93230644a6005cf9a67e3312ac4b2d459c42705b1a93fd8c0130 *src/main.tsx
 771c917ba294de70e6ae11318ca870932191ff83d30f082bb29f6c91bfa61bf5 *src/pages/contract.tsx
-1628bf08175d566e53aca783647ede9e6bbbff7177806cd723589b3657fcc41d *src/pages/entry-points.tsx
+44d8bd89857f9537bec478bf704bb04d7adeda4524ec589162b194a8f0f0e69a *src/pages/entry-points.tsx
 f2bd62c7694f237aff8ac30a824ef92c4b0c56da54cb86c271258c970993052b *src/pages/meds-today.tsx
 eba3dcdb4363ea822874dff46c027bd129f31923001671262d72c0cf011b22b1 *src/pages/my-calendar.tsx
 2f985c5e8a974c88e084d0920e95f7ca47aed64707e833a8926966b3ab31b7ee *src/pages/my-day.tsx

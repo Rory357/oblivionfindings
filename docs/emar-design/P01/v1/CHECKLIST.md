@@ -91,7 +91,7 @@ Legend: **Pass** · **Pass (note)** = passes with a stated limitation · **N/A**
 |---|---|---|
 | No dead or decorative actions or meter blocks; unbuilt things hidden | Pass (note) | Actions that belong to other packages or global chrome say so in a toast (“… — outside this preview”), which is the mockup boundary, not product behaviour. Link-only tabs are the brief’s instruction and are labelled |
 | Synthetic data clearly labelled | Pass | Hatched viewer bar: “mockup viewer — not product UI · Synthetic data”; photos say “synthetic placeholder” |
-| Reference frames owned by other modules | Pass | Transport uses Fleet’s real `FleetCompactHero` as on the live page, with no meter tiles invented (review fix 2); its row action says “Record” (fix 3) |
+| Reference frames owned by other modules | Pass | Transport copies main’s migrated header (`transports/show.tsx` after `cbd9b3ccf`/`75d5f46b8`: profile PageHeader, no meters, Medication Transit and Pre-Transport Check links), with no meter tiles invented (review fix 2); its row action says “Record” (fix 3) |
 | Views approved earlier reused unchanged unless an approved change says otherwise | Pass (note) | P00 v5 states, wording and dialogs reused (blocked reasons, allergy notices, amount paths, witness override, “Recorded and reported”, app-wide banners, My Day card, rostered tasks), restyled with the real components as the brief asks. P01 additions are listed in the README |
 
 ## 3. Process

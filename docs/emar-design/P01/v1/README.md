@@ -44,7 +44,7 @@ Every entry point opens **one** WizardShell dialog — *Safety checks → Record
 | Guided round (`GuidedRoundDialog`) | One tick for identity; no time, allergy or co-signer; window always overridden | A round walker on the Rounds view that opens the shared dialog dose by dose (“Next in the round”) — the separate round dialog retires; `/emar/rounds?guided=` keeps working |
 | MAR one-click “Mark given” (`dose-context-menu`) | Posts “given” with no safety display for non-CD, non-witness, non-observation doses | Offered **only for simple doses** (list below); otherwise “Record dose” and “Why no one-click Mark given?” |
 | Client profile › Record dose (`emar-dialog`) | Its own 9 reasons; no amount; no scheduled time; refuses every offline save | Choose the dose, then the shared dialog; `emar-dialog` retires |
-| Fleet transport › Administer (`transport-medication-dialogs`) | Given only; no time, reasons, allergies or observations; prescribed dose as given | The shared dialog with the transport locked and the pack check kept; one record whichever screen makes it. The row action says **Record**, like every other entry point. The transport header is Fleet’s own `FleetCompactHero`, as on the live page |
+| Fleet transport › Administer (`transport-medication-dialogs`) | Given only; no time, reasons, allergies or observations; prescribed dose as given | The shared dialog with the transport locked and the pack check kept; one record whichever screen makes it. The row action says **Record**, like every other entry point. The transport header is Fleet’s own, copied from the migrated page on main (`cbd9b3ccf`, `75d5f46b8`) |
 | My Day (`/my-day/medications/*/administer|refuse|snooze`, unmounted `stream-context-menu`) | Live routes with no screen (NF-14) | **Retired** (recommended, Q1). My Day shows counts and links; recording opens the shared dialog |
 | Mobile API (`/api/medications/*`) | Its own validation | Must take the same requirements and outcomes (API contract; no screen — web only, D7) |
 
@@ -78,7 +78,7 @@ Sending (row and dialog), Recorded (success pane with “Next due”), Not recor
 The review session inspected `e0a9600ce` and asked for five fixes, all made in this version:
 
 1. My Day no longer repeats a number: the Medicines card drops “Recorded” (Q10 closed by the rule).
-2. Transport: the two link tiles dressed as meters are gone; the header is Fleet’s real `FleetCompactHero` as on the live page; the links are buttons in the Medicines section; no two-line subline or repeated count.
+2. Transport: the two link tiles dressed as meters are gone; the header is Fleet’s own, copied from main’s migrated `transports/show.tsx` (profile PageHeader, “Transport #12”, “in progress”, “Tama Walker · appointment”, the Medication Transit and Pre-Transport Check links — main moved on from `FleetCompactHero` after this branch’s base); the links are buttons in the Medicines section; no two-line subline or repeated count.
 3. Transport row action says “Record” (pack check kept); the Fleet wording question is in Q9.
 4. Meds today subline is one line at 1440 and 1280: “Mon 28 Sep 2026 · Kōwhai House · shift 7:00 am–3:00 pm” (the day stays, per P00 v4). At 1280 the header’s action cluster leaves 332 px, so the time zone moved to the header’s filter row, where “Updated 9:12 am NZDT” shows on every view. Three other captions that truncated at 1280 were shortened (Due now “3 people · by 10:00 am”, Follow-ups “Oldest 11:30 pm Sunday”, My eligibility “To 14 Mar 2027”).
 5. The Late meter caption is “Oldest due 8:00 am”.

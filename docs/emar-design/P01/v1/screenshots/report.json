@@ -1,6 +1,6 @@
 {
   "base": "http://127.0.0.1:4381/",
-  "when": "2026-09-29T08:39:56.296Z",
+  "when": "2026-09-29T18:47:13.284Z",
   "shots": [
     {
       "shot": "01-meds-today-schedule",
@@ -2041,7 +2041,10 @@
       "size": "1440",
       "file": "1440-105-transport.png",
       "overflow": 0,
-      "header": null,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -2050,7 +2053,10 @@
       "size": "1280",
       "file": "1280-105-transport.png",
       "overflow": 0,
-      "header": null,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -2059,7 +2065,10 @@
       "size": "zoom200",
       "file": "zoom200-105-transport.png",
       "overflow": 0,
-      "header": null,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -2068,7 +2077,10 @@
       "size": "1440",
       "file": "1440-106-transport-record.png",
       "overflow": 0,
-      "header": null,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -2077,7 +2089,10 @@
       "size": "1280",
       "file": "1280-106-transport-record.png",
       "overflow": 0,
-      "header": null,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -2086,7 +2101,10 @@
       "size": "zoom200",
       "file": "zoom200-106-transport-record.png",
       "overflow": 0,
-      "header": null,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": []
+      },
       "errors": [],
       "stepError": null
     },

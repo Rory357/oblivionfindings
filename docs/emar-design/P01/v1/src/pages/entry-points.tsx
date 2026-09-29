@@ -23,6 +23,8 @@ import { Card } from '@/components/ui/card';
 import type { DoseStatus, ScheduleRow } from '@/pages/meds/today/types';
 import {
     Activity,
+    Car,
+    ClipboardCheck,
     ClipboardList,
     FileText,
     HeartPulse,
@@ -36,7 +38,6 @@ import {
     Zap,
 } from 'lucide-react';
 import { Link } from '@inertiajs/react';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { useState, type MouseEvent } from 'react';
 import { requirementsFor, type DoseState } from '../contract';
 import { PEOPLE, doseById, type Dose } from '../data';
@@ -314,12 +315,15 @@ export function TransportPage() {
         'inline-flex h-[30px] items-center gap-1.5 rounded-lg border border-primary-foreground/25 bg-primary-foreground/10 px-2.5 text-[12px] font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20';
     return (
         <Shell crumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Fleet & Assets', href: '/fleet-assets' }, { title: 'Transport Logs', href: '/fleet-assets/transports' }, { title: 'Transport #12' }]}>
-            {/* Fleet's own header on transports/show.tsx, rendered with its real component. */}
-            <FleetCompactHero
-                pill="Resident transports · in progress"
+            {/* Fleet's own header, copied from origin/main transports/show.tsx (cbd9b3ccf, 75d5f46b8). */}
+            <PageHeader
+                wrapTitle
+                variant="profile"
+                icon={Car}
                 title="Transport #12"
                 backHref="/fleet-assets/transports"
-                backLabel="Transport Logs"
+                titleChip={<PageHeaderStatusChip variant="info">in progress</PageHeaderStatusChip>}
+                subline="Tama Walker · appointment"
                 actions={
                     <>
                         <Link href={hrefFor('/fleet-assets/transports/12', {}, s.route)} className={linkCls}>
@@ -327,14 +331,14 @@ export function TransportPage() {
                             Medication Transit
                         </Link>
                         <Link href={hrefFor('/fleet-assets/transports/12/pre-check', {}, s.route)} className={linkCls}>
-                            <ClipboardList className="h-3.5 w-3.5" />
+                            <ClipboardCheck className="h-3.5 w-3.5" />
                             Pre-Transport Check
                         </Link>
                     </>
                 }
             />
             <DesignNote title="Reference frame — the transport record is Fleet’s">
-                <p>The header is Fleet’s own (FleetCompactHero, as on the live transport page; its migration is Fleet’s). P01 changes only how a carried dose is recorded: the row’s action opens the same recording steps as Meds today, with the transport locked as context and the pack check kept (today’s scan check). It records against the scheduled 8:00 am dose, so there is one record wherever it’s made — once it has an outcome here, Meds today shows it too, and vice versa. Outcomes are no longer “given” only: a refusal or withhold can be recorded on the trip, with the time and amount given. The button says “Record”, like every other entry point (Fleet may keep “Administer” — README Q9).</p>
+                <p>The header is Fleet’s own, copied from the migrated transport page on main (PageHeader, profile variant). P01 changes only how a carried dose is recorded: the row’s action opens the same recording steps as Meds today, with the transport locked as context and the pack check kept (today’s scan check). It records against the scheduled 8:00 am dose, so there is one record wherever it’s made — once it has an outcome here, Meds today shows it too, and vice versa. Outcomes are no longer “given” only: a refusal or withhold can be recorded on the trip, with the time and amount given. The button says “Record”, like every other entry point (Fleet may keep “Administer” — README Q9).</p>
             </DesignNote>
             <section id="p01-carried" tabIndex={-1} className="flex flex-col gap-2.5 rounded-[14px] outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Medicines carried">
                 <ListCaption
