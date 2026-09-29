@@ -380,13 +380,15 @@ class MedicationAlertService
 
         if ($medication->isExpiringSoon(7)) {
             // Expiring soon is dashboard-only — NOT operational
-            $daysRemaining = (int) now()->startOfDay()->diffInDays($medication->end_date->copy()->startOfDay());
-            $days = Str::plural('day', $daysRemaining);
+            $daysRemaining = $medication->daysUntilEnd();
+            $expires = $daysRemaining === 0
+                ? 'Expires today'
+                : "Expires in {$daysRemaining} ".Str::plural('day', $daysRemaining);
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'expiring_soon',
                 'warning',
-                "{$medication->name}: Expires in {$daysRemaining} {$days} ({$medication->end_date->format('d/m/Y')})",
+                "{$medication->name}: {$expires} ({$medication->end_date->format('d/m/Y')})",
                 $medication->id
             );
 
@@ -716,7 +718,7 @@ class MedicationAlertService
             ))
             ->when(! $canViewControlled, fn ($query) => $query->where('controlled_drug', false))
             ->whereNotNull('end_date')
-            ->where('end_date', '<=', now()->addDays(14))
+            ->where('end_date', '<=', now(config('app.worker_timezone', 'Pacific/Auckland'))->addDays(14)->toDateString())
             ->where('end_date', '>=', now())
             ->with('client:id,first_name,last_name');
 
@@ -736,9 +738,7 @@ class MedicationAlertService
                 'client_id' => $m->client_id,
                 'medication' => $m->name,
                 'expiry_date' => $m->end_date?->toDateString(),
-                'days_remaining' => $m->end_date
-                    ? (int) now()->startOfDay()->diffInDays($m->end_date->copy()->startOfDay())
-                    : null,
+                'days_remaining' => $m->daysUntilEnd(),
             ])->toArray(),
         ];
     }

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 class ClientMedication extends Model
 {
@@ -433,7 +434,8 @@ class ClientMedication extends Model
     }
 
     /**
-     * Check if medication is expiring soon (within 7 days)
+     * Check if medication is expiring soon: not yet expired, and ending
+     * within $days days on the New Zealand calendar
      */
     public function isExpiringSoon(int $days = 7): bool
     {
@@ -441,7 +443,22 @@ class ClientMedication extends Model
             return false;
         }
 
-        return now()->diffInDays($this->end_date, false) <= $days && $this->end_date->isFuture();
+        return $this->end_date->isFuture() && $this->daysUntilEnd() <= $days;
+    }
+
+    /**
+     * Whole days from today on the New Zealand calendar to the end date:
+     * 0 on the order's last day, negative once that day has passed
+     */
+    public function daysUntilEnd(): ?int
+    {
+        if (! $this->end_date) {
+            return null;
+        }
+
+        $today = Carbon::parse(now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString());
+
+        return (int) $today->diffInDays($this->end_date->copy()->startOfDay());
     }
 
     /**

@@ -5,25 +5,35 @@ use App\Models\ClientMedication;
 use App\Models\MedicationDashboardAlert;
 use App\Models\Site;
 use App\Services\MedicationAlertService;
+use App\Services\MedicationSafetyService;
 use Illuminate\Support\Carbon;
 
 /*
- * Carbon 3's diffInDays() is signed and fractional, so measuring from the end
- * date back to now showed "Expires in -2.9166666666667 days". Days remaining
- * are whole calendar days from today until the order's end date.
+ * Days remaining on a medication order are whole days on the New Zealand
+ * calendar, from today to the order's end date (its last day). The app clock
+ * is UTC, so from midnight to noon in New Zealand the UTC date is still
+ * yesterday, and counting from it read one day high every morning.
  */
-
-beforeEach(function () {
-    // 2 pm NZ on 8 June (02:00 UTC), so the NZ and UTC dates agree.
-    Carbon::setTestNow(Carbon::parse('2026-06-08 14:00:00', 'Pacific/Auckland')->utc());
-});
 
 afterEach(function () {
     Carbon::setTestNow();
 });
 
-function medicationOrderEndingOn(Site $site, string $endDate): ClientMedication
+// 8 June is NZST (UTC+12): at 1 am the UTC date is still 7 June.
+dataset('new zealand clock on 8 june', [
+    '1 am' => '2026-06-08 01:00:00',
+    '2 pm' => '2026-06-08 14:00:00',
+    '11:30 pm' => '2026-06-08 23:30:00',
+]);
+
+function freezeNzClock(string $nzDateTime): void
 {
+    Carbon::setTestNow(Carbon::parse($nzDateTime, 'Pacific/Auckland')->utc());
+}
+
+function medicationOrderEndingOn(string $endDate): ClientMedication
+{
+    $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
     $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
 
     return ClientMedication::factory()->create([
@@ -42,31 +52,82 @@ function medicationOrderEndingOn(Site $site, string $endDate): ClientMedication
     ]);
 }
 
-it('tells staff how many whole days are left before an order expires', function (string $endDate, string $message) {
-    $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
-    $order = medicationOrderEndingOn($site, $endDate);
-
+function expiringSoonAlertMessage(ClientMedication $order): ?string
+{
     app(MedicationAlertService::class)->generateClientAlerts($order->client);
 
-    $alert = MedicationDashboardAlert::query()
+    return MedicationDashboardAlert::query()
         ->where('client_medication_id', $order->id)
         ->where('alert_type', 'expiring_soon')
-        ->firstOrFail();
+        ->value('message');
+}
 
-    expect($alert->message)->toBe($message);
-})->with([
+it('tells staff how many days are left on an order, counted on the New Zealand calendar', function (string $nzNow, string $endDate, string $message) {
+    freezeNzClock($nzNow);
+
+    expect(expiringSoonAlertMessage(medicationOrderEndingOn($endDate)))->toBe($message);
+})->with('new zealand clock on 8 june')->with([
     'three days' => ['2026-06-11', 'Risperidone: Expires in 3 days (11/06/2026)'],
     'one day' => ['2026-06-09', 'Risperidone: Expires in 1 day (09/06/2026)'],
 ]);
 
-it('gives the expiring-medications widget whole days remaining', function () {
-    $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
-    $order = medicationOrderEndingOn($site, '2026-06-11');
+it('says an order expires today on its last day', function () {
+    freezeNzClock('2026-06-08 01:00:00');
+    $order = medicationOrderEndingOn('2026-06-08');
 
-    $widgets = app(MedicationAlertService::class)->getGlobalDashboardWidgets(siteIds: [$site->id]);
+    expect($order->daysUntilEnd())->toBe(0)
+        ->and($order->isExpiringSoon())->toBeTrue()
+        ->and(expiringSoonAlertMessage($order))->toBe('Risperidone: Expires today (08/06/2026)');
+});
+
+it('gives the expiring-medications widget days remaining on the New Zealand calendar', function (string $nzNow) {
+    freezeNzClock($nzNow);
+    $order = medicationOrderEndingOn('2026-06-11');
+
+    $widgets = app(MedicationAlertService::class)->getGlobalDashboardWidgets(siteIds: [$order->client->site_id]);
     $item = collect($widgets['expiring_medications']['items'])->firstWhere('id', $order->id);
 
     expect($item)->not->toBeNull()
         ->and($item['expiry_date'])->toBe('2026-06-11')
         ->and($item['days_remaining'])->toBe(3);
-});
+})->with('new zealand clock on 8 june');
+
+it('lists orders ending within 14 days on the New Zealand calendar in the widget', function (string $nzNow) {
+    freezeNzClock($nzNow);
+    $lastListed = medicationOrderEndingOn('2026-06-22');
+    $notListed = medicationOrderEndingOn('2026-06-23');
+
+    $widgets = app(MedicationAlertService::class)->getGlobalDashboardWidgets(
+        siteIds: [$lastListed->client->site_id, $notListed->client->site_id],
+    );
+    $items = collect($widgets['expiring_medications']['items']);
+
+    expect($items->pluck('id')->all())->toBe([$lastListed->id])
+        ->and($items->first()['days_remaining'])->toBe(14);
+})->with('new zealand clock on 8 june');
+
+it('reports days remaining in the administration safety check on the New Zealand calendar', function (string $nzNow) {
+    freezeNzClock($nzNow);
+    $order = medicationOrderEndingOn('2026-06-11');
+
+    $result = app(MedicationSafetyService::class)->performSafetyCheck($order->client, $order);
+    $expiring = collect($result['warnings'])->firstWhere('type', 'expiring_soon');
+
+    expect($expiring)->not->toBeNull()
+        ->and($expiring['details'])->toBe(['expiry_date' => '2026-06-11', 'days_remaining' => 3]);
+})->with('new zealand clock on 8 june');
+
+it('keeps the expiring-soon window and the day count on the same calendar', function (string $nzNow) {
+    freezeNzClock($nzNow);
+    $endingIn = fn (int $days) => (new ClientMedication)->forceFill([
+        'end_date' => now(config('app.worker_timezone'))->addDays($days)->toDateString(),
+    ]);
+
+    expect($endingIn(1)->daysUntilEnd())->toBe(1)
+        ->and($endingIn(1)->isExpiringSoon())->toBeTrue()
+        ->and($endingIn(7)->daysUntilEnd())->toBe(7)
+        ->and($endingIn(7)->isExpiringSoon())->toBeTrue()
+        ->and($endingIn(8)->daysUntilEnd())->toBe(8)
+        ->and($endingIn(8)->isExpiringSoon())->toBeFalse()
+        ->and((new ClientMedication)->daysUntilEnd())->toBeNull();
+})->with('new zealand clock on 8 june');
