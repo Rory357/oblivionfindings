@@ -280,6 +280,44 @@ test('performSafetyCheck has no dose warning when dose is within range', functio
     expect($doseWarnings)->toHaveCount(0);
 });
 
+test('performSafetyCheck reports days remaining as whole calendar days until the order ends', function () {
+    // 2 pm NZ on 8 June (02:00 UTC): the order ends in three calendar days,
+    // but a raw Carbon 3 diff from the end date back to now is -2.9166...
+    Carbon::setTestNow(Carbon::parse('2026-06-08 14:00:00', 'Pacific/Auckland')->utc());
+
+    try {
+        $client = Mockery::mock(Client::class)->makePartial();
+        $client->id = 1;
+
+        $medication = Mockery::mock(ClientMedication::class)->makePartial();
+        $medication->setRawAttributes([
+            'id' => 1,
+            'name' => 'Risperidone',
+            'is_prn' => false,
+            'high_risk' => false,
+            'controlled_drug' => false,
+            'end_date' => '2026-06-11',
+        ]);
+        $medication->shouldReceive('isActive')->andReturn(true);
+        $medication->shouldReceive('isExpired')->andReturn(false);
+        $medication->shouldReceive('isExpiringSoon')->andReturn(true);
+
+        $service = Mockery::mock(MedicationSafetyService::class)->makePartial();
+        $service->shouldReceive('checkAllergies')->andReturn(['has_match' => false, 'matches' => [], 'allergy_count' => 0]);
+        $service->shouldReceive('checkDuplicates')->andReturn(['has_duplicate' => false, 'duplicates' => []]);
+        $service->shouldReceive('checkInteractions')->andReturn(['has_interaction' => false, 'interactions' => []]);
+
+        $result = $service->performSafetyCheck($client, $medication, Carbon::now());
+
+        $expiring = collect($result['warnings'])->firstWhere('type', 'expiring_soon');
+        expect($expiring)->not->toBeNull()
+            ->and($expiring['details']['expiry_date'])->toBe('2026-06-11')
+            ->and($expiring['details']['days_remaining'])->toBe(3);
+    } finally {
+        Carbon::setTestNow();
+    }
+});
+
 test('performSafetyCheck preserves controlled counterpart safety decisions while concealing identity', function () {
     $client = Mockery::mock(Client::class)->makePartial();
     $client->id = 1;

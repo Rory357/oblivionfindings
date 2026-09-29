@@ -244,7 +244,7 @@ class MedicationSafetyService
                 'message' => "Expiring soon: This medication expires on {$medication->end_date->format('d/m/Y')}",
                 'details' => [
                     'expiry_date' => $medication->end_date->toDateString(),
-                    'days_remaining' => $medication->end_date->diffInDays(now()),
+                    'days_remaining' => (int) now()->startOfDay()->diffInDays($medication->end_date->copy()->startOfDay()),
                 ],
             ];
         }
