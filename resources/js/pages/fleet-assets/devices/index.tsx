@@ -2,6 +2,14 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,14 +26,7 @@ import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/fleet-utils';
 import { cn } from '@/lib/utils';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     Battery,
@@ -619,78 +620,59 @@ export default function DevicesIndex({
             <Head title="Tracking Devices" />
             <PageShell>
                 {/* ── Hero ── */}
-                <HeroShell>
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={Radio} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Device registry · canonical
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Tracking Devices
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                GPS trackers and IoT devices paired to assets,
-                                with tracking consent.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
-                                label="Online"
-                                value={fmt(onlineCount)}
-                                caption={`of ${fmt(totalDevices)} devices`}
-                                tone={onlineCount > 0 ? 'success' : 'neutral'}
-                            />
-                            <HeroClusterTile
-                                label="Low battery"
-                                value={fmt(lowBatteryCount)}
-                                caption="20% or less"
-                                tone={
-                                    lowBatteryCount > 0 ? 'warning' : 'success'
+                <PageHeader
+                    wrapTitle
+                    title="Tracking Devices"
+                    icon={Radio}
+                    subline={
+                        <>
+                            GPS trackers and paired devices · {fmt(onlineCount)}{' '}
+                            online · {fmt(lowBatteryCount)} low battery ·{' '}
+                            {fmt(unpairedCount)} unpaired
+                        </>
+                    }
+                    actions={
+                        <>
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
+                                onClick={() => {
+                                    setPairStepIndex(0);
+                                    setDialogOpen(true);
+                                }}
+                            >
+                                Pair device
+                            </PageHeaderPrimaryButton>
+                            <PageHeaderGlassButton
+                                icon={Download}
+                                onClick={() =>
+                                    window.location.assign(
+                                        '/fleet-assets/devices?export=csv',
+                                    )
                                 }
-                            />
-                            <HeroClusterTile
+                            >
+                                Export CSV
+                            </PageHeaderGlassButton>
+                        </>
+                    }
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
                                 label="Consent granted"
-                                value={fmt(consentGranted)}
-                                caption={
-                                    consentBlocked > 0
-                                        ? `${fmt(consentBlocked)} blocked`
-                                        : 'none blocked'
-                                }
+                                onClick={() => switchTab('consent')}
                                 tone={
                                     consentBlocked > 0 ? 'warning' : 'success'
                                 }
-                            />
-                            <HeroClusterTile
-                                label="Unpaired"
-                                value={fmt(unpairedCount)}
-                                caption="no asset linked"
-                                tone={unpairedCount > 0 ? 'warning' : 'success'}
-                            />
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                            unstyled
-                            type="button"
-                            onClick={() => {
-                                setPairStepIndex(0);
-                                setDialogOpen(true);
-                            }}
-                            className="inline-flex h-[34px] items-center gap-2 rounded-lg bg-primary-foreground px-3.5 text-[12.5px] font-extrabold text-primary shadow-sm transition-colors hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
-                        >
-                            <Plus className="h-[15px] w-[15px]" />
-                            Pair device
-                        </Button>
-                        <FleetHeroAction
-                            href="/fleet-assets/devices?export=csv"
-                            icon={Download}
-                            external
-                        >
-                            Export CSV
-                        </FleetHeroAction>
-                    </div>
-                </HeroShell>
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(consentGranted)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    view consent records
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
+                />
 
                 {/* ── Tab strip ── */}
                 <div className="inline-flex w-fit items-center gap-1 rounded-lg border bg-muted/40 p-1">

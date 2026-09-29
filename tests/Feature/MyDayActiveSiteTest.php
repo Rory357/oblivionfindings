@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
@@ -33,16 +34,17 @@ it('exposes the active shift site with every co-resident', function () {
         'first_name' => 'Margaret',
         'last_name' => 'Hewitt',
     ]);
-    Client::factory()->create([
+    $hone = Client::factory()->create([
         'site_id' => $site->id,
         'first_name' => 'Hone',
         'last_name' => 'Tāmati',
     ]);
-    Client::factory()->create([
+    $aroha = Client::factory()->create([
         'site_id' => $site->id,
         'first_name' => 'Aroha',
         'last_name' => 'Lee',
     ]);
+    assignMyDayActiveSiteWorker($worker, $site, $margaret, $hone, $aroha);
 
     $start = Carbon::now('Pacific/Auckland')->setTime(9, 0);
     Shift::factory()
@@ -67,6 +69,43 @@ it('exposes the active shift site with every co-resident', function () {
         );
 });
 
+it('only lists the co-residents the worker may view', function () {
+    $worker = User::factory()->frontlineWorker()->create();
+    $site = Site::factory()->create(['name' => 'Rimu House', 'type' => 'house']);
+    $supported = Client::factory()->create([
+        'site_id' => $site->id,
+        'first_name' => 'Margaret',
+        'last_name' => 'Hewitt',
+    ]);
+    Client::factory()->create([
+        'site_id' => $site->id,
+        'first_name' => 'Unsupported',
+        'last_name' => 'Housemate-Private',
+    ]);
+    assignMyDayActiveSiteWorker($worker, $site, $supported);
+
+    $start = Carbon::now('Pacific/Auckland')->setTime(9, 0);
+    Shift::factory()
+        ->assignedToday($worker, $start)
+        ->inProgress()
+        ->create([
+            'client_id' => $supported->id,
+            'site_id' => $site->id,
+        ]);
+
+    $response = $this->actingAs($worker)
+        ->get('/my-day')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('my-day/index')
+            ->where('active_shift.site.id', $site->id)
+            ->has('active_shift.site.residents', 1)
+            ->where('active_shift.site.residents.0.id', $supported->id)
+        );
+
+    expect($response->getContent())->not->toContain('Housemate-Private');
+});
+
 it('uses the open attendance session shift as the active site shift after the UTC date rolls over', function () {
     Carbon::setTestNow(Carbon::parse('2026-05-23 17:30:00', 'Pacific/Auckland'));
 
@@ -77,11 +116,12 @@ it('uses the open attendance session shift as the active site shift after the UT
         'first_name' => 'Margaret',
         'last_name' => 'Hewitt',
     ]);
-    Client::factory()->create([
+    $hone = Client::factory()->create([
         'site_id' => $site->id,
         'first_name' => 'Hone',
         'last_name' => 'Tamati',
     ]);
+    assignMyDayActiveSiteWorker($worker, $site, $client, $hone);
 
     $start = Carbon::parse('2026-05-23 09:00:00', 'Pacific/Auckland');
     $shift = Shift::factory()
@@ -123,6 +163,7 @@ it('does not let an unsupported legacy active shift displace a clockable schedul
         'first_name' => 'Margaret',
         'last_name' => 'Hewitt',
     ]);
+    assignMyDayActiveSiteWorker($worker, $site);
 
     Shift::factory()->create([
         'user_id' => $worker->id,
@@ -158,10 +199,16 @@ it('exposes active shift site checklists and clears them after completion', func
     $worker->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
 
     $site = Site::factory()->create(['name' => 'Rimu House', 'type' => 'house']);
+    // Pin the employment dates: the factory's random start_date comes from the
+    // real clock and can land after the frozen test date, which made this test
+    // flaky (the worker had no current Site, so no active shift).
     HrEmployeeProfile::factory()->create([
         'user_id' => $worker->id,
         'primary_site_id' => $site->id,
         'secondary_site_ids' => [],
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+        'is_active' => true,
     ]);
     $client = Client::factory()->create([
         'site_id' => $site->id,
@@ -232,7 +279,15 @@ it('returns null active_shift.site when the worker is not on a site shift', func
 
 it('still works on a 1:1 shift without a site relationship', function () {
     $worker = User::factory()->frontlineWorker()->create();
-    $client = Client::factory()->create(['first_name' => 'Margaret', 'last_name' => 'Hewitt']);
+    // The shift carries no site_id; Site scope resolves it through the
+    // client's home Site instead.
+    $site = Site::factory()->create();
+    $client = Client::factory()->create([
+        'site_id' => $site->id,
+        'first_name' => 'Margaret',
+        'last_name' => 'Hewitt',
+    ]);
+    assignMyDayActiveSiteWorker($worker, $site, $client);
 
     $start = Carbon::now('Pacific/Auckland')->setTime(9, 0);
     Shift::factory()
@@ -264,6 +319,38 @@ it('hue helper matches the TS implementation byte-for-byte for known inputs', fu
     expect(ResidentHue::initials('Aroha', 'Lee'))->toBe('AL');
     expect(ResidentHue::initials(null, null))->toBe('');
 });
+
+/**
+ * My Day only resolves shifts at Sites where the worker is currently
+ * employed, and only lists residents the worker may view (ClientPolicy::view).
+ * Seeded support workers hold clients.viewAssigned, so the fixture does too.
+ */
+function assignMyDayActiveSiteWorker(User $worker, Site $site, Client ...$supportedClients): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+
+    if ($supportedClients === []) {
+        return;
+    }
+
+    $permission = Permission::query()->firstOrCreate(
+        ['key' => 'clients.viewAssigned'],
+        ['description' => 'clients.viewAssigned'],
+    );
+    $worker->permissionOverrides()->syncWithoutDetaching([
+        $permission->id => ['allowed' => true],
+    ]);
+    foreach ($supportedClients as $client) {
+        $client->supportWorkers()->attach($worker->id);
+    }
+}
 
 function makeMyDayChecklistRun(Site $site, User $worker): array
 {

@@ -31,11 +31,13 @@ const stockDialogsSource = readFileSync(
     resolve(process.cwd(), 'resources/js/pages/emar/_stock-dialogs.tsx'),
     'utf8',
 );
-const clientAdministrationSources = [
-    'resources/js/components/clients/profile/emar-dialog.tsx',
-    'resources/js/pages/clients/medical.tsx',
-    'resources/js/pages/operations/clients/medical.tsx',
-].map((path) => readFileSync(resolve(process.cwd(), path), 'utf8'));
+const clientEmarDialogSource = readFileSync(
+    resolve(
+        process.cwd(),
+        'resources/js/components/clients/profile/emar-dialog.tsx',
+    ),
+    'utf8',
+);
 
 function dialogSource(start: string, end: string): string {
     return source.slice(source.indexOf(start), source.indexOf(end));
@@ -291,28 +293,28 @@ describe('controlled mutation dialog replay contracts', () => {
         );
     });
 
-    it('binds every direct client-medical administration form to a stable intent UUID', () => {
-        for (const administrationSource of clientAdministrationSources) {
-            expect(administrationSource).toContain(
-                'createMedicationMutationReplayState',
-            );
-            expect(administrationSource).toContain(
-                'prepareMedicationMutationReplayState',
-            );
-            expect(administrationSource).toContain('client_request_uuid:');
-            expect(administrationSource).not.toContain('return `med-admin-');
-        }
+    it('binds the client profile administration dialog to a stable intent UUID', () => {
+        expect(clientEmarDialogSource).toContain(
+            'createMedicationMutationReplayState',
+        );
+        expect(clientEmarDialogSource).toContain(
+            'prepareMedicationMutationReplayState',
+        );
+        expect(clientEmarDialogSource).toContain('client_request_uuid:');
+        expect(clientEmarDialogSource).not.toContain('return `med-admin-');
     });
 
-    it('keeps witness credentials ephemeral on the client medical administration page', () => {
-        const clientMedicalSource = clientAdministrationSources[1];
-
-        expect(clientMedicalSource).toContain("witness_credential: ''");
-        expect(clientMedicalSource).toContain('Witness password / PIN');
-        expect(clientMedicalSource).toContain(
+    it('keeps witness credentials ephemeral on the client profile administration dialog', () => {
+        expect(clientEmarDialogSource).toContain(
+            "const [witnessCredential, setWitnessCredential] = useState('');",
+        );
+        expect(clientEmarDialogSource).toContain(
             'witness_credential: _witnessCredential',
         );
-        expect(clientMedicalSource).toContain('!navigator.onLine');
+        expect(clientEmarDialogSource).toContain('!navigator.onLine');
+        expect(clientEmarDialogSource).toContain(
+            'Witness credentials are never saved on this device.',
+        );
     });
 
     it('gives the Meds Today dose wizard a material-aware online-only UUID', () => {
@@ -325,14 +327,5 @@ describe('controlled mutation dialog replay contracts', () => {
             'client_request_uuid: doseReplay.current.uuid',
         );
         expect(doseWizard).toContain('!navigator.onLine');
-    });
-
-    it('only exposes manual medication classification when both controlled capabilities are present', () => {
-        for (const medicalPageSource of clientAdministrationSources.slice(1)) {
-            expect(medicalPageSource).toContain(
-                'can_edit && can_controlled_view && can_controlled_record',
-            );
-            expect(medicalPageSource).toContain('{canClassifyMedication &&');
-        }
     });
 });

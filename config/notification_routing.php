@@ -72,6 +72,7 @@ return [
 
         // --- Audit & Safety ---
         'breakglass.daily_report' => [
+            'include_managers' => false,
             'target_groups' => ['managers_core', 'auditors'],
         ],
         'incidents.high_unreviewed_reminder' => [

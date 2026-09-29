@@ -8,6 +8,7 @@ use App\Models\Asset;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
+use App\Models\ClientEmergencyContact;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
@@ -46,6 +47,30 @@ class ResidentTransportJourneySecurityTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
+    }
+
+    public function test_pre_check_reads_emergency_contact_relationship_from_canonical_schema(): void
+    {
+        $site = Site::factory()->create();
+        $viewer = $this->siteUser($site, ['fleet.viewAny', 'clients.viewAny']);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $vehicle = $this->vehicle($site, 'Pre-check vehicle');
+        $transport = $this->transport($site, $client, $vehicle, $viewer);
+        ClientEmergencyContact::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Test contact',
+            'relationship' => 'sibling',
+            'phone' => '0210000000',
+        ]);
+
+        $this->actingAs($viewer)
+            ->get("/fleet-assets/transports/{$transport->id}/pre-check")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('fleet-assets/transports/pre-check')
+                ->where('emergency_contacts.0.name', 'Test contact')
+                ->where('emergency_contacts.0.relation', 'sibling')
+                ->where('emergency_contacts.0.phone', '0210000000'));
     }
 
     public function test_site_viewer_gets_only_their_transport_matrix_and_global_transport_role_is_explicitly_positive(): void

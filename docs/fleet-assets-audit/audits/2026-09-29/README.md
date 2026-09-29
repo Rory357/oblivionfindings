@@ -1,5 +1,7 @@
 # Fleet implementation integration audit — 29 September 2026
 
+Follow-up: [30 September release and CI assessment](../2026-09-30/release-follow-up.md) establishes the actual server deployment, corrects the Fleet/Device handoff, supersedes the earlier incomplete CI classification, and records the user-deferred hosted/125% acceptance checks.
+
 This audit covers the integrated Fleet & Assets programme, related reporting and People Locations regressions, and the three recent correction sessions. It verifies publication and exercised behaviour; it is not a claim that every Fleet page has completed visual acceptance.
 
 ## Publication provenance
