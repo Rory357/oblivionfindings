@@ -14,11 +14,13 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Notifications\AppEventNotification;
 use App\Services\NotificationService;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Notification;
 use Mockery;
 use Tests\TestCase;
 
@@ -28,6 +30,8 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
 
     protected User $operator;
 
+    protected Site $site;
+
     protected Client $client;
 
     protected ClientMedication $medication;
@@ -36,11 +40,11 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
     {
         parent::setUp();
 
-        Carbon::setTestNow(Carbon::parse('2026-07-01 08:10:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-07-01 08:10:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
         Cache::flush();
 
-        $site = Site::factory()->create([
+        $this->site = $site = Site::factory()->create([
             'name' => 'Operations eMAR Home',
             'is_active' => true,
         ]);
@@ -72,12 +76,22 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
             'created_by' => $this->operator->id,
             'updated_by' => $this->operator->id,
         ]);
+        // A bare `passed` row reads as unassessed: signing "given" needs a
+        // declared, acknowledged assessment by someone other than the worker.
+        $assessor = User::factory()->create([
+            'role' => 'manager',
+            'approved_at' => now(),
+        ]);
         MedicationCompetencyAssessment::query()->create([
             'user_id' => $this->operator->id,
+            'assessor_id' => $assessor->id,
             'assessment_type' => 'annual',
             'status' => 'passed',
-            'assessment_date' => today(),
-            'expiry_date' => today()->addYear(),
+            'assessment_date' => now()->subMonth()->toDateString(),
+            'expiry_date' => now()->addYear()->toDateString(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'can_administer_unsupervised' => true,
         ]);
 
         $serviceContext = ServiceContext::factory()->create([
@@ -129,11 +143,39 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
         parent::tearDown();
     }
 
+    private function siteColleague(): User
+    {
+        $colleague = User::factory()->create([
+            'role' => 'support_worker',
+            'approved_at' => now(),
+        ]);
+        $colleague->roles()->syncWithoutDetaching([
+            Role::query()->where('name', 'support_worker')->firstOrFail()->id,
+        ]);
+        $colleague->permissionOverrides()->sync([
+            Permission::query()->where('key', 'medications.administer.record')->value('id') => ['allowed' => true],
+        ]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $colleague->id,
+            'position_role' => 'support_worker',
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $colleague->id,
+            'updated_by' => $colleague->id,
+        ]);
+
+        return $colleague;
+    }
+
     public function test_duplicate_client_request_uuid_returns_cached_response_without_second_write(): void
     {
-        $notification = Mockery::mock(NotificationService::class);
-        $notification->shouldReceive('notifyCrud')->once()->andReturnNull();
-        $this->app->instance(NotificationService::class, $notification);
+        // Administrations notify Site colleagues who record doses (not via
+        // notifyCrud); the duplicate replay must not notify them again.
+        Notification::fake();
+        $colleague = $this->siteColleague();
 
         $scheduledFor = Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))->setTime(8, 0);
         $payload = [
@@ -174,6 +216,7 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
         $this->assertDatabaseHas('client_medication_administrations', [
             'client_request_uuid' => $payload['client_request_uuid'],
         ]);
+        Notification::assertSentToTimes($colleague, AppEventNotification::class, 1);
     }
 
     public function test_offline_replay_conflicts_with_existing_scheduled_record(): void
