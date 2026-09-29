@@ -5,6 +5,7 @@
 - Version: v4, 29 September 2026 (NZDT). Baseline `52dafa672`, branch `claude/vigilant-mclaren-233129`.
 - Exact file identity: [`VERSION.txt`](VERSION.txt) (SHA-256 of each mockup file). Approval applies to those hashes only.
 - Everything in the [v3 README](../v3/README.md) still applies unless changed below.
+- The P0 fixes are accepted and live on main (`c2838f86a`), including the P00 v2 copy fixes (`f5c97b770`) and NF-25 (`4a5f2f238`).
 - Design only: no application code, routes, schema, seeders, configuration, DESIGN.md or design_styles changed.
 
 ## What changed from v3
@@ -26,13 +27,13 @@ Stephan's answers of 29 September 2026 (relayed by the review session), plus his
 3. **Medication rules** replaces "Administration rules" (same URL, `/emar/settings`).
    - A plain-language rule builder (WizardShell) with a live preview, overlap warnings, Active/Paused, a confirm step and change history. Existing rules keep their meaning (countersign and/or observations; name, route or NZULM code). New: type/class matching (needs a medicine classification) and controlled-status matching.
    - Alongside: the allergy rule, restricted competency (showing the review recommendation), the area rule, the amount rule (Stephan's decision), the witness default and a summary of the PIN rules.
-4. **Restricted competency:** the recommendation (Co-signer with witness PIN; Block — showing who on shift can give it — until the PIN is built; never a login password) is shown. The value is still Stephan's (NF-03).
+4. **Safety rules show Stephan’s values** (29 September 2026): restricted competency Block (the dialog shows who on shift can give it), areas Block when failed, allergy Warn (whether to adopt mode 3 is still open). The recommendation to move restricted competency to Co-signer with witness PIN once the PIN is built — never a login password — is shown beside it.
 5. **Witness PIN page moved** from My HR to the account settings, next to Password and Two-Factor Authentication.
 6. **Rostered medication work reaches All Tasks and My Calendar** (Stephan: "these emar schedules [should] form part of the to do automatically to rostered staff").
    - One task per time slot per house for everyone rostered on a covering shift. It uses the same schedule and counts as Meds today, and it completes by itself when every dose has an outcome.
    - The same slots appear in My Calendar's Meds source, following CALENDAR_STYLE_GUIDE.
 7. **Meds today** stays a worklist, and its header now states the viewed day (see "Schedule and the calendar rules" below).
-8. The main /dashboard medication widget uses the same maths (NF-25, commit `4a5f2f238`, not yet accepted), so the v3 open item is closed.
+8. The main /dashboard medication widget uses the same maths (NF-25, commit `4a5f2f238`, live on main), so the v3 open item is closed.
 
 ## Schedule and the calendar rules
 
@@ -120,11 +121,10 @@ Then open http://127.0.0.1:4360/.
 - **Who grants witness overrides (D8):** reuse `medications.controlled.override` (today "override controlled drug discrepancy blocks") or add a new key. Recommendation: a new key.
 - Also open under D8: the longest override (Not configured), and whether managers see the roster suggestion (proposed).
 - **Rostered medication tasks (D2/D12):** who owns a slot when several staff cover the same house (proposal: everyone rostered sees it; a round's assignee or a lead narrows it). Should overdue alerts go to rostered staff and the house lead, not only a round's assignee?
-- **Restricted competency value (NF-03):** recommendation shown, not applied.
+- **Restricted competency later (NF-03):** Block is set; the recommendation is to move to Co-signer with witness PIN once the PIN is built.
 - Still pending, not treated as decided:
-  - the allergy-match mode
-  - the 7 copy fixes for the P0 code
-  - NF-26
+  - the allergy-match mode (Warn is set; mode 3, prescriber-confirmed, is still open)
+  - NF-26 (Stephan chose the fallback and test fix; no commit found on main yet)
   - PIN numbers
   - D2 / D5–D7 / D9 / D11 / D12, and proposed D13
 
