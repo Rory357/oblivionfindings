@@ -1,5 +1,7 @@
 # P11 v1 — approval record
 
+> **Withdrawn by Stephan the same day. See "Withdrawn, 29 September 2026" at the end. The replacement is `docs/emar-design/P11/v2/`.**
+
 **Approved, 29 September 2026 (NZDT), exactly as committed in `c13048324`.**
 
 - In this session Stephan said the review session ("main") would give the approval.
@@ -50,3 +52,13 @@ No v2 was asked for. Answer 1 changes an approved P00 view slightly; the others 
 - P11 is built after PIN-1 lands, because only one session writes application code at a time.
 - Nothing is implemented until the review session releases it.
 - The next design package is P01 (recording a dose). It starts only when Stephan asks for it.
+
+## Withdrawn, 29 September 2026
+
+**Stephan withdrew this approval the same day**, after he saw the mockup for the first time. His words: "i dont approve this design their is no toggle switches on off it is difficult to navigate and the modals is not following the rules. Please look at the fleet settings for a bit more inspiration".
+
+- v1 stays frozen as a record. Its files and hashes are unchanged; only this note is added.
+- The replacement is **P11 v2**, in `docs/emar-design/P11/v2/`. It is a Vite + React preview on the app's real components, which is the review session's mandatory method.
+- The 21 answers above carry into v2, except **answer 15**. On 29 September Stephan decided that managers set who gets each alert: one set for every house, plus extra people a house manager adds for their own house.
+- He also decided that settings are shown as cards, while lists of records stay tables.
+- Lesson recorded: show Stephan the mockup in his browser before asking for approval.
