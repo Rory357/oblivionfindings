@@ -777,7 +777,7 @@ function LinkIncidentPane({
     const submit = (e: FormEvent) => {
         e.preventDefault();
         // Inertia's useForm().transform() does not support chaining in this version —
-        // set the transform, then post on a separate statement (see clients/medical.tsx).
+        // set the transform, then post on a separate statement.
         form.transform((data) => ({
             related_incident_id:
                 data.related_incident_id && data.related_incident_id !== NONE
