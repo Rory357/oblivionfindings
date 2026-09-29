@@ -22,7 +22,16 @@
     },
     "viteProductionBuild": "passed after substantive source changes; only the existing large-chunk advisory",
     "gitDiffCheck": "passed",
-    "activeLegacyComponentSearch": "no references in the 26 converted pages; the remaining references are two inactive branches and legacy component definitions"
+    "activeLegacyComponentSearch": "no references in the 26 converted pages; the remaining references are two inactive branches and legacy component definitions",
+    "detailContinuation": {
+      "typescript": "passed: tsc --noEmit",
+      "phpRegression": "passed: pre-check emergency contact relationship, 1 test, 16 assertions",
+      "phpSyntax": "passed on controller and test",
+      "eslint": "passed on two edited detail TSX pages",
+      "prettier": "passed on two edited detail TSX pages",
+      "viteProductionBuild": "passed after banner wrapping fixes",
+      "gitDiffCheck": "passed"
+    }
   },
   "browser": {
     "origin": "http://127.0.0.1:8797",
@@ -53,7 +62,7 @@
       "maintenance/checklists/run",
       "trips/playback"
     ],
-    "recordAndProcessPagesWithoutMatchingSyntheticFixture": [
+    "recordAndProcessPagesWithoutMatchingSyntheticFixtureInFirstSweep": [
       "drivers/show",
       "handovers/show",
       "inspections/show",
@@ -62,6 +71,33 @@
       "transports/pre-check",
       "transports/show"
     ],
+    "fixtureBackedContinuation": {
+      "origin": "http://127.0.0.1:8798",
+      "assetSource": "local production Vite manifest; no public/hot",
+      "database": "isolated synthetic Fleet MySQL schema with North and South records",
+      "signIn": "normal Laravel login with synthetic manager and North-site read-only viewer",
+      "northPagesRendered": [
+        "drivers/show",
+        "handovers/show",
+        "inspections/show",
+        "outings/show",
+        "resident-tracking/history",
+        "transports/pre-check",
+        "transports/show"
+      ],
+      "northPageResult": "all seven rendered one shared header and one main heading without document overflow at the narrow browser viewport",
+      "residentHistoryPrivacy": "active consent and assignment were rechecked asynchronously before the North tracker became visible; no movement points existed",
+      "southDirectObjectDenial": "six 404 responses; handover returned the existing tested 403 site denial; no South record content appeared",
+      "narrowViewport": {
+        "override": "390x844",
+        "measuredCssDocumentWidth": "approximately 300–312 pixels on this host",
+        "documentOverflowAfterFix": false
+      },
+      "discoveredAndFixed": [
+        "transport pre-check selected nonexistent emergency-contact relation column; now reads canonical relationship and maps to the existing UI prop",
+        "inspection and transport detail result/status banners wrapped at narrow width"
+      ]
+    },
     "narrowViewport": {
       "overrideWidth": 375,
       "measuredCssWidth": "288–300 depending on page and host device pixel ratio",
@@ -82,9 +118,11 @@
     "zoom125Percent": "not independently established: host device pixel ratio and viewport override are not proof of browser zoom"
   },
   "external": {
-    "hostedCom": "Authenticated deployment and visual acceptance on oblivionfindings.com were not available in the local browser session; the public URL redirected to login.",
+    "hostedCom": "Authenticated Chrome showed the older gradient Fleet bookings hero and app-DpCHbvaC.js; the pushed shared-header revision was not deployed. Hosted visual acceptance remains open.",
     "googleProvider": "Live Google Maps, Places, Geocoding and Routes were not called; project configuration and billing remain outside this local synthetic check.",
-    "previousMainGitHubActions": "For dab1531, public Actions showed visual-regression, linter and tests failed while database-bootstrap passed; detailed failing logs required GitHub sign-in.",
+    "previousMainGitHubActions": "For dab1531, visual-regression, linter and tests failed while database-bootstrap passed.",
+    "currentMainGitHubActions": "For cbd9b3c, database-bootstrap passed; full-repository lint failed with 3,340 problems, tests failed first in unrelated modules, and captured visual failures were non-Fleet snapshots. No Fleet regression was identified in captured logs; later Fleet test execution was not established.",
+    "deployment": "No repository deployment workflow or configured server access, backup/recovery point and reviewed release window were established; scripts/deploy-server.sh is a broad server-side release operation. No hosted deployment performed.",
     "applicationWideGreen": false
   }
 }
