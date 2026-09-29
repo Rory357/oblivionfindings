@@ -63,8 +63,12 @@ const dialogs = hits(/\bwindow\.(prompt|confirm|alert)\(|(?<![.\w])(prompt|confi
 check('never a browser prompt/confirm/alert', dialogs.length === 0, dialogs.slice(0, 3).join(' | '));
 const net = hits(/\bfetch\(|axios|XMLHttpRequest|router\.(visit|get|post)/g);
 check('no network calls (synthetic only)', net.length === 0, net.slice(0, 3).join(' | '));
-const variants = hits(/variant="(ghost|link|secondary)"/g);
-check('buttons use default / outline / destructive only', variants.length === 0, variants.slice(0, 3).join(' | '));
+// design_styles/DESIGN_TOKENS.md:104-110 allows default, outline, ghost and link (Fleet uses link inside ReviewCards and
+// ghost in section footers). Buttons are never restyled: only spacing classes may be added.
+const variants = hits(/variant="(secondary)"/g);
+check('buttons use default / outline / destructive / ghost / link only', variants.length === 0, variants.slice(0, 3).join(' | '));
+const restyled = hits(/<Button[^>]*className="([^"]*)"/g).filter((h) => h.replace(/^.*className="|"$/g, '').split(/\s+/).some((c) => c && !/^-?(m|p)[trblxy]?-|^gap-|^self-|^shrink|^w-full$/.test(c)));
+check('buttons are never restyled (spacing classes only)', restyled.length === 0, restyled.slice(0, 3).join(' | '));
 
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll checks passed');
 process.exit(fails ? 1 : 0);

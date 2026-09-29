@@ -88,7 +88,7 @@ export function UnsavedList() {
             {views.map((v) => (
                 <ReviewCard key={v} icon={Layers} title={VIEW_LABEL[v]}>
                     {ch.filter((c) => GROUPS[c.g].view === v).map((c) => <ReviewRow key={c.g + c.k} label={c.label} value={c.to} />)}
-                    <Button variant="outline" size="sm" className="mt-3" onClick={() => { close(); go(settingsHref(v)); }}>Go to {VIEW_LABEL[v]}<ArrowUpRight /></Button>
+                    <Button variant="link" onClick={() => { close(); go(settingsHref(v)); }}>Go to {VIEW_LABEL[v]}{' '}<ArrowUpRight className="size-4" /></Button>
                 </ReviewCard>
             ))}
         </Modal>

@@ -250,7 +250,7 @@ export function Overview({ title, caption, cards: all, note, q = '' }: { title: 
                         <div className="space-y-2">
                             {c.lines.map((l, i) => <p key={i} className="text-subtle">{l}</p>)}
                             {c.badge ? <div>{c.badge}</div> : null}
-                            <Button variant="outline" size="sm" onClick={c.onClick}>{c.cta}<ArrowUpRight /></Button>
+                            <Button variant="link" onClick={c.onClick}>{c.cta}{' '}<ArrowUpRight className="size-4" /></Button>
                         </div>
                     </ReviewCard>
                 ))}

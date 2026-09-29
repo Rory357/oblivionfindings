@@ -649,7 +649,7 @@ function Alerts({ ctx }: { ctx: Ctx }) {
             <RowMenu ctx={menu.ctx} close={menu.close} icon={Bell} title={(a) => a.l} items={actions} />
             <div className="text-subtle flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                 <span className="inline-flex items-center gap-2"><Shield className="size-3.5" />Alerts about controlled medicines only reach people with controlled-medicine access. Control Room shows these alerts in its queue; who is told is set here.</span>
-                <Button variant="outline" size="sm" onClick={() => go(settingsHref('alerts', 'delivery'))}>Review delivery & follow-up<ArrowUpRight /></Button>
+                <Button variant="ghost" size="sm" onClick={() => go(settingsHref('alerts', 'delivery'))}>Review delivery & follow-up<ArrowUpRight className="size-3.5" /></Button>
             </div>
         </Section>
     );

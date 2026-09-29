@@ -124,3 +124,22 @@ Also carried over from v2:
 ## Questions for Stephan
 
 See `AUDIT.md` §4.
+
+## Main's inspection, 29 September 2026: pass, with one fix (done)
+
+Main inspected `8eda02a78`.
+- `sha256sum -c` passed on all 23 entries.
+- Main compared v3 side by side with the live Fleet Settings at 1440 (demo admin):
+  - Tracking › Overview matches the Overview;
+  - Notifications › Preferences matches the Alerts table;
+  - Delivery & channels is its own tab;
+  - Staff & PINs and Safety checks have titled groups.
+- The Who-gets-it wizard and the on-call dialog read well, and no internal codes appear on screen.
+
+1. **Fixed: "Review …" links on Overview cards.** They now use Fleet's `<Button variant="link">` with a size-4 arrow, exactly as in `fleet-assets/settings/_owners.tsx:146-151`. They were outline buttons.
+   - The same change covers "Go to …" in the Unsaved changes dialog, which is also inside a ReviewCard.
+   - The Alerts footer strip's "Review delivery & follow-up" now uses Fleet's footer pattern: `variant="ghost" size="sm"` (`_notifications.tsx:577-584`).
+   - `reuse-check.mjs` now allows `ghost` and `link` (`design_styles/DESIGN_TOKENS.md:104-110`). It still refuses restyling: a Button `className` may hold spacing classes only.
+2. **New question Q10** (on-call phone privacy) is added to `AUDIT.md` §4.
+
+After Main's pass, Stephan asked for the Delivery tab to be interactive ("re-alert, attended"). That change (`5fce692b1`) is covered in the table at the top of this file.
