@@ -245,9 +245,9 @@ describe('ConfirmDialog', () => {
             'This removes the saved boundary and its active state.',
         );
         await waitFor(() => expect(cancel).toHaveFocus());
-        expect(
-            screen.getByRole('button', { name: 'Delete geofence' }),
-        ).toHaveClass('bg-destructive', 'text-destructive-foreground');
+        const confirm = screen.getByRole('button', { name: 'Delete geofence' });
+        expect(confirm).toHaveClass('bg-destructive');
+        expect(confirm).not.toHaveClass('btn-soft-primary');
     });
 
     it('uses visible labels and semantic default action tokens', () => {

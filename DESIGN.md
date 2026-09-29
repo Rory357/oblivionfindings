@@ -327,6 +327,10 @@ before.
   `value={data.field || undefined}` for optional selects.
 - **Hand-rolled status pills** — diverge from the verified-contrast token
   pairs; use `<StatusBadge>`.
+- **Recolouring a primary button with `bg-*` classes** (fixed 2026-09-30) —
+  the default variant's unlayered `.btn-soft-primary` gradient paints over
+  `bg-destructive` / `bg-status-critical`, so the button stays purple. Pick
+  the tone with `variant="destructive"` on `<Button>` or `<AlertDialogAction>`.
 - **Ad-hoc `text-2xl`/`text-xl` headings** — use the typography helpers.
 - **`dark:` colour pairs on token-styled elements** — redundant and drifts.
 - **Pinning a fixed hue to a module** (e.g. `bg-purple-500` for HR) — use
