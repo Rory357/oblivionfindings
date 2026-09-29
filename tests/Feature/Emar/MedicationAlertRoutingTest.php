@@ -23,7 +23,8 @@ use Illuminate\Support\Facades\Notification;
 /*
  * Medication alert routing faults found while designing P11
  * (docs/emar-design/P11/v1/README.md, "Facts from today's app").
- * Recipients stay as they are today; these tests pin the fixes only.
+ * Recipients stay as they are today apart from the break-glass daily report,
+ * which Stephan narrowed to its configured groups (29 Sep 2026).
  */
 
 beforeEach(function () {
@@ -202,8 +203,6 @@ it('sends the break-glass daily report under its catalogued key so notification 
     Notification::fake();
     $site = Site::factory()->create();
     $optedOutAdmin = medicationAlertStaff($site, 'admin');
-    $coordinator = medicationAlertStaff($site, 'coordinator');
-    $worker = medicationAlertStaff($site, 'support_worker');
     UserNotificationPreference::query()->create([
         'user_id' => $optedOutAdmin->id,
         'key' => 'breakglass.daily_report',
@@ -213,14 +212,24 @@ it('sends the break-glass daily report under its catalogued key so notification 
     $this->artisan('breakglass:daily-report')->assertExitCode(0);
 
     Notification::assertNotSentTo($optedOutAdmin, AppEventNotification::class);
-    // Recipients are otherwise unchanged: the rule adds its groups to the
-    // default manager roles (P11 "Alert recipients" decides any narrowing).
-    Notification::assertSentTo(
-        $coordinator,
+});
+
+it('sends the break-glass daily report only to provider managers, admins and auditors', function () {
+    Notification::fake();
+    $site = Site::factory()->create();
+    $recipients = collect(['admin', 'provider_manager', 'auditor'])
+        ->map(fn (string $role) => medicationAlertStaff($site, $role));
+    $others = collect(['coordinator', 'hr', 'finance', 'team_lead', 'support_worker'])
+        ->map(fn (string $role) => medicationAlertStaff($site, $role));
+
+    $this->artisan('breakglass:daily-report')->assertExitCode(0);
+
+    $recipients->each(fn (User $user) => Notification::assertSentTo(
+        $user,
         AppEventNotification::class,
         fn (AppEventNotification $notification) => $notification->payload['event_key'] === 'breakglass.daily_report',
-    );
-    Notification::assertNotSentTo($worker, AppEventNotification::class);
+    ));
+    $others->each(fn (User $user) => Notification::assertNotSentTo($user, AppEventNotification::class));
 });
 
 it('still sends the low-stock notification after the 06:00 stock check has run', function () {
