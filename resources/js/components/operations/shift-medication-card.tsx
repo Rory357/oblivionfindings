@@ -19,7 +19,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { type DoseWindow, doseTiming } from '@/lib/emar-dose-window';
+import { doseTiming, type DoseWindow } from '@/lib/emar-dose-window';
 import {
     emarMutationWasAccepted,
     submitEmarMutation,
