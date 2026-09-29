@@ -301,6 +301,7 @@ export default function TripsIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Trips', href: '/fleet-assets/trips' },
             ]}

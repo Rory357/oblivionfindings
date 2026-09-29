@@ -110,12 +110,12 @@ function statusVariant(
 }
 
 const STATUS_COLORS: Record<string, string> = {
-    pending: '#eab308',
-    approved: '#3b82f6',
-    checked_out: '#22c55e',
-    returned: '#9ca3af',
-    rejected: '#ef4444',
-    cancelled: '#d1d5db',
+    pending: 'var(--status-warning)',
+    approved: 'var(--status-info)',
+    checked_out: 'var(--status-success)',
+    returned: 'var(--muted-foreground)',
+    rejected: 'var(--status-critical)',
+    cancelled: 'var(--muted-foreground)',
 };
 
 function getMonday(d: Date): Date {
@@ -202,8 +202,8 @@ function BookingCalendar({
 
     return (
         <div className="space-y-3">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <Button
                         variant="outline"
                         size="sm"
@@ -239,7 +239,12 @@ function BookingCalendar({
                     {formatShortDay(addDays(weekStart, 6))}
                 </span>
             </div>
-            <div className="overflow-hidden rounded-lg border">
+            <div
+                className="overflow-x-auto rounded-lg border"
+                role="region"
+                aria-label="Vehicle booking calendar"
+                tabIndex={0}
+            >
                 <div className="min-w-[700px]">
                     <div className="grid grid-cols-[180px_repeat(7,1fr)] border-b bg-muted/30">
                         <div className="border-r px-3 py-2 text-xs font-medium text-muted-foreground">
@@ -282,7 +287,7 @@ function BookingCalendar({
                                         ) => {
                                             const color =
                                                 STATUS_COLORS[booking.status] ??
-                                                '#6b7280';
+                                                'var(--muted-foreground)';
                                             return (
                                                 <Link
                                                     key={booking.id}
@@ -429,6 +434,7 @@ export default function BookingsIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Bookings', href: '/fleet-assets/bookings' },
             ]}
@@ -656,10 +662,26 @@ export default function BookingsIndex({
                             ) : (
                                 <FleetEmptyState
                                     icon={Calendar}
-                                    title="No bookings yet"
-                                    description="Create a booking to reserve a vehicle for a trip or task."
-                                    actionLabel="Book Vehicle"
-                                    onAction={() => setWizardOpen(true)}
+                                    title={
+                                        filters.status || filters.overdue
+                                            ? 'No bookings in this view'
+                                            : 'No bookings yet'
+                                    }
+                                    description={
+                                        filters.status || filters.overdue
+                                            ? 'Choose another status to see bookings.'
+                                            : 'Create a booking to reserve a vehicle for a trip or task.'
+                                    }
+                                    actionLabel={
+                                        filters.status || filters.overdue
+                                            ? undefined
+                                            : 'Book Vehicle'
+                                    }
+                                    onAction={
+                                        filters.status || filters.overdue
+                                            ? undefined
+                                            : () => setWizardOpen(true)
+                                    }
                                 />
                             )}
                         </div>

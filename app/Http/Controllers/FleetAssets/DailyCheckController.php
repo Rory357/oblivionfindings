@@ -81,37 +81,40 @@ class DailyCheckController extends Controller
         // Roadworthiness badges over the person's permitted vehicles — the same
         // scope and COUNT patterns as VehicleController::index; the pre-drive
         // check is exactly where an expired WOF must be visible.
+        $expiryCalendar = CarbonImmutable::now((string) config('app.worker_timezone', 'Pacific/Auckland'));
+        $expiryToday = $expiryCalendar->toDateString();
+        $expiryEnd = $expiryCalendar->addDays(30)->toDateString();
         $wofDue = (clone $permitted)->wofExpiring(30)->count();
         $wofExpired = (clone $permitted)
             ->whereNotNull('wof_expires_at')
-            ->where('wof_expires_at', '<', now())
+            ->where('wof_expires_at', '<', $expiryToday)
             ->count();
         $regoDue = (clone $permitted)->registrationExpiring(30)->count();
         $regoExpired = (clone $permitted)
             ->whereNotNull('registration_expires_at')
-            ->where('registration_expires_at', '<', now())
+            ->where('registration_expires_at', '<', $expiryToday)
             ->count();
         $cofDue = (clone $permitted)
             ->whereNotNull('cof_expires_at')
-            ->where('cof_expires_at', '<=', now()->addDays(30))
-            ->where('cof_expires_at', '>=', now())
+            ->where('cof_expires_at', '<=', $expiryEnd)
+            ->where('cof_expires_at', '>=', $expiryToday)
             ->count();
         $cofExpired = (clone $permitted)
             ->whereNotNull('cof_expires_at')
-            ->where('cof_expires_at', '<', now())
+            ->where('cof_expires_at', '<', $expiryToday)
             ->count();
         $hasInsuranceExpiry = Schema::hasColumn('assets', 'insurance_expires_at');
         $insuranceExpiring = $hasInsuranceExpiry
             ? (clone $permitted)
                 ->whereNotNull('insurance_expires_at')
-                ->where('insurance_expires_at', '<=', now()->addDays(30))
-                ->where('insurance_expires_at', '>=', now())
+                ->where('insurance_expires_at', '<=', $expiryEnd)
+                ->where('insurance_expires_at', '>=', $expiryToday)
                 ->count()
             : null;
         $insuranceExpired = $hasInsuranceExpiry
             ? (clone $permitted)
                 ->whereNotNull('insurance_expires_at')
-                ->where('insurance_expires_at', '<', now())
+                ->where('insurance_expires_at', '<', $expiryToday)
                 ->count()
             : null;
         $alertQuery = app(FleetAlertScope::class)->query($user, $request->only(['site_id']))->actionable();
@@ -142,6 +145,7 @@ class DailyCheckController extends Controller
             'can' => [
                 // Recorded checks are reviewed on the vehicle profile.
                 'view_vehicles' => (bool) $user?->canDo('fleet.viewAny'),
+                'view_alerts' => (bool) ($user?->canDo('assets.viewAny') || $user?->canDo('assets.alerts.view')),
             ],
         ]);
     }

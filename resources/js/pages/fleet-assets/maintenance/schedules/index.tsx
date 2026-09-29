@@ -559,6 +559,7 @@ export default function SchedulesIndex({
         return (
             <AppLayout
                 breadcrumbs={[
+                    { title: 'Home', href: '/dashboard' },
                     { title: 'Fleet & Assets', href: '/fleet-assets' },
                     {
                         title: 'Service Schedules',
@@ -589,6 +590,7 @@ export default function SchedulesIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 {
                     title: 'Service Schedules',

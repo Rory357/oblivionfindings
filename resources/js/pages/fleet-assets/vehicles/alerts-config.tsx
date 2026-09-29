@@ -1,4 +1,8 @@
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +16,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Battery,
@@ -184,6 +187,7 @@ export default function VehicleAlertsConfig({
             }) as AlertConfig,
     );
     const [processing, setProcessing] = useState(false);
+    const [saveError, setSaveError] = useState('');
 
     const updateRule = <K extends keyof AlertConfig>(
         key: K,
@@ -202,10 +206,16 @@ export default function VehicleAlertsConfig({
         }
 
         setProcessing(true);
+        setSaveError('');
         router.post(
             `/fleet-assets/vehicles/${asset.id}/alerts-config`,
             { config } as any,
             {
+                onError: (errors) =>
+                    setSaveError(
+                        Object.values(errors)[0] ??
+                            'Alert configuration could not be saved. Review the rules and try again.',
+                    ),
                 onFinish: () => setProcessing(false),
             },
         );
@@ -214,6 +224,7 @@ export default function VehicleAlertsConfig({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Vehicles', href: '/fleet-assets/vehicles' },
                 {
@@ -225,15 +236,20 @@ export default function VehicleAlertsConfig({
         >
             <Head title={`Alerts: ${asset.name}`} />
             <PageShell>
-                <FleetCompactHero
-                    pill="Vehicle alerts · configuration"
-                    title={`Alert Configuration: ${asset.name}`}
+                <PageHeader
+                    variant="profile"
+                    icon={Bell}
+                    title="Alert rules"
                     backHref={`/fleet-assets/vehicles/${asset.id}`}
-                    backLabel="Vehicle"
+                    titleChip={
+                        <PageHeaderStatusChip
+                            variant={canManage ? 'info' : 'neutral'}
+                        >
+                            {canManage ? 'Can edit' : 'View only'}
+                        </PageHeaderStatusChip>
+                    }
+                    subline={`Set alerts for ${asset.name}${asset.asset_tag ? ` · ${asset.asset_tag}` : ''}.`}
                 />
-                <p className="text-sm text-muted-foreground">
-                    Configure alert rules and thresholds for this vehicle.
-                </p>
 
                 <div className="space-y-4">
                     {ALERT_TYPES.map(
@@ -264,6 +280,7 @@ export default function VehicleAlertsConfig({
                                                 <label className="relative inline-flex cursor-pointer items-center">
                                                     <input
                                                         type="checkbox"
+                                                        aria-label={`Enable ${label} alert`}
                                                         checked={rule.enabled}
                                                         onChange={(e) =>
                                                             updateRule(
@@ -517,7 +534,12 @@ export default function VehicleAlertsConfig({
                     )}
                 </div>
 
-                <div className="flex items-center gap-2 pt-4">
+                {saveError && (
+                    <p role="alert" className="text-sm text-status-critical">
+                        {saveError}
+                    </p>
+                )}
+                <div className="flex flex-wrap items-center gap-2 pt-4">
                     {canManage ? (
                         <Button onClick={handleSave} disabled={processing}>
                             {processing ? (

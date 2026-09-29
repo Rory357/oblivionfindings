@@ -180,6 +180,7 @@ export default function OutingsIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Outings', href: '#' },
             ]}

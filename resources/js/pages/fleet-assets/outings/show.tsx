@@ -188,6 +188,7 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Outings', href: '/fleet-assets/outings' },
                 { title: safeOuting.title ?? 'Outing', href: '#' },

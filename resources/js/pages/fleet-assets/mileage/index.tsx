@@ -234,6 +234,7 @@ export default function MileageIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Mileage Claims', href: '#' },
             ]}

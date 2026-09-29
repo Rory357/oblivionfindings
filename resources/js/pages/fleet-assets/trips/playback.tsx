@@ -135,6 +135,7 @@ export default function FleetTripPlayback({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Trips', href: '/fleet-assets/trips' },
                 { title: `Trip #${trip.id}`, href: '#' },

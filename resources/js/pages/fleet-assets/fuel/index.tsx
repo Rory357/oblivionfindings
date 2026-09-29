@@ -267,6 +267,7 @@ export default function FuelIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Fuel Logs', href: '/fleet-assets/fuel' },
             ]}

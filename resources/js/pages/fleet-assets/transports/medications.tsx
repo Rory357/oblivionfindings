@@ -192,6 +192,7 @@ export default function MedicationTransitIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Transport Logs', href: '/fleet-assets/transports' },
                 { title: 'Medication Transit', href: '#' },

@@ -152,6 +152,7 @@ export default function HandoverShow({ handover: h, current_user_id }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Shift Handovers', href: '/fleet-assets/handovers' },
                 { title: `Handover #${h.id}`, href: '#' },

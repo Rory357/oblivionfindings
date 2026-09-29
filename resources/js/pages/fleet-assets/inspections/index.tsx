@@ -170,6 +170,7 @@ export default function InspectionsIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Inspections', href: '/fleet-assets/inspections' },
             ]}

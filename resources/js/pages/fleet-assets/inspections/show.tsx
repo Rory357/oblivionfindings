@@ -135,6 +135,7 @@ export default function InspectionShow({ inspection, can_report }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Inspections', href: '/fleet-assets/inspections' },
                 { title: `Inspection #${insp.id ?? ''}`, href: '#' },

@@ -27,6 +27,7 @@ use App\Services\Fleet\VehicleReadinessService;
 use App\Services\Fleet\VehicleStaffDirectory;
 use App\Services\Fleet\VehicleWorkspacePresenter;
 use App\Services\UserSiteAccessService;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -174,37 +175,40 @@ class VehicleController extends Controller
             : 0;
 
         // Compliance chips — efficient COUNT queries over the vehicle set.
+        $expiryCalendar = CarbonImmutable::now((string) config('app.worker_timezone', 'Pacific/Auckland'));
+        $expiryToday = $expiryCalendar->toDateString();
+        $expiryEnd = $expiryCalendar->addDays(30)->toDateString();
         $wofDue = (clone $visibleVehicles)->wofExpiring(30)->count();
         $wofExpired = (clone $visibleVehicles)
             ->whereNotNull('wof_expires_at')
-            ->where('wof_expires_at', '<', now())
+            ->where('wof_expires_at', '<', $expiryToday)
             ->count();
         $regoDue = (clone $visibleVehicles)->registrationExpiring(30)->count();
         $regoExpired = (clone $visibleVehicles)
             ->whereNotNull('registration_expires_at')
-            ->where('registration_expires_at', '<', now())
+            ->where('registration_expires_at', '<', $expiryToday)
             ->count();
         $cofDue = (clone $visibleVehicles)
             ->whereNotNull('cof_expires_at')
-            ->where('cof_expires_at', '<=', now()->addDays(30))
-            ->where('cof_expires_at', '>=', now())
+            ->where('cof_expires_at', '<=', $expiryEnd)
+            ->where('cof_expires_at', '>=', $expiryToday)
             ->count();
         $cofExpired = (clone $visibleVehicles)
             ->whereNotNull('cof_expires_at')
-            ->where('cof_expires_at', '<', now())
+            ->where('cof_expires_at', '<', $expiryToday)
             ->count();
         $hasInsuranceExpiry = Schema::hasColumn('assets', 'insurance_expires_at');
         $insuranceExpiring = $hasInsuranceExpiry
             ? (clone $visibleVehicles)
                 ->whereNotNull('insurance_expires_at')
-                ->where('insurance_expires_at', '<=', now()->addDays(30))
-                ->where('insurance_expires_at', '>=', now())
+                ->where('insurance_expires_at', '<=', $expiryEnd)
+                ->where('insurance_expires_at', '>=', $expiryToday)
                 ->count()
             : null;
         $insuranceExpired = $hasInsuranceExpiry
             ? (clone $visibleVehicles)
                 ->whereNotNull('insurance_expires_at')
-                ->where('insurance_expires_at', '<', now())
+                ->where('insurance_expires_at', '<', $expiryToday)
                 ->count()
             : null;
         $alertQuery = app(FleetAlertScope::class)->query($user, $request->only(['site_id']))->actionable();

@@ -209,6 +209,7 @@ export default function KeyManagement({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Key Management', href: '/fleet-assets/keys' },
             ]}

@@ -650,6 +650,7 @@ export default function TransportWorkspace({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 {
                     title: 'Transport',

@@ -474,6 +474,7 @@ export default function ResidentTrackingHistory({
         return (
             <AppLayout
                 breadcrumbs={[
+                    { title: 'Home', href: '/dashboard' },
                     { title: 'Fleet & Assets', href: '/fleet-assets' },
                     {
                         title: 'Resident Tracking',
@@ -520,6 +521,7 @@ export default function ResidentTrackingHistory({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 {
                     title: 'Resident Tracking',

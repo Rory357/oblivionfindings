@@ -577,6 +577,7 @@ export default function FleetIncidentsIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Health & Safety', href: '/health-safety' },
                 { title: 'Fleet Incidents', href: '/fleet-assets/incidents' },
             ]}

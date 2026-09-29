@@ -117,6 +117,7 @@ export default function ChecklistRun({ templates, assets, work_orders, selected_
         return (
             <AppLayout
                 breadcrumbs={[
+                    { title: 'Home', href: '/dashboard' },
                     { title: 'Fleet & Assets', href: '/fleet-assets' },
                     {
                         title: 'Checklists',
@@ -154,6 +155,7 @@ export default function ChecklistRun({ templates, assets, work_orders, selected_
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 {
                     title: 'Checklists',

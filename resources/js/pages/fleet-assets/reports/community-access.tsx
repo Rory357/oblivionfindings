@@ -89,6 +89,7 @@ export default function CommunityAccess({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Reports', href: '/fleet-assets/reports' },
                 {

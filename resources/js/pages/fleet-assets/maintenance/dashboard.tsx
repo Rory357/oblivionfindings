@@ -457,6 +457,7 @@ export default function MaintenanceDashboard({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 {
                     title: 'Maintenance',

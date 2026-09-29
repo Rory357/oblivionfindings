@@ -146,6 +146,39 @@ class DailyCheckRecordsTest extends TestCase
         $assertChecked(false, 0);
     }
 
+    public function test_date_only_expiry_evidence_remains_due_through_its_auckland_calendar_day(): void
+    {
+        $worker = $this->siteUser(['fleet.viewAny']);
+        $due = $this->vehicle();
+        $due->forceFill([
+            'wof_expires_at' => '2026-09-22',
+            'registration_expires_at' => '2026-09-22',
+            'cof_expires_at' => '2026-09-22',
+            'insurance_expires_at' => '2026-09-22',
+        ])->save();
+        $expired = $this->vehicle();
+        $expired->forceFill([
+            'wof_expires_at' => '2026-09-21',
+            'registration_expires_at' => '2026-09-21',
+            'cof_expires_at' => '2026-09-21',
+            'insurance_expires_at' => '2026-09-21',
+        ])->save();
+
+        $assertCounts = fn (string $url) => $this->actingAs($worker)->get($url)->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('compliance.wof_due', 1)
+                ->where('compliance.wof_expired', 1)
+                ->where('compliance.rego_due', 1)
+                ->where('compliance.rego_expired', 1)
+                ->where('compliance.cof_due', 1)
+                ->where('compliance.cof_expired', 1)
+                ->where('compliance.insurance_expiring', 1)
+                ->where('compliance.insurance_expired', 1));
+
+        $assertCounts('/fleet-assets/daily-check');
+        $assertCounts('/fleet-assets/vehicles');
+    }
+
     public function test_daily_checks_never_block_bookings_while_vehicle_checks_still_do(): void
     {
         $worker = $this->siteUser(['fleet.viewAny']);

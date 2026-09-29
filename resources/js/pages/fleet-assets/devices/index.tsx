@@ -611,6 +611,7 @@ export default function DevicesIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Tracking Devices', href: '/fleet-assets/devices' },
             ]}
