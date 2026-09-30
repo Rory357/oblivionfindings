@@ -114,6 +114,7 @@ use App\Services\UserSiteAccessService;
 use App\Support\ClientSafetyPayload;
 use App\Support\HazardDetailPresenter;
 use App\Support\HealthSafety\RiskAssessmentPresenter;
+use App\Support\Medication\MedicationStockQuantity;
 use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
@@ -1825,7 +1826,11 @@ class ClientController extends Controller
         $stock = $medication->stock;
 
         $payload['stock'] = $stock ? [
-            'on_hand' => $stock->on_hand,
+            // The decimal:2 cast yields "24.00"; send a number like the eMAR
+            // stock payloads so the profile reads "24 doses on hand".
+            'on_hand' => $stock->on_hand !== null
+                ? MedicationStockQuantity::toFloat($stock->on_hand)
+                : null,
             'unit' => $stock->unit,
             'reorder_threshold' => $stock->reorder_level,
             'is_low' => $stock->isLowStock(),
