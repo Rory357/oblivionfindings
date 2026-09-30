@@ -69,7 +69,8 @@ class WitnessPinTest extends TestCase
                 ->where('witnessPin.status', WitnessPinService::STATUS_NOT_SET)
                 ->where('rules.maxAttempts', 5)
                 ->where('rules.lockoutMinutes', 15)
-                ->where('rules.renewalMonths', null));
+                ->where('rules.renewalMonths', null)
+                ->where('rules.loginCheckToSet', true));
 
         $pins = app(WitnessPinService::class);
         foreach ([
@@ -84,22 +85,23 @@ class WitnessPinTest extends TestCase
             $this->assertNull($pins->formatError($fine), "{$fine} must be allowed");
         }
 
-        // The form refuses them too (the route allows 6 tries a minute).
+        // The form refuses them too (the route allows 6 tries a minute). A
+        // first PIN needs the login password (on by default since go-live).
         foreach (['12345', '111111', '123456'] as $weak) {
             $this->actingAs($worker)
                 ->from('/settings/witness-pin')
-                ->put('/settings/witness-pin', ['pin' => $weak, 'pin_confirmation' => $weak])
+                ->put('/settings/witness-pin', ['current_password' => 'password', 'pin' => $weak, 'pin_confirmation' => $weak])
                 ->assertSessionHasErrors('pin');
         }
         $this->actingAs($worker)
             ->from('/settings/witness-pin')
-            ->put('/settings/witness-pin', ['pin' => '482915', 'pin_confirmation' => '482916'])
+            ->put('/settings/witness-pin', ['current_password' => 'password', 'pin' => '482915', 'pin_confirmation' => '482916'])
             ->assertSessionHasErrors('pin');
         $this->assertNull(UserWitnessPin::query()->where('user_id', $worker->id)->first());
 
         $this->actingAs($worker)
             ->from('/settings/witness-pin')
-            ->put('/settings/witness-pin', ['pin' => '708142', 'pin_confirmation' => '708142'])
+            ->put('/settings/witness-pin', ['current_password' => 'password', 'pin' => '708142', 'pin_confirmation' => '708142'])
             ->assertSessionHasNoErrors();
 
         $pin = UserWitnessPin::query()->where('user_id', $worker->id)->sole();
@@ -488,7 +490,7 @@ class WitnessPinTest extends TestCase
                 ->where('witnessPin.resetBy', $lead->name));
         $this->actingAs($worker)
             ->from('/settings/witness-pin')
-            ->put('/settings/witness-pin', ['pin' => '708142', 'pin_confirmation' => '708142'])
+            ->put('/settings/witness-pin', ['current_password' => 'password', 'pin' => '708142', 'pin_confirmation' => '708142'])
             ->assertSessionHasNoErrors();
         app(WitnessPinService::class)->verify($worker->fresh(), '708142', 'witness_credential');
     }
