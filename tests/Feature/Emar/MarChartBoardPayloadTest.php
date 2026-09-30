@@ -3,6 +3,7 @@
 namespace Tests\Feature\Emar;
 
 use App\Models\Client;
+use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\Permission;
 use App\Models\Role;
@@ -206,6 +207,70 @@ class MarChartBoardPayloadTest extends TestCase
         $this->actingAs($user)
             ->get('/emar/clients/'.$client->id.'/inr')
             ->assertRedirect('/emar/mar?client_id='.$client->id);
+    }
+
+    public function test_mar_inr_list_shows_unlinked_readings_but_conceals_controlled_and_cross_client_links(): void
+    {
+        $this->seed(RbacSeeder::class);
+
+        $user = $this->makeRoleUser('admin');
+        $this->grantPermissions($user, ['medications.view']);
+        $user->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()->where('key', 'medications.controlled.view')->value('id') => ['allowed' => false],
+        ]);
+
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $neighbour = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $warfarin = $this->prnMedication($client, 'Warfarin');
+        $morphine = $this->prnMedication($client, 'Morphine sulfate', true);
+        $neighbourWarfarin = $this->prnMedication($neighbour, 'Warfarin');
+
+        foreach ([
+            [null, 4.8],
+            [$warfarin->id, 2.5],
+            // Controlled — concealed from a reader without controlled view.
+            [$morphine->id, 5.5],
+            // Another resident's order — never a canonical link.
+            [$neighbourWarfarin->id, 6.1],
+        ] as [$medicationId, $value]) {
+            ClientInrRecord::query()->create([
+                'client_id' => $client->id,
+                'client_medication_id' => $medicationId,
+                'inr_value' => $value,
+                'target_range_low' => 2.0,
+                'target_range_high' => 3.0,
+                'tested_on' => today()->toDateString(),
+                'recorded_by' => $user->id,
+            ]);
+        }
+
+        // The MAR rail labels the reading whose client_medication_id is null.
+        $this->actingAs($user)
+            ->get('/emar/mar?client_id='.$client->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('emar/MarCharts')
+                ->has('marData.inr_records', 2)
+                ->where('marData.inr_records', fn ($records) => collect($records)
+                    ->mapWithKeys(fn (array $r) => [(string) $r['inr_value'] => $r['client_medication_id']])
+                    ->sortKeys()
+                    ->all() === ['2.5' => $warfarin->id, '4.8' => null])
+            );
+    }
+
+    private function prnMedication(Client $client, string $name, bool $controlled = false): ClientMedication
+    {
+        return ClientMedication::query()->create([
+            'client_id' => $client->id,
+            'name' => $name,
+            'dosage' => '1 tablet',
+            'frequency' => 'As required',
+            'is_prn' => true,
+            'controlled_drug' => $controlled,
+            'active' => true,
+            'state' => 'active',
+        ]);
     }
 
     protected function makeRoleUser(string $roleName): User
