@@ -1,0 +1,11 @@
+{
+    "extends": "../../../../tsconfig.json",
+    "compilerOptions": {
+        "baseUrl": "../../../..",
+        "paths": {
+            "@inertiajs/react": ["./docs/emar-design/P07b/v1/src/inertia-shim.tsx"],
+            "@/*": ["./resources/js/*"]
+        }
+    },
+    "include": ["src/**/*.tsx", "src/**/*.ts", "../../../../resources/js/types/**/*.d.ts"]
+}
