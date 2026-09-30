@@ -16,6 +16,10 @@ import {
     CD_REGISTER_ENTRY_TYPES,
 } from './components/cd-register-modal';
 import {
+    buildSyringeDriverRequest,
+    syringeDriverRequiresWitness,
+} from './components/mar-governance-dialogs';
+import {
     addMedicationStockQuantities,
     buildControlledPharmacyDeliveryRequest,
     controlledPharmacyDeliveryPath,
@@ -262,5 +266,54 @@ describe('controlled medication request contracts', () => {
         expect(
             medicationStockQuantitiesEqual('0.30000000000000004', '0.30'),
         ).toBe(false);
+    });
+
+    it('starts a syringe driver from the charted medicine id the server requires', () => {
+        const form = {
+            commenced_at: '2026-09-30T10:00',
+            rate: '2',
+            rate_unit: 'mL/hr',
+            site_of_insertion: 'Left upper arm',
+            notes: '',
+            contents: [{ client_medication_id: '41', dose: '10', unit: 'mg' }],
+            witnessed_by: '',
+            witness_credential: '',
+        };
+        const request = buildSyringeDriverRequest(form);
+
+        expect(request.contents).toEqual([
+            { client_medication_id: 41, dose: '10', unit: 'mg' },
+        ]);
+        expect(request.contents[0]).not.toHaveProperty('name');
+        expect(request.witnessed_by).toBeNull();
+        expect(
+            buildSyringeDriverRequest({ ...form, witnessed_by: '19' })
+                .witnessed_by,
+        ).toBe(19);
+    });
+
+    it('asks for a syringe driver witness for any controlled medicine, as the server does', () => {
+        const medicine = {
+            id: 41,
+            name: 'Midazolam',
+            dosage: '5 mg',
+            controlled_drug: false,
+            witness_required: false,
+        };
+
+        expect(syringeDriverRequiresWitness(undefined)).toBe(false);
+        expect(syringeDriverRequiresWitness(medicine)).toBe(false);
+        expect(
+            syringeDriverRequiresWitness({
+                ...medicine,
+                controlled_drug: true,
+            }),
+        ).toBe(true);
+        expect(
+            syringeDriverRequiresWitness({
+                ...medicine,
+                witness_required: true,
+            }),
+        ).toBe(true);
     });
 });

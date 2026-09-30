@@ -6,7 +6,9 @@ use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoomAlert;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Factories\ControlRoomAlertFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -19,6 +21,8 @@ class ControlRoomMyTasksControllerTest extends TestCase
 
     protected User $other;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -30,6 +34,8 @@ class ControlRoomMyTasksControllerTest extends TestCase
 
         $this->other = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->other->roles()->attach(Role::where('name', 'admin')->first());
+
+        $this->site = Site::factory()->create();
     }
 
     public function test_index_requires_authentication(): void
@@ -48,8 +54,8 @@ class ControlRoomMyTasksControllerTest extends TestCase
 
     public function test_index_returns_only_alerts_assigned_to_current_user(): void
     {
-        $mine = ControlRoomAlert::factory()->open()->assignedTo($this->admin)->create();
-        ControlRoomAlert::factory()->open()->assignedTo($this->other)->create();
+        $mine = $this->alertFactory()->open()->assignedTo($this->admin)->create();
+        $this->alertFactory()->open()->assignedTo($this->other)->create();
 
         $this->actingAs($this->admin)
             ->get('/control-room/my-tasks')
@@ -67,8 +73,8 @@ class ControlRoomMyTasksControllerTest extends TestCase
 
     public function test_index_excludes_resolved_alerts_from_my_alerts_list(): void
     {
-        ControlRoomAlert::factory()->open()->assignedTo($this->admin)->create();
-        ControlRoomAlert::factory()->resolved()->assignedTo($this->admin)->create();
+        $this->alertFactory()->open()->assignedTo($this->admin)->create();
+        $this->alertFactory()->resolved()->assignedTo($this->admin)->create();
 
         $this->actingAs($this->admin)
             ->get('/control-room/my-tasks')
@@ -80,7 +86,7 @@ class ControlRoomMyTasksControllerTest extends TestCase
 
     public function test_residual_terminal_sla_is_omitted_from_my_alert_status(): void
     {
-        $alert = ControlRoomAlert::factory()->open()->assignedTo($this->admin)->create();
+        $alert = $this->alertFactory()->open()->assignedTo($this->admin)->create();
         AlertSla::query()->create([
             'alert_id' => $alert->id,
             'ended_as' => AlertSla::ENDED_RECONCILED_NO_MATCH,
@@ -98,7 +104,7 @@ class ControlRoomMyTasksControllerTest extends TestCase
 
     public function test_complete_followup_clears_followup_flag(): void
     {
-        $alert = ControlRoomAlert::factory()->open()->create();
+        $alert = $this->alertFactory()->open()->create();
         $note = OperatorNote::create([
             'alert_id' => $alert->id,
             'user_id' => $this->admin->id,
@@ -116,7 +122,7 @@ class ControlRoomMyTasksControllerTest extends TestCase
 
     public function test_complete_followup_only_allows_owner(): void
     {
-        $alert = ControlRoomAlert::factory()->open()->create();
+        $alert = $this->alertFactory()->open()->create();
         $note = OperatorNote::create([
             'alert_id' => $alert->id,
             'user_id' => $this->other->id,
@@ -130,5 +136,16 @@ class ControlRoomMyTasksControllerTest extends TestCase
             ->assertNotFound();
 
         $this->assertTrue($note->fresh()->requires_followup);
+    }
+
+    /**
+     * Control Room visibility is Site-scoped, so alerts without an effective
+     * Site are hidden even from their assignee.
+     */
+    private function alertFactory(): ControlRoomAlertFactory
+    {
+        return ControlRoomAlert::factory()->state([
+            'site_id' => $this->site->id,
+        ]);
     }
 }

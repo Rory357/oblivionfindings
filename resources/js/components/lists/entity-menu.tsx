@@ -73,7 +73,7 @@ export function EntityKebab({
                         type="button"
                         aria-label={label}
                         className={cn(
-                            'flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
+                            'frontline-hit flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
                             className,
                         )}
                     >

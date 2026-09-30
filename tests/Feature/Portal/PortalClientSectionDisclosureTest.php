@@ -175,6 +175,20 @@ function seedPortalSectionDisclosureData(Client $client, User $actor): array
     ];
 }
 
+/**
+ * The portal calendar always sends its visible range. Without one the
+ * endpoint falls back to the current month, which misses the fixtures dated
+ * tomorrow whenever a test runs on the last day of a month.
+ */
+function portalSectionCalendarUrl(Client $client): string
+{
+    return route('portal.clients.calendar.events', [
+        'client' => $client,
+        'start' => now()->subDay()->toDateString(),
+        'end' => now()->addWeek()->toDateString(),
+    ], false);
+}
+
 /** @return array<int, string> */
 function portalSectionCalendarTypes(TestResponse $response): array
 {
@@ -249,7 +263,7 @@ it('fails closed across portal readers for a NOK without active family informati
             ->where('showShifts', false)
             ->where('showRespite', false));
 
-    $calendar = $this->getJson(route('portal.clients.calendar.events', $client, false))
+    $calendar = $this->getJson(portalSectionCalendarUrl($client))
         ->assertOk();
     expect(portalSectionCalendarTypes($calendar))->toBe([]);
 
@@ -319,7 +333,7 @@ it('combines active consent portal settings and NOK flags for positive family di
             ->where('showShifts', true)
             ->where('showRespite', true));
 
-    $calendar = $this->getJson(route('portal.clients.calendar.events', $client, false))
+    $calendar = $this->getJson(portalSectionCalendarUrl($client))
         ->assertOk();
     expect(portalSectionCalendarTypes($calendar))->toBe([
         'family_note',
@@ -391,7 +405,7 @@ it('keeps each disabled family portal setting effective even with active consent
             ->has('shifts', 0)
             ->has('respiteStays', 0));
 
-    $calendar = $this->getJson(route('portal.clients.calendar.events', $client, false))
+    $calendar = $this->getJson(portalSectionCalendarUrl($client))
         ->assertOk();
     expect(portalSectionCalendarTypes($calendar))->toBe([]);
 
@@ -445,7 +459,7 @@ it('does not apply family disclosure controls to the person viewing their own po
             ->has('shifts', 1)
             ->has('respiteStays', 1));
 
-    $calendar = $this->getJson(route('portal.clients.calendar.events', $client, false))
+    $calendar = $this->getJson(portalSectionCalendarUrl($client))
         ->assertOk();
     expect(portalSectionCalendarTypes($calendar))->toBe([
         'family_note',

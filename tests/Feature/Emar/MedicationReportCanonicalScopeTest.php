@@ -712,6 +712,9 @@ class MedicationReportCanonicalScopeTest extends TestCase
         $this->assertStringNotContainsString('HIDDEN UNLINKED DRIVER CONTENT', $controlledPayload);
 
         $reader = $this->medicationReader($site);
+        // An ordinary reader opens only an assigned resident's MAR
+        // (ClientPolicy::viewMedications); Site access alone is a 404.
+        $client->supportWorkers()->attach($reader->id);
         $ordinaryPage = $this->actingAs($reader)
             ->get(route('emar.mar', ['client_id' => $client->id]))
             ->assertOk();

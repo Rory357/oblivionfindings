@@ -44,6 +44,7 @@ use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\Emar\ShiftMedicationSnapshotService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationOrderLifecycleService;
 use App\Services\Medication\MedicationRoundGenerationService;
@@ -58,7 +59,6 @@ use App\Services\MedicationScanVerificationService;
 use App\Services\Operations\HandoverPresenter;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
-use App\Support\EmarUrl;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -92,7 +92,20 @@ class EmarController extends Controller
         protected MedicationRoundGenerationService $roundGeneration,
     ) {}
 
+    private ?MarLinkService $marLinks = null;
+
     // ─── Helpers ──────────────────────────────────────────
+
+    /**
+     * Site-scoped list rows link to a resident's MAR only when the viewer may
+     * open it (ClientPolicy::viewMedications), never to a chart that 404s.
+     */
+    private function marUrlFor(mixed $clientId): ?string
+    {
+        $this->marLinks ??= app(MarLinkService::class);
+
+        return $this->marLinks->urlFor(request()->user(), $clientId);
+    }
 
     private function buildMedicationPermissions(?User $user): array
     {
@@ -958,12 +971,23 @@ class EmarController extends Controller
         }
 
         try {
-            return Carbon::parse($value);
+            return $this->parseSyringeDriverCommencedAt($value);
         } catch (\InvalidArgumentException) {
             // The canonical validation error remains inside the locked Client
             // boundary; an invalid hint must not move validation ahead of 404.
             return null;
         }
+    }
+
+    /**
+     * The MAR dialog submits a zone-less datetime-local value (worker wall
+     * clock). Read it in the worker timezone — an explicit offset still wins —
+     * and normalise to UTC for storage, so "now" in NZ is neither refused as a
+     * future time nor recorded 12–13 hours off.
+     */
+    private function parseSyringeDriverCommencedAt(string $value): Carbon
+    {
+        return Carbon::parse($value, config('app.worker_timezone', 'Pacific/Auckland'))->utc();
     }
 
     private function assertRunningSyringeDriverMutationAuthority(
@@ -1161,6 +1185,11 @@ class EmarController extends Controller
         [$dayStartUtc, $dayEndUtc] = $scheduleService->utcDayWindow($scheduleDate);
         $can = $this->buildMedicationPermissions($actor);
         $viewableClientIds = $this->medicationViewableClientIds($actor);
+        // Site scope is not person scope: the picker lists only residents whose
+        // medication record this user may open (ClientPolicy::viewMedications —
+        // assignment for ordinary support workers), so it never names a person
+        // the explicit ?client_id path below refuses. site_id is selected
+        // because the policy's Site check reads it.
         $clients = Client::query()
             ->whereIn('id', $viewableClientIds)
             ->whereIn('site_id', $allowedSiteIds)
@@ -1169,7 +1198,9 @@ class EmarController extends Controller
                 ->when(! $can['view_controlled'], fn ($query) => $query->where('controlled_drug', false))])
             ->having('active_medications_count', '>', 0)
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'date_of_birth', 'nhi_number']);
+            ->get(['id', 'site_id', 'first_name', 'last_name', 'date_of_birth', 'nhi_number'])
+            ->filter(fn (Client $client) => Gate::forUser($actor)->allows('viewMedications', $client))
+            ->values();
 
         $selectedClient = null;
         $marData = [];
@@ -1208,13 +1239,22 @@ class EmarController extends Controller
 
         // Default the resident server-side so the MAR chart opens straight onto a
         // chart instead of a two-step picker. An explicit ?client_id (deep-link or
-        // the hero EntityFilter) wins and enforces access (403 on denial); with no
-        // client_id we fall back to the last chart this user viewed, else the first
-        // resident they may view — never throwing for an auto-pick.
+        // the hero EntityFilter) wins; it must pass both the Site boundary and the
+        // per-person ClientPolicy::viewMedications check, and a denial is a 404
+        // indistinguishable from a missing or out-of-Site record. With no
+        // client_id we fall back to the last chart this user viewed, else the
+        // first resident they may view — never throwing for an auto-pick.
         if ($request->filled('client_id')) {
-            $selectedClient = Client::with($marWith)
+            $selectedClient = Client::query()
                 ->whereIn('site_id', $allowedSiteIds)
-                ->findOrFail($requestedClientId);
+                ->find($requestedClientId);
+            abort_unless(
+                $selectedClient !== null
+                    && Gate::forUser($actor)->allows('viewMedications', $selectedClient),
+                404,
+                'The requested medication record was not found.',
+            );
+            $selectedClient->load($marWith);
         } else {
             $defaultClientId = $this->defaultMarClientId($request, $clients);
             $selectedClient = $defaultClientId ? Client::with($marWith)->find($defaultClientId) : null;
@@ -1262,7 +1302,7 @@ class EmarController extends Controller
                 ->whereNull('deleted_at')
                 ->latest()
                 ->get(['id', 'allergen', 'reaction', 'severity', 'notes', 'identified_date']) : [],
-            'interactions' => $selectedClient ? $this->getActiveInteractions($selectedClient) : [],
+            'interactions' => $selectedClient ? $this->getActiveInteractions($selectedClient, $can['view_controlled']) : [],
             'clientContext' => $clientContext,
             'breakGlassAccess' => $breakGlassAccess,
             'pendingCorrections' => $pendingCorrections,
@@ -1510,10 +1550,16 @@ class EmarController extends Controller
             : null;
     }
 
-    private function getActiveInteractions(Client $client): array
+    /**
+     * Interaction pairs among the client's active medicines. Without controlled
+     * view, controlled medicines are excluded from the candidate set (as on the
+     * register and medication detail) so no pair can name one.
+     */
+    private function getActiveInteractions(Client $client, bool $includeControlled): array
     {
         $medicationNames = $client->medications()
             ->active()
+            ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
             ->pluck('name')
             ->map(fn ($name) => strtolower($name))
             ->toArray();
@@ -1852,7 +1898,7 @@ class EmarController extends Controller
             'given_time' => $at ? $at->copy()->timezone($timezone)->format('H:i') : null,
             'given_date' => $at ? $at->copy()->timezone($timezone)->format('j M') : null,
             'given_by' => $a->administeredBy?->name,
-            'mar_url' => EmarUrl::mar($a->client_id),
+            'mar_url' => $this->marUrlFor($a->client_id),
             'baseline' => array_filter([
                 'blood_glucose_level' => $a->blood_glucose_level,
                 'pulse_bpm' => $a->pulse_bpm,
@@ -2445,7 +2491,7 @@ class EmarController extends Controller
             'client_name' => trim(($s->medication?->client?->first_name ?? '').' '.($s->medication?->client?->last_name ?? '')),
             'client_id' => $s->medication?->client_id,
             'client_room' => $s->medication?->client?->room?->name,
-            'mar_url' => $s->medication?->client_id ? EmarUrl::mar($s->medication->client_id) : null,
+            'mar_url' => $this->marUrlFor($s->medication?->client_id),
             'site_id' => $s->medication?->client?->site_id,
             'site_name' => $s->medication?->client?->site?->name,
             'on_hand' => $s->on_hand !== null
@@ -3136,7 +3182,7 @@ class EmarController extends Controller
             'is_overdue' => $r->status === 'scheduled' && $r->scheduled_date && $r->scheduled_date->isPast(),
             // Deep-link to the resident's MAR chart for the row context menu /
             // detail "Open on MAR" action (mirrors the PRN register's mar_url).
-            'mar_url' => $r->client_id ? EmarUrl::mar($r->client_id) : null,
+            'mar_url' => $this->marUrlFor($r->client_id),
         ];
     }
 
@@ -3792,7 +3838,7 @@ class EmarController extends Controller
                 'is_voided' => $d->voided_at !== null,
                 'void_stock_semantics' => MedicationDestruction::VOID_STOCK_SEMANTICS,
                 'requires_governed_stock_reconciliation' => $d->voided_at !== null && (bool) $d->is_controlled_drug,
-                'mar_url' => $d->client_id ? EmarUrl::mar($d->client_id) : null,
+                'mar_url' => $this->marUrlFor($d->client_id),
             ])->values(),
             'medications' => $medications->map(fn (ClientMedication $m) => [
                 'id' => $m->id,
@@ -5132,6 +5178,13 @@ class EmarController extends Controller
             MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
             requestedClientId: (int) $client->id,
         );
+        // Same per-person gate as the MAR chart it redirects to, so the redirect
+        // is never an existence oracle for a resident this user may not open.
+        abort_unless(
+            Gate::forUser($actor)->allows('viewMedications', $client),
+            404,
+            'The requested medication record was not found.',
+        );
 
         return redirect()->route('emar.mar', ['client_id' => $client->id]);
     }
@@ -5257,7 +5310,7 @@ class EmarController extends Controller
 
             abort_if(isset($validated['site_id']) && (int) $validated['site_id'] !== (int) $lockedClient->site_id, 404);
             $commencedAt = $presenceEffectiveAt?->copy()
-                ?? Carbon::parse($validated['commenced_at']);
+                ?? $this->parseSyringeDriverCommencedAt((string) $validated['commenced_at']);
             if ($commencedAt->gt(now()->addMinute())) {
                 throw ValidationException::withMessages([
                     'commenced_at' => 'The syringe driver commencement time cannot be in the future.',

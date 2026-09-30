@@ -73,7 +73,7 @@ export function RecordedDetailDialog({
                 </div>
 
                 <DialogFooter className="gap-2 sm:gap-0">
-                    {canViewMar ? (
+                    {canViewMar && row.mar_url ? (
                         <Button type="button" variant="outline" asChild>
                             <Link href={row.mar_url}>
                                 <FileText className="h-4 w-4" />

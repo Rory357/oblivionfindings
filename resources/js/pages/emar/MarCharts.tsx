@@ -26,6 +26,7 @@ import {
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import MarGovernanceDialogs, {
+    type ChartMedicationOption,
     type MarModal,
     type PendingCorrection,
 } from '@/pages/emar/components/mar-governance-dialogs';
@@ -66,6 +67,13 @@ type MarData = {
         witness_required: boolean;
         admin_rules?: { required_observations?: string[] | null } | null;
         dose_times: string[];
+    }>;
+    prn?: Array<{
+        id: number;
+        name: string;
+        dosage: string;
+        controlled_drug: boolean;
+        witness_required: boolean;
     }>;
     attention_alerts?: Array<{
         id: number;
@@ -247,6 +255,21 @@ export default function MarCharts(props: Props) {
                 dose_times: med.dose_times ?? [],
             })),
         [marData.scheduled],
+    );
+
+    // Active charted medicines (scheduled + PRN) a syringe driver may contain.
+    const chartMedications: ChartMedicationOption[] = useMemo(
+        () =>
+            [...(marData.scheduled ?? []), ...(marData.prn ?? [])]
+                .map((med) => ({
+                    id: med.id,
+                    name: med.name,
+                    dosage: med.dosage,
+                    controlled_drug: med.controlled_drug,
+                    witness_required: med.witness_required,
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name)),
+        [marData.scheduled, marData.prn],
     );
 
     const searched = useMemo(
@@ -690,6 +713,7 @@ export default function MarCharts(props: Props) {
                 awaitingVerification={marData.awaiting_verification ?? []}
                 corrections={pendingCorrections}
                 witnesses={witnesses}
+                medications={chartMedications}
                 suppression={{
                     suppressed:
                         marData.settings?.suppress_med_admin_alerts ?? false,

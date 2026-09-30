@@ -443,12 +443,13 @@ class FleetHeroRolloutContractTest extends TestCase
         );
     }
 
-    public function test_driver_detail_uses_the_desktop_fleet_hero_family(): void
+    public function test_driver_detail_uses_the_shared_page_header(): void
     {
         $driverSource = file_get_contents(resource_path('js/pages/fleet-assets/drivers/show.tsx'));
 
         $this->assertIsString($driverSource);
-        $this->assertStringContainsString('<FleetCompactHero', $driverSource);
+        $this->assertStringContainsString('<PageHeader', $driverSource);
+        $this->assertStringNotContainsString('<FleetCompactHero', $driverSource);
         $this->assertStringContainsString('data-fleet-narrow-strategy="horizontal-scroll"', $driverSource);
     }
 }
