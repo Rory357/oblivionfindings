@@ -60,7 +60,7 @@ class MedicationIncidentIntegrationService
                     $incident = new ClientIncident;
                     $incident->client_id = $client->id;
                     $incident->site_id = $client->site_id;
-                    $incident->title = "Missed medication: {$medication->name}";
+                    $incident->title = "Missed medication: {$medication->unrestrictedName()}";
                     $incident->description = $this->buildMissedDoseDescription($locked, $medication);
                     $incident->category = 'medication';
                     $incident->severity = $this->determineSeverity('missed_dose', $medication);
@@ -86,12 +86,12 @@ class MedicationIncidentIntegrationService
                     MedicationSignalService::TYPE_MISSED_DOSE,
                     $client->id,
                     $severity,
-                    "Missed dose: {$medication->name} scheduled for ".($locked->scheduled_for?->format('H:i') ?? 'unknown time'),
+                    "Missed dose: {$medication->unrestrictedName()} scheduled for ".($locked->scheduled_for?->format('H:i') ?? 'unknown time'),
                     [
                         'incident_id' => $incident->id,
                         'client_medication_id' => $medication->id,
                         'administration_id' => $locked->id,
-                        'medication_name' => $medication->name,
+                        'medication_name' => $medication->unrestrictedName(),
                         'scheduled_for' => $locked->scheduled_for?->toIso8601String(),
                         'controlled_drug' => $medication->controlled_drug,
                         'high_risk' => $medication->high_risk,
@@ -154,8 +154,8 @@ class MedicationIncidentIntegrationService
             $incident = new ClientIncident;
             $incident->client_id = $lockedClient->id;
             $incident->site_id = $lockedClient->site_id;
-            $incident->title = "PRN limit exceeded: {$lockedMedication->name}";
-            $incident->description = "Attempted to administer PRN medication {$lockedMedication->name} when limit already reached.\n\n".
+            $incident->title = "PRN limit exceeded: {$lockedMedication->unrestrictedName()}";
+            $incident->description = "Attempted to administer PRN medication {$lockedMedication->unrestrictedName()} when limit already reached.\n\n".
                 "Maximum per 24h: {$maxPerDay}\n".
                 "Given in last 24h: {$count24h}\n".
                 "Attempted by: User ID {$attemptedBy}\n\n".
@@ -192,11 +192,11 @@ class MedicationIncidentIntegrationService
                 MedicationSignalService::TYPE_PRN_OVER_LIMIT,
                 $lockedClient->id,
                 'critical',
-                "PRN limit exceeded: {$lockedMedication->name} ({$count24h}/{$maxPerDay})",
+                "PRN limit exceeded: {$lockedMedication->unrestrictedName()} ({$count24h}/{$maxPerDay})",
                 [
                     'incident_id' => $incident->id,
                     'client_medication_id' => $lockedMedication->id,
-                    'medication_name' => $lockedMedication->name,
+                    'medication_name' => $lockedMedication->unrestrictedName(),
                     'prn_attempt_id' => $attemptId,
                     'prn_count_24h' => $count24h,
                     'max_per_day' => $maxPerDay,
@@ -334,7 +334,7 @@ class MedicationIncidentIntegrationService
                     $incident = new ClientIncident;
                     $incident->client_id = $client->id;
                     $incident->site_id = $client->site_id;
-                    $incident->title = "Medication correction after {$hoursSince}h: {$medication->name}";
+                    $incident->title = "Medication correction after {$hoursSince}h: {$medication->unrestrictedName()}";
                     $incident->description = $this->buildCorrectionDescription($lockedOriginal, $correctionData, $hoursSince);
                     $incident->category = 'medication';
                     $incident->severity = $hoursSince > 24 ? 'high' : 'medium';
@@ -359,13 +359,13 @@ class MedicationIncidentIntegrationService
                     MedicationSignalService::TYPE_UNSAFE_CORRECTION,
                     $client->id,
                     $hoursSince > 24 ? 'high' : 'medium',
-                    "Medication correction after {$hoursSince}h: {$medication->name}",
+                    "Medication correction after {$hoursSince}h: {$medication->unrestrictedName()}",
                     [
                         'incident_id' => $incident->id,
                         'client_medication_id' => $medication->id,
                         'administration_id' => $lockedOriginal->id,
                         'correction_id' => $correction?->id,
-                        'medication_name' => $medication->name,
+                        'medication_name' => $medication->unrestrictedName(),
                         'hours_since_original' => $hoursSince,
                         'corrected_by' => $correctedBy,
                         'controlled_drug' => $medication->controlled_drug,
@@ -403,8 +403,8 @@ class MedicationIncidentIntegrationService
                     $incident = new ClientIncident;
                     $incident->client_id = $client->id;
                     $incident->site_id = $client->site_id;
-                    $incident->title = "Late medication: {$medication->name} ({$hoursLate}h late)";
-                    $incident->description = "Medication {$medication->name} was administered {$hoursLate} hours after scheduled time.\n\n".
+                    $incident->title = "Late medication: {$medication->unrestrictedName()} ({$hoursLate}h late)";
+                    $incident->description = "Medication {$medication->unrestrictedName()} was administered {$hoursLate} hours after scheduled time.\n\n".
                         'Scheduled: '.($locked->scheduled_for?->format('d/m/Y H:i') ?? 'Unknown')."\n".
                         'Given: '.($locked->administered_at?->format('d/m/Y H:i') ?? 'Unknown')."\n".
                         'Reason: '.($locked->reason ?? 'Not provided');
@@ -432,12 +432,12 @@ class MedicationIncidentIntegrationService
                     MedicationSignalService::TYPE_LATE_DOSE,
                     $client->id,
                     $severity,
-                    "Late dose: {$medication->name} ({$hoursLate}h late)",
+                    "Late dose: {$medication->unrestrictedName()} ({$hoursLate}h late)",
                     [
                         'incident_id' => $incident->id,
                         'client_medication_id' => $medication->id,
                         'administration_id' => $locked->id,
-                        'medication_name' => $medication->name,
+                        'medication_name' => $medication->unrestrictedName(),
                         'hours_late' => $hoursLate,
                         'scheduled_for' => $locked->scheduled_for?->toIso8601String(),
                         'administered_at' => $locked->administered_at?->toIso8601String(),
@@ -475,8 +475,8 @@ class MedicationIncidentIntegrationService
                     $incident = new ClientIncident;
                     $incident->client_id = $client->id;
                     $incident->site_id = $client->site_id;
-                    $incident->title = "Refused medication: {$medication->name}";
-                    $incident->description = "Client refused {$medication->name}.\n\n".
+                    $incident->title = "Refused medication: {$medication->unrestrictedName()}";
+                    $incident->description = "Client refused {$medication->unrestrictedName()}.\n\n".
                         'Classification: '.($medication->high_risk ? 'High Risk' : '').
                         ($medication->controlled_drug ? ' Controlled Drug' : '')."\n".
                         'Reason given: '.($locked->reason ?? 'Not provided')."\n".
@@ -504,12 +504,12 @@ class MedicationIncidentIntegrationService
                     MedicationSignalService::TYPE_REFUSED_DOSE,
                     $client->id,
                     $medication->controlled_drug ? 'high' : 'medium',
-                    "Refused dose: {$medication->name}",
+                    "Refused dose: {$medication->unrestrictedName()}",
                     [
                         'incident_id' => $incident->id,
                         'client_medication_id' => $medication->id,
                         'administration_id' => $locked->id,
-                        'medication_name' => $medication->name,
+                        'medication_name' => $medication->unrestrictedName(),
                         'reason' => $locked->reason,
                         'controlled_drug' => $medication->controlled_drug,
                         'high_risk' => $medication->high_risk,
@@ -537,6 +537,7 @@ class MedicationIncidentIntegrationService
             $administration = $lockedFollowup?->administration;
             $medication = $administration?->medication;
             $medicationName = $medication?->name ?? 'Medication';
+            $publicMedicationName = $medication?->unrestrictedName() ?? 'Medication';
 
             if (! $lockedFollowup || ! $client) {
                 return null;
@@ -568,10 +569,10 @@ class MedicationIncidentIntegrationService
                 $incident = new ClientIncident;
                 $incident->client_id = $client->id;
                 $incident->site_id = $client->site_id;
-                $incident->title = "Repeated medication refusal: {$medicationName}";
+                $incident->title = "Repeated medication refusal: {$publicMedicationName}";
                 $incident->description = $this->buildRefusalEscalationDescription(
                     $lockedFollowup,
-                    $medicationName,
+                    $publicMedicationName,
                     $recentRefusalCount
                 );
                 $incident->category = 'medication';
@@ -609,13 +610,13 @@ class MedicationIncidentIntegrationService
                 MedicationSignalService::TYPE_REFUSAL_ESCALATION,
                 $client->id,
                 ($medication?->controlled_drug || $medication?->high_risk) ? 'high' : 'medium',
-                "{$medicationName}: repeated refusals require follow-up",
+                "{$publicMedicationName}: repeated refusals require follow-up",
                 [
                     'incident_id' => $incident->id,
                     'client_medication_id' => $medication?->id,
                     'administration_id' => $administration?->id,
                     'followup_id' => $lockedFollowup->id,
-                    'medication_name' => $medicationName,
+                    'medication_name' => $publicMedicationName,
                     'recent_refusal_count' => $recentRefusalCount,
                     'gp_notification_required' => (bool) $lockedFollowup->gp_notification_required,
                     'follow_up_due_at' => $lockedFollowup->follow_up_due_at?->toIso8601String(),
@@ -755,12 +756,11 @@ class MedicationIncidentIntegrationService
             MedicationSignalService::TYPE_TRANSIT_EXCEPTION,
             $client->id,
             'high',
-            "Controlled medication in transit: {$medicationName}",
+            $this->controlledEventTitle('in transit', $client),
             [
                 'client_medication_id' => $log->medication_id,
                 'transport_log_id' => $log->id,
                 'transport_id' => $log->transport_id,
-                'medication_name' => $medicationName,
                 'packed_at' => $log->packed_at?->toIso8601String(),
                 'packed_by' => $log->packed_by_user_id,
                 'packed_by_name' => $log->packedBy?->name,
@@ -928,7 +928,7 @@ class MedicationIncidentIntegrationService
         ClientMedication $medication
     ): string {
         $description = "Scheduled medication was not administered.\n\n";
-        $description .= "Medication: {$medication->name}\n";
+        $description .= "Medication: {$medication->unrestrictedName()}\n";
         $description .= 'Dosage: '.($medication->formatted_dose ?? 'N/A')."\n";
         $description .= 'Scheduled time: '.($administration->scheduled_for?->format('d/m/Y H:i') ?? 'Unknown')."\n";
         $description .= 'Classification: ';

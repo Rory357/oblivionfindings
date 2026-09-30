@@ -309,10 +309,10 @@ class MedicationAlertService
                 MedicationSignalService::TYPE_PRN_OVER_LIMIT,
                 $client->id,
                 'critical',
-                "{$medication->name}: PRN limit reached ({$count}/{$maxPerDay})",
+                "{$medication->unrestrictedName()}: PRN limit reached ({$count}/{$maxPerDay})",
                 [
                     'client_medication_id' => $medication->id,
-                    'medication_name' => $medication->name,
+                    'medication_name' => $medication->unrestrictedName(),
                     'prn_count_24h' => $count,
                     'max_per_day' => $maxPerDay,
                     'controlled_drug' => $medication->controlled_drug,
@@ -364,10 +364,10 @@ class MedicationAlertService
                 MedicationSignalService::TYPE_EXPIRED,
                 $client->id,
                 'high',
-                "{$medication->name}: Medication expired on {$medication->end_date->format('d/m/Y')}",
+                "{$medication->unrestrictedName()}: Medication expired on {$medication->end_date->format('d/m/Y')}",
                 [
                     'client_medication_id' => $medication->id,
-                    'medication_name' => $medication->name,
+                    'medication_name' => $medication->unrestrictedName(),
                     'expiry_date' => $medication->end_date->toDateString(),
                     'controlled_drug' => $medication->controlled_drug,
                     'high_risk' => $medication->high_risk,
@@ -422,10 +422,10 @@ class MedicationAlertService
                 MedicationSignalService::TYPE_STOCK_OUT,
                 $client->id,
                 'high',
-                "{$medication->name}: OUT OF STOCK — client cannot receive scheduled doses",
+                "{$medication->unrestrictedName()}: OUT OF STOCK — client cannot receive scheduled doses",
                 [
                     'client_medication_id' => $medication->id,
-                    'medication_name' => $medication->name,
+                    'medication_name' => $medication->unrestrictedName(),
                     'controlled_drug' => $medication->controlled_drug,
                     'high_risk' => $medication->high_risk,
                     'site_id' => $client->site_id,
@@ -485,7 +485,7 @@ class MedicationAlertService
 
                     if (! $recorded) {
                         $overdueCount++;
-                        $overdueMeds[] = $medication->name;
+                        $overdueMeds[] = $medication->unrestrictedName();
                     }
                 }
             }
@@ -552,15 +552,15 @@ class MedicationAlertService
             $openDiscrepancies->first()->client_medication_id
         );
 
-        // Operational signal → Control Room
+        // Operational signal → Control Room. The medicine names stay on the
+        // controlled-only dashboard alert above (EM-12).
         $this->signalService->emit(
             MedicationSignalService::TYPE_CONTROLLED_DISCREPANCY,
             $client->id,
             'critical',
-            "Controlled drug discrepancy: {$medNames}. Review required.",
+            "Controlled drug discrepancy: {$openDiscrepancies->count()} open. Review required.",
             [
                 'client_medication_id' => $openDiscrepancies->first()->client_medication_id,
-                'medication_names' => $medNames,
                 'discrepancy_count' => $openDiscrepancies->count(),
                 'discrepancy_ids' => $openDiscrepancies->pluck('id')->toArray(),
                 'site_id' => $client->site_id,
