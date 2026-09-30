@@ -1,6 +1,6 @@
 # eMAR P09 v1 — Reports & audit
 
-**Status: candidate v1 for Main’s approval.** Main is the review session, “Codex eMAR audit re-review”, acting under Stephan’s delegation. This design is not implemented.
+**Status: candidate v1.1 for Main’s approval.** v1 was inspected on 1 October; v1.1 makes Main’s one fixture fix and records the decisions (see “Main’s inspection of v1”). Main is the review session, “Codex eMAR audit re-review”, acting under Stephan’s delegation. This design is not implemented.
 
 - **Version:** v1, 1 October 2026 (NZDT). Branch `claude/emar-p09`, based on `origin/main` `33fb7a3c9`.
 - **Exact file identity:** [`VERSION.txt`](VERSION.txt), the SHA-256 of every source, build and tool file.
@@ -93,7 +93,7 @@ Rows open the person’s MAR for the period (P02). ⋯, right-click and the menu
 
 ### 3. The audit trail (Q7)
 
-- **Events:** 50 a page, newest first, filtered and paged on the server — “1–50 of 481” — with the real LaravelPagination. Each row shows the event, when (NZ), by whom, the person, and **its place in the chain** (#17,771 · Linked).
+- **Events:** 50 a page, newest first, filtered and paged on the server — “1–50 of 655” — with the real LaravelPagination. Each row shows the event, when (NZ), by whom, the person, and **its place in the chain** (#17,771 · Linked).
 - **An event:** its facts and its chain link — this event’s fingerprint, the one before it, and the check.
 - **Verify the chain:** each house checked from the first event — intact, with the latest event.
 - **Unrecorded doses:** every dose whose window ended with nothing recorded, **over the whole period**, with what was done about it (a follow-up, open or closed). Each is actionable: the MAR at that dose, report an error (P08b), open the follow-up.
@@ -156,7 +156,7 @@ Drawn as a P11 v5 frame, in its group/row pattern; **built with P09, not in B1**
    - `reports.viewAny` leaves the eMAR report routes (**end-review item**).
    - Identifiable exports need reports.view **and** `medications.reports.export` (provider_manager, coordinator).
    - The Stock report and its CSV need `medications.reports.export` or reports.view, with no people for finance and controlled lines hidden without controlled view.
-   - The audit-trail export for the auditor: `medications.audit.view` plus an export key — proposed **`medications.audit.export`** (provider_manager, coordinator, auditor); deviation 6.
+   - **New `medications.audit.export`** (Main, D6), with a grant migration to provider_manager, coordinator and auditor. It covers the audit-trail export only; every other identifiable export stays under `medications.reports.export`.
    - Deploys skip seeders, so every new key ships a grant migration.
 6. **Controlled medicines:** totals include them; the breakdown, named rows and builder sources need controlled view; audit rows are redacted inside, and the row stays (AUDIT 1.7).
 7. **The event log (Q7):**
@@ -220,6 +220,21 @@ Drawn as a P11 v5 frame, in its group/row pattern; **built with P09, not in B1**
   - The menu key opens the report row’s menu.
 - **`tsc` and ESLint:** clean for `src/` (ESLint: 22 files, 0 problems; no unused imports). The 1 `tsc` error in a shared file comes from P01’s Inertia shim, as in the earlier packages.
 
+## Main’s inspection of v1 (1 October 2026)
+
+Identity verified: VERSION.txt sha256 `30026f89…`, 36 files, docs-only, parent `33fb7a3c9`. Main checked the Doses arithmetic, the redacted controlled row kept in the event log, the purpose prompt, the event-log-down notice and the SAC severe dialog.
+
+- **Fixed in v1.1 — a future event.** “Medication error reported — MED-0048” was timed Mon 28 Sep, 9:00 pm, after the 9:12 am clock; every report event had a fixed 9:00 pm. Each error’s report event now takes P08b’s time (MED-0048 at 8:40 am). **Every fixture timestamp was then checked** against 9:12 am and against P07b and P08b where the records are shared:
+  - dose events use the recorded times the shared records give (Grace’s clonazepam at 8:05 am today; the cetirizine recorded at 11:00 on 21 Sep; the methylphenidate doses and their 4:30 pm correction; the oxycodone given at 7:05 am under witness override OV-9, so not witnessed); a late dose is recorded 65 minutes after it was due, and nothing today is later than 9:10 am;
+  - the omissions P08b reports (MED-0041, MED-0037) are missed doses, and MED-0040 is a late one;
+  - controlled counts at each shift change, per house, as P07b; D-14 at 7:00 am today; D-12 → L-7 on Fri 25 Sep; DS-21 at 8:45 am today; DS-19 on 25 Aug; D-9 on 24 Sep (P08b’s INC-2219);
+  - exports made at their own times; the SAC close and new exports at 9:12 am;
+  - stock as at 9:12 am from P07b’s register (clonazepam 20, methylphenidate 18, midazolam 4, oxycodone 9);
+  - the levothyroxine order change (which contradicted P05’s R-28) is removed; amoxicillin has no end date, as P04’s order.
+
+  The newest event is now DS-21 at 8:45 am.
+- **D2, D4, D5, D7 → accepted.** **D6 → accepted:** the new `medications.audit.export` (build note 5).
+
 ## Deviations (for Main)
 
 1. **Reference frames are reproduced:**
@@ -231,10 +246,10 @@ Drawn as a P11 v5 frame, in its group/row pattern; **built with P09, not in B1**
    - The preview answers the builder’s requests with synthetic results (`src/builder-stub.ts`, mockup infrastructure).
    - The Inertia shim gained `push`, `flushAll` and wider parameter types, so the builder and the shared shell type-check. Behaviour is unchanged.
 3. **Synthetic dose slots** are generated by one deterministic rule from the orders. The projection itself is P01’s build.
-4. **The audit chain’s fingerprints are synthetic** (FNV, eight hex digits) — the build uses a cryptographic hash (build note 7).
+4. **The audit chain’s fingerprints are synthetic** (FNV, eight hex digits) — the build uses SHA-256 (build note 7). Accepted (Main, 1 Oct).
 5. **`sac=on`** is a viewer-only link parameter that shows closing with SAC without saving the setting first. The settings flow (`97`) shows it from the saved setting.
-6. **The auditor’s audit-trail export key** — proposed `medications.audit.export` (provider_manager, coordinator, auditor), because today’s audit export needs `medications.reports.export`, which the auditor doesn’t hold. For Main to confirm the key name.
-7. **Fixtures** follow P02–P08b’s people, orders and errors. Additions:
+6. **The auditor’s audit-trail export key — decided (Main, D6):** a new `medications.audit.export`, granted to provider_manager, coordinator and auditor, for the audit-trail export only (build note 5).
+7. **Fixtures** follow P02–P08b’s people, orders and errors, with P07b’s controlled register — Ben’s oxycodone, the shift-change counts (7:00 am and 7:00 pm; Rimu ten minutes later), D-14 this morning, D-12 → L-7 on Friday, DS-21 today and DS-19 in August, and the methylphenidate correction — and each error reported at P08b’s time (v1.1). Additions:
    - Hemi (as-needed medicines only) and Leilani (finance).
    - Aroha’s ferrous sulfate, ceased in August.
    - MED-0049, severe harm, ready to close (with INC-2226).

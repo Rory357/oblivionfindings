@@ -371,12 +371,12 @@ export function controlled(c: Ctx, ctxMenu: ReturnType<typeof useCtx>): Built {
         <>
             <Meter label="Controlled doses given" value={c.dash ?? x.given} caption={c.dash ? '—' : 'Scheduled and as needed'} aria={`${x.given} controlled doses given`} />
             <Meter label="Witnessed" value={c.dash ?? pct(x.witnessed, x.given) ?? NA} caption={c.dash ? '—' : x.given ? `${x.witnessed} of ${x.given}` : 'No controlled dose given'} aria={`Witnessed: ${pct(x.witnessed, x.given) ?? NA}`} />
-            <Meter label="Counts done" value={c.dash ?? x.counts} caption={c.dash ? '—' : 'Twice a day'} aria={`${x.counts} counts done`} />
+            <Meter label="Counts done" value={c.dash ?? x.counts} caption={c.dash ? '—' : 'At each shift change'} aria={`${x.counts} counts done`} />
             <Meter label="Discrepancies" value={c.dash ?? x.discrepancies.length} tone={!c.dash && openD ? 'critical' : 'brand'} caption={c.dash ? '—' : openD ? `${openD} still open` : 'None open'} aria={`${x.discrepancies.length} discrepancies`} />
             <Meter label="Losses" value={c.dash ?? x.losses.length} tone={!c.dash && x.losses.length ? 'warning' : 'brand'} caption={c.dash ? '—' : `${x.destructions.length} destroyed`} aria={`${x.losses.length} losses`} />
         </>
     );
-    const events = [...x.discrepancies.map((d) => ({ id: d.id, kind: 'Discrepancy', day: d.day, orderId: d.orderId, what: d.what, state: d.state === 'open' ? 'Open' : 'Closed' })), ...x.losses.map((d) => ({ id: d.id, kind: 'Loss', day: d.day, orderId: d.orderId, what: d.what, state: 'Waiting for a manager' })), ...x.destructions.map((d) => ({ id: d.id, kind: 'Destruction', day: d.day, orderId: d.orderId, what: d.what, state: 'Done' }))].sort((a, b) => b.day.localeCompare(a.day));
+    const events = [...x.discrepancies.map((d) => ({ id: d.id, kind: 'Discrepancy', day: d.day, orderId: d.orderId, what: d.what, state: d.state === 'open' ? 'Open' : 'Closed' })), ...x.losses.map((d) => ({ id: d.id, kind: 'Loss', day: d.day, orderId: d.orderId, what: d.what, state: 'Waiting for a manager' })), ...x.destructions.map((d) => ({ id: d.id, kind: 'Destruction', day: d.day, orderId: d.orderId, what: d.what, state: 'Returned to the pharmacy' }))].sort((a, b) => b.day.localeCompare(a.day));
     const body = (
         <>
             <Section title="By medicine" caption={`${x.byOrder.length} shown · ${c.period.text}`}>
@@ -390,7 +390,7 @@ export function controlled(c: Ctx, ctxMenu: ReturnType<typeof useCtx>): Built {
                     identity={(r) => ({ icon: LockKeyhole, name: r.order.med, subline: <Wrap>{r.order.strength} · {PEOPLE[r.order.pid].legal} · {HOUSES[PEOPLE[r.order.pid].house]}</Wrap> })}
                     columns={[
                         { key: 'given', label: 'Doses given', width: '0.8fr', align: 'right', cell: (r) => <Num n={r.given} /> },
-                        { key: 'wit', label: 'Witnessed', width: '0.8fr', align: 'right', cell: (r) => <Rate n={r.given} d={r.given} reason="None given" /> },
+                        { key: 'wit', label: 'Witnessed', width: '1fr', cell: (r) => <Rate n={r.witnessed} d={r.given} reason="None given" /> },
                         { key: 'kind', label: 'Given', width: '0.8fr', cell: (r) => <span className="text-[12.5px]">{r.order.prn ? 'As needed' : 'Scheduled'}</span> },
                     ]}
                     actionsFor={menu}

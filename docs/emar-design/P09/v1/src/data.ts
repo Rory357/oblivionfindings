@@ -73,13 +73,14 @@ export const ORDERS: Order[] = [
     { id: 'o-levetiracetam', pid: 'tama', med: 'Levetiracetam', strength: '500 mg tablet', times: ['08:00', '20:00'] },
     { id: 'o-midazolam', pid: 'tama', med: 'Midazolam', strength: '5 mg/mL buccal syringe', times: [], cd: true, prn: true },
     { id: 'o-omeprazole', pid: 'mele', med: 'Omeprazole', strength: '20 mg capsule', times: ['09:00'] },
-    { id: 'o-amoxicillin', pid: 'mele', med: 'Amoxicillin', strength: '500 mg capsule', times: ['08:00', '14:00', '20:00'], from: '2026-09-21', to: '2026-09-27' },
+    { id: 'o-amoxicillin', pid: 'mele', med: 'Amoxicillin', strength: '500 mg capsule', times: ['08:00', '14:00', '20:00'] },
     { id: 'o-sertraline', pid: 'grace', med: 'Sertraline', strength: '50 mg tablet', times: ['08:00'] },
     { id: 'o-levothyroxine', pid: 'grace', med: 'Levothyroxine', strength: '50 microgram tablet', times: ['09:00'] },
     { id: 'o-clonazepam', pid: 'grace', med: 'Clonazepam', strength: '0.5 mg tablet', times: ['09:00'], cd: true },
     { id: 'o-melatonin', pid: 'sam', med: 'Melatonin', strength: '3 mg modified-release tablet', times: ['20:30'] },
     { id: 'o-cetirizine', pid: 'sam', med: 'Cetirizine', strength: '10 mg tablet', times: ['08:00'] },
     { id: 'o-amlodipine', pid: 'ben', med: 'Amlodipine', strength: '5 mg tablet', times: ['09:00'] },
+    { id: 'o-oxycodone', pid: 'ben', med: 'Oxycodone', strength: '5 mg tablet', times: ['07:00', '20:00'], cd: true },
     { id: 'o-paracetamol-ben', pid: 'ben', med: 'Paracetamol', strength: '500 mg tablet', times: [], prn: true },
     { id: 'o-paracetamol-hemi', pid: 'hemi', med: 'Paracetamol', strength: '500 mg tablet', times: [], prn: true },
     // Ceased in August — still on August’s MAR (Q8: ceased medicines stay on historical MARs)
@@ -102,22 +103,32 @@ export function fnv(s: string) {
     return h >>> 0;
 }
 /** Recorded exceptions that the P08a/P08b fixtures describe. */
-export const SLOT_OVERRIDES: Record<string, { outcome: Outcome; late?: boolean; note?: string }> = {
-    'o-levetiracetam|2026-09-27|20:00': { outcome: 'missed', note: 'Reported as MED-0047' },
-    'o-cetirizine|2026-09-21|08:00': { outcome: 'given', late: true, note: 'Recorded at 11:00 — MED-0044' },
+export const SLOT_OVERRIDES: Record<string, { outcome: Outcome; late?: boolean; note?: string; by?: string; at?: string; unwitnessed?: boolean }> = {
+    'o-levetiracetam|2026-09-27|20:00': { outcome: 'missed', by: 'Daniel Ahn', at: '21:35', note: 'Reported as MED-0047' },
+    'o-cetirizine|2026-09-21|08:00': { outcome: 'given', late: true, by: 'Priya Shah', at: '11:00', note: 'Given at 8:00, recorded at 11:00 — MED-0044' },
+    'o-melatonin|2026-09-16|20:30': { outcome: 'missed', by: 'Mere Kahu', at: '21:10', note: 'Reported as MED-0041' },
+    'o-amlodipine|2026-08-19|09:00': { outcome: 'missed', by: 'Ana Lemalu', at: '10:15', note: 'Reported as MED-0037' },
+    'o-levetiracetam|2026-09-10|08:00': { outcome: 'given', late: true, by: 'Mere Kahu', at: '09:20', note: 'Given at the wrong time — MED-0040' },
+    'o-clonazepam|2026-09-26|09:00': { outcome: 'given', by: 'Mere Kahu', at: '09:02' },
+    'o-clonazepam|2026-09-27|09:00': { outcome: 'given', by: 'Priya Shah', at: '09:00' },
+    'o-methylphenidate|2026-09-24|12:00': { outcome: 'given', by: 'Mere Kahu', at: '12:00' },
+    'o-methylphenidate|2026-09-25|12:00': { outcome: 'given', by: 'Priya Shah', at: '12:10', note: 'Recorded as 2 tablets; corrected to 1 at 4:30 pm' },
+    'o-methylphenidate|2026-09-26|12:00': { outcome: 'given', by: 'Mere Kahu', at: '12:05' },
+    'o-oxycodone|2026-09-27|20:00': { outcome: 'given', by: 'Ana Lemalu', at: '20:00' },
+    'o-oxycodone|2026-09-28|07:00': { outcome: 'given', by: 'Sione Taufa', at: '07:05', unwitnessed: true, note: 'Given under witness override OV-9 — no second person on shift' },
     'o-losartan|2026-09-14|09:00': { outcome: 'notRecorded' },
     'o-sertraline|2026-09-24|08:00': { outcome: 'notRecorded' },
     'o-amlodipine|2026-09-19|09:00': { outcome: 'notRecorded' },
     'o-melatonin|2026-08-11|20:30': { outcome: 'notRecorded' },
 };
-export function slotOutcome(orderId: string, day: string, time: string): { outcome: Outcome; late: boolean; by: string } {
+export function slotOutcome(orderId: string, day: string, time: string): { outcome: Outcome; late: boolean; by: string; at?: string; unwitnessed?: boolean; note?: string } {
     const key = `${orderId}|${day}|${time}`;
     const h = fnv(key);
     const house = PEOPLE[orderOf(orderId).pid].house;
     const staff = house === 'kowhai' ? STAFF_KOWHAI : STAFF_RIMU;
     const by = staff[h % staff.length];
     const o = SLOT_OVERRIDES[key];
-    if (o) return { outcome: o.outcome, late: !!o.late, by };
+    if (o) return { outcome: o.outcome, late: !!o.late, by: o.by ?? by, at: o.at, unwitnessed: o.unwitnessed, note: o.note };
     const r = h % 1000;
     const outcome: Outcome = r < 962 ? 'given' : r < 983 ? 'refused' : 'withheld';
     return { outcome, late: outcome === 'given' && h % 31 === 0, by };
@@ -142,13 +153,18 @@ export const PRN_DOSES: PrnDose[] = [
 
 /* ───────────── controlled medicines (P07a / P07b) ───────────── */
 export const CD_EVENTS = {
-    counts: { kowhai: 56, rimu: 0 },
+    /** Witnessed counts at each shift change (P07b: 7:00 am and 7:00 pm; Rimu ten minutes later). */
+    counts: { kowhai: { times: ['07:00', '19:00'], by: ['Priya Shah', 'Daniel Ahn'] }, rimu: { times: ['07:10', '19:10'], by: ['Ana Lemalu', 'Sione Taufa'] } },
     discrepancies: [
-        { id: 'D-14', orderId: 'o-clonazepam', day: '2026-09-26', state: 'open' as const, what: 'Count 1 tablet short at the evening check' },
-        { id: 'D-9', orderId: 'o-methylphenidate', day: '2026-09-22', state: 'closed' as const, what: 'Recount matched — a counting slip' },
+        { id: 'D-14', orderId: 'o-clonazepam', day: '2026-09-28', hm: '07:00', by: 'Priya Shah', state: 'open' as const, what: 'Counted 21, expected 22 — witnessed by Daniel Ahn' },
+        { id: 'D-12', orderId: 'o-midazolam', day: '2026-09-25', hm: '15:30', by: 'Mere Kahu', state: 'closed' as const, what: 'Counted 5, expected 6 — closed as loss L-7' },
+        { id: 'D-9', orderId: 'o-methylphenidate', day: '2026-09-24', hm: '15:00', by: 'Jordan Tipene', state: 'closed' as const, what: 'Recount matched — a counting slip' },
     ],
-    losses: [{ id: 'L-7', orderId: 'o-midazolam', day: '2026-09-20', state: 'waiting' as const, what: 'Syringe dropped and contaminated' }],
-    destructions: [{ id: 'X-4', orderId: 'o-clonazepam', day: '2026-09-10', what: '2 tablets returned to the pharmacy for destruction' }],
+    losses: [{ id: 'L-7', orderId: 'o-midazolam', day: '2026-09-25', hm: '16:10', by: 'Jordan Tipene', state: 'waiting' as const, what: 'One syringe missing at the 3:30 pm count — unexplained' }],
+    destructions: [
+        { id: 'DS-21', orderId: 'o-midazolam', day: '2026-09-28', hm: '08:45', by: 'Jordan Tipene', what: '1 expired syringe returned to Kōwhai Pharmacy' },
+        { id: 'DS-19', orderId: 'o-clonazepam', day: '2026-08-25', hm: '14:00', by: 'Jordan Tipene', what: '6 tablets returned to Kōwhai Pharmacy — stopped by the prescriber' },
+    ],
 };
 
 /* ───────────── medication errors (P08b v1.1 fixtures, plus MED-0049) ───────────── */
@@ -179,28 +195,31 @@ export interface MedError {
     stage: 'triage' | 'investigating' | 'actions' | 'closed';
     owner?: string;
     reportedBy: string;
+    /** When it was reported — P08b’s time, NZ. */
+    reportedIso: string;
+    reportedHm: string;
     openActions: number;
     told: boolean;
     incident?: string;
     closed?: { by: string; at: string; note: string; sac?: Sac };
 }
 export const ERRORS: MedError[] = [
-    { id: 'MED-0048', pid: 'grace', orderIds: ['o-clonazepam'], type: 'wrongTime', occurred: 'Mon 28 Sep, 8:05 am', occurredIso: '2026-09-28', reached: 'yes', harm: 'none', stage: 'triage', reportedBy: 'Priya Shah', openActions: 0, told: false },
-    { id: 'MED-0047', pid: 'tama', orderIds: ['o-levetiracetam'], type: 'omission', occurred: 'Sun 27 Sep, 8:00 pm', occurredIso: '2026-09-27', reached: 'yes', harm: 'minor', stage: 'investigating', owner: 'Jordan Tipene', reportedBy: 'Daniel Ahn', openActions: 0, told: true },
-    { id: 'MED-0045', pid: 'aroha', orderIds: ['o-insulin'], type: 'wrongDose', occurred: 'Fri 25 Sep, 9:05 am', occurredIso: '2026-09-25', reached: 'yes', harm: 'moderate', stage: 'actions', owner: 'Jordan Tipene', reportedBy: 'Priya Shah', openActions: 1, told: true, incident: 'INC-2236' },
-    { id: 'MED-0044', pid: 'sam', orderIds: ['o-cetirizine'], type: 'recorded', occurred: 'Mon 21 Sep, 8:00 am', occurredIso: '2026-09-21', reached: 'yes', harm: 'none', stage: 'actions', owner: 'Jordan Tipene', reportedBy: 'Priya Shah', openActions: 0, told: true },
-    { id: 'MED-0043', pid: 'mele', orderIds: [], type: 'wrongPerson', occurred: 'Mon 21 Sep, 8:00 am', occurredIso: '2026-09-21', reached: 'no', harm: 'none', stage: 'closed', owner: 'Jordan Tipene', reportedBy: 'Mere Kahu', openActions: 0, told: false, closed: { by: 'Jordan Tipene', at: 'Tue 22 Sep, 11:30 am', note: 'Near miss — caught at the name check. Shelves separated.' } },
-    { id: 'MED-0042', pid: 'aroha', orderIds: ['o-metformin', 'o-losartan'], type: 'wrongMedicine', occurred: 'Mon 21 Sep, 12:00 pm', occurredIso: '2026-09-21', reached: 'yes', harm: 'moderate', stage: 'closed', owner: 'Jordan Tipene', reportedBy: 'Mere Kahu', openActions: 0, told: true, incident: 'INC-2229', closed: { by: 'Jordan Tipene', at: 'Sat 26 Sep, 10:00 am', note: 'Packs stored in time order; no further harm; Aroha and Wiki told.' } },
-    { id: 'MED-0046', pid: 'ben', orderIds: ['o-amlodipine'], type: 'recorded', occurred: 'Sat 26 Sep, 9:00 am', occurredIso: '2026-09-26', reached: 'yes', harm: 'none', stage: 'investigating', owner: 'Sione Taufa', reportedBy: 'Sione Taufa', openActions: 0, told: false },
+    { id: 'MED-0048', pid: 'grace', orderIds: ['o-clonazepam'], type: 'wrongTime', occurred: 'Mon 28 Sep, 8:05 am', occurredIso: '2026-09-28', reached: 'yes', harm: 'none', stage: 'triage', reportedBy: 'Priya Shah', reportedIso: '2026-09-28', reportedHm: '08:40', openActions: 0, told: false },
+    { id: 'MED-0047', pid: 'tama', orderIds: ['o-levetiracetam'], type: 'omission', occurred: 'Sun 27 Sep, 8:00 pm', occurredIso: '2026-09-27', reached: 'yes', harm: 'minor', stage: 'investigating', owner: 'Jordan Tipene', reportedBy: 'Daniel Ahn', reportedIso: '2026-09-27', reportedHm: '21:40', openActions: 0, told: true },
+    { id: 'MED-0045', pid: 'aroha', orderIds: ['o-insulin'], type: 'wrongDose', occurred: 'Fri 25 Sep, 9:05 am', occurredIso: '2026-09-25', reached: 'yes', harm: 'moderate', stage: 'actions', owner: 'Jordan Tipene', reportedBy: 'Priya Shah', reportedIso: '2026-09-25', reportedHm: '09:10', openActions: 1, told: true, incident: 'INC-2236' },
+    { id: 'MED-0044', pid: 'sam', orderIds: ['o-cetirizine'], type: 'recorded', occurred: 'Mon 21 Sep, 8:00 am', occurredIso: '2026-09-21', reached: 'yes', harm: 'none', stage: 'actions', owner: 'Jordan Tipene', reportedBy: 'Priya Shah', reportedIso: '2026-09-21', reportedHm: '11:05', openActions: 0, told: true },
+    { id: 'MED-0043', pid: 'mele', orderIds: [], type: 'wrongPerson', occurred: 'Mon 21 Sep, 8:00 am', occurredIso: '2026-09-21', reached: 'no', harm: 'none', stage: 'closed', owner: 'Jordan Tipene', reportedBy: 'Mere Kahu', reportedIso: '2026-09-21', reportedHm: '08:15', openActions: 0, told: false, closed: { by: 'Jordan Tipene', at: 'Tue 22 Sep, 11:30 am', note: 'Near miss — caught at the name check. Shelves separated.' } },
+    { id: 'MED-0042', pid: 'aroha', orderIds: ['o-metformin', 'o-losartan'], type: 'wrongMedicine', occurred: 'Mon 21 Sep, 12:00 pm', occurredIso: '2026-09-21', reached: 'yes', harm: 'moderate', stage: 'closed', owner: 'Jordan Tipene', reportedBy: 'Mere Kahu', reportedIso: '2026-09-21', reportedHm: '12:20', openActions: 0, told: true, incident: 'INC-2229', closed: { by: 'Jordan Tipene', at: 'Sat 26 Sep, 10:00 am', note: 'Packs stored in time order; no further harm; Aroha and Wiki told.' } },
+    { id: 'MED-0046', pid: 'ben', orderIds: ['o-amlodipine'], type: 'recorded', occurred: 'Sat 26 Sep, 9:00 am', occurredIso: '2026-09-26', reached: 'yes', harm: 'none', stage: 'investigating', owner: 'Sione Taufa', reportedBy: 'Sione Taufa', reportedIso: '2026-09-26', reportedHm: '18:00', openActions: 0, told: false },
     // P09’s addition: a severe-harm error, ready to close, to show the SAC choice (Main, Q11)
-    { id: 'MED-0049', pid: 'ben', orderIds: ['o-amlodipine'], type: 'wrongDose', occurred: 'Tue 15 Sep, 9:00 am', occurredIso: '2026-09-15', reached: 'yes', harm: 'severe', stage: 'actions', owner: 'Sione Taufa', reportedBy: 'Ana Lemalu', openActions: 0, told: true, incident: 'INC-2226' },
+    { id: 'MED-0049', pid: 'ben', orderIds: ['o-amlodipine'], type: 'wrongDose', occurred: 'Tue 15 Sep, 9:00 am', occurredIso: '2026-09-15', reached: 'yes', harm: 'severe', stage: 'actions', owner: 'Sione Taufa', reportedBy: 'Ana Lemalu', reportedIso: '2026-09-15', reportedHm: '09:30', openActions: 0, told: true, incident: 'INC-2226' },
     // Older closed reports (P08b)
-    { id: 'MED-0041', pid: 'sam', orderIds: ['o-melatonin'], type: 'omission', occurred: 'Wed 16 Sep, 8:30 pm', occurredIso: '2026-09-16', reached: 'yes', harm: 'none', stage: 'closed', reportedBy: 'Mere Kahu', openActions: 0, told: true, closed: { by: 'Jordan Tipene', at: 'Fri 18 Sep, 3:00 pm', note: 'Looked into and closed. (Synthetic.)' } },
-    { id: 'MED-0040', pid: 'tama', orderIds: ['o-levetiracetam'], type: 'wrongTime', occurred: 'Thu 10 Sep, 8:00 am', occurredIso: '2026-09-10', reached: 'yes', harm: 'none', stage: 'closed', reportedBy: 'Mere Kahu', openActions: 0, told: true, closed: { by: 'Jordan Tipene', at: 'Mon 14 Sep, 10:00 am', note: 'Looked into and closed. (Synthetic.)' } },
-    { id: 'MED-0039', pid: 'mele', orderIds: ['o-amoxicillin'], type: 'recorded', occurred: 'Fri 4 Sep, 2:00 pm', occurredIso: '2026-09-04', reached: 'no', harm: 'none', stage: 'closed', reportedBy: 'Mere Kahu', openActions: 0, told: false, closed: { by: 'Jordan Tipene', at: 'Mon 7 Sep, 11:00 am', note: 'Looked into and closed. (Synthetic.)' } },
-    { id: 'MED-0038', pid: 'aroha', orderIds: ['o-metformin'], type: 'wrongDose', occurred: 'Thu 27 Aug, 12:00 pm', occurredIso: '2026-08-27', reached: 'yes', harm: 'minor', stage: 'closed', reportedBy: 'Mere Kahu', openActions: 0, told: true, closed: { by: 'Jordan Tipene', at: 'Wed 2 Sep, 4:00 pm', note: 'Looked into and closed. (Synthetic.)' } },
-    { id: 'MED-0037', pid: 'ben', orderIds: ['o-amlodipine'], type: 'omission', occurred: 'Wed 19 Aug, 9:00 am', occurredIso: '2026-08-19', reached: 'yes', harm: 'none', stage: 'closed', reportedBy: 'Ana Lemalu', openActions: 0, told: true, closed: { by: 'Sione Taufa', at: 'Fri 21 Aug, 9:30 am', note: 'Looked into and closed. (Synthetic.)' } },
-    { id: 'MED-0036', pid: 'grace', orderIds: ['o-sertraline'], type: 'wrongTime', occurred: 'Wed 12 Aug, 8:00 am', occurredIso: '2026-08-12', reached: 'no', harm: 'none', stage: 'closed', reportedBy: 'Mere Kahu', openActions: 0, told: false, closed: { by: 'Jordan Tipene', at: 'Thu 13 Aug, 2:00 pm', note: 'Looked into and closed. (Synthetic.)' } },
+    { id: 'MED-0041', pid: 'sam', orderIds: ['o-melatonin'], type: 'omission', occurred: 'Wed 16 Sep, 8:30 pm', occurredIso: '2026-09-16', reached: 'yes', harm: 'none', stage: 'closed', reportedBy: 'Mere Kahu', reportedIso: '2026-09-16', reportedHm: '20:30', openActions: 0, told: true, closed: { by: 'Jordan Tipene', at: 'Fri 18 Sep, 3:00 pm', note: 'Looked into and closed. (Synthetic.)' } },
+    { id: 'MED-0040', pid: 'tama', orderIds: ['o-levetiracetam'], type: 'wrongTime', occurred: 'Thu 10 Sep, 8:00 am', occurredIso: '2026-09-10', reached: 'yes', harm: 'none', stage: 'closed', reportedBy: 'Mere Kahu', reportedIso: '2026-09-10', reportedHm: '08:00', openActions: 0, told: true, closed: { by: 'Jordan Tipene', at: 'Mon 14 Sep, 10:00 am', note: 'Looked into and closed. (Synthetic.)' } },
+    { id: 'MED-0039', pid: 'mele', orderIds: ['o-amoxicillin'], type: 'recorded', occurred: 'Fri 4 Sep, 2:00 pm', occurredIso: '2026-09-04', reached: 'no', harm: 'none', stage: 'closed', reportedBy: 'Mere Kahu', reportedIso: '2026-09-04', reportedHm: '14:00', openActions: 0, told: false, closed: { by: 'Jordan Tipene', at: 'Mon 7 Sep, 11:00 am', note: 'Looked into and closed. (Synthetic.)' } },
+    { id: 'MED-0038', pid: 'aroha', orderIds: ['o-metformin'], type: 'wrongDose', occurred: 'Thu 27 Aug, 12:00 pm', occurredIso: '2026-08-27', reached: 'yes', harm: 'minor', stage: 'closed', reportedBy: 'Mere Kahu', reportedIso: '2026-08-27', reportedHm: '12:00', openActions: 0, told: true, closed: { by: 'Jordan Tipene', at: 'Wed 2 Sep, 4:00 pm', note: 'Looked into and closed. (Synthetic.)' } },
+    { id: 'MED-0037', pid: 'ben', orderIds: ['o-amlodipine'], type: 'omission', occurred: 'Wed 19 Aug, 9:00 am', occurredIso: '2026-08-19', reached: 'yes', harm: 'none', stage: 'closed', reportedBy: 'Ana Lemalu', reportedIso: '2026-08-19', reportedHm: '09:00', openActions: 0, told: true, closed: { by: 'Sione Taufa', at: 'Fri 21 Aug, 9:30 am', note: 'Looked into and closed. (Synthetic.)' } },
+    { id: 'MED-0036', pid: 'grace', orderIds: ['o-sertraline'], type: 'wrongTime', occurred: 'Wed 12 Aug, 8:00 am', occurredIso: '2026-08-12', reached: 'no', harm: 'none', stage: 'closed', reportedBy: 'Mere Kahu', reportedIso: '2026-08-12', reportedHm: '08:00', openActions: 0, told: false, closed: { by: 'Jordan Tipene', at: 'Thu 13 Aug, 2:00 pm', note: 'Looked into and closed. (Synthetic.)' } },
 ];
 
 /* ───────────── medication reviews (P05 v1.1) ───────────── */
@@ -238,21 +257,22 @@ export const STOCK: StockLine[] = [
     { orderId: 'o-metformin', onHand: 44, unit: 'tablets', perDay: 2, reorderAt: 28, expires: 'Mar 2027', expiresIso: '2027-03-31' },
     { orderId: 'o-losartan', onHand: 9, unit: 'tablets', perDay: 1, reorderAt: 14, expires: 'Jan 2027', expiresIso: '2027-01-31' },
     { orderId: 'o-insulin', onHand: 2, unit: 'pens', perDay: 0.1, reorderAt: 1, expires: '20 Oct 2026', expiresIso: '2026-10-20' },
-    { orderId: 'o-methylphenidate', onHand: 23, unit: 'tablets', perDay: 1, reorderAt: 14, expires: 'Jun 2027', expiresIso: '2027-06-30' },
+    { orderId: 'o-methylphenidate', onHand: 18, unit: 'tablets', perDay: 1, reorderAt: 14, expires: 'Jun 2027', expiresIso: '2027-06-30' },
     { orderId: 'o-levetiracetam', onHand: 5, unit: 'tablets', perDay: 2, reorderAt: 28, expires: 'Feb 2027', expiresIso: '2027-02-28' },
-    { orderId: 'o-midazolam', onHand: 3, unit: 'syringes', perDay: 0, reorderAt: 2, expires: '12 Oct 2026', expiresIso: '2026-10-12' },
+    { orderId: 'o-midazolam', onHand: 4, unit: 'syringes', perDay: 0, reorderAt: 2, expires: '12 Oct 2026', expiresIso: '2026-10-12' },
     { orderId: 'o-omeprazole', onHand: 31, unit: 'capsules', perDay: 1, reorderAt: 14, expires: 'Apr 2027', expiresIso: '2027-04-30' },
     { orderId: 'o-sertraline', onHand: 27, unit: 'tablets', perDay: 1, reorderAt: 14, expires: 'May 2027', expiresIso: '2027-05-31' },
     { orderId: 'o-levothyroxine', onHand: 60, unit: 'tablets', perDay: 1, reorderAt: 14, expires: 'Nov 2026', expiresIso: '2026-11-30' },
-    { orderId: 'o-clonazepam', onHand: 17, unit: 'tablets', perDay: 1, reorderAt: 14, expires: 'Aug 2027', expiresIso: '2027-08-31' },
+    { orderId: 'o-clonazepam', onHand: 20, unit: 'tablets', perDay: 1, reorderAt: 14, expires: 'Aug 2027', expiresIso: '2027-08-31' },
     { orderId: 'o-melatonin', onHand: 12, unit: 'tablets', perDay: 1, reorderAt: 14, expires: 'Dec 2026', expiresIso: '2026-12-31' },
     { orderId: 'o-cetirizine', onHand: 40, unit: 'tablets', perDay: 1, reorderAt: 14, expires: 'Sep 2027', expiresIso: '2027-09-30' },
     { orderId: 'o-amlodipine', onHand: 21, unit: 'tablets', perDay: 1, reorderAt: 14, expires: 'Jul 2027', expiresIso: '2027-07-31' },
+    { orderId: 'o-oxycodone', onHand: 9, unit: 'tablets', perDay: 2, reorderAt: 14, expires: 'May 2027', expiresIso: '2027-05-31' },
     { orderId: 'o-paracetamol-ben', onHand: 38, unit: 'tablets', perDay: 0, reorderAt: 10, expires: 'Oct 2027', expiresIso: '2027-10-31' },
     { orderId: 'o-paracetamol-hemi', onHand: 20, unit: 'tablets', perDay: 0, reorderAt: 10, expires: 'Oct 2027', expiresIso: '2027-10-31' },
 ];
 /** What finance sees per line: cost only, no person (Main, Q5). */
-export const UNIT_COST: Record<string, number> = { 'o-metformin': 0.06, 'o-losartan': 0.11, 'o-insulin': 21.4, 'o-methylphenidate': 0.52, 'o-levetiracetam': 0.35, 'o-midazolam': 18.9, 'o-omeprazole': 0.09, 'o-sertraline': 0.12, 'o-levothyroxine': 0.07, 'o-clonazepam': 0.14, 'o-melatonin': 0.48, 'o-cetirizine': 0.05, 'o-amlodipine': 0.04, 'o-paracetamol-ben': 0.02, 'o-paracetamol-hemi': 0.02 };
+export const UNIT_COST: Record<string, number> = { 'o-metformin': 0.06, 'o-losartan': 0.11, 'o-insulin': 21.4, 'o-methylphenidate': 0.52, 'o-levetiracetam': 0.35, 'o-midazolam': 18.9, 'o-omeprazole': 0.09, 'o-sertraline': 0.12, 'o-levothyroxine': 0.07, 'o-clonazepam': 0.14, 'o-melatonin': 0.48, 'o-cetirizine': 0.05, 'o-amlodipine': 0.04, 'o-oxycodone': 0.85, 'o-paracetamol-ben': 0.02, 'o-paracetamol-hemi': 0.02 };
 
 /* ───────────── staff who give medicines (P11 eligibility) ───────────── */
 export interface Staff {
@@ -277,6 +297,8 @@ export const STAFF: Staff[] = [
 /* ───────────── exports made (the audit trail’s “Exports made”) ───────────── */
 export interface ExportMade {
     id: string;
+    /** The time it was made, NZ (24-hour) — the audit event’s time. */
+    hm?: string;
     what: string;
     detail: string;
     by: string;
@@ -286,10 +308,10 @@ export interface ExportMade {
     house: House;
 }
 export const EXPORTS: ExportMade[] = [
-    { id: 'EX-118', what: 'MAR (PDF)', detail: 'Aroha Mere Ngata · August 2026', by: 'Rangi Parata', at: 'Fri 25 Sep, 2:14 pm', day: '2026-09-25', purpose: 'Asked for by the person or whānau', house: 'kowhai' },
-    { id: 'EX-117', what: 'Audit trail (CSV)', detail: 'Kōwhai House · 1–21 Sep', by: 'Mereana Walsh', at: 'Tue 22 Sep, 10:02 am', day: '2026-09-22', purpose: 'Audit or inspection', house: 'kowhai' },
-    { id: 'EX-116', what: 'Controlled drug register (PDF)', detail: 'Clonazepam 0.5 mg · Grace Liu', by: 'Rangi Parata', at: 'Mon 21 Sep, 4:40 pm', day: '2026-09-21', purpose: 'Looking into an incident', house: 'kowhai' },
-    { id: 'EX-115', what: 'Stock (CSV)', detail: 'Both houses · as at 1 Sep', by: 'Leilani Faleolo', at: 'Tue 1 Sep, 9:30 am', day: '2026-09-01', purpose: 'Costs and budgeting', house: 'kowhai' },
+    { id: 'EX-118', what: 'MAR (PDF)', detail: 'Aroha Mere Ngata · August 2026', by: 'Rangi Parata', at: 'Fri 25 Sep, 2:14 pm', day: '2026-09-25', hm: '14:14', purpose: 'Asked for by the person or whānau', house: 'kowhai' },
+    { id: 'EX-117', what: 'Audit trail (CSV)', detail: 'Kōwhai House · 1–21 Sep', by: 'Mereana Walsh', at: 'Tue 22 Sep, 10:02 am', day: '2026-09-22', hm: '10:02', purpose: 'Audit or inspection', house: 'kowhai' },
+    { id: 'EX-116', what: 'Controlled drug register (PDF)', detail: 'Clonazepam 0.5 mg · Grace Liu', by: 'Rangi Parata', at: 'Mon 21 Sep, 4:40 pm', day: '2026-09-21', hm: '16:40', purpose: 'Looking into an incident', house: 'kowhai' },
+    { id: 'EX-115', what: 'Stock (CSV)', detail: 'Both houses · as at 1 Sep', by: 'Leilani Faleolo', at: 'Tue 1 Sep, 9:30 am', day: '2026-09-01', hm: '09:30', purpose: 'Costs and budgeting', house: 'kowhai' },
 ];
 
 /* ───────────── P11 (the Settings frame) ───────────── */

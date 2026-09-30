@@ -154,6 +154,10 @@ export interface Slot {
     late: boolean;
     by: string;
     cd: boolean;
+    /** When it was recorded (NZ, 24-hour), where the shared records give it. */
+    at?: string;
+    unwitnessed?: boolean;
+    note?: string;
 }
 const SLOT_CACHE = new Map<string, { counted: Slot[]; dueNow: number }>();
 /** Scheduled slots in the period whose window has ended (counted), and the ones still inside their window today (not counted yet). */
@@ -174,7 +178,7 @@ export function slotsIn(from: string, to: string, pids: PersonId[]) {
                     continue;
                 }
                 const r = slotOutcome(o.id, day, time);
-                counted.push({ orderId: o.id, pid: o.pid, day, time, outcome: r.outcome, late: r.late, by: r.by, cd: !!o.cd });
+                counted.push({ orderId: o.id, pid: o.pid, day, time, outcome: r.outcome, late: r.late, by: r.by, cd: !!o.cd, at: r.at, unwitnessed: r.unwitnessed, note: r.note });
             }
         }
     }
@@ -243,18 +247,22 @@ export function cdIn(p: Period, pids: PersonId[]) {
     const { counted } = slotsIn(p.from, p.to, pids);
     const given = counted.filter((s) => s.cd && s.outcome === 'given');
     const prn = prnIn(p, pids).filter((d) => orderOf(d.orderId).cd);
-    const houses = [...new Set(pids.map((x) => PEOPLE[x].house))];
-    const days = daysIn(p.from, p.to > TODAY_ISO ? TODAY_ISO : p.to).length;
-    const counts = houses.includes('kowhai') ? days * 2 - (p.to >= TODAY_ISO ? 1 : 0) : 0;
+    const houses = [...new Set(pids.filter((x) => ORDERS.some((o) => o.cd && o.pid === x)).map((x) => PEOPLE[x].house))];
+    const days = daysIn(p.from, p.to > TODAY_ISO ? TODAY_ISO : p.to);
+    const counts = houses.reduce((n, h) => n + days.reduce((m, d) => m + CD_EVENTS.counts[h].times.filter((t) => d < TODAY_ISO || t <= NOW_HM).length, 0), 0);
+    const unwitnessed = given.filter((s) => s.unwitnessed).length;
     const inScope = (orderId: string) => pids.includes(orderOf(orderId).pid);
     return {
         given: given.length + prn.length,
-        witnessed: given.length + prn.length,
+        witnessed: given.length + prn.length - unwitnessed,
         counts,
         discrepancies: CD_EVENTS.discrepancies.filter((d) => inPeriod(d.day, p) && inScope(d.orderId)),
         losses: CD_EVENTS.losses.filter((d) => inPeriod(d.day, p) && inScope(d.orderId)),
         destructions: CD_EVENTS.destructions.filter((d) => inPeriod(d.day, p) && inScope(d.orderId)),
-        byOrder: ORDERS.filter((o) => o.cd && pids.includes(o.pid)).map((o) => ({ order: o, given: given.filter((s) => s.orderId === o.id).length + prn.filter((d) => d.orderId === o.id).length })),
+        byOrder: ORDERS.filter((o) => o.cd && pids.includes(o.pid)).map((o) => {
+            const n = given.filter((s) => s.orderId === o.id).length + prn.filter((d) => d.orderId === o.id).length;
+            return { order: o, given: n, witnessed: n - given.filter((s) => s.orderId === o.id && s.unwitnessed).length };
+        }),
     };
 }
 export function allErrors(rt: Runtime): MedError[] {
@@ -308,26 +316,34 @@ export function eventLog(): LogEvent[] {
     for (const s of counted) {
         if (s.outcome === 'notRecorded') continue;
         const o = orderOf(s.orderId);
-        const at = s.late ? addMin(s.time, 95) : addMin(s.time, (fnv(s.orderId + s.day) % 25) + 1);
-        raw.push({ id: `E-${s.orderId}-${s.day}-${s.time}`, house: PEOPLE[s.pid].house, day: s.day, hm: at, kind: s.cd ? 'controlled' : 'dose', what: `${s.outcome === 'given' ? 'Dose given' : s.outcome === 'refused' ? 'Dose refused' : s.outcome === 'withheld' ? 'Dose withheld' : 'Dose missed'} — ${o.med}`, detail: `${time12(s.time)} dose${s.late ? ', recorded late' : ''}`, by: s.by, pid: s.pid, orderId: s.orderId, cd: s.cd });
+        const at = s.at ?? (s.late ? addMin(s.time, 65) : addMin(s.time, (fnv(s.orderId + s.day) % 25) + 1));
+        raw.push({ id: `E-${s.orderId}-${s.day}-${s.time}`, house: PEOPLE[s.pid].house, day: s.day, hm: s.day === TODAY_ISO && at > NOW_HM ? '09:10' : at, kind: s.cd ? 'controlled' : 'dose', what: `${s.outcome === 'given' ? 'Dose given' : s.outcome === 'refused' ? 'Dose refused' : s.outcome === 'withheld' ? 'Dose withheld' : 'Dose missed'} — ${o.med}`, detail: `${time12(s.time)} dose${s.late ? ', recorded late' : ''}${s.note ? ` — ${s.note}` : ''}`, by: s.by, pid: s.pid, orderId: s.orderId, cd: s.cd });
     }
     for (const d of PRN_DOSES) {
         const o = orderOf(d.orderId);
         const hm = d.at.includes('pm') && !d.at.startsWith('12') ? `${String(Number(d.at.split(':')[0]) + 12).padStart(2, '0')}:${d.at.split(':')[1].slice(0, 2)}` : `${d.at.split(':')[0].padStart(2, '0')}:${d.at.split(':')[1].slice(0, 2)}`;
         raw.push({ id: `E-prn-${d.orderId}-${d.day}`, house: PEOPLE[o.pid].house, day: d.day, hm, kind: o.cd ? 'controlled' : 'dose', what: `As-needed dose given — ${o.med}`, detail: d.effect ? `Effect: ${d.effect}` : 'Effect not recorded yet', by: d.by, pid: o.pid, orderId: o.id, cd: !!o.cd });
     }
-    for (const day of daysIn(RANGE_START, TODAY_ISO))
-        for (const hm of ['07:45', '19:45']) if (!(day === TODAY_ISO && hm > NOW_HM)) raw.push({ id: `E-count-${day}-${hm}`, house: 'kowhai', day, hm, kind: 'controlled', what: 'Controlled count — Kōwhai House', detail: 'Two people counted every controlled medicine', by: 'Jordan Tipene', cd: true });
-    for (const d of CD_EVENTS.discrepancies) raw.push({ id: `E-${d.id}`, house: PEOPLE[orderOf(d.orderId).pid].house, day: d.day, hm: '20:10', kind: 'controlled', what: `Discrepancy ${d.id} — ${orderOf(d.orderId).med}`, detail: d.what, by: 'Jordan Tipene', pid: orderOf(d.orderId).pid, orderId: d.orderId, cd: true });
-    for (const d of CD_EVENTS.losses) raw.push({ id: `E-${d.id}`, house: PEOPLE[orderOf(d.orderId).pid].house, day: d.day, hm: '16:30', kind: 'controlled', what: `Loss ${d.id} — ${orderOf(d.orderId).med}`, detail: d.what, by: 'Daniel Ahn', pid: orderOf(d.orderId).pid, orderId: d.orderId, cd: true });
+    // Grace’s 9:00 am clonazepam was given at 8:05 (P08b MED-0048): recorded, though its window is still open
+    raw.push({ id: 'E-o-clonazepam-2026-09-28-09:00', house: 'kowhai', day: TODAY_ISO, hm: '08:05', kind: 'controlled', what: 'Dose given — Clonazepam', detail: '9:00 am dose, given at 8:05 — reported as MED-0048', by: 'Priya Shah', pid: 'grace', orderId: 'o-clonazepam', cd: true });
+    raw.push({ id: 'E-mph-correction', house: 'kowhai', day: '2026-09-25', hm: '16:30', kind: 'controlled', what: 'Dose corrected — Methylphenidate', detail: 'The 12:10 pm dose was recorded as 2 tablets; voided and re-entered as 1, witnessed by Daniel Ahn', by: 'Jordan Tipene', pid: 'aroha', orderId: 'o-methylphenidate', cd: true });
+    for (const h of ['kowhai', 'rimu'] as House[])
+        for (const day of daysIn(RANGE_START, TODAY_ISO))
+            CD_EVENTS.counts[h].times.forEach((hm, i) => {
+                if (day === TODAY_ISO && hm > NOW_HM) return;
+                const [by, witness] = i === 0 ? CD_EVENTS.counts[h].by : [...CD_EVENTS.counts[h].by].reverse();
+                raw.push({ id: `E-count-${h}-${day}-${hm}`, house: h, day, hm, kind: 'controlled', what: `Controlled count — ${HOUSES[h]}`, detail: `Shift-change count of every controlled medicine, witnessed by ${witness}`, by, cd: true });
+            });
+    for (const d of CD_EVENTS.discrepancies) raw.push({ id: `E-${d.id}`, house: PEOPLE[orderOf(d.orderId).pid].house, day: d.day, hm: d.hm, kind: 'controlled', what: `Discrepancy ${d.id} — ${orderOf(d.orderId).med}`, detail: d.what, by: d.by, pid: orderOf(d.orderId).pid, orderId: d.orderId, cd: true });
+    for (const d of CD_EVENTS.losses) raw.push({ id: `E-${d.id}`, house: PEOPLE[orderOf(d.orderId).pid].house, day: d.day, hm: d.hm, kind: 'controlled', what: `Loss ${d.id} — ${orderOf(d.orderId).med}`, detail: d.what, by: d.by, pid: orderOf(d.orderId).pid, orderId: d.orderId, cd: true });
+    for (const d of CD_EVENTS.destructions) raw.push({ id: `E-${d.id}`, house: PEOPLE[orderOf(d.orderId).pid].house, day: d.day, hm: d.hm, kind: 'controlled', what: `Destruction ${d.id} — ${orderOf(d.orderId).med}`, detail: d.what, by: d.by, pid: orderOf(d.orderId).pid, orderId: d.orderId, cd: true });
     for (const e of ERRORS) {
-        raw.push({ id: `E-${e.id}-rep`, house: PEOPLE[e.pid].house, day: e.occurredIso, hm: '21:00', kind: 'error', what: `Medication error reported — ${e.id}`, detail: `Medication error — ${lowerFirst(TYPE_LABEL[e.type])} — ${HOUSES[PEOPLE[e.pid].house]}`, by: e.reportedBy, pid: e.pid, cd: false });
+        raw.push({ id: `E-${e.id}-rep`, house: PEOPLE[e.pid].house, day: e.reportedIso, hm: e.reportedHm, kind: 'error', what: `Medication error reported — ${e.id}`, detail: `Medication error — ${lowerFirst(TYPE_LABEL[e.type])} — ${HOUSES[PEOPLE[e.pid].house]}`, by: e.reportedBy, pid: e.pid, cd: false });
     }
-    raw.push({ id: 'E-order-R28', house: 'kowhai', day: '2026-09-15', hm: '10:40', kind: 'order', what: 'Order changed — Levothyroxine', detail: '50 → 75 microgram, from the review R-28; checked by Jordan Tipene', by: 'Hana Kereama', pid: 'grace', orderId: 'o-levothyroxine', cd: false });
     raw.push({ id: 'E-order-ferrous', house: 'kowhai', day: '2026-08-20', hm: '15:05', kind: 'order', what: 'Order stopped — Ferrous sulfate', detail: 'Stopped by Dr Lena Chen (synthetic); entered by Jordan Tipene', by: 'Jordan Tipene', pid: 'aroha', orderId: 'o-ferrous', cd: false });
     raw.push({ id: 'E-bg-1', house: 'rimu', day: '2026-09-18', hm: '02:20', kind: 'access', what: 'Emergency access opened — Ben’s record', detail: 'Night call to the after-hours GP; closed at 2:55 am', by: 'Ana Lemalu', pid: 'ben', cd: false });
     raw.push({ id: 'E-set-h6', house: 'kowhai', day: '2026-09-20', hm: '10:41', kind: 'settings', what: 'Medicine rule paused — Digoxin, record pulse', detail: 'Active → Paused · all houses', by: 'Hana Kereama', cd: false });
-    for (const x of EXPORTS) raw.push({ id: `E-${x.id}`, house: x.house, day: x.day, hm: '12:00', kind: 'export', what: `Export made — ${x.what}`, detail: `${x.detail} · purpose: ${x.purpose}`, by: x.by, cd: x.what.startsWith('Controlled'), pid: undefined });
+    for (const x of EXPORTS) raw.push({ id: `E-${x.id}`, house: x.house, day: x.day, hm: x.hm ?? '12:00', kind: 'export', what: `Export made — ${x.what}`, detail: `${x.detail} · purpose: ${x.purpose}`, by: x.by, cd: x.what.startsWith('Controlled'), pid: undefined });
     raw.sort((a, b) => `${a.day}T${a.hm}${a.id}`.localeCompare(`${b.day}T${b.hm}${b.id}`));
     const head: Record<House, { seq: number; hash: string }> = { kowhai: { seq: 16400, hash: '5e1c09a2' }, rimu: { seq: 3100, hash: '0b7d44e1' } };
     LOG = raw.map((r) => {
@@ -407,8 +423,8 @@ export const DEFS: Record<string, Def> = {
     prnGiven: { name: 'As-needed doses given', counts: 'As-needed (PRN) doses recorded as given in the period.' },
     prnEffect: { name: 'Effect recorded', counts: 'As-needed doses with their effect recorded ÷ as-needed doses given.', na: 'No as-needed dose was given.' },
     cdGiven: { name: 'Controlled doses given', counts: 'Scheduled and as-needed controlled doses recorded as given. Needs controlled-medicine access.' },
-    cdWitnessed: { name: 'Witnessed', counts: 'Controlled doses with a second person’s witness PIN ÷ controlled doses given.', na: 'No controlled dose was given.' },
-    cdCounts: { name: 'Counts done', counts: 'Witnessed counts of every controlled medicine at a house (twice a day at Kōwhai House).' },
+    cdWitnessed: { name: 'Witnessed', counts: 'Controlled doses with a second person’s witness PIN ÷ controlled doses given. A dose given under a witness override isn’t witnessed.', na: 'No controlled dose was given.' },
+    cdCounts: { name: 'Counts done', counts: 'Witnessed counts of every controlled medicine at a house, at each shift change (7:00 am and 7:00 pm; Rimu House ten minutes later).' },
     errReached: { name: 'Reached the person', counts: 'Medication errors, by when they happened, that reached the person — with harm, with no harm or not known yet.' },
     errHarm: { name: 'With harm', counts: 'Reached the person with minor, moderate, severe or permanent harm, or death.' },
     errNear: { name: 'Near misses', counts: 'Errors that didn’t reach the person. Counted separately and reported with the rest.' },

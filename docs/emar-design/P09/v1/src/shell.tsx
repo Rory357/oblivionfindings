@@ -57,7 +57,7 @@ function Viewer() {
             className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-dashed border-border bg-muted px-4 py-2 text-[12px] text-muted-foreground"
             style={{ backgroundImage: 'repeating-linear-gradient(135deg, transparent 0 8px, color-mix(in oklch, var(--foreground) 5%, transparent) 8px 9px)' }}
         >
-            <span className="font-bold tracking-wide text-foreground uppercase">eMAR P09 v1 · mockup viewer — not product UI</span>
+            <span className="font-bold tracking-wide text-foreground uppercase">eMAR P09 v1.1 · mockup viewer — not product UI</span>
             <span className="rounded-md bg-status-warning-bg px-2 py-0.5 font-semibold text-status-warning">Synthetic data · Monday 28 Sep 2026, 9:12 am NZDT</span>
             <label className="flex items-center gap-1.5">
                 Signed in as

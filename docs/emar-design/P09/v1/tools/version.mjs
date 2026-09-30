@@ -21,7 +21,7 @@ const files = [];
 const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 const shots = readdirSync(path.join(root, 'screenshots')).filter((f) => f.endsWith('.png'));
 const lines = [
-    'eMAR P09 v1 — Reports & audit',
+    'eMAR P09 v1.1 — Reports & audit (v1 inspected by Main, 1 Oct; fixture times fixed)',
     'Branch claude/emar-p09 · base origin/main 33fb7a3c9 · 1 October 2026 (NZDT)',
     'SHA-256 of every file that makes up this version (approval applies to these hashes only).',
     `Screenshots are evidence, not part of the approved version: ${shots.length} PNG files; report.json sha256 ${sha(path.join(root, 'screenshots', 'report.json'))}.`,

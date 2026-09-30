@@ -1,6 +1,6 @@
 {
   "base": "http://127.0.0.1:4494/",
-  "when": "2026-09-30T13:39:03.357Z",
+  "when": "2026-09-30T13:59:06.415Z",
   "shots": [
     {
       "shot": "01-doses-house-lead",
@@ -2223,14 +2223,5 @@
       "Make Aroha’s MAR (PDF)"
     ],
     "keyboardMenuVia": "ContextMenu key"
-  },
-  "reruns": [
-    {
-      "when": "2026-09-30T13:45:53.572Z",
-      "only": [
-        "keyboard"
-      ],
-      "captures": 0
-    }
-  ]
+  }
 }

@@ -109,7 +109,10 @@ function EventList({ c, rows, page, pageSize, ctxMenu, title, caption, empty, em
             { label: 'Open the event', icon: History, onClick: () => c.open(`event:${e.id}`) },
             !!e.pid && (e.kind === 'dose' || (e.kind === 'controlled' && !!e.orderId)) && { label: `Open ${PEOPLE[e.pid].pref}’s MAR at this dose`, icon: FileText, onClick: () => c.toast(`Opens ${PEOPLE[e.pid!].pref}’s MAR on ${labelIso(e.day)} (P02) — outside this preview.`) },
         ]);
-    const links = pages > 1 ? [{ url: pg > 1 ? hrefPage(pg - 1) : null, label: '&laquo; Previous', active: false }, ...Array.from({ length: pages }, (_, i) => ({ url: hrefPage(i + 1), label: String(i + 1), active: i + 1 === pg })), { url: pg < pages ? hrefPage(pg + 1) : null, label: 'Next &raquo;', active: false }] : [];
+    /* Laravel’s paginator sends a windowed list with “…” gaps: the first and last pages, and the pages either side of this one. */
+    const shownPages = Array.from({ length: pages }, (_, i) => i + 1).filter((n) => n === 1 || n === pages || Math.abs(n - pg) <= 1 || (pg <= 3 && n <= 4) || (pg >= pages - 2 && n >= pages - 3));
+    const numbered = shownPages.flatMap((n, i) => [...(i && n - shownPages[i - 1] > 1 ? [{ url: null, label: '...', active: false }] : []), { url: hrefPage(n), label: String(n), active: n === pg }]);
+    const links = pages > 1 ? [{ url: pg > 1 ? hrefPage(pg - 1) : null, label: '&laquo; Previous', active: false }, ...numbered, { url: pg < pages ? hrefPage(pg + 1) : null, label: 'Next &raquo;', active: false }] : [];
     return (
         <section className="flex flex-col gap-2.5" aria-label={title}>
             <ListCaption title={title} caption={caption || `${rows.length ? `${from.toLocaleString('en-NZ')}–${to.toLocaleString('en-NZ')} of ${rows.length.toLocaleString('en-NZ')}` : 'None'} · newest first · ${pageSize} a page`} />

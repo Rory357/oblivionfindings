@@ -57,7 +57,7 @@ Legend: **Pass** · **Pass (note)** passes with a stated limitation · **N/A** i
 |---|---|---|
 | EntityTable contracts: identity first, kebab last | Pass | Every list: people (`01`), rounds (`08`), controlled (`11`), errors (`13`), stock (`16`), events (`30`), unrecorded doses (`36`), exports (`50`), P11 change history (`96`). |
 | ⋯ and the same menu on right-click (plus the menu key); clicking a row opens it | Pass | `02`, `39`, and `report.json` → `keyboard`. Unavailable actions are left out of menus (Jordan’s person menu has no “Make MAR”). |
-| Server-style pagination | Pass | The audit trail pages 50 at a time with the real `LaravelPagination` — “1–50 of 481”, page 2 (`30`, `31`). |
+| Server-style pagination | Pass | The audit trail pages 50 at a time with the real `LaravelPagination` — “1–50 of 655”, page 2 (`30`, `31`). |
 | Empty, loading and error states use the shared components; worded per section | Pass | For example “Every round that ended was completed”, “No unrecorded doses in this period”, “No as-needed doses given”, “No medication errors in this period” (`101`); SkeletonTable (`100`); ErrorState (`102`). |
 
 ### D. Dialogs
@@ -156,3 +156,13 @@ Earlier runs found these problems, and this version fixes them:
 **`tsc`** (`tsconfig.json`): no errors in `src/`. The 1 error in a shared file (`breadcrumbs.tsx:36`) comes from P01’s Inertia shim types.
 
 **ESLint** (the app config, `--no-ignore`, `src/**/*.{ts,tsx}`): 22 files, 0 errors, 0 warnings. A separate check found no unused imports.
+
+## 5. v1.1 — Main’s inspection fix (1 October 2026)
+
+**The fix:** “Medication error reported — MED-0048” was timed 9:00 pm on Mon 28 Sep, after the 9:12 am clock. Every report event now takes P08b’s report time (MED-0048 at 8:40 am).
+
+**The scan:** every fixture timestamp was checked against 9:12 am and against P07b and P08b where the records are shared — dose events, counts, discrepancies, losses, destructions, error reports, exports made, unrecorded doses and SAC closes. Nothing is later than now; the newest event is DS-21 at 8:45 am (`30`, `34`). The details are in the README (“Main’s inspection of v1”). Because the fixtures changed, **the whole harness was re-run**: see §4.
+
+**Recorded:** D2, D4, D5, D7 accepted; D6 → the new `medications.audit.export` (README build note 5).
+
+**Found by the re-run and fixed:** with the P07b-aligned fixtures the audit trail has 14 pages, and 14 page buttons overflowed at 200 %. The preview now sends the windowed link list Laravel’s paginator sends (first and last pages, the pages either side, and “…”). **Harness:** 170 captures, 0 problems.
