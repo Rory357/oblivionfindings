@@ -1127,7 +1127,7 @@ class MyTasksController extends Controller
             $service = app(GuidedRoundService::class);
             $progress = $service->progress(
                 $round,
-                $user->canDo('medications.controlled.view') || $user->canDo('medications.controlled.record'),
+                $user->canDo('medications.controlled.view'),
             );
 
             if ($progress['total'] === 0) {

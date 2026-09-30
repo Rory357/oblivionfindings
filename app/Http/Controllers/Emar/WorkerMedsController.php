@@ -75,8 +75,9 @@ class WorkerMedsController extends Controller
             $user->canDo('medications.view') || $user->canDo('medications.administer.record'),
             403,
         );
-        $includeControlled = $user->canDo('medications.controlled.view')
-            || $user->canDo('medications.controlled.record');
+        // EM-12: only controlled view reveals controlled rows. Record authority
+        // alone gates the write path, never what the board shows.
+        $includeControlled = $user->canDo('medications.controlled.view');
 
         $timezone = $this->scheduleService->workerTimezone();
         $now = Carbon::now($timezone);
@@ -945,7 +946,7 @@ class WorkerMedsController extends Controller
 
             $progress = $this->guidedRoundService->progress(
                 $round,
-                $user->canDo('medications.controlled.view') || $user->canDo('medications.controlled.record'),
+                $user->canDo('medications.controlled.view'),
             );
 
             if ($progress['total'] === 0) {
@@ -997,8 +998,7 @@ class WorkerMedsController extends Controller
                 ->limit(12)
                 ->get();
 
-            $includeControlled = $user->canDo('medications.controlled.view')
-                || $user->canDo('medications.controlled.record');
+            $includeControlled = $user->canDo('medications.controlled.view');
 
             return $rounds
                 ->map(function (MedicationRound $round) use ($includeControlled) {

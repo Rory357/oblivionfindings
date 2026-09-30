@@ -23,6 +23,13 @@ use Illuminate\Support\Str;
 
 class MedicationIncidentIntegrationService
 {
+    /**
+     * Incidents and their Control Room alerts are readable without controlled
+     * view (EM-12), so controlled events name only the Site there; the medicine
+     * stays on the restricted register entry and eMAR alert.
+     */
+    private const CONTROLLED_MEDICATION_DETAIL = 'restricted — see the controlled drug register entry';
+
     public function __construct(
         protected ?MedicationSignalService $signalService = null,
         protected ?IncidentJourneyService $journeyService = null,
@@ -240,8 +247,8 @@ class MedicationIncidentIntegrationService
                 $incident = new ClientIncident;
                 $incident->client_id = $client->id;
                 $incident->site_id = $client->site_id;
-                $incident->title = "Controlled drug discrepancy: {$medication->name}";
-                $incident->description = $this->buildDiscrepancyDescription($lockedDiscrepancy, $medication);
+                $incident->title = $this->controlledEventTitle('count discrepancy', $client);
+                $incident->description = $this->buildDiscrepancyDescription($lockedDiscrepancy);
                 $incident->category = 'controlled_drug';
                 $incident->severity = 'critical';
                 $incident->status = 'submitted';
@@ -266,15 +273,16 @@ class MedicationIncidentIntegrationService
                 $medication->id
             );
 
+            // The signal becomes a Control Room alert; like the incident it is
+            // readable without controlled view, so it carries no medicine name.
             $this->signalService->emit(
                 MedicationSignalService::TYPE_CONTROLLED_DISCREPANCY,
                 $client->id,
                 'critical',
-                "Controlled drug discrepancy: {$medication->name} (diff: {$lockedDiscrepancy->difference})",
+                $this->controlledEventTitle('count discrepancy', $client)." (diff: {$lockedDiscrepancy->difference})",
                 [
                     'incident_id' => $incident->id,
                     'client_medication_id' => $medication->id,
-                    'medication_name' => $medication->name,
                     'discrepancy_id' => $lockedDiscrepancy->id,
                     'difference' => $lockedDiscrepancy->difference,
                     'site_id' => $client->site_id,
@@ -661,8 +669,8 @@ class MedicationIncidentIntegrationService
                 $incident = new ClientIncident;
                 $incident->client_id = $client->id;
                 $incident->site_id = $client->site_id;
-                $incident->title = "Controlled drug loss: {$medicationName}";
-                $incident->description = $this->buildControlledLossDescription($lockedReport, $medicationName);
+                $incident->title = $this->controlledEventTitle('loss', $client);
+                $incident->description = $this->buildControlledLossDescription($lockedReport);
                 $incident->category = 'controlled_drug';
                 $incident->severity = 'critical';
                 $incident->status = 'submitted';
@@ -694,12 +702,11 @@ class MedicationIncidentIntegrationService
                 MedicationSignalService::TYPE_CONTROLLED_LOSS,
                 $client->id,
                 'critical',
-                "Controlled drug loss reported: {$medicationName}",
+                $this->controlledEventTitle('loss', $client).' reported',
                 [
                     'incident_id' => $incident->id,
                     'client_medication_id' => $medication?->id,
                     'loss_report_id' => $lockedReport->id,
-                    'medication_name' => $medicationName,
                     'quantity_lost' => (string) $lockedReport->quantity_lost,
                     'unit' => $lockedReport->unit,
                     'reported_to_police' => (bool) $lockedReport->reported_to_police,
@@ -945,12 +952,10 @@ class MedicationIncidentIntegrationService
     /**
      * Build discrepancy description
      */
-    private function buildDiscrepancyDescription(
-        ClientControlledDrugDiscrepancy $discrepancy,
-        ClientMedication $medication
-    ): string {
+    private function buildDiscrepancyDescription(ClientControlledDrugDiscrepancy $discrepancy): string
+    {
         $description = "Controlled drug stock discrepancy detected.\n\n";
-        $description .= "Medication: {$medication->name}\n";
+        $description .= 'Medication: '.self::CONTROLLED_MEDICATION_DETAIL."\n";
         $description .= "Expected quantity: {$discrepancy->on_hand_before}\n";
         $description .= "Actual quantity: {$discrepancy->on_hand_after}\n";
         $description .= "Difference: {$discrepancy->difference}\n";
@@ -1007,12 +1012,10 @@ class MedicationIncidentIntegrationService
         return $description;
     }
 
-    private function buildControlledLossDescription(
-        ControlledDrugLossReport $report,
-        string $medicationName
-    ): string {
+    private function buildControlledLossDescription(ControlledDrugLossReport $report): string
+    {
         $description = "Controlled drug loss report submitted.\n\n";
-        $description .= "Medication: {$medicationName}\n";
+        $description .= 'Medication: '.self::CONTROLLED_MEDICATION_DETAIL."\n";
         $description .= "Quantity lost: {$report->quantity_lost}".($report->unit ? " {$report->unit}" : '')."\n";
         $description .= "Circumstances: {$report->circumstances}\n";
         $description .= 'Reported to police: '.($report->reported_to_police ? 'Yes' : 'No')."\n";
@@ -1141,16 +1144,29 @@ class MedicationIncidentIntegrationService
     /**
      * Link incident to medication (store in metadata)
      */
+    /** e.g. "Controlled medicine count discrepancy — Kōwhai House". */
+    private function controlledEventTitle(string $event, Client $client): string
+    {
+        $siteName = trim((string) $client->site?->name);
+
+        return $siteName === ''
+            ? "Controlled medicine {$event}"
+            : "Controlled medicine {$event} — {$siteName}";
+    }
+
     private function linkToMedication(ClientIncident $incident, ClientMedication $medication): void
     {
         if (! $this->incidentSupportsMetadata()) {
             return;
         }
 
-        // Store medication reference in incident metadata
+        // Store medication reference in incident metadata. A controlled
+        // medicine's name is not copied onto the (unrestricted) incident.
         $metadata = $incident->metadata ?? [];
         $metadata['medication_id'] = $medication->id;
-        $metadata['medication_name'] = $medication->name;
+        if (! $medication->controlled_drug) {
+            $metadata['medication_name'] = $medication->name;
+        }
         $metadata['controlled_drug'] = $medication->controlled_drug;
         $metadata['high_risk'] = $medication->high_risk;
         $incident->metadata = $metadata;
