@@ -15,7 +15,10 @@ import {
     buildCdRegisterRequest,
     CD_REGISTER_ENTRY_TYPES,
 } from './components/cd-register-modal';
-import { buildSyringeDriverRequest } from './components/mar-governance-dialogs';
+import {
+    buildSyringeDriverRequest,
+    syringeDriverRequiresWitness,
+} from './components/mar-governance-dialogs';
 import {
     addMedicationStockQuantities,
     buildControlledPharmacyDeliveryRequest,
@@ -287,5 +290,30 @@ describe('controlled medication request contracts', () => {
             buildSyringeDriverRequest({ ...form, witnessed_by: '19' })
                 .witnessed_by,
         ).toBe(19);
+    });
+
+    it('asks for a syringe driver witness for any controlled medicine, as the server does', () => {
+        const medicine = {
+            id: 41,
+            name: 'Midazolam',
+            dosage: '5 mg',
+            controlled_drug: false,
+            witness_required: false,
+        };
+
+        expect(syringeDriverRequiresWitness(undefined)).toBe(false);
+        expect(syringeDriverRequiresWitness(medicine)).toBe(false);
+        expect(
+            syringeDriverRequiresWitness({
+                ...medicine,
+                controlled_drug: true,
+            }),
+        ).toBe(true);
+        expect(
+            syringeDriverRequiresWitness({
+                ...medicine,
+                witness_required: true,
+            }),
+        ).toBe(true);
     });
 });

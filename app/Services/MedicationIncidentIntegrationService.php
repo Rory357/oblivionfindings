@@ -1141,9 +1141,6 @@ class MedicationIncidentIntegrationService
         };
     }
 
-    /**
-     * Link incident to medication (store in metadata)
-     */
     /** e.g. "Controlled medicine count discrepancy — Kōwhai House". */
     private function controlledEventTitle(string $event, Client $client): string
     {
@@ -1154,6 +1151,9 @@ class MedicationIncidentIntegrationService
             : "Controlled medicine {$event} — {$siteName}";
     }
 
+    /**
+     * Link incident to medication (store in metadata)
+     */
     private function linkToMedication(ClientIncident $incident, ClientMedication $medication): void
     {
         if (! $this->incidentSupportsMetadata()) {

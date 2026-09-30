@@ -46,8 +46,19 @@ export type ChartMedicationOption = {
     id: number;
     name: string;
     dosage: string;
+    controlled_drug: boolean;
     witness_required: boolean;
 };
+
+/**
+ * Mirrors ClientMedication::requiresWitness() on the server: a controlled
+ * medicine always needs a witness, whatever its witness_required flag says.
+ */
+export function syringeDriverRequiresWitness(
+    medication: ChartMedicationOption | undefined,
+): boolean {
+    return Boolean(medication?.witness_required || medication?.controlled_drug);
+}
 
 export type PendingCorrection = {
     id: number;
@@ -366,7 +377,7 @@ function SyringeDriverDialog({
     const selectedMedication = medications.find(
         (m) => String(m.id) === content.client_medication_id,
     );
-    const requiresWitness = selectedMedication?.witness_required ?? false;
+    const requiresWitness = syringeDriverRequiresWitness(selectedMedication);
 
     const setContent = (patch: Partial<typeof content>) =>
         form.setData('contents', [{ ...content, ...patch }]);

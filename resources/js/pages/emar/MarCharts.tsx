@@ -70,6 +70,7 @@ type MarData = {
         id: number;
         name: string;
         dosage: string;
+        controlled_drug: boolean;
         witness_required: boolean;
     }>;
     attention_alerts?: Array<{
@@ -272,6 +273,7 @@ export default function MarCharts(props: Props) {
                     id: med.id,
                     name: med.name,
                     dosage: med.dosage,
+                    controlled_drug: med.controlled_drug,
                     witness_required: med.witness_required,
                 }))
                 .sort((a, b) => a.name.localeCompare(b.name)),

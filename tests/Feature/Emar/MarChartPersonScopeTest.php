@@ -165,6 +165,31 @@ class MarChartPersonScopeTest extends TestCase
         );
     }
 
+    public function test_mar_payload_flags_every_controlled_medicine_as_witness_required(): void
+    {
+        // The syringe-driver dialog shows its witness fields from this payload;
+        // the server demands a witness for any controlled content
+        // (ClientMedication::requiresWitness), whatever the column says.
+        $client = $this->residentWithMedication('Hine', 'Palliative', 'Haloperidol');
+        $this->medication($client, 'Midazolam', controlled: true, witnessRequired: false);
+        $reader = $this->userWithPermissions([
+            'medications.view',
+            'clients.viewAny',
+            'medications.controlled.view',
+        ]);
+
+        $rows = collect(
+            $this->actingAs($reader)
+                ->get(route('emar.mar', ['client_id' => $client->id]))
+                ->assertOk()
+                ->inertiaProps('marData.scheduled'),
+        )->keyBy('name');
+
+        $this->assertTrue($rows['Midazolam']['controlled_drug']);
+        $this->assertTrue($rows['Midazolam']['witness_required']);
+        $this->assertFalse($rows['Haloperidol']['witness_required']);
+    }
+
     private function residentWithMedication(string $first, string $last, string $medication = 'Paracetamol'): Client
     {
         $client = Client::factory()->create([
@@ -178,7 +203,12 @@ class MarChartPersonScopeTest extends TestCase
         return $client;
     }
 
-    private function medication(Client $client, string $name, bool $controlled = false): ClientMedication
+    private function medication(
+        Client $client,
+        string $name,
+        bool $controlled = false,
+        ?bool $witnessRequired = null,
+    ): ClientMedication
     {
         return ClientMedication::query()->create([
             'client_id' => $client->id,
@@ -188,7 +218,7 @@ class MarChartPersonScopeTest extends TestCase
             'dose_times' => ['08:00'],
             'is_prn' => false,
             'controlled_drug' => $controlled,
-            'witness_required' => $controlled,
+            'witness_required' => $witnessRequired ?? $controlled,
             'active' => true,
             'state' => 'active',
             'approval_status' => 'verified',
