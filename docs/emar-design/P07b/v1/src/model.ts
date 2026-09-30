@@ -81,21 +81,29 @@ export const OUTCOME_LABEL: Record<NonNullable<Discrepancy['resolved']>['outcome
     loss: 'Unexplained loss — loss report',
     escalate: 'Escalated to a manager',
 };
+/** A loss is never shown as a success (Main, 30 Sep): warning for a loss, neutral for the rest. */
+export const OUTCOME_TONE: Record<NonNullable<Discrepancy['resolved']>['outcome'], 'warning' | 'neutral'> = {
+    recount: 'neutral',
+    recording: 'neutral',
+    found: 'neutral',
+    loss: 'warning',
+    escalate: 'neutral',
+};
 
 /* ───────────── losses (Q5) ───────────── */
 export const allLosses = (rt: Runtime): Loss[] => [...rt.losses, ...LOSSES].map((l) => ({ ...l, ...rt.lossPatch[l.id] }) as Loss);
-export const LOSS_STATE: Record<Loss['status'], { label: string; variant: 'warning' | 'info' | 'success' }> = {
+export const LOSS_STATE: Record<Loss['status'], { label: string; variant: 'warning' | 'info' | 'neutral' }> = {
     investigating: { label: 'Investigating', variant: 'warning' },
     awaitingClose: { label: 'Waiting for a manager to close', variant: 'info' },
-    closed: { label: 'Closed', variant: 'success' },
+    closed: { label: 'Closed', variant: 'neutral' },
 };
 
 /* ───────────── destructions (Q6) ───────────── */
 export const allDestructions = (rt: Runtime): Destruction[] => [...rt.destructions, ...DESTRUCTIONS].map((d) => ({ ...d, ...rt.destructionPatch[d.id] }) as Destruction);
-export function destructionState(d: Destruction): { label: string; variant: 'warning' | 'success' | 'neutral' } {
+export function destructionState(d: Destruction): { label: string; variant: 'warning' | 'neutral' } {
     if (d.voided) return { label: 'Voided', variant: 'neutral' };
     if (d.method === 'return' && !d.received) return { label: 'Waiting for the pharmacist’s receipt', variant: 'warning' };
-    return { label: d.method === 'return' ? 'Received by the pharmacy' : 'Destroyed on site', variant: 'success' };
+    return { label: d.method === 'return' ? 'Received by the pharmacy' : 'Destroyed on site', variant: 'neutral' };
 }
 
 /* ───────────── witness overrides (Q7) ───────────── */

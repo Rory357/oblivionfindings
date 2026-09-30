@@ -158,3 +158,17 @@ The final run below is complete.
 **`tsc`** (`tsconfig.json`): no errors in `src/`. The 2 errors in shared files (`breadcrumbs.tsx:36`, `file-dropzone.tsx:223`) come from P01’s Inertia shim types.
 
 **ESLint** (the app config, `--no-ignore`, `src/**/*.{ts,tsx}`): 17 files, 0 errors, 0 warnings. A separate check found no unused imports.
+
+## 5. v1.1 — Main’s inspection fixes (30 September 2026)
+
+**The fixes:**
+1. **Empty states** are worded per section and filter, not built from a template. For example “No discrepancies with a manager” (`10`) and “No declined overrides” (`16b`, new).
+2. **Outcome tones.** A discrepancy’s outcome badge is warning for a loss and neutral otherwise (`10`). Closed losses (`12`) and completed destructions (`13`) are neutral, not green.
+
+**Clinical leads — deviation 5 → (B).** Clinical leads hold no controlled keys. Hana’s persona label and the design note say so (`05`, `17`), and the preview behaves the same.
+
+**Harness:** the touched states were re-run with `--only`: `05`, `10`–`17` (with the new `16b`), `28`, `43`, `58` and `100`. That is 30 captures, with 0 problems.
+- A partial run now replaces only its own captures in `report.json` and records itself under `reruns`.
+- `report.json` therefore holds 136 captures: 66 states at 1440, plus 35 each at 1280 and 200 %. All pass.
+
+**`tsc` and ESLint:** clean for `src/` (17 files, 0 problems; no unused imports).

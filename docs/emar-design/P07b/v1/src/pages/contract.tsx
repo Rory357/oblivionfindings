@@ -64,12 +64,12 @@ export function ContractPage() {
                         ['Q2 — append-only', 'No entry is edited or deleted. A wrong one is voided with a reason and a witness PIN, stays struck through, and a correcting entry follows.'],
                         ['Q3 — no free adjustment', 'Every change outside doses, receipts and movements comes from a named reason — a discrepancy’s resolution, a loss, a breakage or spillage, a void — witnessed and linked.'],
                         ['Q4 — resolving a discrepancy', 'Recount matched · recording error (void and correct) · stock found · unexplained loss (a real loss report) · escalate to a manager (under review). Never by someone who counted or witnessed the count. A note goes on the linked incident; Medication errors (P08b) closes the incident. The misleading “blocked” and “logged against the incident” texts go.'],
-                        ['Q5 — losses', 'A witnessed register entry, plus the incident, plus an append-only investigation; police and Medicines Control notifications recorded; a manager closes it.'],
+                        ['Q5 — losses', 'A witnessed register entry, plus the incident, plus an append-only investigation; police and Medicines Control notifications recorded, also when told later (Main confirmed 30 Sep); a theft can’t close until the police are recorded; a manager closes it.'],
                         ['Q6 — destruction', 'One path. Return to the pharmacy by default (standard NZ practice), with a witness, and the pharmacist’s name and registration on receipt. On-site denaturing only where the organisation allows it, with two witnesses. Fixed reasons and methods, an optional photo, both witnesses on the entry. Voiding reverses the entry.'],
                         ['Q7 — witness overrides', 'Request → decision → doses given → the house lead’s witnessed count and sign-off (P07a Q4), with an overdue flag. controlled.override is only the key for granting overrides.'],
                         ['Q8 — witnesses', 'A restricted competency blocks witnessing. The recorder must be at the house. PIN-1’s lock applies everywhere. Declared relationships (where HR records one) are a build note.'],
                         ['Q9 — NZ class', 'Class A / B / C (Misuse of Drugs Act 1975) replaces “Schedule 2/3/4”. Existing values are flagged for a lead to review, not mapped automatically.'],
-                        ['Q10 — who', 'A new key, medications.controlled.manage (grant migration: house leads, clinical leads, provider managers) — resolve, void, reasoned changes, destruction sign-off. Managers close losses and grant overrides. Frontline staff record, witness and report losses. Support workers lose resolve and void.'],
+                        ['Q10 — who', 'A new key, medications.controlled.manage (grant migration: house leads and provider managers) — resolve, void, reasoned changes, destruction sign-off. Clinical leads hold no controlled keys (Main, 30 Sep). Managers close losses and grant overrides. Frontline staff record, witness and report losses. Support workers lose resolve and void.'],
                         ['Also decided', 'P07a: one count cadence (every shift change), a discrepancy starts from a count and doses are never blocked. P06 Q9: the controlled receipt is P06’s witnessed register entry.'],
                     ]}
                 />
@@ -97,7 +97,7 @@ export function ContractPage() {
                     rows={[
                         ['Class to review', L('Show', C, { as: 'lead', show: 'class' })],
                         ['Two houses (manager)', L('Rangi Parata', C, { as: 'pm' })],
-                        ['No controlled view (clinical lead with controlled.manage)', L('Hana Kereama', C, { as: 'clinical' })],
+                        ['No controlled view (clinical lead, no controlled keys)', L('Hana Kereama', C, { as: 'clinical' })],
                         ['Read only (auditor with controlled view)', L('Mereana Walsh', C, { as: 'auditor', view: 'discrepancies' })],
                         ['Witness picker: restricted competency, locked PIN, yourself', L('Breakage as Jordan', C, { as: 'lead', open: 'breakage:cd-czp' })],
                         ['/emar/destructions redirects', L('Open it', '/emar/destructions', { as: 'lead' })],

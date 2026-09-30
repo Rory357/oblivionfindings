@@ -45,6 +45,7 @@ import {
     medOf,
     medsIn,
     OUTCOME_LABEL,
+    OUTCOME_TONE,
     signed,
     unitLabel,
     whyCantResolve,
@@ -108,9 +109,9 @@ export function RegisterPage({ forceView }: { forceView?: View }) {
                     <Lock className="size-8 text-muted-foreground" aria-hidden="true" />
                     <h1 className="text-section-title">You don’t have access to the controlled register</h1>
                     <p className="text-subtle">It needs controlled-medicine access. Ask your manager if you need it for your work.</p>
-                    {PERSONAS[p].perms.includes('cd.manage') ? (
-                        <DesignNote title="Design note — deviation 5">
-                            <p>Main granted medications.controlled.manage to clinical leads (Q10), but they have no controlled-medicine view today, so they can’t reach the register to resolve or void. The build either grants controlled view with it, or leaves it unused for them.</p>
+                    {p === 'clinical' ? (
+                        <DesignNote title="Design note — clinical leads (Main, 30 Sep)">
+                            <p>Clinical leads hold no controlled-medicine keys, as on main today: least privilege. controlled.manage goes to house leads and provider managers only. An admin can grant controlled view and controlled.manage in Settings › Roles.</p>
                         </DesignNote>
                     ) : null}
                 </Card>
@@ -350,10 +351,10 @@ function DiscrepanciesView({ discs, search }: { discs: Discrepancy[]; search: st
     const open = useOpen();
     const q = search.trim().toLowerCase();
     const list = discs.filter((d) => !q || `${medOf(d.medId).med} ${PEOPLE[medOf(d.medId).pid].legal} ${d.id}`.toLowerCase().includes(q));
-    const sections: { key: Discrepancy['status']; title: string; caption: string }[] = [
-        { key: 'open', title: 'Open', caption: 'the house lead owns each one; never resolved by someone who did the count' },
-        { key: 'under_review', title: 'With a manager', caption: 'escalated for a manager to resolve' },
-        { key: 'closed', title: 'Closed', caption: 'with the outcome — kept' },
+    const sections: { key: Discrepancy['status']; title: string; caption: string; empty: string }[] = [
+        { key: 'open', title: 'Open', caption: 'the house lead owns each one; never resolved by someone who did the count', empty: 'No open discrepancies' },
+        { key: 'under_review', title: 'With a manager', caption: 'escalated for a manager to resolve', empty: 'No discrepancies with a manager' },
+        { key: 'closed', title: 'Closed', caption: 'with the outcome — kept', empty: 'No closed discrepancies yet' },
     ];
     const act = (d: Discrepancy) => {
         if (d.status === 'closed') return null;
@@ -392,7 +393,7 @@ function DiscrepanciesView({ discs, search }: { discs: Discrepancy[]; search: st
                                         width: '1.6fr',
                                         cell: (d) => (
                                             <span className="flex flex-col items-start gap-1 py-0.5">
-                                                <StatusBadge variant={d.status === 'closed' ? 'success' : d.status === 'under_review' ? 'info' : 'warning'} className="rounded-[8px]">
+                                                <StatusBadge variant={d.status === 'closed' ? OUTCOME_TONE[d.resolved!.outcome] : d.status === 'under_review' ? 'info' : 'warning'} className="rounded-[8px]">
                                                     {d.status === 'closed' ? OUTCOME_LABEL[d.resolved!.outcome] : d.status === 'under_review' ? 'With a manager' : 'Open'}
                                                 </StatusBadge>
                                                 <StateLine>{d.status === 'closed' ? `${d.resolved!.at} by ${d.resolved!.by}${d.resolved!.link ? ` · ${d.resolved!.link}` : ''}` : d.status === 'under_review' ? `Escalated ${d.escalated?.at} by ${d.escalated?.by}` : `Owner: ${d.owner} · incident ${d.incident} · doses aren’t blocked`}</StateLine>
@@ -406,7 +407,7 @@ function DiscrepanciesView({ discs, search }: { discs: Discrepancy[]; search: st
                             />
                         ) : (
                             <Card className="p-2">
-                                <EmptyState variant="compact" icon={Scale} title={`No ${sec.title.toLowerCase()} discrepancies`} />
+                                <EmptyState variant="compact" icon={Scale} title={sec.empty} />
                             </Card>
                         )}
                     </section>
@@ -494,10 +495,10 @@ function DestructionsView({ dests, search, empty, redirected }: { dests: Destruc
     const open = useOpen();
     const q = search.trim().toLowerCase();
     const list = dests.filter((d) => !q || `${medOf(d.medId).med} ${PEOPLE[medOf(d.medId).pid].legal} ${d.id}`.toLowerCase().includes(q));
-    const bands: { key: string; title: string; caption: string; pick: (d: Destruction) => boolean }[] = [
-        { key: 'waiting', title: 'Waiting for the pharmacist’s receipt', caption: 'returned to the pharmacy; record the pharmacist’s name and registration when they sign for it', pick: (d) => !d.voided && d.method === 'return' && !d.received },
-        { key: 'done', title: 'Destroyed', caption: 'received by the pharmacy, or destroyed on site', pick: (d) => !d.voided && (d.method === 'onsite' || !!d.received) },
-        { key: 'voided', title: 'Voided', caption: 'kept, with the reason; the register entry was reversed', pick: (d) => !!d.voided },
+    const bands: { key: string; title: string; caption: string; empty: string; pick: (d: Destruction) => boolean }[] = [
+        { key: 'waiting', title: 'Waiting for the pharmacist’s receipt', caption: 'returned to the pharmacy; record the pharmacist’s name and registration when they sign for it', empty: 'Nothing waiting for the pharmacist', pick: (d) => !d.voided && d.method === 'return' && !d.received },
+        { key: 'done', title: 'Destroyed', caption: 'received by the pharmacy, or destroyed on site', empty: 'No destructions yet', pick: (d) => !d.voided && (d.method === 'onsite' || !!d.received) },
+        { key: 'voided', title: 'Voided', caption: 'kept, with the reason; the register entry was reversed', empty: 'No voided destructions', pick: (d) => !!d.voided },
     ];
     return (
         <>
@@ -557,7 +558,7 @@ function DestructionsView({ dests, search, empty, redirected }: { dests: Destruc
                                 />
                             ) : (
                                 <Card className="p-2">
-                                    <EmptyState variant="compact" icon={PackageX} title="None" />
+                                    <EmptyState variant="compact" icon={PackageX} title={b.empty} />
                                 </Card>
                             )}
                         </section>

@@ -23,7 +23,7 @@ const LEAD: Perm[] = [...FRONTLINE, 'cd.manage', 'audit.view'];
 export const PERSONAS: Record<PersonaId, Persona> = {
     sw: { id: 'sw', name: 'Priya Shah', initials: 'PS', role: 'Support worker · Kōwhai House', houses: ['kowhai'], perms: FRONTLINE },
     lead: { id: 'lead', name: 'Jordan Tipene', initials: 'JT', role: 'House lead · Kōwhai House', houses: ['kowhai'], perms: LEAD },
-    clinical: { id: 'clinical', name: 'Hana Kereama', initials: 'HK', role: 'Clinical lead · controlled.manage, no controlled-medicine view', houses: ['kowhai', 'rimu'], perms: ['view', 'cd.manage', 'audit.view'] },
+    clinical: { id: 'clinical', name: 'Hana Kereama', initials: 'HK', role: 'Clinical lead · no controlled-medicine keys', houses: ['kowhai', 'rimu'], perms: ['view', 'audit.view'] },
     auditor: { id: 'auditor', name: 'Mereana Walsh', initials: 'MW', role: 'Auditor · read only, with controlled view', houses: ['kowhai', 'rimu'], perms: ['view', 'cd.view', 'audit.view'] },
     pm: { id: 'pm', name: 'Rangi Parata', initials: 'RP', role: 'Provider manager · grants overrides', houses: ['kowhai', 'rimu'], perms: [...LEAD, 'cd.override', 'manager'] },
     rimu: { id: 'rimu', name: 'Sione Taufa', initials: 'ST', role: 'House lead · Rimu House', houses: ['rimu'], perms: LEAD },

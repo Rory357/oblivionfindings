@@ -6,9 +6,10 @@
 // console errors, the header subline's line count, truncated meter captions
 // and truncated table cells. Also records a real-key keyboard walk through
 // the resolve-discrepancy wizard. Output: screenshots/*.png + report.json.
-//   node docs/emar-design/P07b/v1/tools/verify.mjs [--only=name-substring] [--core]
+//   node docs/emar-design/P07b/v1/tools/verify.mjs [--only=substring,substring,…] [--core]
+// A partial run (--only) replaces just its captures in report.json and notes the re-run there.
 import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,6 +20,8 @@ const BASE = process.env.P07B_URL ?? 'http://127.0.0.1:4390/';
 const CHROME = process.env.CHROME ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const PORT = 9362;
 const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7);
+const onlyList = only ? only.split(',').map((x) => x.trim()).filter(Boolean) : null;
+const picked = (name) => !onlyList || onlyList.some((x) => name.includes(x));
 const profile = process.env.P07B_PROFILE ?? path.join(here, '..', '.chrome-profile');
 
 const SIZES = [
@@ -69,6 +72,7 @@ const SHOTS = [
     // Safety & oversight › Witness overrides
     { name: '15-overrides-manager', hash: SV('as=pm'), core: true },
     { name: '16-overrides-house-lead', hash: SV('as=lead'), core: true },
+    { name: '16b-overrides-filter-empty', hash: SV('as=rimu&st=declined') },
     { name: '17-overrides-clinical-no-view', hash: SV('as=clinical') },
     { name: '18-safety-other-view-link-only', hash: '#/emar/safety?as=lead&view=followups' },
     // The medicine’s register, voids, class, breakage
@@ -190,7 +194,7 @@ async function load(hash) {
 
 const report = { base: BASE, when: new Date().toISOString(), shots: [], keyboard: null };
 const core = process.argv.includes('--core');
-for (const shot of SHOTS.filter((s) => !only || s.name.includes(only))) {
+for (const shot of SHOTS.filter((s) => picked(s.name))) {
     for (const size of SIZES) {
         if (size.key !== '1440' && !shot.core) continue;
         if (core && !shot.core) continue;
@@ -218,7 +222,7 @@ for (const shot of SHOTS.filter((s) => !only || s.name.includes(only))) {
 }
 
 /* ───────────── keyboard walk (real key events) ───────────── */
-if (!only || only === 'keyboard') {
+if (!onlyList || onlyList.includes('keyboard')) {
     await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
     await load('#/emar/controlled?as=lead&view=discrepancies');
     const key = async (k, code, keyCode, mods = 0) => {
@@ -257,8 +261,18 @@ if (!only || only === 'keyboard') {
     process.stdout.write(`keyboard: after Escape focus = ${afterEscape}; ${via} menu = ${JSON.stringify(menu)}\n`);
 }
 
-writeFileSync(path.join(outDir, only ? `report-${only}.json` : 'report.json'), JSON.stringify(report, null, 2));
-const bad = report.shots.filter((r) => r.stepError || r.errors.length || r.overflow > 0);
-process.stdout.write(`\n${report.shots.length} captures · ${bad.length} with problems\n`);
+const reportPath = path.join(outDir, 'report.json');
+const ran = report.shots;
+if (onlyList && existsSync(reportPath)) {
+    const full = JSON.parse(readFileSync(reportPath, 'utf8'));
+    const key = (r) => `${r.size} ${r.shot}`;
+    const fresh = new Set(ran.map(key));
+    full.shots = [...full.shots.filter((r) => !fresh.has(key(r))), ...ran];
+    if (report.keyboard) full.keyboard = report.keyboard;
+    full.reruns = [...(full.reruns ?? []), { when: report.when, only: onlyList, captures: ran.length }];
+    writeFileSync(reportPath, JSON.stringify(full, null, 2));
+} else writeFileSync(reportPath, JSON.stringify(report, null, 2));
+const bad = ran.filter((r) => r.stepError || r.errors.length || r.overflow > 0);
+process.stdout.write(`\n${ran.length} captures · ${bad.length} with problems\n`);
 ws.close();
 chrome.kill();

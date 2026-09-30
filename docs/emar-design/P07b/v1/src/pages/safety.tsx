@@ -155,7 +155,7 @@ export function SafetyPage() {
                     />
                 ) : (
                     <Card className="p-2">
-                        <EmptyState variant="compact" icon={Shield} title="No witness overrides" description="Overrides appear here when a manager is asked to let a controlled dose go ahead without a second person." />
+                        {st === 'all' ? <EmptyState variant="compact" icon={Shield} title="No witness overrides" description="Overrides appear here when a manager is asked to let a controlled dose go ahead without a second person." /> : <EmptyState variant="compact" icon={Shield} title={st === 'attention' ? 'No overrides need a sign-off' : st === 'done' ? 'No signed-off overrides' : 'No declined overrides'} description="Choose All overrides to see the rest." />}
                     </Card>
                 )}
                 {ctx.node}

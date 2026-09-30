@@ -1,6 +1,6 @@
 # eMAR P07b v1 — Controlled register, losses and destruction
 
-**Status: candidate v1 for Main’s inspection.** Main is the review session, “Codex eMAR audit re-review”, acting under Stephan’s delegation. This design is not implemented.
+**Status: candidate v1.1 for Main’s approval.** v1 was inspected on 30 September; v1.1 makes Main’s two fixes and records the two decisions (see “Main’s inspection of v1”). Main is the review session, “Codex eMAR audit re-review”, acting under Stephan’s delegation. This design is not implemented.
 
 - **Version:** v1, 30 September 2026 (NZDT). Branch `claude/emar-p07b`, based on `origin/main` `21bfb4ce4`.
 - **Exact file identity:** [`VERSION.txt`](VERSION.txt), the SHA-256 of every source, build and tool file.
@@ -39,12 +39,12 @@ All ten questions took the recommended option (A).
 | Q2 | Append-only | **No entry is edited or deleted.** A wrong entry is **voided** with a reason and a witness PIN; the original stays, struck through, and a **correcting entry** follows. |
 | Q3 | Adjustments | **No free adjustment.** Every change outside doses, receipts and movements comes from a named, witnessed reason: a discrepancy’s resolution, a loss, a breakage or spillage, or a void. |
 | Q4 | Resolving a discrepancy | The outcomes are **recount matched · recording error · stock found · unexplained loss · escalate to a manager**. It is **never resolved by someone who counted or witnessed the count**. The misleading texts go, and **Medication errors (P08b) closes the incident**. |
-| Q5 | Losses | A loss is **a witnessed register entry**, plus its incident and an **append-only investigation**. Police and Medicines Control notifications are recorded, **a manager closes it**, and the register gains a **Losses view**. |
+| Q5 | Losses | A loss is **a witnessed register entry**, plus its incident and an **append-only investigation**. Police and Medicines Control notifications are recorded, **a manager closes it**, and the register gains a **Losses view**. **Main confirmed 30 Sep:** notifications made after the report are recorded too (who, when, the police event number), and a theft can’t close until the police are recorded. |
 | Q6 | Destruction | **One path.** **Return to the pharmacy by default.** On-site denaturing needs **two witnesses** and **organisation permission**. Reasons and methods are **fixed lists**, the photo is optional, and **both witnesses** go on the entry. **Voiding reverses the entry.** |
 | Q7 | Witness overrides | **A Witness overrides view for leads and managers with controlled view.** `controlled.override` is **only** the key for granting overrides. |
 | Q8 | Witnesses | **A restricted competency blocks witnessing.** The recorder must be at the house, and **PIN-1’s lock** applies. Declared relationships are a build note. |
 | Q9 | Class | **NZ Class A / B / C** (Misuse of Drugs Act 1975). Existing “Schedule 2/3/4” values are **flagged for review, not mapped automatically**. |
-| Q10 | Who | A **new key, `medications.controlled.manage`**, with a grant migration to team_lead, clinical_lead and provider_manager. It covers resolve, void, reasoned changes and destruction sign-off. **Managers close losses.** Frontline staff record, witness and report losses. **Support workers lose resolve and void.** |
+| Q10 | Who | A **new key, `medications.controlled.manage`**, with a grant migration to team_lead and provider_manager. It covers resolve, void, reasoned changes and destruction sign-off. **Clinical leads get no controlled keys** (Main decided 30 Sep, deviation 5 → B). **Managers close losses.** Frontline staff record, witness and report losses. **Support workers lose resolve and void.** |
 
 ## Open it
 
@@ -58,7 +58,7 @@ The hatched bar is the **mockup viewer, not product UI**. It has:
 - **Signed in as:**
   - Priya Shah: support worker; records and witnesses.
   - Jordan Tipene: house lead, Kōwhai House; `controlled.manage`.
-  - Hana Kereama: clinical lead; `controlled.manage` but **no controlled view**.
+  - Hana Kereama: clinical lead; **no controlled-medicine keys**.
   - Mereana Walsh: auditor; controlled view, read only.
   - Rangi Parata: provider manager, both houses; closes losses and grants overrides.
   - Sione Taufa: house lead, Rimu House.
@@ -95,7 +95,7 @@ It stays at today’s URL, `/emar/controlled`, in the P02 hub pattern. Breadcrum
   - **Recent entries** follow, newest first across medicines, with who recorded and who witnessed each one. **Voided entries are struck through**, with a “Voided” badge; the correcting entry says which entry it corrects.
 - **The medicine’s register:** a `WizardShell` viewer with “This medicine” and “Entries”. It shows every entry kept, the voided ones struck through, with who voided it, the witness and the reason.
 - **Who sees it:**
-  - People without controlled view see a no-access card. This includes the clinical lead, who holds `controlled.manage` (deviation 5).
+  - People without controlled view see a no-access card. This includes the clinical lead, who holds no controlled keys (deviation 5, decided).
   - A record outside their houses shows “We can’t show this record”.
 
 ### 2. Append-only and void (Q2, Q3)
@@ -204,7 +204,7 @@ The recorder must be at the house.
 |---|---|---|---|---|
 | Support worker | ✓ | — | — | — |
 | House lead (`controlled.manage`) | ✓ | ✓ | — | — |
-| Clinical lead (`controlled.manage`) | — (no controlled view) | — (no controlled view) | — | — |
+| Clinical lead (no controlled keys; sees the no-access card) | — | — | — | — |
 | Provider manager | ✓ | ✓ | ✓ | ✓ (`controlled.override`) |
 | Auditor | — | — | — | — (read only) |
 
@@ -256,7 +256,7 @@ The recorder must be at the house.
    - A “Class to review” count until every medicine has a class.
    - Destruction stores the class (AUDIT 3.11).
 10. **Permissions:**
-    - Add `medications.controlled.manage` with a grant migration to team_lead, clinical_lead and provider_manager.
+    - Add `medications.controlled.manage` with a grant migration to team_lead and provider_manager only. clinical_lead keeps no `controlled.*` keys, as on main (the RbacSeeder clinicalLead block); an admin can grant both keys in Settings › Roles.
     - Remove resolve and void from `controlled.record`.
     - Managers close losses.
     - Remember deploys skip seeders (AUDIT 7).
@@ -271,12 +271,22 @@ The recorder must be at the house.
   - no truncated meter captions or table cells.
 
   Details are in CHECKLIST §4, which also lists what the earlier runs found and this version fixes, and in `screenshots/report.json`.
+- **v1.1:** the states touched by Main’s fixes were re-run: 30 captures, 0 problems, including the new empty-filter state 16b. `report.json` now holds 136 captures, all passing (CHECKLIST §5).
 - **Keyboard:**
   - Enter opens “Resolve” on D-14.
   - Tab stays inside the wizard.
   - Escape closes the untouched wizard and returns focus to “Resolve”.
   - The menu key opens the register row’s menu.
 - **`tsc` and ESLint:** clean for `src/` (ESLint: 17 files, 0 problems; no unused imports). The 2 `tsc` errors in shared files come from P01’s Inertia shim, as in the earlier packages.
+
+## Main’s inspection of v1 (30 September 2026)
+
+Identity verified (VERSION sha, 31 files, docs-only diff). Two fixes, made in v1.1:
+
+1. **Empty states built from a template.** Discrepancies › With a manager read “No with a manager discrepancies”. Each section and filter now has its own words: “No discrepancies with a manager”, “No open discrepancies”, “No closed discrepancies yet”; the Destructions bands (“Nothing waiting for the pharmacist”, “No destructions yet”, “No voided destructions”); and the Witness overrides filters (“No overrides need a sign-off”, “No signed-off overrides”, “No declined overrides”, each with “Choose All overrides to see the rest.”).
+2. **A loss shown as a success.** Closed D-12 showed “Unexplained loss — loss report” in a green badge. A discrepancy’s outcome badge is now **warning for a loss** and **neutral** for recount matched, recording error and stock found. A closed loss and a completed destruction (“Received by the pharmacy”, “Destroyed on site”) are **neutral**, not green. The label always says what happened.
+
+Two decisions, recorded for Stephan’s end review: deviation 5 → (B) (below), and the Q5 extension approved as designed (Q5 above).
 
 ## Deviations (for Main)
 
@@ -286,7 +296,7 @@ The recorder must be at the house.
 2. **P07a is linked, not redesigned.** “Count and sign off” and a discrepancy’s count come from P07a’s approved dialogs and show a toast here.
 3. **A loss from a discrepancy is a zero-change entry.** The count already moved the balance (P07a), so the loss entry records the loss without moving it again.
 4. **The auditor has controlled view, read only.** Mereana sees the register, discrepancies, losses and destructions, with no actions.
-5. **The clinical lead holds `controlled.manage` without controlled view** (Q10’s grant list). In the preview, Hana sees the no-access card. At build, either grant clinical_lead `controlled.view`, or leave the key unusable for them — **for Main to decide**.
+5. **Clinical leads — decided (B), Main, 30 September.** clinical_lead gets no `controlled.manage`; the grant goes to team_lead and provider_manager only. On main, clinical_lead deliberately holds no `controlled.*` keys, and the EM-12 concealment work treats them as outside controlled view: least privilege. An admin can grant both keys in Settings › Roles. The preview is unchanged: Hana sees the no-access card.
 6. **`ConfirmDialog` is the real one.** PR #15 is merged, so destructive confirms are red.
 7. **Fixtures** follow P02–P06’s people. Additions:
    - Aroha’s methylphenidate, with a voided and corrected dose.

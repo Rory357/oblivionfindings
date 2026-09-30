@@ -133,33 +133,6 @@
       "stepError": null
     },
     {
-      "shot": "05-register-clinical-no-view",
-      "size": "1440",
-      "file": "1440-05-register-clinical-no-view.png",
-      "overflow": 0,
-      "header": null,
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "05-register-clinical-no-view",
-      "size": "1280",
-      "file": "1280-05-register-clinical-no-view.png",
-      "overflow": 0,
-      "header": null,
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "05-register-clinical-no-view",
-      "size": "zoom200",
-      "file": "zoom200-05-register-clinical-no-view.png",
-      "overflow": 0,
-      "header": null,
-      "errors": [],
-      "stepError": null
-    },
-    {
       "shot": "06-register-support-worker",
       "size": "1440",
       "file": "1440-06-register-support-worker.png",
@@ -228,240 +201,6 @@
       "shot": "09-register-recent-entries",
       "size": "1440",
       "file": "1440-09-register-recent-entries.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "10-discrepancies",
-      "size": "1440",
-      "file": "1440-10-discrepancies.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "10-discrepancies",
-      "size": "1280",
-      "file": "1280-10-discrepancies.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "10-discrepancies",
-      "size": "zoom200",
-      "file": "zoom200-10-discrepancies.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "11-discrepancies-support-worker",
-      "size": "1440",
-      "file": "1440-11-discrepancies-support-worker.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "12-losses",
-      "size": "1440",
-      "file": "1440-12-losses.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "12-losses",
-      "size": "1280",
-      "file": "1280-12-losses.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "12-losses",
-      "size": "zoom200",
-      "file": "zoom200-12-losses.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "13-destructions",
-      "size": "1440",
-      "file": "1440-13-destructions.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "13-destructions",
-      "size": "1280",
-      "file": "1280-13-destructions.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "13-destructions",
-      "size": "zoom200",
-      "file": "zoom200-13-destructions.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "14-destructions-redirect",
-      "size": "1440",
-      "file": "1440-14-destructions-redirect.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "15-overrides-manager",
-      "size": "1440",
-      "file": "1440-15-overrides-manager.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "15-overrides-manager",
-      "size": "1280",
-      "file": "1280-15-overrides-manager.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "15-overrides-manager",
-      "size": "zoom200",
-      "file": "zoom200-15-overrides-manager.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "16-overrides-house-lead",
-      "size": "1440",
-      "file": "1440-16-overrides-house-lead.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "16-overrides-house-lead",
-      "size": "1280",
-      "file": "1280-16-overrides-house-lead.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "16-overrides-house-lead",
-      "size": "zoom200",
-      "file": "zoom200-16-overrides-house-lead.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "17-overrides-clinical-no-view",
-      "size": "1440",
-      "file": "1440-17-overrides-clinical-no-view.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
@@ -735,19 +474,6 @@
       "shot": "27-breakage",
       "size": "zoom200",
       "file": "zoom200-27-breakage.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "28-discrepancy-view",
-      "size": "1440",
-      "file": "1440-28-discrepancy-view.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
@@ -1047,45 +773,6 @@
       "shot": "42-loss-who-told",
       "size": "1440",
       "file": "1440-42-loss-who-told.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "43-loss-view",
-      "size": "1440",
-      "file": "1440-43-loss-view.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "43-loss-view",
-      "size": "1280",
-      "file": "1280-43-loss-view.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "43-loss-view",
-      "size": "zoom200",
-      "file": "zoom200-43-loss-view.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
@@ -1408,19 +1095,6 @@
       "stepError": null
     },
     {
-      "shot": "58-destruction-view",
-      "size": "1440",
-      "file": "1440-58-destruction-view.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
       "shot": "60-override-overdue",
       "size": "1440",
       "file": "1440-60-override-overdue.png",
@@ -1707,6 +1381,345 @@
       "stepError": null
     },
     {
+      "shot": "05-register-clinical-no-view",
+      "size": "1440",
+      "file": "1440-05-register-clinical-no-view.png",
+      "overflow": 0,
+      "header": null,
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "05-register-clinical-no-view",
+      "size": "1280",
+      "file": "1280-05-register-clinical-no-view.png",
+      "overflow": 0,
+      "header": null,
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "05-register-clinical-no-view",
+      "size": "zoom200",
+      "file": "zoom200-05-register-clinical-no-view.png",
+      "overflow": 0,
+      "header": null,
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "10-discrepancies",
+      "size": "1440",
+      "file": "1440-10-discrepancies.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "10-discrepancies",
+      "size": "1280",
+      "file": "1280-10-discrepancies.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "10-discrepancies",
+      "size": "zoom200",
+      "file": "zoom200-10-discrepancies.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "11-discrepancies-support-worker",
+      "size": "1440",
+      "file": "1440-11-discrepancies-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "12-losses",
+      "size": "1440",
+      "file": "1440-12-losses.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "12-losses",
+      "size": "1280",
+      "file": "1280-12-losses.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "12-losses",
+      "size": "zoom200",
+      "file": "zoom200-12-losses.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "13-destructions",
+      "size": "1440",
+      "file": "1440-13-destructions.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "13-destructions",
+      "size": "1280",
+      "file": "1280-13-destructions.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "13-destructions",
+      "size": "zoom200",
+      "file": "zoom200-13-destructions.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "14-destructions-redirect",
+      "size": "1440",
+      "file": "1440-14-destructions-redirect.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "15-overrides-manager",
+      "size": "1440",
+      "file": "1440-15-overrides-manager.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "15-overrides-manager",
+      "size": "1280",
+      "file": "1280-15-overrides-manager.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "15-overrides-manager",
+      "size": "zoom200",
+      "file": "zoom200-15-overrides-manager.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "16-overrides-house-lead",
+      "size": "1440",
+      "file": "1440-16-overrides-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "16-overrides-house-lead",
+      "size": "1280",
+      "file": "1280-16-overrides-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "16-overrides-house-lead",
+      "size": "zoom200",
+      "file": "zoom200-16-overrides-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "16b-overrides-filter-empty",
+      "size": "1440",
+      "file": "1440-16b-overrides-filter-empty.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "17-overrides-clinical-no-view",
+      "size": "1440",
+      "file": "1440-17-overrides-clinical-no-view.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "28-discrepancy-view",
+      "size": "1440",
+      "file": "1440-28-discrepancy-view.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "43-loss-view",
+      "size": "1440",
+      "file": "1440-43-loss-view.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "43-loss-view",
+      "size": "1280",
+      "file": "1280-43-loss-view.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "43-loss-view",
+      "size": "zoom200",
+      "file": "zoom200-43-loss-view.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "58-destruction-view",
+      "size": "1440",
+      "file": "1440-58-destruction-view.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
       "shot": "100-contract-page",
       "size": "1440",
       "file": "1440-100-contract-page.png",
@@ -1758,5 +1771,27 @@
       "Change the class"
     ],
     "keyboardMenuVia": "ContextMenu key"
-  }
+  },
+  "reruns": [
+    {
+      "when": "2026-09-30T10:12:57.463Z",
+      "only": [
+        "05-",
+        "10-",
+        "11-",
+        "12-",
+        "13-",
+        "14-",
+        "15-",
+        "16-",
+        "16b-",
+        "17-",
+        "28-",
+        "43-",
+        "58-",
+        "100-"
+      ],
+      "captures": 30
+    }
+  ]
 }
