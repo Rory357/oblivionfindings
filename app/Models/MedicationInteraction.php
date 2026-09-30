@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MedicationInteraction extends Model
 {
@@ -17,11 +18,20 @@ class MedicationInteraction extends Model
         'clinical_effects',
         'management',
         'active',
+        'created_by',
     ];
 
     protected $casts = [
         'active' => 'boolean',
     ];
+
+    /**
+     * Who authored the rule (null for rules seeded before NF-09).
+     */
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
     /**
      * Severity levels with display info
