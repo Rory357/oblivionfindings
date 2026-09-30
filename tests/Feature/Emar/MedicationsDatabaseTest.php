@@ -102,7 +102,9 @@ class MedicationsDatabaseTest extends TestCase
         $user = $this->makeRoleUser('admin');
         $this->grantPermissions($user, ['medications.view']);
 
-        $client = Client::factory()->create(['status' => 'active']);
+        // Medication reads are Site-scoped, so the client needs a canonical Site.
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $warfarin = ClientMedication::query()->create([
             'client_id' => $client->id,
             'name' => 'Warfarin',
