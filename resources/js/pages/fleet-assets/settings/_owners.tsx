@@ -4,6 +4,8 @@ import {
 } from '@/components/lists/entity-menu';
 import { EntityTable } from '@/components/lists/entity-table';
 import { ListCaption } from '@/components/lists/list-caption';
+import { SettingsModal } from '@/components/settings/settings-modal';
+import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SkeletonTable } from '@/components/ui/skeleton-table';
@@ -27,7 +29,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Page, Policy } from './_types';
-import { api, Modal, Notice, Sections } from './_ui';
+import { api, Sections } from './_ui';
 
 type Device = {
     id: number;
@@ -199,12 +201,12 @@ export function Tracking({
                             </p>
                         </ReviewCard>
                     </div>
-                    <Notice>
+                    <SettingsNotice>
                         Map accuracy is only meaningful when the source reports
                         supported units. A dilution-of-precision value is not an
                         accuracy distance. Review source evidence before
                         interpreting it as metres.
-                    </Notice>
+                    </SettingsNotice>
                 </>
             )}
             {section === 'devices' && (
@@ -224,12 +226,12 @@ export function Tracking({
                             description="Your Fleet device permissions are required to view this directory."
                         />
                     ) : devices.error ? (
-                        <Notice>
+                        <SettingsNotice>
                             {devices.error}{' '}
                             <Button variant="outline" onClick={devices.reload}>
                                 Retry
                             </Button>
-                        </Notice>
+                        </SettingsNotice>
                     ) : !devices.data ? (
                         <SkeletonTable />
                     ) : devices.data.data.length ? (
@@ -305,11 +307,11 @@ export function Tracking({
                             description="Change the search, or review device assignment in the source workspace."
                         />
                     )}
-                    <Notice>
+                    <SettingsNotice>
                         This directory shows contact metadata only. Open the
                         source record for permitted location evidence,
                         capability details and command status.
-                    </Notice>
+                    </SettingsNotice>
                 </>
             )}
             {section === 'policies' && (
@@ -353,12 +355,12 @@ export function Tracking({
                             },
                         ]}
                     />
-                    <Notice>
+                    <SettingsNotice>
                         Raw device messages, personal tracking and audit
                         evidence use separate retention controls. These
                         configured values do not confirm a cleanup job ran, and
                         changing a tracker profile does not change retention.
-                    </Notice>
+                    </SettingsNotice>
                 </>
             )}
             {section === 'profiles' && (
@@ -405,11 +407,11 @@ export function Tracking({
                             <ArrowUpRight className="size-4" />
                         </Button>
                     </ReviewCard>
-                    <Notice>
+                    <SettingsNotice>
                         Settings does not dispatch commands or create another
                         profile store. Existing device permissions, step-up
                         checks, approvals and verification remain in force.
-                    </Notice>
+                    </SettingsNotice>
                 </>
             )}
             {context.ctx && (
@@ -431,17 +433,17 @@ export function Tracking({
                 />
             )}
             {policy && (
-                <Modal
+                <SettingsModal
                     title={policy.title}
                     description={policy.owner}
                     onClose={() => setPolicy(null)}
                 >
                     <ReviewRow label="Current value" value={policy.value} />
                     <p className="text-subtle">{policy.detail}</p>
-                </Modal>
+                </SettingsModal>
             )}
             {device && (
-                <Modal
+                <SettingsModal
                     title={device.name}
                     description="Canonical device metadata"
                     onClose={() => setDevice(null)}
@@ -469,12 +471,12 @@ export function Tracking({
                                 : 'Not recorded'
                         }
                     />
-                    <Notice>
+                    <SettingsNotice>
                         Last contact does not establish a usable fix. The source
                         record owns permitted position evidence and supported
                         controls.
-                    </Notice>
-                </Modal>
+                    </SettingsNotice>
+                </SettingsModal>
             )}
         </div>
     );
@@ -579,12 +581,12 @@ export function Setup({ query }: { query: string }) {
                 onOpen={setDetail}
                 onRowContextMenu={context.open}
             />
-            <Notice>
+            <SettingsNotice>
                 Each source workspace enforces your permissions and approved
                 Sites. Setup changes must preserve existing booking, schedule
                 and evidence history. Tracking is optional and does not require
                 another vehicle or asset record.
-            </Notice>
+            </SettingsNotice>
             {context.ctx && (
                 <EntityContextMenu
                     x={context.ctx.x}
@@ -595,7 +597,7 @@ export function Setup({ query }: { query: string }) {
                 />
             )}
             {detail && (
-                <Modal
+                <SettingsModal
                     title={detail.title}
                     description={`Managed in ${detail.owner}`}
                     onClose={() => setDetail(null)}
@@ -615,13 +617,13 @@ export function Setup({ query }: { query: string }) {
                 >
                     <p className="text-subtle">{detail.detail}</p>
                     {detail.key === 'import' && (
-                        <Notice>
+                        <SettingsNotice>
                             The existing importer owns mapping, row errors,
                             duplicate checks, saved progress and reconciliation.
                             Opening it does not upload or import anything.
-                        </Notice>
+                        </SettingsNotice>
                     )}
-                </Modal>
+                </SettingsModal>
             )}
         </div>
     );
@@ -646,12 +648,12 @@ export function ChangeHistory({ query }: { query: string }) {
                 caption="Your preferences and permitted provider changes"
             />
             {remote.error ? (
-                <Notice>
+                <SettingsNotice>
                     {remote.error}{' '}
                     <Button variant="outline" onClick={remote.reload}>
                         Retry
                     </Button>
-                </Notice>
+                </SettingsNotice>
             ) : !remote.data ? (
                 <SkeletonTable />
             ) : remote.data.data.length ? (
@@ -711,7 +713,7 @@ export function ChangeHistory({ query }: { query: string }) {
                 />
             )}
             {detail && (
-                <Modal
+                <SettingsModal
                     title={detail.title}
                     description="Recorded application change"
                     onClose={() => setDetail(null)}
@@ -724,7 +726,7 @@ export function ChangeHistory({ query }: { query: string }) {
                         A saved configuration does not confirm provider
                         delivery, device application or acknowledgement.
                     </p>
-                </Modal>
+                </SettingsModal>
             )}
         </div>
     );

@@ -4,6 +4,8 @@ import {
 } from '@/components/lists/entity-menu';
 import { EntityTable } from '@/components/lists/entity-table';
 import { ListCaption } from '@/components/lists/list-caption';
+import { SettingsModal } from '@/components/settings/settings-modal';
+import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,7 +40,7 @@ import {
 import { MapTools } from './_map-tools';
 import type { MapSnapshot, MapValues } from './_types';
 import { mergeMapDraft } from './_types';
-import { api, Modal, Notice, SettingsError } from './_ui';
+import { api, SettingsError } from './_ui';
 
 const steps = [
     {
@@ -290,7 +292,7 @@ export function Maps({
     return (
         <div className="space-y-5">
             {recovery && (
-                <Notice>
+                <SettingsNotice>
                     An unsaved map configuration was found in this browser.{' '}
                     <Button
                         variant="link"
@@ -312,11 +314,11 @@ export function Maps({
                     <Button variant="link" onClick={() => setRecovery(null)}>
                         Discard recovered draft
                     </Button>
-                </Notice>
+                </SettingsNotice>
             )}
             {notice && (
                 <div role="status">
-                    <Notice>{notice}</Notice>
+                    <SettingsNotice>{notice}</SettingsNotice>
                 </div>
             )}
             {error && !open && (
@@ -326,7 +328,7 @@ export function Maps({
                     ref={errorRef}
                     tabIndex={-1}
                 >
-                    <Notice role="note">{error}</Notice>
+                    <SettingsNotice role="note">{error}</SettingsNotice>
                 </div>
             )}
             <ListCaption
@@ -479,11 +481,11 @@ export function Maps({
                 onOpen={setDetail}
                 onRowContextMenu={context.open}
             />
-            <Notice>
+            <SettingsNotice>
                 Boundary editing remains application-owned. Personal tracking
                 source, consent and sharing stay with Client Location and People
                 Locations. Enabling a provider grants no extra access.
-            </Notice>
+            </SettingsNotice>
             {saved.values.google && (
                 <Button variant="outline" onClick={() => setToolsOpen(true)}>
                     Explore configured map capabilities
@@ -511,7 +513,7 @@ export function Maps({
                 />
             )}
             {detail && (
-                <Modal
+                <SettingsModal
                     title={detail.title}
                     description="Separate API capability"
                     onClose={() => setDetail(null)}
@@ -530,7 +532,7 @@ export function Maps({
                         application-owned coordinates and geometry are
                         preserved.
                     </p>
-                </Modal>
+                </SettingsModal>
             )}
             {open && (
                 <WizardShell
@@ -599,7 +601,9 @@ export function Maps({
                                     tabIndex={-1}
                                     ref={errorRef}
                                 >
-                                    <Notice role="note">{error}</Notice>
+                                    <SettingsNotice role="note">
+                                        {error}
+                                    </SettingsNotice>
                                 </div>
                             )}
                             {step === 0 && (
@@ -744,12 +748,12 @@ export function Maps({
                             )}
                             {step === 1 && (
                                 <>
-                                    <Notice>
+                                    <SettingsNotice>
                                         Google map display provides the map
                                         context for Google results. Address
                                         search, reverse geocoding and routing
                                         are separate optional APIs.
-                                    </Notice>
+                                    </SettingsNotice>
                                     {saved.capabilities.map((capability) => (
                                         <Card
                                             key={capability.key}
@@ -798,11 +802,11 @@ export function Maps({
                                             />
                                         </Card>
                                     ))}
-                                    <Notice>
+                                    <SettingsNotice>
                                         Each API must also be enabled for your
                                         Google project. Optional capabilities
                                         can incur provider charges.
-                                    </Notice>
+                                    </SettingsNotice>
                                 </>
                             )}
                             {step === 2 && (
@@ -810,12 +814,12 @@ export function Maps({
                                     <h2 className="text-section-title">
                                         Check the setup before saving
                                     </h2>
-                                    <Notice>
+                                    <SettingsNotice>
                                         This checks configuration presence only.
                                         It makes no Google request and cannot
                                         verify key restrictions, enabled APIs,
                                         quota or billing.
-                                    </Notice>
+                                    </SettingsNotice>
                                     {saved.capabilities.map((capability) => {
                                         const selected =
                                             draft.google &&
@@ -962,11 +966,11 @@ export function Maps({
                                             }
                                         />
                                     </div>
-                                    <Notice>
+                                    <SettingsNotice>
                                         This saves configuration. It does not
                                         test a provider or change Google project
                                         billing and key restrictions.
-                                    </Notice>
+                                    </SettingsNotice>
                                     <p className="text-subtle">
                                         Set conservative API quotas in Google
                                         Cloud before enabling services. Budget
@@ -1010,7 +1014,7 @@ export function Maps({
                 </WizardShell>
             )}
             {discard && (
-                <Modal
+                <SettingsModal
                     title="Discard map changes?"
                     description="Your saved map configuration will be kept."
                     onClose={() => setDiscard(false)}
@@ -1043,10 +1047,10 @@ export function Maps({
                     }
                 >
                     The unsaved provider changes will be removed.
-                </Modal>
+                </SettingsModal>
             )}
             {latest && (
-                <Modal
+                <SettingsModal
                     title="Map configuration changed"
                     description="Saved settings or deployment credentials changed. Keep your edited fields and review them against the current configuration, or load the saved configuration."
                     onClose={() => setLatest(null)}
@@ -1090,7 +1094,7 @@ export function Maps({
                         label="Current project"
                         value={latest.values.project}
                     />
-                </Modal>
+                </SettingsModal>
             )}
         </div>
     );

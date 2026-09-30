@@ -2,32 +2,10 @@ import {
     TierTwoTabs,
     type GroupedProfileNavTab,
 } from '@/components/page/grouped-profile-nav';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Info } from 'lucide-react';
-import type { ComponentProps, ReactNode } from 'react';
 
-export function Notice({
-    children,
-    role = 'alert',
-}: {
-    children: ReactNode;
-    role?: 'alert' | 'note';
-}) {
-    return (
-        <Alert role={role}>
-            <Info className="size-4" />
-            <AlertDescription>{children}</AlertDescription>
-        </Alert>
-    );
-}
+// Modal and Notice moved to components/settings (eMAR P11 Q1) so every
+// Settings page shares them.
 export function Sections({
     tabs,
     value,
@@ -58,48 +36,6 @@ export function Sections({
         />
     );
 }
-export function Modal({
-    title,
-    description,
-    children,
-    footer,
-    onClose,
-    onCloseAutoFocus,
-}: {
-    title: string;
-    description: string;
-    children: ReactNode;
-    footer?: ReactNode;
-    onClose: () => void;
-    onCloseAutoFocus?: ComponentProps<typeof DialogContent>['onCloseAutoFocus'];
-}) {
-    return (
-        <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent
-                className="flex max-h-[88vh] flex-col overflow-hidden p-0 sm:max-w-[480px]"
-                onCloseAutoFocus={onCloseAutoFocus}
-            >
-                <div className="shrink-0 border-b p-5 pr-12">
-                    <DialogTitle>{title}</DialogTitle>
-                    <DialogDescription className="mt-2">
-                        {description}
-                    </DialogDescription>
-                </div>
-                <div className="min-h-0 space-y-4 overflow-y-auto p-5">
-                    {children}
-                </div>
-                <DialogFooter className="shrink-0 border-t bg-muted/30 p-4">
-                    {footer ?? (
-                        <Button variant="outline" onClick={onClose}>
-                            Close
-                        </Button>
-                    )}
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
 export class SettingsError extends Error {
     constructor(
         message: string,

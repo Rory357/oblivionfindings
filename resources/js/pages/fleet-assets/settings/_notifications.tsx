@@ -5,6 +5,8 @@ import {
 } from '@/components/lists/entity-menu';
 import { EntityTable } from '@/components/lists/entity-table';
 import { ListCaption } from '@/components/lists/list-caption';
+import { SettingsModal } from '@/components/settings/settings-modal';
+import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -54,7 +56,7 @@ import {
     type NotificationSnapshot,
     type Overrides,
 } from './_types';
-import { api, Modal, Notice, Sections, SettingsError } from './_ui';
+import { api, Sections, SettingsError } from './_ui';
 
 const sections = [
     { key: 'preferences', label: 'Preferences', icon: SlidersHorizontal },
@@ -329,7 +331,7 @@ export function Notifications({
             <Sections tabs={sections} value={section} onChange={setSection} />
             {message && (
                 <div role="status">
-                    <Notice>
+                    <SettingsNotice>
                         {message}{' '}
                         {undo && (
                             <Button
@@ -343,11 +345,11 @@ export function Notifications({
                                 Undo reset
                             </Button>
                         )}
-                    </Notice>
+                    </SettingsNotice>
                 </div>
             )}
             {recovery && (
-                <Notice>
+                <SettingsNotice>
                     You have an unsaved draft on this browser.{' '}
                     <Button
                         variant="outline"
@@ -370,7 +372,7 @@ export function Notifications({
                     <Button variant="ghost" onClick={() => setRecovery(null)}>
                         Discard browser draft
                     </Button>
-                </Notice>
+                </SettingsNotice>
             )}
             {section === 'preferences' && (
                 <>
@@ -421,12 +423,12 @@ export function Notifications({
                         }
                     />
                     {!personal && (
-                        <Notice>
+                        <SettingsNotice>
                             These are the effective defaults for your current
                             roles. A personal choice can override an optional
                             channel. Defaults never grant access to a source
                             record.
-                        </Notice>
+                        </SettingsNotice>
                     )}
                     {visible.length ? (
                         <EntityTable<NotificationEvent>
@@ -863,7 +865,7 @@ export function Notifications({
                                         setPreviewChannel(value as Channel)
                                     }
                                 />
-                                <Notice>
+                                <SettingsNotice>
                                     {personal && dirty
                                         ? 'Showing your unsaved draft.'
                                         : personal
@@ -872,7 +874,7 @@ export function Notifications({
                                     {effective(preview, values, previewChannel)
                                         ? 'This optional channel is selected.'
                                         : 'This optional copy would be skipped.'}
-                                </Notice>
+                                </SettingsNotice>
                                 <ReviewCard
                                     icon={Bell}
                                     title={`${preview.title} · example`}
@@ -915,7 +917,7 @@ export function Notifications({
                 </WizardShell>
             )}
             {review && (
-                <Modal
+                <SettingsModal
                     title="Review notification changes"
                     description="These choices affect your optional copies. Required responses remain with their source owners."
                     onClose={() => !busy && setReview(false)}
@@ -959,11 +961,11 @@ export function Notifications({
                             </ReviewCard>
                         );
                     })}
-                    {message && <Notice>{message}</Notice>}
-                </Modal>
+                    {message && <SettingsNotice>{message}</SettingsNotice>}
+                </SettingsModal>
             )}
             {discard && (
-                <Modal
+                <SettingsModal
                     title="Discard notification changes?"
                     description="Your saved preferences will be kept."
                     onClose={() => !busy && setDiscard(false)}
@@ -983,11 +985,11 @@ export function Notifications({
                     }
                 >
                     Your unsaved channel choices will be removed.
-                    {message && <Notice>{message}</Notice>}
-                </Modal>
+                    {message && <SettingsNotice>{message}</SettingsNotice>}
+                </SettingsModal>
             )}
             {latest && (
-                <Modal
+                <SettingsModal
                     title="Preferences changed elsewhere"
                     description="Compare your draft with the newest saved choices. Keep your edited channels and adopt current values for the others."
                     onClose={() => setLatest(null)}
@@ -1053,7 +1055,7 @@ export function Notifications({
                             </ReviewCard>
                         );
                     })}
-                </Modal>
+                </SettingsModal>
             )}
             {checkContext.ctx && (
                 <EntityContextMenu
@@ -1065,7 +1067,7 @@ export function Notifications({
                 />
             )}
             {check && (
-                <Modal
+                <SettingsModal
                     title={`${check.event} · dry run`}
                     description="No notification was sent. Delivery and acknowledgement are not tested."
                     onClose={() => setCheck(null)}
@@ -1083,7 +1085,7 @@ export function Notifications({
                             value={check.revision.slice(0, 12)}
                         />
                     </ReviewCard>
-                </Modal>
+                </SettingsModal>
             )}
         </div>
     );

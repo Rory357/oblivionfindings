@@ -1,4 +1,5 @@
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
+import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,7 +8,7 @@ import { usePage } from '@inertiajs/react';
 import { MapPin, Route, Search } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MapSnapshot } from './_types';
-import { api, Notice } from './_ui';
+import { api } from './_ui';
 
 type Point = { lat: number; lng: number };
 type Place = Point & {
@@ -271,22 +272,22 @@ export function MapTools({
         >
             <WizardStepPane key={section}>
                 <div className="space-y-4">
-                    <Notice>
+                    <SettingsNotice>
                         Requests use the configured Google APIs and may incur
                         provider charges. Enter only information you are
                         authorised to share. Results are temporary and are not
                         saved into source records.
-                    </Notice>
+                    </SettingsNotice>
                     {error && (
                         <div role="alert">
-                            <Notice>{error}</Notice>
+                            <SettingsNotice>{error}</SettingsNotice>
                         </div>
                     )}
                     {!enabled(['places', 'geocoding', 'routes'][section]) && (
-                        <Notice>
+                        <SettingsNotice>
                             This capability is not available with the current
                             provider configuration.
-                        </Notice>
+                        </SettingsNotice>
                     )}
                     {section === 0 ? (
                         <div className="space-y-2">
