@@ -235,6 +235,24 @@ export default [
         },
     },
     {
+        // Node tooling (scripts/, tools/): run by node, not the browser bundle.
+        files: ['**/*.{cjs,mjs}'],
+        languageOptions: {
+            globals: {
+                ...globals.node,
+            },
+        },
+    },
+    {
+        files: ['**/*.cjs'],
+        languageOptions: {
+            sourceType: 'commonjs',
+        },
+        rules: {
+            '@typescript-eslint/no-require-imports': 'off',
+        },
+    },
+    {
         ignores: [
             'vendor',
             'collector/vendor/**',
@@ -245,11 +263,11 @@ export default [
             'playwright-report/**',
             'test-results/**',
             'tailwind.config.js',
-            // Immutable Transport design evidence is verified by its frozen manifests.
-            'docs/fleet-assets-audit/previews/PKG-05/**',
-            // Frozen Asset Profile references retain their recorded byte hashes.
-            'docs/fleet-assets-audit/previews/PKG-06B/**',
-            'docs/fleet-assets-audit/evidence/PKG-06B/v*/**',
+            // Audit evidence, design previews and before/after snapshots are
+            // records, not shipped code. Some are verified by frozen byte
+            // hashes, and `npm run lint` runs with --fix, which would
+            // rewrite them.
+            'docs/**',
             // Claude Code agent worktrees: each is a full repo checkout so
             // recursing into them duplicates lint work for every parallel
             // session and overflows ESLint's stylish formatter on machines

@@ -189,7 +189,7 @@ function HandoffBody({
     useEffect(() => {
         void load();
         return () => {
-            ++epoch.current;
+            epoch.current += 1;
             request.current?.abort();
         };
     }, [load]);
