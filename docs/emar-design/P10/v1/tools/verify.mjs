@@ -3,8 +3,8 @@
 // against the running preview (serve.mjs, port 4395). For every state: load
 // at 1440×900, 1280×800 and 200 % zoom (720×450 CSS px at device scale 2),
 // run the steps, capture a screenshot, and record horizontal overflow,
-// console errors, the header subline's line count, truncated meter captions
-// and truncated table cells. Also records a real-key keyboard walk through
+// console errors, the header subline's line count, truncated meter captions,
+// truncated table cells, and text clipped inside the date/time pickers. Also records a real-key keyboard walk through
 // the start-emergency-access wizard, and the menu key on a grant row. Output: screenshots/*.png + report.json.
 //   node docs/emar-design/P10/v1/tools/verify.mjs [--only=substring,substring,…] [--core]
 // A partial run (--only) replaces just its captures in report.json and notes the re-run there.
@@ -46,6 +46,25 @@ const pickDate = async (label, d, month, year = 2026) => { const t = [...documen
 const pickTime = async (label, h, m, ap) => { const t = [...document.querySelectorAll('button[aria-label^="' + label + ':"]')].find(vis); if (!t) throw new Error('No time field: ' + label); t.click(); await wait(450); const hh = [...document.querySelectorAll('input[aria-label="' + label + ' hour"]')].find(vis); const mm = [...document.querySelectorAll('input[aria-label="' + label + ' minute"]')].find(vis); if (!hh || !mm) throw new Error('No time inputs: ' + label); const sv = (e, v) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(e, v); e.dispatchEvent(new Event('input', { bubbles: true })); }; sv(hh, h); await wait(120); sv(mm, m); await wait(120); const p = [...document.querySelectorAll('[aria-label="' + label + ' AM or PM"] button')].find((b) => b.textContent.trim() === ap); if (p) { p.click(); await wait(150); } const u = [...document.querySelectorAll('button')].find((x) => vis(x) && x.textContent.trim().startsWith('Use time')); if (!u) throw new Error('No Use time'); u.click(); await wait(300); };
 const go = async (h) => { location.hash = h; await wait(700); };
 `;
+/* Main, P10 v1 fix 1: text clipped, or a part escaping its card, inside the approved date/time pickers.
+ * For every visible DateTimeField, each picker card (its trigger button) must sit inside its column, every
+ * part of it inside the card, and no text in it cut short. Defines PICKERS for the metrics below. */
+const PICKER_CHECK = `const PICKERS = [...document.querySelectorAll('fieldset.date-time-field .field')].filter(vis).flatMap((f) => {
+    const out = [];
+    const fr = f.getBoundingClientRect();
+    const card = [...f.querySelectorAll('button')].find(vis);
+    if (!card) return out;
+    const cr = card.getBoundingClientRect();
+    const name = (f.querySelector('label')?.textContent || 'picker').trim();
+    if (cr.right > fr.right + 1 || cr.left < fr.left - 1) out.push(name + ': the card is wider than its column');
+    for (const c of card.querySelectorAll('*')) {
+        if (!vis(c)) continue;
+        const r = c.getBoundingClientRect();
+        if (r.width && (r.right > cr.right + 1 || r.left < cr.left - 1)) out.push(name + ': ' + (c.textContent.trim() || c.tagName.toLowerCase()).slice(0, 40) + ' escapes the card');
+        if (c.children.length === 0 && c.textContent.trim() && c.scrollWidth > c.clientWidth + 1) out.push(name + ': “' + c.textContent.trim().slice(0, 40) + '” is cut short');
+    }
+    return out;
+});`;
 const A = (q) => `#/emar/emergency-access?${q}`;
 const M = (q) => `#/emar/mar?${q}`;
 const T = (q) => `#/meds/today?${q}`;
@@ -60,6 +79,7 @@ const toCheck = `${second} await cont();`;
 const ticks = `el('#rq-a1').click(); await wait(150); el('#rq-a2').click(); await wait(200);`;
 const rqPin = `${toSecond} await pick('#rq-who','Hana Kereama'); await set('#rq-pin','482913');`;
 const reviewFill = `await tile('justified'); await set('#rv-notes','Reasonable cover — the roster had no one signed off that afternoon.');`;
+const insulinFill = `await tile('given'); await set('#rd-bsl','6.4'); await pick('#rd-witness','Daniel Ahn'); await set('#rd-pin','482913');`;
 const endFill = `await set('#en-why','Mere Kahu is on shift now and can give Aroha’s doses.');`;
 const paperOwn = `await tile('given'); await pickDate('Time on the paper date', 19, 'September'); await pickTime('Time on the paper time', '10', '05', 'AM'); await pick('#pe-by','Sione Taufa');`;
 
@@ -135,13 +155,14 @@ const SHOTS = [
     { name: '72-mar-aroha-priya-blocked', hash: M('as=sw&person=aroha'), core: true },
     { name: '73-mar-aroha-hana-blocked', hash: M('as=clinical&person=aroha') },
     { name: '74-record-under-grant', hash: M('as=pm&person=aroha&open=record:aroha:o-insulin'), core: true },
-    { name: '75-recorded-under-grant', hash: M('as=pm&person=aroha&open=record:aroha:o-insulin'), steps: `await tile('given'); fbtn('Save').click(); await wait(600);`, core: true },
-    { name: '76-record-expired', hash: M('as=pm&person=aroha&scn=expired&open=record:aroha:o-insulin'), steps: `await tile('given'); fbtn('Save').click(); await wait(400);`, core: true },
-    { name: '77-record-expired-restart', hash: M('as=pm&person=aroha&scn=expired&open=record:aroha:o-insulin'), steps: `await tile('given'); fbtn('Save').click(); await wait(400); await click('Start it again'); await wait(300);`, core: true },
+    { name: '75-recorded-under-grant', hash: M('as=pm&person=aroha&open=record:aroha:o-insulin'), steps: `${insulinFill} fbtn('Save').click(); await wait(600);`, core: true },
+    { name: '75b-record-rules-validation', hash: M('as=pm&person=aroha&open=record:aroha:o-insulin'), steps: `await tile('given'); fbtn('Save').click(); await wait(300);` },
+    { name: '76-record-expired', hash: M('as=pm&person=aroha&scn=expired&open=record:aroha:o-insulin'), steps: `${insulinFill} fbtn('Save').click(); await wait(400);`, core: true },
+    { name: '77-record-expired-restart', hash: M('as=pm&person=aroha&scn=expired&open=record:aroha:o-insulin'), steps: `${insulinFill} fbtn('Save').click(); await wait(400); await click('Start it again'); await wait(300);`, core: true },
     { name: '78-mar-expired', hash: M('as=pm&person=aroha&scn=expired'), core: true },
     { name: '79-mar-ending', hash: M('as=pm&person=aroha&scn=ending') },
     { name: '80-request-link-house-lead', hash: M('as=lead&person=aroha&open=request:aroha'), core: true },
-    { name: '81-record-offline-saved-on-device', hash: M('as=pm&person=aroha&scn=offline&open=record:aroha:o-insulin'), steps: `await tile('given'); fbtn('Save').click(); await wait(600);` },
+    { name: '81-record-offline-needs-connection', hash: M('as=pm&person=aroha&scn=offline&open=record:aroha:o-insulin'), steps: `${insulinFill} fbtn('Save').click(); await wait(500);` },
     { name: '82-record-controlled-witness', hash: M('as=pm&person=aroha&open=record:aroha:o-methylphenidate') },
     // Meds today (P01 frame)
     { name: '85-today-offline-no-pack', hash: T('as=sw&scn=offline'), core: true },
@@ -172,6 +193,7 @@ const SHOTS = [
     { name: '113-audit-event-ea13', hash: R('as=pm&view=audit&open=event:E-EA-13-open'), core: true },
     { name: '114-exports-house-lead', hash: R('as=lead&view=exports'), core: true },
     { name: '115-pack-house-lead', hash: R('as=lead&view=exports&open=export:pack'), core: true },
+    { name: '115b-pack-first-page', hash: R('as=lead&view=exports&open=export:pack'), steps: `document.querySelector('[aria-label="The first page"]').scrollIntoView({ block: 'center' }); await wait(300);`, core: true },
     { name: '116-pack-hana-no-controlled', hash: R('as=clinical&view=exports&open=export:pack'), core: true },
     { name: '117-pack-offline', hash: R('as=lead&view=exports&scn=offline&open=export:pack'), steps: `fbtn('Make the pack').click(); await wait(300);`, core: true },
     { name: '118-pack-made-in-audit', hash: R('as=lead&view=exports&open=export:pack'), steps: `fbtn('Make the pack').click(); await wait(500); location.hash = '#/emar/reports?as=pm&view=audit&sub=exports'; await wait(700);`, core: true },
@@ -269,13 +291,13 @@ for (const shot of SHOTS.filter((s) => picked(s.name))) {
             stepError = String(e.message ?? e).slice(0, 300);
         }
         const overflow = await evaluate(`return document.documentElement.scrollWidth - document.documentElement.clientWidth;`);
-        const header = await evaluate(`const p = document.querySelector('header.eh-header p'); if (!p) return null; const lh = parseFloat(getComputedStyle(p).lineHeight) || 16; return { sublineLines: Math.round(p.getBoundingClientRect().height / lh), truncatedCaptions: [...document.querySelectorAll('.eh-meter span.truncate')].filter((c) => c.scrollWidth > c.clientWidth).map((c) => c.textContent), truncatedCells: [...document.querySelectorAll('[role=row] .truncate, [role=row] [class*=truncate]')].filter((c) => c.offsetParent !== null && c.scrollWidth > c.clientWidth + 1).map((c) => c.textContent.trim().slice(0, 60)) };`);
+        const header = await evaluate(`${PICKER_CHECK} const p = document.querySelector('header.eh-header p'); if (!p) return { sublineLines: 0, truncatedCaptions: [], truncatedCells: [], pickerClipped: PICKERS }; const lh = parseFloat(getComputedStyle(p).lineHeight) || 16; return { sublineLines: Math.round(p.getBoundingClientRect().height / lh), truncatedCaptions: [...document.querySelectorAll('.eh-meter span.truncate')].filter((c) => c.scrollWidth > c.clientWidth).map((c) => c.textContent), truncatedCells: [...document.querySelectorAll('[role=row] .truncate, [role=row] [class*=truncate]')].filter((c) => c.offsetParent !== null && c.scrollWidth > c.clientWidth + 1).map((c) => c.textContent.trim().slice(0, 60)), pickerClipped: PICKERS };`);
         const shotPng = await send('Page.captureScreenshot', { format: 'png' });
         const file = `${size.key}-${shot.name}.png`;
         writeFileSync(path.join(outDir, file), Buffer.from(shotPng.data, 'base64'));
         const row = { shot: shot.name, size: size.key, file, overflow, header, errors: errors.slice(before), stepError };
         report.shots.push(row);
-        process.stdout.write(`${row.stepError || row.errors.length || row.overflow > 0 ? '✗' : '✓'} ${size.key} ${shot.name}${overflow > 0 ? ` overflow=${overflow}` : ''}${row.errors.length ? ` errors=${row.errors.length}` : ''}${stepError ? ` step: ${stepError}` : ''}${header && (header.sublineLines > 1 || header.truncatedCaptions.length || header.truncatedCells.length) ? ` header=${JSON.stringify(header)}` : ''}\n`);
+        process.stdout.write(`${row.stepError || row.errors.length || row.overflow > 0 || header?.pickerClipped?.length ? '✗' : '✓'} ${size.key} ${shot.name}${overflow > 0 ? ` overflow=${overflow}` : ''}${row.errors.length ? ` errors=${row.errors.length}` : ''}${stepError ? ` step: ${stepError}` : ''}${header && (header.sublineLines > 1 || header.truncatedCaptions.length || header.truncatedCells.length || header.pickerClipped.length) ? ` header=${JSON.stringify(header)}` : ''}\n`);
     }
 }
 
@@ -330,7 +352,7 @@ if (onlyList && existsSync(reportPath)) {
     full.reruns = [...(full.reruns ?? []), { when: report.when, only: onlyList, captures: ran.length }];
     writeFileSync(reportPath, JSON.stringify(full, null, 2));
 } else writeFileSync(reportPath, JSON.stringify(report, null, 2));
-const bad = ran.filter((r) => r.stepError || r.errors.length || r.overflow > 0);
+const bad = ran.filter((r) => r.stepError || r.errors.length || r.overflow > 0 || r.header?.pickerClipped?.length);
 process.stdout.write(`\n${ran.length} captures · ${bad.length} with problems\n`);
 ws.close();
 chrome.kill();

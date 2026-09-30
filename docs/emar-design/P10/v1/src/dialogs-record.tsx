@@ -8,11 +8,12 @@ import InputError from '@/components/input-error';
 import { DateTimeField } from '@/components/fleet-assets/maintenance/date-time-field';
 import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Ban, Check, Hand, KeyRound, Phone } from 'lucide-react';
+import { Ban, Check, Hand, KeyRound, ListChecks, Phone } from 'lucide-react';
 import { useState } from 'react';
-import { HOUSES, ONCALL, PEOPLE, PERSONAS, STAFF_KOWHAI, STAFF_RIMU, orderOf, type PersonId } from './data';
+import { HOUSES, MED_RULES, ONCALL, PEOPLE, PERSONAS, STAFF_KOWHAI, STAFF_RIMU, orderOf, readingFor, secondPersonFor, type PersonId } from './data';
 import { LiveStrip } from './ea-ui';
 import { cantSaveOffline, focusFirst, Req, restore } from './helpers';
 import { COULDNT_SAVE } from './dialogs-ea';
@@ -37,16 +38,21 @@ export function RecordDialog({ pid, orderId, onClose, returnFocus }: { pid: Pers
     const [at, setAt] = useState(draft ? `${TODAY_ISO}T${draft.hm}` : `${TODAY_ISO}T09:10`);
     const [witness, setWitness] = useState('');
     const [pin, setPin] = useState('');
+    const [bsl, setBsl] = useState('');
     const [x, setX] = useState<Record<string, string>>({});
     const staff = (person.house === 'kowhai' ? STAFF_KOWHAI : STAFF_RIMU).filter((n) => n !== me.name);
     const oncall = ONCALL[person.house];
+    /* P01 v2’s medication rules for this dose: mr1 (a reading) and mr2 (a second person) — the same rules as the downtime pack’s boxes. */
+    const need2 = secondPersonFor(orderId);
+    const reading = readingFor(orderId);
     function save() {
         const v: Record<string, string> = {};
         if (!outcome) v['rd-outcome'] = 'Choose what happened.';
         if (outcome === 'given' && !/T\d{2}:\d{2}$/.test(at)) v['rd-at'] = 'Choose when it was given.';
         if (outcome === 'given' && at.slice(11) > NOW_HM) v['rd-at'] = 'It can’t be later than now.';
-        if (o.cd && outcome === 'given' && !witness) v['rd-witness'] = 'Choose who witnessed it.';
-        if (o.cd && outcome === 'given' && pin.length !== 6) v['rd-pin'] = 'They type their 6-digit witness PIN.';
+        if (reading && outcome === 'given' && !/^\d{1,2}(\.\d)?$/.test(bsl.trim())) v['rd-bsl'] = `Enter the ${reading.label.charAt(0).toLowerCase()}${reading.label.slice(1)} in ${reading.unit} — for example 6.4.`;
+        if (need2 && outcome === 'given' && !witness) v['rd-witness'] = need2 === 'rule' ? 'Choose the second person.' : 'Choose who witnessed it.';
+        if (need2 && outcome === 'given' && pin.length !== 6) v['rd-pin'] = 'They type their 6-digit witness PIN.';
         setX(v);
         if (Object.keys(v).length) return focusFirst(v);
         if (ranOut) {
@@ -54,7 +60,7 @@ export function RecordDialog({ pid, orderId, onClose, returnFocus }: { pid: Pers
             return setX({ 'rd-save': 'ended' });
         }
         if (scn === 'logdown') return setX({ 'rd-save': COULDNT_SAVE });
-        if (scn === 'offline' && o.cd) return setX({ 'rd-save': cantSaveOffline });
+        if (scn === 'offline' && need2) return setX({ 'rd-save': cantSaveOffline });
         const hm = at.slice(11);
         const key = `${orderId}|${row?.time ?? o.times[0]}`;
         s.update((rt) => {
@@ -63,7 +69,7 @@ export function RecordDialog({ pid, orderId, onClose, returnFocus }: { pid: Pers
             if (grant) next.grants = { ...rt.grants, [grant.id]: { ...(rt.grants[grant.id] ?? {}), activity: [...grant.activity, { at: stampAt(), what: `Dose ${outcome === 'given' ? 'given' : outcome} — ${o.med} ${o.strength.split(' ')[0]} ${o.strength.split(' ')[1] ?? ''}, the ${time12(row?.time ?? o.times[0])} dose`.replace('  ', ' '), kind: 'dose' }] } };
             return next;
         });
-        s.toast('success', scn === 'offline' ? `Saved on this device — ${o.med} for ${person.pref} is sent when you’re back.` : `${o.med} recorded for ${person.pref}${grant ? ` — under emergency access ${grant.id}` : ''}.`);
+        s.toast('success', scn === 'offline' ? `Saved on this device — ${o.med} for ${person.pref} is sent when you’re back.${grant ? ` If your emergency access has ended by then, it’s still accepted — it was recorded inside it — and reviewers see “sent after the grant ended”.` : ''}` : `${o.med} recorded for ${person.pref}${grant ? ` — under emergency access ${grant.id}` : ''}.`);
         onClose();
     }
     const ended = x['rd-save'] === 'ended';
@@ -130,12 +136,27 @@ export function RecordDialog({ pid, orderId, onClose, returnFocus }: { pid: Pers
                 </div>
                 <InputError message={x['rd-outcome']} />
             </div>
+            {(need2 === 'rule' || reading) && outcome !== 'refused' && outcome !== 'withheld' ? (
+                <Notice tone="neutral" icon={ListChecks} title="Medication rules for this dose">
+                    {[reading ? MED_RULES.mr1.sentence : '', need2 === 'rule' ? MED_RULES.mr2.sentence : ''].filter(Boolean).join(' ')}
+                </Notice>
+            ) : null}
             {outcome === 'given' ? <DateTimeField id="rd-at" label="Given at" value={at} onChange={(v) => (setAt(v), setX({}))} error={x['rd-at']} /> : null}
-            {o.cd && outcome === 'given' ? (
+            {reading && outcome === 'given' ? (
+                <div className="space-y-1.5 sm:max-w-xs">
+                    <Label htmlFor="rd-bsl">
+                        {reading.label} <Req />
+                    </Label>
+                    <Input id="rd-bsl" inputMode="decimal" value={bsl} aria-invalid={!!x['rd-bsl']} placeholder={reading.example} onChange={(ev) => (setBsl(ev.target.value), setX({}))} />
+                    <p className="text-caption">In {reading.unit}. A medication rule asks for it before saving.</p>
+                    <InputError message={x['rd-bsl']} />
+                </div>
+            ) : null}
+            {need2 && outcome === 'given' ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">
                         <Label htmlFor="rd-witness">
-                            Witness <Req />
+                            {need2 === 'rule' ? 'Second person' : 'Witness'} <Req />
                         </Label>
                         <Select value={witness || undefined} onValueChange={(v) => (setWitness(v), setX({}))}>
                             <SelectTrigger id="rd-witness" className="w-full" aria-invalid={!!x['rd-witness']}>
@@ -151,12 +172,12 @@ export function RecordDialog({ pid, orderId, onClose, returnFocus }: { pid: Pers
                         </Select>
                         <InputError message={x['rd-witness']} />
                     </div>
-                    <WitnessPinInput id="rd-pin" value={pin} onChange={(v) => (setPin(v), setX({}))} error={x['rd-pin']} atCupboard />
+                    <WitnessPinInput id="rd-pin" value={pin} onChange={(v) => (setPin(v), setX({}))} error={x['rd-pin']} atCupboard={need2 === 'controlled'} />
                 </div>
             ) : null}
             {x['rd-save'] && !ended ? (
                 <Notice tone="critical" title={x['rd-save'] === cantSaveOffline ? 'You’re offline' : 'Couldn’t save — try again'} live="alert">
-                    {x['rd-save'] === cantSaveOffline ? 'Controlled-medicine entries need a connection. Nothing is lost — keep this open and save when you reconnect, or use the paper pack.' : 'Nothing was recorded, and what you entered is still here. The event log couldn’t be written.'}
+                    {x['rd-save'] === cantSaveOffline ? `${need2 === 'rule' ? 'A dose that needs a second person' : 'A controlled-medicine entry'} needs a connection. Nothing is lost — keep this open and save when you reconnect, or record it on the paper pack.` : 'Nothing was recorded, and what you entered is still here. The event log couldn’t be written.'}
                 </Notice>
             ) : null}
             <DesignNote>A frame of P01’s approved record dialog — only P10’s parts are designed here: the strip while recording under emergency access, and the plain “ended” state that keeps what was entered. {grant ? `Reviewers see this dose on ${grant.id}.` : ''}</DesignNote>

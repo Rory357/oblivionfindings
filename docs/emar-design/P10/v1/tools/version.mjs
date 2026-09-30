@@ -21,7 +21,7 @@ const files = [];
 const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 const shots = readdirSync(path.join(root, 'screenshots')).filter((f) => f.endsWith('.png'));
 const lines = [
-    'eMAR P10 v1 — Emergency access & downtime',
+    'eMAR P10 v1.1 — Emergency access & downtime (v1 inspected by Main, 1 Oct; pickers, paper-entry headings and the pack’s second-person boxes fixed)',
     'Branch claude/emar-p10 · base origin/main 4f7f37245 · 1 October 2026 (NZDT)',
     'SHA-256 of every file that makes up this version (approval applies to these hashes only).',
     `Screenshots are evidence, not part of the approved version: ${shots.length} PNG files; report.json sha256 ${sha(path.join(root, 'screenshots', 'report.json'))}.`,

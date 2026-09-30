@@ -15,9 +15,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
-import { Ban, Check, FileText, Hand, LockKeyhole, PenLine, Printer } from 'lucide-react';
+import { Ban, Check, FileText, Hand, LockKeyhole, PenLine, Printer, Users } from 'lucide-react';
 import { useState } from 'react';
-import { HOUSES, ORDERS, PEOPLE, PERSONAS, STAFF_KOWHAI, STAFF_RIMU, orderOf, type Downtime, type ExportMade, type House, type PaperItem, type PersonId } from './data';
+import { HOUSES, MED_RULES, ORDERS, PEOPLE, PERSONAS, STAFF_KOWHAI, STAFF_RIMU, orderOf, readingFor, routeOf, secondPersonFor, type Downtime, type ExportMade, type House, type PaperItem, type PersonId } from './data';
 import { COULDNT_SAVE } from './dialogs-ea';
 import { cantSaveOffline, focusFirst, Req, restore, stamp } from './helpers';
 import { Modal } from './modal';
@@ -107,7 +107,7 @@ export function PackDialog({ onClose, returnFocus }: { onClose: () => void; retu
                 </div>
             </div>
             <ReviewCard icon={FileText} title="What’s in it">
-                <ReviewRow label="Recording sheets" value="Every scheduled dose for each person — time, dose, route and instructions — with blank “given at”, initials and witness boxes" />
+                <ReviewRow label="Recording sheets" value="Every scheduled dose for each person — time, dose, route and instructions — with blank “given at” and initials boxes, a second-person box wherever the current rules need one, and a box for any reading a rule asks for" />
                 <ReviewRow label="As-needed medicines" value="Each with its limits — the most in 24 hours and the gap between doses" />
                 <ReviewRow label="Allergies" value="On every person’s page" />
                 <ReviewRow label="Round sheets" value="Built from the scheduled doses — not only the ones already recorded" />
@@ -120,7 +120,7 @@ export function PackDialog({ onClose, returnFocus }: { onClose: () => void; retu
                     The rest of the pack prints. A line in their place says to ask the house lead.
                 </Notice>
             ) : null}
-            {house ? <FirstPage house={house} /> : null}
+            {house ? <FirstPage house={house} cd={cd} /> : null}
             <KV rows={[['Purpose', 'Downtime — a paper copy in case the system is down (recorded)']]} />
             {x['pk-save'] ? (
                 <Notice tone="critical" title={x['pk-save'] === cantSaveOffline ? 'You’re offline' : 'Couldn’t save — try again'} live="alert">
@@ -132,9 +132,10 @@ export function PackDialog({ onClose, returnFocus }: { onClose: () => void; retu
     );
 }
 /** A preview of the pack’s first page: the recording sheet for the first person. */
-function FirstPage({ house }: { house: House }) {
+function FirstPage({ house, cd }: { house: House; cd: boolean }) {
     const pid = (Object.keys(PEOPLE) as PersonId[]).find((q) => PEOPLE[q].house === house)!;
     const rows = ORDERS.filter((o) => o.pid === pid && !o.to && !o.prn).flatMap((o) => o.times.map((t) => ({ o, t }))).sort((a, b) => a.t.localeCompare(b.t));
+    const anyRule = rows.some(({ o }) => secondPersonFor(o.id) === 'rule');
     return (
         <section aria-label="The first page" className="space-y-1.5">
             <p className="text-sm font-semibold">The first page — {PEOPLE[pid].legal}</p>
@@ -146,24 +147,30 @@ function FirstPage({ house }: { house: House }) {
                             <TableHead>Medicine</TableHead>
                             <TableHead>Given at</TableHead>
                             <TableHead>Initials</TableHead>
-                            <TableHead>Witness</TableHead>
+                            <TableHead>Second person</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {rows.map(({ o, t }) => (
-                            <TableRow key={`${o.id}${t}`}>
-                                <TableCell className="text-[12.5px]">{time12(t)}</TableCell>
-                                <TableCell className="text-[12.5px] whitespace-normal">
-                                    {o.cd ? 'Controlled — see its register page' : `${o.med} ${o.strength}`}
-                                </TableCell>
-                                <TableCell className="text-[12.5px] text-muted-foreground">______</TableCell>
-                                <TableCell className="text-[12.5px] text-muted-foreground">____</TableCell>
-                                <TableCell className="text-[12.5px] text-muted-foreground">{o.cd ? '____' : '—'}</TableCell>
-                            </TableRow>
-                        ))}
+                        {rows.map(({ o, t }) => {
+                            const need = secondPersonFor(o.id);
+                            const reading = readingFor(o.id);
+                            return (
+                                <TableRow key={`${o.id}${t}`}>
+                                    <TableCell className="align-top text-[12.5px]">{time12(t)}</TableCell>
+                                    <TableCell className="align-top text-[12.5px] whitespace-normal">
+                                        <span className="block">{o.cd && !cd ? 'Controlled medicine — see its register page' : `${o.med} ${o.strength}`}</span>
+                                        <span className="block text-[11.5px] text-muted-foreground">{routeOf(o.id)}{reading ? ` · ${reading.label}: ______ ${reading.unit}` : ''}</span>
+                                    </TableCell>
+                                    <TableCell className="align-top text-[12.5px] text-muted-foreground">______</TableCell>
+                                    <TableCell className="align-top text-[12.5px] text-muted-foreground">____</TableCell>
+                                    <TableCell className="align-top text-[12.5px] text-muted-foreground">{need ? <><span className="block">____</span><span className="block text-[11.5px]">{need === 'controlled' ? 'Witness — controlled' : 'Medication rule'}</span></> : '—'}</TableCell>
+                                </TableRow>
+                            );
+                        })}
                     </TableBody>
                 </Table>
             </div>
+            <p className="text-caption">A “Second person” box wherever the current rules need one: controlled medicines (a witness){anyRule ? ', and the medication rule for subcutaneous injections at Kōwhai House' : ', and any medication rule that’s on'}. “—” where none is needed. A rule that asks for a reading adds a box for it.</p>
         </section>
     );
 }
@@ -239,10 +246,8 @@ export function DeclareDialog({ onClose, returnFocus }: { onClose: () => void; r
                 </Select>
                 <InputError message={x['dc-house']} />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-                <DateTimeField id="dc-from" label="It started" value={from} onChange={(v) => (setFrom(v), setX({}))} error={x['dc-from']} />
-                <DateTimeField id="dc-to" label="It ended" value={to} onChange={(v) => (setTo(v), setX({}))} error={x['dc-to']} />
-            </div>
+            <DateTimeField id="dc-from" label="It started" value={from} onChange={(v) => (setFrom(v), setX({}))} error={x['dc-from']} />
+            <DateTimeField id="dc-to" label="It ended" value={to} onChange={(v) => (setTo(v), setX({}))} error={x['dc-to']} />
             <div className="space-y-1.5">
                 <Label htmlFor="dc-why">
                     What went down <Req />
@@ -287,6 +292,7 @@ export function PaperEntryDialog({ itemId, addTo, onClose, returnFocus }: { item
     const [pin, setPin] = useState('');
     const [x, setX] = useState<Record<string, string>>({});
     const o = orderId ? orderOf(orderId) : null;
+    const need2 = orderId ? secondPersonFor(orderId) : null;
     const prnOrders = pid ? ORDERS.filter((q) => q.pid === pid && q.prn) : [];
     const forOther = !!givenBy && givenBy !== me.name;
     const hideCd = !!o?.cd && !cdView(p);
@@ -299,13 +305,13 @@ export function PaperEntryDialog({ itemId, addTo, onClose, returnFocus }: { item
         if (!/^\d{2}:\d{2}$/.test(hm) || time.slice(0, 10) !== d.start.day) v['pe-time'] = `Choose the time on the paper, on ${labelIso(d.start.day)}.`;
         else if (hm < d.start.hm || hm > d.end.hm) v['pe-time'] = `It must be inside the downtime, ${time12(d.start.hm)}–${time12(d.end.hm)}.`;
         if (!givenBy) v['pe-by'] = 'Choose who gave it, from the paper.';
-        if (o?.cd && outcome === 'given' && !witness) v['pe-witness'] = 'Choose the witness named on the paper.';
+        if (need2 && outcome === 'given' && !witness) v['pe-witness'] = need2 === 'rule' ? 'Choose the second person named on the paper.' : 'Choose the witness named on the paper.';
         setX(v);
         if (Object.keys(v).length) return focusFirst(v);
         if (scn === 'offline') return setX({ 'pe-save': cantSaveOffline });
         if (scn === 'logdown') return setX({ 'pe-save': COULDNT_SAVE });
         const id = item?.id ?? `${d.id}-add-${(s.rt.extraPaper[d.id]?.length ?? 0) + 1}`;
-        const entry: PaperEntry = { by: me.name, at: stampAt(), outcome: outcome as PaperEntry['outcome'], hm, givenBy, ...(note.trim() ? { note: note.trim() } : {}), ...(forOther ? { forOther: true } : {}), ...(o?.cd && outcome === 'given' ? { witness: { name: witness, ...(pin.length === 6 ? { confirmed: stampAt() } : {}) } } : {}) };
+        const entry: PaperEntry = { by: me.name, at: stampAt(), outcome: outcome as PaperEntry['outcome'], hm, givenBy, ...(note.trim() ? { note: note.trim() } : {}), ...(forOther ? { forOther: true } : {}), ...(need2 && outcome === 'given' ? { witness: { name: witness, ...(pin.length === 6 ? { confirmed: stampAt() } : {}) } } : {}) };
         const added: PaperItem | null = item ? null : { id, pid: pid as PersonId, orderId, source: 'paper', paper: { outcome: outcome as PaperEntry['outcome'], hm, by: givenBy, ...(note.trim() ? { note: note.trim() } : {}) } };
         const med = orderOf(orderId).med;
         s.update((rt) => ({
@@ -336,16 +342,16 @@ export function PaperEntryDialog({ itemId, addTo, onClose, returnFocus }: { item
             }
         >
             {item && item.paper.by === '—' ? (
-                <Notice tone="neutral" icon={FileText} title={`Due ${time12(item.due!)} — nothing was recorded for it`}>
-                    Enter what the paper says for this dose.
+                <Notice tone="neutral" icon={FileText} title={`Listed from the schedule — due ${time12(item.due!)}, nothing recorded`}>
+                    Find this dose on the paper sheet, then enter it below.
                 </Notice>
             ) : item ? (
-                <ReviewCard icon={FileText} title="What the paper says">
+                <ReviewCard icon={FileText} title={`Listed from the paper sheet — ${d.id}`}>
                     <ReviewRow label="Outcome" value={item.paper.outcome === 'given' ? 'Given' : item.paper.outcome === 'refused' ? 'Refused' : 'Withheld'} />
                     <ReviewRow label="Time" value={time12(item.paper.hm)} />
                     <ReviewRow label="By" value={item.paper.by} />
                     {item.paper.note && !hideCd ? <ReviewRow label="Note" value={`“${item.paper.note}”`} /> : null}
-                    <p className="text-caption pt-1.5">Shown as the starting point — enter what the paper says; nothing is entered for you.</p>
+                    <p className="text-caption pt-1.5">The starting point, as it was listed when the downtime was recorded. Check it against the sheet and enter it below — nothing is filled in for you.</p>
                 </ReviewCard>
             ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -387,36 +393,35 @@ export function PaperEntryDialog({ itemId, addTo, onClose, returnFocus }: { item
                     </div>
                 </div>
             )}
+            <h3 className="text-sm font-semibold">Enter it</h3>
             <div className="space-y-2">
                 <Label id="pe-outcome-l">
-                    What the paper says <Req />
+                    Outcome <Req />
                 </Label>
                 <div id="pe-outcome" tabIndex={-1}>
                     <TilePicker labelledBy="pe-outcome-l" value={outcome || null} invalid={!!x['pe-outcome'] && !outcome} onChange={(k) => (setOutcome(k), setX({}))} tiles={OUTCOME_TILES} />
                 </div>
                 <InputError message={x['pe-outcome']} />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-                <DateTimeField id="pe-time" label="Time on the paper" value={time} onChange={(v) => (setTime(v), setX({}))} error={x['pe-time']} hint={`Inside the downtime, ${time12(d.start.hm)}–${time12(d.end.hm)}, ${labelIso(d.start.day)}`} />
-                <div className="space-y-1.5">
-                    <Label htmlFor="pe-by">
-                        Who gave it <Req />
-                    </Label>
-                    <Select value={givenBy || undefined} onValueChange={(v) => (setGivenBy(v), setX({}))}>
-                        <SelectTrigger id="pe-by" className="w-full" aria-invalid={!!x['pe-by']}>
-                            <SelectValue placeholder="Choose who — from the paper" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {staffAt(d.house).map((n) => (
-                                <SelectItem key={n} value={n}>
-                                    {n}
-                                    {n === me.name ? ' (you)' : ''}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <InputError message={x['pe-by']} />
-                </div>
+            <DateTimeField id="pe-time" label="Time on the paper" value={time} onChange={(v) => (setTime(v), setX({}))} error={x['pe-time']} hint={`Inside the downtime, ${time12(d.start.hm)}–${time12(d.end.hm)}, ${labelIso(d.start.day)}`} />
+            <div className="space-y-1.5">
+                <Label htmlFor="pe-by">
+                    Who gave it <Req />
+                </Label>
+                <Select value={givenBy || undefined} onValueChange={(v) => (setGivenBy(v), setX({}))}>
+                    <SelectTrigger id="pe-by" className="w-full" aria-invalid={!!x['pe-by']}>
+                        <SelectValue placeholder="Choose who — from the paper" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {staffAt(d.house).map((n) => (
+                            <SelectItem key={n} value={n}>
+                                {n}
+                                {n === me.name ? ' (you)' : ''}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <InputError message={x['pe-by']} />
             </div>
             <div className="space-y-1.5">
                 <Label htmlFor="pe-note">
@@ -429,12 +434,12 @@ export function PaperEntryDialog({ itemId, addTo, onClose, returnFocus }: { item
                     {`${givenBy.split(' ')[0]} is asked to confirm it in Follow-ups. It shows as “Waiting for ${givenBy.split(' ')[0]} to confirm” until they do.`}
                 </Notice>
             ) : null}
-            {o?.cd && outcome === 'given' ? (
+            {need2 && outcome === 'given' ? (
                 <>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-1.5">
                             <Label htmlFor="pe-witness">
-                                Witness on the paper <Req />
+                                {need2 === 'rule' ? 'Second person on the paper' : 'Witness on the paper'} <Req />
                             </Label>
                             <Select value={witness || undefined} onValueChange={(v) => (setWitness(v), setX({}))}>
                                 <SelectTrigger id="pe-witness" className="w-full" aria-invalid={!!x['pe-witness']}>
@@ -452,11 +457,17 @@ export function PaperEntryDialog({ itemId, addTo, onClose, returnFocus }: { item
                             </Select>
                             <InputError message={x['pe-witness']} />
                         </div>
-                        <WitnessPinInput id="pe-pin" value={pin} onChange={setPin} required={false} label="Their witness PIN, if they’re here" />
+                        <WitnessPinInput id="pe-pin" value={pin} onChange={setPin} required={false} label="Their witness PIN, if they’re here" atCupboard={need2 === 'controlled'} />
                     </div>
-                    <Notice tone="neutral" icon={LockKeyhole} title="A controlled medicine">
-                        {`It waits as “Witness to confirm” until ${witness || 'the witness'} confirms with their PIN — now, or from Follow-ups. It goes into the register in time order, and its running balance is worked out again. The closing count at the end of the downtime checks it.`}
-                    </Notice>
+                    {need2 === 'rule' ? (
+                        <Notice tone="neutral" icon={Users} title="A medication rule asks for a second person">
+                            {`${MED_RULES.mr2.sentence} It waits as “Second person to confirm” until ${witness || 'they'} confirm with their PIN — now, or from Follow-ups.`}
+                        </Notice>
+                    ) : (
+                        <Notice tone="neutral" icon={LockKeyhole} title="A controlled medicine">
+                            {`It waits as “Witness to confirm” until ${witness || 'the witness'} confirms with their PIN — now, or from Follow-ups. It goes into the register in time order, and its running balance is worked out again. The closing count at the end of the downtime checks it.`}
+                        </Notice>
+                    )}
                 </>
             ) : null}
             {x['pe-save'] ? (

@@ -11,7 +11,7 @@
 export type PersonaId = 'sw' | 'lead' | 'clinical' | 'coord' | 'auditor' | 'pm' | 'rimu';
 /** Mockup permission names; the build keys are in README build note 1.
  *  `breakglass` = medications.breakglass (admin, provider_manager — unchanged, Q2).
- *  `ea.end` = may end someone else’s live grant (clinical leads, coordinators, managers — not auditors). */
+ *  `ea.end` = medications.breakglass.end — NEW (Main, 1 Oct): end someone else’s live grant; provider_manager, coordinator, clinical_lead — not the auditor. */
 export type Perm = 'record' | 'cd.view' | 'reports.view' | 'reports.export' | 'audit.view' | 'audit.export' | 'stock.only' | 'errors.manage' | 'incidents.approve' | 'settings.org' | 'breakglass' | 'ea.end' | 'ea.policy';
 export type House = 'kowhai' | 'rimu';
 export const HOUSES: Record<House, string> = { kowhai: 'Kōwhai House', rimu: 'Rimu House' };
@@ -328,6 +328,24 @@ export const EXPORTS: ExportMade[] = [
     { id: 'EX-116', what: 'Controlled drug register (PDF)', detail: 'Clonazepam 0.5 mg · Grace Liu', by: 'Rangi Parata', at: 'Mon 21 Sep, 4:40 pm', day: '2026-09-21', hm: '16:40', purpose: 'Looking into an incident', house: 'kowhai' },
     { id: 'EX-115', what: 'Stock (CSV)', detail: 'Both houses · as at 1 Sep', by: 'Leilani Faleolo', at: 'Tue 1 Sep, 9:30 am', day: '2026-09-01', hm: '09:30', purpose: 'Costs and budgeting', house: 'kowhai' },
 ];
+
+/* ───────────── routes and medication rules (P01 v2 / P00 v5 fixtures — Settings › Medication rules) ───────────── */
+export const ROUTE: Record<string, string> = { 'o-insulin': 'Subcutaneous injection', 'o-midazolam': 'Buccal' };
+export const routeOf = (orderId: string) => ROUTE[orderId] ?? 'By mouth';
+/** P01 v2’s two active rules: mr1 (a blood sugar reading for insulin glargine, all houses) and mr2 (a second person for subcutaneous injections at Kōwhai House). */
+export const MED_RULES = {
+    mr1: { sentence: 'Before saving a dose of insulin glargine at all houses: record a blood sugar (BSL) reading.', by: 'Hana Kereama, 3 Aug 2026' },
+    mr2: { sentence: 'Before saving a dose given by subcutaneous injection at Kōwhai House: a second person confirms with their witness PIN.', by: 'Hana Kereama, 19 Aug 2026' },
+};
+/** Why a dose needs a second person now: a controlled medicine (a witness), or an active medication rule. */
+export function secondPersonFor(orderId: string): 'controlled' | 'rule' | null {
+    const o = orderOf(orderId);
+    if (o.cd) return 'controlled';
+    if (routeOf(orderId) === 'Subcutaneous injection' && PEOPLE[o.pid].house === 'kowhai') return 'rule';
+    return null;
+}
+/** A reading an active rule asks for before saving (mr1). */
+export const readingFor = (orderId: string) => (orderOf(orderId).med === 'Insulin glargine' ? { label: 'Blood sugar (BSL) reading', unit: 'mmol/L', example: 'e.g. 6.4' } : null);
 
 /* ═════════════ P10 — emergency access ═════════════ */
 /** A time on a NZ calendar day: `day` YYYY-MM-DD, `hm` 24-hour. */

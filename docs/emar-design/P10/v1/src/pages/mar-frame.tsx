@@ -12,13 +12,13 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { CalendarDays, ClipboardList, Clock3, History, KeyRound, LockKeyhole, Phone, Pill, UserRound, type LucideIcon } from 'lucide-react';
-import { HOUSES, ONCALL, ORDERS, PEOPLE, PERSONAS, has, type Order, type PersonId, type PersonaId } from '../data';
+import { HOUSES, ONCALL, ORDERS, PEOPLE, PERSONAS, has, secondPersonFor, type Order, type PersonId, type PersonaId } from '../data';
 import { LiveStrip } from '../ea-ui';
 import { useOpen } from '../host';
 import { allGrants, canRequest, canAudit, eventLog, housesOf, isLive, time12, TODAY_ISO, NOW_HM, type Runtime, type Scenario } from '../model';
 import { Shell } from '../shell';
 import { hrefFor, useStore } from '../store';
-import { DesignNote, Notice, StateLine } from '../ui';
+import { DesignNote, Notice, StateLine, Wrap } from '../ui';
 import { useCtx } from './hub';
 
 /** Who this morning’s shifts cover (synthetic roster): Aroha’s own worker went home unwell at 8:20. */
@@ -165,7 +165,7 @@ export function MarFrame() {
                         minWidth={900}
                         identityLabel="Medicine"
                         identityWidth="1.6fr"
-                        identity={(d) => ({ icon: d.order.cd ? LockKeyhole : Pill, name: d.order.cd && !has(p, 'cd.view') ? 'Controlled medicine' : `${d.order.med} ${d.order.strength}`, subline: d.order.cd ? 'Controlled — needs a witness' : d.order.prn ? 'As needed' : 'Scheduled' })}
+                        identity={(d) => ({ icon: d.order.cd ? LockKeyhole : Pill, name: d.order.cd && !has(p, 'cd.view') ? 'Controlled medicine' : `${d.order.med} ${d.order.strength}`, subline: <Wrap>{d.order.cd ? 'Controlled — needs a witness' : d.order.prn ? 'As needed' : secondPersonFor(d.order.id) === 'rule' ? 'Scheduled · a second person and a reading — medication rules' : 'Scheduled'}</Wrap> })}
                         columns={[
                             { key: 'due', label: 'Due', width: '0.7fr', cell: (d) => <span className="text-[12.5px]">{d.time ? time12(d.time) : '—'}</span> },
                             {

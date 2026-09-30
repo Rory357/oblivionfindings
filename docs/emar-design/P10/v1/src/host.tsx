@@ -144,7 +144,7 @@ export function DialogHost() {
         case 'end':
             if (!grantVisible) return <NotFoundDialog onClose={close} />;
             if (grant!.by === me.name) return <DoneDialog key={spec} id={a1} onClose={close} />;
-            if (!canEndOthers(p)) return <CantDoThis onClose={close} what="end someone else’s emergency access" who="clinical leads, coordinators and managers" />;
+            if (!canEndOthers(p)) return <CantDoThis onClose={close} what="end someone else’s emergency access" who="clinical leads, coordinators and provider managers — auditors review, they don’t end grants" />;
             if (!isLive(grant!)) return <NothingToDo onClose={close} title={`${grant!.id} has already ended`} description="Nothing to end.">It goes to reviewers.</NothingToDo>;
             return <EndDialog key={spec} id={a1} onClose={close} returnFocus={rf} />;
         case 'ack': {

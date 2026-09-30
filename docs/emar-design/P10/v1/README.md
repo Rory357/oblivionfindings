@@ -1,6 +1,6 @@
 # eMAR P10 v1 — Emergency access & downtime
 
-**Status: candidate v1 for Main’s approval.** Main is the review session, “Codex eMAR audit re-review”, acting under Stephan’s delegation. This design is not implemented. **The build of paper reconciliation (section 7) needs Stephan’s OK on its scope** — it is on his end-review list.
+**Status: candidate v1.1 for Main’s approval.** v1 was inspected on 1 October; v1.1 makes Main’s three fixes and records the decisions (see “Main’s inspection of v1”). Main is the review session, “Codex eMAR audit re-review”, acting under Stephan’s delegation. This design is not implemented. **The build of paper reconciliation (section 7) needs Stephan’s OK on its scope** — it is on his end-review list.
 
 - **Version:** v1, 1 October 2026 (NZDT). Branch `claude/emar-p10`, based on `origin/main` `4f7f37245`.
 - **Exact file identity:** [`VERSION.txt`](VERSION.txt), the SHA-256 of every source, build and tool file.
@@ -103,6 +103,7 @@ node node_modules/vite/bin/vite.js build --config docs/emar-design/P10/v1/vite.c
 - **Extend** (the person using it): the new end, the “never past” time and a required reason; each extension is its own row and event.
 - **I’m done** (the person using it): a non-destructive confirm, no reason; it goes to reviewers.
 - **End their access** (a clinical lead, coordinator or manager, never the auditor — deviation 4): a required reason and a destructive confirm; the person is told with the reason.
+- **The record dialog frame follows P01’s rules for the dose:** Aroha’s insulin glargine asks for the blood sugar (BSL) reading (P01’s rule mr1) and a second person with their witness PIN (mr2: subcutaneous injections at Kōwhai House), as in P01 v2 — so recording it under emergency access needs someone there to confirm it.
 - **Ended mid-record:** the record dialog keeps what was entered and says “Your emergency access for Aroha ended at 9:10 am, so this wasn’t saved”, with **Start it again** (the draft is kept and the wizard’s success offers “Back to the insulin dose”) and **Ask someone on shift** (the on-call contact) — deviation 3.
 
 ### 4. Review (Q6, NF-12)
@@ -124,6 +125,7 @@ node node_modules/vite/bin/vite.js build --config docs/emar-design/P10/v1/vite.c
 
 - **In P09’s Print & exports**, first in the list: one house, today or tomorrow. What’s in it: recording sheets for every scheduled dose with blank “given at / initials / witness” boxes, as-needed limits, allergies, **round sheets built from the scheduled doses**, controlled register pages (balance at 9:12 am, then blank rows), a “recording on paper” page, and on every page “Printed Mon 28 Sep, 9:12 am by Jordan Tipene — for Mon 28 Sep only. Check for changes before each round.” A preview of the first page is in the dialog.
 - **Controlled register pages only with controlled view** (Main’s refinement): Hana’s pack prints without them and the line in their place says to ask the house lead.
+- **A second-person box wherever the current rules need one** (Main, v1 fix 3): controlled medicines (a witness), and any active medication rule — here P01’s mr2, so Aroha’s insulin glargine has a second-person box, and P01’s mr1 adds a blood sugar reading box beside it. “—” only where none is needed. The same rules drive the record dialog frame, so the pack and P01 agree.
 - **Who:** house leads, clinical leads, coordinators and managers, for their houses; the auditor only exports the audit trail (P09). The purpose “Downtime — a paper copy in case the system is down” is recorded.
 - **Meds today** (a P01 frame), offline: “Doses you record are kept on this device and sent when you’re back. Anything that needs a witness, and controlled-medicine entries, need a connection — if this lasts, record those on today’s paper pack”, with **Open today’s paper pack** when this device made one, or “No paper pack on this device today — use the printed copy kept in the house, or call Jordan Tipene — 021 555 0163.” Out of date and couldn’t load point to the pack too. The app-wide offline banner says the same.
 
@@ -131,8 +133,8 @@ node node_modules/vite/bin/vite.js build --config docs/emar-design/P10/v1/vite.c
 
 - **Safety & oversight › Downtime & paper records** (house leads, clinical leads, coordinators, managers). A support worker reaches their own paper records from Meds today.
 - **Record a downtime:** the house, when it started and ended (the approved DateTimeField, Pacific/Auckland), what went down, and photos or scans of the paper (FileDropzone). Every scheduled dose in the window with nothing recorded is listed to enter.
-- **The downtime:** its facts, the paper sheets, and the paper records: who, the medicine, **what the paper says** (shown as the starting point — never entered for you), and its state: To enter · Waiting for Ana to confirm · Witness to confirm · Entered from paper, with **both times**: “Given 10:05 am Sat 19 Sep by Sione Taufa (paper) — entered 9:12 am Mon 28 Sep by Sione Taufa”.
-- **Entering one:** what the paper says (the outcome), the time on the paper (it must be inside the downtime), who gave it, a note. **Entering for someone else** asks them to confirm (Follow-ups). **A controlled dose** names the paper’s witness; it waits as “Witness to confirm” until they confirm with their PIN, goes into the register in time order with the running balance worked out again, and the closing count checks it. **Add a dose from the paper** adds an as-needed dose the paper lists.
+- **The downtime:** its facts, the paper sheets, and the paper records: who, the medicine, **on the paper** (as listed when the downtime was recorded — the starting point, never entered for you), and its state: To enter · Waiting for Ana to confirm · Witness to confirm · Entered from paper, with **both times**: “Given 10:05 am Sat 19 Sep by Sione Taufa (paper) — entered 9:12 am Mon 28 Sep by Sione Taufa”.
+- **Entering one** (v1.1 layout, Main’s fixes 1–2): the card **“Listed from the paper sheet — DT-4”** shows the starting point; the form below is headed **“Enter it”**: the outcome, the time on the paper (the approved date/time picker, **full width** — it must be inside the downtime), then **who gave it** on its own row, and a note. **Entering for someone else** asks them to confirm (Follow-ups). **A dose that needs a second person** (controlled, or a medication rule) names them from the paper; it waits as “Witness to confirm” until they confirm with their PIN, goes into the register in time order with the running balance worked out again, and the closing count checks it. **Add a dose from the paper** adds an as-needed dose the paper lists.
 - **Finish it** once every paper record is entered; confirmations carry on in Follow-ups.
 - **The fixture** is P09’s own follow-up F-15: Rimu House was offline on Sat 19 Sep, 8:40–10:20 am (the router failed); Ben’s 9:00 am amlodipine was “given at 9:40, recorded on paper”. Three paper records wait: the amlodipine and Hemi’s paracetamol (Ana Lemalu’s) and Ben’s paracetamol (Sione’s) — deviation 2.
 
@@ -154,7 +156,7 @@ These were verified on `origin/main` `4f7f37245` (AUDIT.md).
 1. **Keys.**
    - `medications.breakglass` stays with admin and provider_manager (Q2). **The page gate** becomes `medications.breakglass|medications.audit.view` (routes/emar.php:356-358), with the view chosen inside. **The request** keeps its gate.
    - **Reviewing** keeps `medications.audit.view` (emar.php:371-373) and adds the rules in note 5.
-   - **Ending someone else’s grant:** today `breakglass|audit.view` (emar.php:361-363) — the auditor could end one. The mockup lets clinical leads, coordinators and managers do it, not the auditor (deviation 4 — for Main: a new `medications.breakglass.end` with a grant migration, or keep today’s rule).
+   - **Ending someone else’s grant — decided (Main, 1 Oct): a new `medications.breakglass.end`,** granted to provider_manager, coordinator and clinical_lead (admin through its backfill), **not the auditor** (a read-only role), with a grant migration. Today the DELETE route is `breakglass|audit.view` (emar.php:361-363), which let the auditor end one. The grantee ends their own with `medications.breakglass` (“I’m done”).
    - **The history export** uses `medications.audit.export` (P09 D6).
    - **The downtime pack** needs no new key: `medications.reports.view` for the house (P09’s new key), leaving out the auditor.
 2. **Team lead baseline** (Main’s prerequisite): team_lead gets `administer.record`, `administer.correct`, `controlled.view`, `controlled.record`, `controlled.witness`, with a grant migration, shipping with the first build that needs it.
@@ -169,16 +171,18 @@ These were verified on `origin/main` `4f7f37245` (AUDIT.md).
 11. **The downtime pack.** A new PDF built from the **scheduled doses** (P01’s dose-slot projection), not recorded administrations (round-sheet.blade.php:54-69); NZ dates (today UTC, EmarPdfController:34-35, 109-110); controlled pages only with `controlled.view`; recorded as an export with the purpose “Downtime”. The service worker keeps the latest pack per house so Meds today opens it offline. The offline banner’s copy is fixed (offline-status-banner.tsx:95-97).
 12. **Paper reconciliation — scope needs Stephan’s OK.** A downtimes table (house, start, end, reason, recorded by, files). Paper entries are administrations with an entry source of `paper`, the clinical time, `entered_at`, `entered_by`, the giver, `downtime_id`, and the giver’s confirmation; the clinical time must be inside the downtime. Witnessed entries wait for the witness’s PIN. Controlled entries go into the register in time order and rebalance (today `on_hand_before` must match current stock, EC:8330-8344, so replay is order-sensitive). Ordinary late entries keep P01’s rules.
 13. **Clean-up found in the audit:** the two unused Control Room bridges, the `revoke_break_glass` flag, the break-glass type in MedicationAuditController, the co-signer list cut to 100 before filtering (EAC:190-209), and the search/grant Site mismatch (EAC:44-47 vs CP:127-131).
-14. **For Main (deviation 9):** a dose recorded **offline** inside a live grant is refused if it syncs after the grant ends (MSDS:935-937 checks `expires_at > now()`). Recommended: accept it when its recorded time is inside the grant, and show it to reviewers as “sent after the grant ended”.
+14. **An offline dose that syncs after the grant ended — decided (Main, 1 Oct), with a guard.** Today it’s refused (MSDS:935-937 checks `expires_at > now()`). Accept it **only** when it was queued offline (`queued_offline` with `captured_offline_at`) **and** its captured time is inside the grant; show it to reviewers as **“sent after the grant ended”**. Anything else is refused, as today. A dose that needs a second person can’t be saved offline in any case (D7).
+15. **The pack and the record dialog read the same rules:** the second-person box and reading box come from the active medication rules (P11 › Medication rules) and controlled status — never a fixed list.
 
 ## Verification (1 October 2026)
 
-- **`tools/verify.mjs`:** 273 captures — all 111 states at 1440, plus the 81 core states at 1280 and at 200 %. Across all of them:
+- **`tools/verify.mjs` (v1.1, full run):** 277 captures — all 113 states at 1440, plus the 82 core states at 1280 and at 200 %. Across all of them:
   - overflow 0 and console errors 0;
   - every scripted step completed;
-  - no truncated P10 meter caption or table cell (P11’s one header caption is noted in deviation 10).
+  - no truncated P10 meter caption or table cell (P11’s one header caption is noted in deviation 10);
+  - **no text clipped, and no part escaping, inside any date/time picker** — the check added for Main’s fix 1.
 
-  After two copy fixes found in the screenshots (the grant timeline’s end line and a quote’s full stop), 11 states were re-run; the re-run is recorded in `screenshots/report.json`. Details are in CHECKLIST §4.
+  After the full run, the insulin row’s new subline was wrapped (it was cut short at 1280 and 200 %), the contract page gained the v1 decisions, and a validation line kept “BSL” in capitals: 16 states were re-run (recorded in `screenshots/report.json`). Details are in CHECKLIST §4–5.
 - **Keyboard:**
   - On Mele’s chart, Enter on “Start emergency access” opens the wizard; Tab stays inside it.
   - Escape closes the untouched wizard and returns focus to the button.
@@ -186,15 +190,24 @@ These were verified on `origin/main` `4f7f37245` (AUDIT.md).
 - **`tsc` and ESLint:** clean for `src/` (ESLint: 26 files, 0 problems; no unused imports). The Inertia shim’s `Link` takes an optional `href`, as Inertia’s own does, so `breadcrumbs.tsx` type-checks (the earlier packages carried that 1 error).
 - **Fixtures:** every timestamp is at or before 9:12 am today, and the records shared with P07b, P08b and P09 are theirs, unchanged (CHECKLIST §3).
 
+## Main’s inspection of v1 (1 October 2026)
+
+Identity verified: VERSION.txt sha256 `7ec3f4a1…`, 40 files, docs-only, parent `4f7f37245`. Checked: Running now with the scope strip (`01`), required-and-nobody-here with no bypass (`30`), ended mid-record keeping the entry (`76`), the review with the reviewer rules (`42`), the pack for the house lead (`115`), paper entry (`93`); personas consistent.
+
+- **Fixed in v1.1 — 1. Cramped pickers.** In paper entry the date/time picker sat in a half-width column beside “Who gave it”, so the date card cut “Choose a day on the calendar” short and the time card’s chevron escaped. The picker group is now **full width** (as in P01 and the record dialog, `76`) with “Who gave it” on its own row below; **Record a downtime** had the same fault (two pickers side by side) and now stacks them. **The harness now checks inside the pickers** (`PICKER_CHECK` in `tools/verify.mjs`): every picker card inside its column, every part inside its card, no text cut short. Run against the v1 build it flagged exactly the 12 captures of `93`, `97`, `99` and `100`, and nothing in the full-width record dialog (`74`, `76`).
+- **Fixed in v1.1 — 2. Two identical headings.** The card is now **“Listed from the paper sheet — DT-4”** (“The starting point, as it was listed when the downtime was recorded. Check it against the sheet and enter it below — nothing is filled in for you.”); the form is headed **“Enter it”**, with “Outcome” as its first label.
+- **Fixed in v1.1 — 3. The pack’s witness column** is now **“Second person”**, with a box for every dose whose current rules need one — controlled medicines, and P01’s active rule mr2, so **Aroha’s insulin glargine has one** — and “—” only where none is needed; P01’s mr1 adds a blood sugar reading box. The record dialog frame now asks for the same (reading and second person), consistent with P01 v2.
+- **Decisions:** deviations 1, 2, 3, 5, 6, 7, 8 and 10 accepted. **4 → the new key `medications.breakglass.end`** (provider_manager, coordinator, clinical_lead; not the auditor; grant migration — build note 1; screen `60`). **9 → the recommendation, with a guard** (build note 14).
+
 ## Deviations (for Main)
 
 1. **P09’s fixture has a support worker using emergency access.** P09’s approved event E-bg-1 is Ana Lemalu (a Rimu support worker) opening Ben’s record on Fri 18 Sep at 2:20 am. By today’s seeding a support worker can’t hold emergency access, and Q2 doesn’t change that. P10 keeps it exactly as P09 recorded it (EA-9, reviewed as justified by Hana). For Main: read it as history from before the key was limited, or correct P09’s fixture when P09 is built.
 2. **The downtime fixture moved to Rimu, Sat 19 Sep** (I proposed “Kōwhai last Friday, 2:10–5:40 pm, three doses”). P09 generates a recorded dose for every Kōwhai slot, and has Kōwhai events that Friday afternoon (D-12, L-7, the methylphenidate correction), so a Kōwhai downtime would contradict P09. P09’s own follow-up F-15 — “given at 9:40, recorded on paper while offline” — is a Rimu downtime, so it’s the fixture: 8:40–10:20 am, three paper records.
 3. **“Ended mid-record” offers Start it again, not Extend.** The approved wording was “Extend it, or ask someone on shift to record”, but only a live grant can be extended (BGC:95-98, and P10 keeps that). The dialog keeps what was entered, and the new wizard’s success offers “Back to the insulin dose”.
-4. **The auditor can’t end someone else’s grant.** Today they can (`audit.view` on revoke). P10 keeps the auditor read-only apart from reviewing, as P09 does. The build needs a decision (build note 1).
+4. **The auditor can’t end someone else’s grant.** Today they can (`audit.view` on revoke). **Decided:** a new `medications.breakglass.end` for provider_manager, coordinator and clinical_lead (build note 1).
 5. **Event wording follows P09:** “Emergency access opened — Ben’s record” (E-bg-1), so the start is “opened” and the end “closed” in the audit trail, while the screens say start and end.
 6. **P09’s event numbers move up** by the events P10 adds before them. The order and the times are P09’s.
 7. **A new persona, Tomasi Vea (coordinator),** because no earlier package names a coordinator. He isn’t in P11’s staff list.
 8. **Downtime & paper records sits in Safety & oversight.** The plan puts the pack in Print & exports but doesn’t place reconciliation.
-9. **Offline doses under emergency access** — a question for Main (build note 14).
+9. **Offline doses under emergency access.** **Decided:** accepted only when queued offline with its captured time inside the grant, shown as “sent after the grant ended” (build note 14).
 10. **The P11 frame draws P11’s rows read-only**, marked P11, because their editor is B3’s. Its header caption truncates at 1280 and 200 %, as in P09’s approved frame — it is P11’s reference header, unchanged.

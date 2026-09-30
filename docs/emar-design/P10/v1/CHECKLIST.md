@@ -92,7 +92,7 @@ Legend: **Pass** · **Pass (note)** passes with a stated limitation · **N/A** i
 
 ## 4. Harness results
 
-**The run:** `tools/verify.mjs` against its own read-only server on port 4495 — **273 captures**: all 111 states at 1440 × 900, and the 81 core states also at 1280 × 800 and at 200 % zoom (720 × 450 CSS px, device scale 2).
+**The run (v1.1):** `tools/verify.mjs` against its own read-only server on port 4495 — **277 captures**: all 113 states at 1440 × 900, and the 82 core states also at 1280 × 800 and at 200 % zoom (720 × 450 CSS px, device scale 2).
 
 | Measure | Result |
 |---|---|
@@ -101,7 +101,20 @@ Legend: **Pass** · **Pass (note)** passes with a stated limitation · **N/A** i
 | Scripted steps | All completed — including the full wizard to “started”, both review paths, the correction, extend, “I’m done”, ending someone else’s (reason and destructive confirm), acknowledging, recording under the grant and after it ran out (“Start it again” keeps the draft), the pack (with and without controlled pages, and offline), entering paper records (own, for Ana, outside the downtime), recording a downtime, and saving P10’s settings |
 | Header subline | One line everywhere except the P11 frame at 1280 (P11’s reference header, as in P09’s approved frame) |
 | Truncated meter captions | Only P11’s “5 not configured · the rest are defaults” at 1280 and 200 % — P11’s reference header, unchanged (deviation 10) |
-| Truncated table cells | 0 (the paper records’ sublines wrap — fixed during the run) |
-| Re-run | 11 states after two copy fixes: the grant timeline’s end line read “Ended by Hana Kereama, Thu 17 Sep” (now “Ended by Hana Kereama — “Mere Kahu is on shift…””), and a quoted reason ended “.”.” |
+| Truncated table cells | 0 (the paper records’ sublines and the insulin row’s rules subline wrap) |
+| Text clipped inside the date/time pickers (added in v1.1) | 0 — every picker card inside its column, every part inside its card, no text cut short |
+| Re-runs | v1: 11 states after two copy fixes (the grant timeline’s end line; a quoted reason ending “.”.”). v1.1: after the full run, 16 states — the chart and record states (the insulin subline wrapped), the contract page (the v1 decisions) and the rule validation (“BSL” kept in capitals). |
 
 **Keyboard (real key events):** from Mele’s chart, Enter on “Start emergency access” opens the wizard; ten Tabs stay inside it (Close · Cancel · Continue · the first step, repeating); Escape closes it untouched and focus returns to the button. On Running now, the menu key on EA-13’s row opens: Open the grant · I’m done — end it now · Open Aroha’s MAR.
+
+## 5. v1.1 — Main’s inspection fixes (1 October 2026)
+
+| Fix | Result | Evidence |
+|---|---|---|
+| 1. The approved date/time picker was cramped in paper entry (a half-width column beside “Who gave it”): the date card cut “Choose a day on the calendar” short and the time card’s chevron escaped | Pass | The picker group is full width, as in P01 and the record dialog; “Who gave it” is on its own row below (`93`, `96`–`98`, `99`). **Record a downtime** had the same fault (two pickers side by side) and now stacks them (`100`, `101`). Re-checked at 1280 and at 200 %. |
+| 1a. A harness check for text clipped inside the pickers | Pass | `PICKER_CHECK` in `tools/verify.mjs` records `pickerClipped` for every capture and counts it as a problem. Against the v1 build it flagged exactly the 12 captures of `93`, `97`, `99` and `100` at every size, and none of the full-width record dialog (`74`, `76`). In v1.1: 0. |
+| 2. Two identical headings in paper entry, and a card that said “nothing is entered for you” while showing values | Pass | The card is **“Listed from the paper sheet — DT-4”**, with “The starting point, as it was listed when the downtime was recorded. Check it against the sheet and enter it below — nothing is filled in for you.”; the form is headed **“Enter it”**, its first label “Outcome” (`93`). A slot with nothing listed reads “Listed from the schedule — due 9:00 am, nothing recorded”. |
+| 3. The pack’s witness column | Pass | Now **“Second person”**: a box for every dose whose current rules need one — controlled medicines (“Witness — controlled”) and P01’s active rule mr2 (“Medication rule”: Aroha’s insulin glargine, subcutaneous at Kōwhai House) — and “—” only where none is needed; P01’s mr1 adds “Blood sugar (BSL) reading: ______ mmol/L” (`115b`). The record dialog frame asks for the same reading and second person, consistent with P01 v2 (`74`, `75b`, `75`), and a dose that needs a second person can’t be saved offline (`81`). Paper entry applies the same rule. |
+| Decision 4 — `medications.breakglass.end` | Recorded | Build note 1; the auditor’s deep link says “This is done by clinical leads, coordinators and provider managers — auditors review, they don’t end grants” (`60`); the contract page. |
+| Decision 9 — offline doses after the grant ended | Recorded | Build note 14 (queued offline, captured time inside the grant, “sent after the grant ended”; anything else refused); the offline save under a grant says so; the contract page. |
+

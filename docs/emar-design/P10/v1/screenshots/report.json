@@ -1,6 +1,6 @@
 {
   "base": "http://127.0.0.1:4495/",
-  "when": "2026-09-30T19:05:12.168Z",
+  "when": "2026-09-30T19:29:21.214Z",
   "shots": [
     {
       "shot": "01-running-rangi",
@@ -10,7 +10,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -23,7 +24,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -36,7 +38,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -49,7 +52,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -62,7 +66,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -75,7 +80,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -88,7 +94,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -101,7 +108,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -114,7 +122,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -127,7 +136,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -140,7 +150,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -153,7 +164,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -166,7 +178,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -179,7 +192,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -192,7 +206,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -205,7 +220,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -218,7 +234,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -231,7 +248,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -244,7 +262,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -257,7 +276,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -270,7 +290,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -283,7 +304,50 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "09-not-available-house-lead",
+      "size": "1440",
+      "file": "1440-09-not-available-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 0,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "09-not-available-house-lead",
+      "size": "1280",
+      "file": "1280-09-not-available-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 0,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "09-not-available-house-lead",
+      "size": "zoom200",
+      "file": "zoom200-09-not-available-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 0,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -296,7 +360,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -309,7 +374,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -322,7 +388,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -335,7 +402,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -348,7 +416,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -361,7 +430,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -374,7 +444,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -387,7 +458,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -400,7 +472,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -413,7 +486,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -426,7 +500,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -439,7 +514,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -452,7 +528,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -465,7 +542,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -478,7 +556,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -491,7 +570,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -504,7 +584,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -517,7 +598,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -530,7 +612,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -543,7 +626,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -556,7 +640,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -569,7 +654,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -582,7 +668,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -595,7 +682,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -608,7 +696,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -621,7 +710,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -634,7 +724,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -647,7 +738,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -660,7 +752,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -673,7 +766,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -686,7 +780,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -699,7 +794,50 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "29-request-started",
+      "size": "1440",
+      "file": "1440-29-request-started.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "29-request-started",
+      "size": "1280",
+      "file": "1280-29-request-started.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "29-request-started",
+      "size": "zoom200",
+      "file": "zoom200-29-request-started.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -712,7 +850,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -725,7 +864,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -738,7 +878,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -751,7 +892,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -764,7 +906,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -777,7 +920,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -790,7 +934,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -803,7 +948,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -816,7 +962,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -829,7 +976,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -842,7 +990,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -855,7 +1004,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -868,7 +1018,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -881,7 +1032,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -894,7 +1046,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -907,7 +1060,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -920,7 +1074,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -933,7 +1088,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -946,7 +1102,92 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "40-grant-ea13-rangi",
+      "size": "1440",
+      "file": "1440-40-grant-ea13-rangi.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "40-grant-ea13-rangi",
+      "size": "1280",
+      "file": "1280-40-grant-ea13-rangi.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "40-grant-ea13-rangi",
+      "size": "zoom200",
+      "file": "zoom200-40-grant-ea13-rangi.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "41-grant-ea8-not-justified",
+      "size": "1440",
+      "file": "1440-41-grant-ea8-not-justified.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "41-grant-ea8-not-justified",
+      "size": "1280",
+      "file": "1280-41-grant-ea8-not-justified.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "41-grant-ea8-not-justified",
+      "size": "zoom200",
+      "file": "zoom200-41-grant-ea8-not-justified.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -959,7 +1200,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -972,7 +1214,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -985,7 +1228,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -998,7 +1242,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1011,7 +1256,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1024,7 +1270,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1037,7 +1284,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1050,7 +1298,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1063,7 +1312,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1076,7 +1326,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1089,7 +1340,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1102,7 +1354,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1115,7 +1368,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1128,7 +1382,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1141,7 +1396,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1154,7 +1410,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1167,7 +1424,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1180,7 +1438,50 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "48-correct-saved",
+      "size": "1440",
+      "file": "1440-48-correct-saved.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "48-correct-saved",
+      "size": "1280",
+      "file": "1280-48-correct-saved.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "48-correct-saved",
+      "size": "zoom200",
+      "file": "zoom200-48-correct-saved.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1193,7 +1494,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1206,7 +1508,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1219,7 +1522,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1232,7 +1536,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1245,7 +1550,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1258,7 +1564,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1271,7 +1578,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1284,7 +1592,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1297,7 +1606,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1310,7 +1620,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1323,7 +1634,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1336,7 +1648,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1349,7 +1662,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1362,7 +1676,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1375,7 +1690,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1388,7 +1704,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1401,7 +1718,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1414,7 +1732,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1427,7 +1746,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1440,7 +1760,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1453,7 +1774,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1466,7 +1788,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1479,7 +1802,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1492,7 +1816,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1505,7 +1830,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1518,7 +1844,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1531,7 +1858,50 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "59-ended-by-hana",
+      "size": "1440",
+      "file": "1440-59-ended-by-hana.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "59-ended-by-hana",
+      "size": "1280",
+      "file": "1280-59-ended-by-hana.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "59-ended-by-hana",
+      "size": "zoom200",
+      "file": "zoom200-59-ended-by-hana.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1544,7 +1914,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1557,7 +1928,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1570,7 +1942,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1583,7 +1956,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1596,7 +1970,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1609,7 +1984,92 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "62-ack-saved",
+      "size": "1440",
+      "file": "1440-62-ack-saved.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "62-ack-saved",
+      "size": "1280",
+      "file": "1280-62-ack-saved.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "62-ack-saved",
+      "size": "zoom200",
+      "file": "zoom200-62-ack-saved.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "63-ack-own-cant",
+      "size": "1440",
+      "file": "1440-63-ack-own-cant.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "63-ack-own-cant",
+      "size": "1280",
+      "file": "1280-63-ack-own-cant.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "63-ack-own-cant",
+      "size": "zoom200",
+      "file": "zoom200-63-ack-own-cant.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1622,7 +2082,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1635,7 +2096,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1648,7 +2110,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -1661,371 +2124,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "70-mar-aroha-rangi-strip",
-      "size": "1440",
-      "file": "1440-70-mar-aroha-rangi-strip.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "70-mar-aroha-rangi-strip",
-      "size": "1280",
-      "file": "1280-70-mar-aroha-rangi-strip.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "70-mar-aroha-rangi-strip",
-      "size": "zoom200",
-      "file": "zoom200-70-mar-aroha-rangi-strip.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "71-mar-mele-rangi-blocked",
-      "size": "1440",
-      "file": "1440-71-mar-mele-rangi-blocked.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "71-mar-mele-rangi-blocked",
-      "size": "1280",
-      "file": "1280-71-mar-mele-rangi-blocked.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "71-mar-mele-rangi-blocked",
-      "size": "zoom200",
-      "file": "zoom200-71-mar-mele-rangi-blocked.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "72-mar-aroha-priya-blocked",
-      "size": "1440",
-      "file": "1440-72-mar-aroha-priya-blocked.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "72-mar-aroha-priya-blocked",
-      "size": "1280",
-      "file": "1280-72-mar-aroha-priya-blocked.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "72-mar-aroha-priya-blocked",
-      "size": "zoom200",
-      "file": "zoom200-72-mar-aroha-priya-blocked.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "73-mar-aroha-hana-blocked",
-      "size": "1440",
-      "file": "1440-73-mar-aroha-hana-blocked.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "74-record-under-grant",
-      "size": "1440",
-      "file": "1440-74-record-under-grant.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "74-record-under-grant",
-      "size": "1280",
-      "file": "1280-74-record-under-grant.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "74-record-under-grant",
-      "size": "zoom200",
-      "file": "zoom200-74-record-under-grant.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "75-recorded-under-grant",
-      "size": "1440",
-      "file": "1440-75-recorded-under-grant.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "75-recorded-under-grant",
-      "size": "1280",
-      "file": "1280-75-recorded-under-grant.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "75-recorded-under-grant",
-      "size": "zoom200",
-      "file": "zoom200-75-recorded-under-grant.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "76-record-expired",
-      "size": "1440",
-      "file": "1440-76-record-expired.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "76-record-expired",
-      "size": "1280",
-      "file": "1280-76-record-expired.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "76-record-expired",
-      "size": "zoom200",
-      "file": "zoom200-76-record-expired.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "78-mar-expired",
-      "size": "1440",
-      "file": "1440-78-mar-expired.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "78-mar-expired",
-      "size": "1280",
-      "file": "1280-78-mar-expired.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "78-mar-expired",
-      "size": "zoom200",
-      "file": "zoom200-78-mar-expired.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "79-mar-ending",
-      "size": "1440",
-      "file": "1440-79-mar-ending.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "80-request-link-house-lead",
-      "size": "1440",
-      "file": "1440-80-request-link-house-lead.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "80-request-link-house-lead",
-      "size": "1280",
-      "file": "1280-80-request-link-house-lead.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "80-request-link-house-lead",
-      "size": "zoom200",
-      "file": "zoom200-80-request-link-house-lead.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "81-record-offline-saved-on-device",
-      "size": "1440",
-      "file": "1440-81-record-offline-saved-on-device.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "82-record-controlled-witness",
-      "size": "1440",
-      "file": "1440-82-record-controlled-witness.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2038,7 +2138,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2051,7 +2152,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2064,7 +2166,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2077,7 +2180,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2090,7 +2194,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2103,7 +2208,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2116,7 +2222,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2129,7 +2236,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2142,7 +2250,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2155,7 +2264,50 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "89-today-sione-paper-records",
+      "size": "1440",
+      "file": "1440-89-today-sione-paper-records.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "89-today-sione-paper-records",
+      "size": "1280",
+      "file": "1280-89-today-sione-paper-records.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "89-today-sione-paper-records",
+      "size": "zoom200",
+      "file": "zoom200-89-today-sione-paper-records.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2165,7 +2317,12 @@
       "size": "1440",
       "file": "1440-90-today-not-on-shift.png",
       "overflow": 0,
-      "header": null,
+      "header": {
+        "sublineLines": 0,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -2177,7 +2334,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2190,7 +2348,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2203,7 +2362,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2216,7 +2376,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2229,7 +2390,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2242,7 +2404,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2255,7 +2418,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2268,7 +2432,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2281,7 +2446,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2294,7 +2460,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2307,7 +2474,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2320,7 +2488,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2333,7 +2502,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2346,7 +2516,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2359,7 +2530,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2372,7 +2544,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2385,7 +2558,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2398,7 +2572,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2411,7 +2586,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2424,7 +2600,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2437,7 +2614,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2450,7 +2628,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2463,7 +2642,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2476,7 +2656,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2489,7 +2670,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2502,7 +2684,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2515,7 +2698,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2528,7 +2712,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2541,7 +2726,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2554,7 +2740,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2567,7 +2754,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2580,7 +2768,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2590,7 +2779,12 @@
       "size": "1440",
       "file": "1440-103-downtime-support-worker.png",
       "overflow": 0,
-      "header": null,
+      "header": {
+        "sublineLines": 0,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
       "errors": [],
       "stepError": null
     },
@@ -2602,7 +2796,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2615,7 +2810,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2628,7 +2824,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2641,7 +2838,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2654,7 +2852,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2667,7 +2866,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2680,7 +2880,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2693,7 +2894,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2706,7 +2908,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2719,7 +2922,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2732,7 +2936,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2745,7 +2950,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2758,7 +2964,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2771,7 +2978,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2784,7 +2992,92 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "115b-pack-first-page",
+      "size": "1440",
+      "file": "1440-115b-pack-first-page.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "115b-pack-first-page",
+      "size": "1280",
+      "file": "1280-115b-pack-first-page.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "115b-pack-first-page",
+      "size": "zoom200",
+      "file": "zoom200-115b-pack-first-page.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "116-pack-hana-no-controlled",
+      "size": "1440",
+      "file": "1440-116-pack-hana-no-controlled.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "116-pack-hana-no-controlled",
+      "size": "1280",
+      "file": "1280-116-pack-hana-no-controlled.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "116-pack-hana-no-controlled",
+      "size": "zoom200",
+      "file": "zoom200-116-pack-hana-no-controlled.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2797,7 +3090,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2810,7 +3104,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2823,7 +3118,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2836,7 +3132,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2849,7 +3146,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2862,7 +3160,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2875,7 +3174,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2888,7 +3188,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2903,7 +3204,8 @@
         "truncatedCaptions": [
           "5 not configured · the rest are defaults"
         ],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2918,7 +3220,8 @@
         "truncatedCaptions": [
           "5 not configured · the rest are defaults"
         ],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2931,7 +3234,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2946,7 +3250,8 @@
         "truncatedCaptions": [
           "5 not configured · the rest are defaults"
         ],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2961,7 +3266,8 @@
         "truncatedCaptions": [
           "5 not configured · the rest are defaults"
         ],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2974,7 +3280,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -2989,7 +3296,8 @@
         "truncatedCaptions": [
           "5 not configured · the rest are defaults"
         ],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -3004,7 +3312,8 @@
         "truncatedCaptions": [
           "5 not configured · the rest are defaults"
         ],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -3017,7 +3326,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -3032,7 +3342,8 @@
         "truncatedCaptions": [
           "5 not configured · the rest are defaults"
         ],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -3047,7 +3358,8 @@
         "truncatedCaptions": [
           "5 not configured · the rest are defaults"
         ],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -3060,7 +3372,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -3073,35 +3386,9 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "130-contract-page",
-      "size": "1440",
-      "file": "1440-130-contract-page.png",
-      "overflow": 0,
-      "header": null,
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "130-contract-page",
-      "size": "1280",
-      "file": "1280-130-contract-page.png",
-      "overflow": 0,
-      "header": null,
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "130-contract-page",
-      "size": "zoom200",
-      "file": "zoom200-130-contract-page.png",
-      "overflow": 0,
-      "header": null,
       "errors": [],
       "stepError": null
     },
@@ -3113,307 +3400,274 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "09-not-available-house-lead",
+      "shot": "70-mar-aroha-rangi-strip",
       "size": "1440",
-      "file": "1440-09-not-available-house-lead.png",
+      "file": "1440-70-mar-aroha-rangi-strip.png",
       "overflow": 0,
-      "header": null,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "09-not-available-house-lead",
+      "shot": "70-mar-aroha-rangi-strip",
       "size": "1280",
-      "file": "1280-09-not-available-house-lead.png",
+      "file": "1280-70-mar-aroha-rangi-strip.png",
       "overflow": 0,
-      "header": null,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "09-not-available-house-lead",
+      "shot": "70-mar-aroha-rangi-strip",
       "size": "zoom200",
-      "file": "zoom200-09-not-available-house-lead.png",
+      "file": "zoom200-70-mar-aroha-rangi-strip.png",
       "overflow": 0,
-      "header": null,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "29-request-started",
+      "shot": "71-mar-mele-rangi-blocked",
       "size": "1440",
-      "file": "1440-29-request-started.png",
+      "file": "1440-71-mar-mele-rangi-blocked.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "29-request-started",
+      "shot": "71-mar-mele-rangi-blocked",
       "size": "1280",
-      "file": "1280-29-request-started.png",
+      "file": "1280-71-mar-mele-rangi-blocked.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "29-request-started",
+      "shot": "71-mar-mele-rangi-blocked",
       "size": "zoom200",
-      "file": "zoom200-29-request-started.png",
+      "file": "zoom200-71-mar-mele-rangi-blocked.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "40-grant-ea13-rangi",
+      "shot": "72-mar-aroha-priya-blocked",
       "size": "1440",
-      "file": "1440-40-grant-ea13-rangi.png",
+      "file": "1440-72-mar-aroha-priya-blocked.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "40-grant-ea13-rangi",
+      "shot": "72-mar-aroha-priya-blocked",
       "size": "1280",
-      "file": "1280-40-grant-ea13-rangi.png",
+      "file": "1280-72-mar-aroha-priya-blocked.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "40-grant-ea13-rangi",
+      "shot": "72-mar-aroha-priya-blocked",
       "size": "zoom200",
-      "file": "zoom200-40-grant-ea13-rangi.png",
+      "file": "zoom200-72-mar-aroha-priya-blocked.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "41-grant-ea8-not-justified",
+      "shot": "73-mar-aroha-hana-blocked",
       "size": "1440",
-      "file": "1440-41-grant-ea8-not-justified.png",
+      "file": "1440-73-mar-aroha-hana-blocked.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "41-grant-ea8-not-justified",
-      "size": "1280",
-      "file": "1280-41-grant-ea8-not-justified.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "41-grant-ea8-not-justified",
-      "size": "zoom200",
-      "file": "zoom200-41-grant-ea8-not-justified.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "48-correct-saved",
+      "shot": "74-record-under-grant",
       "size": "1440",
-      "file": "1440-48-correct-saved.png",
+      "file": "1440-74-record-under-grant.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "48-correct-saved",
+      "shot": "74-record-under-grant",
       "size": "1280",
-      "file": "1280-48-correct-saved.png",
+      "file": "1280-74-record-under-grant.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "48-correct-saved",
+      "shot": "74-record-under-grant",
       "size": "zoom200",
-      "file": "zoom200-48-correct-saved.png",
+      "file": "zoom200-74-record-under-grant.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "59-ended-by-hana",
+      "shot": "75-recorded-under-grant",
       "size": "1440",
-      "file": "1440-59-ended-by-hana.png",
+      "file": "1440-75-recorded-under-grant.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "59-ended-by-hana",
+      "shot": "75-recorded-under-grant",
       "size": "1280",
-      "file": "1280-59-ended-by-hana.png",
+      "file": "1280-75-recorded-under-grant.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "59-ended-by-hana",
+      "shot": "75-recorded-under-grant",
       "size": "zoom200",
-      "file": "zoom200-59-ended-by-hana.png",
+      "file": "zoom200-75-recorded-under-grant.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "62-ack-saved",
+      "shot": "76-record-expired",
       "size": "1440",
-      "file": "1440-62-ack-saved.png",
+      "file": "1440-76-record-expired.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "62-ack-saved",
+      "shot": "76-record-expired",
       "size": "1280",
-      "file": "1280-62-ack-saved.png",
+      "file": "1280-76-record-expired.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "62-ack-saved",
+      "shot": "76-record-expired",
       "size": "zoom200",
-      "file": "zoom200-62-ack-saved.png",
+      "file": "zoom200-76-record-expired.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "63-ack-own-cant",
-      "size": "1440",
-      "file": "1440-63-ack-own-cant.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "63-ack-own-cant",
-      "size": "1280",
-      "file": "1280-63-ack-own-cant.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "63-ack-own-cant",
-      "size": "zoom200",
-      "file": "zoom200-63-ack-own-cant.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -3426,7 +3680,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -3439,7 +3694,8 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -3452,85 +3708,190 @@
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "89-today-sione-paper-records",
+      "shot": "78-mar-expired",
       "size": "1440",
-      "file": "1440-89-today-sione-paper-records.png",
+      "file": "1440-78-mar-expired.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "89-today-sione-paper-records",
+      "shot": "78-mar-expired",
       "size": "1280",
-      "file": "1280-89-today-sione-paper-records.png",
+      "file": "1280-78-mar-expired.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "89-today-sione-paper-records",
+      "shot": "78-mar-expired",
       "size": "zoom200",
-      "file": "zoom200-89-today-sione-paper-records.png",
+      "file": "zoom200-78-mar-expired.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "116-pack-hana-no-controlled",
+      "shot": "79-mar-ending",
       "size": "1440",
-      "file": "1440-116-pack-hana-no-controlled.png",
+      "file": "1440-79-mar-ending.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "116-pack-hana-no-controlled",
+      "shot": "80-request-link-house-lead",
+      "size": "1440",
+      "file": "1440-80-request-link-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "80-request-link-house-lead",
       "size": "1280",
-      "file": "1280-116-pack-hana-no-controlled.png",
+      "file": "1280-80-request-link-house-lead.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
     },
     {
-      "shot": "116-pack-hana-no-controlled",
+      "shot": "80-request-link-house-lead",
       "size": "zoom200",
-      "file": "zoom200-116-pack-hana-no-controlled.png",
+      "file": "zoom200-80-request-link-house-lead.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
         "truncatedCaptions": [],
-        "truncatedCells": []
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "81-record-offline-needs-connection",
+      "size": "1440",
+      "file": "1440-81-record-offline-needs-connection.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "82-record-controlled-witness",
+      "size": "1440",
+      "file": "1440-82-record-controlled-witness.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "130-contract-page",
+      "size": "1440",
+      "file": "1440-130-contract-page.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 0,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "130-contract-page",
+      "size": "1280",
+      "file": "1280-130-contract-page.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 0,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "130-contract-page",
+      "size": "zoom200",
+      "file": "zoom200-130-contract-page.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 0,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "75b-record-rules-validation",
+      "size": "1440",
+      "file": "1440-75b-record-rules-validation.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": [],
+        "pickerClipped": []
       },
       "errors": [],
       "stepError": null
@@ -3561,21 +3922,32 @@
   },
   "reruns": [
     {
-      "when": "2026-09-30T19:18:49.227Z",
+      "when": "2026-09-30T19:37:52.282Z",
       "only": [
-        "40-grant",
-        "41-grant",
-        "48-correct",
-        "62-ack",
-        "59-ended",
-        "77-record",
-        "116-pack",
-        "09-not",
-        "89-today",
-        "29-request-started",
-        "63-ack"
+        "70-",
+        "71-",
+        "72-",
+        "73-",
+        "74-",
+        "75-",
+        "75b-",
+        "76-",
+        "77-",
+        "78-",
+        "79-",
+        "80-",
+        "81-",
+        "82-",
+        "130-"
       ],
-      "captures": 33
+      "captures": 35
+    },
+    {
+      "when": "2026-09-30T19:39:36.677Z",
+      "only": [
+        "75b-"
+      ],
+      "captures": 1
     }
   ]
 }
