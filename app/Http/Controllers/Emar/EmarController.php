@@ -60,6 +60,7 @@ use App\Services\Operations\HandoverPresenter;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
 use App\Support\Medication\MedicationStockQuantity;
+use App\Support\WorkerClock;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -7738,7 +7739,7 @@ class EmarController extends Controller
                     $payload,
                     [
                         'created_by' => $user->id,
-                        'start_date' => $validated['start_date'] ?? now()->toDateString(),
+                        'start_date' => $validated['start_date'] ?? WorkerClock::today()->toDateString(),
                         'state' => 'active',
                         'active' => true,
                         'approval_status' => 'pending_verification',
@@ -9026,7 +9027,7 @@ class EmarController extends Controller
                     'route' => $row['route'],
                     'state' => 'active',
                     'active' => true,
-                    'start_date' => now()->toDateString(),
+                    'start_date' => WorkerClock::today()->toDateString(),
                     'approval_status' => 'pending_verification',
                     'verified_by' => null,
                     'verified_at' => null,
