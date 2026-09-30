@@ -573,10 +573,12 @@ class EmarController extends Controller
     private function getClientInrRecords(Client $client, bool $includeControlled): array
     {
         $query = $client->inrRecords();
+        // A reading with no medicine linked is never hidden (NF-23); the MAR
+        // rail labels it. A linked reading still needs a same-Client order.
         $this->governanceScope->scopeCanonicalClientMedicationRows(
             $query->getQuery(),
             $client->site_id ? [(int) $client->site_id] : [],
-            false,
+            true,
         );
         if (! $includeControlled) {
             $this->governanceScope->scopeWithoutControlledMedicationRows($query->getQuery());
