@@ -145,3 +145,5 @@ The self-review of that run also changed:
 **`tsc`** (`tsconfig.json`): no errors in `src/`. The 2 errors in shared files (`breadcrumbs.tsx:36`, `file-dropzone.tsx:223`) come from P01’s Inertia shim types, as in the earlier packages.
 
 **ESLint** (the app config, `--no-ignore`, `src/**/*.{ts,tsx}`): 15 files, 0 errors, 0 warnings.
+
+**Main’s fix (30 September):** explanation text stays neutral or muted, with colour only on the badge. Checked on the committed `7355c720d` screenshot `1440-01`: the cefalexin State cell’s badge has 230 strongly red pixels and its explanation lines have none. The To check, Covert and Reconciliation lists have no red text. The reconciliation dialog’s “It can’t be checked until the prescriber confirms it’s safe” line is now muted too. The rebuilt version was re-run through the harness (numbers above).

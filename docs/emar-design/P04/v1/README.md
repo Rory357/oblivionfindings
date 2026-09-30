@@ -1,6 +1,6 @@
 # eMAR P04 v1 — Orders, changes & reconciliation
 
-**Status: design candidate for Main (the review session, “Codex eMAR audit re-review”), reviewing under Stephan’s delegation.** Not approved yet. Not implemented.
+**Status: approved by Main (the review session, “Codex eMAR audit re-review”) under Stephan’s delegation, 30 September 2026, for Stephan’s final inspection — see [APPROVAL.md](APPROVAL.md).** Frozen. Not implemented.
 
 - Version: v1, 30 September 2026 (NZDT). Branch `claude/emar-p04`, based on `origin/main` `1b4b6e23e`.
 - Exact file identity: [`VERSION.txt`](VERSION.txt) (SHA-256 of every source, build and tool file).
@@ -139,7 +139,7 @@ Steps: **who and why (and the sources) → match each medicine → what changes 
 3. **The independent check** for every new or changed version, on the server: not the enterer, not the read-back witness (AUDIT 2.1). The lone check replaces the password waiver and creates a P08a follow-up (AUDIT 2.2). Saving with no change keeps the check (AUDIT 2.3).
 4. **Read-back uses the witness PIN** (PIN-1), not the witness’s login password (AUDIT 3.1).
 5. **The prescriber’s written confirmation replaces the internal countersign**, due by the end of the next day in NZ time — not `order_date + 1 day` in UTC (AUDIT 3.5). Attachments on orders.
-6. **A server-side allergy check at ordering**, with a per-version “prescriber confirmed it’s safe” record shown at dose time (AUDIT 3.3, 3.4).
+6. **A server-side allergy check at ordering**, with a per-version “prescriber confirmed it’s safe” record shown at dose time (AUDIT 3.3, 3.4). **Drug classes come from a maintained class source** (for example, penicillin → cephalosporin cross-reactivity), never a hard-coded list (Main, 30 September; AUDIT 3.3).
 7. **Covert as structured fields** — capacity, consulted, pharmacist’s advice (required), GP file, method, review date, and revoked at/by/reason — and shown in P01’s dialog (AUDIT 5).
 8. **Reconciliation as its own record, linked to orders**, replacing Respite’s counts and free text; keep the check-in rule (AUDIT 6).
 9. **Stop reasons on the order**, not only in the audit log (AUDIT 4.5).
@@ -157,7 +157,7 @@ Steps: **who and why (and the sources) → match each medicine → what changes 
 - **`tsc` and ESLint:** clean for `src/` (ESLint: 15 files, 0 problems). The 2 `tsc` errors in shared files come from P01’s Inertia shim, as in P01, P03, P07a and P08a.
 - **Live reference:** not re-checked live this time; see AUDIT §8.
 
-## Deviations Main should check
+## Deviations (accepted by Main)
 
 1. **Reference frames.** The shell chrome is reproduced, as in P01, P02, P03, P07a and P08a, because `AppLayout` needs live Inertia props. The person record and Meds today are link-only here.
 2. **Fixture additions.** Aroha has a new cefalexin order matching her penicillin allergy, to show “Prescriber must confirm”. Hine (respite, from P01) arrives today with an open reconciliation. Ben moved to Rimu House this morning.
@@ -165,3 +165,9 @@ Steps: **who and why (and the sources) → match each medicine → what changes 
 4. **Change entry keeps the medicine fixed.** A different medicine is a new order and a stop, not a change — say if Main wants “change the medicine” as one step.
 5. **The hub header’s meters are P04’s own** (To check, written confirmations, ending, covert, reconciliation, current orders), not P02’s dose meters, because this is the Orders & reviews hub.
 6. **The dose-only phone instruction opens P08a’s approved dialog, unchanged.** To check opens P08a v1’s “Countersign a phone instruction”, copied view for view. Main decided on 30 September that it also needs the prescriber’s written confirmation; that is build note 15, an approved change to P08a, not previewed here.
+
+**Main’s inspection, 30 September:** v1 at `7355c720d` passed (`sha256sum -c` 29 OK) with one fix, made in this version: explanation text stays neutral or muted, with the colour only on the badge (as in P03). The Orders list’s State lines were already muted in `7355c720d` (the committed screenshot’s explanation lines have no red pixels; the badge has them), and no To check, Covert or Reconciliation list uses red text. The one red explanation left — “It can’t be checked until the prescriber confirms it’s safe” beside the allergy badge in the reconciliation dialog — is now muted. Main also accepted deviations 1–6 and the “already has it” warning, and added the drug-class build note (build note 6; AUDIT 3.3).
+
+## Approval
+
+Approved by Main under Stephan’s delegation, for his final inspection. The exact version and the record are in [`APPROVAL.md`](APPROVAL.md). **v1 is frozen**; any change goes in `P04/v2/`.

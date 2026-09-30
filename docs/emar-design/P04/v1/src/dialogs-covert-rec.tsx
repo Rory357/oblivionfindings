@@ -749,7 +749,7 @@ export function ReconcileDialog({ recId, onClose, returnFocus }: { recId: string
                                         <InputError message={e[`rc-c-${i.key}`]} />
                                     </>
                                 ) : null}
-                                {i.decision === 'new' && (i.allergy || (person && allergyMatch(person.id, i.med))) ? <p className="text-[12px] font-semibold text-status-critical">It can’t be checked until the prescriber confirms it’s safe.</p> : null}
+                                {i.decision === 'new' && (i.allergy || (person && allergyMatch(person.id, i.med))) ? <p className="text-[12px] text-muted-foreground">It can’t be checked until the prescriber confirms it’s safe.</p> : null}
                                 {!i.onList && i.decision !== 'ask' && !i.decision ? <p className="text-[12px] text-muted-foreground">Not on the GP list — ask the GP first is usual.</p> : null}
                             </div>
                         </li>

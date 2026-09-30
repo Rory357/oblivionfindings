@@ -39,7 +39,8 @@ const restore = (rf?: () => HTMLElement | null) => (ev: Event) => {
 };
 const when = (v: Version, o: Order) => (o.prn ? `${v.dose} when needed — ${o.prn}` : `${v.dose} · ${v.when}`);
 const stamp = () => `Mon 28 Sep, ${NOW_LABEL}`;
-/** Fixture-level allergy matching (the build uses MedicationAllergy’s matching). */
+/** Preview-only allergy matching on a few fixture names. The build must not hard-code drug classes:
+ * class matching (a penicillin, a cephalosporin cross-reaction) comes from a maintained class source (Main, 30 Sep). */
 export function allergyMatch(pid: PersonId, med: string): string | null {
     const p = PEOPLE[pid];
     if (p.allergy.state !== 'recorded') return null;
