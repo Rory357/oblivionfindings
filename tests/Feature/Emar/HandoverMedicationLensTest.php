@@ -854,6 +854,9 @@ class HandoverMedicationLensTest extends TestCase
         $this->travelTo(Carbon::parse('2026-08-28 12:30:00', 'UTC'));
 
         try {
+            // setUp dates are relative to the real clock, so pin the outgoing
+            // worker as employed before this fixed moment.
+            $this->worker->hrEmployeeProfile()->update(['start_date' => '2026-07-01']);
             $this->witness->hrEmployeeProfile()->update([
                 'start_date' => '2026-08-29',
                 'end_date' => '2026-08-29',
