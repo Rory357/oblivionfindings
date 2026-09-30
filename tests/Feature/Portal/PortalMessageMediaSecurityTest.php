@@ -526,6 +526,8 @@ it('authorizes staff photo delivery against the client policy section and nested
         'approved_at' => now(),
     ]);
     grantPortalMessageMediaStaffRole($manager, ['clients.viewAny', 'clients.update']);
+    // clients.viewAny no longer bypasses the Client's Site (a8ffbc6ae).
+    assignPortalMessageMediaWorkerToSite($manager, $site);
     Storage::disk('local')->put('client-photos/private/staff.png', onePixelPortalMessageMediaPng());
     $photo = ClientPhoto::query()->create([
         'client_id' => $client->id,

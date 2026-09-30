@@ -421,6 +421,8 @@ it('scopes edit wizard options to the canonical client Site and clears ineligibl
     $ownSite = Site::factory()->create(['name' => 'Own house']);
     $otherSite = Site::factory()->create(['name' => 'Other house']);
     $thirdSite = Site::factory()->create(['name' => 'Third house']);
+    // clients.update no longer bypasses the client's Site (a8ffbc6ae).
+    scopeClientProfileFoundationUserToSite($manager, $ownSite, 'manager');
     $ownContext = ServiceContext::factory()->create([
         'site_id' => $ownSite->id,
         'name' => 'Own context',
@@ -595,6 +597,7 @@ it('requires retained Site-bound options to be cleared when the Site is cleared'
     $manager = User::factory()->create();
     grantClientProfileFoundationPermissions($manager, ['clients.update']);
     $site = Site::factory()->create(['name' => 'Current Site']);
+    scopeClientProfileFoundationUserToSite($manager, $site, 'manager');
     $context = ServiceContext::factory()->create(['site_id' => $site->id]);
     $geofence = AssetGeofence::query()->create([
         'site_id' => $site->id,
@@ -643,6 +646,7 @@ it('preserves omitted Site-bound fields on an unrelated profile update', functio
     $manager = User::factory()->create();
     grantClientProfileFoundationPermissions($manager, ['clients.update']);
     $site = Site::factory()->create(['name' => 'Current Site']);
+    scopeClientProfileFoundationUserToSite($manager, $site, 'manager');
     $historicalSite = Site::factory()->create(['name' => 'Historical Site']);
     $historicalContext = ServiceContext::factory()->create([
         'site_id' => $historicalSite->id,
@@ -783,7 +787,10 @@ it('requires granular consent authority and parent client access', function () {
     $accessibleSite = Site::factory()->create(['is_active' => true]);
     $otherSite = Site::factory()->create(['is_active' => true]);
     $updater = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
+    // The updater can see the Client, so only the missing consents.record
+    // capability refuses the write (store() 404s Clients it can't view).
     grantClientProfileFoundationRole($updater, 'manager', [
+        'clients.viewAny',
         'clients.update',
     ]);
     scopeClientProfileFoundationUserToSite($updater, $accessibleSite, 'coordinator');
@@ -829,8 +836,10 @@ it('enforces consent nesting and only withdraws a currently given consent once',
     $client = Client::factory()->create(['site_id' => $site->id]);
     $otherClient = Client::factory()->create(['site_id' => $site->id]);
     $consentType = ConsentType::factory()->create(['active' => true]);
+    // Consents carry their canonical Site (1bade924d), as the app records them.
     $given = ClientConsent::query()->create([
         'client_id' => $client->id,
+        'site_id' => $site->id,
         'consent_type_id' => $consentType->id,
         'status' => 'given',
         'given_at' => now(),
@@ -840,6 +849,7 @@ it('enforces consent nesting and only withdraws a currently given consent once',
     ]);
     $refused = ClientConsent::query()->create([
         'client_id' => $client->id,
+        'site_id' => $site->id,
         'consent_type_id' => $consentType->id,
         'status' => 'refused',
         'given_at' => now(),
