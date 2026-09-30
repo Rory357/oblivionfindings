@@ -1,6 +1,6 @@
 # eMAR P05 v1 — Medication review
 
-**Status: candidate v1 for Main’s inspection.** Main is the review session, “Codex eMAR audit re-review”, acting under Stephan’s delegation. This design is not implemented.
+**Status: candidate v1.1 for Main’s approval.** v1 was inspected on 1 October; v1.1 makes Main’s one fix and records the confirmed decision (see “Main’s inspection of v1”). Main is the review session, “Codex eMAR audit re-review”, acting under Stephan’s delegation. This design is not implemented.
 
 - **Version:** v1, 30 September 2026 (NZDT). Branch `claude/emar-p05`, based on `origin/main` `2e1d38a8a`.
 - **Exact file identity:** [`VERSION.txt`](VERSION.txt), the SHA-256 of every source, build and tool file.
@@ -245,6 +245,7 @@ They are the same records All Tasks shows the owner, and each opens the exact re
     - One “Due in 30 days” number, not 7 days on the card and 30 in the list (AUDIT 1.6, 7.10).
 13. **Copy (EM-17):** remove “3-monthly…”, “Pharmacist-led, GP-signed, whānau-informed”, “HQSC expectation”, the quarter cycle and “Resident” (AUDIT 4).
 14. **The person rule** for the schedule dialog’s client picker. It’s on Stephan’s end-review list, and P05 lists only the reader’s people (AUDIT 6.1).
+15. **Disabled menu items with a reason — a shared change (Main, 1 Oct).** Extend the shared `MenuItem` (`components/lists/entity-menu.tsx`) with `disabled?: string`, rendered `aria-disabled` with the reason as a second line, in both the kebab and the context menu. It’s applied app-wide at build. Until then, unavailable items are left out of menus, as here.
 
 ## Verification (30 September 2026)
 
@@ -259,6 +260,14 @@ They are the same records All Tasks shows the owner, and each opens the exact re
   - Escape closes the untouched wizard and returns focus to the button.
   - The menu key opens the review row’s menu.
 - **`tsc` and ESLint:** clean for `src/` (ESLint: 19 files, 0 problems; no unused imports). The 2 `tsc` errors in shared files come from P01’s Inertia shim, as in the earlier packages.
+
+## Main’s inspection of v1 (1 October 2026)
+
+Identity verified: VERSION.txt sha256 `48b0efec…`, 33 files, docs-only diff, branched from `2e1d38a8a`.
+
+- **Confirmed (Main, 1 Oct):** when someone without controlled-medicine access records a review, a controlled row is saved as **“Outcome to add”**, and a house lead with access adds it in the small dialog. It never defaults to “Continue”.
+- **Fixed in v1.1:** a regular review’s row menu offered a red “Cancel the review” that only led to a refusal. It’s now left out of a regular review’s menu, as approved mockups leave unavailable items out, and “Move the review” stays. The rule — “Regular reviews are moved, not cancelled” — is shown in the review’s “This review” section and on the Move dialog. A regular review reached by its cancel link says the same and offers “Move it instead”. Triggered reviews keep a working Cancel. The review’s own footer never offered Cancel.
+- **P11 B1 build note (Main, 1 Oct):** P11’s meter caption “5 not configured · the rest are defaults” truncates at 1280 px and 200 %, in P11 v5 as well. It becomes “5 not configured”. P05 keeps P11’s copy as it is.
 
 ## Deviations (for Main)
 

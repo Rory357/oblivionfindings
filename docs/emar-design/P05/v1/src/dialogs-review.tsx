@@ -150,6 +150,7 @@ export function ReviewDialog({ review: r, onClose, onAction }: { review: Review;
                         })()],
                     ]}
                 />
+                {r.kind === 'regular' && r.state === 'booked' ? <p className="text-caption">Regular reviews are moved, not cancelled — so the cycle never lapses.</p> : null}
                 {r.moves.length ? <p className="text-caption">Earlier dates are kept: {r.moves.map((m) => m.from).join(', ')}.</p> : null}
             </>
         ),

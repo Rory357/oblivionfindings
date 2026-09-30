@@ -95,7 +95,8 @@ export function reviewMenu(r: Review, p: ReturnType<typeof useStore>['route']['p
         booked && canManage(p) && { label: 'Record the outcome', icon: FileSignature, onClick: () => open(`record:${r.id}`) },
         booked && canManage(p) && { label: r.booked ? 'Change the appointment' : 'Book the appointment', icon: CalendarPlus, onClick: () => open(`appt:${r.id}`) },
         booked && canManage(p) && { label: 'Move the review', icon: MoveRight, onClick: () => open(`move:${r.id}`) },
-        booked && canManage(p) && { label: 'Cancel the review', icon: XCircle, onClick: () => open(`cancel:${r.id}`), danger: true },
+        // A regular review is moved, never cancelled (Main, Q8): Cancel is left out of its menu, as approved mockups leave unavailable items out.
+        booked && canManage(p) && r.kind === 'triggered' && { label: 'Cancel the review', icon: XCircle, onClick: () => open(`cancel:${r.id}`), danger: true },
         { separator: true },
         { label: `Open ${PEOPLE[r.pid].pref}’s medication record`, icon: UserRound, onClick: () => go('/emar/mar', { client_id: String(PEOPLE[r.pid].clientId), tab: 'clinical', view: 'reviews', open: undefined }) },
         canManage(p) && r.state === 'booked' && { label: 'Change how often', icon: Repeat, onClick: () => open(`interval:${r.pid}`) },

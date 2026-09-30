@@ -427,7 +427,7 @@ export function MoveDialog({ review: r, onClose, returnFocus }: { review: Review
         <Modal
             width={720}
             title={`Move the review — ${r.id}, ${PEOPLE[r.pid].pref}`}
-            description={`Due ${r.due} now · earlier dates are always kept`}
+            description={`Due ${r.due} now · earlier dates are always kept${r.kind === 'regular' ? ' · regular reviews are moved, not cancelled' : ''}`}
             onClose={onClose}
             onCloseAutoFocus={restore(returnFocus)}
             footer={
@@ -488,7 +488,7 @@ export function CancelDialog({ review: r, onClose, onAction, returnFocus }: { re
     if (r.kind === 'regular')
         return (
             <Modal
-                title="A regular review can’t be cancelled"
+                title="Regular reviews are moved, not cancelled"
                 description="So the cycle never lapses."
                 onClose={onClose}
                 footer={

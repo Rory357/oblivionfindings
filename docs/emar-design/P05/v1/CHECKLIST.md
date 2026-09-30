@@ -54,7 +54,7 @@ Legend: **Pass** · **Pass (note)** passes with a stated limitation · **N/A** i
 | Item | Result | Evidence |
 |---|---|---|
 | EntityTable contracts: identity first, kebab last | Pass | Covers every list: reviews (`01`, `10`–`12`), changes (`08`), the person’s reviews (`15`) and the P11 change history (`74`). |
-| ⋯ and the same menu on right-click (plus the menu key); clicking a row opens it | Pass (note) | `02`, `13`, and `report.json` → `keyboard`. Blocked actions stay in the menu and explain why: a regular review’s “Cancel” (`64`), and “can’t do this” with who can (`96`, `60`). `MenuItem` has no disabled state. |
+| ⋯ and the same menu on right-click (plus the menu key); clicking a row opens it | Pass (note) | `02`, `13`, and `report.json` → `keyboard`. Unavailable actions are left out of the menu, as approved mockups do — a regular review offers “Move the review”, never “Cancel” (v1.1). The shared `MenuItem` has no disabled state; build note 15 adds one app-wide. A deep link to an action you can’t take says why and who can (`64`, `96`, `60`). |
 | Server-style pagination | N/A (note) | Today’s list is capped at 250 rows (AUDIT 1.2). The build pages it (build note 1). |
 | Empty, loading and error states use the shared components | Pass | EmptyState worded per section (“Nothing overdue”, “No open changes”, …) (`91`, `12`); SkeletonTable (`90`); ErrorState (`92`). |
 
@@ -94,7 +94,7 @@ Legend: **Pass** · **Pass (note)** passes with a stated limitation · **N/A** i
 |---|---|---|
 | NZ English, sentence case, plain words; no codes as titles, raw enums or developer words | Pass | Permission keys and package codes appear only in design notes, viewer toasts and the contract page. Product copy says “someone else who checks orders”, “the phone rule”, “house leads, clinical leads, coordinators and managers”. |
 | “Not configured”, “Not available” or “Unknown” instead of fake zeros | Pass | Examples: “Not booked with a clinician yet”, “Default — not yet reviewed”, “Outcome to add”. No “GP accept %”. |
-| Every blocked action says why and who can unblock it | Pass | Examples:<br>• a regular review can’t be cancelled, with “Move it instead” (`64`);<br>• support workers can’t record (`96`);<br>• a clinical lead can’t decide a controlled change (`60`);<br>• a second regular review is refused, naming the booked one (`32`). |
+| Every blocked action says why and who can unblock it | Pass | Examples:<br>• regular reviews are moved, not cancelled — said in the review and on the Move dialog, and on the cancel link with “Move it instead” (`22`, `62`, `64`);<br>• support workers can’t record (`96`);<br>• a clinical lead can’t decide a controlled change (`60`);<br>• a second regular review is refused, naming the booked one (`32`). |
 | No invented clinical values or authority claims | Pass | The cadence claims and “HQSC expectation” are gone (AUDIT 4). Clinicians and practices are marked synthetic. The drug burden index and falls are only the clinician’s own figures. |
 
 ### H. Honesty
@@ -147,3 +147,15 @@ Earlier runs found these problems, and this version fixes them:
 **`tsc`** (`tsconfig.json`): no errors in `src/`. The 2 errors in shared files (`breadcrumbs.tsx:36`, `file-dropzone.tsx:223`) come from P01’s Inertia shim types.
 
 **ESLint** (the app config, `--no-ignore`, `src/**/*.{ts,tsx}`): 19 files, 0 errors, 0 warnings. A separate check found no unused imports.
+
+## 5. v1.1 — Main’s inspection fix (1 October 2026)
+
+**The fix:** a regular review’s row menu offered a red “Cancel the review” that only led to a refusal.
+- Cancel is now left out of a regular review’s menu, and “Move the review” stays (`02`, keyboard).
+- The rule is shown in the review’s “This review” section (`22`, `27`) and on the Move dialog (`62`).
+- A regular review reached by its cancel link says “Regular reviews are moved, not cancelled”, with “Move it instead” (`64`).
+- Triggered reviews keep a working Cancel (`65`).
+
+**Build note 15:** `MenuItem` gains `disabled?: string`, applied app-wide at build.
+
+**Harness:** the touched states were re-run with `--only`: `02`, `22`, `27`, `62`–`65` and the keyboard walk: 15 captures, 0 problems. `report.json` holds 151 captures, all passing.

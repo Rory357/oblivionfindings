@@ -42,45 +42,6 @@
       "stepError": null
     },
     {
-      "shot": "02-reviews-row-menu",
-      "size": "1440",
-      "file": "1440-02-reviews-row-menu.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "02-reviews-row-menu",
-      "size": "1280",
-      "file": "1280-02-reviews-row-menu.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "02-reviews-row-menu",
-      "size": "zoom200",
-      "file": "zoom200-02-reviews-row-menu.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
       "shot": "03-reviews-manager-two-houses",
       "size": "1440",
       "file": "1440-03-reviews-manager-two-houses.png",
@@ -536,45 +497,6 @@
       "stepError": null
     },
     {
-      "shot": "22-review-grace",
-      "size": "1440",
-      "file": "1440-22-review-grace.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "22-review-grace",
-      "size": "1280",
-      "file": "1280-22-review-grace.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "22-review-grace",
-      "size": "zoom200",
-      "file": "zoom200-22-review-grace.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
       "shot": "23-review-grace-medicines",
       "size": "1440",
       "file": "1440-23-review-grace-medicines.png",
@@ -643,19 +565,6 @@
       "shot": "26-review-grace-history",
       "size": "1440",
       "file": "1440-26-review-grace-history.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "27-review-sam-moved",
-      "size": "1440",
-      "file": "1440-27-review-sam-moved.png",
       "overflow": 0,
       "header": {
         "sublineLines": 1,
@@ -1316,110 +1225,6 @@
       "stepError": null
     },
     {
-      "shot": "62-move",
-      "size": "1440",
-      "file": "1440-62-move.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "62-move",
-      "size": "1280",
-      "file": "1280-62-move.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "62-move",
-      "size": "zoom200",
-      "file": "zoom200-62-move.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "63-move-validation",
-      "size": "1440",
-      "file": "1440-63-move-validation.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "64-cancel-regular",
-      "size": "1440",
-      "file": "1440-64-cancel-regular.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "64-cancel-regular",
-      "size": "1280",
-      "file": "1280-64-cancel-regular.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "64-cancel-regular",
-      "size": "zoom200",
-      "file": "zoom200-64-cancel-regular.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
-      "shot": "65-cancel-triggered",
-      "size": "1440",
-      "file": "1440-65-cancel-triggered.png",
-      "overflow": 0,
-      "header": {
-        "sublineLines": 1,
-        "truncatedCaptions": [],
-        "truncatedCells": []
-      },
-      "errors": [],
-      "stepError": null
-    },
-    {
       "shot": "66-appointment",
       "size": "1440",
       "file": "1440-66-appointment.png",
@@ -1964,6 +1769,201 @@
       "header": null,
       "errors": [],
       "stepError": null
+    },
+    {
+      "shot": "02-reviews-row-menu",
+      "size": "1440",
+      "file": "1440-02-reviews-row-menu.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "02-reviews-row-menu",
+      "size": "1280",
+      "file": "1280-02-reviews-row-menu.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "02-reviews-row-menu",
+      "size": "zoom200",
+      "file": "zoom200-02-reviews-row-menu.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "22-review-grace",
+      "size": "1440",
+      "file": "1440-22-review-grace.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "22-review-grace",
+      "size": "1280",
+      "file": "1280-22-review-grace.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "22-review-grace",
+      "size": "zoom200",
+      "file": "zoom200-22-review-grace.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "27-review-sam-moved",
+      "size": "1440",
+      "file": "1440-27-review-sam-moved.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "62-move",
+      "size": "1440",
+      "file": "1440-62-move.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "62-move",
+      "size": "1280",
+      "file": "1280-62-move.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "62-move",
+      "size": "zoom200",
+      "file": "zoom200-62-move.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "63-move-validation",
+      "size": "1440",
+      "file": "1440-63-move-validation.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "64-cancel-regular",
+      "size": "1440",
+      "file": "1440-64-cancel-regular.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "64-cancel-regular",
+      "size": "1280",
+      "file": "1280-64-cancel-regular.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "64-cancel-regular",
+      "size": "zoom200",
+      "file": "zoom200-64-cancel-regular.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "65-cancel-triggered",
+      "size": "1440",
+      "file": "1440-65-cancel-triggered.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
     }
   ],
   "keyboard": {
@@ -1987,10 +1987,25 @@
       "Record the outcome",
       "Book the appointment",
       "Move the review",
-      "Cancel the review",
       "Open Sam’s medication record",
       "Change how often"
     ],
     "keyboardMenuVia": "ContextMenu key"
-  }
+  },
+  "reruns": [
+    {
+      "when": "2026-09-30T11:27:50.448Z",
+      "only": [
+        "02-",
+        "22-",
+        "27-",
+        "62-",
+        "63-",
+        "64-",
+        "65-",
+        "keyboard"
+      ],
+      "captures": 15
+    }
+  ]
 }
