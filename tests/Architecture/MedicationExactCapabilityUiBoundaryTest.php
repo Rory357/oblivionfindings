@@ -36,7 +36,9 @@ it('keeps medication UI flags and authoring routes on their exact capabilities',
             "'correct' => \$actor->canDo('medications.administer.correct')",
         )
         ->and($apiController)
-        ->toContain("abort_unless(\$user?->canDo('medications.administer.correct'), 403);")
+        // NF-09: interaction rules are governance, not a dose-correction right.
+        ->toContain("abort_unless(\$user?->canDo('medications.settings.manage'), 403);")
+        ->not->toContain("abort_unless(\$user?->canDo('medications.administer.correct'), 403);")
         ->and($emarRoutes)
         ->toContain(
             "Route::middleware('permission:medications.settings.manage')->group(function ()",
@@ -44,7 +46,8 @@ it('keeps medication UI flags and authoring routes on their exact capabilities',
         )
         ->not->toContain('permission:medications.settings.manage|medications.orders.manage|clients.update')
         ->and($apiRoutes)
-        ->toContain("->middleware('permission:medications.administer.correct')\n        ->name('api.medications.interactions.store')")
+        ->toContain("->middleware('permission:medications.settings.manage')\n        ->name('api.medications.interactions.store')")
+        ->not->toContain("->middleware('permission:medications.administer.correct')\n        ->name('api.medications.interactions.store')")
         ->not->toContain('permission:medications.administer.correct|clients.update')
         ->and($sidebar)
         ->toContain(
