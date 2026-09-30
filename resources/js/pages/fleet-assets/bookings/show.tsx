@@ -1,6 +1,10 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import PageShell from '@/components/page-shell';
 import {
+    PageHeader,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
+import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -15,10 +19,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import { fleetReturnFromLocation } from '@/lib/fleet-return';
 import { formatDate, formatDateTime, formatDistance } from '@/lib/fleet-utils';
 import { cn } from '@/lib/utils';
-import { fleetReturnFromLocation } from '@/lib/fleet-return';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     Calendar,
@@ -117,6 +120,7 @@ export default function BookingShow({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Bookings', href: '/fleet-assets/bookings' },
                 { title: `Booking #${b.id ?? ''}`, href: '#' },
@@ -124,11 +128,30 @@ export default function BookingShow({
         >
             <Head title={`Booking #${b.id ?? ''}`} />
             <PageShell>
-                <FleetCompactHero
-                    pill={`Vehicle booking · ${(b.status ?? 'pending').replace(/_/g, ' ')}`}
+                <PageHeader
+                    variant="profile"
+                    icon={Calendar}
                     title={`Booking #${b.id ?? ''}`}
                     backHref={fleetReturn ?? '/fleet-assets/bookings'}
-                    backLabel={fleetReturn ? 'Return to Fleet view' : 'Bookings'}
+                    titleChip={
+                        <PageHeaderStatusChip
+                            variant={
+                                b.status === 'rejected'
+                                    ? 'critical'
+                                    : b.status === 'pending'
+                                      ? 'warning'
+                                      : b.status === 'approved' ||
+                                          b.status === 'checked_out'
+                                        ? 'info'
+                                        : 'neutral'
+                            }
+                        >
+                            {(b.status ?? 'pending').replace(/_/g, ' ')}
+                        </PageHeaderStatusChip>
+                    }
+                    subline={[b.reference_number, b.asset?.name, b.purpose]
+                        .filter(Boolean)
+                        .join(' · ')}
                 />
 
                 {/* Status Banner */}
@@ -139,8 +162,8 @@ export default function BookingShow({
                             statusBannerColors.pending,
                     )}
                 >
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-3">
                             <Badge className="text-sm capitalize">
                                 {(b.status ?? '').replace(/_/g, ' ')}
                             </Badge>
@@ -791,7 +814,7 @@ export default function BookingShow({
                                     );
                                     setShowRejectDialog(false);
                                 }}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                variant="destructive"
                             >
                                 Reject
                             </AlertDialogAction>

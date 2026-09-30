@@ -14,6 +14,7 @@ use App\Services\EnhancedMarService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Database\Factories\UserFactory;
 
 beforeEach(function () {
     Cache::flush();
@@ -176,7 +177,7 @@ it('records a witnessed controlled drug My Day give through the MAR service', fu
         ->post("/my-day/medications/{$medication->id}/administer", [
             'scheduled_for' => Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland')->toIso8601String(),
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ])
         ->assertRedirect()
         ->assertSessionHas('success');

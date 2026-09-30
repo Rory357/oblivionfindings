@@ -205,6 +205,7 @@ export default function AssetLabels({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Assets', href: '/fleet-assets/assets' },
                 { title: 'QR labels', href: `${endpoint}/workspace` },

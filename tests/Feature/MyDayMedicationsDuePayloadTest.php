@@ -18,7 +18,9 @@ use Illuminate\Support\Facades\DB;
 beforeEach(function () {
     Cache::flush();
     // 10:00 NZ — dose slots at 09:00 and 13:00 both land inside the
-    // controller's visibility window (now-2h .. now+4h => 08:00 .. 14:00).
+    // worker's active shift (09:00 .. 13:00), which bounds the My Day window.
+    // Freeze with a UTC instance: a mocked "now" in another timezone makes
+    // Carbon parse the stored UTC shift times in that zone, 12h off.
     Carbon::setTestNow(Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland')->utc());
 });
 
@@ -75,14 +77,7 @@ it('emits a distinct medications_due row per in-window dose slot', function () {
 
 it('keeps record-only workers on Meds Today without exposing a dead admin eMAR link', function () {
     $worker = User::factory()->frontlineWorker()->create();
-    $recordPermission = Permission::query()->firstOrCreate(
-        ['key' => 'medications.administer.record'],
-        ['description' => 'medications.administer.record'],
-    );
-    $worker->permissionOverrides()->syncWithoutDetaching([
-        $recordPermission->id => ['allowed' => true],
-    ]);
-    $client = Client::factory()->create();
+    $client = assignMyDayMedicationWorkerToClientSite($worker, ['medications.administer.record']);
     Shift::factory()->assignedToday($worker)->published()->create([
         'client_id' => $client->id,
     ]);
@@ -254,7 +249,9 @@ it('matches every dose slot with a single administration query (no N+1)', functi
 
 it('does not disclose shift medications without an exact medication capability', function () {
     $worker = User::factory()->frontlineWorker()->create();
-    $client = Client::factory()->create();
+    // The worker can see the shift and its client; only the medication
+    // capability is missing.
+    $client = assignMyDayMedicationWorkerToClientSite($worker);
     Shift::factory()->assignedToday($worker)->published()->create([
         'client_id' => $client->id,
     ]);
@@ -274,6 +271,8 @@ it('does not disclose shift medications without an exact medication capability',
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('my-day/index')
+            ->has('shifts', 1)
+            ->where('shifts.0.client.id', $client->id)
             ->has('medications_due', 0)
             ->where('stats.meds_due', 0)
             ->where('stats.meds_overdue', 0)
@@ -381,14 +380,7 @@ it('only serializes an active medication round with canonical accessible Site pr
 function makeWorkerWithMyDayMedicationClient(): array
 {
     $worker = User::factory()->frontlineWorker()->create();
-    $permission = Permission::query()->firstOrCreate(
-        ['key' => 'medications.view'],
-        ['description' => 'medications.view'],
-    );
-    $worker->permissionOverrides()->syncWithoutDetaching([
-        $permission->id => ['allowed' => true],
-    ]);
-    $client = Client::factory()->create();
+    $client = assignMyDayMedicationWorkerToClientSite($worker, ['medications.view']);
 
     // A visible shift today routes this client into the medications-due
     // builder. No site_id on the shift => the active-site path is skipped and
@@ -398,4 +390,35 @@ function makeWorkerWithMyDayMedicationClient(): array
     ]);
 
     return [$worker, $client];
+}
+
+/**
+ * My Day only shows shifts at Sites where the worker is currently employed,
+ * and only for clients the worker may view (ClientPolicy::view). Seeded
+ * support workers hold clients.viewAssigned, so the fixture does too.
+ *
+ * @param  array<int, string>  $extraPermissions
+ */
+function assignMyDayMedicationWorkerToClientSite(User $worker, array $extraPermissions = []): Client
+{
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+
+    foreach (['clients.viewAssigned', ...$extraPermissions] as $key) {
+        $permission = Permission::query()->firstOrCreate(['key' => $key], ['description' => $key]);
+        $worker->permissionOverrides()->syncWithoutDetaching([
+            $permission->id => ['allowed' => true],
+        ]);
+    }
+    $client->supportWorkers()->attach($worker->id);
+
+    return $client;
 }

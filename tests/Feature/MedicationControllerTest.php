@@ -26,6 +26,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 class MedicationControllerTest extends TestCase
 {
@@ -308,30 +309,49 @@ class MedicationControllerTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════════════════
-    //  2. SUPPORT WORKER VISIBILITY - Current Site boundary
+    //  2. SUPPORT WORKER VISIBILITY - Per-person MAR scope
     // ══════════════════════════════════════════════════════════════
 
-    public function test_support_worker_only_sees_clients_at_their_current_sites_in_medications_index(): void
+    public function test_support_worker_mar_picker_lists_only_residents_they_may_open(): void
     {
-        // The MAR picker is Site-scoped: an individual client assignment must
-        // not hide another resident at the worker's current Site, while a
-        // resident at a foreign Site remains concealed.
-        $this->createMedication();
+        // Person scope, not Site scope (supersedes the earlier Site-wide
+        // picker rule, 2026-09-30): an ordinary support worker's MAR picker
+        // lists only residents whose chart they may open under
+        // ClientPolicy::viewMedications — an assignment, or a clocked-in shift
+        // covering them — never another resident at the same Site, and never
+        // anyone at a foreign Site.
+        $assignedClient = Client::factory()->create(['site_id' => $this->site->id]);
+        $assignedClient->supportWorkers()->attach($this->supportWorker->id);
+        $coveredClient = Client::factory()->create(['site_id' => $this->site->id]);
+        Shift::factory()->create([
+            'client_id' => $coveredClient->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->supportWorker->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(7),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'started_by' => $this->supportWorker->id,
+            'status' => 'in_progress',
+        ]);
         $sameSiteClient = Client::factory()->create(['site_id' => $this->site->id]);
-        $this->createMedication(['client_id' => $sameSiteClient->id]);
-        $foreignSite = Site::factory()->create();
-        $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
-        $this->createMedication(['client_id' => $foreignClient->id]);
+        $foreignClient = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
+        foreach ([$assignedClient, $coveredClient, $sameSiteClient, $foreignClient] as $client) {
+            $this->createMedication(['client_id' => $client->id]);
+        }
 
-        $this->actingAs($this->supportWorker)
-            ->get(EmarUrl::mar())
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('clients', fn ($clients) => collect($clients)->pluck('id')->contains($this->client->id) &&
-                    collect($clients)->pluck('id')->contains($sameSiteClient->id) &&
-                    ! collect($clients)->pluck('id')->contains($foreignClient->id)
-                )
-            );
+        $pickerIds = collect(
+            $this->actingAs($this->supportWorker)
+                ->get(EmarUrl::mar())
+                ->assertOk()
+                ->inertiaProps('clients'),
+        )->pluck('id');
+
+        $this->assertTrue($pickerIds->contains($assignedClient->id), 'Assigned resident is listed.');
+        $this->assertTrue($pickerIds->contains($coveredClient->id), 'Clocked-in covering-shift resident is listed.');
+        $this->assertFalse($pickerIds->contains($sameSiteClient->id), 'Unassigned, uncovered same-Site resident is hidden.');
+        $this->assertFalse($pickerIds->contains($foreignClient->id), 'Foreign-Site resident is hidden.');
     }
 
     public function test_admin_sees_all_clients_in_medications_index(): void
@@ -1206,7 +1226,7 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
                 'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
@@ -1235,7 +1255,7 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'witnessed_by' => $this->supportWorker->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
                 'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
@@ -1264,7 +1284,7 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
                 'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
@@ -1292,7 +1312,7 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
                 'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
@@ -1341,7 +1361,7 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'witnessed_by' => $this->hrUser->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
                 'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
@@ -1458,7 +1478,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 8,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Two tablets are not accounted for.',
             ])
             ->assertSessionHasErrors('immediate_action_taken');
@@ -1482,7 +1502,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $this->admin->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasErrors('witnessed_by');
 
@@ -1508,7 +1528,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -1542,7 +1562,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 8,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Two missing after shift change',
                 'immediate_action_taken' => 'Secured the remaining stock and escalated the discrepancy.',
             ])
@@ -1579,7 +1599,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 9.5,
                 'actual_balance' => 9,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Half tablet count variance',
                 'immediate_action_taken' => 'Secured the stock and escalated the half-tablet variance.',
             ])
@@ -1613,7 +1633,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 9.999,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Invalid precision probe',
                 'immediate_action_taken' => 'No action should be recorded.',
             ])
@@ -1644,7 +1664,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -1667,7 +1687,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 8,
                 'witnessed_by' => $this->hrUser->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Count differs.',
                 'immediate_action_taken' => 'Secured the stock pending an authorised witness review.',
             ])
@@ -2674,7 +2694,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertRedirect()
             ->assertSessionHas('success');

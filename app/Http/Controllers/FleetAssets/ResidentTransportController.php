@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\Fleet\ResidentTransportJourneyScope;
 use App\Services\Fleet\ResidentTransportJourneyService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
+use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationScanVerificationService;
 use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Http\Request;
@@ -373,12 +374,10 @@ class ResidentTransportController extends Controller
                     'scan_verification' => $this->buildMedicationScanPayload($selectedClient, $medication),
                 ]);
 
-            $medicationWitnesses = $this->transportWitnesses
-                ->eligibleWitnessesForSite((int) $selectedClient->site_id, now(), (int) $actor->id)
-                ->map(fn (User $witness): array => [
-                    'id' => $witness->id,
-                    'name' => $witness->name,
-                ]);
+            $medicationWitnesses = app(WitnessPinService::class)->pickerRows(
+                $this->transportWitnesses
+                    ->eligibleWitnessesForSite((int) $selectedClient->site_id, now(), (int) $actor->id),
+            );
         }
 
         return [
@@ -668,14 +667,10 @@ class ResidentTransportController extends Controller
         }
 
         $witnesses = ($canManageMedicationTransit || $canAdministerMedicationTransit)
-            ? $this->transportWitnesses
-                ->eligibleWitnessesForSite((int) $transport->site_id, now(), (int) $request->user()->id)
-                ->map(fn ($user) => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                ])
-                ->values()
-                ->toArray()
+            ? app(WitnessPinService::class)->pickerRows(
+                $this->transportWitnesses
+                    ->eligibleWitnessesForSite((int) $transport->site_id, now(), (int) $request->user()->id),
+            )->toArray()
             : [];
 
         return Inertia::render('fleet-assets/transports/show', [
@@ -969,16 +964,13 @@ class ResidentTransportController extends Controller
         $canAdministerMedicationTransit = $request->user()->canDo('medications.administer.record');
         $canRecordControlledMedication = $request->user()->canDo('medications.controlled.record');
         $witnesses = ($canManageMedicationTransit || $canAdministerMedicationTransit)
-            ? $this->transportWitnesses->eligibleWitnessesForSites(
+            ? app(WitnessPinService::class)->pickerRows($this->transportWitnesses->eligibleWitnessesForSites(
                 $selectedTransport
                     ? [(int) $selectedTransport->site_id]
                     : $this->journeyScope->accessibleSiteIds($request->user()),
                 now(),
                 (int) $request->user()->id,
-            )->map(fn ($user) => [
-                'id' => $user->id,
-                'name' => $user->name,
-            ])->values()
+            ))
             : [];
 
         return Inertia::render('fleet-assets/transports/medications', [
@@ -1312,12 +1304,12 @@ class ResidentTransportController extends Controller
             ) {
                 $emergencyContacts = DB::table('client_emergency_contacts')
                     ->where('client_id', $client->id)
-                    ->select('name', 'relation', 'phone')
+                    ->select('name', 'relationship', 'phone')
                     ->limit(5)
                     ->get()
                     ->map(fn ($c) => [
                         'name' => $c->name,
-                        'relation' => $c->relation ?? '',
+                        'relation' => $c->relationship ?? '',
                         'phone' => $c->phone ?? '',
                     ])
                     ->toArray();

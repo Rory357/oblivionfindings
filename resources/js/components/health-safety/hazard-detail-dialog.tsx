@@ -1088,11 +1088,7 @@ function PaneFooter({
             <Button
                 type="submit"
                 disabled={processing}
-                className={
-                    danger
-                        ? 'bg-status-critical text-primary-foreground hover:bg-status-critical/90'
-                        : ''
-                }
+                variant={danger ? 'destructive' : 'default'}
             >
                 {processing ? (
                     <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />

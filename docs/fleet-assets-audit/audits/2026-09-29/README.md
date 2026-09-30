@@ -1,5 +1,7 @@
 # Fleet implementation integration audit — 29 September 2026
 
+Follow-up: [30 September release and CI assessment](../2026-09-30/release-follow-up.md) establishes the actual server deployment, corrects the Fleet/Device handoff, supersedes the earlier incomplete CI classification, and records the user-deferred hosted/125% acceptance checks.
+
 This audit covers the integrated Fleet & Assets programme, related reporting and People Locations regressions, and the three recent correction sessions. It verifies publication and exercised behaviour; it is not a claim that every Fleet page has completed visual acceptance.
 
 ## Publication provenance
@@ -60,3 +62,9 @@ Other limits:
 - Frozen Compliance mockup versions and old scratch logs remain local preservation material. Unrelated eMAR audit files were not staged with this work. No unrelated working files were deleted.
 
 `DESIGN.md` and `design_styles/*` remain read-only and unchanged. Authorization continues to use one organisation, approved sites, roles, canonical ownership and privacy rules.
+
+## Secondary-page follow-up on the published audit
+
+The follow-up starts from published main `3ffc4c1c4623f6219a3a1994b458a03c891637be`. [Secondary page assessment](secondary-page-assessment.md) traces all 50 titled page files to active controller rendering or an inactive fallback. It identifies 26 active pages still using a legacy hero, including the booking list, and does not count the inactive map or asset-profile fallback as live defects.
+
+This follow-up corrects Daily Checks, booking details and vehicle alert configuration headers, repairs the booking list's mobile calendar and filtered empty state, and restores Home-rooted breadcrumbs on reachable secondary pages. Compliance counts and automatic WoF alerts now interpret date-only expiry fields on the Auckland calendar day, so an item due today is not marked expired at midnight. The Daily Checks alert chip only links to the queue for a user with queue permission. The [separate verification record](secondary-verification.json) lists exact local checks, browser states and external limits; it does not overwrite the earlier audit's 713-test result.

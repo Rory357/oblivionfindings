@@ -23,6 +23,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
@@ -1766,6 +1767,17 @@ class MedicationsApiController extends Controller
                 'identified_date' => $a->identified_date?->toDateString(),
                 'recorded_by' => $a->recordedBy?->name,
             ]),
+            // Medication register + health profile (EM-07): the same combined
+            // source dose-time safety checks read, so ordering and dosing agree.
+            'recorded_allergies' => array_map(
+                fn (array $entry): array => [
+                    'allergen' => $entry['allergen'],
+                    'severity' => $entry['severity'],
+                    'reaction' => $entry['reaction'],
+                    'source' => $entry['source'],
+                ],
+                app(ClientAllergyRecordService::class)->forClient($client),
+            ),
         ]);
     }
 
@@ -2223,12 +2235,14 @@ class MedicationsApiController extends Controller
     }
 
     /**
-     * Create drug interaction
+     * Create a drug interaction rule. Rules feed every resident's safety
+     * checks, so authoring one is clinical governance (NF-09): it needs the
+     * medication settings capability, records its author and is audited.
      */
     public function createDrugInteraction(Request $request)
     {
         $user = $request->user();
-        abort_unless($user?->canDo('medications.administer.correct'), 403);
+        abort_unless($user?->canDo('medications.settings.manage'), 403);
 
         $data = $request->validate([
             'medication_a' => ['required', 'string', 'max:255'],
@@ -2239,15 +2253,26 @@ class MedicationsApiController extends Controller
             'management' => ['nullable', 'string'],
         ]);
 
-        $interaction = MedicationInteraction::create([
-            'medication_a' => $data['medication_a'],
-            'medication_b' => $data['medication_b'],
-            'severity' => $data['severity'],
-            'description' => $data['description'],
-            'clinical_effects' => $data['clinical_effects'] ?? null,
-            'management' => $data['management'] ?? null,
-            'active' => true,
-        ]);
+        $interaction = DB::transaction(function () use ($data, $user): MedicationInteraction {
+            $interaction = MedicationInteraction::create([
+                'medication_a' => $data['medication_a'],
+                'medication_b' => $data['medication_b'],
+                'severity' => $data['severity'],
+                'description' => $data['description'],
+                'clinical_effects' => $data['clinical_effects'] ?? null,
+                'management' => $data['management'] ?? null,
+                'active' => true,
+                'created_by' => $user->id,
+            ]);
+
+            AuditLogger::logOrFail('medications.interaction.created', $interaction, [
+                'medication_a' => $interaction->medication_a,
+                'medication_b' => $interaction->medication_b,
+                'severity' => $interaction->severity,
+            ]);
+
+            return $interaction;
+        });
 
         return response()->json([
             'success' => true,

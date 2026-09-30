@@ -175,7 +175,8 @@ it('omits medical payloads from portal client when a linked NOK has no health fl
 });
 
 it('uses the NOK medical flag independently from medication access on both portal surfaces', function () {
-    $client = Client::factory()->create();
+    // Family consent only counts for a Client with a canonical Site.
+    $client = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
     seedClientProfilePortalSensitiveData($client);
     $nok = makeClientProfilePortalNok($client, [
         'can_view_medical' => true,
@@ -207,7 +208,7 @@ it('uses the NOK medical flag independently from medication access on both porta
 });
 
 it('uses the NOK medication flag independently from medical access on both portal surfaces', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
     $sensitive = seedClientProfilePortalSensitiveData($client);
     $nok = makeClientProfilePortalNok($client, [
         'can_view_medical' => false,
@@ -259,7 +260,7 @@ it('hides portal-visible incidents when the linked NOK lacks portal incident per
 });
 
 it('shows only portal-visible incidents when the linked NOK has portal incident permission', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
     $nok = makeClientProfilePortalNok(
         $client,
         flags: ['can_view_incidents' => true],

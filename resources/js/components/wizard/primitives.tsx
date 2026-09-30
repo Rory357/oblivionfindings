@@ -208,7 +208,8 @@ export function SelectInput({
     value: string;
     onChange: (v: string) => void;
     placeholder: string;
-    options: { value: string; label: string }[];
+    /** `disabled` lists an option that can't be chosen (e.g. no witness PIN set). */
+    options: { value: string; label: string; disabled?: boolean }[];
     /** Accessible name for the trigger; falls back to the placeholder so a
      *  placeholder-only (unselected) trigger is never a nameless button (axe button-name). */
     ariaLabel?: string;
@@ -226,7 +227,11 @@ export function SelectInput({
             </SelectTrigger>
             <SelectContent>
                 {options.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
+                    <SelectItem
+                        key={o.value}
+                        value={o.value}
+                        disabled={o.disabled}
+                    >
                         {o.label}
                     </SelectItem>
                 ))}

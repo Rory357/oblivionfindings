@@ -7,6 +7,7 @@ import type {
     PrescriptionOrder,
     StaffOption,
 } from '@/components/emar/prescriptions/types';
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +21,11 @@ import {
     StepHead,
     TilePicker,
 } from '@/components/wizard/primitives';
+import {
+    WITNESS_PIN_LENGTH,
+    witnessIsSelectable,
+    witnessOptionLabel,
+} from '@/lib/witness-pin';
 import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -219,7 +225,8 @@ export function NewOrderDialog({
         !isVerbal ||
             (form.data.read_back_confirmed &&
                 !!form.data.read_back_witnessed_by &&
-                !!form.data.read_back_witness_credential),
+                form.data.read_back_witness_credential.length ===
+                    WITNESS_PIN_LENGTH),
     ];
 
     return (
@@ -609,36 +616,26 @@ export function NewOrderDialog({
                                     placeholder="Select witness…"
                                     options={readBackWitnesses.map((s) => ({
                                         value: String(s.id),
-                                        label: s.name,
+                                        label: witnessOptionLabel(s),
+                                        disabled: !witnessIsSelectable(s),
                                     }))}
                                 />
                             </Field>
-                            <Field
-                                label="Witness verification"
-                                required
+                            <WitnessPinInput
+                                label="Read-back witness’s PIN"
+                                value={form.data.read_back_witness_credential}
+                                onChange={(v) =>
+                                    form.setData(
+                                        'read_back_witness_credential',
+                                        v,
+                                    )
+                                }
                                 error={form.errors.read_back_witness_credential}
-                            >
-                                <Input
-                                    type="password"
-                                    value={
-                                        form.data.read_back_witness_credential
-                                    }
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'read_back_witness_credential',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="Witness enters their password"
-                                    autoComplete="off"
-                                    maxLength={255}
-                                    required
-                                />
-                            </Field>
+                            />
                             <InfoCard icon={AlertTriangle} tone="warn">
-                                The selected witness must enter their own
-                                password now. It is sent once for verification,
-                                is not stored, and is cleared after submission.
+                                The selected witness types their own witness PIN
+                                now. It is sent once for verification, is not
+                                stored, and is cleared after submission.
                             </InfoCard>
                         </div>
                     )}

@@ -1611,7 +1611,7 @@ function DetailBody({
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            className="bg-status-critical text-white hover:bg-status-critical/90"
+                            variant="destructive"
                             onClick={() => {
                                 setConfirmDeleteOpen(false);
                                 onOpenChange(false);

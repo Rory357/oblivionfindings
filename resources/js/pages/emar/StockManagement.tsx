@@ -26,6 +26,7 @@ import {
     AdjustStockDialog,
     ControlledPharmacyDeliveryDialog,
     NewPharmacyOrderDialog,
+    PharmacyDeliveryDialog,
     ReceiveStockDialog,
     StockCountDialog,
     type ClientOpt,
@@ -120,6 +121,7 @@ type Modal =
     | { type: 'order'; clientId?: number; medId?: number }
     | { type: 'receive'; medId?: number }
     | { type: 'controlled-delivery'; order: OrderRow; item: StockRow }
+    | { type: 'delivery'; order: OrderRow }
     | { type: 'count'; medId?: number; controlledOnly?: boolean }
     | { type: 'adjust'; item: StockRow }
     | { type: 'detail'; item: StockRow }
@@ -350,15 +352,24 @@ export default function StockManagement({
                           icon: <Truck className="h-3.5 w-3.5" />,
                           label: 'Receive against order',
                           onClick: () => {
+                              const action = orderRow
+                                  ? pharmacyOrderAdvanceAction(orderRow)
+                                  : null;
                               if (
                                   orderRow &&
-                                  pharmacyOrderAdvanceAction(orderRow) ===
-                                      'controlled-delivery'
+                                  action === 'controlled-delivery'
                               ) {
                                   setModal({
                                       type: 'controlled-delivery',
                                       order: orderRow,
                                       item: s,
+                                  });
+                                  return;
+                              }
+                              if (orderRow && action === 'delivery') {
+                                  setModal({
+                                      type: 'delivery',
+                                      order: orderRow,
                                   });
                                   return;
                               }
@@ -573,7 +584,12 @@ export default function StockManagement({
     }, [filtered]);
 
     const advance = async (order: OrderRow) => {
-        if (pharmacyOrderAdvanceAction(order) === 'controlled-delivery') {
+        const action = pharmacyOrderAdvanceAction(order);
+        if (action === 'delivery') {
+            setModal({ type: 'delivery', order });
+            return;
+        }
+        if (action === 'controlled-delivery') {
             const item = stockItems.find(
                 (stock) => stock.medication_id === order.medication_id,
             );
@@ -1348,6 +1364,12 @@ export default function StockManagement({
                         onClose={() => setModal(null)}
                     />
                 )}
+            {modal?.type === 'delivery' && (
+                <PharmacyDeliveryDialog
+                    order={modal.order}
+                    onClose={() => setModal(null)}
+                />
+            )}
             {modal?.type === 'count' && (
                 <StockCountDialog
                     medications={controlledGovernedMedications}

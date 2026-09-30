@@ -1,14 +1,17 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\MedicationReview;
+use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\MedicationOverviewService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
 
 beforeEach(function () {
@@ -52,6 +55,104 @@ it('surfaces an INR-out-of-range item in the action centre', function () {
         ->and($inr['status'])->toBe('Above range')
         ->and($inr['code'])->toBe('INR')
         ->and($inr['client'])->toBe('Margaret Sole');
+});
+
+it('labels an INR reading with no medicine linked instead of hiding it', function () {
+    $user = User::factory()->create();
+    $client = makeOverviewClient();
+    $linkedClient = Client::factory()->create([
+        'site_id' => $client->site_id,
+        'first_name' => 'Linked',
+        'last_name' => 'Reading',
+    ]);
+    $warfarin = ClientMedication::factory()->create([
+        'client_id' => $linkedClient->id,
+        'name' => 'Warfarin',
+        'controlled_drug' => false,
+    ]);
+    foreach ([[$client, null], [$linkedClient, $warfarin->id]] as [$owner, $medicationId]) {
+        ClientInrRecord::create([
+            'client_id' => $owner->id,
+            'client_medication_id' => $medicationId,
+            'inr_value' => 4.8,
+            'target_range_low' => 2.0,
+            'target_range_high' => 3.0,
+            'tested_on' => today()->toDateString(),
+            'recorded_by' => $user->id,
+        ]);
+    }
+
+    $service = app(MedicationOverviewService::class);
+    $inr = collect($service->actionCentre(today()))
+        ->where('type', 'inr')
+        ->keyBy('client_id');
+    // The /emar watch card labels the reading from its missing medicine link.
+    $watch = collect($service->inrWatch())->keyBy('client_id');
+
+    expect($inr->keys()->sort()->values()->all())->toBe([$client->id, $linkedClient->id])
+        ->and($inr[$client->id]['summary'])->toStartWith('No medicine linked · Target 2–3')
+        ->and($inr[$linkedClient->id]['summary'])->toStartWith('Target 2–3')
+        ->and($inr[$linkedClient->id]['summary'])->not->toContain('No medicine linked')
+        ->and($watch->keys()->sort()->values()->all())->toBe([$client->id, $linkedClient->id])
+        ->and($watch[$client->id]['client_medication_id'])->toBeNull()
+        ->and($watch[$linkedClient->id]['client_medication_id'])->toBe($warfarin->id);
+});
+
+it('keeps controlled, cross-client and other-Site INR readings concealed from a scoped reader', function () {
+    $this->seed(RbacSeeder::class);
+    $recorder = User::factory()->create();
+    $visible = makeOverviewClient();
+    $controlledOwner = Client::factory()->create(['site_id' => $visible->site_id]);
+    $crossLinked = Client::factory()->create(['site_id' => $visible->site_id]);
+    $otherSite = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
+    $morphine = ClientMedication::factory()->create([
+        'client_id' => $controlledOwner->id,
+        'name' => 'Morphine sulfate',
+        'controlled_drug' => true,
+    ]);
+    $visibleWarfarin = ClientMedication::factory()->create([
+        'client_id' => $visible->id,
+        'name' => 'Warfarin',
+        'controlled_drug' => false,
+    ]);
+    foreach ([
+        [$visible, null],
+        [$controlledOwner, $morphine->id],
+        // Linked to another resident's order — not canonical, stays hidden.
+        [$crossLinked, $visibleWarfarin->id],
+        [$otherSite, null],
+    ] as [$owner, $medicationId]) {
+        ClientInrRecord::create([
+            'client_id' => $owner->id,
+            'client_medication_id' => $medicationId,
+            'inr_value' => 4.8,
+            'target_range_low' => 2.0,
+            'target_range_high' => 3.0,
+            'tested_on' => today()->toDateString(),
+            'recorded_by' => $recorder->id,
+        ]);
+    }
+
+    $reader = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $reader->permissionOverrides()->sync([
+        Permission::query()->where('key', 'medications.view')->value('id') => ['allowed' => true],
+        Permission::query()->where('key', 'medications.controlled.view')->value('id') => ['allowed' => false],
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $reader->id,
+        'primary_site_id' => $visible->site_id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+
+    $payload = app(MedicationOverviewService::class)->payload(today(), $reader);
+
+    expect(collect($payload['actionCentre'])->where('type', 'inr')->pluck('client_id')->all())
+        ->toBe([$visible->id])
+        ->and(collect($payload['inrWatch'])->pluck('client_id')->all())
+        ->toBe([$visible->id]);
 });
 
 it('surfaces an open CD discrepancy in the action centre', function () {

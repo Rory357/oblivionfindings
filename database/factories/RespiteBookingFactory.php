@@ -18,7 +18,9 @@ class RespiteBookingFactory extends Factory
             'client_id' => Client::factory(),
             'start_at' => $start,
             'end_at' => fake()->dateTimeBetween($start, (clone $start)->modify('+14 days')),
-            'status' => fake()->randomElement(['pending', 'confirmed', 'in_progress', 'completed', 'cancelled']),
+            // A live booking by default: stay actions require confirmed or
+            // in_progress, so a random status made stay fixtures flaky.
+            'status' => 'confirmed',
         ];
     }
 }

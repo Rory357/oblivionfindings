@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Domain\Hr\Models\HrAsset;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Models\Concerns\AuditableChanges;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -355,16 +356,20 @@ class Asset extends Model
 
     public function scopeWofExpiring($query, int $days = 30)
     {
+        $today = CarbonImmutable::now((string) config('app.worker_timezone', 'Pacific/Auckland'));
+
         return $query->whereNotNull('wof_expires_at')
-            ->where('wof_expires_at', '<=', now()->addDays($days))
-            ->where('wof_expires_at', '>=', now());
+            ->where('wof_expires_at', '<=', $today->addDays($days)->toDateString())
+            ->where('wof_expires_at', '>=', $today->toDateString());
     }
 
     public function scopeRegistrationExpiring($query, int $days = 30)
     {
+        $today = CarbonImmutable::now((string) config('app.worker_timezone', 'Pacific/Auckland'));
+
         return $query->whereNotNull('registration_expires_at')
-            ->where('registration_expires_at', '<=', now()->addDays($days))
-            ->where('registration_expires_at', '>=', now());
+            ->where('registration_expires_at', '<=', $today->addDays($days)->toDateString())
+            ->where('registration_expires_at', '>=', $today->toDateString());
     }
 
     public function scopeVehicles($query)

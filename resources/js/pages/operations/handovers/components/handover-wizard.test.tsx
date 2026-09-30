@@ -322,7 +322,7 @@ describe('handover wizard governance contracts', () => {
             screen.queryByText(/Controlled-drug count evidence/i),
         ).not.toBeInTheDocument();
         expect(
-            screen.queryByLabelText('Witness password or PIN'),
+            screen.queryByLabelText('Their witness PIN'),
         ).not.toBeInTheDocument();
         expect(screen.queryByText(/Open CD register/i)).not.toBeInTheDocument();
     });
@@ -369,7 +369,7 @@ describe('handover wizard governance contracts', () => {
         expect(screen.getByText('Current Ack Assignee')).toBeInTheDocument();
         expect(screen.getAllByText('Eligible Witness')).not.toHaveLength(0);
         expect(
-            screen.queryByLabelText('Witness password or PIN'),
+            screen.queryByLabelText('Their witness PIN'),
         ).not.toBeInTheDocument();
         expect(
             screen.queryByRole('button', { name: 'Save changes' }),
@@ -411,9 +411,9 @@ describe('handover wizard governance contracts', () => {
             screen.queryByRole('option', { name: 'Foreign Site Worker' }),
         ).not.toBeInTheDocument();
 
-        const credential = screen.getByLabelText('Witness password or PIN');
-        fireEvent.change(credential, { target: { value: 'one-shot-secret' } });
-        expect(credential).toHaveValue('one-shot-secret');
+        const credential = screen.getByLabelText('Their witness PIN');
+        fireEvent.change(credential, { target: { value: '482915' } });
+        expect(credential).toHaveValue('482915');
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
         expect(credential).toHaveValue('');
         expect(mocks.onOpenChange).toHaveBeenCalledWith(false);

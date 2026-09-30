@@ -272,13 +272,22 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     });
 
     // ─── Facility Medication Admin Rules (1CHART §6.1 — countersign / observation prompts) ───
+    // House leads with the PIN reset permission reach the settings page for the
+    // second-person confirmation section only (PIN-1).
+    Route::get('/settings', [MedicationSettingsController::class, 'index'])
+        ->middleware('permission:medications.settings.manage|medications.witness_pin.reset')
+        ->name('emar.settings');
+    Route::post('/settings/witness-pins/{user}/reset', [MedicationSettingsController::class, 'resetWitnessPin'])
+        ->middleware('permission:medications.witness_pin.reset')
+        ->name('emar.settings.witness_pins.reset');
     Route::middleware('permission:medications.settings.manage')->group(function () {
-        Route::get('/settings', [MedicationSettingsController::class, 'index'])->name('emar.settings');
         Route::post('/settings/rules', [MedicationSettingsController::class, 'store'])->name('emar.settings.rules.store');
         Route::put('/settings/rules/{rule}', [MedicationSettingsController::class, 'update'])->name('emar.settings.rules.update');
         Route::delete('/settings/rules/{rule}', [MedicationSettingsController::class, 'destroy'])->name('emar.settings.rules.destroy');
         // Organisation-wide safety rules (EM-07 profile allergies, NF-03 competency).
         Route::put('/settings/safety-policy', [MedicationSettingsController::class, 'updateSafetyPolicy'])->name('emar.settings.safety_policy.update');
+        // Witness PIN rules (PIN-1): attempt limit, lockout, renewal.
+        Route::put('/settings/witness-pin-rules', [MedicationSettingsController::class, 'updateWitnessPinRules'])->name('emar.settings.witness_pin_rules.update');
     });
 
     // ─── End CRUD Routes ────────────────────────────────────

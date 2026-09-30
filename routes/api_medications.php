@@ -143,7 +143,9 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
         ->middleware('permission:medications.view')
         ->name('api.medications.interactions.index');
 
+    // Interaction rules apply to every resident's safety checks, so authoring
+    // them is clinical governance (NF-09), not a dose-correction right.
     Route::post('/interactions', [MedicationsApiController::class, 'createDrugInteraction'])
-        ->middleware('permission:medications.administer.correct')
+        ->middleware('permission:medications.settings.manage')
         ->name('api.medications.interactions.store');
 });

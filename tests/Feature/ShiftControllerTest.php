@@ -615,6 +615,7 @@ class ShiftControllerTest extends TestCase
     public function test_direct_assignment_returns_safe_503_without_side_effects_and_succeeds_on_retry(): void
     {
         Notification::fake();
+        $this->giveAdminCurrentHrProfile();
         $shift = $this->assignmentBoundaryShift();
         $baseline = [
             'audit' => AuditLog::query()->count(),
@@ -624,8 +625,9 @@ class ShiftControllerTest extends TestCase
             'outbox' => ShiftSignalOutbox::query()->count(),
         ];
         $attempt = 0;
+        // Failed preview, then the retry's preview plus the locked re-decision.
         $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use (&$attempt): void {
-            $mock->shouldReceive('evaluate')->twice()->andReturnUsing(function () use (&$attempt) {
+            $mock->shouldReceive('evaluate')->times(3)->andReturnUsing(function () use (&$attempt) {
                 if (++$attempt === 1) {
                     throw new \RuntimeException('private eligibility infrastructure detail');
                 }
@@ -687,10 +689,13 @@ class ShiftControllerTest extends TestCase
 
     public function test_direct_warning_requires_the_governed_override_and_persists_immutable_evidence(): void
     {
+        $this->giveAdminCurrentHrProfile();
         $shift = $this->assignmentBoundaryShift();
         $warning = 'Would exceed the weekly fatigue warning threshold.';
+        // Warning preview, then preview plus locked re-decision for both the
+        // refused scheduler override and the admin override.
         $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use ($warning): void {
-            $mock->shouldReceive('evaluate')->times(3)->andReturn(
+            $mock->shouldReceive('evaluate')->times(5)->andReturn(
                 $this->assignmentEligibilityResult(warnings: [$warning]),
             );
         });
@@ -1280,6 +1285,7 @@ class ShiftControllerTest extends TestCase
     {
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'user_id' => $this->staff->id,
             'status' => 'scheduled',
             'starts_at' => now()->subMinutes(10),
@@ -1300,6 +1306,7 @@ class ShiftControllerTest extends TestCase
     {
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'user_id' => $this->staff->id,
             'status' => 'in_progress',
             'actual_starts_at' => now()->subHours(2),
@@ -1318,6 +1325,7 @@ class ShiftControllerTest extends TestCase
     {
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'user_id' => $this->staff->id,
             'status' => 'in_progress',
             'actual_starts_at' => now()->subHours(2),
@@ -1409,6 +1417,7 @@ class ShiftControllerTest extends TestCase
     public function test_assignment_route_segments_sunday_overnight_hours_across_local_iso_weeks(): void
     {
         Notification::fake();
+        $this->giveAdminCurrentHrProfile();
         config([
             'app.worker_timezone' => 'Pacific/Auckland',
             'hr.fatigue.max_hours_per_day' => 24,
@@ -1525,6 +1534,27 @@ class ShiftControllerTest extends TestCase
         $this->assertSame($timelineCount, TimelineEvent::query()->count());
         $this->assertSame($reservationCount, CoverageReservation::query()->count());
         Notification::assertNothingSent();
+    }
+
+    /**
+     * Shift lifecycle writes lock the actor's current HR profile as employment
+     * evidence, so the admin needs one before an assignment can land.
+     */
+    private function giveAdminCurrentHrProfile(): void
+    {
+        HrEmployeeProfile::query()->create([
+            'tenant_id' => 1,
+            'user_id' => $this->admin->id,
+            'employee_number' => 'EMP-ADMIN-'.$this->admin->id,
+            'work_email' => $this->admin->email,
+            'position_title' => 'Operations Manager',
+            'position_role' => 'admin',
+            'employment_type' => 'full_time',
+            'start_date' => now()->subMonth()->toDateString(),
+            'is_active' => true,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+        ]);
     }
 
     private function assignmentBoundaryShift(): Shift

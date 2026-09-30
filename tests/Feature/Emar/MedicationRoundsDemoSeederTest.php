@@ -3,24 +3,35 @@
 namespace Tests\Feature\Emar;
 
 use App\Models\Client;
+use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationRound;
+use App\Models\MedicationRoundTemplate;
 use App\Models\ServiceContext;
 use App\Models\User;
 use App\Services\GuidedRoundService;
 use Carbon\Carbon;
 use Database\Seeders\MedicationRoundsDemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Tests\TestCase;
 
 /**
  * The rounds demo seeder must produce a populated /emar/rounds for TODAY:
- * 5 rounds whose doses ("cells") actually resolve through the scheduling
- * pipeline, with the Morning-partial / Midday-in-progress / rest-pending story,
- * and it must be idempotent (no duplicate residents on re-run).
+ * one round per Site per dosed slot (a round covers exactly one Site) whose
+ * doses ("cells") actually resolve through the scheduling pipeline, with the
+ * Morning-partial / Midday-in-progress / rest-pending story, and it must be
+ * idempotent (no duplicate residents, templates, rounds or doses on re-run).
  */
 class MedicationRoundsDemoSeederTest extends TestCase
 {
     use RefreshDatabase;
+
+    /** The slots each demo Site's residents are dosed in. */
+    private const ROUNDS_BY_SITE = [
+        'Kauri Lodge' => ['Afternoon Round', 'Evening Round', 'Midday Round', 'Morning Round', 'Night Round'],
+        'Kowhai Villa' => ['Afternoon Round', 'Morning Round', 'Night Round'],
+        'Rata House' => ['Evening Round', 'Midday Round', 'Morning Round'],
+    ];
 
     protected function tearDown(): void
     {
@@ -39,6 +50,41 @@ class MedicationRoundsDemoSeederTest extends TestCase
         return $t;
     }
 
+    private function demoContextId(): int
+    {
+        $ctxId = ServiceContext::where('name', 'Rounds Demo (eMAR)')->value('id');
+        $this->assertNotNull($ctxId);
+
+        return (int) $ctxId;
+    }
+
+    /** @return Collection<int, MedicationRound> */
+    private function todaysRounds(): Collection
+    {
+        return MedicationRound::where('service_context_id', $this->demoContextId())
+            ->whereDate('round_date', today())
+            ->with('site:id,name')
+            ->get();
+    }
+
+    /**
+     * Cells of every Site's round with this name. Controlled doses are included
+     * so the demo's Oxycodone counts; cells() hides them by default.
+     */
+    private function cells(Collection $rounds, string $name): array
+    {
+        $svc = app(GuidedRoundService::class);
+
+        return $rounds->where('name', $name)
+            ->flatMap(fn (MedicationRound $round) => $svc->cells($round, includeControlled: true))
+            ->all();
+    }
+
+    private function statuses(Collection $rounds): array
+    {
+        return $rounds->pluck('status')->unique()->values()->all();
+    }
+
     public function test_seeds_todays_rounds_with_live_cells_and_recorded_statuses(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
@@ -46,37 +92,34 @@ class MedicationRoundsDemoSeederTest extends TestCase
 
         $this->seed(MedicationRoundsDemoSeeder::class);
 
-        $ctxId = ServiceContext::where('name', 'Rounds Demo (eMAR)')->value('id');
-        $this->assertNotNull($ctxId);
+        $rounds = $this->todaysRounds();
+        $this->assertSame(
+            self::ROUNDS_BY_SITE,
+            $rounds->groupBy(fn (MedicationRound $round) => $round->site?->name)
+                ->map(fn (Collection $siteRounds) => $siteRounds->pluck('name')->sort()->values()->all())
+                ->sortKeys()
+                ->all(),
+        );
 
-        $rounds = MedicationRound::where('service_context_id', $ctxId)
-            ->whereDate('round_date', today())
-            ->get()
-            ->keyBy('name');
-        $this->assertCount(5, $rounds);
-
-        $svc = app(GuidedRoundService::class);
-        $cells = fn (string $name) => $svc->cells($rounds[$name]);
-
-        // Morning: 8 doses, 7 given + 1 refused → partial.
-        $morning = $cells('Morning Round');
+        // Morning: 8 doses across the 3 Sites, 7 given + 1 refused → partial.
+        $morning = $this->cells($rounds, 'Morning Round');
         $this->assertCount(8, $morning);
         $this->assertSame(7, $this->tally($morning)['given'] ?? 0);
         $this->assertSame(1, $this->tally($morning)['refused'] ?? 0);
-        $this->assertSame('partial', $rounds['Morning Round']->status);
+        $this->assertSame(['partial'], $this->statuses($rounds->where('name', 'Morning Round')));
 
         // Midday: 5 doses, 2 given + 3 still due → in_progress.
-        $midday = $cells('Midday Round');
+        $midday = $this->cells($rounds, 'Midday Round');
         $this->assertCount(5, $midday);
         $this->assertSame(2, $this->tally($midday)['given'] ?? 0);
         $this->assertSame(3, $this->tally($midday)['due'] ?? 0);
-        $this->assertSame('in_progress', $rounds['Midday Round']->status);
+        $this->assertSame(['in_progress'], $this->statuses($rounds->where('name', 'Midday Round')));
 
         // Remaining rounds: pending, everything due.
-        $this->assertCount(3, $cells('Afternoon Round'));
-        $this->assertCount(5, $cells('Evening Round'));
-        $this->assertCount(3, $cells('Night Round'));
-        $this->assertSame('pending', $rounds['Afternoon Round']->status);
+        $this->assertCount(3, $this->cells($rounds, 'Afternoon Round'));
+        $this->assertCount(5, $this->cells($rounds, 'Evening Round'));
+        $this->assertCount(3, $this->cells($rounds, 'Night Round'));
+        $this->assertSame(['pending'], $this->statuses($rounds->whereNotIn('name', ['Morning Round', 'Midday Round'])));
 
         // The insulin dose carries a recorded blood-glucose reading.
         $insulin = collect($morning)->firstWhere('medication_name', 'Insulin Lantus');
@@ -96,11 +139,41 @@ class MedicationRoundsDemoSeederTest extends TestCase
         $this->seed(MedicationRoundsDemoSeeder::class);
         $this->seed(MedicationRoundsDemoSeeder::class);
 
-        $ctxId = ServiceContext::where('name', 'Rounds Demo (eMAR)')->value('id');
+        $ctxId = $this->demoContextId();
         $this->assertSame(8, Client::where('service_context_id', $ctxId)->count());
-        $this->assertSame(5, MedicationRound::where('service_context_id', $ctxId)->whereDate('round_date', today())->count());
+        $this->assertSame(11, MedicationRoundTemplate::where('service_context_id', $ctxId)->count());
+        $this->assertSame(10, ClientMedicationAdministration::where('service_context_id', $ctxId)->count());
 
-        $morning = MedicationRound::where('service_context_id', $ctxId)->where('name', 'Morning Round')->first();
-        $this->assertCount(8, app(GuidedRoundService::class)->cells($morning));
+        $rounds = $this->todaysRounds();
+        $this->assertCount(11, $rounds);
+        $this->assertCount(8, $this->cells($rounds, 'Morning Round'));
+    }
+
+    public function test_reseeding_deactivates_legacy_all_site_templates(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
+        User::factory()->create(['role' => 'support_worker']);
+        $context = ServiceContext::query()->create([
+            'name' => 'Rounds Demo (eMAR)',
+            'type' => 'residential',
+            'is_active' => true,
+        ]);
+        $legacy = MedicationRoundTemplate::query()->create([
+            'name' => 'Morning Round',
+            'service_context_id' => $context->id,
+            'site_id' => null,
+            'scheduled_time' => '08:00',
+            'window_minutes' => 60,
+            'days_of_week' => [],
+            'active' => true,
+        ]);
+
+        $this->seed(MedicationRoundsDemoSeeder::class);
+
+        $this->assertFalse($legacy->fresh()->active);
+        $this->assertSame(0, MedicationRoundTemplate::where('service_context_id', $context->id)
+            ->whereNull('site_id')
+            ->where('active', true)
+            ->count());
     }
 }

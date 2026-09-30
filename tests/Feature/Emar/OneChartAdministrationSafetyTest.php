@@ -20,6 +20,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 class OneChartAdministrationSafetyTest extends TestCase
 {
@@ -190,7 +191,7 @@ class OneChartAdministrationSafetyTest extends TestCase
                 'status' => 'given',
                 'dose_given' => '5mg',
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'witness-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => now()->toIso8601String(),
                 'administered_at' => now()->toIso8601String(),
             ])
@@ -202,7 +203,7 @@ class OneChartAdministrationSafetyTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame($witness->id, $admin->witnessed_by);
-        $this->assertSame('password', $admin->witness_method);
+        $this->assertSame('witness_pin', $admin->witness_method);
         $this->assertNotNull($admin->witnessed_at);
     }
 

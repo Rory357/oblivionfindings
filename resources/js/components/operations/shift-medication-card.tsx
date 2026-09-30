@@ -1,3 +1,4 @@
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,11 +19,17 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { doseTiming, type DoseWindow } from '@/lib/emar-dose-window';
 import {
     emarMutationWasAccepted,
     submitEmarMutation,
 } from '@/lib/emar-offline';
 import { createOfflineRequestUuid } from '@/lib/offline-queue';
+import {
+    witnessIsSelectable,
+    witnessOptionLabel,
+    type WitnessPickerOption,
+} from '@/lib/witness-pin';
 import { Link, router, useForm } from '@inertiajs/react';
 import axios from 'axios';
 import { AlertTriangle, QrCode, ShieldCheck } from 'lucide-react';
@@ -89,6 +96,7 @@ type MedicationSummary = {
         is_controlled?: boolean;
         is_prn?: boolean;
     }>;
+    dose_window?: DoseWindow | null;
 } | null;
 
 type Props = {
@@ -98,7 +106,7 @@ type Props = {
     canRecord: boolean;
     canRecordControlled: boolean;
     summary: MedicationSummary;
-    witnesses: Array<{ id: number; name: string }>;
+    witnesses: WitnessPickerOption[];
 };
 
 function toLocalDateTimeInput(iso?: string | null) {
@@ -110,6 +118,10 @@ function toLocalDateTimeInput(iso?: string | null) {
 
 function fromLocalDateTimeInput(value: string) {
     return value ? new Date(value).toISOString() : null;
+}
+
+function minutesLabel(minutes: number) {
+    return `${minutes} minute${minutes === 1 ? '' : 's'}`;
 }
 
 function sentenceCase(value: string) {
@@ -167,33 +179,40 @@ export default function ShiftMedicationCard({
         [summary],
     );
 
+    const doseWindow = summary?.dose_window ?? null;
+
+    const timing = useMemo(() => {
+        if (!activeRow || activeRow.medication.is_prn) return null;
+
+        return doseTiming(
+            adminForm.data.scheduled_for,
+            fromLocalDateTimeInput(adminForm.data.administered_at) ||
+                new Date().toISOString(),
+            doseWindow,
+        );
+    }, [
+        activeRow,
+        adminForm.data.administered_at,
+        adminForm.data.scheduled_for,
+        doseWindow,
+    ]);
+
     const needsReason = useMemo(() => {
         if (!activeRow) return false;
         if (adminForm.data.status !== 'given') return true;
         if (activeRow.medication.is_prn) return true;
 
-        if (adminForm.data.scheduled_for && adminForm.data.administered_at) {
-            try {
-                const scheduled = new Date(adminForm.data.scheduled_for);
-                const administeredAt = new Date(
-                    fromLocalDateTimeInput(adminForm.data.administered_at) ||
-                        new Date().toISOString(),
-                );
-                const diffMinutes =
-                    (administeredAt.getTime() - scheduled.getTime()) / 60000;
-                return diffMinutes < -60 || diffMinutes > 30;
-            } catch {
-                return false;
-            }
-        }
+        return timing === 'early' || timing === 'late';
+    }, [activeRow, adminForm.data.status, timing]);
 
-        return false;
-    }, [
-        activeRow,
-        adminForm.data.administered_at,
-        adminForm.data.scheduled_for,
-        adminForm.data.status,
-    ]);
+    const outsideWindowHint =
+        adminForm.data.status !== 'given' || !doseWindow
+            ? null
+            : timing === 'early'
+              ? `This is more than ${minutesLabel(doseWindow.early_minutes)} before the scheduled time. Add a reason.`
+              : timing === 'late'
+                ? `This is more than ${minutesLabel(doseWindow.late_minutes)} after the scheduled time. Add a reason.`
+                : null;
 
     const needsWitness = useMemo(
         () =>
@@ -904,34 +923,34 @@ export default function ShiftMedicationCard({
                                                         value={String(
                                                             witness.id,
                                                         )}
+                                                        disabled={
+                                                            !witnessIsSelectable(
+                                                                witness,
+                                                            )
+                                                        }
                                                     >
-                                                        {witness.name}
+                                                        {witnessOptionLabel(
+                                                            witness,
+                                                        )}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="space-y-1">
-                                        <Label>Witness password or PIN</Label>
-                                        <Input
-                                            type="password"
-                                            autoComplete="off"
-                                            value={
-                                                adminForm.data
-                                                    .witness_credential
-                                            }
-                                            onChange={(event) =>
-                                                adminForm.setData(
-                                                    'witness_credential',
-                                                    event.target.value,
-                                                )
-                                            }
-                                        />
-                                        <div className="text-xs text-muted-foreground">
-                                            Entered by the witness and never
-                                            saved on this device.
-                                        </div>
-                                    </div>
+                                    <WitnessPinInput
+                                        label="Their witness PIN"
+                                        required={false}
+                                        value={
+                                            adminForm.data.witness_credential
+                                        }
+                                        onChange={(v) =>
+                                            adminForm.setData(
+                                                'witness_credential',
+                                                v,
+                                            )
+                                        }
+                                        className="space-y-1"
+                                    />
                                 </div>
                             ) : null}
 
@@ -953,8 +972,8 @@ export default function ShiftMedicationCard({
                                 />
                                 {needsReason ? (
                                     <div className="text-xs text-muted-foreground">
-                                        A reason is required for PRN, non-given,
-                                        or outside-window administrations.
+                                        {outsideWindowHint ??
+                                            'A reason is needed for PRN doses, doses not given, and doses given outside the allowed time.'}
                                     </div>
                                 ) : null}
                             </div>

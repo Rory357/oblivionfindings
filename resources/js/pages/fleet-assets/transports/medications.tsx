@@ -1,5 +1,9 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,14 +17,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/fleet-utils';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -192,6 +189,7 @@ export default function MedicationTransitIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Transport Logs', href: '/fleet-assets/transports' },
                 { title: 'Medication Transit', href: '#' },
@@ -199,68 +197,54 @@ export default function MedicationTransitIndex({
         >
             <Head title="Medication Transit" />
             <PageShell>
-                <HeroShell>
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={Pill} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                {transportScope
-                                    ? `Medication transit · transport #${transportScope.id}`
-                                    : 'Medication transit · all trips'}
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Medication-in-Transit
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                {transportScope
-                                    ? `Medication workflow for transport #${transportScope.id}. Controlled drug audit trail stays scoped to this trip.`
-                                    : 'Track medications packed for resident transport. Controlled drug audit trail for NZ compliance.'}
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-3 lg:ml-auto lg:max-w-xl">
-                            <HeroClusterTile
-                                label="Packed today"
-                                value={fmt(safeStats.total_packed_today)}
-                                caption="for transit today"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                label="Controlled out"
-                                value={fmt(safeStats.controlled_drugs_out)}
-                                caption="CDs in transit"
-                                tone={
-                                    safeStats.controlled_drugs_out > 0
-                                        ? 'critical'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                label="Awaiting return"
-                                value={fmt(safeStats.awaiting_return)}
-                                caption="not back at house"
-                                tone={
-                                    safeStats.awaiting_return > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                            />
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <FleetHeroAction
-                            href={
-                                transportScope
-                                    ? `/fleet-assets/transports/${transportScope.id}`
-                                    : '/fleet-assets/transports'
-                            }
+                <PageHeader
+                    wrapTitle
+                    title="Medication-in-Transit"
+                    icon={Pill}
+                    subline={
+                        transportScope
+                            ? `Medication workflow for transport #${transportScope.id} · Controlled drug audit trail scoped to this trip`
+                            : 'Medication packs and controlled drug audit trail for resident transport'
+                    }
+                    actions={
+                        <PageHeaderGlassButton
                             icon={ArrowLeft}
+                            onClick={() =>
+                                router.visit(
+                                    transportScope
+                                        ? `/fleet-assets/transports/${transportScope.id}`
+                                        : '/fleet-assets/transports',
+                                )
+                            }
                         >
                             {transportScope
                                 ? 'Back to this transport'
                                 : 'Back to transport logs'}
-                        </FleetHeroAction>
-                    </div>
-                </HeroShell>
+                        </PageHeaderGlassButton>
+                    }
+                />
+                <div className="grid gap-3 sm:grid-cols-3">
+                    <Card>
+                        <CardContent className="p-3 text-sm">
+                            <strong>{fmt(safeStats.total_packed_today)}</strong>{' '}
+                            packed today
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-3 text-sm">
+                            <strong>
+                                {fmt(safeStats.controlled_drugs_out)}
+                            </strong>{' '}
+                            controlled out
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-3 text-sm">
+                            <strong>{fmt(safeStats.awaiting_return)}</strong>{' '}
+                            awaiting return
+                        </CardContent>
+                    </Card>
+                </div>
 
                 {transportScope && (
                     <Card className="mb-6 border-primary/20 bg-primary/5">

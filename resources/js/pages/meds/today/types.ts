@@ -1,5 +1,6 @@
 /* Shared types for the worker-facing Meds Today board (`/meds/today`).
  * Shapes mirror the Inertia props served by Emar/WorkerMedsController. */
+import type { WitnessPinStatus } from '@/lib/witness-pin';
 
 export interface RoundInfo {
     id: number;
@@ -52,7 +53,8 @@ export interface ScheduleRow {
     round_label: string;
     status: DoseStatus;
     recorded: RecordedInfo | null;
-    mar_url: string;
+    /** Null when this worker may not open the resident's MAR (not assigned, no clocked-in covering shift). */
+    mar_url: string | null;
 }
 
 export interface ClientInfo {
@@ -168,6 +170,8 @@ export interface ActivityItem {
 export interface WitnessOption {
     id: number;
     name: string;
+    /** PIN-1: people without a usable witness PIN are listed but can't be chosen. */
+    witness_pin?: WitnessPinStatus;
 }
 
 export interface NotGivenReasonOption {
@@ -211,6 +215,8 @@ export interface MedsTodayProps {
         controlled_record: boolean;
         cd_witness: boolean;
         competency_notice?: CompetencyNotice | null;
+        /** PIN-1: the viewer's own witness PIN status (prompt to set one). */
+        witness_pin?: WitnessPinStatus;
     };
     board_can: {
         view_emar: boolean;

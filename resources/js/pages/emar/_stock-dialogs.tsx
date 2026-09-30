@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- wizard position/variance panes are custom-layout
    bordered surfaces inside the wizard shell, not Card components; all colours are tokens. */
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,11 @@ import {
     type MedicationScanVerification,
 } from '@/lib/medication-scan';
 import { createOfflineRequestUuid } from '@/lib/offline-queue';
+import {
+    witnessIsSelectable,
+    witnessOptionLabel,
+    type WitnessPinStatus,
+} from '@/lib/witness-pin';
 import { router, useForm } from '@inertiajs/react';
 import {
     Barcode,
@@ -43,8 +49,10 @@ import { toast } from 'sonner';
 import {
     addMedicationStockQuantities,
     buildControlledPharmacyDeliveryRequest,
+    buildPharmacyDeliveryRequest,
     controlledPharmacyDeliveryPath,
     genericStockMedications,
+    pharmacyOrderAdvancePath,
     stockItemQuantityDestination,
 } from './medication-stock-governance';
 
@@ -100,7 +108,12 @@ export type StockRow = {
     scan_verification?: MedicationScanVerification | null;
     movements: StockMovement[];
 };
-export type StaffOpt = { id: number; name: string };
+export type StaffOpt = {
+    id: number;
+    name: string;
+    /** PIN-1: unusable witness PINs are listed but can't be chosen. */
+    witness_pin?: WitnessPinStatus;
+};
 export type ClientOpt = { id: number; first_name: string; last_name: string };
 
 const STORAGE_OPTIONS = [
@@ -788,6 +801,189 @@ export function ReceiveStockDialog({
     );
 }
 
+export type PharmacyDeliveryOrder = {
+    id: number;
+    client_name: string;
+    medication_name: string | null;
+    pharmacy_name: string | null;
+    quantity_ordered: number | null;
+    batch_number: string | null;
+    batch_expiry: string | null;
+};
+
+// ── Ordinary pharmacy delivery (confirm what actually arrived) ──────────────
+export function PharmacyDeliveryDialog({
+    order,
+    onClose,
+}: {
+    order: PharmacyDeliveryOrder;
+    onClose: () => void;
+}) {
+    const deliveryReplay = useRef(createMedicationMutationReplayState());
+    const [busy, setBusy] = useState(false);
+    const form = useForm({
+        // Left blank on purpose: the receiver records what arrived, not a
+        // copy of the ordered amount.
+        quantity_received: '',
+        batch_number: order.batch_number ?? '',
+        batch_expiry: order.batch_expiry ?? '',
+        delivery_notes: '',
+    });
+    const valid = form.data.quantity_received.trim() !== '';
+
+    const submit = async () => {
+        const request = buildPharmacyDeliveryRequest({
+            quantityReceived: form.data.quantity_received,
+            batchNumber: form.data.batch_number,
+            batchExpiry: form.data.batch_expiry,
+            deliveryNotes: form.data.delivery_notes,
+            uuid: deliveryReplay.current.uuid,
+        });
+        const { client_request_uuid: _uuid, ...material } = request;
+        deliveryReplay.current = prepareMedicationMutationReplayState(
+            deliveryReplay.current,
+            { pharmacy_order_id: order.id, ...material },
+        );
+        setBusy(true);
+        try {
+            const result = await submitEmarMutation(
+                pharmacyOrderAdvancePath(order.id),
+                {
+                    ...request,
+                    client_request_uuid: deliveryReplay.current.uuid,
+                },
+                {
+                    action: 'stock_update',
+                    successMessage: 'Delivery recorded',
+                },
+            );
+            if (!emarMutationWasAccepted(result.status)) return;
+            deliveryReplay.current = createMedicationMutationReplayState();
+            onClose();
+            if (result.status !== 'queued') refreshStock();
+        } catch (error: unknown) {
+            applyFormRequestErrors(
+                error,
+                (field, value) =>
+                    (form.setError as (f: string, v: string) => void)(
+                        field,
+                        value,
+                    ),
+                'Could not record the delivery.',
+            );
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <MedsWizardDialog
+            open
+            onClose={onClose}
+            title="Receive delivery"
+            description="Record what arrived against this dispensed order."
+            railIcon={Truck}
+            railTitle="Receive delivery"
+            railSubtitle={order.medication_name ?? 'Pharmacy order'}
+            steps={[
+                {
+                    key: 'delivery',
+                    label: 'Delivery',
+                    blurb: 'Quantity & batch',
+                    icon: Package,
+                },
+            ]}
+            stepIndex={0}
+            onStepClick={() => {}}
+            footer={
+                <>
+                    <Button variant="ghost" onClick={onClose} disabled={busy}>
+                        Cancel
+                    </Button>
+                    <Button onClick={submit} disabled={!valid || busy}>
+                        {busy ? 'Recording…' : 'Add to stock'}
+                    </Button>
+                </>
+            }
+        >
+            <StepHead
+                icon={Package}
+                title="Delivery"
+                blurb="Count what arrived and copy the batch and expiry from the label."
+            />
+            <div className="mb-4 rounded-lg border px-4">
+                <SummaryRow label="Client" value={order.client_name} />
+                <SummaryRow
+                    label="Medication"
+                    value={order.medication_name ?? '—'}
+                />
+                <SummaryRow
+                    label="Pharmacy"
+                    value={order.pharmacy_name ?? '—'}
+                />
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field
+                    label="Quantity received"
+                    required
+                    hint={
+                        order.quantity_ordered !== null
+                            ? `Ordered: ${order.quantity_ordered}`
+                            : undefined
+                    }
+                    error={form.errors.quantity_received}
+                >
+                    <Input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step={0.01}
+                        value={form.data.quantity_received}
+                        onChange={(event) =>
+                            form.setData(
+                                'quantity_received',
+                                event.target.value,
+                            )
+                        }
+                    />
+                </Field>
+                <Field label="Batch number" error={form.errors.batch_number}>
+                    <Input
+                        value={form.data.batch_number}
+                        onChange={(event) =>
+                            form.setData('batch_number', event.target.value)
+                        }
+                        placeholder="From the label"
+                    />
+                </Field>
+                <Field label="Expiry" error={form.errors.batch_expiry}>
+                    <Input
+                        type="date"
+                        value={form.data.batch_expiry}
+                        onChange={(event) =>
+                            form.setData('batch_expiry', event.target.value)
+                        }
+                    />
+                </Field>
+                <Field
+                    label="Delivery note"
+                    span
+                    error={form.errors.delivery_notes}
+                >
+                    <Textarea
+                        value={form.data.delivery_notes}
+                        onChange={(event) =>
+                            form.setData('delivery_notes', event.target.value)
+                        }
+                        rows={2}
+                        placeholder="Optional note"
+                    />
+                </Field>
+            </div>
+        </MedsWizardDialog>
+    );
+}
+
 export type ControlledPharmacyDeliveryOrder = {
     id: number;
     medication_id: number;
@@ -814,7 +1010,11 @@ export function ControlledPharmacyDeliveryDialog({
     onClose: () => void;
 }) {
     const [step, setStep] = useState(0);
-    const deliveryReplay = useRef(createMedicationMutationReplayState());
+    // Seed the replay ref from state so render never reads ref.current.
+    const [initialDeliveryReplay] = useState(() =>
+        createMedicationMutationReplayState(),
+    );
+    const deliveryReplay = useRef(initialDeliveryReplay);
     const form = useForm({
         quantity_received:
             order.quantity_ordered !== null
@@ -823,7 +1023,7 @@ export function ControlledPharmacyDeliveryDialog({
         witnessed_by: '',
         witness_credential: '',
         delivery_notes: '',
-        client_request_uuid: deliveryReplay.current.uuid,
+        client_request_uuid: initialDeliveryReplay.uuid,
     });
     const onHandBefore = String(stockItem.on_hand);
     const onHandAfter = addMedicationStockQuantities(
@@ -1019,28 +1219,20 @@ export function ControlledPharmacyDeliveryDialog({
                                 placeholder="Select witness…"
                                 options={witnesses.map((witness) => ({
                                     value: String(witness.id),
-                                    label: witness.name,
+                                    label: witnessOptionLabel(witness),
+                                    disabled: !witnessIsSelectable(witness),
                                 }))}
                             />
                         </Field>
-                        <Field
-                            label="Witness password"
-                            required
+                        <WitnessPinInput
+                            label="Their witness PIN"
+                            value={form.data.witness_credential}
+                            onChange={(v) =>
+                                form.setData('witness_credential', v)
+                            }
                             error={form.errors.witness_credential}
-                        >
-                            <Input
-                                type="password"
-                                autoComplete="current-password"
-                                value={form.data.witness_credential}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'witness_credential',
-                                        event.target.value,
-                                    )
-                                }
-                                placeholder="Witness enters their password"
-                            />
-                        </Field>
+                            atCupboard
+                        />
                         <Field
                             label="Delivery note"
                             span
@@ -1419,24 +1611,20 @@ export function StockCountDialog({
                                     placeholder="Select witness…"
                                     options={witnesses.map((w) => ({
                                         value: String(w.id),
-                                        label: w.name,
+                                        label: witnessOptionLabel(w),
+                                        disabled: !witnessIsSelectable(w),
                                     }))}
                                 />
                             </Field>
-                            <Field label="Witness password" required>
-                                <Input
-                                    type="password"
-                                    value={form.data.witness_credential}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'witness_credential',
-                                            e.target.value,
-                                        )
-                                    }
-                                    autoComplete="current-password"
-                                    placeholder="Witness enters their password"
-                                />
-                            </Field>
+                            <WitnessPinInput
+                                label="Their witness PIN"
+                                value={form.data.witness_credential}
+                                onChange={(v) =>
+                                    form.setData('witness_credential', v)
+                                }
+                                error={form.errors.witness_credential}
+                                atCupboard
+                            />
                         </>
                     )}
                     <Field label="Reconciliation note" span>

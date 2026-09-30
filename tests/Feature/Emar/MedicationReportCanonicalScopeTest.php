@@ -5,6 +5,7 @@ namespace Tests\Feature\Emar;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationError;
@@ -711,6 +712,9 @@ class MedicationReportCanonicalScopeTest extends TestCase
         $this->assertStringNotContainsString('HIDDEN UNLINKED DRIVER CONTENT', $controlledPayload);
 
         $reader = $this->medicationReader($site);
+        // An ordinary reader opens only an assigned resident's MAR
+        // (ClientPolicy::viewMedications); Site access alone is a 404.
+        $client->supportWorkers()->attach($reader->id);
         $ordinaryPage = $this->actingAs($reader)
             ->get(route('emar.mar', ['client_id' => $client->id]))
             ->assertOk();
@@ -736,6 +740,49 @@ class MedicationReportCanonicalScopeTest extends TestCase
         $this->assertStringContainsString('HIDDEN MIXED DRIVER NOTES', $controlledPage->getContent());
         $this->assertStringNotContainsString('HIDDEN FORGED DRIVER CONTENT', $controlledPage->getContent());
         $this->assertStringNotContainsString('HIDDEN UNLINKED DRIVER CONTENT', $controlledPage->getContent());
+    }
+
+    public function test_observation_report_includes_unlinked_inr_readings_without_widening_scope(): void
+    {
+        $localSite = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+        $foreignSite = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+        $local = Client::factory()->create(['site_id' => $localSite->id, 'status' => 'active']);
+        $neighbour = Client::factory()->create(['site_id' => $localSite->id, 'status' => 'active']);
+        $foreign = Client::factory()->create(['site_id' => $foreignSite->id, 'status' => 'active']);
+        $recorder = User::factory()->create();
+        $warfarin = $this->medication($local, 'Warfarin');
+        $morphine = $this->medication($local, 'Morphine sulfate', true);
+        $neighbourWarfarin = $this->medication($neighbour, 'Neighbour warfarin');
+
+        foreach ([
+            [$local, null, 4.8],
+            [$local, $warfarin->id, 2.5],
+            // Controlled — concealed when the report excludes controlled rows.
+            [$local, $morphine->id, 5.5],
+            // Another resident's order — never a canonical link.
+            [$local, $neighbourWarfarin->id, 6.1],
+            // Outside the reader's Sites.
+            [$foreign, null, 7.2],
+        ] as [$client, $medicationId, $value]) {
+            ClientInrRecord::query()->create([
+                'client_id' => $client->id,
+                'client_medication_id' => $medicationId,
+                'inr_value' => $value,
+                'target_range_low' => 2.0,
+                'target_range_high' => 3.0,
+                'tested_on' => today()->toDateString(),
+                'recorded_by' => $recorder->id,
+            ]);
+        }
+
+        $inr = collect(app(MedicationReportingService::class)
+            ->reportObservationUsage(siteIds: [$localSite->id], includeControlled: false)['records'])
+            ->where('observation_type', 'inr')
+            ->mapWithKeys(fn (array $record) => [(string) $record['value'] => $record['medication']])
+            ->sortKeys()
+            ->all();
+
+        $this->assertSame(['2.5' => 'Warfarin', '4.8' => 'No medicine linked'], $inr);
     }
 
     private function medication(Client $client, string $name, bool $controlled = false): ClientMedication

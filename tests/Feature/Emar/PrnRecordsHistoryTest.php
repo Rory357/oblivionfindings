@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
@@ -9,6 +10,7 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationPrnEffectiveness;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -109,6 +111,7 @@ class PrnRecordsHistoryTest extends TestCase
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $med = $this->prnMed($client);
         $dose = $this->dose($client, $med, $user);
+        $this->onShiftWith($user, $client);
 
         $this->actingAs($user)->from('/emar/prn')->post('/meds/today/prn/effect', [
             'client_medication_administration_id' => $dose->id,
@@ -168,6 +171,34 @@ class PrnRecordsHistoryTest extends TestCase
         $this->grantPermissions($user, ['medications.view', 'medications.administer.record', 'medications.controlled.witness']);
 
         return $user;
+    }
+
+    /**
+     * Recording an effectiveness review needs a current HR profile at the
+     * client's Site and a clocked-in shift covering the client (or
+     * break-glass), like any other medication record.
+     */
+    private function onShiftWith(User $user, Client $client): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $client->site_id,
+            'secondary_site_ids' => [],
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+        Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'user_id' => $user->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(3),
+            'actual_starts_at' => now()->subMinutes(30),
+            'actual_ends_at' => null,
+            'status' => 'in_progress',
+            'started_by' => $user->id,
+        ]);
     }
 
     /**

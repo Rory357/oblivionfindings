@@ -338,10 +338,10 @@ export default function ShowLeave({ request, can }: Props) {
                         <AlertDialogAction
                             onClick={runAction}
                             disabled={processing}
-                            className={
+                            variant={
                                 confirmAction === 'decline'
-                                    ? 'bg-status-critical hover:bg-status-critical'
-                                    : undefined
+                                    ? 'destructive'
+                                    : 'default'
                             }
                         >
                             {processing

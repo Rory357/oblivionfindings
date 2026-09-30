@@ -913,7 +913,6 @@ function ActionCard({
                                 onMenu(action, rect.left, rect.bottom);
                             }}
                             className="frontline-focus frontline-tap shrink-0 text-muted-foreground"
-                            style={{ minHeight: 44, minWidth: 44 }}
                         >
                             <MoreVertical className="h-4 w-4" />
                         </Button>

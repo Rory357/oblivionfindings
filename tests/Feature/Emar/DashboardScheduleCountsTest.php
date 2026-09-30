@@ -61,7 +61,7 @@ class DashboardScheduleCountsTest extends TestCase
         string $localNow,
         string $nowLabel,
     ): void {
-        Carbon::setTestNow(Carbon::parse($localNow, self::TZ));
+        Carbon::setTestNow(Carbon::parse($localNow, self::TZ)->utc());
         $this->seedOneClientOnShift();
 
         $given = $this->order('Levothyroxine 50mcg', '06:00');
@@ -124,7 +124,7 @@ class DashboardScheduleCountsTest extends TestCase
 
     public function test_admin_rate_is_not_applicable_before_any_dose_is_due(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-06-15 05:00:00', self::TZ));
+        Carbon::setTestNow(Carbon::parse('2026-06-15 05:00:00', self::TZ)->utc());
         $this->seedOneClientOnShift();
         $this->order('Metformin 500mg', '07:00');
 

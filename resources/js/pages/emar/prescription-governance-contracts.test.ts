@@ -128,9 +128,13 @@ describe('prescriber order governance contracts', () => {
 
     it('uses a one-shot current-Site read-back witness credential', () => {
         expect(dialogs).toContain("read_back_witness_credential: ''");
-        expect(dialogs).toContain('type="password"');
-        expect(dialogs).toContain('autoComplete="off"');
-        expect(dialogs).toContain('!!form.data.read_back_witness_credential');
+        // PIN-1: the read-back witness types their own 6-digit witness PIN
+        // in the shared masked field — never their login password.
+        expect(dialogs).toContain('<WitnessPinInput');
+        expect(dialogs).not.toContain('autoComplete="current-password"');
+        expect(dialogs).toContain(
+            'form.data.read_back_witness_credential.length ===\n                    WITNESS_PIN_LENGTH',
+        );
         expect(dialogs).toContain(
             'VERBAL.includes(payload.order_type)\n                    ? { read_back_witness_credential }',
         );
@@ -143,7 +147,10 @@ describe('prescriber order governance contracts', () => {
         expect(dialogs).not.toMatch(/localStorage|sessionStorage|indexedDB/);
 
         expect(controller).toContain("'read_back_witness_credential'");
-        expect(controller).toContain('Hash::check(');
+        // PIN-1: verified against the witness's PIN (attempt limit + audit),
+        // never their login password hash.
+        expect(controller).toContain('app(WitnessPinService::class)->verify(');
+        expect(controller).not.toContain('Hash::check(');
         expect(controller).toContain(
             "unset($validated['read_back_witness_credential'])",
         );
@@ -151,7 +158,7 @@ describe('prescriber order governance contracts', () => {
             "'read_back_witness_method' => $readBackVerificationMethod",
         );
         expect(controller).toContain(
-            'MedicationPrescriberOrder::READ_BACK_VERIFICATION_METHOD_PASSWORD',
+            'MedicationPrescriberOrder::READ_BACK_VERIFICATION_METHOD_WITNESS_PIN',
         );
         expect(controller).toContain("'read_back_witnessed_at'");
         expect(bootstrap).toContain("'read_back_witness_credential'");

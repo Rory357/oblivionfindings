@@ -1,9 +1,12 @@
 <?php
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Resources\MyShiftResource;
 use App\Models\Client;
+use App\Models\Permission;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 
@@ -51,7 +54,28 @@ it('emits scheduled_for from MyShiftResource for timed tasks', function () {
 
 it('emits scheduled_for for the open clock-session task map on My Day', function () {
     $worker = User::factory()->frontlineWorker()->create();
-    $client = Client::factory()->create();
+    // My Day shows the clock session for a shift at the worker's current
+    // Site, and the shift's client tasks only when the worker may view that
+    // client. The shift has no site_id of its own: it resolves through the
+    // client's home Site.
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+    $viewAssigned = Permission::query()->firstOrCreate(
+        ['key' => 'clients.viewAssigned'],
+        ['description' => 'clients.viewAssigned'],
+    );
+    $worker->permissionOverrides()->syncWithoutDetaching([
+        $viewAssigned->id => ['allowed' => true],
+    ]);
+    $client->supportWorkers()->attach($worker->id);
     $shift = Shift::factory()->assignedToday(
         $worker,
         Carbon::parse('2026-06-01 22:00:00', 'Pacific/Auckland')

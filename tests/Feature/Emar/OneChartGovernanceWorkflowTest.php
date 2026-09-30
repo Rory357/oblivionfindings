@@ -21,6 +21,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 class OneChartGovernanceWorkflowTest extends TestCase
 {
@@ -178,7 +179,7 @@ class OneChartGovernanceWorkflowTest extends TestCase
             ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
                 ...$payload,
                 'witnessed_by' => $foreignWitness->id,
-                'witness_credential' => 'foreign-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertNotFound();
 
@@ -191,7 +192,7 @@ class OneChartGovernanceWorkflowTest extends TestCase
             ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
                 ...$payload,
                 'witnessed_by' => $staleWitness->id,
-                'witness_credential' => 'stale-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertNotFound();
 
@@ -238,7 +239,7 @@ class OneChartGovernanceWorkflowTest extends TestCase
                 ...$payload,
                 'commenced_at' => $backdatedAt->toIso8601String(),
                 'witnessed_by' => $backdatedWitness->id,
-                'witness_credential' => 'backdated-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertNotFound();
 
@@ -255,7 +256,7 @@ class OneChartGovernanceWorkflowTest extends TestCase
             ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
                 ...$payload,
                 'witnessed_by' => $unauthorisedWitness->id,
-                'witness_credential' => 'no-capability-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertNotFound();
 
@@ -263,7 +264,7 @@ class OneChartGovernanceWorkflowTest extends TestCase
             ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
                 ...$payload,
                 'witnessed_by' => $this->admin->id,
-                'witness_credential' => 'admin-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasErrors('witnessed_by');
         $this->assertDatabaseCount('medication_syringe_drivers', 0);
@@ -272,7 +273,7 @@ class OneChartGovernanceWorkflowTest extends TestCase
             ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
                 ...$payload,
                 'commenced_at' => now()->addMinutes(5)->toIso8601String(),
-                'witness_credential' => 'witness-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasErrors('commenced_at');
         $this->actingAs($this->admin)
@@ -291,13 +292,13 @@ class OneChartGovernanceWorkflowTest extends TestCase
         $this->actingAs($this->admin)
             ->post("/emar/clients/{$this->client->id}/syringe-drivers", [
                 ...$payload,
-                'witness_credential' => 'witness-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertRedirect();
 
         $driver = $this->client->syringeDrivers()->firstOrFail();
         $this->assertSame($witness->id, $driver->witnessed_by);
-        $this->assertSame('password', $driver->witness_method);
+        $this->assertSame('witness_pin', $driver->witness_method);
 
         $this->actingAs($this->admin)
             ->post("/emar/syringe-drivers/{$driver->id}/checks", [

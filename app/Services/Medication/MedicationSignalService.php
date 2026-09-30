@@ -266,12 +266,12 @@ class MedicationSignalService
             $error->client_id,
             $severityMap[$error->severity],
             'Medication error: '.str_replace('_', ' ', $error->error_type)
-                .($medication ? " — {$medication->name}" : ''),
+                .($medication ? " — {$medication->unrestrictedName()}" : ''),
             [
                 'incident_id' => $error->client_incident_id,
                 'medication_error_id' => $error->id,
                 'client_medication_id' => $error->client_medication_id,
-                'medication_name' => $medication?->name,
+                'medication_name' => $medication?->unrestrictedName(),
                 'error_type' => $error->error_type,
                 'original_severity' => $error->severity,
                 'description' => $error->description,

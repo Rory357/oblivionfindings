@@ -76,7 +76,7 @@ class MedicationCompetencyRestrictionRules
             'requires_cosigner' => $mode === 'cosigner',
             'blocked' => $mode === 'block',
             'message' => $mode === 'cosigner'
-                ? 'Your medication competency is restricted'.$this->notesSuffix($assessment).'. A present, qualified co-signer must confirm each dose you sign as given.'
+                ? 'Your medication competency is restricted'.$this->notesSuffix($assessment).'. A present, qualified co-signer must confirm each dose you sign as given, by typing their own witness PIN.'
                 : 'Your medication competency is restricted'.$this->notesSuffix($assessment).'. You can record refusals and withheld doses, but a competent colleague must give doses.',
         ];
     }
@@ -126,7 +126,7 @@ class MedicationCompetencyRestrictionRules
                     'state' => 'restricted_cosigner_required',
                     'message' => 'Your medication competency assessment is restricted'
                         .$this->notesSuffix($assessment)
-                        .', so a present, qualified co-signer must confirm this dose. Choose a co-signer and ask them to enter their password.',
+                        .', so a present, qualified co-signer must confirm this dose. Choose a co-signer and ask them to type their own witness PIN.',
                     'error_field' => 'witnessed_by',
                 ];
             }

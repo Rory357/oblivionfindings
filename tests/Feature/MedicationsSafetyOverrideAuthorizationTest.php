@@ -28,6 +28,7 @@ use Mockery\MockInterface;
 use Symfony\Component\Process\Process;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 class MedicationsSafetyOverrideAuthorizationTest extends TestCase
 {
@@ -453,7 +454,7 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
             'scheduled_for' => $this->doseSlot->toIso8601String(),
             'administered_at' => now()->toIso8601String(),
             'witnessed_by' => $this->witness->id,
-            'witness_credential' => 'witness-secret',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => $uuid,
         ];
     }

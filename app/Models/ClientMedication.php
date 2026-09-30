@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -331,6 +332,17 @@ class ClientMedication extends Model
     }
 
     /**
+     * The name to use on surfaces readable without medications.controlled.view
+     * — incidents, H&S events, Control Room signals and alerts not linked to
+     * this medicine (EM-12). A controlled medicine is never named there; its
+     * name stays on records that require controlled view.
+     */
+    public function unrestrictedName(): string
+    {
+        return $this->controlled_drug ? 'Controlled medicine' : (string) $this->name;
+    }
+
+    /**
      * High-risk order classes need a verifier other than their creator.
      */
     public function requiresIndependentVerification(): bool
@@ -425,15 +437,18 @@ class ClientMedication extends Model
     }
 
     /**
-     * Check if medication has expired
+     * Check if medication has expired. The end date is the order's last day
+     * (its doses are still scheduled), so it expires once the New Zealand
+     * date is after it
      */
     public function isExpired(): bool
     {
-        return $this->end_date && $this->end_date->isPast();
+        return $this->end_date !== null && $this->daysUntilEnd() < 0;
     }
 
     /**
-     * Check if medication is expiring soon (within 7 days)
+     * Check if medication is expiring soon: not yet expired, and ending
+     * within $days days on the New Zealand calendar
      */
     public function isExpiringSoon(int $days = 7): bool
     {
@@ -441,7 +456,20 @@ class ClientMedication extends Model
             return false;
         }
 
-        return $this->end_date->diffInDays(now(), false) <= $days && $this->end_date->isFuture();
+        return ! $this->isExpired() && $this->daysUntilEnd() <= $days;
+    }
+
+    /**
+     * Whole days from today on the New Zealand calendar to the end date:
+     * 0 on the order's last day, negative once that day has passed
+     */
+    public function daysUntilEnd(): ?int
+    {
+        if (! $this->end_date) {
+            return null;
+        }
+
+        return WorkerClock::daysUntil($this->end_date);
     }
 
     /**

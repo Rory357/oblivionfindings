@@ -19,6 +19,7 @@ use App\Services\EnhancedMarService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationRuleService;
 use App\Services\MedicationScanVerificationService;
@@ -142,7 +143,7 @@ class ResidentTransportJourneyService
         }
         if (blank($data['witness_credential'] ?? null)) {
             throw ValidationException::withMessages([
-                'witness_credential' => 'The witness must enter their password or PIN.',
+                'witness_credential' => 'The witness must type their own 6-digit witness PIN.',
             ]);
         }
     }
@@ -1785,14 +1786,15 @@ class ResidentTransportJourneyService
                     ->orWhereNull('packed_witnessed_by_user_id')
                     ->orWhereNull('packed_witnessed_at')
                     ->orWhereNull('packing_witness_method')
-                    ->orWhere('packing_witness_method', '!=', 'password')
+                    // 'password' attestations predate the witness PIN cutover (PIN-1).
+                    ->orWhereNotIn('packing_witness_method', ['password', WitnessPinService::METHOD])
                     ->orWhereDoesntHave('packingAttestationEvent', function (Builder $event): void {
                         $event->whereIn('action', [
                             'medication_packed',
                             'medication_packing_attestation_corrected',
                         ])
                             ->whereIn('context->attestation->state', ['accepted', 'corrected'])
-                            ->where('context->attestation->method', 'password')
+                            ->whereIn('context->attestation->method', ['password', WitnessPinService::METHOD])
                             ->whereNotNull('context->attestation->subject_digest')
                             ->whereNotNull('witness_user_id')
                             ->whereColumn(

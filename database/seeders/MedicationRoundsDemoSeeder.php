@@ -21,8 +21,9 @@ use Illuminate\Database\Seeder;
  * guided modal and the audit timeline — instead of empty states.
  *
  * The 8 residents live in a DEDICATED service context ("Rounds Demo (eMAR)")
- * so the all-site round templates pick up exactly these residents' doses (and
+ * so each Site's round templates pick up exactly these residents' doses (and
  * not unrelated seed meds), keeping the demo clean and matching the prototype.
+ * A round covers exactly one Site, so every Site gets its own rounds.
  *
  * Date-relative + idempotent: every run targets TODAY and upserts, so it is
  * safe to re-run (and to run daily) on any database state.
@@ -140,10 +141,18 @@ class MedicationRoundsDemoSeeder extends Seeder
             ],
         ];
 
+        // A new order, or one whose clinical fields changed (start_date moves
+        // daily), starts pending verification and is off every round until
+        // verified — record it the way EmarController::verifyMedication does,
+        // by someone other than the creator when there is anyone else.
+        $verifier = $staff
+            ? (User::query()->whereKeyNot($staff->id)->orderBy('id')->first() ?? $staff)
+            : null;
+
         $meds = [];
         foreach ($medDefs as $nhi => $list) {
             foreach ($list as $m) {
-                $meds[$nhi][$m['name']] = ClientMedication::query()->updateOrCreate(
+                $meds[$nhi][$m['name']] = $med = ClientMedication::query()->updateOrCreate(
                     ['client_id' => $clients[$nhi]->id, 'name' => $m['name']],
                     [
                         'created_by' => $staff?->id,
@@ -161,13 +170,24 @@ class MedicationRoundsDemoSeeder extends Seeder
                         'end_date' => null,
                         'active' => true,
                         'state' => 'active',
-                        'approval_status' => 'verified',
                     ],
                 );
+
+                if ($med->approval_status !== 'verified') {
+                    $med->forceFill([
+                        'approval_status' => 'verified',
+                        'verified_by' => $verifier?->id,
+                        'verified_at' => now(),
+                        'rejection_reason' => null,
+                    ])->save();
+                }
             }
         }
 
-        // ── Round templates (5, all-site, scoped to the demo context) ─────────
+        // ── Round templates + today's rounds, per Site (scoped to the context) ─
+        // A site-less template is legacy: generation skips it and the guided
+        // round renders no doses. So each Site gets its own templates, only for
+        // the slots its residents are actually dosed in.
         $templateDefs = [
             'morning' => ['name' => 'Morning Round', 'time' => '08:00', 'window' => 60],
             'midday' => ['name' => 'Midday Round', 'time' => '12:30', 'window' => 45],
@@ -175,35 +195,59 @@ class MedicationRoundsDemoSeeder extends Seeder
             'evening' => ['name' => 'Evening Round', 'time' => '18:00', 'window' => 45],
             'night' => ['name' => 'Night Round', 'time' => '21:00', 'window' => 60],
         ];
+        $slotByTime = array_combine(array_column($templateDefs, 'time'), array_keys($templateDefs));
+        $clientSite = array_column($clientDefs, 'site', 'nhi');
+        $siteSlots = [];
+        foreach ($medDefs as $nhi => $list) {
+            foreach ($list as $m) {
+                foreach ($m['times'] as $time) {
+                    $siteSlots[$clientSite[$nhi]][$slotByTime[$time]] = true;
+                }
+            }
+        }
+
+        // Earlier runs of this seeder created all-site templates; deactivate
+        // them so re-running upgrades an existing demo in place.
+        MedicationRoundTemplate::query()
+            ->where('service_context_id', $context->id)
+            ->whereNull('site_id')
+            ->where('active', true)
+            ->update(['active' => false]);
+
         $assignedKeys = ['morning', 'midday', 'evening'];
         $rounds = [];
-        foreach ($templateDefs as $key => $t) {
-            $template = MedicationRoundTemplate::query()->updateOrCreate(
-                ['name' => $t['name'], 'service_context_id' => $context->id],
-                [
-                    'site_id' => null,
-                    'scheduled_time' => $t['time'],
-                    'window_minutes' => $t['window'],
-                    'days_of_week' => [],
-                    'active' => true,
-                    'default_assigned_to' => in_array($key, $assignedKeys, true) ? $staff?->id : null,
-                ],
-            );
+        foreach ($sites as $siteName => $site) {
+            foreach ($templateDefs as $key => $t) {
+                if (! isset($siteSlots[$siteName][$key])) {
+                    continue;
+                }
 
-            $rounds[$key] = MedicationRound::query()->firstOrCreate(
-                ['round_template_id' => $template->id, 'round_date' => $roundDate],
-                [
-                    'name' => $t['name'],
-                    'service_context_id' => $context->id,
-                    'site_id' => null,
-                    'round_type' => 'scheduled',
-                    'scheduled_time' => $t['time'],
-                    'window_minutes' => $t['window'],
-                    'status' => 'pending',
-                    'assigned_to' => in_array($key, $assignedKeys, true) ? $staff?->id : null,
-                    'total_medications' => $template->applicableMedicationCountForDate(today()),
-                ],
-            );
+                $template = MedicationRoundTemplate::query()->updateOrCreate(
+                    ['name' => $t['name'], 'service_context_id' => $context->id, 'site_id' => $site->id],
+                    [
+                        'scheduled_time' => $t['time'],
+                        'window_minutes' => $t['window'],
+                        'days_of_week' => [],
+                        'active' => true,
+                        'default_assigned_to' => in_array($key, $assignedKeys, true) ? $staff?->id : null,
+                    ],
+                );
+
+                $rounds[$siteName][$key] = MedicationRound::query()->firstOrCreate(
+                    ['round_template_id' => $template->id, 'round_date' => $roundDate],
+                    [
+                        'name' => $t['name'],
+                        'service_context_id' => $context->id,
+                        'site_id' => $site->id,
+                        'round_type' => 'scheduled',
+                        'scheduled_time' => $t['time'],
+                        'window_minutes' => $t['window'],
+                        'status' => 'pending',
+                        'assigned_to' => in_array($key, $assignedKeys, true) ? $staff?->id : null,
+                        'total_medications' => $template->applicableMedicationCountForDate(today()),
+                    ],
+                );
+            }
         }
 
         // ── Administrations → Morning partial, Midday in-progress, rest pending
@@ -225,7 +269,7 @@ class MedicationRoundsDemoSeeder extends Seeder
                 [$roundKey, $time, $nhi, $medName, $status] = $entry;
                 $extra = $entry[5] ?? [];
                 $med = $meds[$nhi][$medName] ?? null;
-                $round = $rounds[$roundKey] ?? null;
+                $round = $rounds[$clientSite[$nhi]][$roundKey] ?? null;
                 if (! $med || ! $round) {
                     continue;
                 }
@@ -252,19 +296,19 @@ class MedicationRoundsDemoSeeder extends Seeder
             }
         }
 
-        // ── Refresh counters + set the demo status story ──────────────────────
-        foreach ($rounds as $round) {
-            $round->updateCounts();
+        // ── Refresh counters + set the demo status story (at every Site) ──────
+        $story = ['morning' => 'partial', 'midday' => 'in_progress'];
+        foreach ($rounds as $siteRounds) {
+            foreach ($siteRounds as $key => $round) {
+                $round->updateCounts();
+                if (isset($story[$key])) {
+                    $round->update([
+                        'status' => $story[$key],
+                        'started_at' => $slotUtc($templateDefs[$key]['time']),
+                        'started_by' => $staff?->id,
+                    ]);
+                }
+            }
         }
-        $rounds['morning']->update([
-            'status' => 'partial',
-            'started_at' => $slotUtc('08:00'),
-            'started_by' => $staff?->id,
-        ]);
-        $rounds['midday']->update([
-            'status' => 'in_progress',
-            'started_at' => $slotUtc('12:30'),
-            'started_by' => $staff?->id,
-        ]);
     }
 }

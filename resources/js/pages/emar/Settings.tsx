@@ -40,6 +40,7 @@ import {
     type SafetyPolicyReviewed,
     type SafetyPolicyValues,
 } from './_safety-policy-card';
+import { WitnessPinCard, type WitnessPinProps } from './_witness-pin-card';
 
 type Option = { value: string; label: string };
 
@@ -57,11 +58,15 @@ type Rule = {
 };
 
 type Props = {
+    /** PIN-1: organisation witness PIN rules and staff PIN status. */
+    witnessPin: WitnessPinProps;
+    /** false = a house lead who can only reset PINs sees just that section. */
+    settingsAccess: boolean;
     safetyPolicy: {
         values: SafetyPolicyValues;
         reviewed: SafetyPolicyReviewed;
         can_manage: boolean;
-    };
+    } | null;
     rules: Rule[];
     sites: { id: number; name: string }[];
     observationOptions: Option[];
@@ -98,6 +103,8 @@ function blankForm(
 }
 
 export default function EmarSettings({
+    witnessPin,
+    settingsAccess,
     safetyPolicy,
     rules,
     sites,
@@ -204,162 +211,188 @@ export default function EmarSettings({
                 backLabel="Back to eMAR"
             />
             <PageShell>
-                <SafetyPolicyCard
-                    values={safetyPolicy.values}
-                    reviewed={safetyPolicy.reviewed}
-                    canManage={safetyPolicy.can_manage}
-                />
-                <div className="mb-4 flex items-center justify-between gap-4">
-                    <p className="text-sm text-muted-foreground">
-                        {rules.length} rule{rules.length === 1 ? '' : 's'}{' '}
-                        configured
-                    </p>
-                    {can.manage && (
-                        <Button onClick={openCreate} size="sm">
-                            <Plus className="mr-1.5 h-4 w-4" />
-                            Add Rule
-                        </Button>
-                    )}
-                </div>
-
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Active &amp; inactive rules
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b text-left text-xs font-medium text-muted-foreground">
-                                        <th className="pr-4 pb-2">Match</th>
-                                        <th className="pr-4 pb-2">Keyword</th>
-                                        <th className="pr-4 pb-2">Scope</th>
-                                        <th className="pr-4 pb-2">
-                                            Requirements
-                                        </th>
-                                        <th className="pr-4 pb-2">Status</th>
-                                        {can.manage && (
-                                            <th className="pb-2 text-right">
-                                                Actions
-                                            </th>
-                                        )}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {rules.map((rule) => (
-                                        <tr
-                                            key={rule.id}
-                                            className="border-b last:border-0"
-                                        >
-                                            <td className="py-2.5 pr-4 font-medium">
-                                                {matchTypeLabel(
-                                                    rule.match_type,
-                                                )}
-                                            </td>
-                                            <td className="py-2.5 pr-4">
-                                                {rule.match_value}
-                                            </td>
-                                            <td className="py-2.5 pr-4 text-muted-foreground">
-                                                {rule.site_name ?? 'All sites'}
-                                            </td>
-                                            <td className="py-2.5 pr-4">
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {rule.requires_countersign && (
-                                                        <Badge
-                                                            variant="secondary"
-                                                            className="gap-1"
-                                                        >
-                                                            <ShieldCheck className="h-3 w-3" />{' '}
-                                                            Countersign
-                                                        </Badge>
-                                                    )}
-                                                    {rule.required_observations.map(
-                                                        (obs) => (
-                                                            <Badge
-                                                                key={obs}
-                                                                variant="outline"
-                                                                className="gap-1"
-                                                            >
-                                                                <Stethoscope className="h-3 w-3" />
-                                                                {observationLabel(
-                                                                    obs,
-                                                                )}
-                                                            </Badge>
-                                                        ),
-                                                    )}
-                                                    {!rule.requires_countersign &&
-                                                        rule
-                                                            .required_observations
-                                                            .length === 0 && (
-                                                            <span className="text-muted-foreground">
-                                                                —
-                                                            </span>
-                                                        )}
-                                                </div>
-                                            </td>
-                                            <td className="py-2.5 pr-4">
-                                                <Badge
-                                                    variant={
-                                                        rule.active
-                                                            ? 'default'
-                                                            : 'outline'
-                                                    }
-                                                >
-                                                    {rule.active
-                                                        ? 'Active'
-                                                        : 'Inactive'}
-                                                </Badge>
-                                            </td>
-                                            {can.manage && (
-                                                <td className="py-2.5 text-right">
-                                                    <div className="flex justify-end gap-1">
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            className="h-8 w-8"
-                                                            aria-label="Edit rule"
-                                                            onClick={() =>
-                                                                openEdit(rule)
-                                                            }
-                                                        >
-                                                            <Pencil className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            className="h-8 w-8 text-status-critical"
-                                                            aria-label="Remove rule"
-                                                            onClick={() =>
-                                                                remove(rule)
-                                                            }
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                </td>
-                                            )}
-                                        </tr>
-                                    ))}
-                                    {rules.length === 0 && (
-                                        <tr>
-                                            <td
-                                                colSpan={can.manage ? 6 : 5}
-                                                className="py-10 text-center text-muted-foreground"
-                                            >
-                                                No administration rules yet. Add
-                                                one to require countersigning or
-                                                observations for matching
-                                                medications.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                {safetyPolicy ? (
+                    <SafetyPolicyCard
+                        values={safetyPolicy.values}
+                        reviewed={safetyPolicy.reviewed}
+                        canManage={safetyPolicy.can_manage}
+                    />
+                ) : null}
+                <WitnessPinCard witnessPin={witnessPin} />
+                {settingsAccess ? (
+                    <>
+                        <div className="mb-4 flex items-center justify-between gap-4">
+                            <p className="text-sm text-muted-foreground">
+                                {rules.length} rule
+                                {rules.length === 1 ? '' : 's'} configured
+                            </p>
+                            {can.manage && (
+                                <Button onClick={openCreate} size="sm">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Add Rule
+                                </Button>
+                            )}
                         </div>
-                    </CardContent>
-                </Card>
+
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-medium">
+                                    Active &amp; inactive rules
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b text-left text-xs font-medium text-muted-foreground">
+                                                <th className="pr-4 pb-2">
+                                                    Match
+                                                </th>
+                                                <th className="pr-4 pb-2">
+                                                    Keyword
+                                                </th>
+                                                <th className="pr-4 pb-2">
+                                                    Scope
+                                                </th>
+                                                <th className="pr-4 pb-2">
+                                                    Requirements
+                                                </th>
+                                                <th className="pr-4 pb-2">
+                                                    Status
+                                                </th>
+                                                {can.manage && (
+                                                    <th className="pb-2 text-right">
+                                                        Actions
+                                                    </th>
+                                                )}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {rules.map((rule) => (
+                                                <tr
+                                                    key={rule.id}
+                                                    className="border-b last:border-0"
+                                                >
+                                                    <td className="py-2.5 pr-4 font-medium">
+                                                        {matchTypeLabel(
+                                                            rule.match_type,
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2.5 pr-4">
+                                                        {rule.match_value}
+                                                    </td>
+                                                    <td className="py-2.5 pr-4 text-muted-foreground">
+                                                        {rule.site_name ??
+                                                            'All sites'}
+                                                    </td>
+                                                    <td className="py-2.5 pr-4">
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {rule.requires_countersign && (
+                                                                <Badge
+                                                                    variant="secondary"
+                                                                    className="gap-1"
+                                                                >
+                                                                    <ShieldCheck className="h-3 w-3" />{' '}
+                                                                    Countersign
+                                                                </Badge>
+                                                            )}
+                                                            {rule.required_observations.map(
+                                                                (obs) => (
+                                                                    <Badge
+                                                                        key={
+                                                                            obs
+                                                                        }
+                                                                        variant="outline"
+                                                                        className="gap-1"
+                                                                    >
+                                                                        <Stethoscope className="h-3 w-3" />
+                                                                        {observationLabel(
+                                                                            obs,
+                                                                        )}
+                                                                    </Badge>
+                                                                ),
+                                                            )}
+                                                            {!rule.requires_countersign &&
+                                                                rule
+                                                                    .required_observations
+                                                                    .length ===
+                                                                    0 && (
+                                                                    <span className="text-muted-foreground">
+                                                                        —
+                                                                    </span>
+                                                                )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-2.5 pr-4">
+                                                        <Badge
+                                                            variant={
+                                                                rule.active
+                                                                    ? 'default'
+                                                                    : 'outline'
+                                                            }
+                                                        >
+                                                            {rule.active
+                                                                ? 'Active'
+                                                                : 'Inactive'}
+                                                        </Badge>
+                                                    </td>
+                                                    {can.manage && (
+                                                        <td className="py-2.5 text-right">
+                                                            <div className="flex justify-end gap-1">
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    className="h-8 w-8"
+                                                                    aria-label="Edit rule"
+                                                                    onClick={() =>
+                                                                        openEdit(
+                                                                            rule,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Pencil className="h-4 w-4" />
+                                                                </Button>
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    className="h-8 w-8 text-status-critical"
+                                                                    aria-label="Remove rule"
+                                                                    onClick={() =>
+                                                                        remove(
+                                                                            rule,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            ))}
+                                            {rules.length === 0 && (
+                                                <tr>
+                                                    <td
+                                                        colSpan={
+                                                            can.manage ? 6 : 5
+                                                        }
+                                                        className="py-10 text-center text-muted-foreground"
+                                                    >
+                                                        No administration rules
+                                                        yet. Add one to require
+                                                        countersigning or
+                                                        observations for
+                                                        matching medications.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </>
+                ) : null}
             </PageShell>
 
             <Dialog open={open} onOpenChange={setOpen}>

@@ -167,6 +167,8 @@ type InrWatchItem = {
     id: number;
     client_id: number;
     client: string;
+    /** Null = no medicine linked; still shown, labelled (NF-23). */
+    client_medication_id: number | null;
     value: number;
     target: string;
     tested_on: string | null;
@@ -899,10 +901,7 @@ export default function EmarHome(props: Props) {
                                 leave a hole in the MAR.
                             </p>
                         </div>
-                        <Button
-                            asChild
-                            className="bg-status-critical text-white hover:bg-status-critical/90"
-                        >
+                        <Button asChild variant="destructive">
                             <Link href="/emar/mar">Open MAR</Link>
                         </Button>
                     </div>
@@ -1575,6 +1574,9 @@ export default function EmarHome(props: Props) {
                                                     {r.client}
                                                 </p>
                                                 <p className="text-[11px] text-muted-foreground">
+                                                    {r.client_medication_id ===
+                                                        null &&
+                                                        'No medicine linked · '}
                                                     Target {r.target} · tested{' '}
                                                     {r.tested_on ?? '—'}
                                                 </p>

@@ -1,5 +1,9 @@
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import ResidentSidebar from '@/components/resident-tracking/resident-sidebar';
 import type { Resident } from '@/components/resident-tracking/types';
 import { GovernedLocationExportDialog } from '@/components/security-devices/governed-location-export-dialog';
@@ -19,7 +23,6 @@ import { Label } from '@/components/ui/label';
 import { usePersonalLocationPrivacy } from '@/hooks/use-personal-location-privacy';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatRelativeTime } from '@/lib/fleet-utils';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, router } from '@inertiajs/react';
 import {
     Battery,
@@ -474,6 +477,7 @@ export default function ResidentTrackingHistory({
         return (
             <AppLayout
                 breadcrumbs={[
+                    { title: 'Home', href: '/dashboard' },
                     { title: 'Fleet & Assets', href: '/fleet-assets' },
                     {
                         title: 'Resident Tracking',
@@ -484,11 +488,20 @@ export default function ResidentTrackingHistory({
             >
                 <Head title={`Location History — ${client?.name ?? ''}`} />
                 <PageShell>
-                    <FleetCompactHero
-                        pill={`Resident tracking · ${client?.name ?? 'location history'}`}
-                        title="Location History"
+                    <PageHeader
+                        wrapTitle
+                        variant="profile"
+                        icon={ShieldOff}
+                        title="Location history"
                         backHref="/fleet-assets/resident-tracking"
-                        backLabel="Tracking"
+                        titleChip={
+                            <PageHeaderStatusChip variant="warning">
+                                {privacyChecking
+                                    ? 'Checking access'
+                                    : 'Access ended'}
+                            </PageHeaderStatusChip>
+                        }
+                        subline={client?.name ?? 'Person unavailable'}
                     />
                     <Card>
                         <CardContent className="flex items-start gap-3 p-5">
@@ -520,6 +533,7 @@ export default function ResidentTrackingHistory({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 {
                     title: 'Resident Tracking',
@@ -530,11 +544,18 @@ export default function ResidentTrackingHistory({
         >
             <Head title={`Location History — ${client?.name ?? ''}`} />
             <PageShell>
-                <FleetCompactHero
-                    pill={`Resident tracking · ${client?.name ?? 'location history'}`}
-                    title="Location History"
+                <PageHeader
+                    wrapTitle
+                    variant="profile"
+                    icon={MapPin}
+                    title="Location history"
                     backHref="/fleet-assets/resident-tracking"
-                    backLabel="Tracking"
+                    titleChip={
+                        <PageHeaderStatusChip variant="success">
+                            Access confirmed
+                        </PageHeaderStatusChip>
+                    }
+                    subline={client?.name ?? 'Person unavailable'}
                 />
 
                 {/* Header strip */}
