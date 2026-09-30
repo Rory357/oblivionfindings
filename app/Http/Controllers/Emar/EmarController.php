@@ -1137,6 +1137,42 @@ class EmarController extends Controller
         );
     }
 
+    /**
+     * Interim single-row stock identity until P06's per-lot rows (EM-10). A
+     * delivery never blanks the recorded batch or expiry, and the row keeps
+     * the earliest expiry among stock actually on hand (with that lot's
+     * batch). When nothing was on hand, the delivery's values, where given,
+     * replace the old ones.
+     */
+    private function mergeDeliveredBatch(
+        ClientMedicationStock $stock,
+        ?string $deliveredBatch,
+        mixed $deliveredExpiry,
+        string $onHandBefore,
+    ): void {
+        $batch = filled($deliveredBatch) ? trim((string) $deliveredBatch) : null;
+        $expiry = filled($deliveredExpiry) ? Carbon::parse($deliveredExpiry)->toDateString() : null;
+        $currentExpiry = $stock->expiry_date?->toDateString();
+
+        if (MedicationStockQuantity::lessThanOrEqual($onHandBefore, 0)) {
+            $stock->batch_number = $batch ?? $stock->batch_number;
+            $stock->expiry_date = $expiry ?? $currentExpiry;
+
+            return;
+        }
+
+        if ($expiry !== null && ($currentExpiry === null || $expiry < $currentExpiry)) {
+            $stock->expiry_date = $expiry;
+            $stock->batch_number = $batch ?? $stock->batch_number;
+
+            return;
+        }
+
+        if (blank($stock->batch_number) && $batch !== null) {
+            $stock->batch_number = $batch;
+        }
+    }
+
     // ─── Dashboard ─────────────────────────────────────────
     public function dashboard(Request $request, MedicationOverviewService $overview)
     {
@@ -2249,16 +2285,21 @@ class EmarController extends Controller
                 ->limit(5)
                 ->get()
                 ->map(function (MedicationScheduledStockCount $c) {
+                    // decimal:2 cast: "0.00" is a truthy string, so compare
+                    // the quantity numerically.
                     $disc = $c->discrepancy;
+                    $hasDiscrepancy = $disc !== null && ! MedicationStockQuantity::equals($disc, 0);
 
                     return [
                         'type' => 'count',
                         'ts' => $c->completed_at?->getTimestamp() ?? 0,
                         'at' => $c->completed_at?->format('j M Y, g:ia'),
-                        'status' => $disc ? 'discrepancy' : 'counted',
+                        'status' => $hasDiscrepancy ? 'discrepancy' : 'counted',
                         'label' => 'Counted '.$c->actual_quantity.($c->expected_quantity !== null ? ' (expected '.$c->expected_quantity.')' : ''),
                         'by' => $c->completedBy?->name,
-                        'note' => $disc ? 'Discrepancy '.($disc > 0 ? '+' : '').$disc : ($c->notes ?: null),
+                        'note' => $hasDiscrepancy
+                            ? 'Discrepancy '.(MedicationStockQuantity::greaterThan($disc, 0) ? '+' : '').$disc
+                            : ($c->notes ?: null),
                     ];
                 });
         }
@@ -6875,7 +6916,16 @@ class EmarController extends Controller
                     'expected_status' => 'nullable|string|in:draft,submitted,confirmed,dispensed',
                     'batch_number' => 'nullable|string|max:255',
                     'batch_expiry' => 'nullable|date',
-                    'quantity_received' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0', MedicationStockQuantity::DECIMAL_12_2_MAX_RULE],
+                    // A delivery records what actually arrived — never a silent
+                    // copy of the ordered amount.
+                    'quantity_received' => [
+                        Rule::requiredIf($lockedOrder->status === 'dispensed'),
+                        'nullable',
+                        'numeric',
+                        MedicationStockQuantity::VALIDATION_RULE,
+                        'min:0',
+                        MedicationStockQuantity::DECIMAL_12_2_MAX_RULE,
+                    ],
                     'delivery_notes' => 'nullable|string',
                     ...$this->medicationOfflineSubmissionRules($request),
                 ]);
@@ -6963,8 +7013,14 @@ class EmarController extends Controller
                         break;
                     case 'dispensed':
                         $updateData['dispensed_at'] = now();
-                        $updateData['batch_number'] = $validated['batch_number'] ?? null;
-                        $updateData['batch_expiry'] = $validated['batch_expiry'] ?? null;
+                        // Record a batch/expiry when given; never blank one the
+                        // order already carries.
+                        if (filled($validated['batch_number'] ?? null)) {
+                            $updateData['batch_number'] = $validated['batch_number'];
+                        }
+                        if (filled($validated['batch_expiry'] ?? null)) {
+                            $updateData['batch_expiry'] = $validated['batch_expiry'];
+                        }
                         break;
                     case 'delivered':
                         if ((bool) $medication->controlled_drug) {
@@ -6974,11 +7030,17 @@ class EmarController extends Controller
                         }
                         $updateData['delivered_at'] = now();
                         $updateData['received_by'] = $actor->id;
-                        $quantityReceived = $validated['quantity_received'] ?? null;
                         $updateData['quantity_received'] = MedicationStockQuantity::normalize(
-                            $quantityReceived ?? $lockedOrder->quantity_ordered,
+                            $validated['quantity_received'],
                         );
                         $updateData['delivery_notes'] = $validated['delivery_notes'] ?? null;
+                        // The receiver may record the batch/expiry on the label.
+                        if (filled($validated['batch_number'] ?? null)) {
+                            $updateData['batch_number'] = $validated['batch_number'];
+                        }
+                        if (filled($validated['batch_expiry'] ?? null)) {
+                            $updateData['batch_expiry'] = $validated['batch_expiry'];
+                        }
                         break;
                 }
 
@@ -7008,9 +7070,13 @@ class EmarController extends Controller
                         );
                     }
 
+                    $this->mergeDeliveredBatch(
+                        $stock,
+                        $lockedOrder->batch_number,
+                        $lockedOrder->batch_expiry,
+                        $onHandBefore,
+                    );
                     $stock->fill([
-                        'batch_number' => $lockedOrder->batch_number,
-                        'expiry_date' => $lockedOrder->batch_expiry,
                         'supplier_name' => $lockedOrder->pharmacy_name,
                         'last_counted_at' => now(),
                     ])->save();
@@ -7203,10 +7269,14 @@ class EmarController extends Controller
                     'witnessed_by' => $witness->id,
                 ]);
 
+                $this->mergeDeliveredBatch(
+                    $stock,
+                    $lockedOrder->batch_number,
+                    $lockedOrder->batch_expiry,
+                    $authoritativeBefore,
+                );
                 $stock->forceFill([
                     'on_hand' => $expectedAfter,
-                    'batch_number' => $lockedOrder->batch_number,
-                    'expiry_date' => $lockedOrder->batch_expiry,
                     'supplier_name' => $lockedOrder->pharmacy_name,
                     'last_counted_at' => now(),
                 ])->save();
@@ -7440,6 +7510,26 @@ class EmarController extends Controller
                     'supplier_name' => 'nullable|string|max:255',
                     'storage_condition' => 'nullable|string|in:ambient,fridge,controlled_room',
                 ]);
+                // A controlled drug's batch and expiry are register facts,
+                // recorded with a witness through the controlled-drug
+                // register — not edited here. Unchanged values (the edit
+                // dialog resends them) pass.
+                if ((bool) $medication->controlled_drug) {
+                    $currentExpiry = $lockedStock->expiry_date?->toDateString();
+                    $submittedExpiry = filled($validated['expiry_date'] ?? null)
+                        ? Carbon::parse($validated['expiry_date'])->toDateString()
+                        : null;
+                    $currentBatch = filled($lockedStock->batch_number) ? trim((string) $lockedStock->batch_number) : null;
+                    $submittedBatch = filled($validated['batch_number'] ?? null) ? trim((string) $validated['batch_number']) : null;
+                    $message = 'A controlled drug\'s batch and expiry are recorded through the controlled-drug register, with a witness.';
+                    $errors = array_filter([
+                        'batch_number' => array_key_exists('batch_number', $validated) && $submittedBatch !== $currentBatch ? $message : null,
+                        'expiry_date' => array_key_exists('expiry_date', $validated) && $submittedExpiry !== $currentExpiry ? $message : null,
+                    ]);
+                    if ($errors !== []) {
+                        throw ValidationException::withMessages($errors);
+                    }
+                }
                 $lockedStock->update($validated);
 
                 AuditLogger::logOrFail('medications.stock.metadata.update', $lockedStock, [

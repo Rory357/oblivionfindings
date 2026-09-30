@@ -22,10 +22,12 @@ import {
 import {
     addMedicationStockQuantities,
     buildControlledPharmacyDeliveryRequest,
+    buildPharmacyDeliveryRequest,
     controlledPharmacyDeliveryPath,
     genericStockMedications,
     medicationStockQuantitiesEqual,
     pharmacyOrderAdvanceAction,
+    pharmacyOrderAdvancePath,
     stockItemQuantityDestination,
     subtractMedicationStockQuantities,
 } from './medication-stock-governance';
@@ -222,12 +224,53 @@ describe('controlled medication request contracts', () => {
                 status: 'confirmed',
             }),
         ).toBe('advance');
+        // An ordinary dispensed order is received through a delivery step
+        // that records what actually arrived (EM-10), not a one-click advance.
         expect(
             pharmacyOrderAdvanceAction({
                 controlled: false,
                 status: 'dispensed',
             }),
+        ).toBe('delivery');
+        expect(
+            pharmacyOrderAdvanceAction({
+                controlled: false,
+                status: 'confirmed',
+            }),
         ).toBe('advance');
+    });
+
+    it('delivers an ordinary order with the counted quantity and never blanks batch or expiry', () => {
+        expect(pharmacyOrderAdvancePath(73)).toBe(
+            '/emar/stock/pharmacy-orders/73/advance',
+        );
+        expect(
+            buildPharmacyDeliveryRequest({
+                quantityReceived: ' 26 ',
+                batchNumber: ' B-2291 ',
+                batchExpiry: '2027-03-31',
+                deliveryNotes: '',
+                uuid: 'delivery-v4',
+            }),
+        ).toEqual({
+            expected_status: 'dispensed',
+            quantity_received: '26',
+            batch_number: 'B-2291',
+            batch_expiry: '2027-03-31',
+            delivery_notes: null,
+            client_request_uuid: 'delivery-v4',
+        });
+        // Blank label fields are sent as null, which the server treats as
+        // "keep what is recorded", never as a clear.
+        expect(
+            buildPharmacyDeliveryRequest({
+                quantityReceived: '26',
+                batchNumber: '  ',
+                batchExpiry: '',
+                deliveryNotes: '',
+                uuid: 'delivery-v4',
+            }),
+        ).toMatchObject({ batch_number: null, batch_expiry: null });
     });
 
     it('posts a precise witnessed controlled delivery to the exact order command', () => {
