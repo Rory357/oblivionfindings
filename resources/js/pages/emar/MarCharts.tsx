@@ -1,5 +1,7 @@
 import AttentionBar from '@/components/emar/mar/attention-bar';
-import ClinicalRail from '@/components/emar/mar/clinical-rail';
+import ClinicalRail, {
+    type InrRecord,
+} from '@/components/emar/mar/clinical-rail';
 import DoseContextMenu, {
     type DoseCtxTarget,
 } from '@/components/emar/mar/dose-context-menu';
@@ -80,17 +82,7 @@ type MarData = {
         detail?: string | null;
         prompt_on_open: boolean;
     }>;
-    inr_records?: Array<{
-        id: number;
-        medication_name?: string | null;
-        inr_value: string | number;
-        tested_on?: string | null;
-        next_test_date?: string | null;
-        target_range_min?: string | number | null;
-        target_range_max?: string | number | null;
-        medication_dose?: string | null;
-        disabled_at?: string | null;
-    }>;
+    inr_records?: InrRecord[];
     syringe_drivers?: Array<{
         id: number;
         status: string;
