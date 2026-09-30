@@ -1,0 +1,1892 @@
+{
+  "base": "http://127.0.0.1:4389/",
+  "when": "2026-09-30T08:00:37.559Z",
+  "shots": [
+    {
+      "shot": "01-stock-house-lead",
+      "size": "1440",
+      "file": "1440-01-stock-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "01-stock-house-lead",
+      "size": "1280",
+      "file": "1280-01-stock-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "01-stock-house-lead",
+      "size": "zoom200",
+      "file": "zoom200-01-stock-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "02-stock-needs-attention",
+      "size": "1440",
+      "file": "1440-02-stock-needs-attention.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "03-stock-running-low",
+      "size": "1440",
+      "file": "1440-03-stock-running-low.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "04-stock-self-managed",
+      "size": "1440",
+      "file": "1440-04-stock-self-managed.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "05-stock-row-menu",
+      "size": "1440",
+      "file": "1440-05-stock-row-menu.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "05-stock-row-menu",
+      "size": "1280",
+      "file": "1280-05-stock-row-menu.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "05-stock-row-menu",
+      "size": "zoom200",
+      "file": "zoom200-05-stock-row-menu.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "06-stock-manager-two-houses",
+      "size": "1440",
+      "file": "1440-06-stock-manager-two-houses.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "06-stock-manager-two-houses",
+      "size": "1280",
+      "file": "1280-06-stock-manager-two-houses.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "06-stock-manager-two-houses",
+      "size": "zoom200",
+      "file": "zoom200-06-stock-manager-two-houses.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "07-stock-clinical-no-cd",
+      "size": "1440",
+      "file": "1440-07-stock-clinical-no-cd.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "07-stock-clinical-no-cd",
+      "size": "1280",
+      "file": "1280-07-stock-clinical-no-cd.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "07-stock-clinical-no-cd",
+      "size": "zoom200",
+      "file": "zoom200-07-stock-clinical-no-cd.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "08-stock-support-worker",
+      "size": "1440",
+      "file": "1440-08-stock-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "08-stock-support-worker",
+      "size": "1280",
+      "file": "1280-08-stock-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "08-stock-support-worker",
+      "size": "zoom200",
+      "file": "zoom200-08-stock-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "09-stock-auditor",
+      "size": "1440",
+      "file": "1440-09-stock-auditor.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "10-stock-rimu-house",
+      "size": "1440",
+      "file": "1440-10-stock-rimu-house.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "11-stock-recent-movements",
+      "size": "1440",
+      "file": "1440-11-stock-recent-movements.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "12-orders",
+      "size": "1440",
+      "file": "1440-12-orders.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "12-orders",
+      "size": "1280",
+      "file": "1280-12-orders.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "12-orders",
+      "size": "zoom200",
+      "file": "zoom200-12-orders.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "13-orders-clinical-read-only",
+      "size": "1440",
+      "file": "1440-13-orders-clinical-read-only.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "14-counts",
+      "size": "1440",
+      "file": "1440-14-counts.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "14-counts",
+      "size": "1280",
+      "file": "1280-14-counts.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "14-counts",
+      "size": "zoom200",
+      "file": "zoom200-14-counts.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "15-expiring",
+      "size": "1440",
+      "file": "1440-15-expiring.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "15-expiring",
+      "size": "1280",
+      "file": "1280-15-expiring.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "15-expiring",
+      "size": "zoom200",
+      "file": "zoom200-15-expiring.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "16-removals",
+      "size": "1440",
+      "file": "1440-16-removals.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "16-removals",
+      "size": "1280",
+      "file": "1280-16-removals.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "16-removals",
+      "size": "zoom200",
+      "file": "zoom200-16-removals.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "17-controlled-link-only",
+      "size": "1440",
+      "file": "1440-17-controlled-link-only.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "18-stock-alerts-support-worker",
+      "size": "1440",
+      "file": "1440-18-stock-alerts-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "18-stock-alerts-support-worker",
+      "size": "1280",
+      "file": "1280-18-stock-alerts-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "18-stock-alerts-support-worker",
+      "size": "zoom200",
+      "file": "zoom200-18-stock-alerts-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "19-stock-alerts-house-lead",
+      "size": "1440",
+      "file": "1440-19-stock-alerts-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "19-stock-alerts-house-lead",
+      "size": "1280",
+      "file": "1280-19-stock-alerts-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "19-stock-alerts-house-lead",
+      "size": "zoom200",
+      "file": "zoom200-19-stock-alerts-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "20-meds-today-schedule-link-only",
+      "size": "1440",
+      "file": "1440-20-meds-today-schedule-link-only.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "21-item-packs",
+      "size": "1440",
+      "file": "1440-21-item-packs.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "21-item-packs",
+      "size": "1280",
+      "file": "1280-21-item-packs.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "21-item-packs",
+      "size": "zoom200",
+      "file": "zoom200-21-item-packs.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "22-item-pack-photos",
+      "size": "1440",
+      "file": "1440-22-item-pack-photos.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "22-item-pack-photos",
+      "size": "1280",
+      "file": "1280-22-item-pack-photos.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "22-item-pack-photos",
+      "size": "zoom200",
+      "file": "zoom200-22-item-pack-photos.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "23-item-this-medicine",
+      "size": "1440",
+      "file": "1440-23-item-this-medicine.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "24-item-movements",
+      "size": "1440",
+      "file": "1440-24-item-movements.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "25-item-controlled",
+      "size": "1440",
+      "file": "1440-25-item-controlled.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "30-receive-what-arrived",
+      "size": "1440",
+      "file": "1440-30-receive-what-arrived.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "30-receive-what-arrived",
+      "size": "1280",
+      "file": "1280-30-receive-what-arrived.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "30-receive-what-arrived",
+      "size": "zoom200",
+      "file": "zoom200-30-receive-what-arrived.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "31-receive-packs-prefilled",
+      "size": "1440",
+      "file": "1440-31-receive-packs-prefilled.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "31-receive-packs-prefilled",
+      "size": "1280",
+      "file": "1280-31-receive-packs-prefilled.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "31-receive-packs-prefilled",
+      "size": "zoom200",
+      "file": "zoom200-31-receive-packs-prefilled.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "32-receive-packs-validation",
+      "size": "1440",
+      "file": "1440-32-receive-packs-validation.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "32-receive-packs-validation",
+      "size": "1280",
+      "file": "1280-32-receive-packs-validation.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "32-receive-packs-validation",
+      "size": "zoom200",
+      "file": "zoom200-32-receive-packs-validation.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "33-receive-photo-prompt",
+      "size": "1440",
+      "file": "1440-33-receive-photo-prompt.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "33-receive-photo-prompt",
+      "size": "1280",
+      "file": "1280-33-receive-photo-prompt.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "33-receive-photo-prompt",
+      "size": "zoom200",
+      "file": "zoom200-33-receive-photo-prompt.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "34-receive-review",
+      "size": "1440",
+      "file": "1440-34-receive-review.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "34-receive-review",
+      "size": "1280",
+      "file": "1280-34-receive-review.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "34-receive-review",
+      "size": "zoom200",
+      "file": "zoom200-34-receive-review.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "35-receive-saved",
+      "size": "1440",
+      "file": "1440-35-receive-saved.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "35-receive-saved",
+      "size": "1280",
+      "file": "1280-35-receive-saved.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "35-receive-saved",
+      "size": "zoom200",
+      "file": "zoom200-35-receive-saved.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "36-receive-part-delivery",
+      "size": "1440",
+      "file": "1440-36-receive-part-delivery.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "37-receive-expired-refused",
+      "size": "1440",
+      "file": "1440-37-receive-expired-refused.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "37-receive-expired-refused",
+      "size": "1280",
+      "file": "1280-37-receive-expired-refused.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "37-receive-expired-refused",
+      "size": "zoom200",
+      "file": "zoom200-37-receive-expired-refused.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "38-receive-short-expiry-reason",
+      "size": "1440",
+      "file": "1440-38-receive-short-expiry-reason.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "39-receive-not-printed",
+      "size": "1440",
+      "file": "1440-39-receive-not-printed.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "40-receive-controlled-register",
+      "size": "1440",
+      "file": "1440-40-receive-controlled-register.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "40-receive-controlled-register",
+      "size": "1280",
+      "file": "1280-40-receive-controlled-register.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "40-receive-controlled-register",
+      "size": "zoom200",
+      "file": "zoom200-40-receive-controlled-register.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "41-receive-controlled-support-worker",
+      "size": "1440",
+      "file": "1440-41-receive-controlled-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "41-receive-controlled-support-worker",
+      "size": "1280",
+      "file": "1280-41-receive-controlled-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "41-receive-controlled-support-worker",
+      "size": "zoom200",
+      "file": "zoom200-41-receive-controlled-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "45-order-new",
+      "size": "1440",
+      "file": "1440-45-order-new.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "45-order-new",
+      "size": "1280",
+      "file": "1280-45-order-new.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "45-order-new",
+      "size": "zoom200",
+      "file": "zoom200-45-order-new.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "46-order-part-received",
+      "size": "1440",
+      "file": "1440-46-order-part-received.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "46-order-part-received",
+      "size": "1280",
+      "file": "1280-46-order-part-received.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "46-order-part-received",
+      "size": "zoom200",
+      "file": "zoom200-46-order-part-received.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "47-order-draft",
+      "size": "1440",
+      "file": "1440-47-order-draft.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "48-order-received-read-only",
+      "size": "1440",
+      "file": "1440-48-order-received-read-only.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "49-order-dispensed",
+      "size": "1440",
+      "file": "1440-49-order-dispensed.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "49-order-dispensed",
+      "size": "1280",
+      "file": "1280-49-order-dispensed.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "49-order-dispensed",
+      "size": "zoom200",
+      "file": "zoom200-49-order-dispensed.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "50-order-dispensed-validation",
+      "size": "1440",
+      "file": "1440-50-order-dispensed-validation.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "51-order-cancel-confirm",
+      "size": "1440",
+      "file": "1440-51-order-cancel-confirm.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "51-order-cancel-confirm",
+      "size": "1280",
+      "file": "1280-51-order-cancel-confirm.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "51-order-cancel-confirm",
+      "size": "zoom200",
+      "file": "zoom200-51-order-cancel-confirm.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "52-order-close-short",
+      "size": "1440",
+      "file": "1440-52-order-close-short.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "55-count-house-blind",
+      "size": "1440",
+      "file": "1440-55-count-house-blind.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "55-count-house-blind",
+      "size": "1280",
+      "file": "1280-55-count-house-blind.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "55-count-house-blind",
+      "size": "zoom200",
+      "file": "zoom200-55-count-house-blind.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "56-count-validation",
+      "size": "1440",
+      "file": "1440-56-count-validation.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "57-count-differences",
+      "size": "1440",
+      "file": "1440-57-count-differences.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "57-count-differences",
+      "size": "1280",
+      "file": "1280-57-count-differences.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "57-count-differences",
+      "size": "zoom200",
+      "file": "zoom200-57-count-differences.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "58-count-review",
+      "size": "1440",
+      "file": "1440-58-count-review.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "59-count-one-matches",
+      "size": "1440",
+      "file": "1440-59-count-one-matches.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "60-signoff-lead",
+      "size": "1440",
+      "file": "1440-60-signoff-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "60-signoff-lead",
+      "size": "1280",
+      "file": "1280-60-signoff-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "60-signoff-lead",
+      "size": "zoom200",
+      "file": "zoom200-60-signoff-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "61-signoff-accept",
+      "size": "1440",
+      "file": "1440-61-signoff-accept.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "62-signoff-support-worker-read-only",
+      "size": "1440",
+      "file": "1440-62-signoff-support-worker-read-only.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "65-remove-expired",
+      "size": "1440",
+      "file": "1440-65-remove-expired.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "65-remove-expired",
+      "size": "1280",
+      "file": "1280-65-remove-expired.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "65-remove-expired",
+      "size": "zoom200",
+      "file": "zoom200-65-remove-expired.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "66-remove-confirm",
+      "size": "1440",
+      "file": "1440-66-remove-confirm.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "66-remove-confirm",
+      "size": "1280",
+      "file": "1280-66-remove-confirm.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "66-remove-confirm",
+      "size": "zoom200",
+      "file": "zoom200-66-remove-confirm.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "67-adjust-validation",
+      "size": "1440",
+      "file": "1440-67-adjust-validation.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "70-coming-back",
+      "size": "1440",
+      "file": "1440-70-coming-back.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "70-coming-back",
+      "size": "1280",
+      "file": "1280-70-coming-back.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "70-coming-back",
+      "size": "zoom200",
+      "file": "zoom200-70-coming-back.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "71-coming-back-given-while-out",
+      "size": "1440",
+      "file": "1440-71-coming-back-given-while-out.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "72-going-out",
+      "size": "1440",
+      "file": "1440-72-going-out.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "90-loading",
+      "size": "1440",
+      "file": "1440-90-loading.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "91-no-stock-yet",
+      "size": "1440",
+      "file": "1440-91-no-stock-yet.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "91-no-stock-yet",
+      "size": "1280",
+      "file": "1280-91-no-stock-yet.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "91-no-stock-yet",
+      "size": "zoom200",
+      "file": "zoom200-91-no-stock-yet.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "92-couldnt-load",
+      "size": "1440",
+      "file": "1440-92-couldnt-load.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "92-couldnt-load",
+      "size": "1280",
+      "file": "1280-92-couldnt-load.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "92-couldnt-load",
+      "size": "zoom200",
+      "file": "zoom200-92-couldnt-load.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "93-out-of-date",
+      "size": "1440",
+      "file": "1440-93-out-of-date.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "94-offline-banner",
+      "size": "1440",
+      "file": "1440-94-offline-banner.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "95-offline-adjust-not-saved",
+      "size": "1440",
+      "file": "1440-95-offline-adjust-not-saved.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "96-support-worker-cant-order",
+      "size": "1440",
+      "file": "1440-96-support-worker-cant-order.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "96-support-worker-cant-order",
+      "size": "1280",
+      "file": "1280-96-support-worker-cant-order.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "96-support-worker-cant-order",
+      "size": "zoom200",
+      "file": "zoom200-96-support-worker-cant-order.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "97-not-found-ben",
+      "size": "1440",
+      "file": "1440-97-not-found-ben.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "97-not-found-ben",
+      "size": "1280",
+      "file": "1280-97-not-found-ben.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "97-not-found-ben",
+      "size": "zoom200",
+      "file": "zoom200-97-not-found-ben.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "98-not-found-controlled",
+      "size": "1440",
+      "file": "1440-98-not-found-controlled.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "99-nothing-to-receive",
+      "size": "1440",
+      "file": "1440-99-nothing-to-receive.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "100-contract-page",
+      "size": "1440",
+      "file": "1440-100-contract-page.png",
+      "overflow": 0,
+      "header": null,
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "100-contract-page",
+      "size": "1280",
+      "file": "1280-100-contract-page.png",
+      "overflow": 0,
+      "header": null,
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "100-contract-page",
+      "size": "zoom200",
+      "file": "zoom200-100-contract-page.png",
+      "overflow": 0,
+      "header": null,
+      "errors": [],
+      "stepError": null
+    }
+  ],
+  "keyboard": {
+    "openedFrom": "Receive",
+    "tabOrder": [
+      "Close",
+      "Cancel",
+      "Continue",
+      "What arrivedPO-1040",
+      "Close",
+      "Cancel",
+      "Continue",
+      "What arrivedPO-1040",
+      "Close",
+      "Cancel"
+    ],
+    "afterEscape": "Receive",
+    "dialogStillOpen": false,
+    "keyboardMenu": [
+      "Open the stock item",
+      "Receive a delivery",
+      "Count it",
+      "Going out or coming back",
+      "Order from the pharmacy",
+      "Adjust or remove"
+    ],
+    "keyboardMenuVia": "ContextMenu key"
+  }
+}
