@@ -143,6 +143,10 @@ Screenshot review also led to four more changes:
 - notices show only where they’re actionable;
 - a package code was removed from the product copy.
 
+**Main’s review fixes (30 September):**
+- the register’s explanation lines are neutral text, with colour only on the badge (`01`);
+- the per-medicine control always sits below the medicine’s name (`54`).
+
 **Keyboard** (real key events over CDP, `report.json` → `keyboard`):
 - Enter on Grace’s “Reassess” in the register opens the wizard.
 - Tab moves through Close → the wishes tiles → the “who took part” checkboxes → the guardian’s name, and stays inside the dialog.

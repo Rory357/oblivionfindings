@@ -26,6 +26,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonTable } from '@/components/ui/skeleton-table';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { AlertTriangle, ClipboardList, Clock3, Eye, FileSignature, History, Home, MessageSquareText, Pill, RefreshCw, Users, type LucideIcon } from 'lucide-react';
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { CHANGES, HOUSES, PEOPLE, PEOPLE_ORDER, PERSONAS, SUPPORT, SUPPORT_ORDER, medsOf, type House, type PersonId, type Support } from '../data';
@@ -292,7 +293,7 @@ function Register({ houses, search }: { houses: House[]; search: string }) {
                         const ag = agreementOf(x.pid, s.rt);
                         const st = statusOf(x.pid, s.rt, p);
                         if (ag) return <span className="text-[12.5px]">{ag.role === 'person' ? `${ag.how === 'signed' ? 'Signed' : 'Agreed verbally'} by ${PEOPLE[x.pid].pref}` : `${ag.role === 'guardian' ? 'Welfare guardian' : 'EPOA'} · ${ag.how === 'signed' ? 'signed' : 'verbal'}`} · {ag.on}</span>;
-                        return st.agreementMissing ? <StateLine tone="warning">Needed — not recorded</StateLine> : <span className="text-[12.5px] text-muted-foreground">Not needed — staff give or help</span>;
+                        return st.agreementMissing ? <StatusBadge variant="warning" className="rounded-[8px]">Needed — not recorded</StatusBadge> : <span className="text-[12.5px] text-muted-foreground">Not needed — staff give or help</span>;
                     },
                 },
                 { key: 'by', label: 'Reassess by', width: '0.8fr', cell: (x) => <span className="text-[12.5px] font-semibold">{assessmentOf(x.pid, s.rt)?.reassessBy ?? '—'}</span> },
@@ -306,7 +307,7 @@ function Register({ houses, search }: { houses: House[]; search: string }) {
                             <span className="flex flex-col items-start gap-1 py-0.5">
                                 <PlanBadge state={st.state} />
                                 {st.lines.map((l) => (
-                                    <StateLine key={l.text} tone={l.tone}>
+                                    <StateLine key={l.text}>
                                         {l.text}
                                     </StateLine>
                                 ))}

@@ -1,6 +1,6 @@
 # eMAR P03 v1 — Support & self-administration
 
-**Status: design candidate for inspection by Main (the review session, “Codex eMAR audit re-review”), which approves under Stephan’s delegation of 30 September 2026.** Not approved, not implemented.
+**Status: approved by Main (the review session, “Codex eMAR audit re-review”) under Stephan’s delegation, 30 September 2026, for Stephan’s final inspection — see [APPROVAL.md](APPROVAL.md).** Frozen. Not implemented.
 
 - Version: v1, 30 September 2026 (NZDT). Branch `claude/emar-p03`, based on `origin/main` `31d597415`.
 - Exact file identity: [`VERSION.txt`](VERSION.txt) (SHA-256 of every source, build and tool file). Approval applies to those hashes only.
@@ -191,7 +191,13 @@ Until the reassessment, support stays as it is and the reason is shown.
 4. **`ConfirmDialog` is the real one.** Its destructive confirm renders purple on main until PR #15 lands; this is not worked around.
 5. **The hub header meters stay P02’s dose numbers** in this view, and the register’s own counts are in its section captions. Per-view meters (reassess now, no assessment, agreements needed) are an option if Main prefers.
 
-## Approval requested
+**Main’s inspection, 30 September:** v1 at `f6a425a5f` passed (`sha256sum -c` 29 OK) with two fixes, made in this version:
+1. **The register’s State column:** the explanation lines are normal text, not long red paragraphs. The colour stays on the “Reassess now” badge, and “Agreement needed” is a warning badge.
+2. **Support for each medicine:** the four-way control always sits below the medicine’s name, so every row lines up.
 
-After Main’s inspection, approve **eMAR P03 v1** exactly as identified by the hashes in `VERSION.txt`, or list the changes for a v2.
+Main also accepted the tightened rule (no more independence outside a reassessment; loosening needs a destructive confirmation) and deviations 1–5. The counts stay in the captions.
+
+## Approval
+
+Approved by Main under Stephan’s delegation, for his final inspection. The exact version and the record are in [`APPROVAL.md`](APPROVAL.md). **v1 is frozen**; any change goes in `P03/v2/`.
 
