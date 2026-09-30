@@ -21,9 +21,9 @@ import { FOLLOW_UPS, HOUSES, PEOPLE, PERSONAS, TYPE_LABEL, hoById, type Handover
 import { NotFoundDialog } from './modal';
 import { dueLabel, isOpen } from './model';
 import { useStore, type Row } from './store';
-import { DesignNote, FuBadge, Notice } from './ui';
+import { ConcealedCount, DesignNote, FuBadge, Notice } from './ui';
 
-function LensSection({ icon: Icon, title, caption, children }: { icon: typeof Pill; title: string; caption?: string; children: ReactNode }) {
+function LensSection({ icon: Icon, title, caption, children }: { icon: typeof Pill; title: string; caption?: ReactNode; children: ReactNode }) {
     return (
         <section aria-label={title} className="rounded-xl border bg-card">
             <header className="flex flex-wrap items-baseline justify-between gap-2 border-b px-3 py-2">
@@ -65,11 +65,25 @@ export function MedicationLens({ h, onOpen, incoming }: { h: Handover; onOpen: (
     const p = PERSONAS[s.route.persona];
     const rows = s.rows();
     const carried = rows.filter((r) => h.carried.includes(r.f.id));
-    const leadOpen = rows.filter((r) => r.f.house === h.house && !h.carried.includes(r.f.id) && isOpen(r.state) && ['disputed', 'partial', 'unconfirmed', 'override', 'countersign'].includes(r.f.type) && r.f.id !== 'fu-partial' && r.f.id !== 'fu-phone' && r.f.id !== 'fu-override');
+    // Lead follow-ups open at this shift change (the later ones were created after it).
+    const atChange = (r: Row) => r.f.house === h.house && !h.carried.includes(r.f.id) && isOpen(r.state) && ['disputed', 'partial', 'unconfirmed', 'override', 'countersign'].includes(r.f.type) && r.f.id !== 'fu-partial' && r.f.id !== 'fu-phone' && r.f.id !== 'fu-override';
+    const leadOpen = rows.filter(atChange);
     const cdView = p.perms.includes('cd.view');
+    // Controlled items this role can’t see: counted, never listed (P02 rule).
+    const hiddenCarried = s.concealed().filter((r) => h.carried.includes(r.f.id)).length;
+    const hiddenLead = s.concealed().filter(atChange).length;
     return (
         <div className="space-y-3">
-            <LensSection icon={Repeat} title="Follow-ups carried over" caption={carried.length ? `${carried.length} from ${h.label.split(' →')[0].toLowerCase()} shift` : 'None'}>
+            <LensSection
+                icon={Repeat}
+                title="Follow-ups carried over"
+                caption={
+                    <>
+                        {carried.length ? `${carried.length} from ${h.label.split(' →')[0].toLowerCase()} shift` : 'None shown'}
+                        {hiddenCarried ? <> · <ConcealedCount n={hiddenCarried} /></> : null}
+                    </>
+                }
+            >
                 {carried.length ? (
                     <>
                         <ul className="divide-y">
@@ -80,16 +94,28 @@ export function MedicationLens({ h, onOpen, incoming }: { h: Handover; onOpen: (
                         <p className="text-caption">Live items, not notes. Everyone rostered sees them until they’re done; the incoming worker becomes the owner on acknowledgement, or the house lead assigns them.</p>
                     </>
                 ) : (
-                    <p className="text-muted-foreground">Nothing was left open at the shift change.</p>
+                    <p className="text-muted-foreground">{hiddenCarried ? 'Nothing you can see was left open at the shift change.' : 'Nothing was left open at the shift change.'}</p>
                 )}
             </LensSection>
-            {leadOpen.length ? (
-                <LensSection icon={Users} title="Still with the house lead" caption={`${leadOpen.length} open`}>
-                    <ul className="divide-y">
-                        {leadOpen.map((r) => (
-                            <FuLine key={r.f.id} row={r} onOpen={onOpen} />
-                        ))}
-                    </ul>
+            {leadOpen.length || hiddenLead ? (
+                <LensSection
+                    icon={Users}
+                    title="Still with the house lead"
+                    caption={
+                        <>
+                            {leadOpen.length} open{hiddenLead ? <> · <ConcealedCount n={hiddenLead} /></> : null}
+                        </>
+                    }
+                >
+                    {leadOpen.length ? (
+                        <ul className="divide-y">
+                            {leadOpen.map((r) => (
+                                <FuLine key={r.f.id} row={r} onOpen={onOpen} />
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-muted-foreground">A house lead with controlled-medicine access deals with it.</p>
+                    )}
                 </LensSection>
             ) : null}
             <LensSection icon={Pill} title="Doses with no outcome at the shift change" caption={h.noOutcome.length ? `${h.noOutcome.length}` : 'None'}>
@@ -107,7 +133,11 @@ export function MedicationLens({ h, onOpen, incoming }: { h: Handover; onOpen: (
                         </Button>
                     </span>
                 </LensSection>
-            ) : null}
+            ) : (
+                <LensSection icon={ShieldCheck} title="Controlled-drug count at the shift change" caption={<ConcealedCount>Not shown — needs controlled-medicine access</ConcealedCount>}>
+                    <p className="text-muted-foreground">The count and who did it are shown to people with controlled-medicine access. The incoming worker sees it.</p>
+                </LensSection>
+            )}
             <LensSection icon={Package} title="Supply" caption={h.supply ? '1 note' : 'Nothing low'}>
                 {h.supply ? (
                     <span className="flex flex-wrap items-center gap-2">

@@ -112,7 +112,7 @@ Legend: **Pass** · **Pass (note)** passes with a stated limitation · **N/A** i
 | No codes in product copy | Pass (see G) |
 | Real button variants only; `link` for ↗ jumps | Pass: `variant="link"` with a lucide `ArrowUpRight` (`72`) |
 | Honest states | Pass |
-| Controlled-drug concealment everywhere, shown with a persona | Pass: Hana Kereama (`65`, `79`, `82`). No override follow-up in lists, meters, tasks or the handover lens; no Controlled counts meter. A direct link shows “We can’t show this record”. |
+| Controlled-drug concealment everywhere, shown with a persona | Pass: Hana Kereama (`65`, `79`, `82`). The override follow-up is left out of lists, meters, tasks and the lens, and the captions count it in P02’s wording, “1 controlled follow-up not shown — needs controlled-medicine access” (Main’s review fix). The lens’s controlled-count section and the Handovers register caption say “not shown — needs controlled-medicine access”. A direct link shows “We can’t show this record”. |
 | House scope: no access (page) is distinct from not found (record) | Pass: Safety & oversight as a support worker (`95`) vs a Rimu House follow-up for Priya (`96`). The manager sees both houses (`60`, `71`). |
 | Loosening a safety setting is destructive | N/A: P08a has no settings. Delivery is P11’s. |
 | Destructive ConfirmDialog renders purple on main | Noted; not worked around |

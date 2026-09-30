@@ -62,6 +62,8 @@ export interface Store {
     /** Every follow-up this persona may see, with its current owner and state. */
     rows: () => Row[];
     row: (id: string) => Row | null;
+    /** Controlled follow-ups at the persona’s houses that their role can’t see — counted in captions, never listed (P02 rule). */
+    concealed: () => Row[];
 }
 const StoreCtx = createContext<Store | null>(null);
 export const useStore = () => useContext(StoreCtx)!;
@@ -122,6 +124,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return FOLLOW_UPS.filter((f) => visible(f, route.persona)).map((f) => ({ f, rt: rt[f.id], owner: ownerOf(f, rt[f.id], route.scenario, kowhaiAcked), state: stateOf(f, rt[f.id], route.persona), ownerSetAt: setAt(f) }));
     }, [route.scenario, route.persona, rt, kowhaiAcked, acked]);
     const row = useCallback((id: string) => rows().find((r) => r.f.id === id) ?? null, [rows]);
+    const concealed = useCallback((): Row[] => {
+        const p = PERSONAS[route.persona];
+        if (p.perms.includes('cd.view')) return [];
+        return FOLLOW_UPS.filter((f) => f.cd && p.houses.includes(f.house) && (route.scenario !== 'empty' || !!f.done)).map((f) => ({ f, rt: rt[f.id], owner: f.owner, state: stateOf(f, rt[f.id], route.persona) }));
+    }, [route.persona, route.scenario, rt]);
 
     const store: Store = {
         route,
@@ -135,6 +142,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         toasts,
         rows,
         row,
+        concealed,
     };
     return <StoreCtx.Provider value={store}>{children}</StoreCtx.Provider>;
 }

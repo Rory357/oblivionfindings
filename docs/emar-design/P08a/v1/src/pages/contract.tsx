@@ -70,7 +70,7 @@ export function ContractPage() {
 
             <Section id="types" title="1. Every follow-up type the approved packages create">
                 <T head={['Follow-up', 'Created by', 'Owner', 'Due', 'Who closes it']} rows={(Object.keys(TYPE_LABEL) as FuType[]).map((k) => [TYPE_LABEL[k], FROM_PACKAGE[k], OWNS[k][0], OWNS[k][1], OWNS[k][2]])} />
-                <p className="text-caption">Everyone rostered at the house and the house lead see every follow-up until it’s done (Stephan, D12). Controlled-medicine follow-ups leave no trace for roles without controlled-medicine access (EM-12).</p>
+                <p className="text-caption">Everyone rostered at the house and the house lead see every follow-up until it’s done (Stephan, D12). Controlled-medicine follow-ups are left out for roles without controlled-medicine access (EM-12), and list captions count them: “1 controlled follow-up not shown — needs controlled-medicine access” (P02’s rule for cross-person lists).</p>
             </Section>
 
             <Section id="rules" title="2. Rules (Main’s answers under Stephan’s delegation, 30 September)">
@@ -119,7 +119,7 @@ export function ContractPage() {
                         ['Handover not acknowledged — heads-up', L('As Rangi Parata', S, { as: 'pm', open: 'headsup:fu-rimu-handover' })],
                         ['Reassign', L('Mele’s paracetamol', M, { open: 'reassign:fu-para-mele', as: 'lead' })],
                         ['Loading · empty · couldn’t load · out of date · offline', <span key="p">{L('Loading', M, { scn: 'loading' })} · {L('Nothing to follow up', M, { scn: 'empty' })} · {L('Couldn’t load', M, { scn: 'unavailable' })} · {L('Out of date', M, { scn: 'stale' })} · {L('Offline', M, { scn: 'offline', open: 'effect:fu-para-aroha' })}</span>],
-                        ['Concealment: no controlled-medicine follow-ups, counts or handover counts', L('As Hana Kereama', S, { as: 'clinical' })],
+                        ['Concealment: controlled follow-ups and counts left out, and counted in the captions', L('As Hana Kereama', S, { as: 'clinical' })],
                         ['No access (page) vs not found (record)', <span key="n">{L('No access: Safety & oversight as a support worker', S, { view: 'followups' })} · {L('Not found: a Rimu House follow-up as Priya', M, { open: 'fu:fu-rimu-unconf' })}</span>],
                     ]}
                 />

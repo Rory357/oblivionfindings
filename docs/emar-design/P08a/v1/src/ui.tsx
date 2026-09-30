@@ -13,6 +13,7 @@ import {
     Clock3,
     Flag,
     Info,
+    LockKeyhole,
     Save,
     Settings2,
     ShieldCheck,
@@ -216,6 +217,17 @@ export function StateLine({ tone, icon: Icon, children }: { tone?: 'warning' | '
         <span className={cn('flex items-start gap-1 text-[12px] leading-snug', tone === 'critical' ? 'font-semibold text-status-critical' : tone === 'warning' ? 'font-semibold text-status-warning' : tone === 'success' ? 'text-status-success' : 'text-muted-foreground')}>
             {Icon ? <Icon className="mt-0.5 size-3 shrink-0" aria-hidden="true" /> : null}
             <span>{children}</span>
+        </span>
+    );
+}
+
+/** P02’s approved rule for cross-person lists: controlled rows are left out for roles without
+ *  controlled-medicine view, and the caption counts them (a redacted row would still show who). */
+export function ConcealedCount({ n, noun = 'follow-up', children }: { n?: number; noun?: string; children?: ReactNode }) {
+    if (!n && !children) return null;
+    return (
+        <span className="inline-flex items-center gap-1">
+            <LockKeyhole className="size-3" aria-hidden="true" /> {children ?? `${n} controlled ${noun}${n === 1 ? '' : 's'} not shown — needs controlled-medicine access`}
         </span>
     );
 }

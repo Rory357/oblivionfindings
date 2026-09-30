@@ -33,7 +33,7 @@ import { isLead, isOpen } from '../model';
 import { FollowUpTable, useRowContext } from '../rows';
 import { Shell } from '../shell';
 import { useStore, type Row } from '../store';
-import { DesignNote, NotConfigured, StateLine } from '../ui';
+import { ConcealedCount, DesignNote, NotConfigured, StateLine } from '../ui';
 import { TYPE_FILTER, matchesSearch, matchesType } from './meds-today';
 
 const SAFETY_VIEWS: { key: string; label: string; icon: typeof Gauge; pkg: string }[] = [
@@ -199,7 +199,7 @@ export function SafetyPage() {
         <Shell crumbs={crumbs}>
             {header}
             {view === 'followups' ? (
-                <OversightFollowUps rows={rows} search={q} />
+                <OversightFollowUps rows={rows} concealed={s.concealed().filter((x) => houses.includes(x.f.house))} search={q} />
             ) : view === 'handovers' ? (
                 <HandoverRegister rows={hRows} search={q} ackOf={ackOf} onOpen={(id) => open(`handover:${id}`)} />
             ) : (
@@ -211,7 +211,7 @@ export function SafetyPage() {
     );
 }
 
-function OversightFollowUps({ rows, search }: { rows: Row[]; search: string }) {
+function OversightFollowUps({ rows, concealed, search }: { rows: Row[]; concealed: Row[]; search: string }) {
     const s = useStore();
     const r = s.route;
     const q = search.trim().toLowerCase();
@@ -239,6 +239,15 @@ function OversightFollowUps({ rows, search }: { rows: Row[]; search: string }) {
     const done = list.filter((x) => !isOpen(x.state) || x.state === 'queued');
     const carried = open.filter((x) => x.f.carried);
     const hidden = !p.perms.includes('cd.view');
+    // Controlled follow-ups this role can’t see: left out of the rows, counted in the caption of the section they’d be in (P02 rule). Not counted while searching.
+    const cList = q ? [] : concealed.filter((x) => matchesType(x, type));
+    const cOpen = cList.filter((x) => isOpen(x.state));
+    const cCount: Record<string, number> = {
+        Overdue: cOpen.filter((x) => x.state === 'overdue').length,
+        Due: cOpen.filter((x) => x.state !== 'overdue').length,
+        'Done in the last 24 hours': cList.filter((x) => !isOpen(x.state) || x.state === 'queued').length,
+        'Carried over from an earlier shift': cOpen.filter((x) => x.f.carried).length,
+    };
     const sections: [string, Row[], string][] =
         st === 'done' ? [['Done in the last 24 hours', done, 'Done late shows how late']] : st === 'carried' ? [['Carried over from an earlier shift', carried, 'Owner set when the handover is acknowledged, or by a lead']] : st === 'overdue' ? [['Overdue', overdue, 'Everyone rostered and the house lead see these until they’re done']] : [['Overdue', overdue, 'Everyone rostered and the house lead see these until they’re done'], ['Due', due, 'Worker follow-ups first, then lead sign-offs']];
     return (
@@ -250,13 +259,20 @@ function OversightFollowUps({ rows, search }: { rows: Row[]; search: string }) {
             ) : (
                 sections.map(([title, items, cap]) => (
                     <section key={title} className="flex flex-col gap-2.5" aria-label={title}>
-                        <ListCaption title={title} caption={`${items.length} shown · ${cap}`} />
+                        <ListCaption
+                            title={title}
+                            caption={
+                                <>
+                                    {items.length} shown{cCount[title] ? <> · <ConcealedCount n={cCount[title]} /></> : null} · {cap}
+                                </>
+                            }
+                        />
                         {items.length ? <FollowUpTable rows={items} showHouse keyPrefix={title} /> : <Card className="p-2"><EmptyState icon={Inbox} title={`Nothing ${title.toLowerCase()}`} description="Change the filters to see more." /></Card>}
                     </section>
                 ))
             )}
             <p className="text-caption">
-                Times in NZDT. Reminders and escalation follow Settings › Alerts › Delivery {scn === 'delivery' ? '(on in this scenario: every 30 minutes, up to 3 times, then to the house lead after 60 minutes)' : <>— <NotConfigured /> until a manager switches them on</>}.{hidden ? ' Showing follow-ups your role can see. Totals exclude medicines your role can’t see.' : ''}
+                Times in NZDT. Reminders and escalation follow Settings › Alerts › Delivery {scn === 'delivery' ? '(on in this scenario: every 30 minutes, up to 3 times, then to the house lead after 60 minutes)' : <>— <NotConfigured /> until a manager switches them on</>}.{hidden ? ' Showing follow-ups your role can see. Meter totals exclude controlled follow-ups; list captions count them.' : ''}
             </p>
         </>
     );
@@ -290,7 +306,20 @@ function HandoverRegister({ rows, search, ackOf, onOpen }: { rows: Handover[]; s
         ]);
     return (
         <section className="flex flex-col gap-2.5" aria-label="Handovers">
-            <ListCaption title="Shift handovers, last 24 hours" caption={`${list.length} of ${rows.length} shown · the medication part of each handover`} />
+            <ListCaption
+                title="Shift handovers, last 24 hours"
+                caption={
+                    <>
+                        {list.length} of {rows.length} shown · the medication part of each handover
+                        {p.perms.includes('cd.view') ? null : (
+                            <>
+                                {' · '}
+                                <ConcealedCount>Controlled-drug counts not shown — needs controlled-medicine access</ConcealedCount>
+                            </>
+                        )}
+                    </>
+                }
+            />
             {list.length ? (
                 <EntityTable<Handover>
                     rows={list}
@@ -339,7 +368,7 @@ function HandoverRegister({ rows, search, ackOf, onOpen }: { rows: Handover[]; s
                     <EmptyState icon={Inbox} title="No handovers match" description="Change the filters to see more." />
                 </Card>
             )}
-            <p className="text-caption">Times in NZDT. Only the incoming worker can acknowledge. Acknowledging closes no medication work and never blocks recording.{p.perms.includes('cd.view') ? '' : ' Controlled-drug counts aren’t shown to your role.'}</p>
+            <p className="text-caption">Times in NZDT. Only the incoming worker can acknowledge. Acknowledging closes no medication work and never blocks recording.</p>
             {ctx.node}
             <DesignNote>Replaces the medication handovers page at /emar/handovers (today a PageHero with “Kia ora …”). The URL is kept; the handover itself (notes, mood, tasks) stays in Operations › Handovers.</DesignNote>
         </section>

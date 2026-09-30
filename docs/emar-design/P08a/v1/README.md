@@ -1,6 +1,6 @@
 # eMAR P08a v1 — Follow-ups & handover
 
-**Status: design candidate for inspection by Main (the review session, “Codex eMAR audit re-review”), which approves under Stephan’s delegation of 30 September 2026.** Not approved, not implemented.
+**Status: approved by Main (the review session, “Codex eMAR audit re-review”) under Stephan’s delegation, 30 September 2026, for Stephan’s final inspection — see [APPROVAL.md](APPROVAL.md).** Frozen. Not implemented.
 
 - Version: v1, 30 September 2026 (NZDT). Branch `claude/emar-p08a`, based on `origin/main` `d9dc17fa5`.
 - Exact file identity: [`VERSION.txt`](VERSION.txt) (SHA-256 of every source, build and tool file). Approval applies to those hashes only.
@@ -27,7 +27,7 @@
 Already decided, and not asked again:
 - Due by the end of the next shift, and visible to everyone rostered and the house lead until done (Stephan, D12).
 - The forgotten-PIN fallback (P01): the named colleague answers “Were you there?”; “no” or no answer starts a lead follow-up.
-- Controlled-medicine follow-ups leave no trace without controlled-medicine view (EM-12).
+- Controlled-medicine follow-ups are left out of lists for roles without controlled-medicine view (EM-12), and the list caption counts them (P02’s approved rule for cross-person lists; Main, 30 September).
 - Follow-ups have no witness PIN, so they save offline and send later (D7).
 
 ## Open it
@@ -153,7 +153,7 @@ The page top is P11 v5’s approved Safety & oversight header and rail. P08a des
 
 ### 9. All Tasks
 
-One task per open follow-up the persona can see: their own, their house’s, and (for leads) their houses’ lead sign-offs. A task opens the same record. Controlled items follow EM-12.
+One task per open follow-up the persona can see: their own, their house’s, and (for leads) their houses’ lead sign-offs. A task opens the same record. Controlled items are left out for roles without controlled-medicine view, and the caption counts them.
 
 ### 10. Reminders and escalation (P11 v5 Delivery)
 
@@ -162,7 +162,7 @@ One task per open follow-up the persona can see: their own, their house’s, and
 
 ### 11. Controlled-drug concealment (EM-12): Hana Kereama
 
-For Hana, the witness-override follow-up doesn’t exist in any list, count, meter, task or handover. The handover lens has no controlled-count section, and the Handovers register has no Controlled counts meter. A direct link to it shows **“We can’t show this record”**, the same as a record that doesn’t exist.
+For Hana, the witness-override follow-up is **left out** of every list, meter, task and handover lens, and the list captions **count** it, in P02’s wording: “1 controlled follow-up not shown — needs controlled-medicine access” (the Due section in Safety & oversight, All Tasks, and the lens’s house-lead section when it applies). A redacted row would still show who is involved. Meter totals exclude it. In the handover lens, the controlled-drug count section reads “Not shown — needs controlled-medicine access”, and the Handovers register caption says controlled-drug counts aren’t shown; the Controlled counts meter is left out. A direct link to the record shows **“We can’t show this record”**, the same as a record that doesn’t exist. (Main’s review fix, 30 September.)
 
 ### 12. States
 
@@ -207,15 +207,17 @@ Every state is deep-linked from the contract page:
 4. **Safety & oversight › Witness overrides belongs to P07b.** Main assigned it on 30 September, after P08a flagged it as unassigned. Its rail view is link-only here and names P07b.
 5. **The P01 dose dialog isn’t redrawn.** The effect-check time picker (Q6) belongs to it; here the time only shows on the record.
 
-## Open questions for Main
+**Main’s inspection, 30 September:** v1 at `32c6cbcca` passed (`sha256sum -c` 33 OK), with one fix. Lists must follow P02’s approved rule for cross-person lists: controlled rows are left out for roles without controlled-medicine view, and **the caption counts them**. For example, Safety & oversight’s Due section now reads “8 shown · 1 controlled follow-up not shown — needs controlled-medicine access”, so a lead knows someone else must deal with it. The same applies to All Tasks and the handover lens. The fix is made in this version (README §11).
 
-1. **A check moved with “Couldn’t check” is on time if done by its new time.** Lateness is kept for checks nobody did. *Recommended: yes.* The alternative measures lateness against the original time.
-2. **“Didn’t help” always turns on “Someone else needs to know”**, and it can’t be turned off. *Recommended: yes.*
-3. **The handover heads-up (answer 5) is a lead follow-up in the list even while Delivery is off**, so it’s never lost. Only its bell and push reminders follow Delivery. *Recommended: yes.*
-4. **A refusal “Not needed now” closes the follow-up with a reason and a note.** It doesn’t count as a second refusal. *Recommended: yes.*
+## Main’s answers to the open questions (30 September, under delegation): all yes
+
+1. **A check moved with “Couldn’t check” is on time if done by its new time.** Lateness is kept for checks nobody did.
+2. **“Didn’t help” always turns on “Someone else needs to know”**, and it can’t be turned off.
+3. **The handover heads-up (answer 5) is a lead follow-up in the list even while Delivery is off.** Only its bell and push reminders follow Delivery.
+4. **A refusal “Not needed now” closes the follow-up with a reason and a note.** It doesn’t count as a second refusal.
 
 Still open from earlier packages: D1, D3, D9, D10 and D11. The per-house on-call contact still shows “Not configured”.
 
-## Approval requested
+## Approval
 
-After Main’s inspection, approve **eMAR P08a v1** exactly as identified by the hashes in `VERSION.txt`, or list the changes for a v2.
+Approved by Main under Stephan’s delegation, for his final inspection. The exact version and the record are in [`APPROVAL.md`](APPROVAL.md). **v1 is frozen**; any change goes in `P08a/v2/`.
