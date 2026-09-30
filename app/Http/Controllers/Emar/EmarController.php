@@ -102,9 +102,26 @@ class EmarController extends Controller
      */
     private function marUrlFor(mixed $clientId): ?string
     {
-        $this->marLinks ??= app(MarLinkService::class);
+        return $this->marLinks()->urlFor(request()->user(), $clientId);
+    }
 
-        return $this->marLinks->urlFor(request()->user(), $clientId);
+    private function marLinks(): MarLinkService
+    {
+        return $this->marLinks ??= app(MarLinkService::class);
+    }
+
+    /**
+     * Site scope is not person scope: narrow a Site-wide list's clients to the
+     * people whose chart this user may open (ClientPolicy::viewMedications), so
+     * an ordinary support worker never sees another resident's rows while leads
+     * keep the whole Site. Same rule as the MAR picker.
+     *
+     * @param  iterable<int, mixed>  $clientIds
+     * @return array<int, int>
+     */
+    private function personScopedClientIds(User $actor, iterable $clientIds): array
+    {
+        return $this->marLinks()->openableClientIds($actor, $clientIds);
     }
 
     private function buildMedicationPermissions(?User $user): array
@@ -1609,12 +1626,10 @@ class EmarController extends Controller
             $clientFilter,
         );
         $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
-        $viewableClientIds = Client::query()
+        $viewableClientIds = $this->personScopedClientIds($user, Client::query()
             ->whereIn('id', $viewableClientIds)
             ->whereIn('site_id', $readerSiteIds)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+            ->pluck('id'));
         $search = trim((string) $request->string('q')) ?: null;
         $scheduleService = app(MarScheduleService::class);
         $timezone = $scheduleService->workerTimezone();
@@ -2468,6 +2483,16 @@ class EmarController extends Controller
                 ->whereHas('client', fn ($c) => $c->whereIn('site_id', $readerSiteIds))
                 ->when($clientFilter, $byClient))
             ->get();
+        // The route requires medications.stock.update, which viewMedications
+        // already treats as Site-wide, so this keeps the whole Site today; it
+        // is here so the stock register follows the same person rule.
+        $openableClientIds = $this->personScopedClientIds(
+            $actor,
+            $stockModels->map(fn (ClientMedicationStock $s) => $s->medication?->client_id),
+        );
+        $stockModels = $stockModels
+            ->filter(fn (ClientMedicationStock $s) => in_array((int) $s->medication?->client_id, $openableClientIds, true))
+            ->values();
 
         // Honest movement history per stock item — sourced from the audit log
         // (AuditableChanges on ClientMedicationStock), no dedicated movements
@@ -3094,11 +3119,17 @@ class EmarController extends Controller
         );
         $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
 
+        $openableClientIds = $this->personScopedClientIds(
+            $actor,
+            Client::query()->whereIn('site_id', $readerSiteIds)->pluck('id'),
+        );
+
         // Flat, client-side-filterable feed — the redesigned page facets by tab,
         // search, site and reviewer with live counts.
         $models = MedicationReview::query()
             ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'reviewer:id,name', 'requestedBy:id,name'])
             ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
+            ->whereIn('client_id', $openableClientIds)
             ->latest('scheduled_date')
             ->limit(250)
             ->get();
@@ -3772,6 +3803,10 @@ class EmarController extends Controller
             $clientFilter,
         );
         $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
+        $openableClientIds = $this->personScopedClientIds(
+            $actor,
+            Client::query()->whereIn('site_id', $readerSiteIds)->pluck('id'),
+        );
 
         // Flat, client-side-filterable disposal register. Voided records remain
         // in the list (struck through) — the register is immutable (MoD Regs 1977).
@@ -3779,6 +3814,7 @@ class EmarController extends Controller
             MedicationDestruction::query(),
             $readerSiteIds,
         )
+            ->whereIn('client_id', $openableClientIds)
             ->when($clientFilter, fn ($query) => $query->where('client_id', $clientFilter))
             ->with([
                 'client:id,first_name,last_name,site_id',
@@ -3797,6 +3833,7 @@ class EmarController extends Controller
         $medications = ClientMedication::query()
             ->active()
             ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
+            ->whereIn('client_id', $openableClientIds)
             ->when($clientFilter, fn ($query) => $query->where('client_id', $clientFilter))
             ->with(['client:id,first_name,last_name', 'stock'])
             ->orderBy('name')
