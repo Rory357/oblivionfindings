@@ -69,6 +69,111 @@ function ToggleRow({
     );
 }
 
+export type OrderAllergy = {
+    allergen: string;
+    severity: string | null;
+    source: string | null;
+};
+
+/** null = still checking; 'unavailable' = couldn't be read; [] = none recorded. */
+export type OrderAllergyState = OrderAllergy[] | 'unavailable' | null;
+
+/**
+ * Read GET /api/medications/clients/{id}/allergies. `recorded_allergies` is
+ * the medication register + health profile list (EM-07) that dose-time
+ * checks use; the register-only `allergies` list is the fallback. A response
+ * without either list is 'unavailable' — never "none recorded".
+ */
+export function parseOrderAllergies(
+    data: unknown,
+): OrderAllergy[] | 'unavailable' {
+    const body = (data ?? {}) as {
+        recorded_allergies?: unknown;
+        allergies?: unknown;
+    };
+    const list: unknown[] | null = Array.isArray(body.recorded_allergies)
+        ? body.recorded_allergies
+        : Array.isArray(body.allergies)
+          ? body.allergies
+          : null;
+    if (list === null) return 'unavailable';
+
+    return list.flatMap((entry): OrderAllergy[] => {
+        const { allergen, severity, source } = (entry ?? {}) as {
+            allergen?: unknown;
+            severity?: unknown;
+            source?: unknown;
+        };
+        if (typeof allergen !== 'string' || allergen.trim() === '') return [];
+
+        return [
+            {
+                allergen: allergen.trim(),
+                severity: typeof severity === 'string' ? severity : null,
+                source: typeof source === 'string' ? source : null,
+            },
+        ];
+    });
+}
+
+/** Fetch a resident's recorded allergies; any failure is 'unavailable'. */
+export async function loadOrderAllergies(
+    clientId: number,
+    get: (url: string) => Promise<{ data: unknown }> = axios.get,
+): Promise<OrderAllergy[] | 'unavailable'> {
+    try {
+        const response = await get(
+            `/api/medications/clients/${clientId}/allergies`,
+        );
+
+        return parseOrderAllergies(response.data);
+    } catch {
+        return 'unavailable';
+    }
+}
+
+/** Allergy step of the new-order wizard. An empty list is never a reassurance. */
+export function OrderAllergyNotice({
+    allergies,
+    clash,
+}: {
+    allergies: OrderAllergyState;
+    clash?: OrderAllergy;
+}) {
+    if (clash) {
+        return (
+            <InfoCard icon={AlertTriangle} tone="crit">
+                <strong>Allergy alert:</strong> this client has a recorded
+                allergy to {clash.allergen}. Confirm with the prescriber before
+                charting.
+            </InfoCard>
+        );
+    }
+    if (allergies === null) {
+        return (
+            <InfoCard icon={HeartPulse}>Checking client allergies…</InfoCard>
+        );
+    }
+    if (allergies === 'unavailable') {
+        return (
+            <InfoCard icon={AlertTriangle} tone="warn">
+                Allergy record couldn&apos;t be loaded — check the health
+                profile before ordering.
+            </InfoCard>
+        );
+    }
+    if (allergies.length === 0) {
+        return <InfoCard icon={HeartPulse}>No allergies recorded.</InfoCard>;
+    }
+
+    return (
+        <InfoCard icon={HeartPulse}>
+            Recorded allergies: {allergies.map((a) => a.allergen).join(', ')}.
+            No name match with this drug.
+        </InfoCard>
+    );
+}
+
 // ── Add medication (shared 4-step wizard; reused by MAR governance) ───────────
 export function AddMedicationDialog({
     clientId,
@@ -104,9 +209,7 @@ export function AddMedicationDialog({
         pharmac_therapeutic_group: '',
     });
 
-    const [allergies, setAllergies] = useState<
-        { allergen: string; severity?: string | null }[] | null
-    >(null);
+    const [allergies, setAllergies] = useState<OrderAllergyState>(null);
     const activeClient =
         presetClient ??
         (form.data.client_id ? Number(form.data.client_id) : null);
@@ -114,27 +217,20 @@ export function AddMedicationDialog({
     useEffect(() => {
         if (step !== 2 || !activeClient) return;
         let cancelled = false;
-        axios
-            .get(`/api/medications/clients/${activeClient}/allergies`)
-            .then(
-                (r) =>
-                    !cancelled &&
-                    setAllergies(
-                        Array.isArray(r.data?.data)
-                            ? r.data.data
-                            : Array.isArray(r.data)
-                              ? r.data
-                              : [],
-                    ),
-            )
-            .catch(() => !cancelled && setAllergies([]));
+        // Never show a previous resident's list while this one loads.
+        setAllergies(null);
+        void loadOrderAllergies(activeClient).then(
+            (result) => !cancelled && setAllergies(result),
+        );
         return () => {
             cancelled = true;
         };
     }, [step, activeClient]);
 
     const doseTimes = previewDoseTimes(form.data.frequency, form.data.is_prn);
-    const allergyClash = (allergies ?? []).find(
+    // Known limitation: a first-word name match only. Server-side drug-class
+    // matching for new orders is P04's build.
+    const allergyClash = (Array.isArray(allergies) ? allergies : []).find(
         (a) =>
             form.data.medication_name &&
             a.allergen
@@ -464,27 +560,10 @@ export function AddMedicationDialog({
                         title="Safety"
                         blurb="Allergy cross-check and order classification."
                     />
-                    {allergyClash ? (
-                        <InfoCard icon={AlertTriangle} tone="crit">
-                            <strong>Allergy alert:</strong> this client has a
-                            recorded allergy to {allergyClash.allergen}. Confirm
-                            with the prescriber before charting.
-                        </InfoCard>
-                    ) : allergies === null ? (
-                        <InfoCard icon={HeartPulse}>
-                            Checking client allergies…
-                        </InfoCard>
-                    ) : allergies.length === 0 ? (
-                        <InfoCard icon={CheckCircle2}>
-                            No recorded allergies for this client.
-                        </InfoCard>
-                    ) : (
-                        <InfoCard icon={HeartPulse}>
-                            Recorded allergies:{' '}
-                            {allergies.map((a) => a.allergen).join(', ')}. No
-                            name match with this drug.
-                        </InfoCard>
-                    )}
+                    <OrderAllergyNotice
+                        allergies={allergies}
+                        clash={allergyClash}
+                    />
                     <div className="mt-4 grid grid-cols-1 gap-2.5">
                         <ToggleRow
                             checked={form.data.controlled_drug}
