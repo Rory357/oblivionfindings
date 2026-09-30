@@ -484,7 +484,7 @@ class HandleInertiaRequests extends Middleware
      * Permission map bust — bump when permission shape/keys change so
      * stale caches from previous deploys are ignored.
      */
-    protected const PERMISSIONS_CACHE_VERSION = 'v9';
+    protected const PERMISSIONS_CACHE_VERSION = 'v10';
 
     /**
      * Get user permissions, deduped per-request via `once()` and cached
@@ -608,6 +608,11 @@ class HandleInertiaRequests extends Middleware
                 'controlledWitness' => $user->canDo('medications.controlled.witness'),
                 'controlledOverride' => $user->canDo('medications.controlled.override'),
                 'breakGlass' => $user->canDo('medications.breakglass'),
+                // PIN-1: every staff member may be chosen as a second person
+                // (witness, co-signer, read-back witness), so staff get the page.
+                'witnessPin' => ! in_array($user->role, ['client', 'next_of_kin'], true)
+                    && ! $user->hasRole('client', 'next_of_kin'),
+                'witnessPinReset' => $user->canDo('medications.witness_pin.reset'),
             ],
 
             'rostering' => [

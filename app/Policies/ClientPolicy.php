@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\Client;
 use App\Models\User;
 use App\Services\CurrentAuthorizationReads;
+use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\DB;
 
@@ -58,7 +59,8 @@ class ClientPolicy
 
     /**
      * Medications access is intentionally scoped and may be granted temporarily
-     * via break-glass. This does not grant full client-profile access.
+     * via a covering shift or break-glass. This does not grant full
+     * client-profile access.
      */
     public function viewMedications(User $user, Client $client): bool
     {
@@ -95,6 +97,17 @@ class ClientPolicy
         }
 
         if ($this->isAssigned($user, $client) && $this->canAccessClientSite($user, $client)) {
+            return true;
+        }
+
+        // A worker clocked in on a shift covering this client may record their
+        // doses, so they may read the chart too — for that shift only. This is
+        // the recording authority's own definition, not a second one.
+        if ($client->exists && in_array(
+            (int) $client->id,
+            app(MedicationScopeDecisionService::class)->clientIdsWithCurrentAuthority($user, [(int) $client->id], now()),
+            true,
+        )) {
             return true;
         }
 

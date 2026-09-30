@@ -1,5 +1,7 @@
 import AttentionBar from '@/components/emar/mar/attention-bar';
-import ClinicalRail from '@/components/emar/mar/clinical-rail';
+import ClinicalRail, {
+    type InrRecord,
+} from '@/components/emar/mar/clinical-rail';
 import DoseContextMenu, {
     type DoseCtxTarget,
 } from '@/components/emar/mar/dose-context-menu';
@@ -24,6 +26,7 @@ import {
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import MarGovernanceDialogs, {
+    type ChartMedicationOption,
     type MarModal,
     type PendingCorrection,
 } from '@/pages/emar/components/mar-governance-dialogs';
@@ -65,6 +68,13 @@ type MarData = {
         admin_rules?: { required_observations?: string[] | null } | null;
         dose_times: string[];
     }>;
+    prn?: Array<{
+        id: number;
+        name: string;
+        dosage: string;
+        controlled_drug: boolean;
+        witness_required: boolean;
+    }>;
     attention_alerts?: Array<{
         id: number;
         type: string;
@@ -72,17 +82,7 @@ type MarData = {
         detail?: string | null;
         prompt_on_open: boolean;
     }>;
-    inr_records?: Array<{
-        id: number;
-        medication_name?: string | null;
-        inr_value: string | number;
-        tested_on?: string | null;
-        next_test_date?: string | null;
-        target_range_min?: string | number | null;
-        target_range_max?: string | number | null;
-        medication_dose?: string | null;
-        disabled_at?: string | null;
-    }>;
+    inr_records?: InrRecord[];
     syringe_drivers?: Array<{
         id: number;
         status: string;
@@ -255,6 +255,21 @@ export default function MarCharts(props: Props) {
                 dose_times: med.dose_times ?? [],
             })),
         [marData.scheduled],
+    );
+
+    // Active charted medicines (scheduled + PRN) a syringe driver may contain.
+    const chartMedications: ChartMedicationOption[] = useMemo(
+        () =>
+            [...(marData.scheduled ?? []), ...(marData.prn ?? [])]
+                .map((med) => ({
+                    id: med.id,
+                    name: med.name,
+                    dosage: med.dosage,
+                    controlled_drug: med.controlled_drug,
+                    witness_required: med.witness_required,
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name)),
+        [marData.scheduled, marData.prn],
     );
 
     const searched = useMemo(
@@ -698,6 +713,7 @@ export default function MarCharts(props: Props) {
                 awaitingVerification={marData.awaiting_verification ?? []}
                 corrections={pendingCorrections}
                 witnesses={witnesses}
+                medications={chartMedications}
                 suppression={{
                     suppressed:
                         marData.settings?.suppress_med_admin_alerts ?? false,

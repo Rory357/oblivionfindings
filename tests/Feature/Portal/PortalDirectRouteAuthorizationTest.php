@@ -10,6 +10,7 @@ use App\Models\FamilyVisitRequest;
 use App\Models\NextOfKin;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\TimelineEventComment;
 use App\Models\User;
@@ -117,7 +118,8 @@ it('denies direct portal incident attachment downloads without effective family 
 it('allows direct portal incident attachment downloads only with consent settings and NOK flags', function () {
     Storage::fake('private');
 
-    $client = Client::factory()->create(['organization_id' => 1]);
+    // Family consent only counts for a Client with a canonical Site.
+    $client = Client::factory()->create(['organization_id' => 1, 'site_id' => Site::factory()->create()->id]);
     $user = makePortalDirectRouteUser($client, [
         'clients.viewPortal',
         'incidents.view.portal',
@@ -250,7 +252,7 @@ it('denies portal timeline interactions when the underlying event is hidden by d
 })->with(['comment', 'reaction', 'like', 'delete']);
 
 it('rejects a portal timeline reply parent from another event', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['organization_id' => 1, 'site_id' => Site::factory()->create()->id]);
     $user = makePortalDirectRouteUser($client, ['clients.viewPortal']);
     grantPortalDirectRouteFamilyDisclosure($client, $user);
     $event = TimelineEvent::factory()->create([
@@ -287,7 +289,7 @@ it('rejects a portal timeline reply parent from another event', function () {
 });
 
 it('preserves portal timeline interactions for events visible under effective disclosure', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['organization_id' => 1, 'site_id' => Site::factory()->create()->id]);
     $user = makePortalDirectRouteUser($client, ['clients.viewPortal']);
     grantPortalDirectRouteFamilyDisclosure($client, $user);
     $event = TimelineEvent::factory()->create([

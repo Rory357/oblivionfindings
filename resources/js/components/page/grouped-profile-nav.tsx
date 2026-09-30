@@ -325,14 +325,16 @@ export function TierTwoTabs({
         <div
             role="tablist"
             aria-label={ariaLabel}
-            className="flex flex-wrap items-center gap-1"
+            className="flex flex-wrap items-center gap-x-1 gap-y-3"
         >
             {tabs.map((tab, index) => {
                 const isActive = tab.key === activeTab;
                 const tone = TONE_CYCLE[index % TONE_CYCLE.length];
                 const Icon = tab.icon;
                 const className = cn(
-                    'relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-[9px] px-3 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:outline-none',
+                    // frontline-hit: a 44 px target without growing the
+                    // strip; gap-y-3 keeps wrapped rows' targets apart.
+                    'frontline-hit relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-[9px] px-3 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:outline-none',
                     isActive
                         ? tone.active
                         : 'text-muted-foreground hover:bg-accent hover:text-foreground',

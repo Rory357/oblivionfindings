@@ -41,16 +41,23 @@ import {
 } from '@/components/wizard/primitives';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import { cn } from '@/lib/utils';
+import {
+    sanitiseWitnessPin,
+    WITNESS_PIN_LENGTH,
+    witnessIsSelectable,
+    witnessOptionLabel,
+    type WitnessPickerOption,
+} from '@/lib/witness-pin';
 
 import {
     type Catalogue,
     type CatalogueShift,
-    type Handover,
-    MOODS,
     clientName,
     fmtTime,
+    type Handover,
     incomingHandoverShifts,
     moodEmoji,
+    MOODS,
     nextShiftIdAfter,
     outgoingHandoverShifts,
     shiftOptionLabel,
@@ -653,9 +660,12 @@ export function HandoverWizard({
             }
             if (f.cd_result && !f.cd_witness)
                 e.cd_witness_id = 'Select the witnessing worker';
-            if (f.cd_result && !f.cd_witness_credential.trim())
+            if (
+                f.cd_result &&
+                f.cd_witness_credential.trim().length !== WITNESS_PIN_LENGTH
+            )
                 e.cd_witness_credential =
-                    'The witness must enter their password or PIN';
+                    'The witness must type their own 6-digit witness PIN';
             if (f.cd_result === 'discrepancy' && !f.cd_notes.trim())
                 e.cd_notes = 'Describe the discrepancy before continuing';
         }
@@ -1454,7 +1464,7 @@ function CdVerificationSection({
     witnessCredentialRef: React.RefObject<HTMLInputElement | null>;
     notes: string;
     cdDue: number;
-    witnesses: { id: number; name: string }[];
+    witnesses: WitnessPickerOption[];
     onResult: (v: '' | 'verified' | 'discrepancy') => void;
     onWitness: (v: string) => void;
     onWitnessCredential: (v: string) => void;
@@ -1548,8 +1558,12 @@ function CdVerificationSection({
                                 : 'Record a result first'}
                         </option>
                         {witnesses.map((w) => (
-                            <option key={w.id} value={w.id}>
-                                {w.name}
+                            <option
+                                key={w.id}
+                                value={w.id}
+                                disabled={!witnessIsSelectable(w)}
+                            >
+                                {witnessOptionLabel(w)}
                             </option>
                         ))}
                     </select>
@@ -1565,23 +1579,41 @@ function CdVerificationSection({
                             htmlFor="handover-cd-witness-credential"
                             className="text-[12.5px] font-semibold"
                         >
-                            Witness password or PIN
+                            Their witness PIN
                         </label>
                         <input
                             ref={witnessCredentialRef}
                             id="handover-cd-witness-credential"
                             type="password"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={WITNESS_PIN_LENGTH}
                             autoComplete="new-password"
                             spellCheck={false}
                             data-lpignore="true"
-                            className={cn(INPUT_CLASS, 'h-9')}
+                            data-1p-ignore="true"
+                            className={cn(
+                                INPUT_CLASS,
+                                'h-9 tracking-[0.3em] tabular-nums',
+                            )}
                             value={witnessCredential}
                             disabled={!witness}
                             aria-invalid={Boolean(errors.credential)}
+                            aria-describedby="handover-cd-witness-credential-help"
                             onChange={(event) =>
-                                onWitnessCredential(event.target.value)
+                                onWitnessCredential(
+                                    sanitiseWitnessPin(event.target.value),
+                                )
                             }
                         />
+                        <p
+                            id="handover-cd-witness-credential-help"
+                            className="text-caption"
+                        >
+                            Their own 6-digit witness PIN — not their login
+                            password. They type it here, at the medicine
+                            cupboard.
+                        </p>
                         {errors.credential ? (
                             <FieldError>{errors.credential}</FieldError>
                         ) : null}

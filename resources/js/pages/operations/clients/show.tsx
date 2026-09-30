@@ -69,6 +69,7 @@ import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { formatDateTime as formatDT } from '@/lib/fleet-utils';
+import type { WitnessPickerOption } from '@/lib/witness-pin';
 import { ClientClinicalRecordLaunchers } from '@/pages/health-clinical/components/client-clinical-launchers';
 import { DailyNoteWizard } from '@/pages/operations/clients/dialogs/daily-note-wizard';
 import { QuickNoteDialog } from '@/pages/operations/clients/dialogs/quick-note-dialog';
@@ -415,6 +416,8 @@ type Props = {
             name: string;
             email?: string | null;
         }>;
+        /** PIN-1: eligible second signatures at the client's Site. */
+        medication_witnesses?: WitnessPickerOption[];
     };
     medical?: {
         profile: any | null;
@@ -6282,8 +6285,24 @@ export default function ClientShow({
                                                                             ) : null}
                                                                         </div>
                                                                     </div>
-                                                                    {b.workspace_url ? <Button size="sm" variant="outline" asChild><Link href={b.workspace_url}>Open transport</Link></Button> : null}
-                                                                    {can.edit && b.can_remove ? (
+                                                                    {b.workspace_url ? (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            asChild
+                                                                        >
+                                                                            <Link
+                                                                                href={
+                                                                                    b.workspace_url
+                                                                                }
+                                                                            >
+                                                                                Open
+                                                                                transport
+                                                                            </Link>
+                                                                        </Button>
+                                                                    ) : null}
+                                                                    {can.edit &&
+                                                                    b.can_remove ? (
                                                                         <Button
                                                                             size="sm"
                                                                             variant="ghost"
@@ -6879,6 +6898,7 @@ export default function ClientShow({
                 medications={(medical?.medications ?? []) as any[]}
                 canRecord={Boolean(can.record_medication_administration)}
                 canRecordControlled={Boolean(can.record_controlled_medication)}
+                witnessOptions={client.medication_witnesses ?? []}
             />
 
             <ClientEditDialog

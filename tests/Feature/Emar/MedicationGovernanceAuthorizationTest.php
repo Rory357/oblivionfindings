@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 class MedicationGovernanceAuthorizationTest extends TestCase
 {
@@ -605,7 +606,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'on_hand_before' => '9.00',
                 'on_hand_after' => '9.50',
                 'witnessed_by' => $context['foreign_witness']->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_request_uuid' => '66331c15-a12a-4b44-b26e-604ebd25bd48',
                 'queued_offline' => false,
             ])
@@ -828,7 +829,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             'expected_balance' => '10.00',
             'actual_balance' => '9.50',
             'witnessed_by' => $context['witness']->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'discrepancy_notes' => 'Half unit count variance.',
             'immediate_action_taken' => 'Secured stock and notified the clinical lead.',
             'client_request_uuid' => $uuid,
@@ -1121,7 +1122,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             'expected_balance' => 10,
             'actual_balance' => 9.5,
             'witnessed_by' => $context['witness']->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'discrepancy_notes' => 'Half unit count variance.',
             'immediate_action_taken' => 'Secured stock and notified the clinical lead.',
             'client_request_uuid' => $uuid,
@@ -1446,7 +1447,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             ->from('/emar/controlled')
             ->post(route('emar.controlled.entries.store'), [
                 ...$this->controlledEntryPayload($context['local_client'], $context['local_medication'], $actor),
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasErrors('witnessed_by');
 
@@ -1579,7 +1580,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             'expected_balance' => 10,
             'actual_balance' => 10,
             'witnessed_by' => $context['witness']->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ];
 
         foreach (['expected_balance', 'actual_balance'] as $missingBalance) {
@@ -1608,7 +1609,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'expected_balance' => 0,
                 'actual_balance' => 0,
                 'witnessed_by' => $context['witness']->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasErrors('expected_balance');
 
@@ -1620,7 +1621,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $context['witness']->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertNotFound();
 
@@ -1641,7 +1642,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $context['witness']->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertRedirect();
 
@@ -1826,7 +1827,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 9.5,
                 'witnessed_by' => $context['witness']->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Half unit variance under investigation.',
                 'immediate_action_taken' => 'Secured stock and notified the clinical lead.',
             ]),
@@ -2278,7 +2279,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             'on_hand_before' => 10,
             'on_hand_after' => 9,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ];
     }
 
@@ -2296,9 +2297,9 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             'disposal_method' => 'denaturing',
             'is_controlled_drug' => true,
             'witness_1_id' => $context['witness']->id,
-            'witness_1_credential' => 'password',
+            'witness_1_credential' => UserFactory::TEST_WITNESS_PIN,
             'witness_2_id' => $context['second_witness']->id,
-            'witness_2_credential' => 'password',
+            'witness_2_credential' => UserFactory::TEST_WITNESS_PIN,
             'authorised_by_name' => 'Pharmacist Pat',
             'denaturing_confirmed' => true,
             'client_request_uuid' => (string) Str::uuid(),
@@ -2389,7 +2390,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ]],
             ['POST', 'emar.pharmacy_orders.controlled_delivery', ['order' => $context['foreign_order']], [
                 'client_medication_id' => $medication->id,
@@ -2397,7 +2398,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'on_hand_before' => '10.00',
                 'on_hand_after' => '10.50',
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_request_uuid' => '4768024e-a514-46a4-bb49-2e01b83a9ad8',
             ]],
             ['POST', 'emar.controlled.discrepancies.resolve', ['discrepancy' => $context['foreign_discrepancy']], [
@@ -2414,9 +2415,9 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'disposal_method' => 'denaturing',
                 'is_controlled_drug' => true,
                 'witness_1_id' => $witness->id,
-                'witness_1_credential' => 'password',
+                'witness_1_credential' => UserFactory::TEST_WITNESS_PIN,
                 'witness_2_id' => $context['second_witness']->id,
-                'witness_2_credential' => 'password',
+                'witness_2_credential' => UserFactory::TEST_WITNESS_PIN,
                 'authorised_by_name' => 'Pharmacist Pat',
                 'denaturing_confirmed' => true,
                 'client_request_uuid' => (string) Str::uuid(),

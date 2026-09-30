@@ -380,8 +380,11 @@ export function CalendarSourcePills({
     onToggle: (key: string) => void;
     counts?: Record<string, number>;
 }) {
+    // From md up the pills are drawn compact (about 27 px) and frontline-hit
+    // gives each a 44 px target; the 18 px row gap keeps wrapped rows'
+    // targets from overlapping.
     return (
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 md:gap-y-[18px]">
             {sources.map((s) => {
                 const on = enabled.has(s.key);
                 return (
@@ -389,7 +392,7 @@ export function CalendarSourcePills({
                         unstyled
                         key={s.key}
                         onClick={() => onToggle(s.key)}
-                        className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-opacity focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:min-h-0 ${on ? '' : 'opacity-40'}`}
+                        className={`frontline-hit inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-opacity focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:min-h-0 ${on ? '' : 'opacity-40'}`}
                         style={{
                             background: `var(--src-${s.key}-bg)`,
                             borderColor: `var(--src-${s.key}-ln)`,

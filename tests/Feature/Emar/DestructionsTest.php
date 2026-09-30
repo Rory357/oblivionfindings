@@ -21,6 +21,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 /**
  * The redesigned Destructions page is an immutable disposal register (MoD Regs
@@ -282,9 +283,9 @@ class DestructionsTest extends TestCase
                 'disposal_method' => 'denaturing',
                 'is_controlled_drug' => true,
                 'witness_1_id' => $w1->id,
-                'witness_1_credential' => 'password',
+                'witness_1_credential' => UserFactory::TEST_WITNESS_PIN,
                 'witness_2_id' => $w2->id,
-                'witness_2_credential' => 'password',
+                'witness_2_credential' => UserFactory::TEST_WITNESS_PIN,
                 'authorised_by_name' => 'Pharmacist Pat',
                 'denaturing_confirmed' => true,
                 'client_request_uuid' => (string) Str::uuid(),
@@ -316,9 +317,9 @@ class DestructionsTest extends TestCase
             'disposal_method' => 'denaturing',
             'is_controlled_drug' => true,
             'witness_1_id' => $w1->id,
-            'witness_1_credential' => 'password',
+            'witness_1_credential' => UserFactory::TEST_WITNESS_PIN,
             'witness_2_id' => $w2->id,
-            'witness_2_credential' => 'password',
+            'witness_2_credential' => UserFactory::TEST_WITNESS_PIN,
             'authorised_by_name' => 'Pharmacist Pat',
             'denaturing_confirmed' => true,
             'client_request_uuid' => $uuid,
@@ -364,9 +365,9 @@ class DestructionsTest extends TestCase
             'disposal_method' => 'denaturing',
             'is_controlled_drug' => true,
             'witness_1_id' => $w1->id,
-            'witness_1_credential' => 'password',
+            'witness_1_credential' => UserFactory::TEST_WITNESS_PIN,
             'witness_2_id' => $w2->id,
-            'witness_2_credential' => 'password',
+            'witness_2_credential' => UserFactory::TEST_WITNESS_PIN,
             'authorised_by_name' => 'Pharmacist Pat',
             'denaturing_confirmed' => true,
             'client_request_uuid' => (string) Str::uuid(),
@@ -422,9 +423,9 @@ class DestructionsTest extends TestCase
             'disposal_method' => 'denaturing',
             'is_controlled_drug' => true,
             'witness_1_id' => $w1->id,
-            'witness_1_credential' => 'password',
+            'witness_1_credential' => UserFactory::TEST_WITNESS_PIN,
             'witness_2_id' => $w2->id,
-            'witness_2_credential' => 'password',
+            'witness_2_credential' => UserFactory::TEST_WITNESS_PIN,
             'authorised_by_name' => 'Pharmacist Pat',
             'denaturing_confirmed' => true,
             'client_request_uuid' => $uuid,

@@ -23,6 +23,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
@@ -1766,6 +1767,17 @@ class MedicationsApiController extends Controller
                 'identified_date' => $a->identified_date?->toDateString(),
                 'recorded_by' => $a->recordedBy?->name,
             ]),
+            // Medication register + health profile (EM-07): the same combined
+            // source dose-time safety checks read, so ordering and dosing agree.
+            'recorded_allergies' => array_map(
+                fn (array $entry): array => [
+                    'allergen' => $entry['allergen'],
+                    'severity' => $entry['severity'],
+                    'reaction' => $entry['reaction'],
+                    'source' => $entry['source'],
+                ],
+                app(ClientAllergyRecordService::class)->forClient($client),
+            ),
         ]);
     }
 

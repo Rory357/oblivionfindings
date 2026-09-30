@@ -332,6 +332,17 @@ class ClientMedication extends Model
     }
 
     /**
+     * The name to use on surfaces readable without medications.controlled.view
+     * — incidents, H&S events, Control Room signals and alerts not linked to
+     * this medicine (EM-12). A controlled medicine is never named there; its
+     * name stays on records that require controlled view.
+     */
+    public function unrestrictedName(): string
+    {
+        return $this->controlled_drug ? 'Controlled medicine' : (string) $this->name;
+    }
+
+    /**
      * High-risk order classes need a verifier other than their creator.
      */
     public function requiresIndependentVerification(): bool

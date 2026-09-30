@@ -9,9 +9,11 @@ use App\Models\FamilyPortalSetting;
 use App\Models\NextOfKin;
 use App\Models\RespiteBooking;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class RespitePortalVisibilityTest extends TestCase
@@ -34,7 +36,10 @@ class RespitePortalVisibilityTest extends TestCase
         ]);
         $this->portalUser->roles()->attach(Role::where('name', 'next_of_kin')->first());
 
-        $this->client = Client::factory()->create();
+        // Consent is only consumable for a Client with a canonical Site.
+        $this->client = Client::factory()->create([
+            'site_id' => Site::factory()->create()->id,
+        ]);
         $this->client->portalUsers()->attach($this->portalUser->id, ['relation' => 'guardian']);
         NextOfKin::query()->create([
             'client_id' => $this->client->id,
@@ -135,20 +140,7 @@ class RespitePortalVisibilityTest extends TestCase
             'show_incidents' => true,
         ]);
 
-        $consentType = ConsentType::factory()->create([
-            'name' => 'Information Sharing with Whānau / Family',
-            'category' => 'communication',
-        ]);
-
-        $consent = ClientConsent::create([
-            'client_id' => $this->client->id,
-            'consent_type_id' => $consentType->id,
-            'status' => 'given',
-            'given_at' => now(),
-            'given_method' => 'written',
-            'given_by_relationship' => 'guardian',
-            'given_by_user_id' => $this->portalUser->id,
-        ]);
+        $consent = $this->grantFamilyInformationConsent();
 
         $consent->update([
             'status' => 'withdrawn',
@@ -164,6 +156,11 @@ class RespitePortalVisibilityTest extends TestCase
         $this->assertTrue($setting->show_shift_schedule);
     }
 
+    /**
+     * Only an authoritative, gate-satisfying decision grants family access
+     * (and resets portal settings when withdrawn), so a bare consent row is
+     * not enough.
+     */
     private function grantFamilyInformationConsent(): ClientConsent
     {
         $consentType = ConsentType::factory()->create([
@@ -171,15 +168,9 @@ class RespitePortalVisibilityTest extends TestCase
             'category' => 'communication',
         ]);
 
-        return ClientConsent::create([
-            'client_id' => $this->client->id,
-            'consent_type_id' => $consentType->id,
-            'status' => 'given',
-            'given_at' => now(),
+        return AuthoritativeConsentFixture::manualSelf($this->client, $consentType, $this->portalUser, [
+            'given_at' => now()->subMinute(),
             'expires_at' => now()->addMonth(),
-            'given_method' => 'written',
-            'given_by_relationship' => 'guardian',
-            'given_by_user_id' => $this->portalUser->id,
         ]);
     }
 }

@@ -327,9 +327,11 @@ class MedicationReportingService
                 'pharmac_therapeutic_group' => $a->medication?->pharmac_therapeutic_group,
             ]);
 
+        // Unlinked readings are reported, labelled, never hidden (NF-23).
         $inrQuery = $this->canonicalMedicationRows(
             ClientInrRecord::query(),
             $siteIds,
+            true,
         );
         if (! $includeControlled) {
             $this->governanceScope->scopeWithoutControlledMedicationRows($inrQuery);
@@ -345,13 +347,17 @@ class MedicationReportingService
                 'date' => $record->tested_on?->toDateString(),
                 'client' => $record->client ? trim("{$record->client->first_name} {$record->client->last_name}") : 'Unknown',
                 'care_level' => $record->client?->care_level,
-                'medication' => $record->medication?->name ?? 'Warfarin',
+                'medication' => $record->client_medication_id === null
+                    ? 'No medicine linked'
+                    : ($record->medication?->name ?? 'Warfarin'),
                 'observation_type' => 'inr',
                 'value' => $record->inr_value,
                 'pharmac_therapeutic_group' => $record->medication?->pharmac_therapeutic_group,
             ]);
 
-        $records = $observations->merge($inrs)->sortBy('date')->values();
+        // With no administration observations, map() leaves an empty Eloquent
+        // collection whose merge() would call getKey() on the INR arrays.
+        $records = $observations->toBase()->merge($inrs)->sortBy('date')->values();
 
         return [
             'meta' => [

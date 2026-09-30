@@ -12,13 +12,13 @@ use App\Models\MedicationMarAttachment;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\Timeline\TimelineEmitter;
-use App\Support\EmarUrl;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +34,7 @@ class MedicationErrorController extends Controller
     public function __construct(
         private readonly MedicationScopeDecisionService $medicationScope,
         private readonly MedicationGovernanceScopeService $governanceScope,
+        private readonly MarLinkService $marLinks,
     ) {}
 
     private function serializeAttachment(
@@ -125,7 +126,7 @@ class MedicationErrorController extends Controller
                 'id' => $incident->id,
                 'ref' => $incident->reference_number ?? 'INC-'.str_pad((string) $incident->id, 4, '0', STR_PAD_LEFT),
             ] : null,
-            'mar_url' => $error->client_id ? EmarUrl::mar($error->client_id) : null,
+            'mar_url' => $this->marLinks->urlFor($request->user(), $error->client_id),
             'reported_by_user' => $error->reportedBy ? [
                 'id' => $error->reportedBy->id,
                 'name' => $error->reportedBy->name,
