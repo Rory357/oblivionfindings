@@ -2716,8 +2716,12 @@ class ClientController extends Controller
         $userId = User::query()->where('email', $email)->value('id');
         $roleId = (int) Role::query()->where('name', $roleName)->value('id');
         abort_unless($roleId > 0, 404);
+        // A brand-new email has no User yet: (int) null is 0, which the lock
+        // service drops, so only the actor is locked and the intake lock above
+        // serialises the create. A raw null here was a TypeError that rolled
+        // back the whole client.
         $lockedUsers = app(AuthorizationEvidenceLockService::class)->lockForUsers(
-            [(int) $actor->id, $userId],
+            [(int) $actor->id, (int) $userId],
             ['clients.create'],
             [$roleId],
         );
