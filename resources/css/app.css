@@ -1010,7 +1010,7 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 /* ──────────────────────────────────────────────────────────────────────────
  * Frontline accessibility helpers (PR 22)
  *
- * Two small primitives so worker-facing controls share a consistent feel:
+ * Small primitives so worker-facing controls share a consistent feel:
  *
  *   .frontline-focus  — clearer, higher-contrast focus ring than the browser
  *                       default for custom buttons/links/chips that don't go
@@ -1025,6 +1025,16 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
  *                       user preference), so 2.75rem alone renders at
  *                       35.75–44px. max() keeps it at 44px or more and
  *                       still grows with a larger root font.
+ *
+ *   .frontline-hit    — the same ≥44×44 px target for compact controls that
+ *                       must keep their drawn size (row kebabs, pagination,
+ *                       tier-2 tabs, the dialog ✕). An invisible ::after
+ *                       centred on the control takes the pointer; the control
+ *                       itself does not grow. Keep 44px between neighbouring
+ *                       targets' centres or their areas overlap, and keep the
+ *                       area clear of an ancestor's overflow clip. The host
+ *                       becomes position: relative unless a utility
+ *                       (absolute, fixed…) positions it.
  *
  * Nothing here redefines layout or colour beyond the ring; pages opt in by
  * adding the utility class where an audit showed a real issue.
@@ -1041,6 +1051,22 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 .frontline-tap {
     min-height: max(44px, 2.75rem);
     min-width: max(44px, 2.75rem);
+}
+
+/* In the components layer so an `absolute`/`fixed` utility on the host wins. */
+@layer components {
+    .frontline-hit {
+        position: relative;
+    }
+}
+.frontline-hit::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px, 2.75rem);
+    height: max(100%, 44px, 2.75rem);
+    transform: translate(-50%, -50%);
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
