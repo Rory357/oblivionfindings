@@ -2174,6 +2174,9 @@ class ShiftHandoverService
             }
 
             RateLimiter::hit($rateLimitKey, self::CD_WITNESS_DECAY_SECONDS);
+            // PIN-1: keep the witness PIN's own message ("Incorrect PIN",
+            // "locked — unlocks at…", "hasn't set a PIN") so staff know
+            // what to do; only this surface's throttle stays generic.
             $this->rejectCdWitnessCredential(
                 $actor,
                 $client,
@@ -2181,6 +2184,7 @@ class ShiftHandoverService
                 $ipAddress,
                 'rejected',
                 RateLimiter::attempts($rateLimitKey),
+                $exception->errors()['cd_witness_credential'][0] ?? null,
             );
         }
 
@@ -2253,6 +2257,7 @@ class ShiftHandoverService
         string $ipAddress,
         string $outcome,
         int $attempts,
+        ?string $message = null,
     ): never {
         Log::warning('Shift handover controlled-drug witness credential rejected.', [
             'security_event' => 'shift_handover_cd_witness_credential_rejected',
@@ -2267,7 +2272,7 @@ class ShiftHandoverService
         ]);
 
         throw ValidationException::withMessages([
-            'cd_witness_credential' => self::CD_WITNESS_FAILURE,
+            'cd_witness_credential' => $message ?? self::CD_WITNESS_FAILURE,
         ]);
     }
 

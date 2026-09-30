@@ -32,7 +32,9 @@ lucide-react icons, Recharts.
    pre-verified); colour is never the only signal (pair with label/icon);
    `focus-visible:ring-2 focus-visible:ring-ring` on all interactive chrome;
    respect the global reduced-motion block; ≥44 px tap targets on frontline
-   surfaces (`.frontline-tap`).
+   surfaces (`.frontline-tap`, or `.frontline-hit` where a compact control
+   must keep its drawn size — row kebabs, pagination, tier-2 tabs, the
+   dialog ✕).
 6. **Safety colours are brand-independent.** Allergen/conflict/emergency
    surfaces use fixed `status-critical`/`status-warning` pairs, never
    brand-derived tints — an admin's brand hue must not be able to push a
@@ -608,6 +610,38 @@ before.
   items use the destructive tone and offer Undo where a compensating action
   exists. Actions with no backend are hidden, never stubbed, and are listed
   in the handoff.
+- **Settings pages that copy Fleet's parts but not its structure**
+  (corrected four times, 2026-09-29, eMAR P11 Settings v1–v3). Stephan
+  rejected settings built as option-list cards, prose tables, plain lists
+  or static info cards. Settings follow `pages/fleet-assets/settings/`:
+  - one PageHeader with a short rail, sub-tabs, and a sticky save bar
+    ("Review changes") with an unsaved-draft guard;
+  - every view opens on an **Overview** of `ReviewCard`s, each with a
+    "Review … ↗" `<Button variant="link">`;
+  - settings sit in **titled groups** (icon plus caption) of compact rows;
+  - every on/off choice is a `Switch` showing its On/Off word; a segmented
+    control is used only for three or more real options;
+  - anything that notifies people gets **In-app / Email** switch columns
+    (plus Push where it applies) and a separate delivery or channels tab
+    with real controls, never badge-only cards;
+  - dialogs use the Fleet `Modal` layout, `WizardShell` or `ConfirmDialog`;
+  - a change that loosens a safety check is flagged on review, and its save
+    uses the destructive variant.
+
+  Compare every view with the live Fleet Settings at 1440 px before
+  calling it done.
+- **Tap targets sized in rem** (corrected 2026-09-30, eMAR P01 v2 Q-v2-1).
+  The root font is `--base-font-size`: 14 px by default, 13 or 16 px by
+  user preference. So `2.75rem`, `min-h-11` and `h-11` render at 38.5 px,
+  not 44 px. `.frontline-tap` had this bug until it was changed to
+  `max(44px, 2.75rem)`. Give frontline controls `.frontline-tap` rather
+  than a Tailwind size class. In dense desktop layouts (tables, pagination,
+  tab strips) use `.frontline-hit`: an invisible 44 px target around a
+  control that keeps its size. Keep 44 px between the centres of
+  neighbouring targets, and keep the area inside any `overflow: hidden`
+  ancestor. Check any tap target by measuring the rendered px
+  (`getBoundingClientRect`, or `elementFromPoint` 21 px from the centre
+  for `.frontline-hit`), not by its class name or a "44px" comment.
 
 ## File viewing and downloading (approved by Stephan 2026-09-27)
 

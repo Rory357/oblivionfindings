@@ -114,6 +114,7 @@ use App\Services\UserSiteAccessService;
 use App\Support\ClientSafetyPayload;
 use App\Support\HazardDetailPresenter;
 use App\Support\HealthSafety\RiskAssessmentPresenter;
+use App\Support\Medication\MedicationStockQuantity;
 use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
@@ -836,6 +837,13 @@ class ClientController extends Controller
                         'name' => $u->name,
                         ...($canAssignWorkers ? ['email' => $u->email] : []),
                     ])->values()
+                    : [],
+                // PIN-1: the record-dose dialog's second signature comes from the
+                // eligible witnesses at the client's Site, with witness PIN status.
+                'medication_witnesses' => $client->site_id && request()->user()?->canDo('medications.administer.record')
+                    ? app(MedicationGovernanceScopeService::class)
+                        ->controlledWitnessPicker([(int) $client->site_id], (int) request()->user()->id)
+                        ->values()
                     : [],
                 // Identity & Culture
                 'ethnicity' => $client->ethnicity,
@@ -1825,7 +1833,11 @@ class ClientController extends Controller
         $stock = $medication->stock;
 
         $payload['stock'] = $stock ? [
-            'on_hand' => $stock->on_hand,
+            // The decimal:2 cast yields "24.00"; send a number like the eMAR
+            // stock payloads so the profile reads "24 doses on hand".
+            'on_hand' => $stock->on_hand !== null
+                ? MedicationStockQuantity::toFloat($stock->on_hand)
+                : null,
             'unit' => $stock->unit,
             'reorder_threshold' => $stock->reorder_level,
             'is_low' => $stock->isLowStock(),
@@ -2711,8 +2723,12 @@ class ClientController extends Controller
         $userId = User::query()->where('email', $email)->value('id');
         $roleId = (int) Role::query()->where('name', $roleName)->value('id');
         abort_unless($roleId > 0, 404);
+        // A brand-new email has no User yet: (int) null is 0, which the lock
+        // service drops, so only the actor is locked and the intake lock above
+        // serialises the create. A raw null here was a TypeError that rolled
+        // back the whole client.
         $lockedUsers = app(AuthorizationEvidenceLockService::class)->lockForUsers(
-            [(int) $actor->id, $userId],
+            [(int) $actor->id, (int) $userId],
             ['clients.create'],
             [$roleId],
         );

@@ -33,8 +33,11 @@ export function LaravelPagination({ links, lastPage, className, preserveState = 
     if (lastPage !== undefined && lastPage <= 1) return null;
     const visitOptions = { preserveState, ...(preserveScroll ? { preserveScroll: true } : {}) };
 
+    // The buttons keep the compact sm size; frontline-hit gives each a 44 px
+    // target, and the 36 px minimum width plus gap-2.5 keep neighbouring
+    // targets from overlapping.
     return (
-        <nav aria-label="Pagination" className={cn('flex items-center justify-center gap-1', className)}>
+        <nav aria-label="Pagination" className={cn('flex items-center justify-center gap-2.5', className)}>
             {links.map((link, i) => {
                 const nav = isNavLabel(link.label);
 
@@ -47,6 +50,7 @@ export function LaravelPagination({ links, lastPage, className, preserveState = 
                             disabled={!link.url}
                             onClick={() => link.url && router.get(link.url, {}, visitOptions)}
                             aria-label="Previous page"
+                            className="frontline-hit min-w-[36px]"
                         >
                             <ChevronLeft className="h-4 w-4" />
                         </Button>
@@ -62,6 +66,7 @@ export function LaravelPagination({ links, lastPage, className, preserveState = 
                             disabled={!link.url}
                             onClick={() => link.url && router.get(link.url, {}, visitOptions)}
                             aria-label="Next page"
+                            className="frontline-hit min-w-[36px]"
                         >
                             <ChevronRight className="h-4 w-4" />
                         </Button>
@@ -76,7 +81,7 @@ export function LaravelPagination({ links, lastPage, className, preserveState = 
                         disabled={!link.url}
                         onClick={() => link.url && router.get(link.url, {}, visitOptions)}
                         aria-current={link.active ? 'page' : undefined}
-                        className="min-w-[36px]"
+                        className="frontline-hit min-w-[36px]"
                     >
                         {stripHtml(link.label)}
                     </Button>

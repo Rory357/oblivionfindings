@@ -19,6 +19,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 /**
  * Regression coverage for the 2026-07 eMAR integrity audit:
@@ -94,7 +95,7 @@ class MedicationIntegrityAuditTest extends TestCase
             'reason' => 'Breakthrough pain',
             'quantity_administered' => 2,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => (string) Str::uuid(),
         ], $user->id);
 
@@ -429,9 +430,9 @@ class MedicationIntegrityAuditTest extends TestCase
             'disposal_method' => 'denaturing',
             'is_controlled_drug' => true,
             'witness_1_id' => $firstWitness->id,
-            'witness_1_credential' => 'password',
+            'witness_1_credential' => UserFactory::TEST_WITNESS_PIN,
             'witness_2_id' => $secondWitness->id,
-            'witness_2_credential' => 'password',
+            'witness_2_credential' => UserFactory::TEST_WITNESS_PIN,
             'authorised_by_name' => 'Pharmacist Pat',
             'denaturing_confirmed' => true,
             'client_request_uuid' => (string) Str::uuid(),

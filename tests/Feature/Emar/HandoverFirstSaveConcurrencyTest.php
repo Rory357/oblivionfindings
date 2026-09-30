@@ -240,7 +240,7 @@ $result = $app->make(App\Services\ShiftHandoverService::class)->save($shift, $ac
     'cd_verification_input' => [
         'result' => 'verified',
         'witness_id' => $witness->id,
-        'witness_credential' => 'password',
+        'witness_credential' => Database\Factories\UserFactory::TEST_WITNESS_PIN,
         'notes' => 'Concurrent count matched.',
     ],
     'submit' => false,

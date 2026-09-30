@@ -16,6 +16,7 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PreventSearchIndexing;
 use App\Http\Middleware\ProtectItDraftResponses;
 use App\Http\Middleware\ProtectVendorVaultResponses;
+use App\Support\Medication\ScrubNestedWitnessSecrets;
 use App\Http\Middleware\RecordItApiRequest;
 use App\Http\Middleware\RoleScope;
 use App\Http\Middleware\TraceItTicketCreation;
@@ -86,6 +87,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(fn (Throwable $exception, Request $request) => ProtectVendorVaultResponses::render($exception, $request));
         $exceptions->report(fn (Throwable $exception) => ProtectVendorVaultResponses::report($exception));
         $exceptions->respond(function (Response $response, Throwable $exception, Request $request): Response {
+            // dontFlash only covers top-level keys; witness PINs posted inside
+            // arrays (fleet transport medications) are removed here.
+            ScrubNestedWitnessSecrets::fromFlashedInput($exception, $request);
+
             return ItTicketRequestTrace::from($request)?->finish($response, $exception) ?? $response;
         });
 
@@ -111,6 +116,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'witness_1_credential',
             'witness_2_credential',
             'waiver_approver_credential',
+            // PIN-1 account settings › Witness PIN
+            'current_pin',
+            'pin',
+            'pin_confirmation',
         ]);
 
         $exceptions->render(function (

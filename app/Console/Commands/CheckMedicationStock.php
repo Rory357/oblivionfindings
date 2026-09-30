@@ -61,6 +61,7 @@ class CheckMedicationStock extends Command
             }
 
             $medicationName = $stock->medication?->name ?? 'Unknown';
+            $publicMedicationName = $stock->medication?->unrestrictedName() ?? 'Unknown';
             $clientName = $stock->medication?->client
                 ? $stock->medication->client->first_name.' '.$stock->medication->client->last_name
                 : 'Unknown';
@@ -80,10 +81,10 @@ class CheckMedicationStock extends Command
                     MedicationSignalService::TYPE_EXPIRED,
                     $stock->medication->client_id,
                     'high',
-                    "{$medicationName} for {$clientName} has EXPIRED",
+                    "{$publicMedicationName} for {$clientName} has EXPIRED",
                     [
                         'client_medication_id' => $stock->client_medication_id,
-                        'medication_name' => $medicationName,
+                        'medication_name' => $publicMedicationName,
                         'expiry_date' => $stock->expiry_date->toDateString(),
                         'batch_number' => $stock->batch_number,
                         'site_id' => $stock->medication->client?->site_id,
@@ -106,6 +107,7 @@ class CheckMedicationStock extends Command
             }
 
             $medicationName = $stock->medication?->name ?? 'Unknown';
+            $publicMedicationName = $stock->medication?->unrestrictedName() ?? 'Unknown';
             $clientName = $stock->medication?->client
                 ? $stock->medication->client->first_name.' '.$stock->medication->client->last_name
                 : 'Unknown';
@@ -129,10 +131,10 @@ class CheckMedicationStock extends Command
                     MedicationSignalService::TYPE_STOCK_OUT,
                     $stock->medication->client_id,
                     'high',
-                    "{$medicationName} for {$clientName}: OUT OF STOCK",
+                    "{$publicMedicationName} for {$clientName}: OUT OF STOCK",
                     [
                         'client_medication_id' => $stock->client_medication_id,
-                        'medication_name' => $medicationName,
+                        'medication_name' => $publicMedicationName,
                         'site_id' => $stock->medication->client?->site_id,
                     ],
                 );

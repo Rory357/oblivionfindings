@@ -17,6 +17,7 @@ use App\Models\ShiftHandover;
 use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Services\Medication\WitnessPinService;
 use App\Services\ShiftHandoverService;
 use App\Services\ShiftTimelineService;
 use Carbon\Carbon;
@@ -29,6 +30,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 /**
  * Coverage for the eMAR medication lens layered onto shift handovers:
@@ -166,7 +168,7 @@ class HandoverMedicationLensTest extends TestCase
                 'medications_due_text' => 'Morphine 5mg — due 20:00',
                 'cd_result' => 'verified',
                 'cd_witness_id' => $this->witness->id,
-                'cd_witness_credential' => 'password',
+                'cd_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'cd_notes' => 'All controlled-drug counts matched.',
                 'submit' => false,
             ])
@@ -209,7 +211,7 @@ class HandoverMedicationLensTest extends TestCase
                 'handover_notes' => 'Operations handover with a governed count.',
                 'cd_result' => 'verified',
                 'cd_witness_id' => $this->witness->id,
-                'cd_witness_credential' => 'password',
+                'cd_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'cd_notes' => 'Register and physical count matched.',
                 'submit' => false,
             ])
@@ -270,7 +272,7 @@ class HandoverMedicationLensTest extends TestCase
                     'handover_notes' => 'Operations handover with replacement evidence.',
                     'cd_result' => 'discrepancy',
                     'cd_witness_id' => $this->witness->id,
-                    'cd_witness_credential' => 'password',
+                    'cd_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                     'cd_notes' => 'One tablet requires reconciliation.',
                     'version' => $handover->version,
                     'submit' => false,
@@ -330,7 +332,7 @@ class HandoverMedicationLensTest extends TestCase
                 'handover_notes' => 'Initial controlled-drug handover evidence.',
                 'cd_result' => 'verified',
                 'cd_witness_id' => $this->witness->id,
-                'cd_witness_credential' => 'password',
+                'cd_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'cd_notes' => 'Register and physical count matched.',
                 'submit' => false,
             ])
@@ -373,7 +375,7 @@ class HandoverMedicationLensTest extends TestCase
                 'handover_notes' => 'Governed replacement evidence.',
                 'cd_result' => 'discrepancy',
                 'cd_witness_id' => $this->witness->id,
-                'cd_witness_credential' => 'password',
+                'cd_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'cd_notes' => 'One tablet requires reconciliation.',
                 'version' => $handover->version,
                 'submit' => false,
@@ -402,7 +404,7 @@ class HandoverMedicationLensTest extends TestCase
                 'handover_notes' => 'Attempted blank discrepancy evidence.',
                 'cd_result' => 'discrepancy',
                 'cd_witness_id' => $this->witness->id,
-                'cd_witness_credential' => 'password',
+                'cd_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'cd_notes' => '   ',
                 'submit' => false,
             ])
@@ -454,7 +456,7 @@ class HandoverMedicationLensTest extends TestCase
                     'handover_notes' => 'Attempted CD verification.',
                     'cd_result' => 'verified',
                     'cd_witness_id' => $this->witness->id,
-                    'cd_witness_credential' => 'password',
+                    'cd_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                     'submit' => false,
                 ])
                 ->assertNotFound();
@@ -536,7 +538,7 @@ class HandoverMedicationLensTest extends TestCase
                 'handover_notes' => 'Attempted foreign witness.',
                 'cd_result' => 'verified',
                 'cd_witness_id' => $foreignWitness->id,
-                'cd_witness_credential' => 'password',
+                'cd_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'submit' => false,
             ])
             ->assertNotFound();
@@ -547,7 +549,7 @@ class HandoverMedicationLensTest extends TestCase
                 'handover_notes' => 'Attempted missing witness.',
                 'cd_result' => 'verified',
                 'cd_witness_id' => (int) User::query()->max('id') + 1000,
-                'cd_witness_credential' => 'password',
+                'cd_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'submit' => false,
             ])
             ->assertNotFound();
@@ -559,7 +561,7 @@ class HandoverMedicationLensTest extends TestCase
                 'handover_notes' => 'Attempted stale witness.',
                 'cd_result' => 'verified',
                 'cd_witness_id' => $this->witness->id,
-                'cd_witness_credential' => 'password',
+                'cd_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'submit' => false,
             ])
             ->assertNotFound();
@@ -575,7 +577,7 @@ class HandoverMedicationLensTest extends TestCase
                 'handover_notes' => 'Attempted self witness.',
                 'cd_result' => 'verified',
                 'cd_witness_id' => $this->worker->id,
-                'cd_witness_credential' => 'password',
+                'cd_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'submit' => false,
             ])
             ->assertSessionHasErrors('cd_witness_id');
@@ -591,7 +593,7 @@ class HandoverMedicationLensTest extends TestCase
                 'submit' => false,
             ])
             ->assertSessionHasErrors([
-                'cd_witness_credential' => 'The witness credential could not be verified.',
+                'cd_witness_credential' => WitnessPinService::INCORRECT,
             ]);
 
         $this->assertArrayNotHasKey('cd_witness_credential', session()->getOldInput());
@@ -633,9 +635,14 @@ class HandoverMedicationLensTest extends TestCase
                         'cd_witness_credential' => 'wrong-handover-secret',
                         'submit' => false,
                     ])
-                    ->assertSessionHasErrors([
-                        'cd_witness_credential' => 'The witness credential could not be verified.',
-                    ]);
+                    ->assertSessionHasErrors('cd_witness_credential');
+
+                // PIN-1: the witness PIN's own message comes through; the
+                // fifth wrong PIN also locks the PIN (default limit 5).
+                $message = session('errors')->first('cd_witness_credential');
+                $attempt < 5
+                    ? $this->assertSame(WitnessPinService::INCORRECT, $message)
+                    : $this->assertStringContainsString('witness PIN is locked after too many wrong attempts', $message);
             }
 
             $this->actingAs($this->worker)
@@ -645,7 +652,7 @@ class HandoverMedicationLensTest extends TestCase
                     'handover_notes' => 'Correct credential remains blocked inside the decay window.',
                     'cd_result' => 'verified',
                     'cd_witness_id' => $this->witness->id,
-                    'cd_witness_credential' => 'password',
+                    'cd_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                     'submit' => false,
                 ])
                 ->assertSessionHasErrors([
@@ -664,7 +671,7 @@ class HandoverMedicationLensTest extends TestCase
                     'handover_notes' => 'Throttled witness is no longer eligible.',
                     'cd_result' => 'verified',
                     'cd_witness_id' => $this->witness->id,
-                    'cd_witness_credential' => 'password',
+                    'cd_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                     'submit' => false,
                 ])
                 ->assertNotFound();
@@ -854,6 +861,9 @@ class HandoverMedicationLensTest extends TestCase
         $this->travelTo(Carbon::parse('2026-08-28 12:30:00', 'UTC'));
 
         try {
+            // setUp dates are relative to the real clock, so pin the outgoing
+            // worker as employed before this fixed moment.
+            $this->worker->hrEmployeeProfile()->update(['start_date' => '2026-07-01']);
             $this->witness->hrEmployeeProfile()->update([
                 'start_date' => '2026-08-29',
                 'end_date' => '2026-08-29',

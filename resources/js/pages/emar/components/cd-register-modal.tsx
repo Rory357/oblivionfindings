@@ -1,6 +1,7 @@
 /* CD register entry — BUILD-NEW modal on the shared Add-Client wizard chrome.
  * Posts to emar.controlled.entries.store with the idempotency envelope
  * (client_request_uuid). Witness is mandatory and must differ from the signer. */
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,11 @@ import {
     createMedicationMutationReplayState,
     prepareMedicationMutationReplayState,
 } from '@/lib/emar-offline';
+import {
+    witnessIsSelectable,
+    witnessOptionLabel,
+    type WitnessPinStatus,
+} from '@/lib/witness-pin';
 import { router } from '@inertiajs/react';
 import { ClipboardCheck, Info, Lock, UserCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -29,7 +35,12 @@ export type MedicationOption = {
     unit: string | null;
     controlled: boolean;
 };
-export type WitnessOption = { id: number; name: string };
+export type WitnessOption = {
+    id: number;
+    name: string;
+    /** PIN-1: unusable witness PINs are listed but can't be chosen. */
+    witness_pin?: WitnessPinStatus;
+};
 
 const STEPS = [
     { key: 'entry', label: 'Entry', blurb: 'Type & quantity', icon: Lock },
@@ -390,19 +401,19 @@ export function CdRegisterModal({
                             }
                             options={eligibleWitnesses.map((w) => ({
                                 value: String(w.id),
-                                label: w.name,
+                                label: witnessOptionLabel(w),
+                                disabled: !witnessIsSelectable(w),
                             }))}
                         />
                     </Field>
-                    <Field label="Witness password" required span>
-                        <Input
-                            type="password"
+                    <Field label="Their witness PIN" required span>
+                        <WitnessPinInput
+                            label="Their witness PIN"
+                            hideLabel
+                            required={false}
                             value={witnessCredential}
-                            onChange={(e) =>
-                                setWitnessCredential(e.target.value)
-                            }
-                            autoComplete="current-password"
-                            placeholder="Witness enters their password"
+                            onChange={setWitnessCredential}
+                            atCupboard
                         />
                     </Field>
                     <Field label="Batch number">

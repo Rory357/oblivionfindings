@@ -167,6 +167,8 @@ type InrWatchItem = {
     id: number;
     client_id: number;
     client: string;
+    /** Null = no medicine linked; still shown, labelled (NF-23). */
+    client_medication_id: number | null;
     value: number;
     target: string;
     tested_on: string | null;
@@ -1575,6 +1577,9 @@ export default function EmarHome(props: Props) {
                                                     {r.client}
                                                 </p>
                                                 <p className="text-[11px] text-muted-foreground">
+                                                    {r.client_medication_id ===
+                                                        null &&
+                                                        'No medicine linked · '}
                                                     Target {r.target} · tested{' '}
                                                     {r.tested_on ?? '—'}
                                                 </p>

@@ -1,3 +1,4 @@
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { MedsWizardDialog } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,7 @@ import {
     StepHead,
     TilePicker,
 } from '@/components/wizard/primitives';
+import { witnessIsSelectable, witnessOptionLabel } from '@/lib/witness-pin';
 import { AddMedicationDialog } from '@/pages/emar/_dialogs';
 import type { WitnessOption } from '@/pages/meds/today/types';
 import { useForm } from '@inertiajs/react';
@@ -41,6 +43,25 @@ type AttentionAlert = {
 };
 type AwaitingOrder = { id: number; name: string; dosage: string };
 
+/** An active medicine on the open chart (already controlled-filtered server-side). */
+export type ChartMedicationOption = {
+    id: number;
+    name: string;
+    dosage: string;
+    controlled_drug: boolean;
+    witness_required: boolean;
+};
+
+/**
+ * Mirrors ClientMedication::requiresWitness() on the server: a controlled
+ * medicine always needs a witness, whatever its witness_required flag says.
+ */
+export function syringeDriverRequiresWitness(
+    medication: ChartMedicationOption | undefined,
+): boolean {
+    return Boolean(medication?.witness_required || medication?.controlled_drug);
+}
+
 export type PendingCorrection = {
     id: number;
     medication_name: string;
@@ -59,6 +80,7 @@ type Props = {
     awaitingVerification: AwaitingOrder[];
     corrections: PendingCorrection[];
     witnesses: WitnessOption[];
+    medications: ChartMedicationOption[];
     suppression: { suppressed: boolean; reason: string | null };
 };
 
@@ -99,6 +121,7 @@ export default function MarGovernanceDialogs({
     awaitingVerification,
     corrections,
     witnesses,
+    medications,
     suppression,
 }: Props) {
     return (
@@ -112,6 +135,7 @@ export default function MarGovernanceDialogs({
             {modal === 'syringe' && (
                 <SyringeDriverDialog
                     clientId={clientId}
+                    medications={medications}
                     witnesses={witnesses}
                     onClose={onClose}
                 />
@@ -300,37 +324,69 @@ function RecordInrDialog({
 }
 
 // ── Start syringe driver ───────────────────────────────────────────────────
+type SyringeDriverFormData = {
+    commenced_at: string;
+    rate: string;
+    rate_unit: string;
+    site_of_insertion: string;
+    notes: string;
+    contents: Array<{
+        client_medication_id: string;
+        dose: string;
+        unit: string;
+    }>;
+    witnessed_by: string;
+    witness_credential: string;
+};
+
+/** Wire shape for POST /emar/clients/{client}/syringe-drivers. */
+export function buildSyringeDriverRequest(data: SyringeDriverFormData) {
+    return {
+        ...data,
+        contents: data.contents.map((item) => ({
+            ...item,
+            client_medication_id: Number(item.client_medication_id),
+        })),
+        witnessed_by: data.witnessed_by ? Number(data.witnessed_by) : null,
+    };
+}
+
 function SyringeDriverDialog({
     clientId,
+    medications,
     witnesses,
     onClose,
 }: {
     clientId: number;
+    medications: ChartMedicationOption[];
     witnesses: WitnessOption[];
     onClose: () => void;
 }) {
-    const form = useForm({
+    // Contents reference the resident's charted medicine by id: the server
+    // resolves the name, controlled status and witness requirement from that
+    // canonical record, never from free text typed here.
+    const form = useForm<SyringeDriverFormData>({
         commenced_at: '',
         rate: '',
         rate_unit: 'mL/hr',
         site_of_insertion: '',
         notes: '',
-        contents: [{ name: '', dose: '', unit: 'mg', requires_witness: false }],
-        witnessed_by: '' as string,
+        contents: [{ client_medication_id: '', dose: '', unit: 'mg' }],
+        witnessed_by: '',
         witness_credential: '',
     });
     const content = form.data.contents[0]!;
-    const requiresWitness = content.requires_witness;
+    const selectedMedication = medications.find(
+        (m) => String(m.id) === content.client_medication_id,
+    );
+    const requiresWitness = syringeDriverRequiresWitness(selectedMedication);
 
     const setContent = (patch: Partial<typeof content>) =>
         form.setData('contents', [{ ...content, ...patch }]);
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        form.transform((data) => ({
-            ...data,
-            witnessed_by: data.witnessed_by ? Number(data.witnessed_by) : null,
-        }));
+        form.transform(buildSyringeDriverRequest);
         form.post(`/emar/clients/${clientId}/syringe-drivers`, {
             preserveScroll: true,
             onSuccess: onClose,
@@ -373,13 +429,26 @@ function SyringeDriverDialog({
                     blurb="Controlled-drug contents require a witness countersignature."
                 />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field label="Medication" required>
-                        <Input
-                            value={content.name}
-                            onChange={(e) =>
-                                setContent({ name: e.target.value })
+                    <Field
+                        label="Medication"
+                        required
+                        error={
+                            form.errors['contents.0.client_medication_id'] ??
+                            form.errors.contents
+                        }
+                    >
+                        <SelectInput
+                            value={content.client_medication_id}
+                            onChange={(v) =>
+                                setContent({ client_medication_id: v })
                             }
-                            placeholder="e.g. Morphine sulfate"
+                            placeholder="Select medication…"
+                            options={medications.map((m) => ({
+                                value: String(m.id),
+                                label: m.dosage
+                                    ? `${m.name} · ${m.dosage}`
+                                    : m.name,
+                            }))}
                         />
                     </Field>
                     <Field label="Dose">
@@ -425,18 +494,6 @@ function SyringeDriverDialog({
                             placeholder="e.g. Left upper arm"
                         />
                     </Field>
-                    <Field label="Witness required" span>
-                        <Segmented
-                            value={requiresWitness ? 'yes' : 'no'}
-                            onChange={(v) =>
-                                setContent({ requires_witness: v === 'yes' })
-                            }
-                            options={[
-                                { value: 'no', label: 'No' },
-                                { value: 'yes', label: 'Yes (CD)' },
-                            ]}
-                        />
-                    </Field>
                     {requiresWitness && (
                         <>
                             <Field
@@ -451,26 +508,19 @@ function SyringeDriverDialog({
                                     placeholder="Select witness…"
                                     options={witnesses.map((w) => ({
                                         value: String(w.id),
-                                        label: w.name,
+                                        label: witnessOptionLabel(w),
+                                        disabled: !witnessIsSelectable(w),
                                     }))}
                                 />
                             </Field>
-                            <Field
-                                label="Witness password / PIN"
+                            <WitnessPinInput
+                                label="Their witness PIN"
+                                value={form.data.witness_credential}
+                                onChange={(v) =>
+                                    form.setData('witness_credential', v)
+                                }
                                 error={form.errors.witness_credential}
-                            >
-                                <Input
-                                    type="password"
-                                    value={form.data.witness_credential}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'witness_credential',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="Re-authenticate"
-                                />
-                            </Field>
+                            />
                         </>
                     )}
                 </div>

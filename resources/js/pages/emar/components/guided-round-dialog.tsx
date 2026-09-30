@@ -12,6 +12,7 @@ import {
     type RoundItem,
     type StaffOption,
 } from '@/components/emar/rounds/types';
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { ClientAvatar } from '@/components/meds/board-bits';
 import { MedsWizardDialog } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ import {
 } from '@/lib/emar-offline';
 import { createOfflineRequestUuid } from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
+import { witnessIsSelectable, witnessOptionLabel } from '@/lib/witness-pin';
 import { router } from '@inertiajs/react';
 import {
     Activity,
@@ -791,20 +793,17 @@ function ConfirmPanel(props: DosePaneProps) {
                             placeholder="Select a second signatory…"
                             options={witnesses.map((w) => ({
                                 value: String(w.id),
-                                label: w.name,
+                                label: witnessOptionLabel(w),
+                                disabled: !witnessIsSelectable(w),
                             }))}
                         />
                     </Field>
-                    <Field label="Witness password / PIN">
-                        <Input
-                            type="password"
-                            value={witnessCredential}
-                            onChange={(e) =>
-                                setWitnessCredential(e.target.value)
-                            }
-                            placeholder="Re-authenticate"
-                        />
-                    </Field>
+                    <WitnessPinInput
+                        label="Their witness PIN"
+                        value={witnessCredential}
+                        onChange={setWitnessCredential}
+                        atCupboard
+                    />
                 </>
             ) : null}
             {pending === 'given' && item.requires_blood_glucose ? (

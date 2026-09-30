@@ -12,13 +12,13 @@ use App\Models\MedicationMarAttachment;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\Timeline\TimelineEmitter;
-use App\Support\EmarUrl;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +34,7 @@ class MedicationErrorController extends Controller
     public function __construct(
         private readonly MedicationScopeDecisionService $medicationScope,
         private readonly MedicationGovernanceScopeService $governanceScope,
+        private readonly MarLinkService $marLinks,
     ) {}
 
     private function serializeAttachment(
@@ -125,7 +126,7 @@ class MedicationErrorController extends Controller
                 'id' => $incident->id,
                 'ref' => $incident->reference_number ?? 'INC-'.str_pad((string) $incident->id, 4, '0', STR_PAD_LEFT),
             ] : null,
-            'mar_url' => $error->client_id ? EmarUrl::mar($error->client_id) : null,
+            'mar_url' => $this->marLinks->urlFor($request->user(), $error->client_id),
             'reported_by_user' => $error->reportedBy ? [
                 'id' => $error->reportedBy->id,
                 'name' => $error->reportedBy->name,
@@ -149,18 +150,20 @@ class MedicationErrorController extends Controller
             requestedSiteId: $siteFilter,
         );
         $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
-        $readerClientIds = Client::query()
-            ->whereIn('site_id', $readerSiteIds)
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->all();
+        // Site scope is not person scope: an ordinary support worker sees only
+        // the residents whose chart they may open (ClientPolicy::viewMedications),
+        // leads keep the whole Site. Rows and stats share this boundary.
+        $readerClientIds = $this->marLinks->openableClientIds(
+            $actor,
+            Client::query()->whereIn('site_id', $readerSiteIds)->pluck('id'),
+        );
 
         // Flat, client-side-filterable register — the redesigned page facets by
         // tab/search/severity/type/reporter with live counts (drops pagination).
         $modelQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
             MedicationError::query(),
             $readerSiteIds,
-        );
+        )->whereIn('client_id', $readerClientIds);
         if (! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
             $this->governanceScope->scopeWithoutControlledMedicationRows($modelQuery);
         }
@@ -201,7 +204,7 @@ class MedicationErrorController extends Controller
         $statQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
             MedicationError::query(),
             $readerSiteIds,
-        );
+        )->whereIn('client_id', $readerClientIds);
         if (! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
             $this->governanceScope->scopeWithoutControlledMedicationRows($statQuery);
         }

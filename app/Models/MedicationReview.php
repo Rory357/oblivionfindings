@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -61,13 +62,15 @@ class MedicationReview extends Model
     public function scopeOverdue($query)
     {
         return $query->where('status', 'scheduled')
-            ->where('scheduled_date', '<', now()->toDateString());
+            ->where('scheduled_date', '<', WorkerClock::today()->toDateString());
     }
 
     public function scopeUpcoming($query, int $days = 30)
     {
+        $today = WorkerClock::today();
+
         return $query->where('status', 'scheduled')
-            ->whereBetween('scheduled_date', [now()->toDateString(), now()->addDays($days)->toDateString()]);
+            ->whereBetween('scheduled_date', [$today->toDateString(), $today->addDays($days)->toDateString()]);
     }
 
     public function scopeDue($query)
@@ -77,6 +80,8 @@ class MedicationReview extends Model
 
     public function isOverdue(): bool
     {
-        return $this->status === 'scheduled' && $this->scheduled_date->isPast();
+        return $this->status === 'scheduled'
+            && $this->scheduled_date !== null
+            && WorkerClock::daysUntil($this->scheduled_date) < 0;
     }
 }

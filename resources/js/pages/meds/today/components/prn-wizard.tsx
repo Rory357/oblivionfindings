@@ -5,6 +5,7 @@
  * Chrome follows the Add Client dialog contract via MedsWizardDialog. Submits
  * to the existing POST /meds/today/prn endpoint (EnhancedMarService), with the
  * same offline queue behaviour the original quick sheet had. */
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import {
     CdBadge,
     ClientAllergyNotice,
@@ -40,6 +41,7 @@ import {
     serverRejectionMessage,
 } from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
+import { witnessIsSelectable, witnessOptionLabel } from '@/lib/witness-pin';
 import { router, useForm } from '@inertiajs/react';
 import axios from 'axios';
 import {
@@ -218,7 +220,7 @@ export function PrnWizard({
                 !form.data.witness_credential
             )
                 e.witness_credential =
-                    'The witness confirms by entering their password';
+                    'The witness confirms by typing their 6-digit witness PIN';
         }
         return e;
     };
@@ -693,32 +695,19 @@ export function PrnWizard({
                                         placeholder="Choose a witness…"
                                         options={witnesses.map((w) => ({
                                             value: String(w.id),
-                                            label: w.name,
+                                            label: witnessOptionLabel(w),
+                                            disabled: !witnessIsSelectable(w),
                                         }))}
                                     />
                                 </Field>
-                                <Field
-                                    label={
-                                        cosignerOnly
-                                            ? 'Co-signer password'
-                                            : 'Witness password'
+                                <WitnessPinInput
+                                    value={form.data.witness_credential}
+                                    onChange={(v) =>
+                                        form.setData('witness_credential', v)
                                     }
-                                    required
-                                    hint="entered by the witness"
                                     error={err('witness_credential')}
-                                >
-                                    <Input
-                                        type="password"
-                                        autoComplete="off"
-                                        value={form.data.witness_credential}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'witness_credential',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </Field>
+                                    atCupboard={med.is_controlled}
+                                />
                             </div>
                         ) : null}
                         {med.max_per_day !== null || med.min_hours_between ? (

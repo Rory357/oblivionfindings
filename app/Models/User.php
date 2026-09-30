@@ -276,6 +276,12 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasOne(HrEmployeeProfile::class);
     }
 
+    /** Personal witness PIN (hash only) — see WitnessPinService. */
+    public function witnessPin()
+    {
+        return $this->hasOne(UserWitnessPin::class);
+    }
+
     public function hrLeaveRequests()
     {
         return $this->hasMany(HrLeaveRequest::class);

@@ -4,6 +4,7 @@
  * their own components. Keys owned by show.tsx's pre-existing dialogs
  * (daily/quick/communication note, edit profile) are delegated before this
  * component is reached. */
+import type { WitnessPickerOption } from '@/lib/witness-pin';
 import { AbcEntryDialog, type AbcEntryRow } from './abc-dialog';
 import { CarePlanWizardDialog, type CarePlanForEdit } from './care-plan-dialog';
 import { EmarRecordDialog, type EmarMedication } from './emar-dialog';
@@ -26,6 +27,7 @@ export function ProfileDialogs({
     medications,
     canRecord,
     canRecordControlled,
+    witnessOptions,
 }: {
     dialog: ProfileDialogState;
     onClose: () => void;
@@ -33,6 +35,7 @@ export function ProfileDialogs({
     medications: EmarMedication[];
     canRecord: boolean;
     canRecordControlled: boolean;
+    witnessOptions: WitnessPickerOption[];
 }) {
     if (!dialog) return null;
 
@@ -108,7 +111,7 @@ export function ProfileDialogs({
                 medications={medications}
                 canRecord={canRecord}
                 canRecordControlled={canRecordControlled}
-                staffOptions={flowContext.staffOptions}
+                witnessOptions={witnessOptions}
                 initialMedicationId={
                     typeof dialog.ctx?.medicationId === 'number'
                         ? dialog.ctx.medicationId

@@ -25,6 +25,7 @@ use RuntimeException;
 use Symfony\Component\Process\Process;
 use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 class MedicationsApiControllerTest extends TestCase
 {
@@ -254,7 +255,7 @@ class MedicationsApiControllerTest extends TestCase
             'reason' => 'Test request may run outside the configured administration window.',
             'quantity_administered' => 0.5,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ];
         $url = "/api/medications/clients/{$this->client->id}/medications/{$medication->id}/administrations";
 

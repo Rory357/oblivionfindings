@@ -306,11 +306,13 @@ export function EntityTable<T>({
                                     </span>
                                 ))}
 
-                                {/* kebab cell — always last */}
+                                {/* kebab cell — always last. pr-2.5 keeps the
+                                    kebab's 44 px frontline-hit area inside
+                                    the card's overflow clip. */}
                                 <span
                                     role="cell"
                                     onClick={(e) => e.stopPropagation()}
-                                    className="flex items-center justify-end pr-1.5"
+                                    className="flex items-center justify-end pr-2.5"
                                 >
                                     {!selectMode ? (
                                         <EntityKebab

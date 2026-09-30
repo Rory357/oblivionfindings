@@ -26,6 +26,7 @@ import {
     Hand,
     History,
     Home,
+    KeyRound,
     MapPin,
     Package,
     Pill,
@@ -81,6 +82,10 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import {
+    OWN_WITNESS_PIN_PROMPT,
+    OWN_WITNESS_PIN_SETTINGS_URL,
+} from '@/lib/witness-pin';
 
 import {
     DayPickerChip,
@@ -247,7 +252,7 @@ function DoseRow({
             </td>
             <td className="py-3 pr-3 align-middle">
                 <div className="flex items-center gap-2">
-                    {canViewMar ? (
+                    {canViewMar && row.mar_url ? (
                         <Link
                             href={row.mar_url}
                             className="truncate text-sm hover:underline"
@@ -1343,13 +1348,13 @@ export default function MedsToday(props: MedsTodayProps) {
             navigator.platform.toUpperCase().includes('MAC');
 
         const common: ShiftCtxItem[] = [
-            ...(board_can.view_emar
+            ...(board_can.view_emar && row.mar_url
                 ? [
                       {
                           icon: <FileText className="h-3.5 w-3.5" />,
                           label: 'View MAR chart',
                           sub: `Full history · ${row.medication_name}`,
-                          onClick: () => router.visit(row.mar_url),
+                          onClick: () => router.visit(row.mar_url!),
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
@@ -1495,6 +1500,15 @@ export default function MedsToday(props: MedsTodayProps) {
             label: `${stock_alerts.length} stock alert${stock_alerts.length === 1 ? '' : 's'}`,
             tone: 'default',
             icon: Package,
+        });
+    // PIN-1: colleagues can only pick you as their witness or co-signer once
+    // you have a usable witness PIN — prompt until you set one.
+    if (board_user.witness_pin && board_user.witness_pin !== 'set')
+        heroBadges.push({
+            label: OWN_WITNESS_PIN_PROMPT[board_user.witness_pin],
+            tone: 'warning',
+            icon: KeyRound,
+            href: OWN_WITNESS_PIN_SETTINGS_URL,
         });
 
     const heroStats: PageHeroStat[] = [

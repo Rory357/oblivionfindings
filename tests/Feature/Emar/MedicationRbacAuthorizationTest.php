@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 class MedicationRbacAuthorizationTest extends TestCase
 {
@@ -904,7 +905,7 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'on_hand_before' => 10,
                 'on_hand_after' => 8,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasNoErrors();
         $this->assertDatabaseHas('client_controlled_drug_entries', [
@@ -1076,7 +1077,7 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'on_hand_before' => 10,
                 'on_hand_after' => 9,
                 'witnessed_by' => $authorisedWitness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_request_uuid' => $entryUuid,
             ])
             ->assertConflict()
@@ -1100,7 +1101,7 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $authorisedWitness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_request_uuid' => $balanceUuid,
             ])
             ->assertConflict()
