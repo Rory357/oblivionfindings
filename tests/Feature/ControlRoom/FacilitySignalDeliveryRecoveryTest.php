@@ -993,7 +993,7 @@ class FacilitySignalDeliveryRecoveryTest extends TestCase
             'source' => 'facility',
             'outbox' => $outbox->id,
         ])
-            ->expectsOutput('Safety-signal delivery replay queued.')
+            ->expectsOutput('Delivery replay requested. Use safety-signals:recover --report-only to inspect the recorded outcome.')
             ->assertSuccessful();
         $this->assertSame('pending', $outbox->fresh()->status);
         $this->assertNull($outbox->fresh()->last_error);
