@@ -9,7 +9,7 @@
   - **P00 v5** (`ff3bff860`): concealment, “Not configured”, no access vs not found, the witness override, and the count cadence wording.
   - **P01 v1** (`3ac640485`): the Meds today page top, the witness picker, the override request and the manager’s one-screen approval, the `Modal`, the shell and the harness. Recording a dose stays P01’s dialog; it is never redesigned here.
   - **P11 v5** (`12ecb24a2`): the staff competency and PIN states, witness eligibility (answers 10–11), and the controlled-drug alerts.
-  - **PIN-1** (`claude/emar-pin-1`, `6bb8caefa`): the witness PIN field and messages are mirrored, not imported, because PIN-1 isn’t on main.
+  - **Witness PIN wording:** P01 v2’s approved wording, verbatim (approved at `d96e29a52`). The review session ruled on 30 September that an approved design outranks PIN-1’s built server text, and the build aligns PIN-1’s messages to it.
 - Linked, not designed here: recording a dose (P01), the person record (P02), follow-ups and the handover lens (P08a), stock and deliveries (P06), the controlled register, resolving discrepancies and loss reports (P07b), errors (P08b).
 
 ## Stephan’s answers (30 September 2026, pop-up questions in this session)
@@ -85,13 +85,13 @@ It is one `WizardShell` with three steps: **Count → Witness → Review & sign*
 - **A count that differs is counted again first:**
   - If the second count matches, nothing is reported, and the first count is kept with the record.
   - If it still differs, a critical notice says a discrepancy starts when saved, owned by the house lead, who is told straight away. “What you found” and “What you did straight away” are both required; they come from today’s two fields.
-- **The witness** uses P01’s searchable picker, with PIN-1’s field wording. It lists everyone on shift at the house now, each with a reason:
+- **The witness** uses P01’s approved searchable picker and PIN field, with P01 v2’s wording: “Witness’s 6-digit PIN”, “Incorrect PIN. 4 tries left before …’s PIN locks for 15 minutes.”, and the locked message. It lists everyone on shift at the house now, each with a reason:
   - “you’re counting — the witness must be someone else”;
   - controlled drugs area not passed;
   - no controlled-medicine access;
   - competency restricted;
   - no witness PIN set;
-  - witness PIN locked.
+  - PIN locked.
 
   “They’ve forgotten their PIN” is shown disabled, with the reason it isn’t allowed for controlled drugs.
 - **The counter** must be clocked in at the house and have controlled-medicine record access. A count is **never** recorded without a witness, and an override never covers a count.
@@ -194,7 +194,7 @@ Loosening the cadence is flagged “Loosens this check”. The details are on th
 
 ## Deviations the review session should check
 
-1. **PIN wording follows PIN-1, not P01.** The brief says to mirror PIN-1. P01 v1’s approved wrong-PIN line gave the tries left (“4 tries left before …”). PIN-1 says “Incorrect PIN. Repeated wrong attempts lock the PIN.”, and its locked message says the owner can reset the PIN. P07a uses PIN-1’s wording (Q1).
+1. ~~PIN wording follows PIN-1, not P01.~~ **Closed by the review session’s inspection (30 September).** P07a now uses P01 v2’s approved wording verbatim, because an approved design outranks PIN-1’s built server text. The build aligns PIN-1’s messages to it.
 2. **Reference frames.**
    - The Schedule is P01’s list, simplified, and labelled “Reference frame”. It is there only to show concealment.
    - Rounds, As-needed, Follow-ups, Stock alerts and Activity are link-only cards naming their packages.
@@ -202,11 +202,13 @@ Loosening the cadence is flagged “Loosens this check”. The details are on th
 3. **The shell chrome is reproduced**, as in P01 and the Fleet previews, because `AppLayout` needs live Inertia props.
 4. **`ConfirmDialog` is the real one.** Its destructive confirm renders purple on main until PR #15 lands (the known shared bug); this is not worked around. “Cancel request” uses `variant="default"`, because cancelling a request isn’t destructive.
 5. **P11’s setting is specified, not drawn**, because P11 v5 is frozen (§10).
-6. **One P00 v5 sentence is updated.** “Counts can still be recorded from the controlled register” now reads “Counts can still be recorded any time”, because P07a moves counting into Controlled checks. The rest of the “Not configured” wording is unchanged.
+6. **One P00 v5 sentence is updated.** “Counts can still be recorded from the controlled register” now reads “Counts can still be recorded any time”, because P07a moves counting into Controlled checks. The rest of the “Not configured” wording is unchanged. The review session accepted this and will put it to Stephan as a one-line confirmation, because P00 is frozen.
+
+**Review session inspection, 30 September:** P07a v1 at `3778fa705` passed with one fix, P01 v2’s PIN wording (deviation 1). The fix was made in this version.
 
 ## Open questions for Stephan (by decision)
 
-1. **PIN wording:** use PIN-1’s “Repeated wrong attempts lock the PIN.” everywhere, including P01’s build, instead of showing the tries left? *Recommended: yes.* It doesn’t tell anyone how many guesses remain.
+1. ~~PIN wording~~ — **dropped by the review session (30 September).** P01 v2’s approved wording is used.
 2. **When a count shows as due:** 30 minutes before the shift change, the same lead time as the dose window. *Recommended: yes.*
 3. **After a mismatch, the register follows what was counted**, as today, with the difference kept on the discrepancy until the house lead resolves it. *Recommended: yes.* The alternative is to keep the old balance until it’s resolved.
 4. **A medicine with an open discrepancy is never blocked for doses.** The row and the dose dialog show the discrepancy. *Recommended: yes.* This matches “never block recording what happened”.

@@ -1,7 +1,7 @@
-/* The witness for a controlled-medicine count or movement — P01 v1's approved
- * witness picker (record-dialog.tsx `SecondPerson`, kind "witness") with
- * PIN-1's field wording (components/medications/witness-pin-input.tsx on
- * claude/emar-pin-1, not on main yet — mirrored here, not imported).
+/* The witness for a controlled-medicine count or movement — P01 v2's approved
+ * witness picker and PIN field (record-dialog.tsx `SecondPerson`, kind
+ * "witness"), wording verbatim. PIN-1's server messages align to this at
+ * build (review session, 30 Sep 2026).
  * Real Popover + Command picker, Input, Checkbox, Label, InputError. */
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -110,26 +110,14 @@ export function WitnessField({
                     <Label htmlFor="w-pin" className="text-sm font-medium">
                         {PIN.label} <span className="text-status-critical">*</span>
                     </Label>
-                    <Input
-                        id="w-pin"
-                        type="password"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        maxLength={6}
-                        autoComplete="one-time-code"
-                        data-lpignore="true"
-                        data-1p-ignore="true"
-                        value={value.pin}
-                        disabled={!chosen}
-                        aria-invalid={!!errors.pin}
-                        aria-describedby="w-pin-h"
-                        onChange={(e) => onChange({ ...value, pin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-                        className="tracking-[0.3em] tabular-nums"
-                    />
-                    <p id="w-pin-h" className="text-caption">
-                        {PIN.help}
-                    </p>
-                    <InputError message={errors.pin} />
+                    <Input id="w-pin" type="password" inputMode="numeric" maxLength={6} autoComplete="off" value={value.pin} disabled={!chosen} aria-invalid={!!errors.pin} aria-describedby="w-pin-h" onChange={(e) => onChange({ ...value, pin: e.target.value.replace(/\D/g, '').slice(0, 6) })} />
+                    {errors.pin ? (
+                        <InputError message={errors.pin} />
+                    ) : (
+                        <p id="w-pin-h" className="text-caption">
+                            {PIN.help}
+                        </p>
+                    )}
                 </div>
             </div>
             <div className="space-y-1">
@@ -148,10 +136,10 @@ export function WitnessField({
     );
 }
 
-/** Server-style PIN check for the mockup (PIN-1 messages). */
+/** Server-style PIN check for the mockup (P01 v2's approved messages). */
 export function checkPin(name: string, pin: string): string | null {
     if (!/^\d{6}$/.test(pin)) return PIN.blank;
-    if (pin === '000000') return PIN.incorrect;
+    if (pin === '000000') return PIN.incorrect(name);
     if (pin === '999999') return PIN.locked(name, '3:03 pm');
     return null;
 }

@@ -62,7 +62,7 @@ export function FollowUpDialog({ onClose, returnFocus }: { onClose: () => void; 
         if (step === 1 && !covered) {
             e = validateCounts(meds, lines, s.balanceOf);
             if (!witness.id) e.witness = 'Choose who is witnessing the count.';
-            else if (!/^\d{6}$/.test(witness.pin)) e.pin = 'Enter their 6-digit witness PIN.';
+            else if (!/^\d{6}$/.test(witness.pin)) e.pin = 'Enter their 6-digit PIN.';
         }
         setErrors(e);
         if (Object.keys(e).length) return focusFirst(e);

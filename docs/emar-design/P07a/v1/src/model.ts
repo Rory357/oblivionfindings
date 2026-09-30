@@ -1,7 +1,7 @@
 /* P07a rules — what Controlled checks shows and what each dialog checks.
- * Wording is the approved P00 v5 / P01 v1 wording unless a P07a decision says
- * otherwise; witness PIN messages mirror PIN-1 (claude/emar-pin-1,
- * WitnessPinService + lib/witness-pin.ts). Synthetic only. */
+ * Wording is the approved P00 v5 / P01 v2 wording unless a P07a decision says
+ * otherwise, including the witness PIN messages (P01 v2's approved wording;
+ * the review session, 30 Sep 2026). Synthetic only. */
 import { NOW_MIN, minutesOf } from './clock';
 import { CD_MEDS, PERSONAS, STAFF, type CdMed, type HouseKey, type PersonaId, type Staff } from './data';
 
@@ -115,8 +115,8 @@ export function candidates(persona: PersonaId, house: HouseKey, scn: Scenario): 
                 else if (s.competency === 'expired') reasons.push('competency expired');
                 else if (!s.cdArea) reasons.push('controlled drugs area not passed');
                 if (s.pin === 'notset') reasons.push('no witness PIN set');
-                else if (s.pin === 'locked') reasons.push('witness PIN locked');
-                else if (s.pin === 'reset') reasons.push('witness PIN reset — must set a new one');
+                else if (s.pin === 'locked') reasons.push('PIN locked');
+                else if (s.pin === 'reset') reasons.push('PIN reset — must set a new one');
             }
             return { staff: s, ok: reasons.length === 0, self, reasons, why: reasons.length ? reasons.join(' · ') : `on shift now · ${s.now} · PIN set` };
         });
@@ -132,14 +132,14 @@ export function countBlock(persona: PersonaId, scn: Scenario, clockedIn: boolean
     return null;
 }
 
-/* ───────────── witness PIN (PIN-1 wording, verbatim) ───────────── */
+/* ───────────── witness PIN — P01 v2's approved wording, verbatim (record-dialog.tsx SecondPerson, kind "witness").
+ * The review session (30 Sep 2026): an approved design outranks PIN-1's server text; the build aligns PIN-1 to this. ───────────── */
 export const PIN = {
-    label: 'Their witness PIN',
-    help: 'Their own 6-digit witness PIN — not their login password. They type it here, at the medicine cupboard.',
-    blank: 'Enter their 6-digit witness PIN.',
-    incorrect: 'Incorrect PIN. Repeated wrong attempts lock the PIN.',
-    locked: (name: string, at: string) => `${name}’s witness PIN is locked after too many wrong attempts. It unlocks at ${at}, or they can reset it in Settings › Witness PIN.`,
-    notSet: (name: string) => `${name} hasn’t set a witness PIN yet. They can set one in Settings › Witness PIN, or choose someone else.`,
+    label: 'Witness’s 6-digit PIN',
+    help: 'Their own witness PIN — not their login password. They type it here, at the medicine cupboard.',
+    blank: 'Enter their 6-digit PIN.',
+    incorrect: (name: string) => `Incorrect PIN. 4 tries left before ${name}’s PIN locks for 15 minutes.`,
+    locked: (name: string, at: string) => `${name}’s PIN is locked after 5 wrong attempts. It unlocks at ${at}, or a house lead or clinical lead can reset it. Choose another witness.`,
     sameServer: 'The witness must be a different eligible staff member.',
     forgottenNotAllowed: 'Not allowed for controlled drugs (your organisation’s setting, Settings › Second-person confirmation).',
     ownPrompt: 'Set your witness PIN so colleagues can choose you as a witness',

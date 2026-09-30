@@ -72,7 +72,7 @@ export function MovementDialog({ lockedId, onClose, returnFocus }: { lockedId: s
             if (f.left.trim() === '') e['mv-left'] = 'Count what’s left and enter it.';
             else if (Number(f.left) !== after) e['mv-left'] = `That doesn’t match what should be left (${m ? qty(after, m) : after}). Check the amount and count again.`;
             if (!witness.id) e.witness = 'Choose who is witnessing.';
-            else if (!/^\d{6}$/.test(witness.pin)) e.pin = 'Enter their 6-digit witness PIN.';
+            else if (!/^\d{6}$/.test(witness.pin)) e.pin = 'Enter their 6-digit PIN.';
         }
         setErrors(e);
         if (Object.keys(e).length) return focusFirst(e);

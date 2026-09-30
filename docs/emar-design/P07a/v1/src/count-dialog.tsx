@@ -200,7 +200,7 @@ export function CountDialog({ medIds, mode, onClose, returnFocus }: { medIds: st
         } else if (step === 1) {
             const e: Record<string, string> = {};
             if (!witness.id) e.witness = 'Choose who is witnessing the count.';
-            else if (!/^\d{6}$/.test(witness.pin)) e.pin = 'Enter their 6-digit witness PIN.';
+            else if (!/^\d{6}$/.test(witness.pin)) e.pin = 'Enter their 6-digit PIN.';
             setErrors(e);
             if (Object.keys(e).length) return focusFirst(e);
             setStep(2);

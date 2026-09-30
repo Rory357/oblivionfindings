@@ -87,19 +87,19 @@ export function ContractPage() {
                 />
             </Section>
 
-            <Section id="pin" title="3. Witness PIN wording (mirrors PIN-1)">
+            <Section id="pin" title="3. Witness PIN wording (P01 v2, approved)">
                 <T
                     head={['When', 'Wording']}
                     rows={[
                         ['Field', `${PIN.label} — “${PIN.help}”`],
                         ['Empty', PIN.blank],
-                        ['Wrong PIN', PIN.incorrect],
+                        ['Wrong PIN', PIN.incorrect('Jordan Tipene')],
                         ['Locked', PIN.locked('Jordan Tipene', '3:03 pm')],
-                        ['No PIN set (picker)', 'Mere Kahu — no witness PIN set — can’t be chosen'],
+                        ['No PIN set or locked (picker)', 'Mere Kahu — … no witness PIN set — can’t be chosen · Leilani Faleolo — … PIN locked — can’t be chosen'],
                         ['Forgotten PIN', PIN.forgottenNotAllowed],
                     ]}
                 />
-                <p className="text-caption">P01 v1’s approved wrong-PIN line said how many tries were left (“4 tries left before …’s PIN locks for 15 minutes”). PIN-1 (the build) says “Repeated wrong attempts lock the PIN.” P07a mirrors PIN-1, as the brief asks — flagged as a deviation for the review session.</p>
+                <p className="text-caption">P01 v2’s approved wording, verbatim. The review session (30 Sep 2026): an approved design outranks PIN-1’s built server text, and the build aligns PIN-1’s messages to this wording.</p>
             </Section>
 
             <Section id="settings" title="4. Setting added to Medication › Settings (P11 Controlled drugs view)">

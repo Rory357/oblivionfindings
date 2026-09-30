@@ -100,7 +100,7 @@ Legend: **Pass** · **Pass (note)** passes with a stated limitation · **N/A** i
 |---|---|---|
 | No dead or decorative actions or meters; unbuilt things are hidden | Pass (note) | Actions owned by other packages say so in a toast (“… — outside this preview”): recording a dose (P01), the person record (P02), the handover (P08a), errors (P08b), the controlled register (P07b). That is the mockup’s boundary, not product behaviour. The other Meds today views are link-only cards naming their package. |
 | Synthetic data clearly labelled | Pass | The hatched viewer bar reads “mockup viewer — not product UI · Synthetic data”. |
-| Views approved earlier are reused unchanged unless an approved change says otherwise | Pass (note) | P01’s header, `Modal`, override request and approval, and witness picker. The PIN wording follows PIN-1, not P01 (declared deviation 1, Q1). |
+| Views approved earlier are reused unchanged unless an approved change says otherwise | Pass | P01’s header, `Modal`, override request and approval, witness picker and PIN field, with P01 v2’s approved PIN wording, verbatim (review-session fix, 30 Sep). The one updated P00 v5 sentence is declared as deviation 6. |
 
 ## 3. Brief §5 findings, checked first
 
