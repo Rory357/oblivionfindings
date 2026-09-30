@@ -36,7 +36,7 @@ import {
 import { type ReactNode } from 'react';
 import { DAY_LABEL } from './clock';
 import { PERSONAS, frontline as isFrontline, type PersonaId } from './data';
-import { SCENARIOS, canActOn, canCloseIncident, canManage, errorsIn, incidentState, incidentsIn, type Scenario } from './model';
+import { SCENARIOS, canCloseIncident, canManage, errorsIn, incidentState, incidentsIn, type Scenario } from './model';
 import { hrefFor, useStore } from './store';
 
 /* ───────────── mockup viewer (not product UI) ───────────── */
@@ -56,7 +56,7 @@ function Viewer() {
             className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-dashed border-border bg-muted px-4 py-2 text-[12px] text-muted-foreground"
             style={{ backgroundImage: 'repeating-linear-gradient(135deg, transparent 0 8px, color-mix(in oklch, var(--foreground) 5%, transparent) 8px 9px)' }}
         >
-            <span className="font-bold tracking-wide text-foreground uppercase">eMAR P08b v1 · mockup viewer — not product UI</span>
+            <span className="font-bold tracking-wide text-foreground uppercase">eMAR P08b v1.1 · mockup viewer — not product UI</span>
             <span className="rounded-md bg-status-warning-bg px-2 py-0.5 font-semibold text-status-warning">Synthetic data · Monday 28 Sep 2026, 9:12 am NZDT</span>
             <label className="flex items-center gap-1.5">
                 Signed in as
@@ -100,12 +100,12 @@ function Viewer() {
 }
 
 /* ───────────── top bar ───────────── */
-/** For people who manage errors: errors to triage that they can act on (a controlled one only with controlled-medicine access), and — for people who close incidents — incidents ready to close (P11 Delivery routes “Medication errors reported” until triaged). */
+/** For people who manage errors: every error waiting for triage at their houses — P11 Delivery tells all the configured recipients, a controlled one included, with the neutral summary only (Main, D3) — and, for people who close incidents, incidents ready to close. */
 export function useBellCount() {
     const s = useStore();
     const p = s.route.persona;
     if (!canManage(p) || ['loading', 'unavailable', 'empty'].includes(s.route.scenario)) return 0;
-    const triage = errorsIn(s.rt, p).filter((e) => e.stage === 'triage' && canActOn(p, e)).length;
+    const triage = errorsIn(s.rt, p).filter((e) => e.stage === 'triage').length;
     const ready = canCloseIncident(p) ? incidentsIn(s.rt, p).filter((i) => incidentState(s.rt, i).label.startsWith('Ready to close')).length : 0;
     return triage + ready;
 }
@@ -146,7 +146,7 @@ function TopBar() {
                 </button>
                 <button
                     type="button"
-                    aria-label={bell ? `Notifications — ${bell} medication-error items need you` : 'Notifications'}
+                    aria-label={bell ? `Notifications — ${bell} about medication errors` : 'Notifications'}
                     onClick={() => (bell ? s.go('/emar/errors', { open: undefined }) : outside('Notifications')())}
                     className="relative grid size-8 place-items-center rounded-md outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring"
                 >

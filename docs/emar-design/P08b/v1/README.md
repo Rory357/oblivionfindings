@@ -1,6 +1,6 @@
 # eMAR P08b v1 — Medication errors & incidents
 
-**Status: candidate v1 for Main’s approval.** Main is the review session, “Codex eMAR audit re-review”, acting under Stephan’s delegation. This design is not implemented.
+**Status: candidate v1.1 for Main’s approval.** v1 was inspected on 1 October; v1.1 applies Main’s decision on the controlled-error alert and records the other decisions (see “Main’s inspection of v1”). Main is the review session, “Codex eMAR audit re-review”, acting under Stephan’s delegation. This design is not implemented.
 
 - **Version:** v1, 1 October 2026 (NZDT). Branch `claude/emar-p08b`, based on `origin/main` `33fb7a3c9`.
 - **Exact file identity:** [`VERSION.txt`](VERSION.txt), the SHA-256 of every source, build and tool file.
@@ -138,7 +138,7 @@ Closing needs the report triaged, every action done, and telling the person reco
 
 Drawn as a P11 v5 frame: its header, meters, rail and section strip, and its group/row pattern. It is **built with P08b, not in B1**.
 - **Triage a reported error:** within 4 hours · by the end of the day · **by the end of the next day** (the default, marked **Default — not yet reviewed**, with “Keep the default”).
-- **Who’s alerted until then:** the existing “Medication errors reported” alert (Delivery).
+- **Who’s alerted until then:** the existing “Medication errors reported” alert — the house lead and the clinical lead for the house (Delivery).
 - **Who triages:** set by role.
 - **The sticky save bar**; **Review changes** shows before → after, and a “Loosens this check” warning when the time gets longer. The change history gets the saved row.
 - **Who can change it:** only people who manage medication settings for all houses; for house leads and auditors the bar says why not.
@@ -166,13 +166,13 @@ A CSV of the last 90 days at your houses. The dialog says what’s in it: every 
    - Closing needs: triaged, no open actions, telling the person recorded if it reached them, and a closer who isn’t the reporter.
    - My Day and All Tasks: the owner’s triage and investigation, and each action for its owner. The Tasks provider gets an assignee and a due date (AUDIT 1.6).
 6. **The P11 addition:** `medication_error_triage_due` (`four_hours` / `end_of_day` / `next_day`; default `next_day`, “Default — not yet reviewed”) in Alerts & access › Error triage. Built with P08b, not in B1. It joins P11’s “Still to decide”.
-7. **Alerts:** P11’s “Medication errors reported” goes to the house lead and the clinical lead until triaged. **For a controlled error, only to those with controlled-medicine access** (deviation 3 — for Main to confirm). `MedicationErrorNotification`, `ComplianceAlertService::alertMedicationError` and `bridgeMedicationError` are retired (AUDIT 8). The Control Room signal carries the summary only.
+7. **Alerts:** P11’s “Medication errors reported” goes to **all the recipients the organisation sets** — the house lead and the clinical lead — until triaged, **a controlled error included** (Main, D3). The alert carries only the neutral summary, so telling a reader without controlled-medicine access leaks nothing; opening it gives the redacted report, and triage stays with people who can act. `MedicationErrorNotification`, `ComplianceAlertService::alertMedicationError` and `bridgeMedicationError` are retired (AUDIT 8). The Control Room signal carries the summary only.
 8. **Incidents (Q6):**
    - Made in the same transaction when required (reached with moderate harm or worse, or `source=more`), or when the reporter asks; title and description = the summary; the person, when it happened and the harm.
    - **Closing the error:** if the closer holds `incidents.approve`, call the Incidents module’s own review and close (IncidentController review → close, through `ClientIncidentPolicy`), with the outcome (≤ 120) and note. Otherwise record the medication-side close on the incident (who, when, note) and show “Ready to close — medication error closed” in the Incidents queue. Never a direct status write.
    - **The same for P07b’s discrepancy and loss incidents** (MIS): “Ready to close — discrepancy closed” / “— loss closed”.
    - Reopening an error doesn’t reopen its incident.
-   - Existing incidents made from errors hold copied free text (AUDIT 4.2). How to treat that history — for example a one-off list for a manager to review, rather than rewriting it — is for the build plan.
+   - **Existing incidents made from errors** hold copied free text (AUDIT 4.2). At the P08b build, produce **a one-off list of them for a manager to review**. Any redaction goes through the incident’s own audited edit; incident history is never rewritten silently (Main, 1 Oct).
 9. **Who (Q7):** new `medications.errors.manage`, with a grant migration to team_lead, clinical_lead, coordinator and provider_manager (deploys skip seeders). Error writes stop using `administer.correct`, so support workers lose resolve and close (AUDIT 5). Reporting stays `administer.record`. Support workers see the reports they made or added to. Export: `errors.manage` or `audit.view`.
 10. **Telling the person (Q8):** structured `disclosure` (state; who — the person and/or the named whānau, welfare guardian or EPOA; how; when; by; or why not yet), replacing `open_disclosure` with a migration. Required before closing when it reached the person.
 11. **Duplicates (Q9):** a server check when reporting — same person, a shared order, within ±24 hours of when it happened, not closed. It returns the match’s id, summary and time only (or the controlled wording). “Add my account” appends an account and makes no second error or incident.
@@ -188,6 +188,7 @@ A CSV of the last 90 days at your houses. The dialog says what’s in it: every 
     - Lists follow the person rule, with no count of hidden rows (P02).
     - P07b’s discrepancy and loss incidents close on the medication side here (P07b Q4).
 17. **Disabled menu items** (P05 build note 15) apply here too; until then, unavailable items are left out, as here.
+18. **Support workers reach “Your reports” from Meds today** — a P01 build note: support workers keep a single “Meds today” entry (Main, D4).
 
 ## Verification (1 October 2026)
 
@@ -197,11 +198,21 @@ A CSV of the last 90 days at your houses. The dialog says what’s in it: every 
   - no truncated P08b meter caption or table cell (P11’s one caption is noted in CHECKLIST §3).
 
   Details are in CHECKLIST §4 and `screenshots/report.json`.
+- **v1.1:** the states D3 touches were re-run (`05`, `31`, `46`, `47`, `55`, `85`, `86`–`91`): 30 captures, 0 problems (CHECKLIST §5).
 - **Keyboard:**
   - Enter on “Triage it” opens the wizard, and Tab stays inside it.
   - Escape closes the untouched wizard and returns focus to the button.
   - The menu key opens the error row’s menu.
 - **`tsc` and ESLint:** clean for `src/` (ESLint: 18 files, 0 problems; no unused imports). The 1 `tsc` error in a shared file comes from P01’s Inertia shim, as in the earlier packages.
+
+## Main’s inspection of v1 (1 October 2026)
+
+Identity verified: VERSION.txt sha256 `3a10a0a1…`, 32 files, docs-only, parent `33fb7a3c9`.
+
+- **D3 → reversed (v1.1).** A controlled error alerts all the configured recipients, the clinical lead included. P11 v5 delivers to the recipients the organisation sets and hides controlled details inside the content; the alert carries only the neutral summary; clinical oversight of every medication error is the governance norm. Changed: the bell counts every error waiting for triage (Hana’s shows MED-0048, and opens the redacted report with “A house lead with controlled-medicine access looks after it”), and the Settings row reads “the house lead and the clinical lead for the house”.
+- **D4 → confirmed.** Support workers reach “Your reports” from Meds today (build note 18).
+- **Build note 8 → decided.** A one-off list of existing incidents made from errors with copied free text, for a manager to review; any redaction through the incident’s own audited edit.
+- **D5 → confirmed.** Closing uses the non-destructive confirm; discard stays red.
 
 ## Deviations (for Main)
 
@@ -210,9 +221,9 @@ A CSV of the last 90 days at your houses. The dialog says what’s in it: every 
    - P11 v5’s Settings frame. Its numbers are P11’s reference numbers as Hana sees them, with “Still to decide” at 47: P11’s 45, P05’s approved addition, and P08b’s until it’s reviewed. Its history rows run up to 28 Sep.
    - **A frame of the Incidents module’s queue** (`/incidents`). Incidents isn’t an eMAR package; only the “Medication side” column and the neutral titles are P08b’s.
 2. **P01 and P08a entry points are deep links** (`report:dose:…`, `report:more:…`, `report:notright:…`, `report:person:…`), not redrawn pages. The contract page lists them.
-3. **The “reported” alert for a controlled error** goes only to leads with controlled-medicine access. It’s an inference from Q7 (a clinical lead without the keys can’t act on it), shown in the bell count and the Settings hint — for Main to confirm.
-4. **Support workers** see the same view, filtered to “Your reports”, inside the Safety & oversight frame. Where a support worker reaches it in the product (My Day or Meds today) belongs to the P01 build.
-5. **Closing uses the non-destructive `ConfirmDialog`**: closing isn’t destructive, and it can be reopened. Discarding a wizard keeps the default red confirm.
+3. **The “reported” alert for a controlled error — decided (Main, D3, v1.1):** it goes to all the configured recipients, the clinical lead included. v1 limited it to leads with controlled-medicine access; that was reversed. Hana’s bell now counts MED-0048, and opening it gives the redacted report (`46`).
+4. **Support workers** see the same view, filtered to “Your reports”, inside the Safety & oversight frame. **Confirmed (Main, D4):** in the product they reach it from Meds today (build note 18).
+5. **Closing uses the non-destructive `ConfirmDialog`** — **confirmed (Main, D5)**: closing isn’t destructive, and it can be reopened. Discarding a wizard keeps the default red confirm.
 6. **Fixtures** follow P02–P07b’s people, orders and incidents. Additions:
    - Six older closed reports (MED-0036 to MED-0041), so the Closed count, the weekly table and the governance count agree.
    - MED-0046 is reported by Sione, its owner, to show that the reporter never closes.

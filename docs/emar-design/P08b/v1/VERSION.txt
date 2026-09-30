@@ -1,15 +1,15 @@
-eMAR P08b v1 — Medication errors & incidents
+eMAR P08b v1.1 — Medication errors & incidents (v1 inspected by Main, 1 Oct; D3 applied)
 Branch claude/emar-p08b · base origin/main 33fb7a3c9 · 1 October 2026 (NZDT)
 SHA-256 of every file that makes up this version (approval applies to these hashes only).
-Screenshots are evidence, not part of the approved version: 201 PNG files; report.json sha256 83596127be9d43f9bf4a4dae9cc9ee6c38d9e3fa79c7e85fc949395f3b0ce8d5.
+Screenshots are evidence, not part of the approved version: 201 PNG files; report.json sha256 5913736a91953dd09af56826e1481d32d25be6e7199d1bd17b5166038ee75287.
 
 61c029353a5536fde2426303726b3e32452aa828cd2f7c51dcb924b9890393ec *.gitignore
 17bc7eeb416d4a20ede86c5433cc161f171812291869e1d5d96fedcd44599318 *AUDIT.md
-f0e0e1215f9287d74d5cc26133bb0ca71d1635eaeaf5fb2b22c792e8f966008a *CHECKLIST.md
-c04dfa00df6c9da89567ee0e9c28b005175f2de8e3131b4e8352b618ce32622a *README.md
-9bdede08bae316b9db3042920c879abd458db1e0bf69be14b2a9e73b999ef9c2 *dist/assets/index-DEKZYhd0.js
+40e40a838672905341c4e80ac4c66acd33ac6e1c4b6c8005749e2e70eff59972 *CHECKLIST.md
+67a4351cb7159c8ed0b2732757c992a5eef447d016500c31171f7e6b021b73aa *README.md
 02120e09a77ff1d298d22a706728be476da442dbde409eb10c493d38b6f33f21 *dist/assets/index-DTrw-d8T.css
-bf6fef0d49a73d1c108f9be1002a128b5d419ffff7b1507bd4c4f1fe5e6c411f *dist/index.html
+33252b06fb7dc55e66590c1c5363f1626e26cc64b158a496079a616dff96d399 *dist/assets/index-vDY-VhC-.js
+d048dfd88c0a7244efa87b7104bf8b8387ac12d4554a68509e6ff24603a15a75 *dist/index.html
 9ba47b72ab7471251a2a2027f9936b74f630d49338fd8cbe5aaf28c0d64927f4 *index.html
 f8651f3be43caa0f49bd1e2ff6ee3776998deb3428e601c3fc49e6c494f5927c *serve.mjs
 b64cb8ca8cebbb1406bb58eabe21905de41e37036bbbb9c7705141b0167c4cf4 *src/clock.ts
@@ -26,12 +26,12 @@ bf0e9353b0d8a6641c86dec2be5b0abbbc8ba6090565d4e26d39cb341bc077c5 *src/host.tsx
 e6cc6f3e2b935e937ab7fd5e998dcd3cc3aa04713c5313b028cdbc42b8987b3e *src/pages/contract.tsx
 7424925199bc316cbc0e5844cd4c911100a5284ed244efb325152b99f4273e52 *src/pages/errors.tsx
 d6198362ed4eefb8de0ded33f9d98f705ee9101ca2b8ba7f47670cde56dacdce *src/pages/incidents.tsx
-4fbfabb162a11d1ba077a9a7201661ca2f731e830238b7ee46e6e1905d25aeb2 *src/pages/settings.tsx
-788190791f832285fb919c1d96ab02f4a154c9ef80b1251d5ce9443f306f4da1 *src/shell.tsx
+744f37160a8c529d44e7ce7f70a3f0abb994e7e484da78bb17c027cadc35c09b *src/pages/settings.tsx
+5f43908700130426a00b1fb8f972285a4344da3dba3c39767d19a4119ce322b6 *src/shell.tsx
 6e5bcba6fae2e7e6cdfd04abc08961df90973ea67beeea9958f681f9e0066321 *src/store.tsx
 a28babd2ae136822405b7f7428b2c556f7ebfeaf2f0e15cd2a9dd77b6b9a83d1 *src/styles.css
 6fcdfe13c15ade4a4f24f98ee615d994559ed181a28a291a415008481265c7d9 *src/ui.tsx
 984514e29b21dfae2943cc02001b1f742108c22f8b36a0e5c8d1ed86b9f438ed *tools/verify.mjs
-d3afee4185f9eaf38757e6ea433155792cac053f1cab24d0e93b4c4ee8db9c53 *tools/version.mjs
+bc3f3072324a8d264e9f5fd8483cd1d4fd307397585a1bb0315d267ec302a002 *tools/version.mjs
 5aa13fdd9ad9fd57972b1e6701fb0a8a0d5fdc1e7b57f79f48eb856bf5c11cb0 *tsconfig.json
 5d515cb79df88a42cb0c577a1d4cf6d61b4e67dbb43eb58b65916519b829398e *vite.config.mjs

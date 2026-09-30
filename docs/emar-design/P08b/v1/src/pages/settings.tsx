@@ -229,7 +229,7 @@ function TriageSection({ ro, show, q }: { ro: boolean; show: string; q: string }
                         ) : null}
                         {org.reviewed && org.by ? <p className="text-caption">Set by {org.by}, {org.at}</p> : null}
                     </GroupRow>
-                    <GroupRow id="et-alert" label="Who’s alerted until then" hint="“Medication errors reported” — the house lead and the clinical lead for the house; for a controlled medicine, only those with controlled-medicine access." hidden={!vis(false, false, 'alerted', 'Medication errors reported')} control={<Button variant="outline" size="sm" onClick={() => s.toast('info', 'Opens Alerts & access › Delivery (P11) — “Medication errors reported”.')}>Delivery <ArrowUpRight className="size-4" /></Button>} />
+                    <GroupRow id="et-alert" label="Who’s alerted until then" hint="“Medication errors reported” — the house lead and the clinical lead for the house." hidden={!vis(false, false, 'alerted', 'Medication errors reported')} control={<Button variant="outline" size="sm" onClick={() => s.toast('info', 'Opens Alerts & access › Delivery (P11) — “Medication errors reported”.')}>Delivery <ArrowUpRight className="size-4" /></Button>} />
                     <GroupRow id="et-who" label="Who triages" hint="House leads, clinical leads, coordinators and managers. Set by role, not here." hidden={!vis(false, false, 'Who triages')} control={<Button variant="outline" size="sm" onClick={() => s.toast('info', 'Opens Settings › Roles — outside this preview.')}><Users className="size-4" /> Roles</Button>} />
                 </SettingGroup>
             </GroupGrid>

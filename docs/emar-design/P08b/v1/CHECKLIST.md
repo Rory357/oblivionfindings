@@ -136,7 +136,6 @@ Earlier runs found these problems, and this version fixes them:
 - **Truncated meter captions** (“Next due the end of tomorrow (Tue 29 Sep)”, “For coordinators and provider managers”, “Happened in the last 90 days”). Now “Due Tue 29 Sep”, “For a manager to close”, “Last 90 days”.
 - **Truncated incident titles and action text** at 1280 and 200 %. The id is the row’s name now, and the title or action wraps on the line below.
 - **A two-line subline** for managers of both houses. Now “at your 2 houses”.
-- **The bell counted a controlled error the clinical lead can’t act on.** It counts only what you can triage.
 - **The triage wizard asked to discard on Escape when nothing had changed**, because the owner was filled in. It now compares with what it opened with.
 - **A component made during render** in Trends (ESLint `react-hooks/static-components`). Removed.
 
@@ -148,3 +147,13 @@ Earlier runs found these problems, and this version fixes them:
 **`tsc`** (`tsconfig.json`): no errors in `src/`. The 1 error in a shared file (`breadcrumbs.tsx:36`) comes from P01’s Inertia shim types.
 
 **ESLint** (the app config, `--no-ignore`, `src/**/*.{ts,tsx}`): 18 files, 0 errors, 0 warnings. A separate check found no unused imports.
+
+## 5. v1.1 — Main’s inspection decisions (1 October 2026)
+
+**D3, reversed:** a controlled error alerts all the configured recipients, the clinical lead included; the alert carries the neutral summary only.
+- The bell counts every error waiting for triage at your houses — Hana’s shows 1 (MED-0048) (`05`), and it opens the redacted report (`46`, `47`); triage stays refused for her (`55`).
+- Settings › Error triage › “Who’s alerted until then” reads “the house lead and the clinical lead for the house” (`86`).
+
+**Recorded:** D4 (support workers reach “Your reports” from Meds today — README build note 18), build note 8 (a one-off review list of existing incidents with copied free text) and D5 (non-destructive close confirm).
+
+**Harness:** the touched states were re-run with `--only` on the v1.1 build: `05`, `31`, `46`, `47`, `55`, `85` and `86`–`91` — 30 captures, 0 problems. The other captures are from the v1 build; v1.1 changes nothing they show except the viewer bar’s “v1.1”. `report.json` holds 201 captures, 0 with problems.
