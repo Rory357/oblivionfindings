@@ -1,0 +1,27 @@
+/* eMAR P05 v1 preview styles: the app's own stylesheet plus explicit Tailwind
+ * sources (the P01 v2 scaffold). This worktree sits under the parent repo's
+ * ignored .claude/ folder, so Tailwind's automatic source detection skips it;
+ * these @source lines make the real components' utilities generate exactly as
+ * in the app. No tokens are defined here; the two rules below preview build
+ * changes Stephan approved with P01 v2 (30 Sep 2026). */
+@import '../../../../../resources/css/app.css';
+@source './';
+@source '../../../../../resources/js/components';
+@source '../../../../../resources/js/lib';
+@source '../../../../../resources/js/pages/fleet-assets/settings';
+@source '../../../../../resources/js/pages/operations/clients/tabs';
+
+/* APPROVED BUILD CHANGE (P01 v2 Q-v2-1), previewed: .frontline-tap is never
+ * under 44 px. The app's root font is 14 px, so today's 2.75rem renders at
+ * 38.5 px. Every worker-facing button in this preview carries .frontline-tap. */
+.frontline-tap {
+    min-height: max(44px, 2.75rem);
+    min-width: max(44px, 2.75rem);
+}
+
+/* APPROVED BUILD CHANGE (P01 Q8), previewed: DateTimeField takes
+ * clearable={false} on required times, so the "Clear date and time" link
+ * doesn't appear on them. Every time asked for in P05’s dialogs is required. */
+[role='dialog'] fieldset.date-time-field > button[aria-label$='Clear date and time'] {
+    display: none;
+}

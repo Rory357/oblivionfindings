@@ -1,0 +1,1996 @@
+{
+  "base": "http://127.0.0.1:4492/",
+  "when": "2026-09-30T11:14:58.839Z",
+  "shots": [
+    {
+      "shot": "01-reviews-house-lead",
+      "size": "1440",
+      "file": "1440-01-reviews-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "01-reviews-house-lead",
+      "size": "1280",
+      "file": "1280-01-reviews-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "01-reviews-house-lead",
+      "size": "zoom200",
+      "file": "zoom200-01-reviews-house-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "02-reviews-row-menu",
+      "size": "1440",
+      "file": "1440-02-reviews-row-menu.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "02-reviews-row-menu",
+      "size": "1280",
+      "file": "1280-02-reviews-row-menu.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "02-reviews-row-menu",
+      "size": "zoom200",
+      "file": "zoom200-02-reviews-row-menu.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "03-reviews-manager-two-houses",
+      "size": "1440",
+      "file": "1440-03-reviews-manager-two-houses.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "03-reviews-manager-two-houses",
+      "size": "1280",
+      "file": "1280-03-reviews-manager-two-houses.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "03-reviews-manager-two-houses",
+      "size": "zoom200",
+      "file": "zoom200-03-reviews-manager-two-houses.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "04-reviews-support-worker",
+      "size": "1440",
+      "file": "1440-04-reviews-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "04-reviews-support-worker",
+      "size": "1280",
+      "file": "1280-04-reviews-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "04-reviews-support-worker",
+      "size": "zoom200",
+      "file": "zoom200-04-reviews-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "05-reviews-clinical-lead",
+      "size": "1440",
+      "file": "1440-05-reviews-clinical-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "06-reviews-auditor",
+      "size": "1440",
+      "file": "1440-06-reviews-auditor.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "07-reviews-rimu",
+      "size": "1440",
+      "file": "1440-07-reviews-rimu.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "08-changes",
+      "size": "1440",
+      "file": "1440-08-changes.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "08-changes",
+      "size": "1280",
+      "file": "1280-08-changes.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "08-changes",
+      "size": "zoom200",
+      "file": "zoom200-08-changes.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "09-changes-clinical-redacted",
+      "size": "1440",
+      "file": "1440-09-changes-clinical-redacted.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "09-changes-clinical-redacted",
+      "size": "1280",
+      "file": "1280-09-changes-clinical-redacted.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "09-changes-clinical-redacted",
+      "size": "zoom200",
+      "file": "zoom200-09-changes-clinical-redacted.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "10-booked",
+      "size": "1440",
+      "file": "1440-10-booked.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "11-recorded",
+      "size": "1440",
+      "file": "1440-11-recorded.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "11-recorded",
+      "size": "1280",
+      "file": "1280-11-recorded.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "11-recorded",
+      "size": "zoom200",
+      "file": "zoom200-11-recorded.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "12-cancelled-closed",
+      "size": "1440",
+      "file": "1440-12-cancelled-closed.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "12-cancelled-closed",
+      "size": "1280",
+      "file": "1280-12-cancelled-closed.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "12-cancelled-closed",
+      "size": "zoom200",
+      "file": "zoom200-12-cancelled-closed.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "13-changes-row-menu",
+      "size": "1440",
+      "file": "1440-13-changes-row-menu.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "15-record-grace-lead",
+      "size": "1440",
+      "file": "1440-15-record-grace-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "15-record-grace-lead",
+      "size": "1280",
+      "file": "1280-15-record-grace-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "15-record-grace-lead",
+      "size": "zoom200",
+      "file": "zoom200-15-record-grace-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "16-record-grace-support-worker",
+      "size": "1440",
+      "file": "1440-16-record-grace-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "16-record-grace-support-worker",
+      "size": "1280",
+      "file": "1280-16-record-grace-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "16-record-grace-support-worker",
+      "size": "zoom200",
+      "file": "zoom200-16-record-grace-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "17-record-grace-clinical-redacted",
+      "size": "1440",
+      "file": "1440-17-record-grace-clinical-redacted.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "17-record-grace-clinical-redacted",
+      "size": "1280",
+      "file": "1280-17-record-grace-clinical-redacted.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "17-record-grace-clinical-redacted",
+      "size": "zoom200",
+      "file": "zoom200-17-record-grace-clinical-redacted.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "18-record-ben-own-interval",
+      "size": "1440",
+      "file": "1440-18-record-ben-own-interval.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "19-record-sam-away",
+      "size": "1440",
+      "file": "1440-19-record-sam-away.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "20-record-wiremu-left",
+      "size": "1440",
+      "file": "1440-20-record-wiremu-left.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "22-review-grace",
+      "size": "1440",
+      "file": "1440-22-review-grace.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "22-review-grace",
+      "size": "1280",
+      "file": "1280-22-review-grace.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "22-review-grace",
+      "size": "zoom200",
+      "file": "zoom200-22-review-grace.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "23-review-grace-medicines",
+      "size": "1440",
+      "file": "1440-23-review-grace-medicines.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "24-review-grace-summary-lead",
+      "size": "1440",
+      "file": "1440-24-review-grace-summary-lead.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "25-review-grace-summary-support-worker",
+      "size": "1440",
+      "file": "1440-25-review-grace-summary-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "25-review-grace-summary-support-worker",
+      "size": "1280",
+      "file": "1280-25-review-grace-summary-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "25-review-grace-summary-support-worker",
+      "size": "zoom200",
+      "file": "zoom200-25-review-grace-summary-support-worker.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "26-review-grace-history",
+      "size": "1440",
+      "file": "1440-26-review-grace-history.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "27-review-sam-moved",
+      "size": "1440",
+      "file": "1440-27-review-sam-moved.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "30-book-who",
+      "size": "1440",
+      "file": "1440-30-book-who.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "30-book-who",
+      "size": "1280",
+      "file": "1280-30-book-who.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "30-book-who",
+      "size": "zoom200",
+      "file": "zoom200-30-book-who.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "31-book-validation",
+      "size": "1440",
+      "file": "1440-31-book-validation.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "32-book-regular-already-booked",
+      "size": "1440",
+      "file": "1440-32-book-regular-already-booked.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "32-book-regular-already-booked",
+      "size": "1280",
+      "file": "1280-32-book-regular-already-booked.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "32-book-regular-already-booked",
+      "size": "zoom200",
+      "file": "zoom200-32-book-regular-already-booked.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "33-book-triggered",
+      "size": "1440",
+      "file": "1440-33-book-triggered.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "34-book-when",
+      "size": "1440",
+      "file": "1440-34-book-when.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "34-book-when",
+      "size": "1280",
+      "file": "1280-34-book-when.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "34-book-when",
+      "size": "zoom200",
+      "file": "zoom200-34-book-when.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "35-book-review",
+      "size": "1440",
+      "file": "1440-35-book-review.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "40-record-who",
+      "size": "1440",
+      "file": "1440-40-record-who.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "40-record-who",
+      "size": "1280",
+      "file": "1280-40-record-who.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "40-record-who",
+      "size": "zoom200",
+      "file": "zoom200-40-record-who.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "41-record-took",
+      "size": "1440",
+      "file": "1440-41-record-took.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "42-record-took-filled",
+      "size": "1440",
+      "file": "1440-42-record-took-filled.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "43-record-medicines",
+      "size": "1440",
+      "file": "1440-43-record-medicines.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "43-record-medicines",
+      "size": "1280",
+      "file": "1280-43-record-medicines.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "43-record-medicines",
+      "size": "zoom200",
+      "file": "zoom200-43-record-medicines.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "44-record-medicines-validation",
+      "size": "1440",
+      "file": "1440-44-record-medicines-validation.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "45-record-medicines-filled",
+      "size": "1440",
+      "file": "1440-45-record-medicines-filled.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "46-record-summary",
+      "size": "1440",
+      "file": "1440-46-record-summary.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "47-record-next",
+      "size": "1440",
+      "file": "1440-47-record-next.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "48-record-review",
+      "size": "1440",
+      "file": "1440-48-record-review.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "48-record-review",
+      "size": "1280",
+      "file": "1280-48-record-review.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "48-record-review",
+      "size": "zoom200",
+      "file": "zoom200-48-record-review.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "49-record-saved",
+      "size": "1440",
+      "file": "1440-49-record-saved.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "50-record-clinical-redacted",
+      "size": "1440",
+      "file": "1440-50-record-clinical-redacted.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "50-record-clinical-redacted",
+      "size": "1280",
+      "file": "1280-50-record-clinical-redacted.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "50-record-clinical-redacted",
+      "size": "zoom200",
+      "file": "zoom200-50-record-clinical-redacted.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "52-change-waiting",
+      "size": "1440",
+      "file": "1440-52-change-waiting.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "52-change-waiting",
+      "size": "1280",
+      "file": "1280-52-change-waiting.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "52-change-waiting",
+      "size": "zoom200",
+      "file": "zoom200-52-change-waiting.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "53-change-phone-rule",
+      "size": "1440",
+      "file": "1440-53-change-phone-rule.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "53-change-phone-rule",
+      "size": "1280",
+      "file": "1280-53-change-phone-rule.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "53-change-phone-rule",
+      "size": "zoom200",
+      "file": "zoom200-53-change-phone-rule.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "54-change-watch",
+      "size": "1440",
+      "file": "1440-54-change-watch.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "55-change-not-agreed",
+      "size": "1440",
+      "file": "1440-55-change-not-agreed.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "56-decision",
+      "size": "1440",
+      "file": "1440-56-decision.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "56-decision",
+      "size": "1280",
+      "file": "1280-56-decision.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "56-decision",
+      "size": "zoom200",
+      "file": "zoom200-56-decision.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "57-decision-validation",
+      "size": "1440",
+      "file": "1440-57-decision-validation.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "58-decision-agreed-phone",
+      "size": "1440",
+      "file": "1440-58-decision-agreed-phone.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "58-decision-agreed-phone",
+      "size": "1280",
+      "file": "1280-58-decision-agreed-phone.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "58-decision-agreed-phone",
+      "size": "zoom200",
+      "file": "zoom200-58-decision-agreed-phone.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "59-enter-in-orders",
+      "size": "1440",
+      "file": "1440-59-enter-in-orders.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "59-enter-in-orders",
+      "size": "1280",
+      "file": "1280-59-enter-in-orders.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "59-enter-in-orders",
+      "size": "zoom200",
+      "file": "zoom200-59-enter-in-orders.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "60-decision-clinical-cant",
+      "size": "1440",
+      "file": "1440-60-decision-clinical-cant.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "62-move",
+      "size": "1440",
+      "file": "1440-62-move.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "62-move",
+      "size": "1280",
+      "file": "1280-62-move.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "62-move",
+      "size": "zoom200",
+      "file": "zoom200-62-move.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "63-move-validation",
+      "size": "1440",
+      "file": "1440-63-move-validation.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "64-cancel-regular",
+      "size": "1440",
+      "file": "1440-64-cancel-regular.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "64-cancel-regular",
+      "size": "1280",
+      "file": "1280-64-cancel-regular.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "64-cancel-regular",
+      "size": "zoom200",
+      "file": "zoom200-64-cancel-regular.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "65-cancel-triggered",
+      "size": "1440",
+      "file": "1440-65-cancel-triggered.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "66-appointment",
+      "size": "1440",
+      "file": "1440-66-appointment.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "67-how-often",
+      "size": "1440",
+      "file": "1440-67-how-often.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "67-how-often",
+      "size": "1280",
+      "file": "1280-67-how-often.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "67-how-often",
+      "size": "zoom200",
+      "file": "zoom200-67-how-often.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "68-how-often-own",
+      "size": "1440",
+      "file": "1440-68-how-often-own.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "70-settings-reviews",
+      "size": "1440",
+      "file": "1440-70-settings-reviews.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "70-settings-reviews",
+      "size": "1280",
+      "file": "1280-70-settings-reviews.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [
+          "5 not configured · the rest are defaults"
+        ],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "70-settings-reviews",
+      "size": "zoom200",
+      "file": "zoom200-70-settings-reviews.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [
+          "5 not configured · the rest are defaults"
+        ],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "71-settings-house-lead-read-only",
+      "size": "1440",
+      "file": "1440-71-settings-house-lead-read-only.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "71-settings-house-lead-read-only",
+      "size": "1280",
+      "file": "1280-71-settings-house-lead-read-only.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [
+          "5 not configured · the rest are defaults"
+        ],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "71-settings-house-lead-read-only",
+      "size": "zoom200",
+      "file": "zoom200-71-settings-house-lead-read-only.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [
+          "5 not configured · the rest are defaults"
+        ],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "72-settings-changed",
+      "size": "1440",
+      "file": "1440-72-settings-changed.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "73-settings-review-changes",
+      "size": "1440",
+      "file": "1440-73-settings-review-changes.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "73-settings-review-changes",
+      "size": "1280",
+      "file": "1280-73-settings-review-changes.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [
+          "5 not configured · the rest are defaults"
+        ],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "73-settings-review-changes",
+      "size": "zoom200",
+      "file": "zoom200-73-settings-review-changes.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [
+          "5 not configured · the rest are defaults"
+        ],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "74-settings-history",
+      "size": "1440",
+      "file": "1440-74-settings-history.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "75-settings-keep-default",
+      "size": "1440",
+      "file": "1440-75-settings-keep-default.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "80-actions-grace",
+      "size": "1440",
+      "file": "1440-80-actions-grace.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "80-actions-grace",
+      "size": "1280",
+      "file": "1280-80-actions-grace.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "80-actions-grace",
+      "size": "zoom200",
+      "file": "zoom200-80-actions-grace.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "81-actions-sam-overdue",
+      "size": "1440",
+      "file": "1440-81-actions-sam-overdue.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "82-actions-grace-clinical",
+      "size": "1440",
+      "file": "1440-82-actions-grace-clinical.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 2,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "90-loading",
+      "size": "1440",
+      "file": "1440-90-loading.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "91-empty",
+      "size": "1440",
+      "file": "1440-91-empty.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "91-empty",
+      "size": "1280",
+      "file": "1280-91-empty.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "91-empty",
+      "size": "zoom200",
+      "file": "zoom200-91-empty.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "92-couldnt-load",
+      "size": "1440",
+      "file": "1440-92-couldnt-load.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "92-couldnt-load",
+      "size": "1280",
+      "file": "1280-92-couldnt-load.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "92-couldnt-load",
+      "size": "zoom200",
+      "file": "zoom200-92-couldnt-load.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "93-out-of-date",
+      "size": "1440",
+      "file": "1440-93-out-of-date.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "94-offline-banner",
+      "size": "1440",
+      "file": "1440-94-offline-banner.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "95-offline-move-not-saved",
+      "size": "1440",
+      "file": "1440-95-offline-move-not-saved.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "96-support-worker-cant-record",
+      "size": "1440",
+      "file": "1440-96-support-worker-cant-record.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "96-support-worker-cant-record",
+      "size": "1280",
+      "file": "1280-96-support-worker-cant-record.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "96-support-worker-cant-record",
+      "size": "zoom200",
+      "file": "zoom200-96-support-worker-cant-record.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "97-not-found-ben",
+      "size": "1440",
+      "file": "1440-97-not-found-ben.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "97-not-found-ben",
+      "size": "1280",
+      "file": "1280-97-not-found-ben.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "97-not-found-ben",
+      "size": "zoom200",
+      "file": "zoom200-97-not-found-ben.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "98-already-recorded",
+      "size": "1440",
+      "file": "1440-98-already-recorded.png",
+      "overflow": 0,
+      "header": {
+        "sublineLines": 1,
+        "truncatedCaptions": [],
+        "truncatedCells": []
+      },
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "100-contract-page",
+      "size": "1440",
+      "file": "1440-100-contract-page.png",
+      "overflow": 0,
+      "header": null,
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "100-contract-page",
+      "size": "1280",
+      "file": "1280-100-contract-page.png",
+      "overflow": 0,
+      "header": null,
+      "errors": [],
+      "stepError": null
+    },
+    {
+      "shot": "100-contract-page",
+      "size": "zoom200",
+      "file": "zoom200-100-contract-page.png",
+      "overflow": 0,
+      "header": null,
+      "errors": [],
+      "stepError": null
+    }
+  ],
+  "keyboard": {
+    "openedFrom": "Record the outcome",
+    "tabOrder": [
+      "Close",
+      "Sarah Wong — Pharmacist, Kōwhai Pharmacy (synthetic)",
+      "When it happened date: 28 Sep 2026",
+      "When it happened time: 08:30 AM",
+      "At the houseThe clinician came to the house",
+      "At the practiceThe person went to the clinic",
+      "By phoneA phone consultation",
+      "By videoA video consultation",
+      "Cancel",
+      "Continue"
+    ],
+    "afterEscape": "Record the outcome",
+    "dialogStillOpen": false,
+    "keyboardMenu": [
+      "Open the review",
+      "Record the outcome",
+      "Book the appointment",
+      "Move the review",
+      "Cancel the review",
+      "Open Sam’s medication record",
+      "Change how often"
+    ],
+    "keyboardMenuVia": "ContextMenu key"
+  }
+}
