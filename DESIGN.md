@@ -624,6 +624,14 @@ before.
 
   Compare every view with the live Fleet Settings at 1440 px before
   calling it done.
+- **Tap targets sized in rem** (corrected 2026-09-30, eMAR P01 v2 Q-v2-1).
+  The root font is `--base-font-size`: 14 px by default, 13 or 16 px by
+  user preference. So `2.75rem`, `min-h-11` and `h-11` render at 38.5 px,
+  not 44 px. `.frontline-tap` had this bug until it was changed to
+  `max(44px, 2.75rem)`. Give frontline controls `.frontline-tap` rather
+  than a Tailwind size class. Check any tap target by measuring the
+  rendered px (`getBoundingClientRect`), not by its class name or a
+  "44px" comment.
 
 ## File viewing and downloading (approved by Stephan 2026-09-27)
 

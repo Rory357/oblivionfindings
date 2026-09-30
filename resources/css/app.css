@@ -1020,6 +1020,11 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
  *   .frontline-tap    — enforces a ≥44×44 px hit area without mandating a
  *                       rigid height, so compact chips/icon buttons meet the
  *                       WCAG 2.5.5 (enhanced) target size when applied.
+ *                       The floor is 44 CSS px, not 2.75rem: the root font
+ *                       is --base-font-size (14px by default, 13/16px by
+ *                       user preference), so 2.75rem alone renders at
+ *                       35.75–44px. max() keeps it at 44px or more and
+ *                       still grows with a larger root font.
  *
  * Nothing here redefines layout or colour beyond the ring; pages opt in by
  * adding the utility class where an audit showed a real issue.
@@ -1034,8 +1039,8 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 }
 
 .frontline-tap {
-    min-height: 2.75rem; /* 44px */
-    min-width: 2.75rem;
+    min-height: max(44px, 2.75rem);
+    min-width: max(44px, 2.75rem);
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
