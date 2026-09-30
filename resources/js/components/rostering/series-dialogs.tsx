@@ -446,7 +446,7 @@ function DetailBody({
                         <AlertDialogCancel>Keep series</AlertDialogCancel>
                         <AlertDialogAction
                             disabled={processing}
-                            className="bg-status-critical text-white hover:bg-status-critical/90"
+                            variant="destructive"
                             onClick={(e) => {
                                 e.preventDefault();
                                 cancelFuture();

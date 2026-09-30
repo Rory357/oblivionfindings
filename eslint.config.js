@@ -2,6 +2,7 @@ import js from '@eslint/js';
 import prettier from 'eslint-config-prettier/flat';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
+import { builtinRules } from 'eslint/use-at-your-own-risk';
 import globals from 'globals';
 import typescript from 'typescript-eslint';
 
@@ -117,6 +118,39 @@ export default [
                         "JSXAttribute[name.name='className'] Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
                     message:
                         'No hex colours in className inside hero components. Use theme tokens.',
+                },
+            ],
+        },
+    },
+    {
+        // DESIGN.md anti-pattern "Recolouring a primary button with bg-*
+        // classes": a <Button> or <AlertDialogAction> left on the default
+        // variant carries .btn-soft-primary, whose unlayered `background`
+        // gradient paints over Tailwind's layered bg-destructive /
+        // bg-status-critical, so the button renders purple. `unstyled`
+        // Buttons skip buttonVariants, so their bg-* classes do apply.
+        //
+        // This is core no-restricted-syntax under its own rule id: ~200 files
+        // open with a blanket `eslint-disable no-restricted-syntax` for the
+        // raw-colour warning above, which would silence this check too.
+        files: ['resources/js/**/*.{ts,tsx}'],
+        plugins: {
+            design: {
+                rules: {
+                    'no-recoloured-primary-button': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
+                },
+            },
+        },
+        rules: {
+            'design/no-recoloured-primary-button': [
+                'error',
+                {
+                    selector:
+                        "JSXOpeningElement[name.name=/^(Button|AlertDialogAction)$/]:not(:has(> JSXAttribute[name.name='unstyled'])):not(:has(> JSXAttribute[name.name='variant']:not([value.value='default']))) > JSXAttribute[name.name='className'] :matches(Literal[value=/\\bbg-(destructive|status-critical)/], TemplateElement[value.raw=/\\bbg-(destructive|status-critical)/])",
+                    message:
+                        'The default Button variant (.btn-soft-primary gradient) paints over bg-destructive / bg-status-critical, so this renders purple. Use variant="destructive" instead of recolouring. See DESIGN.md "Recolouring a primary button with bg-* classes".',
                 },
             ],
         },

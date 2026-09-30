@@ -524,7 +524,7 @@ export default function CompensationReviewDetail({
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            className="bg-status-critical text-status-critical-foreground hover:bg-status-critical/90"
+                            variant="destructive"
                             onClick={confirmReject}
                         >
                             Reject line

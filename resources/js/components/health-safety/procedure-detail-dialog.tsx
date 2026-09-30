@@ -1218,10 +1218,8 @@ function ActionPane({
                         form.processing ||
                         (reviewRequired && !form.data.review_date)
                     }
-                    className={
-                        meta.tone === 'critical'
-                            ? 'bg-status-critical text-white hover:bg-status-critical/90'
-                            : undefined
+                    variant={
+                        meta.tone === 'critical' ? 'destructive' : 'default'
                     }
                 >
                     <meta.icon className="mr-1.5 h-4 w-4" /> {meta.verb}

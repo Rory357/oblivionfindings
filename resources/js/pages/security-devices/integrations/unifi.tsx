@@ -1436,7 +1436,7 @@ export default function UnifiIntegration({
                             <AlertDialogAction
                                 onClick={disableConnection}
                                 disabled={!disableReason || disabling}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                variant="destructive"
                             >
                                 {disabling
                                     ? 'Disabling...'

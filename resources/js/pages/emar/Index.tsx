@@ -901,10 +901,7 @@ export default function EmarHome(props: Props) {
                                 leave a hole in the MAR.
                             </p>
                         </div>
-                        <Button
-                            asChild
-                            className="bg-status-critical text-white hover:bg-status-critical/90"
-                        >
+                        <Button asChild variant="destructive">
                             <Link href="/emar/mar">Open MAR</Link>
                         </Button>
                     </div>

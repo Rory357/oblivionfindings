@@ -332,7 +332,12 @@ before.
 - **Recolouring a primary button with `bg-*` classes** (fixed 2026-09-30) —
   the default variant's unlayered `.btn-soft-primary` gradient paints over
   `bg-destructive` / `bg-status-critical`, so the button stays purple. Pick
-  the tone with `variant="destructive"` on `<Button>` or `<AlertDialogAction>`.
+  the tone with `variant="destructive"` on `<Button>` or `<AlertDialogAction>`;
+  conditional tones use `variant={danger ? 'destructive' : 'default'}`.
+  ESLint (`design/no-recoloured-primary-button`) blocks it. `unstyled`
+  Buttons are exempt because they skip the variant classes. Other tones on
+  the default variant (`bg-status-success` / `-warning` / `-info`) render
+  purple too; there is no variant for those yet.
 - **Ad-hoc `text-2xl`/`text-xl` headings** — use the typography helpers.
 - **`dark:` colour pairs on token-styled elements** — redundant and drifts.
 - **Pinning a fixed hue to a module** (e.g. `bg-purple-500` for HR) — use

@@ -2527,10 +2527,10 @@ export default function CandidateShow({
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            className={
+                            variant={
                                 confirmState?.destructive
-                                    ? 'bg-status-critical text-white hover:bg-status-critical/90'
-                                    : undefined
+                                    ? 'destructive'
+                                    : 'default'
                             }
                             onClick={() => {
                                 confirmState?.action();
