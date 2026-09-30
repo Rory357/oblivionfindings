@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationSignalService;
 use App\Support\Medication\MedicationStockQuantity;
+use App\Support\WorkerClock;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -215,7 +216,7 @@ class MedicationAlertService
             return null;
         }
 
-        $daysUntilDue = now()->startOfDay()->diffInDays($latest->next_test_date->copy()->startOfDay(), false);
+        $daysUntilDue = WorkerClock::daysUntil($latest->next_test_date);
         if ($daysUntilDue > 3) {
             return null;
         }
@@ -242,7 +243,7 @@ class MedicationAlertService
         $alerts = [];
 
         if ($client->next_chart_review_date) {
-            $daysUntilReview = now()->startOfDay()->diffInDays($client->next_chart_review_date->copy()->startOfDay(), false);
+            $daysUntilReview = WorkerClock::daysUntil($client->next_chart_review_date);
             if ($daysUntilReview <= 7) {
                 $alerts[] = MedicationDashboardAlert::createOrUpdateAlert(
                     $client->id,
@@ -255,19 +256,20 @@ class MedicationAlertService
             }
         }
 
+        $reviewWindowEnd = WorkerClock::today()->addDays(7)->toDateString();
         $review = MedicationReview::query()
             ->where('client_id', $client->id)
             ->whereIn('status', ['scheduled', 'overdue'])
-            ->where(function ($query) {
-                $query->whereDate('scheduled_date', '<=', now()->addDays(7)->toDateString())
-                    ->orWhereDate('next_review_date', '<=', now()->addDays(7)->toDateString());
+            ->where(function ($query) use ($reviewWindowEnd) {
+                $query->whereDate('scheduled_date', '<=', $reviewWindowEnd)
+                    ->orWhereDate('next_review_date', '<=', $reviewWindowEnd);
             })
             ->orderByRaw('COALESCE(next_review_date, scheduled_date) asc')
             ->first();
 
         if ($review) {
             $dueDate = $review->next_review_date ?? $review->scheduled_date;
-            $daysUntilReview = now()->startOfDay()->diffInDays($dueDate->copy()->startOfDay(), false);
+            $daysUntilReview = WorkerClock::daysUntil($dueDate);
             $alerts[] = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'medication_review_due',
@@ -355,7 +357,7 @@ class MedicationAlertService
                 $client->id,
                 'expired',
                 'critical',
-                "{$medication->name}: Medication expired on {$medication->end_date->format('d/m/Y')}",
+                "{$medication->name}: Medication ended on {$medication->end_date->format('d/m/Y')}",
                 $medication->id
             );
 
@@ -364,7 +366,7 @@ class MedicationAlertService
                 MedicationSignalService::TYPE_EXPIRED,
                 $client->id,
                 'high',
-                "{$medication->unrestrictedName()}: Medication expired on {$medication->end_date->format('d/m/Y')}",
+                "{$medication->unrestrictedName()}: Medication ended on {$medication->end_date->format('d/m/Y')}",
                 [
                     'client_medication_id' => $medication->id,
                     'medication_name' => $medication->unrestrictedName(),
@@ -380,13 +382,15 @@ class MedicationAlertService
 
         if ($medication->isExpiringSoon(7)) {
             // Expiring soon is dashboard-only — NOT operational
-            $daysRemaining = (int) now()->startOfDay()->diffInDays($medication->end_date->copy()->startOfDay());
-            $days = Str::plural('day', $daysRemaining);
+            $daysRemaining = $medication->daysUntilEnd();
+            $expires = $daysRemaining === 0
+                ? 'Expires today'
+                : "Expires in {$daysRemaining} ".Str::plural('day', $daysRemaining);
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'expiring_soon',
                 'warning',
-                "{$medication->name}: Expires in {$daysRemaining} {$days} ({$medication->end_date->format('d/m/Y')})",
+                "{$medication->name}: {$expires} ({$medication->end_date->format('d/m/Y')})",
                 $medication->id
             );
 
@@ -716,8 +720,8 @@ class MedicationAlertService
             ))
             ->when(! $canViewControlled, fn ($query) => $query->where('controlled_drug', false))
             ->whereNotNull('end_date')
-            ->where('end_date', '<=', now()->addDays(14))
-            ->where('end_date', '>=', now())
+            ->where('end_date', '<=', WorkerClock::today()->addDays(14)->toDateString())
+            ->where('end_date', '>=', WorkerClock::today()->toDateString())
             ->with('client:id,first_name,last_name');
 
         if ($clientId) {
@@ -736,9 +740,7 @@ class MedicationAlertService
                 'client_id' => $m->client_id,
                 'medication' => $m->name,
                 'expiry_date' => $m->end_date?->toDateString(),
-                'days_remaining' => $m->end_date
-                    ? (int) now()->startOfDay()->diffInDays($m->end_date->copy()->startOfDay())
-                    : null,
+                'days_remaining' => $m->daysUntilEnd(),
             ])->toArray(),
         ];
     }

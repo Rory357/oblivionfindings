@@ -26,6 +26,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 class MedicationControllerTest extends TestCase
 {
@@ -1225,7 +1226,7 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
                 'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
@@ -1254,7 +1255,7 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'witnessed_by' => $this->supportWorker->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
                 'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
@@ -1283,7 +1284,7 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
                 'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
@@ -1311,7 +1312,7 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
                 'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
@@ -1360,7 +1361,7 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'witnessed_by' => $this->hrUser->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
                 'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
@@ -1477,7 +1478,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 8,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Two tablets are not accounted for.',
             ])
             ->assertSessionHasErrors('immediate_action_taken');
@@ -1501,7 +1502,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $this->admin->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasErrors('witnessed_by');
 
@@ -1527,7 +1528,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -1561,7 +1562,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 8,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Two missing after shift change',
                 'immediate_action_taken' => 'Secured the remaining stock and escalated the discrepancy.',
             ])
@@ -1598,7 +1599,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 9.5,
                 'actual_balance' => 9,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Half tablet count variance',
                 'immediate_action_taken' => 'Secured the stock and escalated the half-tablet variance.',
             ])
@@ -1632,7 +1633,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 9.999,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Invalid precision probe',
                 'immediate_action_taken' => 'No action should be recorded.',
             ])
@@ -1663,7 +1664,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -1686,7 +1687,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 8,
                 'witnessed_by' => $this->hrUser->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Count differs.',
                 'immediate_action_taken' => 'Secured the stock pending an authorised witness review.',
             ])
@@ -2693,7 +2694,7 @@ class MedicationControllerTest extends TestCase
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertRedirect()
             ->assertSessionHas('success');

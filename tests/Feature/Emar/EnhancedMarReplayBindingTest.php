@@ -26,6 +26,7 @@ use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 class EnhancedMarReplayBindingTest extends TestCase
 {
@@ -507,7 +508,7 @@ class EnhancedMarReplayBindingTest extends TestCase
             'dose_given' => '1 tablet',
             'quantity_administered' => 1,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => 'e60df342-917a-4f2b-b97e-c1b478550514',
             'scope_authorized' => true,
         ];

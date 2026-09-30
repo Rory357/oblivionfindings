@@ -20,6 +20,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 /**
  * Round-3 governance/export audit (2026-07-02): correction two-person rule,
@@ -121,7 +122,7 @@ class MedicationGovernanceAuditTest extends TestCase
             'quantity' => 1,
             'on_hand_before' => 10,
             'on_hand_after' => 9,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ];
 
         $this->actingAs($user)

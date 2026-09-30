@@ -1,3 +1,4 @@
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { MedsWizardDialog } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +10,7 @@ import {
     StepHead,
     TilePicker,
 } from '@/components/wizard/primitives';
+import { witnessIsSelectable, witnessOptionLabel } from '@/lib/witness-pin';
 import { AddMedicationDialog } from '@/pages/emar/_dialogs';
 import type { WitnessOption } from '@/pages/meds/today/types';
 import { useForm } from '@inertiajs/react';
@@ -506,26 +508,19 @@ function SyringeDriverDialog({
                                     placeholder="Select witness…"
                                     options={witnesses.map((w) => ({
                                         value: String(w.id),
-                                        label: w.name,
+                                        label: witnessOptionLabel(w),
+                                        disabled: !witnessIsSelectable(w),
                                     }))}
                                 />
                             </Field>
-                            <Field
-                                label="Witness password / PIN"
+                            <WitnessPinInput
+                                label="Their witness PIN"
+                                value={form.data.witness_credential}
+                                onChange={(v) =>
+                                    form.setData('witness_credential', v)
+                                }
                                 error={form.errors.witness_credential}
-                            >
-                                <Input
-                                    type="password"
-                                    value={form.data.witness_credential}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'witness_credential',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="Re-authenticate"
-                                />
-                            </Field>
+                            />
                         </>
                     )}
                 </div>

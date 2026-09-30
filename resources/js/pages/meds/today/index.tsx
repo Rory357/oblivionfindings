@@ -26,6 +26,7 @@ import {
     Hand,
     History,
     Home,
+    KeyRound,
     MapPin,
     Package,
     Pill,
@@ -81,6 +82,10 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import {
+    OWN_WITNESS_PIN_PROMPT,
+    OWN_WITNESS_PIN_SETTINGS_URL,
+} from '@/lib/witness-pin';
 
 import {
     DayPickerChip,
@@ -1495,6 +1500,15 @@ export default function MedsToday(props: MedsTodayProps) {
             label: `${stock_alerts.length} stock alert${stock_alerts.length === 1 ? '' : 's'}`,
             tone: 'default',
             icon: Package,
+        });
+    // PIN-1: colleagues can only pick you as their witness or co-signer once
+    // you have a usable witness PIN — prompt until you set one.
+    if (board_user.witness_pin && board_user.witness_pin !== 'set')
+        heroBadges.push({
+            label: OWN_WITNESS_PIN_PROMPT[board_user.witness_pin],
+            tone: 'warning',
+            icon: KeyRound,
+            href: OWN_WITNESS_PIN_SETTINGS_URL,
         });
 
     const heroStats: PageHeroStat[] = [

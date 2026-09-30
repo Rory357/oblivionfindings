@@ -8,6 +8,7 @@ import {
     type CdMedication,
     type StaffOption,
 } from '@/components/emar/controlled/types';
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,7 @@ import {
     type OfflineAction,
 } from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
+import { witnessIsSelectable, witnessOptionLabel } from '@/lib/witness-pin';
 import {
     addMedicationStockQuantities,
     medicationStockQuantitiesEqual,
@@ -64,13 +66,20 @@ function medOptions(meds: CdMedication[]) {
 function witnessOptions(
     staff: StaffOption[],
     exclude: (number | null | undefined)[],
+    requirePin = true,
 ) {
     const skip = new Set(
         exclude.filter((id): id is number => typeof id === 'number'),
     );
+    // PIN-1: when the witness confirms with a PIN, colleagues without a
+    // usable witness PIN are listed but disabled.
     return staff
         .filter((s) => !skip.has(s.id))
-        .map((s) => ({ value: String(s.id), label: s.name }));
+        .map((s) => ({
+            value: String(s.id),
+            label: requirePin ? witnessOptionLabel(s) : s.name,
+            disabled: requirePin && !witnessIsSelectable(s),
+        }));
 }
 
 const newControlledMutationUuid = createOfflineRequestUuid;
@@ -126,7 +135,11 @@ export function RecordCdEntryDialog({
     onClose: () => void;
 }) {
     const [step, setStep] = useState(0);
-    const entryReplay = useRef(createMedicationMutationReplayState());
+    // Seed the replay ref from state so render never reads ref.current.
+    const [initialEntryReplay] = useState(() =>
+        createMedicationMutationReplayState(),
+    );
+    const entryReplay = useRef(initialEntryReplay);
     const form = useForm({
         medication_id: '',
         client_id: 0,
@@ -142,7 +155,7 @@ export function RecordCdEntryDialog({
         witnessed_by: '',
         witness_credential: '',
         notes: '',
-        client_request_uuid: entryReplay.current.uuid,
+        client_request_uuid: initialEntryReplay.uuid,
     });
     const isReceipt = form.data.entry_type === 'receipt';
     const med = medications.find(
@@ -463,23 +476,15 @@ export function RecordCdEntryDialog({
                                 options={witnessOptions(staff, [currentUserId])}
                             />
                         </Field>
-                        <Field
-                            label="Witness password or PIN"
-                            required
+                        <WitnessPinInput
+                            label="Their witness PIN"
+                            value={form.data.witness_credential}
+                            onChange={(v) =>
+                                form.setData('witness_credential', v)
+                            }
                             error={form.errors.witness_credential}
-                        >
-                            <Input
-                                type="password"
-                                autoComplete="off"
-                                value={form.data.witness_credential}
-                                onChange={(e) =>
-                                    form.setData(
-                                        'witness_credential',
-                                        e.target.value,
-                                    )
-                                }
-                            />
-                        </Field>
+                            atCupboard
+                        />
                         <Field
                             label={
                                 isReceipt
@@ -586,7 +591,11 @@ export function BalanceCheckDialog({
     const preset = presetMedId
         ? medications.find((m) => m.id === presetMedId)
         : undefined;
-    const balanceReplay = useRef(createMedicationMutationReplayState());
+    // Seed the replay ref from state so render never reads ref.current.
+    const [initialBalanceReplay] = useState(() =>
+        createMedicationMutationReplayState(),
+    );
+    const balanceReplay = useRef(initialBalanceReplay);
     const form = useForm({
         medication_id: preset ? String(preset.id) : '',
         client_id: preset?.client_id ?? 0,
@@ -598,7 +607,7 @@ export function BalanceCheckDialog({
         witness_credential: '',
         discrepancy_notes: '',
         immediate_action_taken: '',
-        client_request_uuid: balanceReplay.current.uuid,
+        client_request_uuid: initialBalanceReplay.uuid,
     });
     const med = medications.find(
         (m) => String(m.id) === form.data.medication_id,
@@ -784,20 +793,13 @@ export function BalanceCheckDialog({
                         options={witnessOptions(staff, [currentUserId])}
                     />
                 </Field>
-                <Field
-                    label="Witness password or PIN"
-                    required
+                <WitnessPinInput
+                    label="Their witness PIN"
+                    value={form.data.witness_credential}
+                    onChange={(v) => form.setData('witness_credential', v)}
                     error={form.errors.witness_credential}
-                >
-                    <Input
-                        type="password"
-                        autoComplete="off"
-                        value={form.data.witness_credential}
-                        onChange={(e) =>
-                            form.setData('witness_credential', e.target.value)
-                        }
-                    />
-                </Field>
+                    atCupboard
+                />
             </div>
             {mismatch && (
                 <div className="mt-3">
@@ -1804,27 +1806,22 @@ export function RecordDestructionDialog({
                                     form.setData('witness_1_id', v)
                                 }
                                 placeholder="First witness…"
-                                options={witnessOptions(staff, [currentUserId])}
+                                options={witnessOptions(
+                                    staff,
+                                    [currentUserId],
+                                    isCd,
+                                )}
                             />
                         </Field>
                         {isCd && (
-                            <Field
-                                label="Witness 1 password or PIN"
-                                required
+                            <WitnessPinInput
+                                label="Witness 1’s PIN"
+                                value={form.data.witness_1_credential}
+                                onChange={(v) =>
+                                    form.setData('witness_1_credential', v)
+                                }
                                 error={form.errors.witness_1_credential}
-                            >
-                                <Input
-                                    type="password"
-                                    autoComplete="off"
-                                    value={form.data.witness_1_credential}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'witness_1_credential',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                            </Field>
+                            />
                         )}
                         {isCd && (
                             <Field
@@ -1848,23 +1845,14 @@ export function RecordDestructionDialog({
                             </Field>
                         )}
                         {isCd && (
-                            <Field
-                                label="Witness 2 password or PIN"
-                                required
+                            <WitnessPinInput
+                                label="Witness 2’s PIN"
+                                value={form.data.witness_2_credential}
+                                onChange={(v) =>
+                                    form.setData('witness_2_credential', v)
+                                }
                                 error={form.errors.witness_2_credential}
-                            >
-                                <Input
-                                    type="password"
-                                    autoComplete="off"
-                                    value={form.data.witness_2_credential}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'witness_2_credential',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                            </Field>
+                            />
                         )}
                         {isCd && (
                             <p className="text-xs text-muted-foreground sm:col-span-2">

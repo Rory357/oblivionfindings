@@ -838,6 +838,13 @@ class ClientController extends Controller
                         ...($canAssignWorkers ? ['email' => $u->email] : []),
                     ])->values()
                     : [],
+                // PIN-1: the record-dose dialog's second signature comes from the
+                // eligible witnesses at the client's Site, with witness PIN status.
+                'medication_witnesses' => $client->site_id && request()->user()?->canDo('medications.administer.record')
+                    ? app(MedicationGovernanceScopeService::class)
+                        ->controlledWitnessPicker([(int) $client->site_id], (int) request()->user()->id)
+                        ->values()
+                    : [],
                 // Identity & Culture
                 'ethnicity' => $client->ethnicity,
                 'preferred_pronouns' => $client->preferred_pronouns,

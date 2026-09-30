@@ -33,6 +33,7 @@ use App\Services\Eligibility\AssignmentEligibilityGateway;
 use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\MedicationTimelineVisibilityService;
+use App\Services\Medication\WitnessPinService;
 use App\Services\NotificationService;
 use App\Services\ServiceContextResolver;
 use App\Services\ShiftAssignmentRecommendationService;
@@ -575,10 +576,8 @@ class ShiftController extends Controller
                 ])->values(),
             ],
             'medications' => $medicationSummary,
-            'medicationWitnesses' => $medicationWitnesses->map(fn (User $user) => [
-                'id' => $user->id,
-                'name' => $user->name,
-            ])->values(),
+            // PIN-1: people without a usable witness PIN are listed but can't be chosen.
+            'medicationWitnesses' => app(WitnessPinService::class)->pickerRows($medicationWitnesses),
             'client_safety' => $shift->client ? ClientSafetyPayload::forClient($shift->client) : null,
             'links' => [
                 'client_care' => $shift->client ? route('operations.clients.show', $shift->client) : null,

@@ -50,6 +50,7 @@ use App\Services\Medication\MedicationOrderLifecycleService;
 use App\Services\Medication\MedicationRoundGenerationService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationOverviewService;
@@ -59,12 +60,12 @@ use App\Services\Operations\HandoverPresenter;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
 use App\Support\Medication\MedicationStockQuantity;
+use App\Support\WorkerClock;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -102,9 +103,26 @@ class EmarController extends Controller
      */
     private function marUrlFor(mixed $clientId): ?string
     {
-        $this->marLinks ??= app(MarLinkService::class);
+        return $this->marLinks()->urlFor(request()->user(), $clientId);
+    }
 
-        return $this->marLinks->urlFor(request()->user(), $clientId);
+    private function marLinks(): MarLinkService
+    {
+        return $this->marLinks ??= app(MarLinkService::class);
+    }
+
+    /**
+     * Site scope is not person scope: narrow a Site-wide list's clients to the
+     * people whose chart this user may open (ClientPolicy::viewMedications), so
+     * an ordinary support worker never sees another resident's rows while leads
+     * keep the whole Site. Same rule as the MAR picker.
+     *
+     * @param  iterable<int, mixed>  $clientIds
+     * @return array<int, int>
+     */
+    private function personScopedClientIds(User $actor, iterable $clientIds): array
+    {
+        return $this->marLinks()->openableClientIds($actor, $clientIds);
     }
 
     private function buildMedicationPermissions(?User $user): array
@@ -1645,12 +1663,10 @@ class EmarController extends Controller
             $clientFilter,
         );
         $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
-        $viewableClientIds = Client::query()
+        $viewableClientIds = $this->personScopedClientIds($user, Client::query()
             ->whereIn('id', $viewableClientIds)
             ->whereIn('site_id', $readerSiteIds)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+            ->pluck('id'));
         $search = trim((string) $request->string('q')) ?: null;
         $scheduleService = app(MarScheduleService::class);
         $timezone = $scheduleService->workerTimezone();
@@ -2509,6 +2525,16 @@ class EmarController extends Controller
                 ->whereHas('client', fn ($c) => $c->whereIn('site_id', $readerSiteIds))
                 ->when($clientFilter, $byClient))
             ->get();
+        // The route requires medications.stock.update, which viewMedications
+        // already treats as Site-wide, so this keeps the whole Site today; it
+        // is here so the stock register follows the same person rule.
+        $openableClientIds = $this->personScopedClientIds(
+            $actor,
+            $stockModels->map(fn (ClientMedicationStock $s) => $s->medication?->client_id),
+        );
+        $stockModels = $stockModels
+            ->filter(fn (ClientMedicationStock $s) => in_array((int) $s->medication?->client_id, $openableClientIds, true))
+            ->values();
 
         // Honest movement history per stock item — sourced from the audit log
         // (AuditableChanges on ClientMedicationStock), no dedicated movements
@@ -3135,11 +3161,17 @@ class EmarController extends Controller
         );
         $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
 
+        $openableClientIds = $this->personScopedClientIds(
+            $actor,
+            Client::query()->whereIn('site_id', $readerSiteIds)->pluck('id'),
+        );
+
         // Flat, client-side-filterable feed — the redesigned page facets by tab,
         // search, site and reviewer with live counts.
         $models = MedicationReview::query()
             ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'reviewer:id,name', 'requestedBy:id,name'])
             ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
+            ->whereIn('client_id', $openableClientIds)
             ->latest('scheduled_date')
             ->limit(250)
             ->get();
@@ -3813,6 +3845,10 @@ class EmarController extends Controller
             $clientFilter,
         );
         $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
+        $openableClientIds = $this->personScopedClientIds(
+            $actor,
+            Client::query()->whereIn('site_id', $readerSiteIds)->pluck('id'),
+        );
 
         // Flat, client-side-filterable disposal register. Voided records remain
         // in the list (struck through) — the register is immutable (MoD Regs 1977).
@@ -3820,6 +3856,7 @@ class EmarController extends Controller
             MedicationDestruction::query(),
             $readerSiteIds,
         )
+            ->whereIn('client_id', $openableClientIds)
             ->when($clientFilter, fn ($query) => $query->where('client_id', $clientFilter))
             ->with([
                 'client:id,first_name,last_name,site_id',
@@ -3838,6 +3875,7 @@ class EmarController extends Controller
         $medications = ClientMedication::query()
             ->active()
             ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
+            ->whereIn('client_id', $openableClientIds)
             ->when($clientFilter, fn ($query) => $query->where('client_id', $clientFilter))
             ->with(['client:id,first_name,last_name', 'stock'])
             ->orderBy('name')
@@ -4123,7 +4161,7 @@ class EmarController extends Controller
                     );
                     if (blank($validated['read_back_witness_credential'] ?? null)) {
                         throw ValidationException::withMessages([
-                            'read_back_witness_credential' => 'The read-back witness must enter their password or PIN.',
+                            'read_back_witness_credential' => 'The read-back witness must enter their 6-digit witness PIN.',
                         ]);
                     }
                     $rateLimitKey = $this->prescriptionReadBackRateLimitKey(
@@ -4143,19 +4181,34 @@ class EmarController extends Controller
                             RateLimiter::attempts($rateLimitKey),
                         );
                     }
-                    if (! Hash::check((string) $validated['read_back_witness_credential'], (string) $readBackWitness->password)) {
-                        RateLimiter::hit($rateLimitKey, self::PRESCRIPTION_READ_BACK_DECAY_SECONDS);
-                        $this->rejectPrescriptionReadBackCredential(
-                            $user,
+                    // PIN-1: the read-back witness confirms with their witness PIN,
+                    // not their login password. The per-witness PIN lock applies on
+                    // top of this surface's own attempt throttle.
+                    try {
+                        app(WitnessPinService::class)->verify(
                             $readBackWitness,
-                            $scope->client,
-                            'mismatch',
-                            RateLimiter::attempts($rateLimitKey),
+                            (string) $validated['read_back_witness_credential'],
+                            'read_back_witness_credential',
+                            ['site_id' => (int) $scope->client->site_id, 'surface' => 'prescription_read_back'],
                         );
+                    } catch (ValidationException $rejected) {
+                        RateLimiter::hit($rateLimitKey, self::PRESCRIPTION_READ_BACK_DECAY_SECONDS);
+                        Log::warning('Medication prescriber-order read-back witness credential rejected.', [
+                            'security_event' => 'medication_prescriber_order_read_back_credential_rejected',
+                            'outcome' => 'mismatch',
+                            'actor_id' => (int) $user->id,
+                            'witness_id' => (int) $readBackWitness->id,
+                            'client_id' => (int) $scope->client->id,
+                            'site_id' => (int) $scope->client->site_id,
+                            'attempts' => RateLimiter::attempts($rateLimitKey),
+                            'attempt_limit' => self::PRESCRIPTION_READ_BACK_ATTEMPT_LIMIT,
+                        ]);
+
+                        throw $rejected;
                     }
                     RateLimiter::clear($rateLimitKey);
                     $readBackWitnessedAt = now();
-                    $readBackVerificationMethod = MedicationPrescriberOrder::READ_BACK_VERIFICATION_METHOD_PASSWORD;
+                    $readBackVerificationMethod = MedicationPrescriberOrder::READ_BACK_VERIFICATION_METHOD_WITNESS_PIN;
                 } else {
                     unset(
                         $validated['read_back_confirmed'],
@@ -5363,7 +5416,7 @@ class EmarController extends Controller
                 'commenced_by' => $lockedActor->id,
                 'witnessed_by' => $witness?->id,
                 'witnessed_at' => $witness ? now() : null,
-                'witness_method' => $witness ? 'password' : null,
+                'witness_method' => $witness ? WitnessPinService::METHOD : null,
                 'rate' => $validated['rate'] ?? null,
                 'rate_unit' => $validated['rate_unit'] ?? null,
                 'duration_hours' => $validated['duration_hours'] ?? null,
@@ -6574,7 +6627,7 @@ class EmarController extends Controller
                 'witness_1_id' => $witness1?->id,
                 'witness_2_id' => $witness2?->id,
                 'witness_method' => $witness1
-                    ? (! empty($payload['is_controlled_drug']) ? 'password' : 'site_staff_record')
+                    ? (! empty($payload['is_controlled_drug']) ? WitnessPinService::METHOD : 'site_staff_record')
                     : null,
                 'witnessed_at' => $witness1 ? now()->toIso8601String() : null,
                 'on_hand_before' => $before,
@@ -7299,7 +7352,7 @@ class EmarController extends Controller
                     'on_hand_before' => $authoritativeBefore,
                     'on_hand_after' => $expectedAfter,
                     'witnessed_by' => $witness->id,
-                    'witness_method' => 'password',
+                    'witness_method' => WitnessPinService::METHOD,
                 ]);
 
                 $this->governanceScope->rememberIdempotencyResult(
@@ -7776,7 +7829,7 @@ class EmarController extends Controller
                     $payload,
                     [
                         'created_by' => $user->id,
-                        'start_date' => $validated['start_date'] ?? now()->toDateString(),
+                        'start_date' => $validated['start_date'] ?? WorkerClock::today()->toDateString(),
                         'state' => 'active',
                         'active' => true,
                         'approval_status' => 'pending_verification',
@@ -8040,14 +8093,21 @@ class EmarController extends Controller
                 $scope->siteId,
                 $this->siteAccess()->accessibleSiteIds($approver, ['clinical.accessAllSites', 'sites.viewAll']),
                 true,
-            )
-            && Hash::check((string) $validated['waiver_approver_credential'], (string) $approver->password);
+            );
 
         if (! $approverIsEligible) {
             throw ValidationException::withMessages([
                 'waiver_approver_credential' => 'The emergency waiver approval could not be verified.',
             ]);
         }
+
+        // PIN-1: the approver confirms with their witness PIN, not their login password.
+        app(WitnessPinService::class)->verify(
+            $approver,
+            (string) $validated['waiver_approver_credential'],
+            'waiver_approver_credential',
+            ['site_id' => (int) $scope->siteId, 'surface' => 'verification_waiver', 'actor_id' => (int) $verifier->id],
+        );
 
         return $approver;
     }
@@ -8376,7 +8436,7 @@ class EmarController extends Controller
                     'stock_id' => $stock->id,
                     'entry_type' => $entryType,
                     'witnessed_by' => $witness->id,
-                    'witness_method' => 'password',
+                    'witness_method' => WitnessPinService::METHOD,
                     'witnessed_at' => now()->toIso8601String(),
                     'on_hand_before' => $onHandBefore,
                     'on_hand_after' => $onHandAfter,
@@ -8636,7 +8696,7 @@ class EmarController extends Controller
                     'stock_id' => $stock->id,
                     'discrepancy_id' => $discrepancy?->id,
                     'witnessed_by' => $witness->id,
-                    'witness_method' => 'password',
+                    'witness_method' => WitnessPinService::METHOD,
                     'witnessed_at' => now()->toIso8601String(),
                     'on_hand_before' => $expectedBalance,
                     'on_hand_after' => $actualBalance,
@@ -9057,7 +9117,7 @@ class EmarController extends Controller
                     'route' => $row['route'],
                     'state' => 'active',
                     'active' => true,
-                    'start_date' => now()->toDateString(),
+                    'start_date' => WorkerClock::today()->toDateString(),
                     'approval_status' => 'pending_verification',
                     'verified_by' => null,
                     'verified_at' => null,

@@ -23,6 +23,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 /**
  * NF-03: the organisation's competency rules (restricted assessments, task
@@ -140,7 +141,7 @@ class CompetencyRestrictionRulesTest extends TestCase
         $restrictedColleague = $this->qualifiedWitness(['restricted' => true]);
         $this->recordGiven($first, [
             'witnessed_by' => $restrictedColleague->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ])->assertSessionHasErrors('witnessed_by');
         $this->assertStringContainsString('restricted', session('errors')->first('witnessed_by'));
         $this->assertDatabaseCount('client_medication_administrations', 0);
@@ -148,7 +149,7 @@ class CompetencyRestrictionRulesTest extends TestCase
         $cosigner = $this->qualifiedWitness();
         $this->recordGiven($second, [
             'witnessed_by' => $cosigner->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ])->assertSessionHas('success');
         $this->assertDatabaseHas('client_medication_administrations', [
             'client_medication_id' => $second->id,

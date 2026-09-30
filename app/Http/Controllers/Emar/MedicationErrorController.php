@@ -150,18 +150,20 @@ class MedicationErrorController extends Controller
             requestedSiteId: $siteFilter,
         );
         $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
-        $readerClientIds = Client::query()
-            ->whereIn('site_id', $readerSiteIds)
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->all();
+        // Site scope is not person scope: an ordinary support worker sees only
+        // the residents whose chart they may open (ClientPolicy::viewMedications),
+        // leads keep the whole Site. Rows and stats share this boundary.
+        $readerClientIds = $this->marLinks->openableClientIds(
+            $actor,
+            Client::query()->whereIn('site_id', $readerSiteIds)->pluck('id'),
+        );
 
         // Flat, client-side-filterable register — the redesigned page facets by
         // tab/search/severity/type/reporter with live counts (drops pagination).
         $modelQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
             MedicationError::query(),
             $readerSiteIds,
-        );
+        )->whereIn('client_id', $readerClientIds);
         if (! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
             $this->governanceScope->scopeWithoutControlledMedicationRows($modelQuery);
         }
@@ -202,7 +204,7 @@ class MedicationErrorController extends Controller
         $statQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
             MedicationError::query(),
             $readerSiteIds,
-        );
+        )->whereIn('client_id', $readerClientIds);
         if (! $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
             $this->governanceScope->scopeWithoutControlledMedicationRows($statQuery);
         }

@@ -232,7 +232,7 @@ class MedicationSafetyService
             $warnings[] = [
                 'type' => 'expired',
                 'severity' => 'danger',
-                'message' => "⚠️ EXPIRED: This medication expired on {$medication->end_date->format('d/m/Y')}",
+                'message' => "⚠️ EXPIRED: This medication ended on {$medication->end_date->format('d/m/Y')}",
                 'details' => [
                     'expiry_date' => $medication->end_date->toDateString(),
                 ],
@@ -244,7 +244,7 @@ class MedicationSafetyService
                 'message' => "Expiring soon: This medication expires on {$medication->end_date->format('d/m/Y')}",
                 'details' => [
                     'expiry_date' => $medication->end_date->toDateString(),
-                    'days_remaining' => (int) now()->startOfDay()->diffInDays($medication->end_date->copy()->startOfDay()),
+                    'days_remaining' => $medication->daysUntilEnd(),
                 ],
             ];
         }

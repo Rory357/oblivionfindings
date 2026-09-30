@@ -13,6 +13,7 @@ use App\Services\MarScheduleService;
 use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\WitnessPinService;
 use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
@@ -499,6 +500,9 @@ class MedsBoardPayloadService
             // NF-03: the organisation's restricted-competency rule, shown to
             // the worker before they sign (null when no rule applies).
             'competency_notice' => $this->competencyNoticeFor($user),
+            // PIN-1: without a usable witness PIN this person can't be chosen
+            // to witness or co-sign; the board prompts them to set one.
+            'witness_pin' => app(WitnessPinService::class)->status($user),
         ];
     }
 

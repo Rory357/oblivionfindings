@@ -1,4 +1,5 @@
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,12 @@ import {
     type MedicationScanCapture,
     type MedicationScanVerification,
 } from '@/lib/medication-scan';
+import {
+    WITNESS_PIN_LENGTH,
+    witnessIsSelectable,
+    witnessOptionLabel,
+    type WitnessPickerOption,
+} from '@/lib/witness-pin';
 import { useForm } from '@inertiajs/react';
 import {
     ArrowLeft,
@@ -273,7 +280,7 @@ export function PackMedicationWizard({
     client: { id: number; name: string } | null;
     residentName: string;
     medications: TransportMedicationOption[];
-    witnesses: Array<{ id: number; name: string }>;
+    witnesses: Array<WitnessPickerOption & { id: number }>;
     onClose: () => void;
     onCompleted: MutationCompleted;
 }) {
@@ -313,7 +320,8 @@ export function PackMedicationWizard({
         (form.data.attestation_state === 'unavailable'
             ? !!form.data.attestation_reason.trim()
             : !!form.data.witnessed_by_user_id &&
-              !!form.data.witness_credential.trim() &&
+              form.data.witness_credential.trim().length ===
+                  WITNESS_PIN_LENGTH &&
               (form.data.attestation_state !== 'refused' ||
                   !!form.data.attestation_reason.trim()));
     const canContinue =
@@ -666,8 +674,15 @@ export function PackMedicationWizard({
                                                                 value={String(
                                                                     witness.id,
                                                                 )}
+                                                                disabled={
+                                                                    !witnessIsSelectable(
+                                                                        witness,
+                                                                    )
+                                                                }
                                                             >
-                                                                {witness.name}
+                                                                {witnessOptionLabel(
+                                                                    witness,
+                                                                )}
                                                             </SelectItem>
                                                         ),
                                                     )}
@@ -683,41 +698,24 @@ export function PackMedicationWizard({
                                                 </p>
                                             ) : null}
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="pack-witness-credential">
-                                                Second checker password / PIN
-                                            </Label>
-                                            <Input
-                                                id="pack-witness-credential"
-                                                type="password"
-                                                autoComplete="current-password"
-                                                value={
-                                                    form.data.witness_credential
-                                                }
-                                                onChange={(event) => {
-                                                    form.clearErrors(
-                                                        'witness_credential',
-                                                    );
-                                                    form.setData(
-                                                        'witness_credential',
-                                                        event.target.value,
-                                                    );
-                                                }}
-                                            />
-                                            <p className="text-xs text-muted-foreground">
-                                                The second checker must be
-                                                present and enter their own
-                                                credential.
-                                            </p>
-                                            {form.errors.witness_credential ? (
-                                                <p className="text-sm text-destructive">
-                                                    {
-                                                        form.errors
-                                                            .witness_credential
-                                                    }
-                                                </p>
-                                            ) : null}
-                                        </div>
+                                        <WitnessPinInput
+                                            id="pack-witness-credential"
+                                            label="Their witness PIN"
+                                            required={false}
+                                            value={form.data.witness_credential}
+                                            onChange={(value) => {
+                                                form.clearErrors(
+                                                    'witness_credential',
+                                                );
+                                                form.setData(
+                                                    'witness_credential',
+                                                    value,
+                                                );
+                                            }}
+                                            error={
+                                                form.errors.witness_credential
+                                            }
+                                        />
                                     </>
                                 ) : null}
 
@@ -868,7 +866,7 @@ export function CorrectPackingAttestationWizard({
     onCompleted,
 }: {
     log: TransportMedicationLog | null;
-    witnesses: Array<{ id: number; name: string }>;
+    witnesses: Array<WitnessPickerOption & { id: number }>;
     onClose: () => void;
     onCompleted: MutationCompleted;
 }) {
@@ -886,7 +884,7 @@ export function CorrectPackingAttestationWizard({
     const canContinue =
         !!log &&
         !!form.data.witnessed_by_user_id &&
-        !!form.data.witness_credential.trim() &&
+        form.data.witness_credential.trim().length === WITNESS_PIN_LENGTH &&
         !!form.data.correction_reason.trim();
     const selectedWitness = correctionWitnesses.find(
         (witness) => String(witness.id) === form.data.witnessed_by_user_id,
@@ -1050,8 +1048,11 @@ export function CorrectPackingAttestationWizard({
                                         <SelectItem
                                             key={witness.id}
                                             value={String(witness.id)}
+                                            disabled={
+                                                !witnessIsSelectable(witness)
+                                            }
                                         >
-                                            {witness.name}
+                                            {witnessOptionLabel(witness)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -1062,29 +1063,17 @@ export function CorrectPackingAttestationWizard({
                                 </p>
                             ) : null}
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="correct-pack-witness-credential">
-                                Second checker password / PIN
-                            </Label>
-                            <Input
-                                id="correct-pack-witness-credential"
-                                type="password"
-                                autoComplete="current-password"
-                                value={form.data.witness_credential}
-                                onChange={(event) => {
-                                    form.clearErrors('witness_credential');
-                                    form.setData(
-                                        'witness_credential',
-                                        event.target.value,
-                                    );
-                                }}
-                            />
-                            {form.errors.witness_credential ? (
-                                <p className="text-sm text-destructive">
-                                    {form.errors.witness_credential}
-                                </p>
-                            ) : null}
-                        </div>
+                        <WitnessPinInput
+                            id="correct-pack-witness-credential"
+                            label="Their witness PIN"
+                            required={false}
+                            value={form.data.witness_credential}
+                            onChange={(value) => {
+                                form.clearErrors('witness_credential');
+                                form.setData('witness_credential', value);
+                            }}
+                            error={form.errors.witness_credential}
+                        />
                         <div className="space-y-2">
                             <Label htmlFor="packing-correction-reason">
                                 Correction reason
@@ -1145,7 +1134,7 @@ export function AdministerTransportMedicationWizard({
     onCompleted,
 }: {
     log: TransportMedicationLog | null;
-    witnesses: Array<{ id: number; name: string }>;
+    witnesses: Array<WitnessPickerOption & { id: number }>;
     onClose: () => void;
     onCompleted: MutationCompleted;
 }) {
@@ -1176,7 +1165,8 @@ export function AdministerTransportMedicationWizard({
         quantityIsValid &&
         (!requiresWitness ||
             (!!form.data.witnessed_by_user_id &&
-                !!form.data.witness_credential.trim())) &&
+                form.data.witness_credential.trim().length ===
+                    WITNESS_PIN_LENGTH)) &&
         (!requiresScan || hasVerifiedMedicationScan(scanCapture));
 
     const reset = () => {
@@ -1370,8 +1360,13 @@ export function AdministerTransportMedicationWizard({
                                             <SelectItem
                                                 key={witness.id}
                                                 value={String(witness.id)}
+                                                disabled={
+                                                    !witnessIsSelectable(
+                                                        witness,
+                                                    )
+                                                }
                                             >
-                                                {witness.name}
+                                                {witnessOptionLabel(witness)}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -1381,27 +1376,19 @@ export function AdministerTransportMedicationWizard({
                                         {form.errors.witnessed_by_user_id}
                                     </p>
                                 ) : null}
-                                <Label htmlFor="administer-witness-credential">
-                                    Witness password / PIN
-                                </Label>
-                                <Input
+                                <WitnessPinInput
                                     id="administer-witness-credential"
-                                    type="password"
-                                    autoComplete="current-password"
+                                    required={false}
                                     value={form.data.witness_credential}
-                                    onChange={(event) => {
+                                    onChange={(value) => {
                                         form.clearErrors('witness_credential');
                                         form.setData(
                                             'witness_credential',
-                                            event.target.value,
+                                            value,
                                         );
                                     }}
+                                    error={form.errors.witness_credential}
                                 />
-                                {form.errors.witness_credential ? (
-                                    <p className="text-sm text-destructive">
-                                        {form.errors.witness_credential}
-                                    </p>
-                                ) : null}
                             </div>
                         ) : null}
                         {requiresScan && log ? (

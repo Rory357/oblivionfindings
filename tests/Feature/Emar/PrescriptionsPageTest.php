@@ -26,6 +26,8 @@ use Illuminate\Support\Facades\RateLimiter;
 use Inertia\Testing\AssertableInertia as Assert;
 use RuntimeException;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
+use App\Services\Medication\WitnessPinService;
 
 /**
  * The redesigned Prescriptions & Orders page serves a flat order/covert payload
@@ -233,7 +235,7 @@ class PrescriptionsPageTest extends TestCase
                 ...$payload,
                 'read_back_confirmed' => true,
                 'read_back_witnessed_by' => $user->id,
-                'read_back_witness_credential' => 'password',
+                'read_back_witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasErrors('read_back_witnessed_by');
         $wrongCredentialResponse = $this->actingAs($user)
@@ -258,7 +260,7 @@ class PrescriptionsPageTest extends TestCase
                 ...$payload,
                 'read_back_confirmed' => true,
                 'read_back_witnessed_by' => $foreignWitness->id,
-                'read_back_witness_credential' => 'foreign-secret',
+                'read_back_witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertNotFound();
 
@@ -267,7 +269,7 @@ class PrescriptionsPageTest extends TestCase
                 ...$payload,
                 'read_back_confirmed' => true,
                 'read_back_witnessed_by' => $witness->id,
-                'read_back_witness_credential' => 'witness-secret',
+                'read_back_witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasNoErrors();
 
@@ -278,7 +280,7 @@ class PrescriptionsPageTest extends TestCase
         $this->assertSame($witness->id, $order->read_back_witnessed_by);
         $this->assertNotNull($order->read_back_verified_at);
         $this->assertSame(
-            MedicationPrescriberOrder::READ_BACK_VERIFICATION_METHOD_PASSWORD,
+            MedicationPrescriberOrder::READ_BACK_VERIFICATION_METHOD_WITNESS_PIN,
             $order->read_back_verification_method,
         );
         $this->assertArrayNotHasKey('read_back_witness_credential', $order->getAttributes());
@@ -294,9 +296,9 @@ class PrescriptionsPageTest extends TestCase
             ->where('auditable_id', $order->id)
             ->sole();
         $this->assertSame($witness->id, (int) $audit->meta['read_back_witnessed_by']);
-        $this->assertSame('password', $audit->meta['read_back_witness_method']);
+        $this->assertSame('witness_pin', $audit->meta['read_back_witness_method']);
         $this->assertNotEmpty($audit->meta['read_back_witnessed_at']);
-        $this->assertStringNotContainsString('witness-secret', $audit->toJson());
+        $this->assertStringNotContainsString(UserFactory::TEST_WITNESS_PIN, $audit->toJson());
         $this->assertSame(1, MedicationPrescriberOrder::query()->where('medication_name', 'Amoxicillin')->count());
     }
 
@@ -538,7 +540,7 @@ class PrescriptionsPageTest extends TestCase
                 'order_date' => '2026-06-15',
                 'read_back_confirmed' => true,
                 'read_back_witnessed_by' => $witness->id,
-                'read_back_witness_credential' => 'read-back-secret',
+                'read_back_witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasNoErrors();
         $order = MedicationPrescriberOrder::query()
@@ -647,7 +649,7 @@ class PrescriptionsPageTest extends TestCase
                 'order_date' => today()->toDateString(),
                 'read_back_confirmed' => true,
                 'read_back_witnessed_by' => $witness->id,
-                'read_back_witness_credential' => 'frozen-read-back-secret',
+                'read_back_witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasNoErrors();
 
@@ -1867,9 +1869,14 @@ class PrescriptionsPageTest extends TestCase
             for ($attempt = 1; $attempt <= 5; $attempt++) {
                 $this->actingAs($actor)
                     ->post(route('emar.prescriptions.store'), $payload)
-                    ->assertSessionHasErrors([
-                        'read_back_witness_credential' => $genericFailure,
-                    ]);
+                    ->assertSessionHasErrors('read_back_witness_credential');
+
+                // PIN-1: the witness PIN's own message comes through; the
+                // fifth wrong PIN also locks the PIN (default limit 5).
+                $message = session('errors')->first('read_back_witness_credential');
+                $attempt < 5
+                    ? $this->assertSame(WitnessPinService::INCORRECT, $message)
+                    : $this->assertStringContainsString('witness PIN is locked after too many wrong attempts', $message);
             }
             $this->actingAs($actor)
                 ->post(route('emar.prescriptions.store'), [

@@ -1,5 +1,6 @@
 /* Shared types for the redesigned eMAR Controlled Drugs page. Mirrors
  * EmarController@controlled. */
+import type { WitnessPinStatus } from '@/lib/witness-pin';
 
 export interface CdMedication {
     id: number;
@@ -118,6 +119,8 @@ export interface ClientOption {
 export interface StaffOption {
     id: number;
     name: string;
+    /** PIN-1: witness PIN status; unusable PINs are listed but can't be chosen. */
+    witness_pin?: WitnessPinStatus;
 }
 
 export const ENTRY_TYPES: { value: string; label: string }[] = [

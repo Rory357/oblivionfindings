@@ -28,6 +28,7 @@ use App\Http\Controllers\Settings\TerminologyController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
 use App\Http\Controllers\Settings\UiPreferenceController;
 use App\Http\Controllers\Settings\UserManagementRedirectController;
+use App\Http\Controllers\Settings\WitnessPinController;
 use App\Http\Controllers\System\UsersController;
 use Illuminate\Support\Facades\Route;
 
@@ -59,6 +60,16 @@ Route::middleware('auth')->group(function () {
 
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('two-factor.show');
+
+    // PIN-1: personal witness PIN for medication second-person checks.
+    Route::get('settings/witness-pin', [WitnessPinController::class, 'edit'])
+        ->name('witness-pin.edit');
+    Route::put('settings/witness-pin', [WitnessPinController::class, 'update'])
+        ->middleware('throttle:6,1')
+        ->name('witness-pin.update');
+    Route::post('settings/witness-pin/reset', [WitnessPinController::class, 'reset'])
+        ->middleware('throttle:6,1')
+        ->name('witness-pin.reset');
 
     // Admin access controls (roles & per-user overrides)
     Route::get('settings/access', [AccessController::class, 'index'])

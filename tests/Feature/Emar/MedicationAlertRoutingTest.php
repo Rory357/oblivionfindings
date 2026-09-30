@@ -260,12 +260,14 @@ it('still sends the low-stock notification after the 06:00 stock check has run',
 
 it('treats a medication order as expiring soon only inside the window', function () {
     $endingOn = fn (?string $endDate) => (new ClientMedication)->forceFill(['end_date' => $endDate]);
+    // The window counts days on the New Zealand calendar (11:15 am, 8 June).
+    $inDays = fn (int $days) => now(config('app.worker_timezone'))->addDays($days)->toDateString();
 
-    expect($endingOn(now()->addDays(3)->toDateString())->isExpiringSoon())->toBeTrue()
-        ->and($endingOn(now()->addDays(7)->toDateString())->isExpiringSoon())->toBeTrue()
-        ->and($endingOn(now()->addDays(8)->toDateString())->isExpiringSoon())->toBeFalse()
-        ->and($endingOn(now()->addDays(60)->toDateString())->isExpiringSoon())->toBeFalse()
-        ->and($endingOn(now()->addDays(60)->toDateString())->isExpiringSoon(90))->toBeTrue()
-        ->and($endingOn(now()->subDay()->toDateString())->isExpiringSoon())->toBeFalse()
+    expect($endingOn($inDays(3))->isExpiringSoon())->toBeTrue()
+        ->and($endingOn($inDays(7))->isExpiringSoon())->toBeTrue()
+        ->and($endingOn($inDays(8))->isExpiringSoon())->toBeFalse()
+        ->and($endingOn($inDays(60))->isExpiringSoon())->toBeFalse()
+        ->and($endingOn($inDays(60))->isExpiringSoon(90))->toBeTrue()
+        ->and($endingOn($inDays(-1))->isExpiringSoon())->toBeFalse()
         ->and($endingOn(null)->isExpiringSoon())->toBeFalse();
 });

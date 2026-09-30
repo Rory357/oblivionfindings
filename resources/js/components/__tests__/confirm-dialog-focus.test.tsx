@@ -91,9 +91,12 @@ describe('ConfirmDialog optional close autofocus', () => {
         const dialog = screen.getByRole('alertdialog', {
             name: 'Discard this proposal?',
         });
-        expect(
-            within(dialog).getByRole('button', { name: 'Discard proposal' }),
-        ).toHaveClass('bg-destructive');
+        const confirm = within(dialog).getByRole('button', {
+            name: 'Discard proposal',
+        });
+        expect(confirm).toHaveClass('bg-destructive');
+        // The primary gradient is unlayered CSS and paints over bg-destructive.
+        expect(confirm).not.toHaveClass('btn-soft-primary');
         fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
         await waitFor(() =>
             expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
@@ -109,5 +112,22 @@ describe('ConfirmDialog optional close autofocus', () => {
             expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument(),
         );
         expect(onConfirm).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders a non-destructive confirmation as the primary button', () => {
+        render(
+            <ConfirmDialog
+                open
+                onClose={() => {}}
+                onConfirm={() => {}}
+                title="Approve this invoice?"
+                description="The invoice will be posted."
+                confirmText="Approve"
+                variant="default"
+            />,
+        );
+        const confirm = screen.getByRole('button', { name: 'Approve' });
+        expect(confirm).toHaveClass('btn-soft-primary');
+        expect(confirm).not.toHaveClass('bg-destructive');
     });
 });

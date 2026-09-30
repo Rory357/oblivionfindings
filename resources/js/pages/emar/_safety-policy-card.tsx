@@ -51,7 +51,7 @@ const RULES: {
     {
         field: 'restricted_competency',
         label: 'A worker’s medication competency is marked restricted',
-        help: 'Refusals and withheld doses can always be recorded.',
+        help: 'Refusals and withheld doses can always be recorded. A co-signer confirms with their own witness PIN — never their login password.',
         options: [
             { value: 'off', label: 'Off — no extra check' },
             {
@@ -60,7 +60,7 @@ const RULES: {
             },
             {
                 value: 'cosigner',
-                label: 'Co-signer — a present, qualified colleague confirms each dose',
+                label: 'Co-signer with witness PIN — a present, qualified colleague confirms each dose with their own PIN',
             },
         ],
     },

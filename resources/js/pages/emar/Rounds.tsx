@@ -42,6 +42,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
+import {
+    OWN_WITNESS_PIN_PROMPT,
+    OWN_WITNESS_PIN_SETTINGS_URL,
+    type WitnessPinStatus,
+} from '@/lib/witness-pin';
 import GenerateRoundsModal from '@/pages/emar/components/generate-rounds-modal';
 import GuidedRoundDialog from '@/pages/emar/components/guided-round-dialog';
 import RoundTemplateDialog from '@/pages/emar/components/round-template-dialog';
@@ -58,6 +63,7 @@ import {
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
+    KeyRound,
     LayoutGrid,
     LayoutList,
     List,
@@ -91,6 +97,7 @@ type Props = {
         med_competent: boolean;
         controlled_record: boolean;
         cd_witness: boolean;
+        witness_pin?: WitnessPinStatus;
     };
     can_manage: boolean;
     can_export: boolean;
@@ -415,6 +422,14 @@ export default function Rounds(props: Props) {
                   label: signer.cd_witness
                       ? 'Med-competent · CD witness authorised'
                       : 'Med-competent',
+              }
+            : null,
+        signer.witness_pin && signer.witness_pin !== 'set'
+            ? {
+                  tone: 'warning' as const,
+                  icon: KeyRound,
+                  label: OWN_WITNESS_PIN_PROMPT[signer.witness_pin],
+                  href: OWN_WITNESS_PIN_SETTINGS_URL,
               }
             : null,
     ].filter(Boolean) as PageHeroBadge[];

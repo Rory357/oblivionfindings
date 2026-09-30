@@ -1,3 +1,4 @@
+import { Badge } from '@/components/ui/badge';
 import { cn, isSameUrl } from '@/lib/utils';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
@@ -15,6 +16,7 @@ import {
     FileText,
     Inbox,
     Key,
+    KeyRound,
     Lock,
     Mail,
     MailCheck,
@@ -47,6 +49,8 @@ interface NavSection {
         title: string;
         href: NonNullable<InertiaLinkProps['href']>;
         permission?: string;
+        /** Small pill after the title, e.g. "New" for a recently added page. */
+        badge?: string;
     }[];
 }
 
@@ -61,6 +65,14 @@ const navSections: NavSection[] = [
                 icon: ShieldCheck,
                 title: 'Two-Factor Authentication',
                 href: show(),
+            },
+            {
+                // PIN-1: personal witness PIN for medication second-person checks.
+                icon: KeyRound,
+                title: 'Witness PIN',
+                href: '/settings/witness-pin',
+                permission: 'medications.witnessPin',
+                badge: 'New',
             },
         ],
     },
@@ -260,6 +272,14 @@ function NavContent({
                                         )}
                                     />
                                     {item.title}
+                                    {item.badge ? (
+                                        <Badge
+                                            variant="secondary"
+                                            className="ml-auto px-1.5 py-0 text-[10px]"
+                                        >
+                                            {item.badge}
+                                        </Badge>
+                                    ) : null}
                                 </Link>
                             );
                         })}
