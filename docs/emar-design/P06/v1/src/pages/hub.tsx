@@ -162,7 +162,7 @@ export function HubPage() {
             subline={`Medicines held for people at ${houseText} · times in NZDT`}
             actions={
                 <>
-                    <PageHeaderSearch value={search} onChange={setSearch} placeholder="Search people, medicines or batches…" />
+                    <PageHeaderSearch value={search} onChange={setSearch} placeholder="Search medicines or batches" />
                     {canReceive(p) && !failed ? (
                         <PageHeaderPrimaryButton icon={PackageCheck} onClick={() => open('receive:new')}>
                             Receive a delivery

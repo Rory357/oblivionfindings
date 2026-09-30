@@ -260,7 +260,9 @@ export function ReceiveDialog({ spec, onClose, returnFocus }: { spec: string; on
     const [offlineErr, setOfflineErr] = useState(false);
     const cd = !!item?.cd;
     const total = packs.reduce((n, x) => n + (Number(x.qty) || 0), 0);
-    const shortBy = expectedQty != null && total < expectedQty ? expectedQty - total : 0;
+    /** Asked only once every pack has a counted quantity (Main, P06 fix 1). */
+    const allCounted = packs.every((x) => Number(x.qty) > 0);
+    const shortBy = expectedQty != null && allCounted && total < expectedQty ? expectedQty - total : 0;
     const hasPhoto = item ? photosOf(item, s.rt).length > 0 : false;
     const promptPhoto = !hasPhoto || looksDifferent;
     const steps = [

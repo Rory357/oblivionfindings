@@ -1,6 +1,6 @@
 # eMAR P06 v1 — Stock & pharmacy
 
-**Status: design candidate for Main (the review session, “Codex eMAR audit re-review”), reviewing under Stephan’s delegation.** Not approved yet. Not implemented.
+**Status: approved by Main (the review session, “Codex eMAR audit re-review”) under Stephan’s delegation, 30 September 2026, for Stephan’s final inspection — see [APPROVAL.md](APPROVAL.md).** Frozen. Not implemented.
 
 - Version: v1, 30 September 2026 (NZDT). Branch `claude/emar-p06`, based on `origin/main` `ada567669`.
 - Exact file identity: [`VERSION.txt`](VERSION.txt) (SHA-256 of every source, build and tool file).
@@ -35,7 +35,7 @@ All ten questions took the recommended option.
 | Q9 | Controlled receipt | **P06 receives controlled deliveries as a register entry** (house lead, witness PIN, balance before and after, the pack). Everything else controlled stays in P07. The controlled batch/expiry edit leak closes. |
 | Q10 | Going out / coming back | **Ordinary movements live in P06**, without a witness. |
 
-Main also sent two live defects from the audit to a fix-first session, so the test site stops losing data before the P06 build: EM-10 (“every delivery wipes batch and expiry”) and “0.00 is truthy” (every scheduled count a discrepancy). AUDIT records them; they’re marked fixed-first once Main confirms.
+Main also sent two live defects from the audit to a fix-first session, so the test site stops losing data before the P06 build: EM-10 (“every delivery wipes batch and expiry”) and “0.00 is truthy” (every scheduled count a discrepancy). Both are **fixed-first on main `21bfb4ce4`** (AUDIT 2.3, 3.5).
 
 ## Open it
 
@@ -126,7 +126,7 @@ Steps: **what arrived → packs → pack photo → (register entry, controlled o
 5. **Receiving:** expiry after today required (or “not printed”); within 7 days needs a reason; the scan requirement is reviewed so the dashboard path works (AUDIT 2.4, 3.8).
 6. **Counts:** blind; differences with reasons create a P08a house-lead follow-up; the scheduled-count witness is kept; “0.00” is not a discrepancy (AUDIT 3.5; also fix-first). Receipts never set `last_counted_at` (AUDIT 3.7).
 7. **Removals without controlled permissions** for ordinary medicines (AUDIT 3.6).
-8. **Photos:** a `medication_stock_photos` record per lot on the private disk, concealed for controlled medicines without controlled view; history kept (AUDIT 5).
+8. **Photos:** a `medication_stock_photos` record per lot on the private disk, concealed for controlled medicines without controlled view; history kept (AUDIT 5). **The pack-photo `FileDropzone` uses `accept="image/*"` with `capture="environment"`** (Main, 30 September): the page is desktop-first, but staff photographing a pack often open it on a phone or tablet at the cupboard, and this opens the camera directly.
 9. **Alerts:** days of supply, reorder level for as-needed; P11 settings (7 days, 30/7 days, scheduled counts off) as “Default — not yet reviewed”; P11 Delivery routing; an All Tasks “Stock” provider; skip discontinued medicines; NZ day boundaries (AUDIT 4).
 10. **Permissions:** add `medications.stock.receive` (grant migration) for roles that administer; grant `stock.update` to house leads (team_lead lacks it); review finance’s `stock.update` (AUDIT 7).
 11. **Controlled:** the controlled receipt becomes a witnessed register entry with a lot; close the `updateStockItem` batch/expiry edit for controlled medicines (AUDIT 6.2).
@@ -139,11 +139,21 @@ Steps: **what arrived → packs → pack photo → (register entry, controlled o
 - **`tsc` and ESLint:** clean for `src/` (ESLint: 16 files, 0 problems; no unused imports). The 2 `tsc` errors in shared files come from P01’s Inertia shim, as in the earlier packages.
 - **Live reference:** not checked live; see AUDIT §9.
 
-## Deviations Main should check
+## Deviations (accepted by Main)
 
 1. **Reference frames.** The shell chrome is reproduced (AppLayout needs Inertia). Meds today’s page top is P01’s, as P07a reproduced it, with 9:12 am reference numbers; its other views are link-only.
 2. **Fixtures** follow P02/P03/P04’s people. Additions: packs, pharmacy orders and counts; Tama’s levetiracetam out at the day programme; Grace’s expired levothyroxine pack.
-3. **`ConfirmDialog` is the real one.** Its destructive confirm renders purple on main until PR #15; not worked around.
+3. **`ConfirmDialog` is the real one.** Its destructive confirm renders purple in this preview; PR #15 has since merged, so it is red on main — this deviation no longer applies at build.
 4. **Pack photos are placeholders** (“Synthetic pack photo”) — no real images in the preview.
 5. **Expiry is entered as month/year** (as printed on NZ packs), not with the date-and-time field; the build stores the last day of that month.
 6. **Days of supply counts regular doses only**; an as-needed medicine uses its reorder level (Q8). A course or a respite stay that ends before stock runs out isn’t “low”.
+
+**Main’s inspection, 30 September:** v1 at `7c2144c28` passed (`sha256sum -c` 30 OK) with two fixes, made in this version:
+1. **Receive › Packs:** “N fewer than the pharmacy sent — is the rest coming?” is asked only once every pack has a counted quantity, and it’s less than what was sent. Until then only the field’s own validation shows.
+2. **The hub search** reads “Search medicines or batches” (it was truncated at 1440).
+
+Main also accepted deviations 1–6 (month/year expiry, stored as the last day of the month, is right) and added the camera-capture build note (build note 8). EM-10 and the “0.00” count fix are fixed-first on main `21bfb4ce4` (AUDIT 2.3, 3.5).
+
+## Approval
+
+Approved by Main under Stephan’s delegation, for his final inspection. The exact version and the record are in [`APPROVAL.md`](APPROVAL.md). **v1 is frozen**; any change goes in `P06/v2/`.

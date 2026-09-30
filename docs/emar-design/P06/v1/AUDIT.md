@@ -27,7 +27,7 @@ What today’s code does, with file and line, as the evidence behind P06’s dec
 1. `client_medication_stocks` has one row per medication (unique `client_medication_id`, `database/migrations/2026_01_24_000001…:26-36`), with a single `batch_number` and `expiry_date` (`2026_03_27_000004…:12-16`). There is no lots table [R].
 2. There is no stock-movements table. History is rebuilt from the audit log (EC:2472-2484, 2664-2719) [R].
 3. **EM-10 — every ordinary pharmacy delivery wipes the batch and expiry [R].** The Stock page’s “advance” sends only `expected_status` and a request id (SM:602-607). Moving an order to “dispensed” sets its batch and expiry to `validated ?? null` (EC:6966-6967); moving it to “delivered” copies them onto the one stock row (EC:7011-7016). The controlled delivery does the same (EC:7207-7212). Receiving directly keeps the old value when the new one is blank (EC:7364-7365), but a new batch still replaces the old one.
-   **Main sent this to a fix-first session on 30 September** so the test site stops losing data before the P06 build. [Fixed-first status: pending Main’s confirmation.]
+   **Fixed-first on main `21bfb4ce4`** (Main, 30 September): deliveries no longer wipe batch or expiry, and the earliest expiry on hand is kept. The lots design (P06) still replaces the single row.
 4. Receiving accepts already-expired stock — expiry is only validated as a date (EC:7286) [R].
 
 ## 3. Flows (→ Q3, Q4, Q7, Q10)
@@ -37,7 +37,7 @@ What today’s code does, with file and line, as the evidence behind P06’s dec
 3. **Dispensing** (P04’s DispenseDialog, PD:783-911) saves pharmacy, batch, expiry, date and notes on the prescriber order — no quantity, never touching stock or the pharmacy order (EC:4583-4591) [R].
 4. **Adjust** sets an absolute quantity with a free-text reason written to `stock.notes` (“Stock adjustment: …”, EC:7541), overwritten by the next write; it is kept only in the audit log [R].
 5. **Counts:** the stocktake posts an absolute adjust with the reason “Physical stock count” (SD:1243-1254); scheduled-count completion drops the witness (MAC:2157) and overwrites `on_hand` (MAC:2159); `ScheduledStockCounts.tsx` is imported nowhere [R].
-   **Every scheduled count shows as a discrepancy:** `$disc ? 'discrepancy' : 'counted'` treats the string “0.00” as true (EC:2258-2261). Main sent this to the same fix-first session. [Fixed-first status: pending Main’s confirmation.]
+   **Every scheduled count showed as a discrepancy:** `$disc ? 'discrepancy' : 'counted'` treated the string “0.00” as true (EC:2258-2261 at `ada567669`). **Fixed-first on main `21bfb4ce4`** (Main, 30 September).
 6. **Removal** of an ordinary medicine is only possible through controlled destruction (EC:6245-6581), which needs `controlled.record`; reason and method are free text (EC:6268-6269) [R].
 7. **No going out / coming back** for ordinary medicines. Receipts and deliveries also set `last_counted_at`, falsifying the last count (EC:7015, 7362) [R].
 8. The dashboard’s “Stock movement” receive always fails: it sends no scan fields (SMM:117-124), but the server requires a verified scan (EC:792) [R].

@@ -145,3 +145,5 @@ One run was stopped by this session’s memory guard (free RAM under 3 GB from o
 **`tsc`** (`tsconfig.json`): no errors in `src/`. The 2 errors in shared files (`breadcrumbs.tsx:36`, `file-dropzone.tsx:223`) come from P01’s Inertia shim types.
 
 **ESLint** (the app config, `--no-ignore`, `src/**/*.{ts,tsx}`): 16 files, 0 errors, 0 warnings. A separate check found no unused imports.
+
+**Main’s fixes (30 September):** the “is the rest coming?” question now waits for a counted quantity (`32` shows only the field’s validation; `36` shows the question after 28 of 56 is entered), and the hub search placeholder is “Search medicines or batches”. The rebuilt version was re-run through the harness (numbers above).
