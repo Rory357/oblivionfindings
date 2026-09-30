@@ -308,30 +308,49 @@ class MedicationControllerTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════════════════
-    //  2. SUPPORT WORKER VISIBILITY - Current Site boundary
+    //  2. SUPPORT WORKER VISIBILITY - Per-person MAR scope
     // ══════════════════════════════════════════════════════════════
 
-    public function test_support_worker_only_sees_clients_at_their_current_sites_in_medications_index(): void
+    public function test_support_worker_mar_picker_lists_only_residents_they_may_open(): void
     {
-        // The MAR picker is Site-scoped: an individual client assignment must
-        // not hide another resident at the worker's current Site, while a
-        // resident at a foreign Site remains concealed.
-        $this->createMedication();
+        // Person scope, not Site scope (supersedes the earlier Site-wide
+        // picker rule, 2026-09-30): an ordinary support worker's MAR picker
+        // lists only residents whose chart they may open under
+        // ClientPolicy::viewMedications — an assignment, or a clocked-in shift
+        // covering them — never another resident at the same Site, and never
+        // anyone at a foreign Site.
+        $assignedClient = Client::factory()->create(['site_id' => $this->site->id]);
+        $assignedClient->supportWorkers()->attach($this->supportWorker->id);
+        $coveredClient = Client::factory()->create(['site_id' => $this->site->id]);
+        Shift::factory()->create([
+            'client_id' => $coveredClient->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->supportWorker->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(7),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'started_by' => $this->supportWorker->id,
+            'status' => 'in_progress',
+        ]);
         $sameSiteClient = Client::factory()->create(['site_id' => $this->site->id]);
-        $this->createMedication(['client_id' => $sameSiteClient->id]);
-        $foreignSite = Site::factory()->create();
-        $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
-        $this->createMedication(['client_id' => $foreignClient->id]);
+        $foreignClient = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
+        foreach ([$assignedClient, $coveredClient, $sameSiteClient, $foreignClient] as $client) {
+            $this->createMedication(['client_id' => $client->id]);
+        }
 
-        $this->actingAs($this->supportWorker)
-            ->get(EmarUrl::mar())
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('clients', fn ($clients) => collect($clients)->pluck('id')->contains($this->client->id) &&
-                    collect($clients)->pluck('id')->contains($sameSiteClient->id) &&
-                    ! collect($clients)->pluck('id')->contains($foreignClient->id)
-                )
-            );
+        $pickerIds = collect(
+            $this->actingAs($this->supportWorker)
+                ->get(EmarUrl::mar())
+                ->assertOk()
+                ->inertiaProps('clients'),
+        )->pluck('id');
+
+        $this->assertTrue($pickerIds->contains($assignedClient->id), 'Assigned resident is listed.');
+        $this->assertTrue($pickerIds->contains($coveredClient->id), 'Clocked-in covering-shift resident is listed.');
+        $this->assertFalse($pickerIds->contains($sameSiteClient->id), 'Unassigned, uncovered same-Site resident is hidden.');
+        $this->assertFalse($pickerIds->contains($foreignClient->id), 'Foreign-Site resident is hidden.');
     }
 
     public function test_admin_sees_all_clients_in_medications_index(): void
