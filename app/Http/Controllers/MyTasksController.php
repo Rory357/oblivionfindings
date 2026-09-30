@@ -27,6 +27,7 @@ use App\Models\User;
 use App\Services\GuidedRoundService;
 use App\Services\HandoverWorkerNotes;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\MyDay\ShiftTaskHelpService;
 use App\Services\MyDay\ShiftTaskWorkService;
@@ -34,7 +35,6 @@ use App\Services\ShiftHandoverService;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\Tasks\TaskItem;
 use App\Services\UserSiteAccessService;
-use App\Support\EmarUrl;
 use App\Support\ResidentHue;
 use App\Support\RunDetailPresenter;
 use Illuminate\Http\Request;
@@ -62,6 +62,7 @@ class MyTasksController extends Controller
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
         private readonly BoardPackAccessService $boardPackAccess,
+        private readonly MarLinkService $marLinks,
     ) {}
 
     public function __invoke(Request $request): Response
@@ -75,8 +76,9 @@ class MyTasksController extends Controller
         $canViewMedications = $canOpenEmar || $canRecordMedications;
         $canRecordControlledMedications = $canRecordMedications
             && $user->canDo('medications.controlled.record');
-        $canAccessControlledMedications = $user->canDo('medications.controlled.view')
-            || $canRecordControlledMedications;
+        // EM-12: only controlled view reveals controlled rows (controlled doses
+        // are never given from My Day, so record authority adds nothing here).
+        $canAccessControlledMedications = $user->canDo('medications.controlled.view');
         $workerNow = Carbon::now($this->workerTimezone());
         $queryNow = $workerNow->copy()->utc();
         $today = $workerNow->copy()->startOfDay()->utc();
@@ -527,9 +529,8 @@ class MyTasksController extends Controller
                     'incident' => $openSession->shift_id
                         ? '/incidents/create?shift_id='.$openSession->shift_id
                         : '/incidents',
-                    'emar' => $openShift?->client_id
-                        ? EmarUrl::mar($openShift->client_id, $now->toDateString())
-                        : '/meds/today',
+                    'emar' => $this->marUrlFor($openShift?->client_id, $now->toDateString())
+                        ?? '/meds/today',
                     'escalate' => $openSession->shift_id
                         ? '/control-room?shift_id='.$openSession->shift_id
                         : '/control-room',
@@ -888,7 +889,7 @@ class MyTasksController extends Controller
                             'scheduled_for' => $scheduledIso,
                             'status' => $status,
                             'emar_url' => $canOpenEmar
-                                ? EmarUrl::mar($med->client_id, $scheduled->toDateString())
+                                ? $this->marUrlFor($med->client_id, $scheduled->toDateString())
                                 : null,
                         ];
                     }
@@ -1056,7 +1057,7 @@ class MyTasksController extends Controller
                                     'dose' => $medication->dosage,
                                     'scheduled_for' => $scheduled->toIso8601String(),
                                     'emar_url' => $canOpenEmar
-                                        ? EmarUrl::mar($medication->client_id, $scheduled->toDateString())
+                                        ? $this->marUrlFor($medication->client_id, $scheduled->toDateString())
                                         : null,
                                 ];
                             }
@@ -1806,5 +1807,14 @@ class MyTasksController extends Controller
     private function workerTimezone(): string
     {
         return (string) config('app.worker_timezone', 'Pacific/Auckland');
+    }
+
+    /**
+     * My Day is roster-scoped; the MAR is person-scoped (assignment or a
+     * clocked-in covering shift). Link only charts this worker may open.
+     */
+    private function marUrlFor(mixed $clientId, ?string $date = null): ?string
+    {
+        return $this->marLinks->urlFor(request()->user(), $clientId, $date);
     }
 }

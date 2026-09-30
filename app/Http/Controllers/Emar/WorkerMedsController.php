@@ -19,6 +19,7 @@ use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Timeline\TimelineEmitter;
@@ -98,6 +99,13 @@ class WorkerMedsController extends Controller
         $bySlot = $this->boardPayload->slotIndex($dayAdministrations);
 
         $schedule = $this->boardPayload->scheduleForDate($assignedClientIds, $date, $now, $bySlot, $includeControlled);
+        // The board is roster-scoped; the MAR is person-scoped (assignment or
+        // a clocked-in covering shift). Link only charts this worker may open.
+        $marLinks = app(MarLinkService::class);
+        $schedule = array_map(fn (array $row): array => [
+            ...$row,
+            'mar_url' => $marLinks->canOpen($user, (int) $row['client_id']) ? $row['mar_url'] : null,
+        ], $schedule);
 
         // Legacy due lists (kept for the established payload contract): the
         // operational "what needs me" window of -2h … +8h around now.

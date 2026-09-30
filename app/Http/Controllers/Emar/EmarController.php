@@ -44,6 +44,7 @@ use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\Emar\ShiftMedicationSnapshotService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationOrderLifecycleService;
 use App\Services\Medication\MedicationRoundGenerationService;
@@ -57,7 +58,6 @@ use App\Services\MedicationScanVerificationService;
 use App\Services\Operations\HandoverPresenter;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
-use App\Support\EmarUrl;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -92,7 +92,20 @@ class EmarController extends Controller
         protected MedicationRoundGenerationService $roundGeneration,
     ) {}
 
+    private ?MarLinkService $marLinks = null;
+
     // ─── Helpers ──────────────────────────────────────────
+
+    /**
+     * Site-scoped list rows link to a resident's MAR only when the viewer may
+     * open it (ClientPolicy::viewMedications), never to a chart that 404s.
+     */
+    private function marUrlFor(mixed $clientId): ?string
+    {
+        $this->marLinks ??= app(MarLinkService::class);
+
+        return $this->marLinks->urlFor(request()->user(), $clientId);
+    }
 
     private function buildMedicationPermissions(?User $user): array
     {
@@ -1885,7 +1898,7 @@ class EmarController extends Controller
             'given_time' => $at ? $at->copy()->timezone($timezone)->format('H:i') : null,
             'given_date' => $at ? $at->copy()->timezone($timezone)->format('j M') : null,
             'given_by' => $a->administeredBy?->name,
-            'mar_url' => EmarUrl::mar($a->client_id),
+            'mar_url' => $this->marUrlFor($a->client_id),
             'baseline' => array_filter([
                 'blood_glucose_level' => $a->blood_glucose_level,
                 'pulse_bpm' => $a->pulse_bpm,
@@ -2478,7 +2491,7 @@ class EmarController extends Controller
             'client_name' => trim(($s->medication?->client?->first_name ?? '').' '.($s->medication?->client?->last_name ?? '')),
             'client_id' => $s->medication?->client_id,
             'client_room' => $s->medication?->client?->room?->name,
-            'mar_url' => $s->medication?->client_id ? EmarUrl::mar($s->medication->client_id) : null,
+            'mar_url' => $this->marUrlFor($s->medication?->client_id),
             'site_id' => $s->medication?->client?->site_id,
             'site_name' => $s->medication?->client?->site?->name,
             'on_hand' => $s->on_hand !== null
@@ -3169,7 +3182,7 @@ class EmarController extends Controller
             'is_overdue' => $r->status === 'scheduled' && $r->scheduled_date && $r->scheduled_date->isPast(),
             // Deep-link to the resident's MAR chart for the row context menu /
             // detail "Open on MAR" action (mirrors the PRN register's mar_url).
-            'mar_url' => $r->client_id ? EmarUrl::mar($r->client_id) : null,
+            'mar_url' => $this->marUrlFor($r->client_id),
         ];
     }
 
@@ -3825,7 +3838,7 @@ class EmarController extends Controller
                 'is_voided' => $d->voided_at !== null,
                 'void_stock_semantics' => MedicationDestruction::VOID_STOCK_SEMANTICS,
                 'requires_governed_stock_reconciliation' => $d->voided_at !== null && (bool) $d->is_controlled_drug,
-                'mar_url' => $d->client_id ? EmarUrl::mar($d->client_id) : null,
+                'mar_url' => $this->marUrlFor($d->client_id),
             ])->values(),
             'medications' => $medications->map(fn (ClientMedication $m) => [
                 'id' => $m->id,

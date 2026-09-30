@@ -5,9 +5,12 @@ namespace Tests\Feature\Emar;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationInteraction;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\ServiceContext;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use Carbon\Carbon;
@@ -188,6 +191,91 @@ class MarChartPersonScopeTest extends TestCase
         $this->assertTrue($rows['Midazolam']['controlled_drug']);
         $this->assertTrue($rows['Midazolam']['witness_required']);
         $this->assertFalse($rows['Haloperidol']['witness_required']);
+    }
+
+    public function test_a_clocked_in_covering_shift_opens_the_mar_only_for_that_shift(): void
+    {
+        $worker = $this->supportWorker();
+        $client = $this->residentWithMedication('Rewi', 'Covered');
+        $shift = $this->coveringShift($worker, $client);
+        $open = fn () => $this->actingAs($worker)->get(route('emar.mar', ['client_id' => $client->id]));
+
+        // Rostered but not clocked in: no recording authority, so no chart.
+        $open()->assertNotFound();
+
+        $shift->forceFill(['status' => 'in_progress', 'actual_starts_at' => now()->subHour()])->save();
+        $this->assertSame([$client->id], collect($open()->assertOk()->inertiaProps('clients'))->pluck('id')->all());
+
+        // Clocked out: the shift's access ends with it.
+        $shift->forceFill(['status' => 'completed', 'actual_ends_at' => now()->subMinute()])->save();
+        $open()->assertNotFound();
+    }
+
+    public function test_meds_today_and_list_rows_link_only_charts_the_worker_may_open(): void
+    {
+        $worker = $this->supportWorker();
+        $covered = $this->residentWithMedication('Tama', 'Rostered');
+        $shift = $this->coveringShift($worker, $covered);
+        $boardUrls = fn () => collect(
+            $this->actingAs($worker)->get('/meds/today')->assertOk()->inertiaProps('schedule'),
+        )->where('client_id', $covered->id)->pluck('mar_url');
+
+        $this->assertNotEmpty($boardUrls());
+        $this->assertTrue($boardUrls()->every(fn ($url) => $url === null));
+
+        $shift->forceFill(['status' => 'in_progress', 'actual_starts_at' => now()->subHour()])->save();
+        $this->assertTrue($boardUrls()->every(fn ($url) => is_string($url) && str_contains($url, 'client_id='.$covered->id)));
+
+        // Site-scoped list rows: only the assigned resident's row links.
+        $assigned = $this->residentWithMedication('Aroha', 'Assigned');
+        $assigned->supportWorkers()->attach($worker->id);
+        $unassigned = $this->residentWithMedication('Hemi', 'Unassigned');
+        foreach ([$assigned, $unassigned] as $client) {
+            $prn = ClientMedication::query()->create([
+                'client_id' => $client->id,
+                'name' => 'Paracetamol PRN',
+                'dosage' => '500mg',
+                'frequency' => 'As needed',
+                'dose_times' => [],
+                'is_prn' => true,
+                'active' => true,
+                'state' => 'active',
+                'approval_status' => 'verified',
+            ]);
+            ClientMedicationAdministration::query()->create([
+                'client_id' => $client->id,
+                'client_medication_id' => $prn->id,
+                'administered_by' => $worker->id,
+                'administered_at' => now()->subHour(),
+                'status' => 'given',
+            ]);
+        }
+        $rows = collect(
+            $this->actingAs($worker)->get(route('emar.prn'))->assertOk()->inertiaProps('history.data'),
+        )->keyBy('client_id');
+
+        $this->assertStringContainsString('client_id='.$assigned->id, (string) $rows[$assigned->id]['mar_url']);
+        $this->assertNull($rows[$unassigned->id]['mar_url']);
+    }
+
+    /** A rostered (not yet clocked-in) shift covering one resident. */
+    private function coveringShift(User $worker, Client $client): Shift
+    {
+        return Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => ServiceContext::factory()->create([
+                'type' => 'residential',
+                'is_active' => true,
+                'site_id' => $this->site->id,
+            ])->id,
+            'user_id' => $worker->id,
+            'starts_at' => now()->subHours(2),
+            'ends_at' => now()->addHours(4),
+            'status' => 'scheduled',
+            'actual_starts_at' => null,
+            'actual_ends_at' => null,
+        ]);
     }
 
     private function residentWithMedication(string $first, string $last, string $medication = 'Paracetamol'): Client

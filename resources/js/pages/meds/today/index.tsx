@@ -247,7 +247,7 @@ function DoseRow({
             </td>
             <td className="py-3 pr-3 align-middle">
                 <div className="flex items-center gap-2">
-                    {canViewMar ? (
+                    {canViewMar && row.mar_url ? (
                         <Link
                             href={row.mar_url}
                             className="truncate text-sm hover:underline"
@@ -1343,13 +1343,13 @@ export default function MedsToday(props: MedsTodayProps) {
             navigator.platform.toUpperCase().includes('MAC');
 
         const common: ShiftCtxItem[] = [
-            ...(board_can.view_emar
+            ...(board_can.view_emar && row.mar_url
                 ? [
                       {
                           icon: <FileText className="h-3.5 w-3.5" />,
                           label: 'View MAR chart',
                           sub: `Full history · ${row.medication_name}`,
-                          onClick: () => router.visit(row.mar_url),
+                          onClick: () => router.visit(row.mar_url!),
                       } satisfies ShiftCtxItem,
                   ]
                 : []),

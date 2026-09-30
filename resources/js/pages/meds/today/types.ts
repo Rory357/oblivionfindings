@@ -52,7 +52,8 @@ export interface ScheduleRow {
     round_label: string;
     status: DoseStatus;
     recorded: RecordedInfo | null;
-    mar_url: string;
+    /** Null when this worker may not open the resident's MAR (not assigned, no clocked-in covering shift). */
+    mar_url: string | null;
 }
 
 export interface ClientInfo {
