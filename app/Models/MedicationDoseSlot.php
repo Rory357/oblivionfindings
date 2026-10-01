@@ -8,7 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * One scheduled dose obligation: an order × NZ calendar day × ordered time
  * (P01 foundation C3). Written only by the dose-slot generator, the outcome
- * writer and the backfill (C5: `reconstructed` rows); nothing reads it yet (C6).
+ * writer and the backfill (C5: `reconstructed` rows); read through
+ * DoseSlotProjection.
  */
 class MedicationDoseSlot extends Model
 {

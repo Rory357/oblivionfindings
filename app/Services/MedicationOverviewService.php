@@ -18,9 +18,12 @@ use App\Models\MedicationRound;
 use App\Models\MedicationSyringeDriver;
 use App\Models\User;
 use App\Services\Emar\MedsBoardPayloadService;
+use App\Services\Medication\DoseSlots\DoseSlotProjection;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -53,10 +56,17 @@ class MedicationOverviewService
     /** @var array<string, array<int, array<string, mixed>>> Scheduled dose slots per worker date. */
     private array $scheduledDoses = [];
 
+    /** Who the dose numbers are for (C6a): reader Sites, then the people they may open. */
+    private ?DoseSlotReaderScope $doseScope = null;
+
+    /** @var array<string, array<int, array<string, mixed>>> 7-day trend per worker date. */
+    private array $trends = [];
+
     public function __construct(
         private readonly MedicationGovernanceScopeService $governanceScope,
         private readonly MedsBoardPayloadService $boardPayload,
         private readonly MarScheduleService $schedule,
+        private readonly DoseSlotProjection $doses,
     ) {}
 
     /**
@@ -83,6 +93,9 @@ class MedicationOverviewService
             'stats' => $stats,
             'trend' => $trend,
             'complianceTrend' => $this->complianceTrend($trend),
+            'doseCoverage' => $this->doseCoverage($date),
+            // Doses waiting for the order check link to the verification queue.
+            'orderCheckUrl' => route('emar.medications', ['tab' => 'awaiting'], false),
             'outcomeBreakdown' => $this->outcomeBreakdown($stats),
             'codedNotGivenReasons' => $this->codedNotGivenReasons($date),
             'actionCentre' => $this->actionCentre($date, $includeControlledErrors),
@@ -105,8 +118,8 @@ class MedicationOverviewService
 
     /**
      * Scheduled-dose counts for another surface (the /dashboard eMAR widget,
-     * NF-25): the same reader Site scope, controlled-medicine concealment,
-     * schedule and definitions as the eMAR dashboard.
+     * NF-25): the same dose-slot projection, reader scope and P09
+     * definitions as the eMAR dashboard.
      *
      * @return array{total: int, given: int, refused: int, withheld: int, missed: int, overdue: int, due: int, dueNow: int, notYetRecorded: int, eligible: int, adminRate: float|null}
      */
@@ -132,54 +145,91 @@ class MedicationOverviewService
                 ->pluck('id')
                 ->map(fn ($id) => (int) $id)
                 ->all();
+            // Dose numbers: the reader's Sites narrowed by the P02 person
+            // rule, so no number counts a person the reader can't open.
+            $this->doseScope = DoseSlotReaderScope::forViewer($actor, $this->readerSiteIds);
         }
     }
 
+    /** The dose-slot reader scope: the actor's, or every person for internal use. */
+    private function doseScope(): DoseSlotReaderScope
+    {
+        return $this->doseScope ??= DoseSlotReaderScope::internal($this->readerClientIds);
+    }
+
     /**
-     * EM-01: dose counts come from the scheduled slots Meds today and the MAR
-     * use. Production never writes `pending` administration rows, so counting
-     * them made "due now" and "overdue" structurally zero.
+     * EM-01 / NF-25 (C6a): dose numbers come from the dose-slot projection,
+     * one definition for every screen. P09's definitions on the NZ day:
      *
-     * Admin rate = given ÷ eligible scheduled doses (slots already recorded
-     * or whose time has come). Nothing eligible is "n/a" (null), never a
-     * reassuring 0 %.
+     * - due now = inside the dose window, or past it today with nothing
+     *   recorded; overdue = the window has ended with nothing recorded;
+     * - admin rate = given ÷ doses due (window ended; Away never due), null
+     *   ("n/a") when nothing was due — never a reassuring 0 %;
+     * - controlled doses are counted for every reader (P09 Q6);
+     * - a Withheld dose for an absence (Away) counts as withheld here;
+     * - a dose due while its order's change waits for the order check can't
+     *   be recorded yet (until P04): it is in none of these numbers, only in
+     *   its own — pendingCheck, "Waiting for the order check" (Main, 2 Oct).
      *
-     * @return array{total: int, given: int, refused: int, withheld: int, missed: int, overdue: int, due: int, dueNow: int, notYetRecorded: int, eligible: int, adminRate: float|null}
+     * @return array{total: int, given: int, refused: int, withheld: int, missed: int, overdue: int, due: int, dueNow: int, notYetRecorded: int, eligible: int, adminRate: float|null, pendingCheck: int}
      */
     private function doseCounts(Carbon $date): array
     {
-        $doses = collect($this->scheduledDoses($date));
-        $countStatus = fn (string ...$statuses): int => $doses
-            ->filter(fn (array $row): bool => in_array($row['status'], $statuses, true))
-            ->count();
+        $day = $this->workerDate($date)->toDateString();
+        $now = $this->projectionNow();
+        $states = $this->doses->stateCounts($this->doseScope(), $day, $day, $now);
+        $totals = $this->doses->totals($this->doseScope(), $day, $day, $now);
 
-        $now = $this->workerNow();
-        $eligible = $doses
-            ->filter(fn (array $row): bool => $row['recorded'] !== null
-                || Carbon::parse($row['scheduled_for'])->lte($now))
-            ->count();
-        $given = $countStatus('given');
-        $overdue = $countStatus('overdue');
-        $due = $countStatus('due');
+        $overdue = $states[DoseSlotProjection::STATE_LATE] + $states[DoseSlotProjection::STATE_NOT_RECORDED];
+        $due = $states[DoseSlotProjection::STATE_DUE];
+        $pendingCheck = $states[DoseSlotProjection::STATE_PENDING_CHECK];
 
         return [
-            'total' => $doses->count(),
-            'given' => $given,
-            'refused' => $countStatus('refused'),
-            'withheld' => $countStatus('withheld'),
-            'missed' => $countStatus('missed'),
+            'total' => array_sum($states) - $pendingCheck,
+            'pendingCheck' => $pendingCheck,
+            'given' => $states['given'],
+            'refused' => $states['refused'],
+            'withheld' => $states['withheld'] + $states['away'],
+            'missed' => $states['missed'],
             'overdue' => $overdue,
             'due' => $due,
             'dueNow' => $overdue + $due,
-            'notYetRecorded' => $countStatus('overdue', 'due', 'upcoming'),
-            'eligible' => $eligible,
-            'adminRate' => $eligible > 0 ? round(($given / $eligible) * 100, 1) : null,
+            'notYetRecorded' => $overdue + $due + $states[DoseSlotProjection::STATE_NOT_DUE],
+            'eligible' => (int) $totals['due'],
+            'adminRate' => $totals['given_rate'],
+        ];
+    }
+
+    /**
+     * Which days the dose numbers hold (C5 coverage): the 7-day trend's
+     * notice, and whether the selected day itself can be shown ("Not
+     * available before {date}" rather than a day of zeros).
+     *
+     * @return array{available_from: string, notice: string|null, day_available: bool, day_notice: string|null}
+     */
+    private function doseCoverage(Carbon $date): array
+    {
+        $day = $this->workerDate($date);
+        $week = $this->doses->coverage($day->copy()->subDays(6)->toDateString(), $this->projectionNow());
+        $selected = $this->doses->coverage($day->toDateString(), $this->projectionNow());
+
+        return [
+            'available_from' => $week['available_from'],
+            'notice' => $week['notice'],
+            'day_available' => $selected['complete'],
+            'day_notice' => $selected['notice'],
         ];
     }
 
     private function workerNow(): Carbon
     {
         return ($this->workerNow ??= Carbon::now($this->schedule->workerTimezone()))->copy();
+    }
+
+    /** The same fixed "now" as an instant, for the projection's live state. */
+    private function projectionNow(): CarbonImmutable
+    {
+        return CarbonImmutable::instance($this->workerNow())->utc();
     }
 
     /** The caller's calendar date as a worker-timezone day (default: worker today). */
@@ -374,6 +424,8 @@ class MedicationOverviewService
             'withheldToday' => $doses['withheld'],
             'missedToday' => $doses['missed'],
             'pendingToday' => $doses['notYetRecorded'],
+            // "Waiting for the order check": not in any number above.
+            'pendingCheckToday' => $doses['pendingCheck'],
             'eligibleToday' => $doses['eligible'],
             'adminRate' => $doses['adminRate'],
             'dueNow' => $doses['dueNow'],
@@ -406,44 +458,59 @@ class MedicationOverviewService
                 ->count(),
             'roundsToday' => MedicationRound::forDate($date->toDateString())->whereIn('site_id', $this->allowedSiteIds())->count(),
             'roundsCompleted' => MedicationRound::forDate($date->toDateString())->whereIn('site_id', $this->allowedSiteIds())->where('status', 'completed')->count(),
-            'givenTrend' => array_map(fn ($d) => $d['given'], $trend),
+            // Days the projection holds only: a day it doesn't hold isn't 0 given.
+            'givenTrend' => array_values(array_map(
+                fn ($d) => $d['given'],
+                array_filter($trend, fn ($d) => $d['available']),
+            )),
         ];
     }
 
     // ─── 7-day trend ───────────────────────────────────────
 
+    /**
+     * The 7 NZ days to $date from the dose-slot projection, by P09: given
+     * and due (window ended; Away never due) on each day, and the admin rate
+     * — null ("Not applicable") when nothing was due. A day before the
+     * projection's coverage is not available (null), never 0.
+     *
+     * @return array<int, array{date: string, nz_date: string, available: bool, given: int|null, refused: int|null, missed: int|null, not_recorded: int|null, total: int|null, rate: float|null}>
+     */
     public function trend(Carbon $date): array
     {
+        $end = $this->workerDate($date);
+        $key = $end->toDateString();
+        if (array_key_exists($key, $this->trends)) {
+            return $this->trends[$key];
+        }
+
+        $from = $end->copy()->subDays(6)->toDateString();
+        $now = $this->projectionNow();
+        $byDay = $this->doses->totalsBy('nz_date', $this->doseScope(), $from, $key, $now);
+        $availableFrom = $this->doses->coverage($from, $now)['available_from'];
+
         $trend = [];
         for ($i = 6; $i >= 0; $i--) {
-            $day = $date->copy()->subDays($i);
-            [$dayStartUtc, $dayEndUtc] = $this->utcDay($day);
-            $dayStats = $this->effectiveAdministrationRows(ClientMedicationAdministration::query())
-                ->whereIn('client_id', $this->allowedClientIds())
-                ->where(fn ($query) => $query
-                    ->whereBetween('scheduled_for', [$dayStartUtc, $dayEndUtc])
-                    ->orWhereBetween('administered_at', [$dayStartUtc, $dayEndUtc]))
-                ->selectRaw("
-                    SUM(CASE WHEN status = 'given' THEN 1 ELSE 0 END) as given,
-                    SUM(CASE WHEN status = 'refused' THEN 1 ELSE 0 END) as refused,
-                    SUM(CASE WHEN status = 'missed' THEN 1 ELSE 0 END) as missed,
-                    COUNT(*) as total
-                ")->first();
-
-            $given = (int) ($dayStats->given ?? 0);
-            $total = (int) ($dayStats->total ?? 0);
+            $day = $end->copy()->subDays($i);
+            $nzDate = $day->toDateString();
+            $available = $nzDate >= $availableFrom;
+            $totals = $byDay[$nzDate] ?? null;
+            $count = fn (string $field): ?int => $available ? (int) ($totals[$field] ?? 0) : null;
 
             $trend[] = [
                 'date' => $day->format('D'),
-                'given' => $given,
-                'refused' => (int) ($dayStats->refused ?? 0),
-                'missed' => (int) ($dayStats->missed ?? 0),
-                'total' => $total,
-                'rate' => $total > 0 ? round(($given / $total) * 100, 1) : 0.0,
+                'nz_date' => $nzDate,
+                'available' => $available,
+                'given' => $count('given'),
+                'refused' => $count('refused'),
+                'missed' => $count('missed'),
+                'not_recorded' => $count('not_recorded'),
+                'total' => $count('due'),
+                'rate' => $available ? ($totals['given_rate'] ?? null) : null,
             ];
         }
 
-        return $trend;
+        return $this->trends[$key] = $trend;
     }
 
     private function complianceTrend(array $trend): array
@@ -453,6 +520,7 @@ class MedicationOverviewService
             'rate' => $d['rate'],
             'given' => $d['given'],
             'total' => $d['total'],
+            'available' => $d['available'],
         ], $trend);
     }
 
@@ -929,37 +997,47 @@ class MedicationOverviewService
 
     public function clientBoard(Carbon $date): array
     {
-        // Per-person counts come from the same scheduled slots as stats().
-        $dosesByClient = collect($this->scheduledDoses($date))->groupBy('client_id');
+        // Per-person counts come from the same dose-slot projection as
+        // stats(), for the people the reader may open (the P02 person rule).
+        $day = $this->workerDate($date)->toDateString();
+        $statesByClient = $this->doses->stateCounts($this->doseScope(), $day, $day, $this->projectionNow(), 'client_id');
+        $clientIds = $this->doseScope()->clientIds ?? $this->allowedClientIds();
+        $none = array_fill_keys(DoseSlotProjection::STATES, 0);
 
         return Client::query()
-            ->whereIn('id', $this->allowedClientIds())
+            ->whereIn('id', $clientIds)
             ->select(['id', 'first_name', 'last_name', 'site_id'])
             ->with('site:id,name')
             ->withCount([
                 'medications as active_medications_count' => fn ($q) => $q
                     ->active()
                     ->when(! $this->includeControlled, fn ($query) => $query->where('controlled_drug', false)),
+                // A person whose orders all wait for the order check is still
+                // listed: their doses show as waiting for the check.
+                'medications as awaiting_medications_count' => fn ($q) => $q
+                    ->awaitingVerification()
+                    ->when(! $this->includeControlled, fn ($query) => $query->where('controlled_drug', false)),
             ])
-            ->having('active_medications_count', '>', 0)
+            ->havingRaw('active_medications_count + awaiting_medications_count > 0')
             ->orderBy('last_name')
             ->limit(12)
             ->get()
-            ->map(function ($client) use ($dosesByClient) {
-                $doses = $dosesByClient->get($client->id, collect());
-                $count = fn (string ...$statuses): int => $doses
-                    ->filter(fn (array $row): bool => in_array($row['status'], $statuses, true))
-                    ->count();
+            ->map(function ($client) use ($statesByClient, $none) {
+                $states = $statesByClient[(int) $client->id] ?? $none;
+                $count = fn (string ...$keys): int => array_sum(array_map(fn (string $key): int => $states[$key], $keys));
 
                 $given = $count('given');
                 $missed = $count('missed');
-                $overdue = $count('overdue');
-                $pending = $count('due', 'upcoming');
-                $recorded = $count('given', 'refused', 'withheld', 'missed');
-                $total = $doses->count();
+                $overdue = $count(DoseSlotProjection::STATE_LATE, DoseSlotProjection::STATE_NOT_RECORDED);
+                $pending = $count(DoseSlotProjection::STATE_DUE, DoseSlotProjection::STATE_NOT_DUE);
+                $recorded = $count('given', 'refused', 'withheld', 'away', 'missed');
+                // Waiting for the order check: its own number, not in the total.
+                $pendingCheck = $count(DoseSlotProjection::STATE_PENDING_CHECK);
+                $total = array_sum($states) - $pendingCheck;
                 $status = $missed > 0 || $overdue > 0
                     ? 'attention'
-                    : ($total > 0 && $recorded === $total ? 'complete' : 'in_progress');
+                    // Not complete while doses wait for the order check.
+                    : ($total > 0 && $recorded === $total && $pendingCheck === 0 ? 'complete' : 'in_progress');
 
                 return [
                     'id' => $client->id,
@@ -970,6 +1048,7 @@ class MedicationOverviewService
                     'pending' => $pending,
                     'overdue' => $overdue,
                     'missed' => $missed,
+                    'pending_check' => $pendingCheck,
                     'total' => $total,
                     'done' => $recorded,
                     'percent' => $total > 0 ? (int) round(($recorded / $total) * 100) : 0,
@@ -982,15 +1061,26 @@ class MedicationOverviewService
     // ─── Reused dashboard bits ─────────────────────────────
 
     /**
-     * Unrecorded scheduled doses whose time has passed (the Meds today
-     * "overdue" definition), oldest first, as ScheduleRow payloads.
+     * Overdue doses — the projection's: the dose window has ended with
+     * nothing recorded — oldest first, as the ScheduleRow payloads the
+     * RecordDoseWizard opens with. Only people the reader may open, and
+     * controlled medicines only for readers who may see them named.
      *
      * @return Collection<int, array<string, mixed>>
      */
     public function overdueMedications(Carbon $date): Collection
     {
+        $day = $this->workerDate($date)->toDateString();
+        $overdue = $this->doses->rows($this->doseScope(), $day, $day, $this->projectionNow())
+            ->filter(fn (array $slot): bool => in_array($slot['state'], [DoseSlotProjection::STATE_LATE, DoseSlotProjection::STATE_NOT_RECORDED], true)
+                && $slot['client_medication_id'] !== null)
+            // The board's row key: order and UTC due minute.
+            ->mapWithKeys(fn (array $slot): array => [
+                $slot['client_medication_id'].':'.CarbonImmutable::parse($slot['due_at'])->utc()->format('YmdHi') => true,
+            ]);
+
         return collect($this->scheduledDoses($date))
-            ->filter(fn (array $row): bool => $row['status'] === 'overdue')
+            ->filter(fn (array $row): bool => $row['recorded'] === null && $overdue->has($row['key']))
             ->sortBy('scheduled_for')
             ->take(10)
             ->values();

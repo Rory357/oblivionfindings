@@ -238,6 +238,31 @@ class DoseSlotGenerationTest extends TestCase
         $this->assertSame($tomorrow->id, $this->slot($order, '2026-06-16', '08:00')->id);
     }
 
+    public function test_a_replacement_entered_mid_day_owes_nothing_due_before_it_was_entered(): void
+    {
+        $original = $this->order(['09:00', '12:00']);
+
+        // Replaced at 10:00 by an order with the same times.
+        $this->freezeNz('2026-06-15 10:00');
+        $replacement = $this->enter(['09:00', '12:00']);
+        $original->forceFill(['superseded_by' => $replacement->id, 'superseded_at' => now()])->save();
+
+        // The 09:00 dose is owed once — by the original, due before it was replaced.
+        $this->assertSame(['2026-06-15 09:00 2026-06-14 21:00:00'], $this->slotLines($original));
+        $this->assertSame([
+            '2026-06-15 12:00 2026-06-15 00:00:00',
+            '2026-06-16 09:00 2026-06-15 21:00:00',
+            '2026-06-16 12:00 2026-06-16 00:00:00',
+            '2026-06-17 09:00 2026-06-16 21:00:00',
+            '2026-06-17 12:00 2026-06-17 00:00:00',
+        ], $this->slotLines($replacement));
+
+        // The hourly run and a later record keep it that way.
+        $this->artisan('emar:generate-dose-slots')->assertSuccessful();
+        DB::transaction(fn () => app(DoseSlotGenerator::class)->ensureDay($replacement->fresh(), '2026-06-15', CarbonImmutable::now()));
+        $this->assertSame('2026-06-15 12:00 2026-06-15 00:00:00', $this->slotLines($replacement)[0]);
+    }
+
     public function test_an_order_from_before_c3_records_its_baseline_on_its_first_change(): void
     {
         $order = $this->order(['08:00', '20:00']);
@@ -262,9 +287,26 @@ class DoseSlotGenerationTest extends TestCase
     }
 
     /**
+     * An order entered at the start of today (NZ): a dose due before an
+     * order was entered is never owed, so the tests' morning doses need an
+     * order entered before them.
+     *
      * @param  list<string>  $doseTimes
      */
-    private function order(array $doseTimes, array $overrides = []): ClientMedication
+    private function order(array $doseTimes, array $overrides = [], string $enteredNz = '2026-06-15 00:00'): ClientMedication
+    {
+        $now = Carbon::getTestNow();
+        $this->freezeNz($enteredNz);
+        $order = $this->enter($doseTimes, $overrides);
+        Carbon::setTestNow($now);
+
+        return $order;
+    }
+
+    /**
+     * @param  list<string>  $doseTimes
+     */
+    private function enter(array $doseTimes, array $overrides = []): ClientMedication
     {
         return ClientMedication::query()->create(array_merge([
             'client_id' => $this->client->id,

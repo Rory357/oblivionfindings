@@ -64,7 +64,15 @@ final class DoseOrderTimelineFactory
             ]];
         }
 
-        return new DoseOrderTimeline((int) $order->id, $versions, $pauses, self::stoppedAt($order));
+        return new DoseOrderTimeline(
+            (int) $order->id,
+            $versions,
+            $pauses,
+            self::stoppedAt($order),
+            // Nothing due before the order was entered is owed (Main, 2 Oct;
+            // the backfill's rule too).
+            self::rawInstant(self::attribute($order, 'created_at')),
+        );
     }
 
     /** The order's current row as a single version (no history recorded yet). */

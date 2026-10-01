@@ -12,6 +12,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\DoseSlots\DoseSlotGenerator;
+use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -70,6 +71,8 @@ class DoseSlotConcurrencyTest extends TestCase
         // The slot is this minute on the NZ clock, so a dose recorded now is on time.
         $nzMinute = CarbonImmutable::now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfMinute();
         $this->slotUtc = $nzMinute->utc();
+        // Entered an hour earlier: a dose due before an order's entry is not owed.
+        Carbon::setTestNow(Carbon::instance($nzMinute->subHour())->utc());
         $this->order = ClientMedication::query()->create([
             'client_id' => $this->client->id,
             'name' => 'Morning tablets',
@@ -80,6 +83,7 @@ class DoseSlotConcurrencyTest extends TestCase
             'active' => true,
             'state' => 'active',
         ]);
+        Carbon::setTestNow();
     }
 
     public function test_a_dose_recorded_while_the_generator_runs_waits_for_it_and_keeps_its_outcome(): void

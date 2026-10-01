@@ -40,7 +40,7 @@ import {
     MedicationDetailDialog,
     RejectOrderDialog,
 } from '@/pages/emar/_dialogs';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -196,7 +196,15 @@ export default function Medications(props: Props) {
         can,
     } = props;
 
-    const [activeTab, setActiveTab] = useState('all');
+    // ?tab= opens a tab directly (the dashboard's "waiting for the order
+    // check" links to Awaiting); anything else falls back to All.
+    const { url } = usePage();
+    const [activeTab, setActiveTab] = useState(() => {
+        const requested = new URLSearchParams(url.split('?')[1] ?? '').get(
+            'tab',
+        );
+        return MED_TABS.find((t) => t.id === requested)?.id ?? 'all';
+    });
     const [search, setSearch] = useState('');
     const [clientFilter, setClientFilter] = useState<number | null>(null);
     const [siteFilter, setSiteFilter] = useState<number | null>(

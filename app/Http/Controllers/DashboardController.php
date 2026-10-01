@@ -492,10 +492,10 @@ class DashboardController extends Controller
                 $user,
                 MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
             );
-            // NF-25: the same scheduled-dose counts as the eMAR dashboard —
-            // reader Sites, controlled concealment, the worker (NZ) day, and
-            // admin rate = given ÷ eligible scheduled doses (null = "n/a").
-            // Recorded-row counts were given ÷ recorded, and UTC-dated.
+            // NF-25 (C6a): the eMAR dashboard's dose numbers, from the
+            // dose-slot projection — reader Sites and the person rule, the
+            // NZ day, P09's admin rate = given ÷ due (null = "n/a"), and
+            // controlled doses counted for every reader.
             $doses = app(MedicationOverviewService::class)->doseSummary($user);
             $workerToday = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
             $alertQuery = $medicationScope->scopeCanonicalClientMedicationRows(

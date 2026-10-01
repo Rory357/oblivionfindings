@@ -124,7 +124,14 @@ final class DoseOrderHistoryReconstructor
             $pauses[] = [$pausedSince, null];
         }
 
-        return new DoseOrderTimeline((int) $order->id, $versions, $pauses, DoseOrderTimelineFactory::stoppedAt($order));
+        return new DoseOrderTimeline(
+            (int) $order->id,
+            $versions,
+            $pauses,
+            DoseOrderTimelineFactory::stoppedAt($order),
+            // Nothing due before the order was entered is owed.
+            DoseOrderTimelineFactory::rawInstant($order->getAttributes()['created_at'] ?? null),
+        );
     }
 
     /**
