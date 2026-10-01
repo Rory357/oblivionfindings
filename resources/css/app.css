@@ -53,6 +53,9 @@
 
     --color-primary: var(--primary);
     --color-primary-foreground: var(--primary-foreground);
+    --color-primary-strong: var(--primary-strong);
+    --color-primary-fill: var(--primary-fill);
+    --color-primary-fill-foreground: var(--primary-fill-foreground);
 
     --color-secondary: var(--secondary);
     --color-secondary-foreground: var(--secondary-foreground);
@@ -168,6 +171,27 @@
     --popover-foreground: oklch(0.15 0.015 277);
     --primary: var(--color-purple-600);
     --primary-foreground: oklch(1 0 0);
+    /* Derived only — follow whatever --primary resolves to on <html>
+       (default, org theme, or a personal accent's inline style).
+       --primary-strong: the brand no lighter than L 0.50, for brand text on
+       white (hero white buttons).
+       --primary-fill: solid fills that carry text (default buttons,
+       badges, tooltips). In light, brands light enough for ink text
+       (L ≥ 0.585) keep their exact colour; darker brands carry white text
+       and are never lighter than L 0.50, so white stays ≥ 4.5:1 on the base
+       and the highlight for every hue. .dark clamps every brand to 0.50.
+       --primary-fill-foreground: white or ink by the same 0.585 crossover.
+       Not --primary-foreground: that is also the text on the dark brand
+       sky, which must stay white for mid-light brands. */
+    --primary-strong: oklch(from var(--primary) min(l, 0.5) c h);
+    --primary-fill: oklch(
+        from var(--primary)
+            calc(l - clamp(0, (0.585 - l) * 1000, 1) * max(0, l - 0.5)) c h
+    );
+    --primary-fill-foreground: oklch(
+        from var(--primary-fill)
+            calc(0.15 + 0.85 * clamp(0, (0.585 - l) * 1000, 1)) 0 0
+    );
     --secondary: oklch(0.96 0.008 277);
     --secondary-foreground: oklch(0.2 0.015 277);
     --muted: oklch(0.96 0.006 277);
@@ -418,6 +442,10 @@
     --popover-foreground: oklch(0.95 0.005 277);
     --primary: oklch(0.65 0.2 277);
     --primary-foreground: oklch(1 0 0);
+    /* --primary stays light here because it is also text on dark surfaces;
+       text-bearing fills use the clamped shade instead, so the fill
+       foreground resolves to white (white on L ≤ 0.50 is ≥ 6:1). */
+    --primary-fill: var(--primary-strong);
     --secondary: oklch(0.2 0.015 277);
     --secondary-foreground: oklch(0.95 0.005 277);
     --muted: oklch(0.18 0.012 277);
@@ -570,35 +598,63 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 .btn-soft-secondary {
     border-radius: calc(var(--radius) - 2px);
     font-weight: 550;
-    transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+    transition:
+        background-color 0.16s ease,
+        border-color 0.16s ease,
+        box-shadow 0.16s ease,
+        transform 0.16s ease;
 }
 .btn-soft-primary {
-    background: linear-gradient(180deg, color-mix(in oklch, var(--primary) 82%, var(--primary-foreground)), var(--primary) 55%);
-    box-shadow: inset 0 1px 0 color-mix(in oklch, var(--primary-foreground) 25%, transparent), 0 1px 2px color-mix(in oklch, var(--primary) 50%, transparent), 0 4px 14px -4px color-mix(in oklch, var(--primary) 60%, transparent);
+    /* 90% (was 82%) keeps the highlight ≥ 4.5:1 under white text for every
+       hue on an L ≤ 0.50 fill (worst case: green, 4.57:1); mixed with white
+       (not the foreground) so it stays a highlight when a light brand takes
+       ink text. */
+    background: linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--primary-fill) 90%, oklch(1 0 0)),
+        var(--primary-fill) 55%
+    );
+    box-shadow:
+        inset 0 1px 0
+            color-mix(in oklch, var(--primary-foreground) 25%, transparent),
+        0 1px 2px color-mix(in oklch, var(--primary) 50%, transparent),
+        0 4px 14px -4px color-mix(in oklch, var(--primary) 60%, transparent);
 }
 .btn-soft-primary:hover:not(:disabled) {
-    box-shadow: inset 0 1px 0 color-mix(in oklch, var(--primary-foreground) 25%, transparent), 0 2px 4px color-mix(in oklch, var(--primary) 50%, transparent), 0 8px 20px -4px color-mix(in oklch, var(--primary) 65%, transparent);
+    box-shadow:
+        inset 0 1px 0
+            color-mix(in oklch, var(--primary-foreground) 25%, transparent),
+        0 2px 4px color-mix(in oklch, var(--primary) 50%, transparent),
+        0 8px 20px -4px color-mix(in oklch, var(--primary) 65%, transparent);
 }
 .btn-soft-secondary {
-    box-shadow: 0 1px 2px color-mix(in oklch, var(--foreground) 5%, transparent), inset 0 -1px 0 color-mix(in oklch, var(--foreground) 4%, transparent);
+    box-shadow:
+        0 1px 2px color-mix(in oklch, var(--foreground) 5%, transparent),
+        inset 0 -1px 0 color-mix(in oklch, var(--foreground) 4%, transparent);
 }
 .btn-soft-secondary:hover:not(:disabled) {
     border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
     box-shadow: 0 3px 8px color-mix(in oklch, var(--foreground) 8%, transparent);
 }
 @media (prefers-reduced-motion: no-preference) {
-    .btn-soft-primary:hover:not(:disabled), .btn-soft-secondary:hover:not(:disabled) { transform: translateY(-1px); }
-    .btn-soft-primary:active:not(:disabled), .btn-soft-secondary:active:not(:disabled) { transform: translateY(.5px); }
+    .btn-soft-primary:hover:not(:disabled),
+    .btn-soft-secondary:hover:not(:disabled) {
+        transform: translateY(-1px);
+    }
+    .btn-soft-primary:active:not(:disabled),
+    .btn-soft-secondary:active:not(:disabled) {
+        transform: translateY(0.5px);
+    }
 }
 
 /* Frontline actions retain a readable target even when a compact shared size is used. */
-    /* Clip decorative overflow without making the hero a hidden scroll area.
+/* Clip decorative overflow without making the hero a hidden scroll area.
        Focusing a tab must not scroll the title out of its own banner. */
-    .my-day-desktop .eh-header {
-        overflow: clip;
-    }
+.my-day-desktop .eh-header {
+    overflow: clip;
+}
 
-    .my-day-desktop [data-slot='button'],
+.my-day-desktop [data-slot='button'],
 .my-day-desktop [role='tab'] {
     min-height: 44px;
 }

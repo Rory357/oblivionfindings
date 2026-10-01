@@ -77,14 +77,41 @@ export function relativeLuminance(hex: string): number {
     );
 }
 
+export const INK_FOREGROUND = 'oklch(0.15 0.015 277)';
+export const WHITE_FOREGROUND = 'oklch(1 0 0)';
+
+/** Relative luminance of INK_FOREGROUND (≈ #090b12). */
+const INK_LUMINANCE = 0.00333;
+
+/** WCAG 2.1 contrast ratio between two relative luminances. */
+export function contrastRatio(a: number, b: number): number {
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
 /**
- * Pick black or white foreground for highest contrast against the given hex.
- * We output oklch strings to stay consistent with the rest of the token set.
+ * Pick the ink or white foreground with the higher WCAG contrast against the
+ * given hex. A fixed luminance cut-off (the old `> 0.5`) gave white text on
+ * mid-light brands such as #ea580c (3.56:1) where ink reaches 5.53:1; the
+ * real crossover is near luminance 0.18. Output is oklch, like the tokens.
  */
 export function pickForeground(hex: string): string {
-    return relativeLuminance(hex) > 0.5
-        ? 'oklch(0.15 0.015 277)'
-        : 'oklch(1 0 0)';
+    const luminance = relativeLuminance(hex);
+    return contrastRatio(1, luminance) >=
+        contrastRatio(INK_LUMINANCE, luminance)
+        ? WHITE_FOREGROUND
+        : INK_FOREGROUND;
+}
+
+/**
+ * Text for `--primary-foreground`, which is also the text on the brand sky
+ * (`.eh-header` and the hero kits). The sky's upper shades are fixed dark
+ * (L 0.30–0.42) whatever the brand, so its text stays white unless the brand
+ * itself is very light — the long-standing rule, kept so headers don't flip
+ * to ink for mid-light brands. Solid fills that carry text use
+ * `--primary-fill-foreground` instead, picked by contrast in app.css.
+ */
+export function skyForeground(hex: string): string {
+    return relativeLuminance(hex) > 0.5 ? INK_FOREGROUND : WHITE_FOREGROUND;
 }
 
 /**
@@ -96,16 +123,16 @@ export function pickForeground(hex: string): string {
  */
 export function derivePalette(brandHex: string): PaletteVars {
     const hex = normaliseHex(brandHex);
-    const fg = pickForeground(hex);
 
     return {
         '--primary': hex,
-        '--primary-foreground': fg,
+        '--primary-foreground': skyForeground(hex),
         '--accent': `color-mix(in oklch, ${hex} 15%, transparent)`,
         '--accent-foreground': hex,
         '--ring': hex,
         '--sidebar-primary': hex,
-        '--sidebar-primary-foreground': fg,
+        // The logo tile is a solid brand fill, so its text is picked by contrast.
+        '--sidebar-primary-foreground': pickForeground(hex),
         '--sidebar-ring': `color-mix(in oklch, ${hex} 70%, white 30%)`,
         '--chart-1': hex,
         '--chart-2': `oklch(from ${hex} l c calc(h + 150))`,
