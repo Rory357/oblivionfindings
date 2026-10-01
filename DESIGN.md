@@ -336,9 +336,16 @@ before.
   the tone with `variant="destructive"` on `<Button>` or `<AlertDialogAction>`;
   conditional tones use `variant={danger ? 'destructive' : 'default'}`.
   ESLint (`design/no-recoloured-primary-button`) blocks it. `unstyled`
-  Buttons are exempt because they skip the variant classes. Other tones on
-  the default variant (`bg-status-success` / `-warning` / `-info`) render
-  purple too; there is no variant for those yet.
+  Buttons are exempt because they skip the variant classes. Success,
+  warning and info recolours (`bg-status-success` / `-warning` / `-info`,
+  `bg-white`) render purple too, and there are deliberately **no** tone
+  variants for them (user decision 2026-09-30; white text on the dark
+  theme's status fills fails AA). Affirmative actions (Approve, Accept,
+  Complete) stay the default primary; a call to action inside an amber or
+  green status banner uses `variant="outline"`; info is already the primary
+  tone. A white button on the brand sky is `PageHeaderPrimaryButton`. ESLint
+  covers these tones too; the `bg-primary-foreground` hero buttons are the
+  same bug but are not yet covered.
 - **Ad-hoc `text-2xl`/`text-xl` headings** — use the typography helpers.
 - **`dark:` colour pairs on token-styled elements** — redundant and drifts.
 - **Pinning a fixed hue to a module** (e.g. `bg-purple-500` for HR) — use

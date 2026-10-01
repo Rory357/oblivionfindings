@@ -245,20 +245,12 @@ function RequestCard({
                 </div>
                 <div className="flex shrink-0 flex-col justify-center gap-1.5">
                     {can.bookingsManage && needsReview(r.status) ? (
-                        <Button
-                            size="sm"
-                            className="bg-status-success text-white hover:bg-status-success/90"
-                            onClick={() => onApprove(r)}
-                        >
+                        <Button size="sm" onClick={() => onApprove(r)}>
                             <CheckCircle2 className="h-3.5 w-3.5" /> Approve
                         </Button>
                     ) : null}
                     {can.bookingsManage && r.status === 'waitlisted' ? (
-                        <Button
-                            size="sm"
-                            className="bg-status-success text-white hover:bg-status-success/90"
-                            onClick={() => onPromote(r)}
-                        >
+                        <Button size="sm" onClick={() => onPromote(r)}>
                             <CheckCircle2 className="h-3.5 w-3.5" /> Promote
                         </Button>
                     ) : null}

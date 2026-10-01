@@ -124,11 +124,7 @@ export function OverrideConfirmationDialog({
                     >
                         Cancel
                     </Button>
-                    <Button
-                        onClick={handleConfirm}
-                        disabled={!canSubmit}
-                        className="bg-status-warning text-white hover:bg-status-warning dark:hover:bg-status-warning"
-                    >
+                    <Button onClick={handleConfirm} disabled={!canSubmit}>
                         {processing ? 'Assigning...' : 'Override & Assign'}
                     </Button>
                 </DialogFooter>

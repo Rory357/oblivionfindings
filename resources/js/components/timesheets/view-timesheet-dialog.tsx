@@ -709,7 +709,7 @@ export default function ViewTimesheetDialog({
                                     </Button>
                                     <Button
                                         size="sm"
-                                        className="gap-1.5 bg-status-success text-white hover:bg-status-success/90"
+                                        className="gap-1.5"
                                         onClick={() =>
                                             call(
                                                 'post',

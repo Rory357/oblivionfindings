@@ -131,11 +131,7 @@ export function MarTab({
                             Review alerts in the full eMAR dashboard.
                         </p>
                     </div>
-                    <Button
-                        size="sm"
-                        className="bg-status-warning text-primary-foreground hover:bg-status-warning"
-                        asChild
-                    >
+                    <Button size="sm" variant="outline" asChild>
                         <Link href={`/operations/clients/${clientId}/mar`}>
                             Review
                         </Link>
@@ -208,10 +204,7 @@ export function MarTab({
 
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-2">
-                <Button
-                    className="gap-1.5 bg-status-info hover:bg-status-info"
-                    asChild
-                >
+                <Button className="gap-1.5" asChild>
                     <Link href={`/operations/clients/${clientId}/mar`}>
                         <Pill className="h-3.5 w-3.5" />
                         Daily MAR

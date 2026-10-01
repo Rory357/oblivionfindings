@@ -232,7 +232,6 @@ function ReferralCard({
                     {can.update && r.status === 'triaged' ? (
                         <Button
                             size="sm"
-                            className="bg-status-success text-white hover:bg-status-success/90"
                             onClick={() => respiteActions.acceptReferral(r.id)}
                         >
                             <Check className="h-3.5 w-3.5" /> Accept
