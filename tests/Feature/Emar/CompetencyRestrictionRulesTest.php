@@ -226,15 +226,25 @@ class CompetencyRestrictionRulesTest extends TestCase
 
     public function test_only_an_organisation_wide_settings_manager_can_change_the_rules(): void
     {
-        $payload = [
+        $values = [
             'profile_allergy_match' => 'block',
             'restricted_competency' => 'cosigner',
             'competency_areas' => 'failed_or_not_seen',
         ];
+        $defaults = ['profile_allergy_match' => 'warn', 'restricted_competency' => 'off', 'competency_areas' => 'off'];
+        $payload = fn (array $values): array => [
+            'view' => 'rules',
+            'changes' => collect($values)->map(fn (string $value, string $key): array => [
+                'group' => 'safety',
+                'key' => $key,
+                'value' => $value,
+                'from' => $defaults[$key],
+            ])->values()->all(),
+        ];
 
         $siteManager = $this->siteStaff(['medications.settings.manage']);
         $this->actingAs($siteManager)
-            ->put('/emar/settings/safety-policy', $payload)
+            ->put('/emar/settings/changes', $payload($values))
             ->assertForbidden();
 
         $orgManager = $this->siteStaff(['medications.settings.manage', 'sites.viewAll']);
@@ -242,22 +252,22 @@ class CompetencyRestrictionRulesTest extends TestCase
             ->get('/emar/settings')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('safetyPolicy.reviewed', [
-                    'profile_allergy_match' => false,
-                    'restricted_competency' => false,
-                    'competency_areas' => false,
+                ->where('settings.reviewed.safety', [
+                    'profile_allergy_match' => null,
+                    'restricted_competency' => null,
+                    'competency_areas' => null,
                 ]));
 
         $this->actingAs($orgManager)
             ->from('/emar/settings')
-            ->put('/emar/settings/safety-policy', [...$payload, 'competency_areas' => 'always'])
-            ->assertSessionHasErrors('competency_areas');
+            ->put('/emar/settings/changes', $payload([...$values, 'competency_areas' => 'always']))
+            ->assertSessionHasErrors('changes.2.value');
 
         $this->actingAs($orgManager)
             ->from('/emar/settings')
-            ->put('/emar/settings/safety-policy', $payload)
+            ->put('/emar/settings/changes', $payload($values))
             ->assertRedirect('/emar/settings')
-            ->assertSessionHas('success');
+            ->assertSessionHas('medication_settings_saved', '3 changes saved. From the next dose signed, at every house.');
 
         $settings = app(MedicationSafetyPolicySettings::class);
         $this->assertSame('block', $settings->profileAllergyMatch());
@@ -274,13 +284,11 @@ class CompetencyRestrictionRulesTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('emar/Settings')
-                ->where('safetyPolicy.values', $payload)
-                ->where('safetyPolicy.reviewed', [
-                    'profile_allergy_match' => true,
-                    'restricted_competency' => true,
-                    'competency_areas' => true,
-                ])
-                ->where('safetyPolicy.can_manage', true));
+                ->where('settings.values.safety.profile_allergy_match', 'block')
+                ->where('settings.values.safety.restricted_competency', 'cosigner')
+                ->where('settings.values.safety.competency_areas', 'failed_or_not_seen')
+                ->where('settings.reviewed.safety.restricted_competency.by', $orgManager->name)
+                ->where('settings.can_manage_organisation', true));
     }
 
     // ─── Fixtures ────────────────────────────────────────────

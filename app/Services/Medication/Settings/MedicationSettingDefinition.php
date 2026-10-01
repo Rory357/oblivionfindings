@@ -1,0 +1,124 @@
+<?php
+
+namespace App\Services\Medication\Settings;
+
+/**
+ * One Medication Settings value (eMAR P11): where it is stored, the values it
+ * accepts with the words the change history uses for each, its default, and
+ * which changes loosen a check.
+ *
+ * Loosening is one rule for the whole page (P11 v5 AUDIT §5): the same
+ * definition decides the destructive confirmation before saving, the label in
+ * the change history and the "loosens a check" warning when an earlier value
+ * is put back. The page receives it through toClient().
+ */
+final class MedicationSettingDefinition
+{
+    public const SCOPE_ORGANISATION = 'organisation';
+
+    public const SCOPE_SITE = 'site';
+
+    public const HIGHER_IS_LOOSER = 'higher_is_looser';
+
+    public const HIGHER_IS_STRICTER = 'higher_is_stricter';
+
+    /**
+     * `$rank` lists option values from loosest to strictest. `$numeric` is for
+     * number values: whether a higher number is looser, which value means
+     * "off", and whether switching off is the loosest choice.
+     *
+     * @param  array<string, string>  $options  Accepted value => the words for it.
+     * @param  list<string>|null  $rank
+     * @param  array{direction: string, off: string|null, off_is_loosest: bool}|null  $numeric
+     */
+    public function __construct(
+        public readonly string $group,
+        public readonly string $key,
+        public readonly string $storageKey,
+        public readonly string $scope,
+        public readonly string $section,
+        public readonly string $label,
+        public readonly array $options,
+        public readonly string $default,
+        public readonly ?array $rank = null,
+        public readonly ?array $numeric = null,
+    ) {}
+
+    public function id(): string
+    {
+        return $this->group.'.'.$this->key;
+    }
+
+    public function isSiteScoped(): bool
+    {
+        return $this->scope === self::SCOPE_SITE;
+    }
+
+    public function accepts(mixed $value): bool
+    {
+        return is_string($value) && array_key_exists($value, $this->options);
+    }
+
+    /** A stored value the setting no longer accepts reads as its default. */
+    public function normalise(mixed $value): string
+    {
+        return $this->accepts($value) ? $value : $this->default;
+    }
+
+    public function format(string $value): string
+    {
+        return $this->options[$value] ?? $value;
+    }
+
+    /** Does changing from one value to another turn a check off or make it less strict? */
+    public function loosens(string $from, string $to): bool
+    {
+        if ($from === $to) {
+            return false;
+        }
+
+        if ($this->rank !== null) {
+            $before = array_search($from, $this->rank, true);
+            $after = array_search($to, $this->rank, true);
+
+            return $before !== false && $after !== false && $after < $before;
+        }
+
+        if ($this->numeric !== null) {
+            $off = $this->numeric['off'];
+            if ($from !== $off && $to === $off) {
+                return $this->numeric['off_is_loosest'];
+            }
+            // Switching a check on is never looser.
+            if ($from === $off || ! is_numeric($from) || ! is_numeric($to)) {
+                return false;
+            }
+            $difference = (float) $to - (float) $from;
+
+            return $this->numeric['direction'] === self::HIGHER_IS_LOOSER
+                ? $difference > 0
+                : $difference < 0;
+        }
+
+        return false;
+    }
+
+    /** @return array<string, mixed> */
+    public function toClient(): array
+    {
+        return [
+            'group' => $this->group,
+            'key' => $this->key,
+            'scope' => $this->scope,
+            'section' => $this->section,
+            'label' => $this->label,
+            'options' => collect($this->options)
+                ->map(fn (string $label, string $value): array => ['value' => (string) $value, 'label' => $label])
+                ->values()
+                ->all(),
+            'default' => $this->default,
+            'rank' => $this->rank,
+            'numeric' => $this->numeric,
+        ];
+    }
+}

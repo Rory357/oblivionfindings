@@ -284,10 +284,11 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::post('/settings/rules', [MedicationSettingsController::class, 'store'])->name('emar.settings.rules.store');
         Route::put('/settings/rules/{rule}', [MedicationSettingsController::class, 'update'])->name('emar.settings.rules.update');
         Route::delete('/settings/rules/{rule}', [MedicationSettingsController::class, 'destroy'])->name('emar.settings.rules.destroy');
-        // Organisation-wide safety rules (EM-07 profile allergies, NF-03 competency).
-        Route::put('/settings/safety-policy', [MedicationSettingsController::class, 'updateSafetyPolicy'])->name('emar.settings.safety_policy.update');
-        // Witness PIN rules (PIN-1): attempt limit, lockout, renewal.
-        Route::put('/settings/witness-pin-rules', [MedicationSettingsController::class, 'updateWitnessPinRules'])->name('emar.settings.witness_pin_rules.update');
+        // P11: save one Settings view's draft (safety checks, witness PIN rules, …),
+        // and "Keep today's value" for defaults nobody has reviewed. Both are
+        // recorded in the change history and the audit log.
+        Route::put('/settings/changes', [MedicationSettingsController::class, 'saveChanges'])->name('emar.settings.changes.save');
+        Route::post('/settings/keep', [MedicationSettingsController::class, 'keepDefaults'])->name('emar.settings.keep');
     });
 
     // ─── End CRUD Routes ────────────────────────────────────

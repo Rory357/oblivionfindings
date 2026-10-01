@@ -439,18 +439,20 @@ class WitnessPinTest extends TestCase
         $this->assertTrue($lead->canDo('medications.witness_pin.reset'));
         $this->assertFalse($colleague->canDo('medications.witness_pin.reset'));
 
-        // A house lead sees only the second-person section, with status only.
+        // A house lead sees only Staff & PINs, read-only apart from resets,
+        // with no change history and no medicine rules.
         $this->actingAs($lead)
             ->get('/emar/settings')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('emar/Settings')
                 ->where('settingsAccess', false)
-                ->where('safetyPolicy', null)
+                ->where('rules', [])
+                ->where('settings.history', [])
+                ->where('settings.can_manage_organisation', false)
                 ->where('witnessPin.can_reset', true)
-                ->where('witnessPin.can_manage', false)
-                ->where('witnessPin.values', ['max_attempts' => '5', 'lockout_minutes' => '15', 'renewal_months' => 'none'])
-                ->where('witnessPin.reviewed', ['max_attempts' => false, 'lockout_minutes' => false, 'renewal_months' => false])
+                ->where('settings.values.pin', ['max_attempts' => '5', 'lockout_minutes' => '15', 'renewal_months' => 'none'])
+                ->where('settings.reviewed.pin', ['max_attempts' => null, 'lockout_minutes' => null, 'renewal_months' => null])
                 ->where('witnessPin.staff', fn ($rows) => collect($rows)->pluck('id')->contains($worker->id)
                     && ! collect($rows)->pluck('id')->contains($elsewhere->id)
                     && ! collect($rows)->pluck('id')->contains($lead->id)
@@ -497,22 +499,32 @@ class WitnessPinTest extends TestCase
 
     public function test_only_an_organisation_wide_settings_manager_saves_the_pin_rules(): void
     {
-        $payload = ['max_attempts' => '3', 'lockout_minutes' => '30', 'renewal_months' => '12'];
+        $values = ['max_attempts' => '3', 'lockout_minutes' => '30', 'renewal_months' => '12'];
+        $defaults = ['max_attempts' => '5', 'lockout_minutes' => '15', 'renewal_months' => 'none'];
+        $payload = fn (array $values): array => [
+            'view' => 'staff',
+            'changes' => collect($values)->map(fn (string $value, string $key): array => [
+                'group' => 'pin',
+                'key' => $key,
+                'value' => $value,
+                'from' => $defaults[$key],
+            ])->values()->all(),
+        ];
 
         $siteManager = $this->siteStaff('support_worker', ['medications.settings.manage']);
         $this->actingAs($siteManager)
-            ->put('/emar/settings/witness-pin-rules', $payload)
+            ->put('/emar/settings/changes', $payload($values))
             ->assertForbidden();
 
         $orgManager = $this->siteStaff('support_worker', ['medications.settings.manage', 'sites.viewAll']);
         $this->actingAs($orgManager)
             ->from('/emar/settings')
-            ->put('/emar/settings/witness-pin-rules', [...$payload, 'max_attempts' => '99'])
-            ->assertSessionHasErrors('max_attempts');
+            ->put('/emar/settings/changes', $payload([...$values, 'max_attempts' => '99']))
+            ->assertSessionHasErrors('changes.0.value');
 
         $this->actingAs($orgManager)
             ->from('/emar/settings')
-            ->put('/emar/settings/witness-pin-rules', $payload)
+            ->put('/emar/settings/changes', $payload($values))
             ->assertSessionHasNoErrors();
 
         $settings = app(WitnessPinSettings::class);
@@ -521,16 +533,17 @@ class WitnessPinTest extends TestCase
         $this->assertSame(12, $settings->renewalMonths());
         $audit = AuditLog::query()->where('action', 'medications.witness_pin_rules.updated')->sole();
         // JSON columns don't keep key order, so compare by key.
-        $this->assertEquals(['max_attempts' => '5', 'lockout_minutes' => '15', 'renewal_months' => 'none'], $audit->meta['before']);
-        $this->assertEquals($payload, $audit->meta['after']);
+        $this->assertEquals($defaults, $audit->meta['before']);
+        $this->assertEquals($values, $audit->meta['after']);
 
         $this->actingAs($orgManager)
             ->get('/emar/settings')
             ->assertInertia(fn (Assert $page) => $page
                 ->where('settingsAccess', true)
-                ->where('witnessPin.can_manage', true)
-                ->where('witnessPin.values', $payload)
-                ->where('witnessPin.reviewed', ['max_attempts' => true, 'lockout_minutes' => true, 'renewal_months' => true]));
+                ->where('settings.can_manage_organisation', true)
+                ->where('settings.values.pin', $values)
+                ->where('settings.reviewed.pin.max_attempts.by', $orgManager->name)
+                ->where('settings.reviewed.pin.renewal_months.by', $orgManager->name));
     }
 
     public function test_staff_see_the_witness_pin_setting_and_leads_see_reset(): void
