@@ -713,6 +713,13 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->everyFifteenMinutes();
 
+// Keep dose slots generated for today and the next two NZ days (P01 C3): hourly
+app(Schedule::class)
+    ->command('emar:generate-dose-slots')
+    ->timezone('Pacific/Auckland')
+    ->hourlyAt(5)
+    ->withoutOverlapping();
+
 // Generate medication chart review, medicine review, and INR due alerts: daily
 app(Schedule::class)
     ->command('emar:check-medication-reviews')

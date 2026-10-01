@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\Medication\DoseSlots\DoseSlotOutcomeWriter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,27 @@ class ClientMedicationAdministration extends Model
     use AuditableChanges;
     use HasFactory;
     use SoftDeletes;
+
+    /**
+     * P01 foundation C3: every write that can change a dose's effective
+     * evidence updates its slot's outcome in the same transaction.
+     */
+    protected static function booted(): void
+    {
+        $sync = static fn (self $administration) => app(DoseSlotOutcomeWriter::class)->syncFor($administration);
+        // The order row before this row: the lock order every medication
+        // write uses (client → order → administration → slots).
+        $lockOrder = static fn (self $administration) => app(DoseSlotOutcomeWriter::class)->lockOrderOf($administration);
+
+        static::saving($lockOrder);
+        static::deleting($lockOrder);
+        static::restoring($lockOrder);
+        static::forceDeleting($lockOrder);
+        static::saved($sync);
+        static::deleted($sync);
+        static::restored($sync);
+        static::forceDeleted($sync);
+    }
 
     public const ADMINISTRATION_ONLY_EVIDENCE_FIELDS = [
         'blood_glucose_level',
