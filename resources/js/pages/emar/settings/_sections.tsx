@@ -395,6 +395,32 @@ export function WitnessPins({
                         />
                     </GroupRow>
                 </SettingGroup>
+                {/* Who may reset is a permission today (Settings › Roles); it becomes a
+                    setting with its enforcement (chunk 5), so this group only explains it. */}
+                <SettingGroup
+                    id="reset"
+                    icon={RefreshCw}
+                    title="Who can reset a PIN"
+                    caption="A reset never shows or sets the PIN"
+                >
+                    <GroupRow
+                        id="pr-reset"
+                        label="Who can reset another person’s PIN"
+                        hint="The owner must choose a new PIN before they can co-sign or witness."
+                        hidden={
+                            show !== 'all' ||
+                            !match(q, 'Who can reset another person’s PIN')
+                        }
+                    >
+                        <p className="text-subtle">
+                            People with the “Reset another person’s witness PIN”
+                            permission — house leads and clinical leads by
+                            default. A house lead can’t reset another lead’s or
+                            an all-sites user’s PIN. Change it in Settings ›
+                            Roles.
+                        </p>
+                    </GroupRow>
+                </SettingGroup>
             </GroupGrid>
         </Section>
     );

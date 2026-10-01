@@ -81,6 +81,8 @@ type Props = MedicineRuleProps & {
     witnessPin: WitnessPinProps;
     /** false = a house lead who can only reset PINs sees Staff & PINs, read-only. */
     settingsAccess: boolean;
+    /** An auditor: every view and the change history, read-only (P11 answer 6). */
+    readOnlyAudit: boolean;
 };
 
 const VIEW_ICON: Record<ViewKey, LucideIcon> = {
@@ -133,7 +135,7 @@ const DirtyDot = () => (
 );
 
 export default function EmarSettings(props: Props) {
-    const { settings: s, witnessPin, settingsAccess } = props;
+    const { settings: s, witnessPin, settingsAccess, readOnlyAudit } = props;
     const built: Built = useMemo(
         () => ({
             rules: settingsAccess ? ['medicines', 'safety'] : [],
@@ -262,11 +264,13 @@ export default function EmarSettings(props: Props) {
         });
     const viewGroups = Object.values(s.groups).filter((g) => g.view === view);
     const editable = viewGroups.some((g) => canEdit(g.key));
-    const accessText = !settingsAccess
-        ? 'Read-only · you can reset witness PINs'
-        : s.can_manage_organisation
-          ? 'All-sites authority · every setting'
-          : `House settings for ${props.sites.map((x) => x.name).join(' and ') || 'no houses'} · organisation rules read-only`;
+    const accessText = readOnlyAudit
+        ? 'Read-only for audit'
+        : !settingsAccess
+          ? 'Read-only · you can reset witness PINs'
+          : s.can_manage_organisation
+            ? 'All-sites authority · every setting'
+            : `House settings for ${props.sites.map((x) => x.name).join(' and ') || 'no houses'} · organisation rules read-only`;
     const select = (
         label: string,
         value: string,
@@ -544,7 +548,9 @@ export default function EmarSettings(props: Props) {
                             readOnly={
                                 editable
                                     ? undefined
-                                    : 'Only someone who manages medication settings for all houses can change these.'
+                                    : readOnlyAudit
+                                      ? 'Read-only — auditors can view settings and their history, not change them.'
+                                      : 'Only someone who manages medication settings for all houses can change these.'
                             }
                         />
                     ) : null}

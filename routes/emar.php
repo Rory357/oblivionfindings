@@ -273,9 +273,10 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // ─── Facility Medication Admin Rules (1CHART §6.1 — countersign / observation prompts) ───
     // House leads with the PIN reset permission reach the settings page for the
-    // second-person confirmation section only (PIN-1).
+    // second-person confirmation section only (PIN-1); auditors read every
+    // setting and its change history, read-only (P11 answer 6).
     Route::get('/settings', [MedicationSettingsController::class, 'index'])
-        ->middleware('permission:medications.settings.manage|medications.witness_pin.reset')
+        ->middleware('permission:medications.settings.manage|medications.witness_pin.reset|medications.audit.view')
         ->name('emar.settings');
     Route::post('/settings/witness-pins/{user}/reset', [MedicationSettingsController::class, 'resetWitnessPin'])
         ->middleware('permission:medications.witness_pin.reset')

@@ -321,10 +321,13 @@ class MedicationSettingsController extends Controller
         $actor = $request->user();
         $canResetPins = (bool) $actor?->canDo('medications.witness_pin.reset');
         $canManage = $this->canManageSettings($actor);
-        abort_unless($canManage || $canResetPins, 403);
+        // P11 answer 6: auditors read Settings and its change history, never change it.
+        $readOnlyAudit = ! $canManage && (bool) $actor?->canDo('medications.audit.view');
+        $canView = $canManage || $readOnlyAudit;
+        abort_unless($canView || $canResetPins, 403);
 
         $canManageGlobal = $this->canManageGlobalRules($actor);
-        $siteIds = $canManage ? $this->accessibleSiteIds($actor) : [];
+        $siteIds = $canView ? $this->accessibleSiteIds($actor) : [];
         $settings = [
             ...$this->settingsRegistry->toClient(),
             'values' => $this->settingsStore->organisationValues(),
@@ -333,7 +336,7 @@ class MedicationSettingsController extends Controller
             'site_values' => $this->settingsStore->siteValues($siteIds),
             'site_reviewed' => $this->settingsStore->siteReviewed($siteIds),
             // Organisation-wide changes, plus changes at the houses this person can see.
-            'history' => $canManage ? $this->settingsStore->history($canManageGlobal ? null : $siteIds) : [],
+            'history' => $canView ? $this->settingsStore->history($canManageGlobal ? null : $siteIds) : [],
             'can_manage_organisation' => $canManage && $canManageGlobal,
         ];
         $witnessPin = [
@@ -343,11 +346,12 @@ class MedicationSettingsController extends Controller
 
         // House leads can reset staff PINs without managing medication rules:
         // they see only Staff & PINs, read-only apart from resets.
-        if (! $canManage) {
+        if (! $canView) {
             return Inertia::render('emar/Settings', [
                 'settings' => $settings,
                 'witnessPin' => $witnessPin,
                 'settingsAccess' => false,
+                'readOnlyAudit' => false,
                 'rules' => [],
                 'sites' => [],
                 'observationOptions' => self::OBSERVATION_OPTIONS,
@@ -356,7 +360,8 @@ class MedicationSettingsController extends Controller
             ]);
         }
 
-        $rules = $this->visibleRulesQuery($actor, $siteIds, $canManageGlobal)
+        // Auditors also read the organisation-wide rules; they change nothing.
+        $rules = $this->visibleRulesQuery($actor, $siteIds, $canManageGlobal || $readOnlyAudit)
             ->with(['site:id,name', 'creator:id,name'])
             ->orderByDesc('active')
             ->orderBy('match_type')
@@ -379,6 +384,7 @@ class MedicationSettingsController extends Controller
             'settings' => $settings,
             'witnessPin' => $witnessPin,
             'settingsAccess' => true,
+            'readOnlyAudit' => $readOnlyAudit,
             'rules' => $rules,
             'sites' => Site::query()
                 ->whereIn('id', $siteIds)
@@ -387,8 +393,8 @@ class MedicationSettingsController extends Controller
             'observationOptions' => self::OBSERVATION_OPTIONS,
             'matchTypes' => self::MATCH_TYPES,
             'can' => [
-                'manage' => $canManageGlobal || $siteIds !== [],
-                'manage_global' => $canManageGlobal,
+                'manage' => $canManage && ($canManageGlobal || $siteIds !== []),
+                'manage_global' => $canManage && $canManageGlobal,
             ],
         ]);
     }

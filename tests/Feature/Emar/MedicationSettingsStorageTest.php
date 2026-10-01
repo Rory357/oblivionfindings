@@ -276,6 +276,39 @@ class MedicationSettingsStorageTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->has('settings.history', 2));
     }
 
+    public function test_history_words_come_only_from_the_setting_definitions(): void
+    {
+        // The change history is readable by everyone who can open Settings, so
+        // its before/after text must never carry a client, a medicine or any
+        // controlled-medicine detail: it is built only from each setting's
+        // fixed option words.
+        $manager = $this->organisationManager();
+        $this->actingAs($manager)
+            ->put('/emar/settings/changes', $this->save('rules', [
+                ['safety', 'restricted_competency', 'cosigner', 'off'],
+                ['safety', 'competency_areas', 'failed_or_not_seen', 'off'],
+            ]))
+            ->assertSessionHasNoErrors();
+        $this->actingAs($manager)
+            ->put('/emar/settings/changes', $this->save('staff', [['pin', 'renewal_months', '6', 'none']]))
+            ->assertSessionHasNoErrors();
+        $this->actingAs($manager)
+            ->post('/emar/settings/keep', ['items' => [['group' => 'safety', 'key' => 'profile_allergy_match']]])
+            ->assertSessionHasNoErrors();
+
+        $registry = app(MedicationSettingsRegistry::class);
+        $changes = MedicationSettingChange::query()->get();
+        $this->assertCount(4, $changes);
+        foreach ($changes as $change) {
+            $definition = $registry->definition($change->setting_group, $change->setting_key);
+            $words = array_values($definition->options);
+            $allowed = [...$words, MedicationSettingsStore::NOT_YET_REVIEWED, ...array_map(fn (string $w): string => 'Kept: '.$w, $words)];
+            $this->assertContains($change->before_text, $allowed);
+            $this->assertContains($change->after_text, $allowed);
+            $this->assertSame($definition->label, $change->label);
+        }
+    }
+
     // ─── Fixtures ────────────────────────────────────────────
 
     /**
