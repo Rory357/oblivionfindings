@@ -11,7 +11,8 @@ use InvalidArgumentException;
 /**
  * The read side of the dose-slot projection (P01 foundation C4): one
  * definition of a scheduled dose and its state for every screen and report.
- * No screen reads it yet (C6).
+ * Read by the eMAR dashboard and the /dashboard widget (C6a); other
+ * screens move onto it in later C6 steps.
  *
  * Live state is worked out in SQL against a bound `now` — never the database
  * clock, never stored — so it can't go stale:
@@ -40,6 +41,12 @@ final class DoseSlotProjection
     public const STATE_NOT_RECORDED = 'not_recorded';
 
     public const STATE_SELF_MANAGED = 'self_managed';
+
+    /** Every state a slot can read as: its recorded outcome, else its live state. */
+    public const STATES = [
+        'given', 'refused', 'withheld', 'missed', 'away',
+        self::STATE_NOT_DUE, self::STATE_DUE, self::STATE_LATE, self::STATE_NOT_RECORDED, self::STATE_SELF_MANAGED,
+    ];
 
     private const GROUPS = ['nz_date', 'client_id'];
 
@@ -149,6 +156,47 @@ final class DoseSlotProjection
                 ($group === 'nz_date' ? substr((string) $row->grp, 0, 10) : (int) $row->grp) => self::totalsFrom($row),
             ])
             ->all();
+    }
+
+    /**
+     * How many slots are in each live state — the day view's counts (C6):
+     * every slot, whether or not its window has ended. Recorded slots count
+     * by outcome (given, refused, withheld, missed, away); the rest by state
+     * (not_due, due, late, not_recorded, self_managed). Controlled doses are
+     * included for every reader, as in totals(). Optionally per NZ day or
+     * per person.
+     *
+     * @return array<string, int>|array<string|int, array<string, int>>
+     */
+    public function stateCounts(DoseSlotReaderScope $scope, string $from, string $to, CarbonImmutable $now, ?string $group = null): array
+    {
+        if ($group !== null && ! in_array($group, self::GROUPS, true)) {
+            throw new InvalidArgumentException('Dose state counts group by one of: '.implode(', ', self::GROUPS).'.');
+        }
+
+        $empty = array_fill_keys(self::STATES, 0);
+        $query = DB::query()
+            ->fromSub($this->base($scope, $from, $to, $now), 'slots')
+            ->selectRaw('state, COUNT(*) as n')
+            ->groupBy('state');
+        if ($group === null) {
+            $counts = $empty;
+            foreach ($query->get() as $row) {
+                $counts[(string) $row->state] = ($counts[(string) $row->state] ?? 0) + (int) $row->n;
+            }
+
+            return $counts;
+        }
+
+        $grouped = [];
+        foreach ($query->selectRaw("{$group} as grp")->groupBy($group)->get() as $row) {
+            $key = $group === 'nz_date' ? substr((string) $row->grp, 0, 10) : (int) $row->grp;
+            $grouped[$key] ??= $empty;
+            $grouped[$key][(string) $row->state] = ($grouped[$key][(string) $row->state] ?? 0) + (int) $row->n;
+        }
+        ksort($grouped);
+
+        return $grouped;
     }
 
     /**

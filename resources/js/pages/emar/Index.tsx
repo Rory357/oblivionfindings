@@ -131,11 +131,22 @@ type Stats = {
     givenTrend: number[];
 };
 
+// From the dose-slot projection (P09): rate is null when nothing was due
+// ("Not applicable"); a day before the projection's coverage is not
+// available, so its numbers are null rather than 0.
 type ComplianceDay = {
     day: string;
-    rate: number;
-    given: number;
-    total: number;
+    rate: number | null;
+    given: number | null;
+    total: number | null;
+    available: boolean;
+};
+type DoseCoverage = {
+    available_from: string;
+    // For the 7-day trend window, and for the selected day.
+    notice: string | null;
+    day_available: boolean;
+    day_notice: string | null;
 };
 type OutcomeSegment = {
     key: string;
@@ -233,6 +244,7 @@ type Props = {
     nowLabel: string;
     stats: Stats;
     complianceTrend: ComplianceDay[];
+    doseCoverage: DoseCoverage;
     outcomeBreakdown: OutcomeBreakdown;
     codedNotGivenReasons: CodedReason[];
     actionCentre: ActionItem[];
@@ -438,6 +450,7 @@ export default function EmarHome(props: Props) {
         nowLabel,
         stats,
         complianceTrend,
+        doseCoverage,
         outcomeBreakdown,
         codedNotGivenReasons,
         actionCentre,
@@ -490,13 +503,17 @@ export default function EmarHome(props: Props) {
     // Witnesses for the reused RecordDoseWizard, excluding the signer.
     const recordWitnesses = witnesses.filter((w) => w.id !== currentUserId);
 
-    // Compliance delta across the 7-day window (for the card pill + the chart caption).
+    // Compliance delta across the 7-day window (for the card pill + the chart
+    // caption): first to last day that had a rate (a day with nothing due,
+    // or not yet available, has none).
+    const ratedDays = complianceTrend.filter(
+        (d): d is ComplianceDay & { rate: number } => d.rate !== null,
+    );
     const complianceDelta =
-        complianceTrend.length >= 2
+        ratedDays.length >= 2
             ? Number(
                   (
-                      complianceTrend[complianceTrend.length - 1].rate -
-                      complianceTrend[0].rate
+                      ratedDays[ratedDays.length - 1].rate - ratedDays[0].rate
                   ).toFixed(1),
               )
             : 0;
@@ -802,19 +819,26 @@ export default function EmarHome(props: Props) {
                     }
                     description={
                         <span>
-                            {stats.totalToday} dose
-                            {stats.totalToday === 1 ? '' : 's'} scheduled across{' '}
-                            {siteNames.length || 1} site
-                            {siteNames.length === 1 ? '' : 's'}. {stats.dueNow}{' '}
-                            due now
-                            {stats.overdue > 0
-                                ? ` (${stats.overdue} overdue)`
-                                : ''}{' '}
-                            and{' '}
-                            {stats.adminRate === null
-                                ? 'no doses due yet'
-                                : `${stats.adminRate}% of due doses given so far`}
-                            .{' '}
+                            {doseCoverage.day_available ? (
+                                <>
+                                    {stats.totalToday} dose
+                                    {stats.totalToday === 1 ? '' : 's'}{' '}
+                                    scheduled across {siteNames.length || 1}{' '}
+                                    site
+                                    {siteNames.length === 1 ? '' : 's'}.{' '}
+                                    {stats.dueNow} due now
+                                    {stats.overdue > 0
+                                        ? ` (${stats.overdue} overdue)`
+                                        : ''}{' '}
+                                    and{' '}
+                                    {stats.adminRate === null
+                                        ? 'no doses due yet'
+                                        : `${stats.adminRate}% of due doses given so far`}
+                                    .{' '}
+                                </>
+                            ) : (
+                                <>Dose numbers: {doseCoverage.day_notice}. </>
+                            )}
                             {can.view_controlled ? (
                                 <>
                                     {stats.activeDiscrepancies} controlled-drug
@@ -1314,6 +1338,9 @@ export default function EmarHome(props: Props) {
                                 </div>
                                 <p className="text-[11px] text-muted-foreground">
                                     95% target line
+                                    {doseCoverage.notice
+                                        ? ` · ${doseCoverage.notice}`
+                                        : ''}
                                 </p>
                             </CardContent>
                         </Card>
