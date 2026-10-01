@@ -57,7 +57,7 @@ export function PendingAssessmentNotice({
                 </div>
                 <Button
                     size="sm"
-                    className="ml-auto shrink-0"
+                    className="frontline-tap ml-auto shrink-0"
                     onClick={() => setOpen(true)}
                 >
                     Read and acknowledge
@@ -112,10 +112,19 @@ export function AcknowledgeAssessment({
             onClose={onClose}
             footer={
                 <>
-                    <Button variant="outline" onClick={onClose}>
+                    {/* Support workers tap these on shift: 44 px targets (Rory, P11). */}
+                    <Button
+                        variant="outline"
+                        className="frontline-tap"
+                        onClick={onClose}
+                    >
                         Cancel
                     </Button>
-                    <Button onClick={acknowledge} disabled={saving}>
+                    <Button
+                        className="frontline-tap"
+                        onClick={acknowledge}
+                        disabled={saving}
+                    >
                         Acknowledge
                     </Button>
                 </>
@@ -169,6 +178,7 @@ export function AcknowledgeAssessment({
                 <span className="inline-flex items-center gap-3">
                     <Switch
                         id="ack-tick"
+                        className="frontline-hit"
                         checked={on}
                         aria-invalid={err || undefined}
                         onCheckedChange={(v) => {
