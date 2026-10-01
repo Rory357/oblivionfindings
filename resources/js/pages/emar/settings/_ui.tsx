@@ -181,6 +181,18 @@ export function Section({
 }
 
 /** The alert description is a grid, so mixed text and <b> are wrapped in one span. */
+/** Label and value pairs in two columns (v5 `KV`), for "How … works" cards. */
+export const KV = ({ rows }: { rows: [string, ReactNode][] }) => (
+    <dl className="grid gap-x-6 gap-y-2 text-[13px] sm:grid-cols-[minmax(160px,240px)_1fr]">
+        {rows.map(([k, v]) => (
+            <div key={k} className="contents">
+                <dt className="text-muted-foreground">{k}</dt>
+                <dd className="m-0">{v}</dd>
+            </div>
+        ))}
+    </dl>
+);
+
 export const Note = ({ children }: { children: ReactNode }) => (
     <SettingsNotice role="note">
         <span>{children}</span>

@@ -33,6 +33,10 @@ return [
         'Rostering' => [
             'shift_task_due',
         ],
+        // eMAR P11: always in the app; push when the person turns it on.
+        'Medication' => [
+            'medications.witness_pin_reminder',
+        ],
         'Audit & Safety' => [
             'breakglass.daily_report',
             'incidents.high_unreviewed_reminder',

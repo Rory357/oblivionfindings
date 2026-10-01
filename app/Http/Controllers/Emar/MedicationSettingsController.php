@@ -9,6 +9,9 @@ use App\Models\ClientMedication;
 use App\Models\MedicationAdminRule;
 use App\Models\Site;
 use App\Models\User;
+use App\Models\WitnessPinReminder;
+use App\Notifications\WitnessPinReminderNotification;
+use App\Services\AuditLogger;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\RoundTemplateCatalogue;
 use App\Services\Medication\Settings\MedicationSettingDefinition;
@@ -129,6 +132,15 @@ class MedicationSettingsController extends Controller
 
         $items = $this->resolveSettings($validated['items'], 'items');
         $this->assertSettingsAuthority($actor, $items);
+        // A setting that isn't configured has no value today to keep: someone
+        // chooses one (P11 v5 "Not configured").
+        foreach ($items as $index => $item) {
+            if ($item['definition']->whenNotConfigured !== null) {
+                throw ValidationException::withMessages([
+                    "items.$index.key" => '“'.$item['definition']->label.'” isn’t configured — choose a value instead.',
+                ]);
+            }
+        }
 
         $kept = DB::transaction(function () use ($actor, $items): int {
             $lockedActor = $this->lockCurrentRuleActor($actor);
@@ -231,6 +243,81 @@ class MedicationSettingsController extends Controller
     }
 
     /**
+     * Remind people to set a witness PIN (P11 PIN status): an in-app reminder,
+     * plus push if they've set it up, opening their account › Witness PIN.
+     * Only people with no usable PIN (not set, or reset) are reminded, by
+     * someone who could reset their PIN, at most once a day each. Audited.
+     */
+    public function remindWitnessPins(Request $request)
+    {
+        $actor = $request->user();
+        abort_unless($actor?->canDo('medications.witness_pin.reset'), 403);
+        $validated = $request->validate([
+            'user_ids' => ['required', 'array', 'min:1', 'max:'.self::WITNESS_PIN_STAFF_LIMIT],
+            'user_ids.*' => ['integer', 'min:1', 'distinct'],
+        ]);
+        $ids = array_values(array_map('intval', $validated['user_ids']));
+        abort_if(in_array((int) $actor->id, $ids, true), 403);
+
+        // Anyone outside the people this person can see is not there to remind.
+        $targets = $this->witnessPinStaffQuery($actor)?->whereKey($ids)->get(['id', 'name', 'approved_at', 'role']) ?? collect();
+        abort_unless($targets->count() === count($ids) && $targets->every(fn (User $user): bool => $this->isSecondPerson($user)), 404);
+        abort_unless($targets->every(fn (User $user): bool => $this->canResetPinOf($actor, $user)), 403);
+
+        $result = DB::transaction(function () use ($actor, $targets, $ids): array {
+            // One reminder a day each, even when two people press at once.
+            User::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get(['id']);
+            $statuses = $this->witnessPins->statuses($ids);
+            $startOfToday = now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay()->utc();
+            $remindedToday = WitnessPinReminder::query()
+                ->whereIn('user_id', $ids)
+                ->where('created_at', '>=', $startOfToday)
+                ->pluck('user_id')
+                ->map(fn ($id): int => (int) $id)
+                ->flip();
+
+            $sent = [];
+            $already = [];
+            $hasPin = [];
+            foreach ($targets as $target) {
+                if (! in_array($statuses[(int) $target->id] ?? null, [WitnessPinService::STATUS_NOT_SET, WitnessPinService::STATUS_RESET], true)) {
+                    $hasPin[] = $target;
+                } elseif ($remindedToday->has((int) $target->id)) {
+                    $already[] = $target;
+                } else {
+                    WitnessPinReminder::query()->create(['user_id' => $target->id, 'reminded_by' => $actor->id]);
+                    $sent[] = $target;
+                }
+            }
+            if ($sent !== []) {
+                AuditLogger::logOrFail('medications.witness_pin.reminded', null, [
+                    'actor_id' => (int) $actor->id,
+                    'user_ids' => array_map(fn (User $user): int => (int) $user->id, $sent),
+                ]);
+            }
+
+            return [$sent, $already, $hasPin];
+        });
+        [$sent, $already, $hasPin] = $result;
+        foreach ($sent as $target) {
+            $target->notify(new WitnessPinReminderNotification((string) $actor->name));
+        }
+
+        $names = fn (array $users): string => collect($users)->pluck('name')->join(', ', ' and ');
+        $message = $sent === []
+            ? 'No reminder was sent.'
+            : (count($sent) === 1 ? 'Reminder sent to '.$sent[0]->name.'.' : 'Reminders sent to '.count($sent).' people.');
+        if ($already !== []) {
+            $message .= ' Already reminded today: '.$names($already).'.';
+        }
+        if ($hasPin !== []) {
+            $message .= ' Already has a PIN: '.$names($hasPin).'.';
+        }
+
+        return redirect()->back()->with('medication_settings_saved', $message);
+    }
+
+    /**
      * Staff in the actor's approved Sites who may be chosen as a second person,
      * filtered by permission before the cap so the list isn't cut short.
      *
@@ -281,9 +368,59 @@ class MedicationSettingsController extends Controller
             ? $staff->filter(fn (User $user): bool => $this->canResetPinOf($actor, $user))->pluck('id')->flip()
             : collect();
 
+        $houses = $this->primaryHouseNames($staff->pluck('id')->all());
+        $timezone = config('app.worker_timezone', 'Pacific/Auckland');
+        $reminders = WitnessPinReminder::query()
+            ->with('remindedBy:id,name')
+            ->whereIn('id', WitnessPinReminder::query()
+                ->selectRaw('MAX(id)')
+                ->whereIn('user_id', $staff->pluck('id')->all())
+                ->groupBy('user_id'))
+            ->get()
+            ->keyBy('user_id');
+
+        $today = now($timezone)->toDateString();
+
         return $this->witnessPins->statusRows($staff)
-            ->map(fn (array $row): array => $row + ['can_reset' => $resettable->has($row['id'])])
+            ->map(function (array $row) use ($resettable, $houses, $reminders, $timezone, $today): array {
+                $reminder = $reminders->get($row['id']);
+                $remindedAt = $reminder?->created_at?->copy()->timezone($timezone);
+
+                return $row + [
+                    'can_reset' => $resettable->has($row['id']),
+                    'house' => $houses[$row['id']] ?? null,
+                    'reminded_at' => $remindedAt?->toIso8601String(),
+                    'reminded_by' => $reminder?->remindedBy?->name,
+                    // One reminder per person per NZ day (Q-G).
+                    'reminded_today' => $remindedAt?->toDateString() === $today,
+                ];
+            })
             ->values();
+    }
+
+    /**
+     * Each person's own house (their HR profile's primary Site), for the PIN
+     * status list's house filter.
+     *
+     * @param  list<int>  $userIds
+     * @return array<int, string>
+     */
+    private function primaryHouseNames(array $userIds): array
+    {
+        if ($userIds === []) {
+            return [];
+        }
+        $profiles = HrEmployeeProfile::query()
+            ->whereIn('user_id', $userIds)
+            ->where('is_active', true)
+            ->pluck('primary_site_id', 'user_id');
+        $names = Site::query()->whereIn('id', $profiles->filter()->unique()->values()->all())->pluck('name', 'id');
+
+        return $profiles
+            ->map(fn (mixed $siteId): ?string => $siteId ? ($names[(int) $siteId] ?? null) : null)
+            ->filter()
+            ->mapWithKeys(fn (string $name, mixed $userId): array => [(int) $userId => $name])
+            ->all();
     }
 
     private function isSecondPerson(User $user): bool

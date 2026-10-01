@@ -25,6 +25,19 @@ return [
         'days' => 7,
     ],
 
+    // Medication competency and exemption defaults (Settings › Staff & PINs;
+    // CompetencyPolicySettings reads the saved values).
+    'competency' => [
+        // An assessment stays current for at most this many months
+        'validity_months' => 12,
+        // Areas (of 12) that must be passed
+        'pass_mark' => 10,
+        // Renewal is due this many days before an assessment ends
+        'renewal_reminder_days' => 30,
+        // An exemption lasts at most this many days
+        'longest_exemption_days' => 30,
+    ],
+
     'witness_pin' => [
         // Ask for the login password before someone sets a witness PIN while
         // they have no usable one (not set yet, reset by a lead, or needing

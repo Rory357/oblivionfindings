@@ -34,6 +34,26 @@ const def = (
     unit: null,
     paired_with: null,
 });
+/** A PIN rule as a whole number in a range (P11 Q-F); renewal can be off. */
+const num = (
+    key: string,
+    label: string,
+    range: [number, number],
+    unit: string,
+    dflt: string,
+    off: string | null = null,
+) => ({
+    ...def('pin', key, 'pins', label, [], dflt),
+    rank: null,
+    numeric: {
+        direction: 'higher_is_looser' as const,
+        off,
+        off_is_loosest: off !== null,
+    },
+    range,
+    unit,
+    off_label: off ? 'No renewal' : null,
+});
 
 /** What an auditor receives: every value, the history, and no authority to change anything. */
 const auditorSettings: SettingsPayload = {
@@ -93,32 +113,26 @@ const auditorSettings: SettingsPayload = {
             ),
         },
         pin: {
-            max_attempts: def(
-                'pin',
+            max_attempts: num(
                 'max_attempts',
-                'pins',
                 'Wrong attempts before a PIN locks',
-                [
-                    opt('3', '3 attempts'),
-                    opt('5', '5 attempts'),
-                    opt('10', '10 attempts'),
-                ],
+                [3, 10],
+                'attempts',
                 '5',
             ),
-            lockout_minutes: def(
-                'pin',
+            lockout_minutes: num(
                 'lockout_minutes',
-                'pins',
                 'How long a locked PIN stays locked',
-                [opt('5', '5 minutes'), opt('15', '15 minutes')],
+                [5, 60],
+                'minutes',
                 '15',
             ),
-            renewal_months: def(
-                'pin',
+            renewal_months: num(
                 'renewal_months',
-                'pins',
                 'PIN renewal (optional)',
-                [opt('none', 'No renewal'), opt('6', 'Every 6 months')],
+                [1, 24],
+                'months',
+                'none',
                 'none',
             ),
         },
@@ -211,17 +225,17 @@ describe('Medication Settings for an auditor (read-only)', () => {
         const switches = screen.getAllByRole('switch');
         expect(switches.length).toBeGreaterThan(0);
         switches.forEach((s) => expect(s).toBeDisabled());
-        for (const name of [
-            'Warn',
-            'Block',
-            'Co-signer with witness PIN',
-            '3 attempts',
-            '10 attempts',
-            '15 minutes',
-        ]) {
+        for (const name of ['Warn', 'Block', 'Co-signer with witness PIN']) {
             const buttons = screen.getAllByRole('button', { name });
             buttons.forEach((b) => expect(b).toBeDisabled());
         }
+        // P11 Q-F: the PIN rules are number inputs, disabled for an auditor.
+        const numbers = screen.getAllByRole('spinbutton');
+        expect(numbers.map((n) => (n as HTMLInputElement).value)).toEqual([
+            '5',
+            '15',
+        ]);
+        numbers.forEach((n) => expect(n).toBeDisabled());
     });
 
     it('gives no Review changes or Discard — only why it is read-only', () => {

@@ -45,6 +45,7 @@ use App\Services\Emar\ShiftMedicationSnapshotService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\MarLinkService;
+use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationOrderLifecycleService;
 use App\Services\Medication\MedicationRoundGenerationService;
@@ -66,6 +67,7 @@ use App\Support\WorkerClock;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -3075,9 +3077,12 @@ class EmarController extends Controller
         $latestByUser = $models->groupBy('user_id')->map(fn ($g) => $g->first());
         $inDate = $latestByUser->filter(fn (MedicationCompetencyAssessment $a) => $a->isPassed())->count();
         $cdWitnesses = $latestByUser->filter(fn (MedicationCompetencyAssessment $a) => $a->isPassed() && $a->can_witness_controlled)->count();
+        // Renewal is due this many days before the end date (Settings › Staff & PINs).
+        $policy = app(CompetencyPolicySettings::class);
+        $renewalDays = $policy->renewalReminderDays();
         $expiring = $latestByUser->filter(fn (MedicationCompetencyAssessment $a) => $a->isPassed()
             && $a->expiry_date?->isFuture()
-            && $a->expiry_date->lte(today()->addDays(30)))->count();
+            && $a->expiry_date->lte(today()->addDays($renewalDays)))->count();
         $expired = $latestByUser->filter(fn (MedicationCompetencyAssessment $a) => $a->isExpired())->count();
 
         $staffWithoutAssessment = User::query()
@@ -3108,6 +3113,14 @@ class EmarController extends Controller
                 'expired' => $expired,
                 'unassessed' => $staffWithoutAssessment->count(),
                 'cd_witnesses' => $cdWitnesses,
+            ],
+            // The organisation's competency settings the form and register follow.
+            'policy' => [
+                'pass_mark' => $policy->passMark(),
+                'core_must_pass' => $policy->coreAreasMustPass(),
+                'observed_minimum' => $policy->observedMinimum(),
+                'validity_months' => $policy->validityMonths(),
+                'renewal_days' => $renewalDays,
             ],
             'sites' => $sites->map(fn (Site $site) => $site->only(['id', 'name']))->values(),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
@@ -5493,6 +5506,58 @@ class EmarController extends Controller
         return [$lockedActor, $subject, $lockedSiteIds];
     }
 
+    /**
+     * The end date an assessment is saved with: the one asked for, which must
+     * be no later than the validity setting allows, or that latest date.
+     */
+    private function competencyExpiry(CompetencyPolicySettings $policy, string $assessmentDate, ?string $requested): string
+    {
+        $latest = $policy->latestExpiry($assessmentDate);
+        if ($requested === null || $requested === '') {
+            return $latest->toDateString();
+        }
+        if (Carbon::parse($requested)->startOfDay()->gt($latest)) {
+            throw ValidationException::withMessages([
+                'expiry_date' => sprintf(
+                    'An assessment stays current for at most %d %s — choose %s or earlier.',
+                    $policy->validityMonths(),
+                    $policy->validityMonths() === 1 ? 'month' : 'months',
+                    $latest->format('j M Y'),
+                ),
+            ]);
+        }
+
+        return Carbon::parse($requested)->toDateString();
+    }
+
+    /**
+     * P11 Q-C: when the organisation asks for a minimum of observed
+     * administrations, an assessment logging fewer isn't saved.
+     *
+     * @param  array<int, mixed>|null  $observedRounds
+     */
+    private function assertObservedMinimum(CompetencyPolicySettings $policy, ?array $observedRounds): void
+    {
+        $minimum = $policy->observedMinimum();
+        if ($minimum === null) {
+            return;
+        }
+        $logged = collect($observedRounds ?? [])
+            ->filter(fn (mixed $round): bool => is_array($round) && trim((string) ($round['resident'] ?? '')) !== '')
+            ->count();
+        if ($logged < $minimum) {
+            throw ValidationException::withMessages([
+                'observed_rounds' => sprintf(
+                    'Log at least %d observed %s — your organisation asks for %d (Settings › Staff & PINs). %d logged.',
+                    $minimum,
+                    $minimum === 1 ? 'administration' : 'administrations',
+                    $minimum,
+                    $logged,
+                ),
+            ]);
+        }
+    }
+
     public function storeCompetency(Request $request)
     {
         $actor = $request->user();
@@ -5540,10 +5605,15 @@ class EmarController extends Controller
         ];
 
         $totalScore = collect($booleanFields)->filter(fn ($f) => ! empty($validated[$f]))->count();
+        // P11 Staff & PINs: the pass mark and how long an assessment stays
+        // current are organisation settings.
+        $policy = app(CompetencyPolicySettings::class);
+
+        $this->assertObservedMinimum($policy, $validated['observed_rounds'] ?? null);
 
         $validated['total_score'] = $totalScore;
-        $validated['pass_threshold'] = 10;
-        $validated['status'] = $totalScore >= 10 ? 'passed' : 'failed';
+        $validated['pass_threshold'] = $policy->passMark();
+        $validated['status'] = $policy->passes(Arr::only($validated, $booleanFields)) ? 'passed' : 'failed';
         $validated['restricted'] = (bool) ($validated['restricted'] ?? false);
         $validated['assessor_id'] = $actor->id;
         // The assessor may record only their own declaration here. The staff
@@ -5551,8 +5621,11 @@ class EmarController extends Controller
         $validated['assessor_declared_at'] = ! empty($validated['assessor_declared']) ? now() : null;
         $validated['staff_acknowledged_at'] = null;
         unset($validated['assessor_declared'], $validated['staff_acknowledged']);
-        $validated['expiry_date'] = $validated['expiry_date']
-            ?? Carbon::parse($validated['assessment_date'])->addYear()->toDateString();
+        $validated['expiry_date'] = $this->competencyExpiry(
+            $policy,
+            (string) $validated['assessment_date'],
+            $validated['expiry_date'] ?? null,
+        );
         $validated['can_administer_unsupervised'] = (bool) ($validated['can_administer_unsupervised'] ?? false);
         $validated['can_witness_controlled'] = (bool) ($validated['can_witness_controlled'] ?? false);
 
@@ -5654,16 +5727,28 @@ class EmarController extends Controller
                 $validated['assessor_declared_at'] = now();
             }
 
+            $policy = app(CompetencyPolicySettings::class);
+            if (array_key_exists('observed_rounds', $validated)) {
+                $this->assertObservedMinimum($policy, $validated['observed_rounds']);
+            }
             if (collect($booleanFields)->contains(fn ($field) => array_key_exists($field, $validated))) {
                 $merged = array_merge($locked->only($booleanFields), $validated);
                 $totalScore = collect($booleanFields)->filter(fn ($field) => ! empty($merged[$field]))->count();
                 $validated['total_score'] = $totalScore;
-                $validated['pass_threshold'] = 10;
-                $validated['status'] = $totalScore >= 10 ? 'passed' : 'failed';
+                $validated['pass_threshold'] = $policy->passMark();
+                $validated['status'] = $policy->passes(Arr::only($merged, $booleanFields)) ? 'passed' : 'failed';
             }
 
-            if (! array_key_exists('expiry_date', $validated) && ! empty($validated['assessment_date'])) {
-                $validated['expiry_date'] = Carbon::parse($validated['assessment_date'])->addYear()->toDateString();
+            // A changed date or end date stays within how long an assessment
+            // stays current; an untouched one keeps the end date it was given.
+            if (! empty($validated['assessment_date']) || array_key_exists('expiry_date', $validated)) {
+                $validated['expiry_date'] = $this->competencyExpiry(
+                    $policy,
+                    (string) ($validated['assessment_date'] ?? $locked->assessment_date?->toDateString()),
+                    array_key_exists('expiry_date', $validated)
+                        ? $validated['expiry_date']
+                        : (empty($validated['assessment_date']) ? $locked->expiry_date?->toDateString() : null),
+                );
             }
 
             $locked->update($validated);

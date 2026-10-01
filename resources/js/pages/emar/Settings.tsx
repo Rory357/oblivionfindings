@@ -18,6 +18,7 @@ import { Sections } from '@/pages/fleet-assets/settings/_ui';
 import { Head, router } from '@inertiajs/react';
 import {
     Activity,
+    ClipboardCheck,
     Clock,
     Eye,
     FileText,
@@ -33,6 +34,7 @@ import {
     Repeat,
     Settings as SettingsIcon,
     Shield,
+    ShieldCheck,
     UserCheck,
     Users,
     type LucideIcon,
@@ -77,11 +79,13 @@ import {
 } from './settings/_rules';
 import {
     PIN_STATUS_OPTIONS,
+    pinHouseOptions,
     PinStatus,
     SafetyChecks,
     WitnessPins,
     type WitnessPinProps,
 } from './settings/_sections';
+import { Competency, ExemptionLimit, StaffOverview } from './settings/_staff';
 import { useStatusMessage } from './settings/_status';
 import {
     houseOf,
@@ -130,13 +134,15 @@ const SEC_ICON: Record<string, LucideIcon> = {
     photos: FileText,
     templates: Repeat,
     timing: Clock,
+    competency: ClipboardCheck,
+    exemptions: ShieldCheck,
     pins: KeyRound,
     status: Users,
     decide: HelpCircle,
     changes: History,
 };
 /** Tabs whose settings are saved through the save bar. */
-const SAVED_SECTIONS = ['safety', 'timing', 'pins'];
+const SAVED_SECTIONS = ['safety', 'timing', 'competency', 'exemptions', 'pins'];
 const SHOW_OPTIONS = [
     { value: 'all', label: 'All settings' },
     { value: 'open', label: 'Not yet reviewed' },
@@ -148,6 +154,7 @@ export type Filters = {
     rulesWhere: string;
     rulesState: string;
     pinState: string;
+    pinHouse: string;
     tplHouse: string;
     tplStatus: string;
     history: HistoryFilters;
@@ -157,6 +164,7 @@ const F0: Filters = {
     rulesWhere: 'all',
     rulesState: 'all',
     pinState: 'all',
+    pinHouse: 'all',
     tplHouse: 'all',
     tplStatus: 'current',
     history: HISTORY_FILTERS,
@@ -185,10 +193,11 @@ export default function EmarSettings(props: Props) {
                 : templatesOnly
                   ? ['templates']
                   : [],
-            staff:
-                settingsAccess || witnessPin.can_reset
-                    ? ['pins', 'status']
-                    : [],
+            staff: settingsAccess
+                ? ['overview', 'competency', 'exemptions', 'pins', 'status']
+                : witnessPin.can_reset
+                  ? ['pins', 'status']
+                  : [],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
         [settingsAccess, templatesOnly, witnessPin.can_reset],
@@ -454,9 +463,18 @@ export default function EmarSettings(props: Props) {
                 )}
             </>
         ) : view === 'staff' && sec === 'status' ? (
-            select('PIN status', f.pinState, PIN_STATUS_OPTIONS, (v) =>
-                setF({ ...f, pinState: v }),
-            )
+            <>
+                {select(
+                    'House',
+                    f.pinHouse,
+                    pinHouseOptions(witnessPin.staff),
+                    (v) => setF({ ...f, pinHouse: v }),
+                    Home,
+                )}
+                {select('PIN status', f.pinState, PIN_STATUS_OPTIONS, (v) =>
+                    setF({ ...f, pinState: v }),
+                )}
+            </>
         ) : view === 'history' && sec === 'changes' ? (
             <>
                 {select(
@@ -666,6 +684,26 @@ export default function EmarSettings(props: Props) {
                     setF({ ...f, show: 'all' });
                 }}
             />
+        ) : view === 'staff' && sec === 'overview' ? (
+            <StaffOverview q={query} witnessPin={witnessPin} />
+        ) : view === 'staff' && sec === 'competency' ? (
+            <Competency
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'staff' && sec === 'exemptions' ? (
+            <ExemptionLimit
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
         ) : view === 'staff' && sec === 'pins' ? (
             <WitnessPins
                 q={query}
@@ -680,9 +718,10 @@ export default function EmarSettings(props: Props) {
                 witnessPin={witnessPin}
                 q={query}
                 state={f.pinState}
+                house={f.pinHouse}
                 clear={() => {
                     clearQ();
-                    setF({ ...f, pinState: 'all' });
+                    setF({ ...f, pinState: 'all', pinHouse: 'all' });
                 }}
             />
         ) : view === 'history' && sec === 'decide' ? (

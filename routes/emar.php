@@ -3,6 +3,7 @@
 use App\Http\Controllers\BreakGlassController;
 use App\Http\Controllers\Emar\AuditLogController;
 use App\Http\Controllers\Emar\CDLossReportController;
+use App\Http\Controllers\Emar\CompetencyExemptionController;
 use App\Http\Controllers\Emar\EmarController;
 use App\Http\Controllers\Emar\EmarPdfController;
 use App\Http\Controllers\Emar\EmarReportController;
@@ -146,6 +147,14 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     Route::post('/competency/{assessment}/acknowledge', [EmarController::class, 'acknowledgeCompetency'])
         ->name('emar.competency.acknowledge');
+    // P11: competency exemptions — one house, a reason, an end date within the
+    // longest exemption (Settings › Staff & PINs); never for yourself.
+    Route::middleware('permission:medications.competency.exempt')->group(function () {
+        Route::post('/competency/exemptions', [CompetencyExemptionController::class, 'store'])
+            ->name('emar.competency.exemptions.store');
+        Route::post('/competency/exemptions/{exemption}/end', [CompetencyExemptionController::class, 'end'])
+            ->name('emar.competency.exemptions.end');
+    });
 
     // Destruction / Disposal Records
     Route::get('/destructions', [EmarController::class, 'destructions'])
@@ -288,6 +297,9 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::post('/settings/witness-pins/{user}/reset', [MedicationSettingsController::class, 'resetWitnessPin'])
         ->middleware('permission:medications.witness_pin.reset')
         ->name('emar.settings.witness_pins.reset');
+    Route::post('/settings/witness-pins/remind', [MedicationSettingsController::class, 'remindWitnessPins'])
+        ->middleware('permission:medications.witness_pin.reset')
+        ->name('emar.settings.witness_pins.remind');
     Route::middleware('permission:medications.settings.manage')->group(function () {
         Route::post('/settings/rules', [MedicationSettingsController::class, 'store'])->name('emar.settings.rules.store');
         Route::put('/settings/rules/{rule}', [MedicationSettingsController::class, 'update'])->name('emar.settings.rules.update');

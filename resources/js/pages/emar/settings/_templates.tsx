@@ -476,7 +476,7 @@ function DayTimeline({
                             key={i}
                             className={
                                 mine
-                                    ? 'absolute top-1 bottom-1 rounded bg-primary text-[10px] font-semibold text-primary-foreground'
+                                    ? 'absolute top-1 bottom-1 rounded bg-primary-fill text-[10px] font-semibold text-primary-fill-foreground'
                                     : 'absolute top-1 bottom-1 rounded bg-primary/25 text-[10px] text-foreground'
                             }
                             style={{

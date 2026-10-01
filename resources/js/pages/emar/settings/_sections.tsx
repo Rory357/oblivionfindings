@@ -1,8 +1,10 @@
 /* Medication › Settings tabs (eMAR P11 B1): Medication rules › Safety checks;
- * Staff & PINs › Witness PINs and PIN status. Saved settings are edited as a
+ * Staff & PINs › Witness PINs and PIN status (the other Staff & PINs tabs are
+ * in _staff.tsx). Saved settings are edited as a
  * draft (see Settings.tsx); PIN resets are records with their own action.
  * Medicine rules are in _rules.tsx. */
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { EntityChip } from '@/components/lists/entity-cells';
 import {
     compactMenu,
     useEntityContextMenu,
@@ -12,7 +14,7 @@ import { EntityTable } from '@/components/lists/entity-table';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { formatDateLong, formatTime } from '@/lib/datetime';
+import { formatDateLong, formatDateTime, formatTime } from '@/lib/datetime';
 import {
     WITNESS_PIN_STATUS_LABEL,
     type WitnessPinStatus,
@@ -20,6 +22,8 @@ import {
 import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Bell,
+    Home,
     KeyRound,
     ListChecks,
     LockKeyhole,
@@ -30,12 +34,21 @@ import {
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useSettings } from './_context';
-import { draftValue, isDirty, reviewerOf, withDraft } from './_model';
+import {
+    definitionOf,
+    draftValue,
+    isDirty,
+    notConfigured,
+    reviewerOf,
+    savedValue,
+    withDraft,
+} from './_model';
 import {
     Choice,
     GroupGrid,
     GroupRow,
     Note,
+    NumberInput,
     OnOff,
     RowMenu,
     Section,
@@ -51,17 +64,21 @@ export function useRow(group: string) {
     const value = (key: string) => draftValue(s, draft, group, key);
     const edit = (key: string, v: string) =>
         setDraft((d) => withDraft(d, group, key, v));
+    const unconfigured = (key: string) =>
+        notConfigured(definitionOf(s, group, key), savedValue(s, group, key));
     const state = (key: string): RowState =>
         isDirty(s, draft, group, key)
             ? 'changed'
-            : reviewerOf(s, group, key)
-              ? null
-              : 'default';
+            : unconfigured(key)
+              ? 'nc'
+              : reviewerOf(s, group, key)
+                ? null
+                : 'default';
     const disabled = !canEdit(group);
     /** Show filter + search: does this row stay visible? */
     const shown = (show: string, q: string, key: string, ...text: string[]) =>
         (show === 'open'
-            ? !reviewerOf(s, group, key)
+            ? !reviewerOf(s, group, key) || unconfigured(key)
             : show === 'changed'
               ? isDirty(s, draft, group, key)
               : true) && match(q, ...text);
@@ -216,7 +233,9 @@ export function SafetyChecks({
     );
 }
 
-/* ── Staff & PINs › Witness PINs (PIN-1 rules on the P11 groups) ── */
+/* ── Staff & PINs › Witness PINs (P11 v5 rules as number inputs, Q-F). The
+   forgotten-PIN fallback and the named-colleague confirmation aren't built,
+   so they aren't shown. ── */
 export function WitnessPins({
     q,
     show,
@@ -227,9 +246,46 @@ export function WitnessPins({
     clear: () => void;
 }) {
     const { s, value, edit, state, disabled, shown } = useRow('pin');
-    const label = (key: string) => s.definitions.pin?.[key]?.label ?? key;
+    const { errors, clearError } = useSettings();
+    const def = (key: string) => s.definitions.pin?.[key];
+    const label = (key: string) => def(key)?.label ?? key;
+    const input = (key: string, unit: string, inputLabel?: string) => (
+        <NumberInput
+            id={`pr-${key}`}
+            label={inputLabel}
+            value={value(key)}
+            unit={unit}
+            min={def(key)?.range?.[0]}
+            max={def(key)?.range?.[1]}
+            disabled={disabled}
+            error={errors[`pin.${key}`]}
+            onChange={(v) => {
+                edit(key, v);
+                clearError(`pin.${key}`);
+            }}
+        />
+    );
+    const number = (
+        key: string,
+        rowLabel: string,
+        hint: string,
+        unit: string,
+    ) => (
+        <GroupRow
+            key={key}
+            id={`pr-${key}`}
+            label={rowLabel}
+            hint={hint}
+            state={state(key)}
+            error={errors[`pin.${key}`]}
+            errorId={`pr-${key}-error`}
+            hidden={!shown(show, q, key, rowLabel, label(key))}
+            control={input(key, unit)}
+        />
+    );
+    const off = def('renewal_months')?.numeric?.off ?? 'none';
     const renewal = value('renewal_months');
-    const renOn = renewal !== 'none';
+    const renOn = renewal !== off;
     const savedRenewal = s.values.pin?.renewal_months;
     return (
         <Section
@@ -264,10 +320,12 @@ export function WitnessPins({
                         label={label('renewal_months')}
                         hint={
                             renOn
-                                ? `People choose a new PIN every ${renewal} months.`
+                                ? `People choose a new PIN every ${renewal || '…'} months.`
                                 : 'No renewal — a PIN stays until its owner changes it.'
                         }
                         state={state('renewal_months')}
+                        error={errors['pin.renewal_months']}
+                        errorId="pr-renewal_months-error"
                         hidden={
                             !shown(
                                 show,
@@ -281,31 +339,29 @@ export function WitnessPins({
                                 id="pr-renon"
                                 checked={renOn}
                                 disabled={disabled}
-                                onChange={(v) =>
+                                onChange={(v) => {
+                                    // On asks for a number (v5): the saved one, or an empty box.
                                     edit(
                                         'renewal_months',
                                         v
                                             ? savedRenewal &&
-                                              savedRenewal !== 'none'
+                                              savedRenewal !== off
                                                 ? savedRenewal
-                                                : '12'
-                                            : 'none',
-                                    )
-                                }
+                                                : ''
+                                            : off,
+                                    );
+                                    clearError('pin.renewal_months');
+                                }}
                             />
                         }
                     >
-                        {renOn ? (
-                            <Choice
-                                value={renewal}
-                                disabled={disabled}
-                                onChange={(v) => edit('renewal_months', v)}
-                                options={[
-                                    ['6', 'Every 6 months'],
-                                    ['12', 'Every 12 months'],
-                                ]}
-                            />
-                        ) : null}
+                        {renOn
+                            ? input(
+                                  'renewal_months',
+                                  'months',
+                                  'Months between renewals',
+                              )
+                            : null}
                     </GroupRow>
                 </SettingGroup>
                 <SettingGroup
@@ -314,62 +370,21 @@ export function WitnessPins({
                     title="Locking"
                     caption="After wrong PINs, across all screens"
                 >
-                    <GroupRow
-                        id="pr-attempts"
-                        label="Locks after"
-                        hint="Counts wrong PINs typed for one person."
-                        state={state('max_attempts')}
-                        hidden={
-                            !shown(
-                                show,
-                                q,
-                                'max_attempts',
-                                'Locks after',
-                                label('max_attempts'),
-                            )
-                        }
-                    >
-                        <Choice
-                            value={value('max_attempts')}
-                            disabled={disabled}
-                            onChange={(v) => edit('max_attempts', v)}
-                            options={[
-                                ['3', '3 attempts'],
-                                ['5', '5 attempts'],
-                                ['10', '10 attempts'],
-                            ]}
-                        />
-                    </GroupRow>
-                    <GroupRow
-                        id="pr-lockout"
-                        label="Stays locked for"
-                        hint="Or until the owner resets it."
-                        state={state('lockout_minutes')}
-                        hidden={
-                            !shown(
-                                show,
-                                q,
-                                'lockout_minutes',
-                                'Stays locked for',
-                                label('lockout_minutes'),
-                            )
-                        }
-                    >
-                        <Choice
-                            value={value('lockout_minutes')}
-                            disabled={disabled}
-                            onChange={(v) => edit('lockout_minutes', v)}
-                            options={[
-                                ['5', '5 minutes'],
-                                ['15', '15 minutes'],
-                                ['30', '30 minutes'],
-                                ['60', '60 minutes'],
-                            ]}
-                        />
-                    </GroupRow>
+                    {number(
+                        'max_attempts',
+                        'Locks after',
+                        'Counts wrong PINs typed for one person.',
+                        'attempts',
+                    )}
+                    {number(
+                        'lockout_minutes',
+                        'Stays locked for',
+                        'Or until the owner resets it.',
+                        'minutes',
+                    )}
                 </SettingGroup>
-                {/* Who may reset is a permission today (Settings › Roles); it becomes a
-                    setting with its enforcement (chunk 5), so this group only explains it. */}
+                {/* Who may reset is a permission (Settings › Roles), so this
+                    group only explains it (P11 Q-F). */}
                 <SettingGroup
                     id="reset"
                     icon={RefreshCw}
@@ -399,7 +414,9 @@ export function WitnessPins({
     );
 }
 
-/* ── Staff & PINs › PIN status (PIN-1 staff list; reset by people with the permission) ── */
+/* ── Staff & PINs › PIN status (P11 v5: PIN-1 staff list, house filter,
+   reminders). People who can reset someone's PIN can reset it or remind them
+   to set one — at most once a day each (Q-G). ── */
 export type WitnessPinStaffRow = {
     id: number;
     name: string;
@@ -409,6 +426,12 @@ export type WitnessPinStaffRow = {
     reset_at: string | null;
     /** False for people with broader authority than a house lead. */
     can_reset: boolean;
+    /** Their own house (HR profile), for the house filter. */
+    house?: string | null;
+    reminded_at?: string | null;
+    reminded_by?: string | null;
+    /** Already reminded today (NZ): no second reminder until tomorrow. */
+    reminded_today?: boolean;
 };
 export type WitnessPinProps = {
     can_reset: boolean;
@@ -421,6 +444,13 @@ export const PIN_STATUS_OPTIONS = [
     { value: 'locked', label: WITNESS_PIN_STATUS_LABEL.locked },
     { value: 'reset', label: WITNESS_PIN_STATUS_LABEL.reset },
     { value: 'expired', label: WITNESS_PIN_STATUS_LABEL.expired },
+];
+/** The house filter's choices: every house in the list, by name. */
+export const pinHouseOptions = (staff: WitnessPinStaffRow[]) => [
+    { value: 'all', label: 'All houses' },
+    ...[...new Set(staff.map((x) => x.house).filter(Boolean) as string[])]
+        .sort((a, b) => a.localeCompare(b))
+        .map((h) => ({ value: h, label: h })),
 ];
 const PIN_VARIANT: Record<
     WitnessPinStatus,
@@ -443,27 +473,50 @@ function pinDetail(row: WitnessPinStaffRow): string {
         return 'Must choose a new PIN before co-signing or witnessing';
     return row.set_at ? `Last changed ${formatDateLong(row.set_at)}` : '';
 }
+const reminded = (row: WitnessPinStaffRow) =>
+    row.reminded_at
+        ? `Reminded ${row.reminded_today ? `today ${formatTime(row.reminded_at)}` : formatDateTime(row.reminded_at)}${row.reminded_by ? `, by ${row.reminded_by}` : ''}`
+        : '';
+/** No usable PIN yet, someone this person can reset, not reminded today. */
+export const canRemind = (can: boolean, row: WitnessPinStaffRow) =>
+    can &&
+    row.can_reset &&
+    (row.status === 'not_set' || row.status === 'reset') &&
+    !row.reminded_today;
 
 export function PinStatus({
     witnessPin,
     q,
     state,
+    house,
     clear,
 }: {
     witnessPin: WitnessPinProps;
     q: string;
     state: string;
+    house: string;
     clear: () => void;
 }) {
     const { can_reset, staff } = witnessPin;
     const [target, setTarget] = useState<WitnessPinStaffRow | null>(null);
     const [resetting, setResetting] = useState(false);
+    const [remind, setRemind] = useState<WitnessPinStaffRow[] | null>(null);
+    const [reminding, setReminding] = useState(false);
     const menu = useEntityContextMenu<WitnessPinStaffRow>();
     const rows = staff.filter(
-        (x) => (state === 'all' || x.status === state) && match(q, x.name),
+        (x) =>
+            (state === 'all' || x.status === state) &&
+            (house === 'all' || x.house === house) &&
+            match(q, x.name, x.house),
     );
+    const remindable = staff.filter((x) => canRemind(can_reset, x));
     const actions = (row: WitnessPinStaffRow): MenuItem[] =>
         compactMenu([
+            canRemind(can_reset, row) && {
+                label: 'Remind them to set a PIN',
+                icon: Bell,
+                onClick: () => setRemind([row]),
+            },
             can_reset &&
                 row.can_reset &&
                 row.status !== 'not_set' &&
@@ -489,11 +542,39 @@ export function PinStatus({
             },
         );
     };
+    const sendReminders = () => {
+        if (!remind?.length) return;
+        router.post(
+            '/emar/settings/witness-pins/remind',
+            { user_ids: remind.map((x) => x.id) },
+            {
+                preserveScroll: true,
+                onStart: () => setReminding(true),
+                onFinish: () => {
+                    setReminding(false);
+                    setRemind(null);
+                },
+            },
+        );
+    };
+    const names = (remind ?? []).map((x) => x.name);
     return (
         <Section
             id="sc-status"
             title="Staff witness PINs"
             caption={`${rows.length} of ${staff.length} shown`}
+            right={
+                remindable.length ? (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRemind(remindable)}
+                    >
+                        <Bell />
+                        Remind {remindable.length} to set a PIN
+                    </Button>
+                ) : undefined
+            }
         >
             <p className="text-subtle">
                 Status only — nobody can see or set another person’s PIN.
@@ -511,8 +592,25 @@ export function PinStatus({
                     identityLabel="Person"
                     identityWidth="1.4fr"
                     minWidth={760}
+                    // A reminded row has up to three lines under its badge.
+                    rowHeight="content"
                     identity={(x) => ({ icon: UserRound, name: x.name })}
                     columns={[
+                        {
+                            key: 'house',
+                            label: 'House',
+                            width: '1fr',
+                            cell: (x) =>
+                                x.house ? (
+                                    <EntityChip icon={Home}>
+                                        {x.house}
+                                    </EntityChip>
+                                ) : (
+                                    <span className="text-subtle">
+                                        No house
+                                    </span>
+                                ),
+                        },
                         {
                             key: 'pin',
                             label: 'Witness PIN',
@@ -525,6 +623,13 @@ export function PinStatus({
                                     >
                                         {WITNESS_PIN_STATUS_LABEL[x.status]}
                                     </StatusBadge>
+                                    {reminded(x) &&
+                                    (x.status === 'not_set' ||
+                                        x.status === 'reset') ? (
+                                        <p className="text-caption mt-1">
+                                            {reminded(x)}
+                                        </p>
+                                    ) : null}
                                     {pinDetail(x) ? (
                                         <p className="text-caption mt-1">
                                             {pinDetail(x)}
@@ -562,7 +667,7 @@ export function PinStatus({
             />
             <Note>
                 {can_reset
-                    ? 'You can reset the PIN of someone at your houses. The owner then chooses a new one in their account settings before they can co-sign or witness again.'
+                    ? 'You can reset the PIN of someone at your houses, or remind someone without one to set it. The owner then chooses a new one in their account settings before they can co-sign or witness again.'
                     : 'Resetting a PIN needs the “Reset another person’s witness PIN” permission — house leads and clinical leads have it by default.'}
             </Note>
             <ConfirmDialog
@@ -585,6 +690,41 @@ export function PinStatus({
                 }
                 confirmText="Reset PIN"
                 variant="destructive"
+            />
+            <ConfirmDialog
+                open={remind !== null}
+                onClose={() => setRemind(null)}
+                onConfirm={sendReminders}
+                processing={reminding}
+                variant="default"
+                title={
+                    names.length === 1
+                        ? `Remind ${names[0]} to set a witness PIN?`
+                        : `Remind ${names.length} people to set a witness PIN?`
+                }
+                description={
+                    <span className="flex flex-col gap-2">
+                        {names.length > 1 ? (
+                            <span className="font-medium text-foreground">
+                                {names.join(', ')}
+                            </span>
+                        ) : null}
+                        <span>
+                            They get an in-app reminder, and push if they’ve set
+                            it up. It opens their account › Witness PIN. Until
+                            they set one, they can’t co-sign or witness.
+                        </span>
+                        <span>
+                            Recorded in the audit log with your name and the
+                            time.
+                        </span>
+                    </span>
+                }
+                confirmText={
+                    names.length === 1
+                        ? 'Send reminder'
+                        : `Send ${names.length} reminders`
+                }
             />
         </Section>
     );
