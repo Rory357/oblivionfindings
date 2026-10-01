@@ -135,8 +135,16 @@ it('sends refusal-cluster alerts to team leads at the house instead of failing o
 it('conceals controlled-drug refusal clusters from team leads without controlled-drug view', function () {
     Notification::fake();
     $site = Site::factory()->create();
+    // Since the eMAR role baseline (1 Oct 2026) team leads hold
+    // medications.controlled.view through their role, so the lead without it
+    // is a team lead with a per-user deny.
     $lead = medicationAlertStaff($site, 'team_lead');
-    $controlledLead = medicationAlertStaff($site, 'team_lead', ['medications.controlled.view']);
+    $lead->permissionOverrides()->syncWithoutDetaching([
+        Permission::query()->where('key', 'medications.controlled.view')->value('id') => ['allowed' => false],
+    ]);
+    $controlledLead = medicationAlertStaff($site, 'team_lead');
+    expect($lead->canDo('medications.controlled.view'))->toBeFalse()
+        ->and($controlledLead->canDo('medications.controlled.view'))->toBeTrue();
     medicationRefusalCluster($site, ['name' => 'Morphine', 'controlled_drug' => true]);
 
     $this->artisan('emar:send-alerts')->assertExitCode(0);

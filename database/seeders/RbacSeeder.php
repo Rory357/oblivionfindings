@@ -914,6 +914,13 @@ class RbacSeeder extends Seeder
             'clinical.protocols.viewAny',
             'clinical.dashboard',
             'medications.view', 'medications.orders.verify', 'medications.witness_pin.reset',
+            // eMAR role baseline (1 Oct 2026): house leads give medicines, see
+            // and record controlled medicines, and witness, so they hold the
+            // same frontline keys as support_worker. Competency, eligibility
+            // and a covering shift still decide who may actually give a dose.
+            // Grant migration: 2026_10_01_100000_grant_team_lead_frontline_medication_keys.
+            'medications.administer.record', 'medications.administer.correct',
+            'medications.controlled.view', 'medications.controlled.record', 'medications.controlled.witness',
             'progress_notes.viewAny', 'progress_notes.create', 'progress_notes.update', 'progress_notes.review',
         ]);
 
