@@ -10,6 +10,7 @@ use App\Services\Medication\DoseSlots\DoseSlotRules;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 use LogicException;
 
@@ -24,10 +25,23 @@ use LogicException;
  * --fresh to start over). A completed run makes its period readable: reads
  * before it say "Not available before {date}".
  *
+ * One run at a time: a writing run holds a cache lock (LOCK) for up to
+ * LOCK_SECONDS and stops, resumably, before it could outlive it. A second
+ * run while one holds it exits with a message and writes nothing. A dry run
+ * writes nothing, so it takes no lock.
+ *
  * Runs on deploy only when Main decides. --dry-run counts and writes nothing.
  */
 class BackfillMedicationDoseSlots extends Command
 {
+    public const LOCK = 'emar:backfill-dose-slots';
+
+    /** How long the lock lasts; a run killed without releasing it blocks others no longer than this. */
+    public const LOCK_SECONDS = 6 * 3600;
+
+    /** A run stops (resumable) this long before its lock would expire. */
+    private const LOCK_MARGIN_SECONDS = 15 * 60;
+
     protected $signature = 'emar:backfill-dose-slots
         {--months=12 : How many months to rebuild, back from the last day}
         {--to= : The last NZ day to rebuild (Y-m-d); defaults to the day before live dose slots began}
@@ -40,6 +54,30 @@ class BackfillMedicationDoseSlots extends Command
     protected $description = 'Rebuild past medication dose slots and outcomes from order history and recorded doses';
 
     public function handle(DoseSlotBackfill $backfill, DoseSlotCoverage $coverage): int
+    {
+        if ($this->option('dry-run')) {
+            return $this->rebuild($backfill, $coverage, null);
+        }
+
+        $lock = Cache::lock(self::LOCK, self::LOCK_SECONDS);
+        if (! $lock->get()) {
+            $this->error('Another dose-slot backfill is running, so this one has not started. Wait for it to finish, then run again: it resumes where the last run stopped. (A run that was killed holds the lock for up to '.intdiv(self::LOCK_SECONDS, 3600).' hours.)');
+
+            return self::FAILURE;
+        }
+
+        try {
+            // Wall-clock time, not the app clock: the lock expires in real time.
+            return $this->rebuild($backfill, $coverage, microtime(true) + self::LOCK_SECONDS - self::LOCK_MARGIN_SECONDS);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * @param  float|null  $stopBy  the wall-clock time a locked run stops by (resumable)
+     */
+    private function rebuild(DoseSlotBackfill $backfill, DoseSlotCoverage $coverage, ?float $stopBy): int
     {
         $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
         $now = CarbonImmutable::now()->utc();
@@ -75,7 +113,8 @@ class BackfillMedicationDoseSlots extends Command
         }
 
         $totals = DoseSlotBackfill::noCounts() + ['orders' => 0, 'skipped' => 0];
-        $stopped = false;
+        // Why the run stopped early, if it did: 'limit' or 'lock'.
+        $stopped = null;
         $lastDayEndUtc = CarbonImmutable::parse($to, $timezone)->endOfDay()->utc()->format('Y-m-d H:i:s');
 
         ClientMedication::withTrashed()
@@ -83,10 +122,15 @@ class BackfillMedicationDoseSlots extends Command
             ->when($only->isNotEmpty(), fn ($query) => $query->whereIn('id', $only->all()))
             // An order entered after the period owes nothing in it.
             ->where(fn ($query) => $query->whereNull('created_at')->orWhere('created_at', '<=', $lastDayEndUtc))
-            ->chunkById(100, function (Collection $orders) use ($backfill, $from, $to, $now, $dryRun, $chunkDays, $limit, $run, &$totals, &$stopped): bool {
+            ->chunkById(100, function (Collection $orders) use ($backfill, $from, $to, $now, $dryRun, $chunkDays, $limit, $stopBy, $run, &$totals, &$stopped): bool {
                 foreach ($orders as $order) {
                     if ($limit !== null && $totals['orders'] + $totals['skipped'] >= $limit) {
-                        $stopped = true;
+                        $stopped = 'limit';
+
+                        return false;
+                    }
+                    if ($stopBy !== null && microtime(true) >= $stopBy) {
+                        $stopped = 'lock';
 
                         return false;
                     }
@@ -129,7 +173,7 @@ class BackfillMedicationDoseSlots extends Command
                 return true;
             });
 
-        if ($run !== null && ! $stopped) {
+        if ($run !== null && $stopped === null) {
             $run->forceFill(['status' => MedicationDoseSlotBackfill::STATUS_COMPLETED, 'finished_at' => CarbonImmutable::now()->utc()])->save();
         }
 
@@ -144,9 +188,11 @@ class BackfillMedicationDoseSlots extends Command
 
         if ($run !== null) {
             $run->refresh();
-            $this->info($stopped
-                ? "Run #{$run->id} stopped after {$limit} orders; run again to resume."
-                : "Run #{$run->id} completed. Dose slots are available from {$coverage->availableFrom($now)}.");
+            $this->info(match ($stopped) {
+                'limit' => "Run #{$run->id} stopped after {$limit} orders; run again to resume.",
+                'lock' => "Run #{$run->id} stopped before its lock expires; run again to resume.",
+                default => "Run #{$run->id} completed. Dose slots are available from {$coverage->availableFrom($now)}.",
+            });
         }
 
         return self::SUCCESS;
