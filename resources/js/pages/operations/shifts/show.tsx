@@ -895,7 +895,7 @@ export default function ShiftShow({
     // Hero footer button treatments — mirrors the redesign's heroPrimary (solid
     // white) vs heroGhost (transparent, white outline) variants on the gradient.
     const heroPrimaryButton =
-        'border border-transparent bg-white text-primary shadow-sm hover:bg-white/90 hover:text-primary';
+        'border border-transparent bg-white text-primary-strong shadow-sm hover:bg-white/90 hover:text-primary-strong';
     const heroGhostButton =
         'border border-white/30 bg-transparent text-white shadow-none hover:bg-white/10 hover:text-white';
 

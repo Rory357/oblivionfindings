@@ -660,7 +660,7 @@ export default function InjuriesIndex({
                                     <button
                                         type="button"
                                         onClick={openCreate}
-                                        className="inline-flex items-center gap-1.5 rounded-md bg-primary-foreground px-3.5 py-2 text-[13px] font-bold text-primary hover:bg-primary-foreground/90"
+                                        className="inline-flex items-center gap-1.5 rounded-md bg-primary-foreground px-3.5 py-2 text-[13px] font-bold text-primary-strong hover:bg-primary-foreground/90"
                                     >
                                         <Plus className="h-4 w-4" /> Record
                                         injury

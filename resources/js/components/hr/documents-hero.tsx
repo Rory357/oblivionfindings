@@ -433,7 +433,7 @@ function RailTab({
             className={cn(
                 'h-6 rounded-md px-2.5 text-[11px] font-bold transition-colors',
                 active
-                    ? 'bg-primary-foreground text-primary'
+                    ? 'bg-primary-foreground text-primary-strong'
                     : 'text-primary-foreground/70 hover:text-primary-foreground',
             )}
         >

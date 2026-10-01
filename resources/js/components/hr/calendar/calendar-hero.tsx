@@ -172,7 +172,7 @@ export function CalendarHero({
                             <button
                                 type="button"
                                 onClick={handlers.onNewEvent}
-                                className="inline-flex h-[34px] items-center gap-2 rounded-[9px] bg-primary-foreground px-3.5 text-[12.5px] font-bold text-primary shadow-sm transition-transform hover:scale-[1.02]"
+                                className="inline-flex h-[34px] items-center gap-2 rounded-[9px] bg-primary-foreground px-3.5 text-[12.5px] font-bold text-primary-strong shadow-sm transition-transform hover:scale-[1.02]"
                             >
                                 <CalendarPlus className="h-[15px] w-[15px]" />
                                 New event

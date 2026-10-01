@@ -374,7 +374,7 @@ function DetailBody({
                             onClick={() =>
                                 setTaskForm({ open: true, task: null })
                             }
-                            className="inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-primary-foreground px-3 text-[12px] font-bold text-primary"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-primary-foreground px-3 text-[12px] font-bold text-primary-strong"
                         >
                             <Plus className="h-3.5 w-3.5" /> Add task
                         </button>

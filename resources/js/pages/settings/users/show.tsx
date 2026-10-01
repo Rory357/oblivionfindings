@@ -559,7 +559,7 @@ export default function UserShow({
                                                                 false,
                                                             );
                                                         }}
-                                                        className="h-auto gap-1 rounded-full border-primary bg-white px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10"
+                                                        className="h-auto gap-1 rounded-full border-primary bg-white px-2.5 py-1 text-xs font-medium text-primary-strong hover:bg-primary/10"
                                                     >
                                                         <Plus className="h-3 w-3" />{' '}
                                                         {role.label ||

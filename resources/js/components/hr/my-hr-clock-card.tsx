@@ -288,7 +288,7 @@ export function MyHrClockCard({
                     type="button"
                     onClick={isClockedIn ? handleClockOut : handleClockIn}
                     disabled={processing}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary-foreground px-3 py-3.5 text-sm font-bold text-primary transition-opacity hover:opacity-90 disabled:opacity-70"
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary-foreground px-3 py-3.5 text-sm font-bold text-primary-strong transition-opacity hover:opacity-90 disabled:opacity-70"
                 >
                     {processing ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

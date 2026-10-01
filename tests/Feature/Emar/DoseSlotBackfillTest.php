@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Console\Commands\BackfillMedicationDoseSlots;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -15,7 +16,9 @@ use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Console\Command;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -395,6 +398,35 @@ class DoseSlotBackfillTest extends TestCase
         $this->backfill(['--months' => 1, '--limit-orders' => 1]);
 
         $this->assertSame('2026-06-20', app(DoseSlotProjection::class)->coverage('2026-05-20')['available_from']);
+    }
+
+    public function test_only_one_run_writes_at_a_time(): void
+    {
+        $this->at('2026-06-01 07:00');
+        $this->order(['08:00']);
+        $this->forgetLiveHistory();
+        $this->at('2026-06-04 12:00');
+
+        // Another run holds the lock: this one says so and writes nothing.
+        $other = Cache::lock(BackfillMedicationDoseSlots::LOCK, 60);
+        $this->assertTrue($other->get());
+        $this->artisan('emar:backfill-dose-slots', ['--to' => '2026-06-03', '--months' => 1])
+            ->expectsOutputToContain('Another dose-slot backfill is running, so this one has not started.')
+            ->assertFailed();
+        $this->assertSame(0, MedicationDoseSlot::query()->count());
+        $this->assertSame(0, MedicationDoseSlotBackfill::query()->count());
+
+        // A dry run writes nothing, so it takes no lock.
+        $this->artisan('emar:backfill-dose-slots', ['--to' => '2026-06-03', '--months' => 1, '--dry-run' => true])->assertSuccessful();
+        $this->assertSame(0, MedicationDoseSlot::query()->count());
+
+        $other->release();
+        // A run that stops early (here: refused input) releases the lock…
+        $this->artisan('emar:backfill-dose-slots', ['--to' => '2026-13-01'])->assertExitCode(Command::INVALID);
+        // …and so does one that finishes.
+        $this->backfill(['--to' => '2026-06-03', '--months' => 1]);
+        $this->assertSame(3, MedicationDoseSlot::query()->count());
+        $this->assertTrue(Cache::lock(BackfillMedicationDoseSlots::LOCK, 60)->get());
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────

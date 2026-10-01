@@ -694,7 +694,7 @@ export default function HsEventsIndex({
                                 }
                                 className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none ${
                                     filters.worksafe
-                                        ? 'border-primary-foreground bg-primary-foreground text-primary'
+                                        ? 'border-primary-foreground bg-primary-foreground text-primary-strong'
                                         : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/80 hover:bg-primary-foreground/20'
                                 }`}
                             >

@@ -71,7 +71,7 @@ function QuickActionButton({ action }: { action: PageHeroQuickAction }) {
         >
             <Icon className="h-[15px] w-[15px]" />
             {action.badge != null ? (
-                <span className="absolute top-0.5 right-0.5 inline-flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-primary-foreground px-1 text-[9px] font-bold text-primary">
+                <span className="absolute top-0.5 right-0.5 inline-flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-primary-foreground px-1 text-[9px] font-bold text-primary-strong">
                     {action.badge}
                 </span>
             ) : null}

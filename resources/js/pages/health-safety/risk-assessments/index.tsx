@@ -401,7 +401,7 @@ export default function RiskAssessmentsIndex({
                                 className={cn(
                                     'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
                                     filters.due_for_review === 'true'
-                                        ? 'border-primary-foreground bg-primary-foreground text-primary'
+                                        ? 'border-primary-foreground bg-primary-foreground text-primary-strong'
                                         : 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
                                 )}
                             >
