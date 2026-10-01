@@ -82,8 +82,9 @@ class MedicationSettingsSiteScopeTest extends TestCase
                     $this->payload($localSite->id, 'CONCEALED UPDATE'),
                 )
                 ->assertNotFound();
+            // P11: rules are paused, never deleted; pausing is scoped like editing.
             $this->actingAs($actor)
-                ->delete(route('emar.settings.rules.destroy', $concealedRule))
+                ->post(route('emar.settings.rules.active', $concealedRule), ['active' => false])
                 ->assertNotFound();
         }
         $this->assertDatabaseHas('medication_admin_rules', [
@@ -129,9 +130,9 @@ class MedicationSettingsSiteScopeTest extends TestCase
         ]);
 
         $this->actingAs($actor)
-            ->delete(route('emar.settings.rules.destroy', $localRule))
+            ->post(route('emar.settings.rules.active', $localRule), ['active' => false])
             ->assertRedirect();
-        $this->assertDatabaseMissing('medication_admin_rules', ['id' => $localRule->id]);
+        $this->assertDatabaseHas('medication_admin_rules', ['id' => $localRule->id, 'active' => false]);
     }
 
     public function test_explicit_global_site_authority_can_list_and_manage_site_bound_and_global_rules(): void
@@ -180,9 +181,9 @@ class MedicationSettingsSiteScopeTest extends TestCase
         ]);
 
         $this->actingAs($actor)
-            ->delete(route('emar.settings.rules.destroy', $secondRule))
+            ->post(route('emar.settings.rules.active', $secondRule), ['active' => false])
             ->assertRedirect();
-        $this->assertDatabaseMissing('medication_admin_rules', ['id' => $secondRule->id]);
+        $this->assertDatabaseHas('medication_admin_rules', ['id' => $secondRule->id, 'active' => false]);
     }
 
     /** @param array<int, string> $permissions */

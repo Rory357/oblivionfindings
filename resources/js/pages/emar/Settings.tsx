@@ -67,16 +67,28 @@ import {
 } from './settings/_nav';
 import {
     MedicineRules,
+    RuleDialogHost,
+    RulesOverview,
+    type MedicineRule,
+    type RuleData,
+    type RuleOptions,
+} from './settings/_rules';
+import {
     PIN_STATUS_OPTIONS,
     PinStatus,
     SafetyChecks,
     WitnessPins,
-    type MedicineRuleProps,
     type WitnessPinProps,
 } from './settings/_sections';
+import { useStatusMessage } from './settings/_status';
 import { SaveBar, StatusMessage } from './settings/_ui';
 
-type Props = MedicineRuleProps & {
+type Props = {
+    rules: MedicineRule[];
+    ruleOptions: RuleOptions;
+    /** Houses this person can see; the house choices for medicine rules. */
+    sites: { id: number; name: string }[];
+    can: { manage: boolean; manage_global: boolean };
     settings: SettingsPayload;
     witnessPin: WitnessPinProps;
     /** false = a house lead who can only reset PINs sees Staff & PINs, read-only. */
@@ -138,7 +150,7 @@ export default function EmarSettings(props: Props) {
     const { settings: s, witnessPin, settingsAccess, readOnlyAudit } = props;
     const built: Built = useMemo(
         () => ({
-            rules: settingsAccess ? ['medicines', 'safety'] : [],
+            rules: settingsAccess ? ['overview', 'medicines', 'safety'] : [],
             staff: ['pins', 'status'],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
@@ -150,7 +162,8 @@ export default function EmarSettings(props: Props) {
     const { view, sec } = route;
     const [draft, setDraftState] = useState<Draft>({});
     const [dialog, setDialog] = useState<Dialog | null>(null);
-    const [message, setMessage] = useState<string | null>(null);
+    const status = useStatusMessage();
+    const setMessage = status.show;
     const [query, setQuery] = useState('');
     const [f, setF] = useState<Filters>(F0);
     const [page, setPage] = useState(1);
@@ -175,7 +188,7 @@ export default function EmarSettings(props: Props) {
                 settingsHash(next.view, next.sec),
             );
         },
-        [built],
+        [built, setMessage],
     );
     useEffect(() => {
         const onHash = () => {
@@ -184,7 +197,7 @@ export default function EmarSettings(props: Props) {
         };
         window.addEventListener('hashchange', onHash);
         return () => window.removeEventListener('hashchange', onHash);
-    }, [built]);
+    }, [built, setMessage]);
 
     // The server says what was saved; show it on the page (Fleet's status
     // message). A save redirects back without the #view/tab, so put it back.
@@ -204,7 +217,7 @@ export default function EmarSettings(props: Props) {
                         settingsHash(view, sec),
                     );
             }),
-        [view, sec],
+        [view, sec, setMessage],
     );
 
     // Fleet's leave guard: leaving with an unsaved draft asks first.
@@ -237,6 +250,13 @@ export default function EmarSettings(props: Props) {
         };
     }, [dirty]);
 
+    const ruleData: RuleData = {
+        rules: props.rules,
+        options: props.ruleOptions,
+        sites: props.sites,
+        can: props.can,
+        readOnlyAudit,
+    };
     const canEdit = (group: string) =>
         !!s.groups[group] && s.can_manage_organisation;
     const ctx: SettingsContext = {
@@ -245,8 +265,17 @@ export default function EmarSettings(props: Props) {
         setDraft: (fn) => setDraftState(fn),
         canEdit,
         go,
-        open: setDialog,
-        close: () => setDialog(null),
+        open: (next) => {
+            // The walkthrough confirms in its own success pane; the page's
+            // message waits until it closes.
+            if (next?.kind === 'reviewdefaults' || next?.kind === 'rule')
+                status.hold();
+            setDialog(next);
+        },
+        close: () => {
+            setDialog(null);
+            status.release();
+        },
         flash: setMessage,
         freshAfter,
         leave: (url) => {
@@ -389,7 +418,7 @@ export default function EmarSettings(props: Props) {
                     <PageHeaderSearch
                         value={query}
                         onChange={setQuery}
-                        placeholder={`Search ${sectionLabel(view, sec).replace(/^[A-Z](?![A-Z])/, (c) => c.toLowerCase())}`}
+                        placeholder={`Search ${(sec === 'overview' ? SET_VIEWS[view].label : sectionLabel(view, sec)).replace(/^[A-Z](?![A-Z])/, (c) => c.toLowerCase())}`}
                     />
                     {settingsAccess ? (
                         <PageHeaderGlassButton
@@ -467,9 +496,11 @@ export default function EmarSettings(props: Props) {
     }));
     const clearQ = () => setQuery('');
     const body =
-        view === 'rules' && sec === 'medicines' ? (
+        view === 'rules' && sec === 'overview' ? (
+            <RulesOverview data={ruleData} q={query} />
+        ) : view === 'rules' && sec === 'medicines' ? (
             <MedicineRules
-                {...props}
+                data={ruleData}
                 q={query}
                 where={f.rulesWhere}
                 state={f.rulesState}
@@ -536,7 +567,7 @@ export default function EmarSettings(props: Props) {
                         value={sec}
                         onChange={(k) => go(view, k)}
                     />
-                    <StatusMessage message={message} />
+                    <StatusMessage message={status.message} />
                     {body}
                     {SAVED_SECTIONS.includes(sec) ? (
                         <SaveBar
@@ -556,6 +587,7 @@ export default function EmarSettings(props: Props) {
                     ) : null}
                 </div>
                 <DialogHost dialog={dialog} />
+                <RuleDialogHost dialog={dialog} data={ruleData} />
             </SettingsCtx.Provider>
         </AppLayout>
     );

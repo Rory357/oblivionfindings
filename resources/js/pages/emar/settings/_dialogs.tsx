@@ -16,7 +16,7 @@ import {
     WizardStepPane,
     WizardSuccessPane,
 } from '@/components/wizard/shell';
-import { formatDateLong, formatTime } from '@/lib/datetime';
+import { formatDateOnly, formatTime, toDateInput } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -67,8 +67,14 @@ const Recorded = () => (
     </p>
 );
 
+/** "29 Sep 2026" in New Zealand time (P11 v5 wording). */
+export function dayText(at: string | null) {
+    return at ? formatDateOnly(toDateInput(at)) : '';
+}
+
+/** "29 Sep 2026 8:05 am" in New Zealand time (P11 v5 wording). */
 export function whenText(at: string | null) {
-    return at ? `${formatDateLong(at)} ${formatTime(at)}` : '';
+    return at ? `${dayText(at)} ${formatTime(at)}` : '';
 }
 
 const GROUP_ICON: Record<string, typeof Layers> = {
@@ -912,5 +918,8 @@ export function DialogHost({ dialog }: { dialog: Dialog | null }) {
             return <KeepDefault group={dialog.group} keyName={dialog.key} />;
         case 'reviewdefaults':
             return <ReviewDefaults />;
+        default:
+            // Medicine-rule dialogs are hosted by RuleDialogHost.
+            return null;
     }
 }

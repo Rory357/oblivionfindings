@@ -3,6 +3,7 @@
 namespace App\Services\Medication\Settings;
 
 use App\Models\AppSetting;
+use App\Models\MedicationAdminRule;
 use App\Models\MedicationSettingChange;
 use App\Models\MedicationSiteSetting;
 use App\Models\User;
@@ -30,6 +31,9 @@ class MedicationSettingsStore
     public const REVISION_KEY = 'medications.settings.revision';
 
     public const NOT_YET_REVIEWED = 'Default — not yet reviewed';
+
+    /** History entries for medicine rules use this group, keyed "rule:{id}". */
+    public const RULES_GROUP = 'medicine_rules';
 
     public function __construct(private readonly MedicationSettingsRegistry $registry) {}
 
@@ -184,14 +188,80 @@ class MedicationSettingsStore
     }
 
     /**
+     * Record a medicine-rule change (added, changed, paused, turned back on)
+     * in the change history, worded like the rule itself. The rule's own
+     * audit entry is written by the model; a rule can't be "put back".
+     */
+    public function recordRuleChange(
+        User $actor,
+        MedicationAdminRule $rule,
+        string $label,
+        string $before,
+        string $after,
+        bool $loosens,
+        string $auditEvent,
+        bool $controlled = false,
+    ): MedicationSettingChange {
+        return MedicationSettingChange::query()->create([
+            'setting_group' => self::RULES_GROUP,
+            'setting_key' => 'rule:'.$rule->id,
+            'site_id' => $rule->site_id,
+            'action' => MedicationSettingChange::ACTION_CHANGED,
+            'view' => MedicationSettingsRegistry::VIEW_RULES,
+            'section' => 'medicines',
+            'label' => $label,
+            'before_value' => null,
+            'after_value' => null,
+            'before_text' => $before,
+            'after_text' => $after,
+            'loosens' => $loosens,
+            'controlled' => $controlled,
+            'actor_id' => $actor->id,
+            'audit_event' => $auditEvent,
+        ]);
+    }
+
+    /**
+     * The newest history entry for each medicine rule, keyed by rule id.
+     *
+     * @param  list<int>  $ruleIds
+     * @return Collection<int, MedicationSettingChange>
+     */
+    public function latestRuleChanges(array $ruleIds): Collection
+    {
+        if ($ruleIds === []) {
+            return collect();
+        }
+        $keys = array_map(fn (int $id): string => 'rule:'.$id, $ruleIds);
+        $latestIds = MedicationSettingChange::query()
+            ->selectRaw('MAX(id) as id')
+            ->where('setting_group', self::RULES_GROUP)
+            ->whereIn('setting_key', $keys)
+            ->groupBy('setting_key')
+            ->pluck('id');
+
+        return MedicationSettingChange::query()
+            ->with('actor:id,name')
+            ->whereIn('id', $latestIds->all())
+            ->get()
+            ->keyBy(fn (MedicationSettingChange $change): int => (int) substr($change->setting_key, 5));
+    }
+
+    /**
      * The newest changes first, organisation-wide ones plus those at the
-     * given houses (null = every house).
+     * given houses (null = every house). For someone without
+     * controlled-medicine access, a change to a rule that names a controlled
+     * medicine — flagged when written, or a rule that does now — keeps only
+     * who, when and where.
      *
      * @param  list<int>|null  $siteIds
+     * @param  list<int>  $controlledRuleIds
      * @return Collection<int, array<string, mixed>>
      */
-    public function history(?array $siteIds, int $limit = 500): Collection
+    public function history(?array $siteIds, int $limit = 500, bool $canSeeControlled = true, array $controlledRuleIds = []): Collection
     {
+        $concealedKeys = array_flip(array_map(fn (int $id): string => 'rule:'.$id, $controlledRuleIds));
+
         return MedicationSettingChange::query()
             ->with(['actor:id,name', 'site:id,name'])
             ->when($siteIds !== null, fn ($query) => $query->where(fn ($scope) => $scope
@@ -200,7 +270,7 @@ class MedicationSettingsStore
             ->orderByDesc('id')
             ->limit($limit)
             ->get()
-            ->map(fn (MedicationSettingChange $change): array => [
+            ->map(fn (MedicationSettingChange $change): array => $this->concealIfNeeded([
                 'id' => $change->id,
                 'at' => $change->created_at?->toIso8601String(),
                 'who' => $change->actor?->name,
@@ -219,7 +289,28 @@ class MedicationSettingsStore
                 'loosens' => $change->loosens,
                 'note' => $change->note,
                 'event' => $change->audit_event,
-            ]);
+                'concealed' => false,
+            ], ! $canSeeControlled && ($change->controlled || ($change->setting_group === self::RULES_GROUP && isset($concealedKeys[$change->setting_key])))));
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function concealIfNeeded(array $row, bool $conceal): array
+    {
+        if (! $conceal) {
+            return $row;
+        }
+
+        return [
+            ...$row,
+            'label' => 'Controlled-medicine rule',
+            'before_text' => '',
+            'after_text' => 'Details need controlled-medicine access',
+            'note' => null,
+            'concealed' => true,
+        ];
     }
 
     /**

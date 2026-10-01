@@ -57,7 +57,7 @@ class OneChartSettingsTest extends TestCase
         ]);
     }
 
-    public function test_manager_can_create_update_and_delete_admin_rules(): void
+    public function test_manager_can_create_update_and_turn_admin_rules_back_on(): void
     {
         $this->actingAs($this->admin)->get('/emar/settings')->assertOk();
 
@@ -96,11 +96,13 @@ class OneChartSettingsTest extends TestCase
         $this->assertSame('Intravenous', $rule->match_value);
         $this->assertFalse($rule->active);
 
+        // P11: rules are paused and turned back on, never deleted.
         $this->actingAs($this->admin)
-            ->delete("/emar/settings/rules/{$rule->id}")
+            ->post("/emar/settings/rules/{$rule->id}/active", ['active' => true])
             ->assertRedirect();
 
-        $this->assertDatabaseMissing('medication_admin_rules', ['id' => $rule->id]);
+        $this->assertTrue($rule->fresh()->active);
+        $this->assertDatabaseCount('medication_admin_rules', 1);
     }
 
     public function test_admin_rule_requires_a_countersign_or_observation(): void
