@@ -3,6 +3,7 @@
 namespace App\Services\Medication;
 
 use App\Models\AppSetting;
+use Illuminate\Container\Attributes\Scoped;
 
 /**
  * Dose timing for every house (eMAR P11 Rounds & timing): when a scheduled
@@ -15,7 +16,13 @@ use App\Models\AppSetting;
  * Stephan 29 Sep 2026: keep them until the clinical lead reviews them) and
  * show as "Default — not yet reviewed" until someone saves or keeps them.
  * Recording a dose is never blocked by these times.
+ *
+ * Read once per request: the container keeps one instance per request or
+ * queued job (#[Scoped]) and it reads every timing value in one query. A save
+ * of a timing key through AppSetting makes the request's instance re-read
+ * (AppSetting's saved/deleted events call settingChanged()).
  */
+#[Scoped]
 class DoseTimingSettings
 {
     public const EARLY_MINUTES = 'medications.mar.window_before_minutes';
@@ -48,6 +55,9 @@ class DoseTimingSettings
         self::REFUSAL_COUNT => ['medications.refusal_escalation.count', 3],
         self::REFUSAL_DAYS => ['medications.refusal_escalation.days', 7],
     ];
+
+    /** @var array<string, mixed>|null every timing value as stored, once read */
+    private ?array $stored = null;
 
     /** Minutes before the dose time a dose can be given from. */
     public function earlyMinutes(): int
@@ -93,10 +103,28 @@ class DoseTimingSettings
         return (string) (int) config($configKey, $fallback);
     }
 
+    /** Forget the values read, so the next read sees the latest saved ones. */
+    public function forget(): void
+    {
+        $this->stored = null;
+    }
+
+    /** An app_settings row changed: a timing key makes this request's reader re-read. */
+    public static function settingChanged(?string $key): void
+    {
+        if ($key !== null && array_key_exists($key, self::RANGES)) {
+            app(self::class)->forget();
+        }
+    }
+
     /** A stored value out of range, or not a whole number, reads as the default. */
     private function value(string $key): int
     {
-        $stored = AppSetting::query()->where('key', $key)->value('value');
+        $this->stored ??= AppSetting::query()
+            ->whereIn('key', array_keys(self::RANGES))
+            ->pluck('value', 'key')
+            ->all();
+        $stored = $this->stored[$key] ?? null;
         [$min, $max] = self::RANGES[$key];
         $stored = is_int($stored) ? (string) $stored : $stored;
 
