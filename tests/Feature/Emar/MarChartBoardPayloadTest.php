@@ -5,6 +5,7 @@ namespace Tests\Feature\Emar;
 use App\Models\Client;
 use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -42,6 +43,18 @@ class MarChartBoardPayloadTest extends TestCase
             'medications.view',
             'medications.administer.record',
             'medications.controlled.witness',
+        ]);
+        // "Med-competent" is the competency policy's decision, not the permission.
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $user->id,
+            'assessor_id' => User::factory()->create(['approved_at' => now()])->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => now()->subMonth()->toDateString(),
+            'expiry_date' => now()->addYear()->toDateString(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'can_administer_unsupervised' => true,
         ]);
 
         $site = Site::factory()->create([
