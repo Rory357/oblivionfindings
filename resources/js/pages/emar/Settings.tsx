@@ -74,6 +74,7 @@ import {
     type MedicineRuleProps,
     type WitnessPinProps,
 } from './settings/_sections';
+import { useStatusMessage } from './settings/_status';
 import { SaveBar, StatusMessage } from './settings/_ui';
 
 type Props = MedicineRuleProps & {
@@ -150,7 +151,8 @@ export default function EmarSettings(props: Props) {
     const { view, sec } = route;
     const [draft, setDraftState] = useState<Draft>({});
     const [dialog, setDialog] = useState<Dialog | null>(null);
-    const [message, setMessage] = useState<string | null>(null);
+    const status = useStatusMessage();
+    const setMessage = status.show;
     const [query, setQuery] = useState('');
     const [f, setF] = useState<Filters>(F0);
     const [page, setPage] = useState(1);
@@ -175,7 +177,7 @@ export default function EmarSettings(props: Props) {
                 settingsHash(next.view, next.sec),
             );
         },
-        [built],
+        [built, setMessage],
     );
     useEffect(() => {
         const onHash = () => {
@@ -184,7 +186,7 @@ export default function EmarSettings(props: Props) {
         };
         window.addEventListener('hashchange', onHash);
         return () => window.removeEventListener('hashchange', onHash);
-    }, [built]);
+    }, [built, setMessage]);
 
     // The server says what was saved; show it on the page (Fleet's status
     // message). A save redirects back without the #view/tab, so put it back.
@@ -204,7 +206,7 @@ export default function EmarSettings(props: Props) {
                         settingsHash(view, sec),
                     );
             }),
-        [view, sec],
+        [view, sec, setMessage],
     );
 
     // Fleet's leave guard: leaving with an unsaved draft asks first.
@@ -245,8 +247,16 @@ export default function EmarSettings(props: Props) {
         setDraft: (fn) => setDraftState(fn),
         canEdit,
         go,
-        open: setDialog,
-        close: () => setDialog(null),
+        open: (next) => {
+            // The walkthrough confirms in its own success pane; the page's
+            // message waits until it closes.
+            if (next?.kind === 'reviewdefaults') status.hold();
+            setDialog(next);
+        },
+        close: () => {
+            setDialog(null);
+            status.release();
+        },
         flash: setMessage,
         freshAfter,
         leave: (url) => {
@@ -536,7 +546,7 @@ export default function EmarSettings(props: Props) {
                         value={sec}
                         onChange={(k) => go(view, k)}
                     />
-                    <StatusMessage message={message} />
+                    <StatusMessage message={status.message} />
                     {body}
                     {SAVED_SECTIONS.includes(sec) ? (
                         <SaveBar
