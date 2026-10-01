@@ -7,11 +7,10 @@ use App\Services\Medication\DoseTimingSettings;
 /**
  * The one place a dose window comes from (P01 foundation, C2).
  *
- * The general window is Medication › Settings › Rounds & timing ("can be
- * given from", "counts as late"), read through DoseTimingSettings; until
- * someone saves them they are config/medications.php's 30 minutes before and
- * 60 after. A DoseWindowOverride gives a time-critical medicine its own late
- * time. Callers ask forOrder() and nothing else hard-codes a window.
+ * Today it reads DoseTimingSettings (P11 Rounds & timing; config 30/60 until saved). P11's
+ * Dose timing settings (Lane A, chunk 4) replace the defaults and register a
+ * DoseWindowOverride for time-critical medicines; callers keep asking
+ * forOrder() and nothing else hard-codes a window.
  */
 final class DoseWindowResolver
 {
