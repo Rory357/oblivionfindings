@@ -82,6 +82,11 @@ export const NOTIFICATION_META: Record<string, NotificationMeta> = {
         name: 'Shift Task Due',
         description: 'When a time-specific shift task is due now',
     },
+    'medications.witness_pin_reminder': {
+        name: 'Witness PIN Reminder',
+        description:
+            'When a lead asks you to set your witness PIN — always in the app; push if you turn it on',
+    },
 };
 
 export const NOTIFICATION_MODULES: Record<string, NotificationModule> = {
@@ -101,6 +106,11 @@ export const NOTIFICATION_MODULES: Record<string, NotificationModule> = {
         label: 'Rostering',
         colour: 'violet',
         keys: ['shift_task_due'],
+    },
+    medication: {
+        label: 'Medication',
+        colour: 'violet',
+        keys: ['medications.witness_pin_reminder'],
     },
     incidents: {
         label: 'Incidents & Safety',

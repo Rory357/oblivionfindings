@@ -24,6 +24,10 @@ export type SettingDefinition = {
     unit: string | null;
     /** A setting decided together with this one: reviewed, kept and listed as one. */
     paired_with: string | null;
+    /** The words for a number switched off ("No renewal"). */
+    off_label?: string | null;
+    /** Off means "Not configured"; what happens until someone chooses. */
+    when_not_configured?: string | null;
     /** Option values from loosest to strictest. */
     rank: string[] | null;
     numeric: {
@@ -98,9 +102,14 @@ export function definitionOf(
 export const isNumber = (def: SettingDefinition) =>
     def.options.length === 0 && def.range !== null;
 
+/** The value meaning "switched off", for a number that can be off. */
+export const offValue = (def: SettingDefinition) =>
+    isNumber(def) ? (def.numeric?.off ?? null) : null;
+
 /** Is this a value the setting accepts? (The server checks the same.) */
 export function accepts(def: SettingDefinition, value: string): boolean {
     if (isNumber(def)) {
+        if (offValue(def) !== null && value === offValue(def)) return true;
         const [min, max] = def.range!;
         return /^\d{1,6}$/.test(value) && +value >= min && +value <= max;
     }
@@ -109,12 +118,22 @@ export function accepts(def: SettingDefinition, value: string): boolean {
 
 /** What to say when a number isn't accepted (the server's words). */
 export const numberError = (def: SettingDefinition) =>
-    `Enter a whole number from ${def.range![0].toLocaleString('en-NZ')} to ${def.range![1].toLocaleString('en-NZ')}.`;
+    `Enter a whole number from ${def.range![0].toLocaleString('en-NZ')} to ${def.range![1].toLocaleString('en-NZ')}${offValue(def) !== null ? ', or switch it off' : ''}.`;
 
 export function format(def: SettingDefinition, value: string): string {
-    if (isNumber(def)) return [value, def.unit].filter(Boolean).join(' ');
+    if (isNumber(def)) {
+        if (offValue(def) !== null && value === offValue(def))
+            return def.off_label ?? 'Off';
+        return [value, def.unit].filter(Boolean).join(' ');
+    }
     return def.options.find((o) => o.value === value)?.label ?? value;
 }
+
+/** A setting still off where off means "Not configured". */
+export const notConfigured = (
+    def: SettingDefinition | undefined,
+    value: string,
+) => !!def?.when_not_configured && value === offValue(def);
 
 /** Does changing from one value to another turn a check off or make it less strict? */
 export function loosens(
@@ -280,11 +299,26 @@ export function stillToDecide(s: SettingsPayload): Pending[] {
             const def = definitionOf(s, g.key, key);
             if (!def || def.scope !== 'organisation') return;
             if (isSecondOfPair(s, def)) return;
+            // Off where off means "Not configured": listed until someone
+            // chooses a number, even after a deliberate save.
+            if (notConfigured(def, savedValue(s, g.key, key))) {
+                out.push({
+                    group: g.key,
+                    key,
+                    view: g.view,
+                    section: def.section,
+                    label: def.label,
+                    state: 'nc',
+                    until: def.when_not_configured!,
+                });
+                return;
+            }
             if (decisionReviewer(s, g.key, key)) return;
             const pair = def.paired_with
                 ? definitionOf(s, g.key, def.paired_with)
                 : undefined;
-            const value = format(def, savedValue(s, g.key, key));
+            const saved = savedValue(s, g.key, key);
+            const value = format(def, saved);
             out.push({
                 group: g.key,
                 key,
@@ -292,9 +326,10 @@ export function stillToDecide(s: SettingsPayload): Pending[] {
                 section: def.section,
                 label: def.label,
                 state: 'default',
-                until: isNumber(def)
-                    ? `Today’s rule: ${pair ? `${value} within ${format(pair, savedValue(s, g.key, pair.key))}` : value}`
-                    : `Behaves as: ${value}`,
+                until:
+                    isNumber(def) && saved !== offValue(def)
+                        ? `Today’s rule: ${pair ? `${value} within ${format(pair, savedValue(s, g.key, pair.key))}` : value}`
+                        : `Behaves as: ${value}`,
             });
         });
     });

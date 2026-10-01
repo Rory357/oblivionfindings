@@ -22,11 +22,18 @@ class WitnessPinSettings
 
     public const RENEWAL_MONTHS = 'medications.witness_pin.renewal_months';
 
-    public const OPTIONS = [
-        self::MAX_ATTEMPTS => ['3', '5', '10'],
-        self::LOCKOUT_MINUTES => ['5', '15', '30', '60'],
-        self::RENEWAL_MONTHS => ['none', '6', '12'],
+    /**
+     * Whole numbers each rule accepts (P11 Q-F: number inputs). Renewal can
+     * also be off. Every value the earlier fixed choices allowed still fits.
+     */
+    public const RANGES = [
+        self::MAX_ATTEMPTS => [3, 10],
+        self::LOCKOUT_MINUTES => [5, 60],
+        self::RENEWAL_MONTHS => [1, 24],
     ];
+
+    /** Renewal switched off: a PIN stays until its owner changes it. */
+    public const RENEWAL_OFF = 'none';
 
     public const DEFAULTS = [
         self::MAX_ATTEMPTS => '5',
@@ -49,7 +56,7 @@ class WitnessPinSettings
     {
         $value = $this->value(self::RENEWAL_MONTHS);
 
-        return $value === 'none' ? null : (int) $value;
+        return $value === self::RENEWAL_OFF ? null : (int) $value;
     }
 
     /** @return array<string, string> */
@@ -88,7 +95,7 @@ class WitnessPinSettings
         return $reviewed;
     }
 
-    /** @param  array<string, string>  $values  Validated against OPTIONS by the caller. */
+    /** @param  array<string, string>  $values  Validated against RANGES by the caller. */
     public function save(array $values): void
     {
         foreach (self::DEFAULTS as $key => $default) {
@@ -111,10 +118,17 @@ class WitnessPinSettings
         );
     }
 
+    /** A stored value out of range, or not a whole number, reads as the default. */
     private function normalise(string $key, mixed $value): string
     {
-        return is_string($value) && in_array($value, self::OPTIONS[$key], true)
-            ? $value
+        $value = is_int($value) ? (string) $value : $value;
+        if ($key === self::RENEWAL_MONTHS && $value === self::RENEWAL_OFF) {
+            return $value;
+        }
+        [$min, $max] = self::RANGES[$key];
+
+        return is_string($value) && preg_match('/^\d{1,6}$/', $value) === 1 && (int) $value >= $min && (int) $value <= $max
+            ? (string) (int) $value
             : self::DEFAULTS[$key];
     }
 }

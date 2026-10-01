@@ -2,6 +2,7 @@
 
 namespace App\Services\Medication\Settings;
 
+use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\DoseTimingSettings;
 use App\Services\Medication\MedicationSafetyPolicySettings;
 use App\Services\Medication\WitnessPinSettings;
@@ -79,7 +80,7 @@ class MedicationSettingsRegistry
     /** @return list<MedicationSettingGroup> */
     protected function build(): array
     {
-        return [$this->safetyChecks(), $this->doseTiming(), $this->witnessPinRules()];
+        return [$this->safetyChecks(), $this->doseTiming(), $this->competencyPolicy(), $this->witnessPinRules()];
     }
 
     private function safetyChecks(): MedicationSettingGroup
@@ -178,13 +179,88 @@ class MedicationSettingsRegistry
         );
     }
 
+    private function competencyPolicy(): MedicationSettingGroup
+    {
+        $policy = CompetencyPolicySettings::class;
+        $number = fn (string $key, string $storageKey, string $section, string $label, string $unit, string $direction): MedicationSettingDefinition => new MedicationSettingDefinition(
+            group: 'elig',
+            key: $key,
+            storageKey: $storageKey,
+            scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+            section: $section,
+            label: $label,
+            options: [],
+            default: $policy::default($storageKey),
+            numeric: ['direction' => $direction, 'off' => null, 'off_is_loosest' => false],
+            range: $policy::RANGES[$storageKey],
+            unit: $unit,
+        );
+        $looser = MedicationSettingDefinition::HIGHER_IS_LOOSER;
+        $stricter = MedicationSettingDefinition::HIGHER_IS_STRICTER;
+        $organisation = MedicationSettingDefinition::SCOPE_ORGANISATION;
+
+        return new MedicationSettingGroup(
+            key: 'elig',
+            view: self::VIEW_STAFF,
+            effect: 'From the next assessment or exemption recorded, at every house — existing ones keep their end dates',
+            auditEvent: 'medications.competency_policy.updated',
+            definitions: [
+                $number('validity', $policy::VALIDITY_MONTHS, 'competency', 'An assessment stays current for', 'months', $looser),
+                $number('pass_mark', $policy::PASS_MARK, 'competency', 'Pass mark', 'of the 12 areas passed', $stricter),
+                // P11 Q-B: off by default — only the pass mark counts.
+                new MedicationSettingDefinition(
+                    group: 'elig',
+                    key: 'core_must_pass',
+                    storageKey: $policy::CORE_AREAS_MUST_PASS,
+                    scope: $organisation,
+                    section: 'competency',
+                    label: 'Every core area must be passed',
+                    options: ['no' => 'Off — only the pass mark counts', 'yes' => 'On'],
+                    default: 'no',
+                    rank: ['no', 'yes'],
+                ),
+                // P11 Q-C: off until the organisation chooses a number; when on,
+                // an assessment logging fewer isn't saved.
+                new MedicationSettingDefinition(
+                    group: 'elig',
+                    key: 'observed_minimum',
+                    storageKey: $policy::OBSERVED_MINIMUM,
+                    scope: $organisation,
+                    section: 'competency',
+                    label: 'Minimum observed administrations',
+                    options: [],
+                    default: $policy::OBSERVED_MINIMUM_OFF,
+                    numeric: ['direction' => $stricter, 'off' => $policy::OBSERVED_MINIMUM_OFF, 'off_is_loosest' => true],
+                    range: $policy::OBSERVED_RANGE,
+                    unit: 'observed administrations',
+                    offLabel: 'Off — no minimum',
+                    whenNotConfigured: 'No minimum is asked for',
+                ),
+                // More notice before an assessment ends is stricter.
+                $number('reminder', $policy::RENEWAL_REMINDER_DAYS, 'competency', 'Renewal reminder', 'days before the end date', $stricter),
+                $number('longest_exemption', $policy::LONGEST_EXEMPTION_DAYS, 'exemptions', 'Longest exemption', 'days', $looser),
+            ],
+        );
+    }
+
     private function witnessPinRules(): MedicationSettingGroup
     {
         $pins = WitnessPinSettings::class;
-        $organisation = MedicationSettingDefinition::SCOPE_ORGANISATION;
-        $unit = fn (array $values, string $unit): array => collect($values)
-            ->mapWithKeys(fn (string $value): array => [$value => $value.' '.$unit])
-            ->all();
+        // P11 Q-F: whole numbers within each rule's range; renewal can be off.
+        $number = fn (string $key, string $storageKey, string $label, string $unit, string $direction, ?string $off = null, ?string $offLabel = null): MedicationSettingDefinition => new MedicationSettingDefinition(
+            group: 'pin',
+            key: $key,
+            storageKey: $storageKey,
+            scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+            section: 'pins',
+            label: $label,
+            options: [],
+            default: $pins::DEFAULTS[$storageKey],
+            numeric: ['direction' => $direction, 'off' => $off, 'off_is_loosest' => $off !== null],
+            range: $pins::RANGES[$storageKey],
+            unit: $unit,
+            offLabel: $offLabel,
+        );
 
         return new MedicationSettingGroup(
             key: 'pin',
@@ -192,41 +268,9 @@ class MedicationSettingsRegistry
             effect: 'From the next dose signed or witnessed, at every house',
             auditEvent: 'medications.witness_pin_rules.updated',
             definitions: [
-                new MedicationSettingDefinition(
-                    group: 'pin',
-                    key: 'max_attempts',
-                    storageKey: $pins::MAX_ATTEMPTS,
-                    scope: $organisation,
-                    section: 'pins',
-                    label: 'Wrong attempts before a PIN locks',
-                    options: $unit($pins::OPTIONS[$pins::MAX_ATTEMPTS], 'attempts'),
-                    default: $pins::DEFAULTS[$pins::MAX_ATTEMPTS],
-                    numeric: ['direction' => MedicationSettingDefinition::HIGHER_IS_LOOSER, 'off' => null, 'off_is_loosest' => false],
-                ),
-                new MedicationSettingDefinition(
-                    group: 'pin',
-                    key: 'lockout_minutes',
-                    storageKey: $pins::LOCKOUT_MINUTES,
-                    scope: $organisation,
-                    section: 'pins',
-                    label: 'How long a locked PIN stays locked',
-                    options: $unit($pins::OPTIONS[$pins::LOCKOUT_MINUTES], 'minutes'),
-                    default: $pins::DEFAULTS[$pins::LOCKOUT_MINUTES],
-                    numeric: ['direction' => MedicationSettingDefinition::HIGHER_IS_STRICTER, 'off' => null, 'off_is_loosest' => false],
-                ),
-                new MedicationSettingDefinition(
-                    group: 'pin',
-                    key: 'renewal_months',
-                    storageKey: $pins::RENEWAL_MONTHS,
-                    scope: $organisation,
-                    section: 'pins',
-                    label: 'PIN renewal (optional)',
-                    options: collect($pins::OPTIONS[$pins::RENEWAL_MONTHS])
-                        ->mapWithKeys(fn (string $value): array => [$value => $value === 'none' ? 'No renewal' : 'Every '.$value.' months'])
-                        ->all(),
-                    default: $pins::DEFAULTS[$pins::RENEWAL_MONTHS],
-                    numeric: ['direction' => MedicationSettingDefinition::HIGHER_IS_LOOSER, 'off' => 'none', 'off_is_loosest' => true],
-                ),
+                $number('max_attempts', $pins::MAX_ATTEMPTS, 'Wrong attempts before a PIN locks', 'attempts', MedicationSettingDefinition::HIGHER_IS_LOOSER),
+                $number('lockout_minutes', $pins::LOCKOUT_MINUTES, 'How long a locked PIN stays locked', 'minutes', MedicationSettingDefinition::HIGHER_IS_STRICTER),
+                $number('renewal_months', $pins::RENEWAL_MONTHS, 'PIN renewal (optional)', 'months', MedicationSettingDefinition::HIGHER_IS_LOOSER, $pins::RENEWAL_OFF, 'No renewal'),
             ],
         );
     }

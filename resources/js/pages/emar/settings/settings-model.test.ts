@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+    accepts,
     canRestore,
     changes,
+    format,
     loosens,
+    numberError,
     stillToDecide,
+    validateView,
     withDraft,
     withoutDrafts,
     type HistoryEntry,
@@ -35,11 +39,8 @@ const renewal: SettingDefinition = {
     scope: 'organisation',
     section: 'pins',
     label: 'PIN renewal (optional)',
-    options: [
-        { value: 'none', label: 'No renewal' },
-        { value: '6', label: 'Every 6 months' },
-        { value: '12', label: 'Every 12 months' },
-    ],
+    // P11 Q-F: a whole number of months, or off.
+    options: [],
     default: 'none',
     rank: null,
     numeric: {
@@ -47,9 +48,30 @@ const renewal: SettingDefinition = {
         off: 'none',
         off_is_loosest: true,
     },
-    range: null,
-    unit: null,
+    range: [1, 24],
+    unit: 'months',
     paired_with: null,
+    off_label: 'No renewal',
+};
+const observed: SettingDefinition = {
+    group: 'elig',
+    key: 'observed_minimum',
+    scope: 'organisation',
+    section: 'competency',
+    label: 'Minimum observed administrations',
+    options: [],
+    default: 'off',
+    rank: null,
+    numeric: {
+        direction: 'higher_is_stricter',
+        off: 'off',
+        off_is_loosest: true,
+    },
+    range: [1, 100],
+    unit: 'observed administrations',
+    paired_with: null,
+    off_label: 'Off — no minimum',
+    when_not_configured: 'No minimum is asked for',
 };
 
 const payload = (over: Partial<SettingsPayload> = {}): SettingsPayload => ({
@@ -121,7 +143,72 @@ describe('drafts', () => {
     });
 });
 
+describe('a number that can be switched off (P11 Q-F)', () => {
+    it('accepts off or a whole number in range, and words each', () => {
+        expect(accepts(renewal, 'none')).toBe(true);
+        expect(accepts(renewal, '1')).toBe(true);
+        expect(accepts(renewal, '24')).toBe(true);
+        expect(accepts(renewal, '25')).toBe(false);
+        expect(accepts(renewal, '')).toBe(false);
+        expect(format(renewal, 'none')).toBe('No renewal');
+        expect(format(renewal, '18')).toBe('18 months');
+        expect(numberError(renewal)).toBe(
+            'Enter a whole number from 1 to 24, or switch it off.',
+        );
+    });
+    it('asks for a number when switched on with an empty box', () => {
+        const s = payload();
+        expect(
+            validateView(
+                s,
+                withDraft({}, 'pin', 'renewal_months', ''),
+                'staff',
+            ),
+        ).toEqual({
+            'pin.renewal_months':
+                'Enter a whole number from 1 to 24, or switch it off.',
+        });
+    });
+});
+
 describe('still to decide', () => {
+    it('lists a setting that is still off where off means not configured, even once saved', () => {
+        const s = payload({
+            groups: {
+                ...payload().groups,
+                elig: {
+                    key: 'elig',
+                    view: 'staff',
+                    effect: 'From the next assessment',
+                    audit_event: 'medications.competency_policy.updated',
+                    keys: ['observed_minimum'],
+                },
+            },
+            definitions: {
+                ...payload().definitions,
+                elig: { observed_minimum: observed },
+            },
+            values: { ...payload().values, elig: { observed_minimum: 'off' } },
+            reviewed: {
+                ...payload().reviewed,
+                elig: { observed_minimum: { by: 'Hana Kereama', at: null } },
+            },
+        });
+        expect(stillToDecide(s)).toContainEqual(
+            expect.objectContaining({
+                key: 'observed_minimum',
+                state: 'nc',
+                until: 'No minimum is asked for',
+            }),
+        );
+        expect(
+            stillToDecide({
+                ...s,
+                values: { ...s.values, elig: { observed_minimum: '12' } },
+            }).some((p) => p.key === 'observed_minimum'),
+        ).toBe(false);
+    });
+
     it('lists organisation settings nobody has saved or kept, with how they behave meanwhile', () => {
         const pending = stillToDecide(payload());
         expect(pending).toEqual([

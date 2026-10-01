@@ -15,6 +15,7 @@ use App\Models\MedicationError;
 use App\Models\MedicationRound;
 use App\Models\Site;
 use App\Services\GuidedRoundService;
+use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\MedicationReportingService;
 use App\Support\Medication\MedicationStockQuantity;
@@ -296,14 +297,16 @@ class EmarReportController extends Controller
                 }
             }));
 
+        // Renewal is due this many days before the end date (Settings › Staff & PINs).
+        $renewalDays = app(CompetencyPolicySettings::class)->renewalReminderDays();
         $currentCompetency = (clone $competencyQuery)->where('status', 'passed')
             ->where('expiry_date', '>', $today)
-            ->where('expiry_date', '>', $today->copy()->addDays(30))
+            ->where('expiry_date', '>', $today->copy()->addDays($renewalDays))
             ->count();
 
         $expiringCompetency = (clone $competencyQuery)->where('status', 'passed')
             ->where('expiry_date', '>', $today)
-            ->where('expiry_date', '<=', $today->copy()->addDays(30))
+            ->where('expiry_date', '<=', $today->copy()->addDays($renewalDays))
             ->count();
 
         $expiredCompetency = (clone $competencyQuery)->where('status', 'passed')
@@ -316,14 +319,14 @@ class EmarReportController extends Controller
             ->orderByDesc('assessment_date')
             ->limit(50)
             ->get()
-            ->map(function ($a) use ($today) {
+            ->map(function ($a) use ($today, $renewalDays) {
                 $daysUntilExpiry = $a->expiry_date ? $today->diffInDays($a->expiry_date, false) : null;
                 $status = 'current';
                 if ($a->status === 'failed') {
                     $status = 'failed';
                 } elseif ($a->expiry_date && $a->expiry_date->lte($today)) {
                     $status = 'expired';
-                } elseif ($daysUntilExpiry !== null && $daysUntilExpiry <= 30) {
+                } elseif ($daysUntilExpiry !== null && $daysUntilExpiry <= $renewalDays) {
                     $status = 'expiring';
                 }
 

@@ -18,6 +18,7 @@ use App\Models\MedicationRound;
 use App\Models\MedicationSyringeDriver;
 use App\Models\User;
 use App\Services\Emar\MedsBoardPayloadService;
+use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
@@ -348,9 +349,11 @@ class MedicationOverviewService
             ->count();
 
         $workerToday = $this->workerNow()->startOfDay();
+        // Renewal is due this many days before the end date (Settings › Staff & PINs).
+        $renewalDays = app(CompetencyPolicySettings::class)->renewalReminderDays();
         $expiringCompetencies = $this->competencyAssessmentQuery()
             ->where('status', 'passed')
-            ->whereBetween('expiry_date', [$workerToday->toDateString(), $workerToday->copy()->addDays(30)->toDateString()])
+            ->whereBetween('expiry_date', [$workerToday->toDateString(), $workerToday->copy()->addDays($renewalDays)->toDateString()])
             ->count();
 
         $allowedClientIds = $this->allowedClientIds();
@@ -1055,7 +1058,7 @@ class MedicationOverviewService
     public function complianceSnapshot(): array
     {
         return [
-            'competencyExpiring' => $this->competencyAssessmentQuery()->where('expiry_date', '<=', $this->workerNow()->addDays(30)->toDateString())->where('expiry_date', '>=', $this->workerNow()->toDateString())->count(),
+            'competencyExpiring' => $this->competencyAssessmentQuery()->where('expiry_date', '<=', $this->workerNow()->addDays(app(CompetencyPolicySettings::class)->renewalReminderDays())->toDateString())->where('expiry_date', '>=', $this->workerNow()->toDateString())->count(),
             'competencyExpired' => $this->competencyAssessmentQuery()->where('expiry_date', '<', $this->workerNow()->toDateString())->count(),
             'pendingReviews' => MedicationReview::whereIn('client_id', $this->allowedClientIds())->where('status', 'scheduled')->where('scheduled_date', '<=', $this->workerNow()->toDateString())->count(),
             'overdueReviews' => MedicationReview::whereIn('client_id', $this->allowedClientIds())->where('status', 'overdue')->count(),

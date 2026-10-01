@@ -30,7 +30,11 @@ final class MedicationSettingDefinition
      * A setting with no `$options` and a `$range` is typed as a whole number
      * within that range (P11 v5 number inputs); `$unit` is the words after it
      * ("minutes before the dose time"). `$pairedWith` names a setting decided
-     * together with this one: it is reviewed, kept and listed as one.
+     * together with this one: it is reviewed, kept and listed as one. A number
+     * whose `$numeric['off']` is set can also be switched off; `$offLabel` is
+     * the words for off ("No renewal"). `$whenNotConfigured` marks a setting
+     * whose off value means "Not configured" — screens give no value until the
+     * organisation chooses one — and says what happens meanwhile.
      *
      * @param  array<string, string>  $options  Accepted value => the words for it.
      * @param  list<string>|null  $rank
@@ -51,11 +55,19 @@ final class MedicationSettingDefinition
         public readonly ?array $range = null,
         public readonly ?string $unit = null,
         public readonly ?string $pairedWith = null,
+        public readonly ?string $offLabel = null,
+        public readonly ?string $whenNotConfigured = null,
     ) {}
 
     public function isNumber(): bool
     {
         return $this->options === [] && $this->range !== null;
+    }
+
+    /** The value meaning "switched off", for a number that can be off. */
+    public function offValue(): ?string
+    {
+        return $this->isNumber() ? ($this->numeric['off'] ?? null) : null;
     }
 
     public function id(): string
@@ -74,6 +86,10 @@ final class MedicationSettingDefinition
             return false;
         }
         if ($this->isNumber()) {
+            if ($this->offValue() !== null && $value === $this->offValue()) {
+                return true;
+            }
+
             return preg_match('/^\d{1,6}$/', $value) === 1
                 && (int) $value >= $this->range[0]
                 && (int) $value <= $this->range[1];
@@ -86,7 +102,7 @@ final class MedicationSettingDefinition
     public function invalidMessage(): string
     {
         return $this->isNumber()
-            ? 'Enter a whole number from '.number_format($this->range[0]).' to '.number_format($this->range[1]).' for “'.$this->label.'”.'
+            ? 'Enter a whole number from '.number_format($this->range[0]).' to '.number_format($this->range[1]).' for “'.$this->label.'”'.($this->offValue() !== null ? ', or switch it off.' : '.')
             : 'Choose one of the listed values for “'.$this->label.'”.';
     }
 
@@ -106,6 +122,10 @@ final class MedicationSettingDefinition
     public function format(string $value): string
     {
         if ($this->isNumber()) {
+            if ($this->offValue() !== null && $value === $this->offValue()) {
+                return $this->offLabel ?? 'Off';
+            }
+
             return trim($value.' '.($this->unit ?? ''));
         }
 
@@ -162,6 +182,8 @@ final class MedicationSettingDefinition
             'range' => $this->range,
             'unit' => $this->unit,
             'paired_with' => $this->pairedWith,
+            'off_label' => $this->offLabel,
+            'when_not_configured' => $this->whenNotConfigured,
             'rank' => $this->rank,
             'numeric' => $this->numeric,
         ];

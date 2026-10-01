@@ -2,7 +2,7 @@
 
 namespace App\Services\Medication;
 
-use App\Models\AppSetting;
+use App\Services\Medication\Settings\ReadsWholeNumberSettings;
 use Illuminate\Container\Attributes\Scoped;
 
 /**
@@ -25,6 +25,8 @@ use Illuminate\Container\Attributes\Scoped;
 #[Scoped]
 class DoseTimingSettings
 {
+    use ReadsWholeNumberSettings;
+
     public const EARLY_MINUTES = 'medications.mar.window_before_minutes';
 
     public const LATE_MINUTES = 'medications.mar.window_after_minutes';
@@ -47,7 +49,7 @@ class DoseTimingSettings
         self::REFUSAL_DAYS => [1, 90],
     ];
 
-    private const CONFIG = [
+    protected const CONFIG = [
         self::EARLY_MINUTES => ['medications.mar.window_before_minutes', 30],
         self::LATE_MINUTES => ['medications.mar.window_after_minutes', 60],
         self::DUE_SOON_MINUTES => ['medications.mar.due_soon_minutes', 60],
@@ -55,9 +57,6 @@ class DoseTimingSettings
         self::REFUSAL_COUNT => ['medications.refusal_escalation.count', 3],
         self::REFUSAL_DAYS => ['medications.refusal_escalation.days', 7],
     ];
-
-    /** @var array<string, mixed>|null every timing value as stored, once read */
-    private ?array $stored = null;
 
     /** Minutes before the dose time a dose can be given from. */
     public function earlyMinutes(): int
@@ -95,41 +94,4 @@ class DoseTimingSettings
         return $this->value(self::REFUSAL_DAYS);
     }
 
-    /** The shipped default for a value, as stored. */
-    public static function default(string $key): string
-    {
-        [$configKey, $fallback] = self::CONFIG[$key];
-
-        return (string) (int) config($configKey, $fallback);
-    }
-
-    /** Forget the values read, so the next read sees the latest saved ones. */
-    public function forget(): void
-    {
-        $this->stored = null;
-    }
-
-    /** An app_settings row changed: a timing key makes this request's reader re-read. */
-    public static function settingChanged(?string $key): void
-    {
-        if ($key !== null && array_key_exists($key, self::RANGES)) {
-            app(self::class)->forget();
-        }
-    }
-
-    /** A stored value out of range, or not a whole number, reads as the default. */
-    private function value(string $key): int
-    {
-        $this->stored ??= AppSetting::query()
-            ->whereIn('key', array_keys(self::RANGES))
-            ->pluck('value', 'key')
-            ->all();
-        $stored = $this->stored[$key] ?? null;
-        [$min, $max] = self::RANGES[$key];
-        $stored = is_int($stored) ? (string) $stored : $stored;
-
-        return is_string($stored) && preg_match('/^\d{1,6}$/', $stored) === 1 && (int) $stored >= $min && (int) $stored <= $max
-            ? (int) $stored
-            : (int) self::default($key);
-    }
 }
