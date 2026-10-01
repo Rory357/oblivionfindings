@@ -215,6 +215,24 @@ class DoseSlotOutcomeWriterTest extends TestCase
         $this->assertSame(0, MedicationDoseSlot::query()->whereNotNull('outcome')->count());
     }
 
+    public function test_a_record_naming_another_person_never_writes_this_orders_slot(): void
+    {
+        $order = $this->scheduledOrder();
+        $someoneElse = Client::factory()->create([
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'status' => 'active',
+        ]);
+
+        // A mismatched (forged or corrupt) record: another person, this order.
+        $this->record($order, ['client_id' => $someoneElse->id, 'status' => 'refused']);
+        $this->assertSame(0, MedicationDoseSlot::query()->whereNotNull('outcome')->count());
+
+        // The person's own record still writes the outcome.
+        $own = $this->record($order);
+        $this->assertOneOutcome($order, 'given', $own);
+    }
+
     public function test_corrections_update_the_outcome_only_when_approved(): void
     {
         $order = $this->scheduledOrder();

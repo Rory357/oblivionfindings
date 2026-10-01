@@ -74,7 +74,9 @@ final class DoseSlotOutcomeWriter
             // slots' mutex, already held by this record's own write — see
             // lockOrderOf), then the slot's administration rows, then slots.
             $order = ClientMedication::withTrashed()->whereKey($root->client_medication_id)->lockForUpdate()->first();
-            if ($order === null) {
+            // A record whose person isn't the order's person is not evidence
+            // for that order's doses: it never writes another person's slot.
+            if ($order === null || (int) $order->client_id !== (int) $root->client_id) {
                 return;
             }
 
