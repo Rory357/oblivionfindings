@@ -25,7 +25,19 @@ class GovernanceCalendarScopeTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // The synthetic fixtures schedule meetings 3 and 7 days from now, and
+        // several tests read the fixed October 2026 range. Once the real date
+        // reached October those meetings fell inside it (6 items, not 4), so
+        // the clock is frozen, in UTC, before the fixtures load.
+        Carbon::setTestNow(Carbon::parse('2026-09-01 09:00:00', 'UTC'));
         $this->fixtures = GovernanceSyntheticFixtures::seed();
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
     }
 
     protected function createExecutiveViewer(): User
