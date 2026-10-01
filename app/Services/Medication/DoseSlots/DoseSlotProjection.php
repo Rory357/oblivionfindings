@@ -43,7 +43,28 @@ final class DoseSlotProjection
 
     private const GROUPS = ['nz_date', 'client_id'];
 
-    public function __construct(private readonly DoseWindowResolver $windows) {}
+    private readonly DoseSlotCoverage $coverage;
+
+    public function __construct(private readonly DoseWindowResolver $windows, ?DoseSlotCoverage $coverage = null)
+    {
+        $this->coverage = $coverage ?? new DoseSlotCoverage;
+    }
+
+    /**
+     * Which days a read starting on $from can show (C5): the projection
+     * holds days from live generation, and back to a completed backfill. A
+     * period starting earlier carries "Not available before {date}".
+     *
+     * @return array{available_from: string, complete: bool, notice: string|null}
+     */
+    public function coverage(string $from, ?CarbonImmutable $now = null): array
+    {
+        if (! DoseSlotRules::isCalendarDate($from)) {
+            throw new InvalidArgumentException('An NZ calendar day is Y-m-d.');
+        }
+
+        return $this->coverage->forPeriod($from, $now);
+    }
 
     /**
      * Every live slot on the NZ days $from..$to (inclusive) for the scope,
@@ -85,6 +106,8 @@ final class DoseSlotProjection
                     'order_change_pending' => (bool) $row->order_change_pending,
                     'dst_adjustment' => $row->dst_adjustment,
                     'last_day' => (bool) $row->last_day,
+                    // Rebuilt from history by the backfill, not generated live.
+                    'reconstructed' => (bool) $row->reconstructed,
                 ];
             });
     }
@@ -155,7 +178,7 @@ final class DoseSlotProjection
 
         return $scoped->select([
             's.id', 's.client_id', 's.client_medication_id', 's.schedule_version_id', 's.nz_date', 's.ordered_time',
-            's.due_at', 's.controlled', 's.order_change_pending', 's.dst_adjustment', 's.self_managed', 's.last_day',
+            's.due_at', 's.controlled', 's.order_change_pending', 's.dst_adjustment', 's.self_managed', 's.last_day', 's.reconstructed',
             's.outcome', 's.outcome_administration_id', 's.outcome_at',
         ])
             ->selectRaw("{$opens} as window_opens_at")

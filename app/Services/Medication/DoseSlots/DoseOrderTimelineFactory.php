@@ -107,7 +107,7 @@ final class DoseOrderTimelineFactory
             || ($inactive && $order->state !== 'ceased' && $ceasedAt === null);
     }
 
-    private static function stoppedAt(ClientMedication $order): ?CarbonImmutable
+    public static function stoppedAt(ClientMedication $order): ?CarbonImmutable
     {
         $stops = array_filter([
             self::rawInstant(self::attribute($order, 'ceased_at')),
