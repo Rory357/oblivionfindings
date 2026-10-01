@@ -43,6 +43,10 @@ Reuse the shared right-click creation menu, blank-date/time creation controls,
 keyboard navigation and entry styling. A visible New entry action must provide
 the same workflow on touch devices. Right-clicking an existing entry opens its
 actions; it must not accidentally create something underneath that entry.
+An action blocked for that entry sets the opt-in
+`CalendarMenuItem.disabledReason` (as LIST_STYLE_GUIDE.md §4): it stays listed,
+aria-disabled and inert, with the reason as its second line, and focusable so
+the reason is announced.
 
 Only entries the user can edit offer drag or resize controls. My Calendar's
 personal planning editor supports tasks, meetings, appointments and reminders;

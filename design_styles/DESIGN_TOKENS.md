@@ -178,9 +178,10 @@ Edit [`resources/css/app.css`](../resources/css/app.css):
 - **44 px targets.** The root font is 14 px, so rem sizes such as `min-h-11`
   render at 38.5 px. `.frontline-tap` makes a control at least 44×44 px.
   `.frontline-hit` gives a compact control (row kebab, pagination, tier-2 tab,
-  dialog and wizard ✕) an invisible 44×44 px target and leaves its drawn size
-  alone. Keep 44 px between the centres of neighbouring `.frontline-hit`
-  targets.
+  dialog, wizard and sheet ✕) an invisible 44×44 px target and leaves its
+  drawn size alone. Keep 44 px between the centres of neighbouring
+  `.frontline-hit` targets, and keep each target on screen: the `Sheet` ✕
+  has a 16 px minimum inset because a sheet touches the screen edge.
 - **Reduced motion.** A global `@media (prefers-reduced-motion: reduce)` block in
   `app.css` disables `animate-ping` / `animate-spin` / `animate-pop` /
   `animate-pulse`. New animated chrome should rely on that block (or a

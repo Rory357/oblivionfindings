@@ -34,7 +34,8 @@ lucide-react icons, Recharts.
    respect the global reduced-motion block; ≥44 px tap targets on frontline
    surfaces (`.frontline-tap`, or `.frontline-hit` where a compact control
    must keep its drawn size — row kebabs, pagination, tier-2 tabs, the
-   `Dialog` and `WizardShell` ✕).
+   `Dialog`, `WizardShell` and `Sheet` ✕; the `Sheet` ✕ keeps a 16 px
+   minimum inset so its 44 px target stays on screen).
 6. **Safety colours are brand-independent.** Allergen/conflict/emergency
    surfaces use fixed `status-critical`/`status-warning` pairs, never
    brand-derived tints — an admin's brand hue must not be able to push a
@@ -625,7 +626,9 @@ before.
     "Review … ↗" `<Button variant="link">`;
   - settings sit in **titled groups** (icon plus caption) of compact rows;
   - every on/off choice is a `Switch` showing its On/Off word; a segmented
-    control is used only for three or more real options;
+    control is used only for three or more real options, or for a choice
+    between two named modes that isn't on/off (e.g. "Block | Co-signer with
+    witness PIN"), shown under the `Switch` that turns the setting on;
   - anything that notifies people gets **In-app / Email** switch columns
     (plus Push where it applies) and a separate delivery or channels tab
     with real controls, never badge-only cards;
