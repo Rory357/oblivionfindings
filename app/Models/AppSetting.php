@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Medication\DoseTimingSettings;
 use App\Support\SecurityPolicy;
 use Illuminate\Database\Eloquent\Model;
 
@@ -24,5 +25,10 @@ class AppSetting extends Model
 
         static::saved($bustPolicyCache);
         static::deleted($bustPolicyCache);
+
+        // Dose timing is read once per request; a save makes it re-read.
+        $refreshDoseTiming = static fn (self $setting) => DoseTimingSettings::settingChanged($setting->key);
+        static::saved($refreshDoseTiming);
+        static::deleted($refreshDoseTiming);
     }
 }

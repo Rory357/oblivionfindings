@@ -27,6 +27,7 @@ import {
     type PageHeroBadge,
     type PageHeroStat,
 } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     TabStrip,
@@ -546,13 +547,12 @@ export default function Rounds(props: Props) {
                     actions={
                         <>
                             {canManage && (
-                                <Button
-                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                <PageHeaderPrimaryButton
+                                    icon={Zap}
                                     onClick={() => setGenerateOpen(true)}
                                 >
-                                    <Zap className="h-4 w-4" />
                                     Generate rounds
-                                </Button>
+                                </PageHeaderPrimaryButton>
                             )}
                         </>
                     }

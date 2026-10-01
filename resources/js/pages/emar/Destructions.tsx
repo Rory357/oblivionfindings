@@ -9,6 +9,7 @@ import {
     type DestructionRow,
 } from '@/components/emar/destruction-detail-dialog';
 import { PageHero, type PageHeroStat } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -465,13 +466,12 @@ export default function Destructions({
                     actions={
                         <>
                             {canRecord ? (
-                                <Button
-                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
                                     onClick={() => setModal({ type: 'record' })}
                                 >
-                                    <Plus className="h-4 w-4" />
                                     Record destruction
-                                </Button>
+                                </PageHeaderPrimaryButton>
                             ) : null}
                             <Button
                                 variant="outline"

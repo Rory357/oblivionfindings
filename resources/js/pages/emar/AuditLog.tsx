@@ -21,6 +21,7 @@ import {
     type PageHeroMetaItem,
     type PageHeroStat,
 } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -599,12 +600,11 @@ export default function AuditLog({
                     stats={heroStats}
                     actions={
                         <>
-                            <a href="/emar/audit/export">
-                                <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
-                                    <Download className="h-4 w-4" />
+                            <PageHeaderPrimaryButton asChild icon={Download}>
+                                <a href="/emar/audit/export">
                                     Export audit pack
-                                </Button>
-                            </a>
+                                </a>
+                            </PageHeaderPrimaryButton>
                             <a href="/emar/reports">
                                 <Button
                                     variant="outline"

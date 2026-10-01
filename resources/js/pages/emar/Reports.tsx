@@ -9,6 +9,7 @@ import {
     OpsStatCard,
 } from '@/components/ops-stat-card';
 import { PageHero, type PageHeroStat } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -484,24 +485,24 @@ export default function Reports(props: Props) {
                     stats={heroStats}
                     actions={
                         <>
-                            <a
-                                href={exportUrl(
-                                    canViewControlled && tab === 'controlled'
-                                        ? 'controlled'
-                                        : tab === 'prn'
-                                          ? 'prn'
-                                          : tab === 'errors'
-                                            ? 'errors'
-                                            : tab === 'rounds'
-                                              ? 'rounds'
-                                              : 'administration',
-                                )}
-                            >
-                                <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
-                                    <Download className="h-4 w-4" />
+                            <PageHeaderPrimaryButton asChild icon={Download}>
+                                <a
+                                    href={exportUrl(
+                                        canViewControlled &&
+                                            tab === 'controlled'
+                                            ? 'controlled'
+                                            : tab === 'prn'
+                                              ? 'prn'
+                                              : tab === 'errors'
+                                                ? 'errors'
+                                                : tab === 'rounds'
+                                                  ? 'rounds'
+                                                  : 'administration',
+                                    )}
+                                >
                                     Export
-                                </Button>
-                            </a>
+                                </a>
+                            </PageHeaderPrimaryButton>
                             <a href="/emar/pdf/mar-chart">
                                 <Button
                                     variant="outline"

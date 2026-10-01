@@ -54,6 +54,7 @@ import {
     StatusPill,
 } from '@/components/meds/board-bits';
 import { PendingAssessmentNotice } from '@/components/meds/pending-assessment';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { PageHero } from '@/components/page/page-hero';
 import type { PageHeroBadge } from '@/components/page/page-hero-badges';
 import type { PageHeroStat } from '@/components/page/page-hero-stats';
@@ -1743,22 +1744,17 @@ export default function MedsToday(props: MedsTodayProps) {
                     actions={
                         <>
                             {active_round && canRecord ? (
-                                <Button
-                                    size="sm"
-                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                    asChild
-                                >
+                                <PageHeaderPrimaryButton asChild icon={Pill}>
                                     <Link
                                         href={active_round.url}
                                         aria-label={`${active_round.status === 'in_progress' ? 'Resume' : 'Start'} ${active_round.name}`}
                                     >
-                                        <Pill className="h-4 w-4" />
                                         {active_round.status === 'in_progress'
                                             ? 'Resume'
                                             : 'Start'}{' '}
                                         {active_round.name.toLowerCase()}
                                     </Link>
-                                </Button>
+                                </PageHeaderPrimaryButton>
                             ) : null}
                             {board_can.view_emar ? (
                                 <Button

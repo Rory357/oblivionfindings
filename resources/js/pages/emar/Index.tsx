@@ -5,6 +5,7 @@
 import { ClientAvatar } from '@/components/meds/board-bits';
 import { DonutChart, OPS_COLORS } from '@/components/ops-stat-card';
 import { PageHero } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import type { PageHeroBadge } from '@/components/page/page-hero-badges';
 import type { PageHeroMetaItem } from '@/components/page/page-hero-meta';
 import type { PageHeroStat } from '@/components/page/page-hero-stats';
@@ -831,14 +832,12 @@ export default function EmarHome(props: Props) {
                     actions={
                         <>
                             {can.record ? (
-                                <Button
-                                    size="sm"
-                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                <PageHeaderPrimaryButton
+                                    icon={Clock}
                                     onClick={() => setModal('generate-rounds')}
                                 >
-                                    <Clock className="h-4 w-4" />
                                     Generate today&rsquo;s rounds
-                                </Button>
+                                </PageHeaderPrimaryButton>
                             ) : null}
                             {can.export_reports ? (
                                 <Button

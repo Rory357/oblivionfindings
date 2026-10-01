@@ -3,6 +3,7 @@ import {
     type IncidentDetail,
 } from '@/components/incidents/incident-detail-dialog';
 import { IncidentReportDialog } from '@/components/incidents/incident-report-dialog';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -644,13 +645,9 @@ export default function IncidentsIndex({
                                 onOpenChange={setLauncherOpen}
                             >
                                 <PopoverTrigger asChild>
-                                    <Button
-                                        size="sm"
-                                        className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                    >
-                                        <Plus className="mr-1.5 h-4 w-4" />{' '}
+                                    <PageHeaderPrimaryButton icon={Plus}>
                                         Report
-                                    </Button>
+                                    </PageHeaderPrimaryButton>
                                 </PopoverTrigger>
                                 <PopoverContent
                                     align="end"

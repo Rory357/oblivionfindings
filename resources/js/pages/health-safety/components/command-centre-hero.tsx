@@ -3,6 +3,7 @@
  * medallion + title + NZ compliance badges, the Leading/Lagging stat clusters, and a footer band
  * (period range · site · role lens · "this week" summary strip). Semantic tokens only; plain
  * string URLs. The kit is the single implementation — analytics composes the same pieces. */
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { EntityFilter } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import {
@@ -292,13 +293,9 @@ export function CommandCentreHero({
 
                 <div className="flex flex-wrap items-center gap-2">
                     {onReport ? (
-                        <Button
-                            onClick={onReport}
-                            className="bg-primary-foreground text-primary shadow-sm hover:bg-primary-foreground/90"
-                        >
-                            <Plus className="mr-1.5 h-4 w-4" />
+                        <PageHeaderPrimaryButton icon={Plus} onClick={onReport}>
                             Report
-                        </Button>
+                        </PageHeaderPrimaryButton>
                     ) : null}
                     <Link
                         href="/health-safety/analytics"

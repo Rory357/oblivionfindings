@@ -5,6 +5,7 @@
  * the dashboard). Shares the dashboard's hero/tab/filter idiom. NZ-only:
  * LTIFR / TRIFR, WorkSafe notifiable events, Nga Paerewa NZS 8134:2021, ACC.
  */
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import type {
     RosterTabItem,
     ShiftCtxItem,
@@ -1173,16 +1174,15 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                                 <LayoutDashboard className="h-4 w-4" />
                                 H&amp;S command centre
                             </Link>
-                            <a
-                                href={queryFor(
-                                    tab === 'sites' ? 'sites' : 'incidents',
-                                )}
-                                className="inline-flex"
-                            >
-                                <Button className="gap-1.5 bg-primary-foreground text-primary shadow-sm hover:bg-primary-foreground/90">
-                                    <Download className="h-4 w-4" /> Export
-                                </Button>
-                            </a>
+                            <PageHeaderPrimaryButton asChild icon={Download}>
+                                <a
+                                    href={queryFor(
+                                        tab === 'sites' ? 'sites' : 'incidents',
+                                    )}
+                                >
+                                    Export
+                                </a>
+                            </PageHeaderPrimaryButton>
                             {canViewBoardReports ? (
                                 <Popover>
                                     <PopoverTrigger asChild>

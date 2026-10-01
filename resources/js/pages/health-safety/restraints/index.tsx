@@ -10,6 +10,7 @@ import {
     type PlanPickerOption,
     type Prescope,
 } from '@/components/health-safety/restraint-event-wizard';
+import { PageHeaderGlassButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -696,16 +697,12 @@ export default function RestraintsIndex({
 
                             <Popover>
                                 <PopoverTrigger asChild>
-                                    <Button
-                                        size="sm"
-                                        className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                    >
-                                        <FileText className="mr-1.5 h-4 w-4" />{' '}
+                                    <PageHeaderGlassButton icon={FileText}>
                                         Export / Board reports
                                         <span aria-hidden className="ml-1">
                                             ▾
                                         </span>
-                                    </Button>
+                                    </PageHeaderGlassButton>
                                 </PopoverTrigger>
                                 <PopoverContent
                                     align="end"
