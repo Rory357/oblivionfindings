@@ -1,4 +1,5 @@
 import HeadingSmall from '@/components/heading-small';
+import { BrandContrastNotice } from '@/components/settings/brand-contrast-notice';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -1059,6 +1060,10 @@ export default function BrandingPage(props: Props) {
                                                 and chart colours are derived
                                                 from this hue.
                                             </p>
+                                            <BrandContrastNotice
+                                                hex={brandHex}
+                                                onUseShade={handleBrandChange}
+                                            />
                                         </div>
 
                                         <div className="space-y-3">

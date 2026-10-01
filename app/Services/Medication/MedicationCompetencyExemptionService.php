@@ -7,6 +7,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\UserSiteAccessService;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,7 @@ class MedicationCompetencyExemptionService
 {
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
+        private readonly CompetencyPolicySettings $policy,
     ) {}
 
     public function approve(
@@ -38,6 +40,21 @@ class MedicationCompetencyExemptionService
         if ($expiresAt->lte($startsAt) || $expiresAt->lte(now())) {
             throw ValidationException::withMessages([
                 'expires_at' => 'The competency exemption must have a future expiry.',
+            ]);
+        }
+        // P11 Staff & PINs › Exemption limit: the last day is at most this
+        // many days after the first (NZ calendar days).
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $longest = $this->policy->longestExemptionDays();
+        $lastAllowed = CarbonImmutable::instance($startsAt)->timezone($timezone)->startOfDay()->addDays($longest);
+        if (CarbonImmutable::instance($expiresAt)->timezone($timezone)->toDateString() > $lastAllowed->toDateString()) {
+            throw ValidationException::withMessages([
+                'expires_at' => sprintf(
+                    'That’s longer than your organisation allows (%d %s). Choose %s or earlier.',
+                    $longest,
+                    $longest === 1 ? 'day' : 'days',
+                    $lastAllowed->format('j M Y'),
+                ),
             ]);
         }
 

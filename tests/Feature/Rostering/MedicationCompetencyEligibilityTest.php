@@ -30,14 +30,29 @@ function makeMedicationShift(Site $site, Client $client): Shift
     ]);
 }
 
+/**
+ * A full assessment, as the app records one (since cd5d34e6b a bare
+ * passed/failed row reads as unassessed): assessed by someone else, the
+ * assessor's declaration and the person's acknowledgement both made already.
+ */
+function establishedMedicationAssessment(User $staff, array $attributes): MedicationCompetencyAssessment
+{
+    return MedicationCompetencyAssessment::query()->forceCreate([
+        'user_id' => $staff->id,
+        'assessor_id' => User::factory()->create()->id,
+        'assessor_declared_at' => now()->subDay(),
+        'staff_acknowledged_at' => now()->subDay(),
+        ...$attributes,
+    ]);
+}
+
 test('an expired medication competency blocks a medication shift', function () {
     $site = Site::factory()->create();
     $client = Client::factory()->create(['site_id' => $site->id]);
     $shift = makeMedicationShift($site, $client);
 
     $staff = User::factory()->create();
-    MedicationCompetencyAssessment::create([
-        'user_id' => $staff->id,
+    establishedMedicationAssessment($staff, [
         'assessment_type' => 'annual',
         'status' => 'passed',
         'assessment_date' => now()->subYear()->toDateString(),
@@ -56,8 +71,7 @@ test('a current medication competency passes the medication-competency rule', fu
     $shift = makeMedicationShift($site, $client);
 
     $staff = User::factory()->create();
-    MedicationCompetencyAssessment::create([
-        'user_id' => $staff->id,
+    establishedMedicationAssessment($staff, [
         'assessment_type' => 'annual',
         'status' => 'passed',
         'assessment_date' => now()->subMonth()->toDateString(),
@@ -65,8 +79,11 @@ test('a current medication competency passes the medication-competency rule', fu
     ]);
 
     $result = app(ShiftStaffEligibilityService::class)->evaluate($shift, $staff)->toArray();
+    $rule = collect($result['checked_rules'])->firstWhere('rule', 'medication_competency');
 
-    expect(collect($result['blocked_reasons'])->implode(' '))->not->toContain('Medication competency');
+    expect($rule['passed'])->toBeTrue()
+        ->and($rule['competency_state'])->toBe('valid');
+    expect(collect($result['blocked_reasons'])->implode(' '))->not->toContain('edication competency');
     expect(collect($result['warning_reasons'])->implode(' '))->not->toContain('Medication competency expires');
 });
 
@@ -76,8 +93,7 @@ test('a competency expiring within the warning window warns but does not block',
     $shift = makeMedicationShift($site, $client);
 
     $staff = User::factory()->create();
-    MedicationCompetencyAssessment::create([
-        'user_id' => $staff->id,
+    establishedMedicationAssessment($staff, [
         'assessment_type' => 'annual',
         'status' => 'passed',
         'assessment_date' => now()->subYear()->toDateString(),
@@ -87,7 +103,9 @@ test('a competency expiring within the warning window warns but does not block',
     $result = app(ShiftStaffEligibilityService::class)->evaluate($shift, $staff)->toArray();
 
     expect(collect($result['blocked_reasons'])->implode(' '))->not->toContain('Medication competency expired');
-    expect(collect($result['warning_reasons'])->implode(' '))->toContain('Medication competency expires');
+    // Within the renewal reminder (Settings › Staff & PINs, default 30 days).
+    expect(collect($result['warning_reasons'])->implode(' '))->toContain('Medication competency expires')
+        ->toContain('(within 30 days)');
 });
 
 test('medication permission alone does not satisfy medication coverage eligibility', function () {
@@ -119,8 +137,7 @@ test('a passed medication competency with no expiry blocks medication coverage e
     $client = Client::factory()->create(['site_id' => $site->id]);
     $shift = makeMedicationShift($site, $client);
     $staff = User::factory()->create();
-    MedicationCompetencyAssessment::create([
-        'user_id' => $staff->id,
+    establishedMedicationAssessment($staff, [
         'assessment_type' => 'annual',
         'status' => 'passed',
         'assessment_date' => now()->toDateString(),
@@ -140,8 +157,7 @@ test('a failed medication competency blocks medication coverage eligibility', fu
     $client = Client::factory()->create(['site_id' => $site->id]);
     $shift = makeMedicationShift($site, $client);
     $staff = User::factory()->create();
-    MedicationCompetencyAssessment::create([
-        'user_id' => $staff->id,
+    establishedMedicationAssessment($staff, [
         'assessment_type' => 'initial',
         'status' => 'failed',
         'assessment_date' => now()->toDateString(),

@@ -99,31 +99,42 @@ blocks, filters, tabs) do.
 ## 3. The sky surface (branding-derived — non-negotiable)
 
 The band's colours ALWAYS derive from the branding colour set in
-Settings → Branding: **the bottom of the band is the actual branding
-colour, and the top is a darker shade of that same colour, fading down
-into it.** Never a neutral/grey/ink top, never a hand-picked palette —
-whatever colour branding sets, the band is that colour's own
-dark-to-true ramp. Layered, top to bottom:
+Settings → Branding: **the top is a darker shade of the branding colour,
+fading down into the brand, no lighter than L 0.46, at the bottom**
+(amended 2026-10-02 from "the actual branding colour"; on Stephan's
+end-review list). The rail's tab labels sit on that bottom edge and must
+read at 4.5:1 for every hue — on the raw brand they measured 2.4–3.5:1 for
+orange, teal, green and even the default purple. Never a
+neutral/grey/ink top, never a hand-picked palette — whatever colour
+branding sets, the band is that colour's own dark-to-deep ramp. Layered,
+top to bottom:
 
 1. Linear gradient of the brand colour's own ramp:
    `oklch(from var(--primary) 0.3 calc(c * 0.6) h)` (top) →
    `oklch(from var(--primary) 0.42 calc(c * 0.8) h)` (55%) →
-   `var(--primary)` (100%). Relative-colour oklch keeps the brand HUE
-   in the dark shades, so the ramp retints automatically. (Lightened
-   2026-09-07 from the original L 0.22/0.34 ramp — the top stays a
-   *dark* shade, just softer; white header text must stay AA.)
-2. Two radial glows rising from the bottom edge: a bright one
-   (brand lightened ~25% toward white, alpha .92) bottom-right, a
-   supporting one (brand, alpha .55) bottom-left — the "horizon" fade.
+   `--eh-floor` = `oklch(from var(--primary) min(l, 0.46) c h)` (100%).
+   Relative-colour oklch keeps the brand HUE in the dark shades, so the
+   ramp retints automatically. (Lightened 2026-09-07 from the original
+   L 0.22/0.34 ramp — the top stays a *dark* shade, just softer; white
+   header text must stay AA.)
+2. Two radial blooms rising from the bottom edge, both in the
+   `--eh-floor` colour and adding **no white** (amended 2026-10-02 — the
+   old bottom-right glow was brand lightened ~25% toward white and sat
+   under the rail): alpha .92 bottom-right, alpha .55 bottom-left — the
+   "horizon" fade now tints rather than lightens. Worst measured rail
+   label with the floor: green, 4.71:1.
 3. Two hairline decorative **orbit arcs** (giant circles, brand
    lightened ~45%, alpha .2 / .14), one swinging low-left, one
    high-right. `pointer-events: none`.
 
 **Safety colours never retint** (non-negotiable #6): critical/warning
 accents anywhere in the band use the fixed `status-critical` /
-`status-warning` tokens (lightened toward white for AA on the dark
-sky); success uses `status-success`. Only neutral/brand accents derive
-from `--primary`.
+`status-warning` tokens; success uses `status-success`. On the dark
+sky they keep their status hue and chroma but never fall below a
+lightness floor — `oklch(from var(--status-critical) max(l, 0.84) c h)`,
+warning and success `max(l, 0.82)` (amended 2026-10-02: the old mix
+toward white left light mode's dark status tokens at 3.1–3.5:1 on the
+meter glass). Only neutral/brand accents derive from `--primary`.
 
 ## 4. Top row — identity (left) + actions (right)
 
@@ -211,6 +222,9 @@ block's full height):
 2. **Visual** (or the big number): one of the five types below.
 3. **Caption**: 10.5px muted context line ("across 3 regions",
    "0% occupied · 41 available") or a toned delta ("▲ 4 this week").
+   Muted means sky text at **70%** — never fainter: at 10.5px it is body
+   text, and the old 50% measured 3.5–4.0:1 on the glass (amended
+   2026-10-02; contact phone numbers and "No info" follow the same 70%).
 
 **The seven block types** — a page composes from these only:
 

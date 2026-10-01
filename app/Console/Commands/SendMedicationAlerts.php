@@ -13,6 +13,7 @@ use App\Notifications\MedicationOverdueNotification;
 use App\Notifications\MedicationRefusalClusterNotification;
 use App\Notifications\MedicationStockLowNotification;
 use App\Services\MarScheduleService;
+use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\RefusalEscalationPolicy;
 use App\Services\UserSiteAccessService;
@@ -243,14 +244,15 @@ class SendMedicationAlerts extends Command
     }
 
     /**
-     * Check for expiring competency: assessments where expiry_date <= today + 30 days.
+     * Check for expiring competency: assessments ending within the renewal
+     * reminder (Settings › Staff & PINs, default 30 days).
      * Notify the assessed user.
      */
     protected function checkExpiringCompetencies(): void
     {
         $this->info('Checking for expiring medication competencies...');
 
-        $expiringAssessments = MedicationCompetencyAssessment::expiringSoon(30)
+        $expiringAssessments = MedicationCompetencyAssessment::expiringSoon(app(CompetencyPolicySettings::class)->renewalReminderDays())
             ->with('user')
             ->get();
 

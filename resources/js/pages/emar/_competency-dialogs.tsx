@@ -10,6 +10,7 @@ import {
     SelectInput,
     StepHead,
 } from '@/components/wizard/primitives';
+import { formatDateOnly } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
 import {
     Award,
@@ -104,13 +105,26 @@ export type AssessmentRow = {
     is_passed: boolean;
 };
 export type StaffOpt = { id: number; name: string; role?: string | null };
+/** The organisation's competency settings (Settings › Staff & PINs › Competency). */
+export type CompetencyPolicy = {
+    pass_mark: number;
+    /** Every core area must pass as well as the pass mark. */
+    core_must_pass: boolean;
+    /** Observed administrations an assessment must log, or null for none. */
+    observed_minimum: number | null;
+    validity_months: number;
+    renewal_days: number;
+};
 
 type TriState = 'yes' | 'no' | 'not_seen';
 const areaVal = (a: AssessmentRow, key: string) =>
     (a as unknown as Record<string, boolean>)[key];
-const addYear = (d: string) => {
-    const dt = new Date(d);
-    dt.setFullYear(dt.getFullYear() + 1);
+/** The latest end date: the assessment date plus the validity months. */
+const addMonths = (d: string, months: number) => {
+    const [y, m, day] = d.split('-').map(Number);
+    if (!y || !m || !day) return d;
+    const last = new Date(Date.UTC(y, m - 1 + months + 1, 0)).getUTCDate();
+    const dt = new Date(Date.UTC(y, m - 1 + months, Math.min(day, last)));
     return dt.toISOString().slice(0, 10);
 };
 
@@ -142,9 +156,11 @@ export function AssessmentWizardDialog({
     assessment,
     mode,
     defaultUserId,
+    policy,
     onClose,
 }: {
     staff: StaffOpt[];
+    policy: CompetencyPolicy;
     assessment?: AssessmentRow | null;
     mode: 'new' | 'edit' | 'renew';
     defaultUserId?: number | null;
@@ -186,7 +202,7 @@ export function AssessmentWizardDialog({
     const [expiry, setExpiry] = useState(
         mode === 'edit' && assessment?.expiry_date
             ? assessment.expiry_date
-            : addYear(today),
+            : addMonths(today, policy.validity_months),
     );
     const [incident, setIncident] = useState('');
     const [areas, setAreas] = useState<Record<string, TriState>>(seedAreas);
@@ -223,8 +239,19 @@ export function AssessmentWizardDialog({
     const applicable = COMPETENCY_AREAS.filter(
         (a) => areas[a.key] !== 'not_seen',
     ).length;
-    const coreFail = CORE_KEYS.some((k) => areas[k] === 'no');
-    const eligible = !coreFail && yesCount >= 10;
+    // Settings › Staff & PINs: the pass mark, and — when the organisation
+    // asks for it — every core area passed (not assessed counts as not passed).
+    const coreFail =
+        policy.core_must_pass && CORE_KEYS.some((k) => areas[k] !== 'yes');
+    const eligible = !coreFail && yesCount >= policy.pass_mark;
+    const logged = rounds.filter((r) => r.resident?.trim()).length;
+    const obsMin = policy.observed_minimum;
+    const obsShort = obsMin !== null && logged < obsMin;
+    const latestExpiry = addMonths(assessDate, policy.validity_months);
+    const expiryError =
+        expiry && assessDate && expiry > latestExpiry
+            ? `An assessment stays current for at most ${policy.validity_months} ${policy.validity_months === 1 ? 'month' : 'months'} — choose ${formatDateOnly(latestExpiry)} or earlier.`
+            : undefined;
     const staffName = staff.find((s) => String(s.id) === userId)?.name;
     const staffRole = staff.find((s) => String(s.id) === userId)?.role;
 
@@ -267,7 +294,11 @@ export function AssessmentWizardDialog({
                 );
                 onClose();
             },
-            onError: () => toast.error('Please check the assessment details'),
+            onError: (errors: Record<string, string>) =>
+                toast.error(
+                    Object.values(errors)[0] ??
+                        'Please check the assessment details',
+                ),
             onFinish: () => setBusy(false),
         };
         const data = payload as Parameters<typeof router.post>[1];
@@ -277,9 +308,9 @@ export function AssessmentWizardDialog({
     };
 
     const valid = [
-        !!userId && !!type && !!assessDate,
+        !!userId && !!type && !!assessDate && !expiryError,
         true,
-        true,
+        !obsShort,
         true,
         assessorDeclared && staffDeclared,
     ];
@@ -398,14 +429,25 @@ export function AssessmentWizardDialog({
                                 onChange={(e) => {
                                     setAssessDate(e.target.value);
                                     if (mode !== 'edit')
-                                        setExpiry(addYear(e.target.value));
+                                        setExpiry(
+                                            addMonths(
+                                                e.target.value,
+                                                policy.validity_months,
+                                            ),
+                                        );
                                 }}
                             />
                         </Field>
-                        <Field label="Expiry date">
+                        <Field
+                            label="Expiry date"
+                            hint={`At most ${policy.validity_months} ${policy.validity_months === 1 ? 'month' : 'months'} after the assessment date`}
+                            error={expiryError}
+                        >
                             <Input
                                 type="date"
                                 value={expiry}
+                                max={latestExpiry}
+                                aria-invalid={!!expiryError || undefined}
                                 onChange={(e) => setExpiry(e.target.value)}
                             />
                         </Field>
@@ -479,13 +521,25 @@ export function AssessmentWizardDialog({
                     <StepHead
                         icon={Eye}
                         title="Observed rounds"
-                        blurb="Log each directly-observed administration (NMC guideline: at least 12 across a range of residents)."
+                        blurb="Log each directly-observed administration, across a range of people."
                     />
-                    <div
-                        className={`mb-3 rounded-lg border px-3 py-2 text-xs ${rounds.length >= 12 ? 'border-status-success/30 bg-status-success-bg/60 text-status-success' : 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning'}`}
-                    >
-                        {rounds.length} of 12 observed administrations logged.
-                    </div>
+                    {obsMin !== null ? (
+                        <div
+                            role={obsShort ? 'alert' : undefined}
+                            className={`mb-3 rounded-lg border px-3 py-2 text-xs ${obsShort ? 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning' : 'border-status-success/30 bg-status-success-bg/60 text-status-success'}`}
+                        >
+                            {logged} of {obsMin} observed administrations
+                            logged.
+                            {obsShort
+                                ? ' Your organisation asks for at least this many before an assessment is saved.'
+                                : ''}
+                        </div>
+                    ) : (
+                        <div className="mb-3 rounded-lg border px-3 py-2 text-xs text-muted-foreground">
+                            {logged} logged · no minimum is set (Settings ›
+                            Staff &amp; PINs).
+                        </div>
+                    )}
                     <div className="flex flex-col gap-2">
                         {rounds.map((r, i) => (
                             <div
@@ -586,12 +640,13 @@ export function AssessmentWizardDialog({
                     <div
                         className={`mb-4 rounded-lg border px-4 py-3 text-sm ${eligible ? 'border-status-success/30 bg-status-success-bg/60 text-status-success' : 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning'}`}
                     >
-                        Score {yesCount}/{applicable} · pass threshold {10}.{' '}
+                        Score {yesCount}/{applicable} · pass mark{' '}
+                        {policy.pass_mark}.{' '}
                         {eligible
                             ? 'Eligible for unsupervised administration.'
                             : coreFail
-                              ? 'A core area is marked No — resolve before unsupervised practice.'
-                              : 'Below the pass threshold for unsupervised practice.'}
+                              ? 'A core area isn’t passed — your organisation requires every core area to pass.'
+                              : 'Below the pass mark for unsupervised practice.'}
                     </div>
                     <div className="flex flex-col gap-2">
                         <label
@@ -804,7 +859,7 @@ export function ViewAssessmentDialog({
                 />
                 <FactTile
                     label="Score"
-                    value={`${assessment.total_score ?? 0}/${assessment.pass_threshold ?? 12}`}
+                    value={`${assessment.total_score ?? 0}/12`}
                 />
                 <FactTile
                     label="Observed"

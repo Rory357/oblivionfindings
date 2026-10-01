@@ -301,12 +301,18 @@ class MedicationSettingsStorageTest extends TestCase
         $this->assertCount(4, $changes);
         foreach ($changes as $change) {
             $definition = $registry->definition($change->setting_group, $change->setting_key);
-            $words = array_values($definition->options);
+            // A number (P11 Q-F: PIN renewal) reads as its definition formats it.
+            $words = $definition->isNumber()
+                ? [$definition->format((string) $change->before_value), $definition->format((string) $change->after_value)]
+                : array_values($definition->options);
             $allowed = [...$words, MedicationSettingsStore::NOT_YET_REVIEWED, ...array_map(fn (string $w): string => 'Kept: '.$w, $words)];
             $this->assertContains($change->before_text, $allowed);
             $this->assertContains($change->after_text, $allowed);
             $this->assertSame($definition->label, $change->label);
         }
+        $renewal = $changes->firstWhere('setting_key', 'renewal_months');
+        $this->assertSame('No renewal', $renewal->before_text);
+        $this->assertSame('6 months', $renewal->after_text);
     }
 
     // ─── Fixtures ────────────────────────────────────────────

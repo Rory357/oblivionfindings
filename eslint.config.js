@@ -176,16 +176,6 @@ export default [
         },
     },
     {
-        // Lane A is rebuilding eMAR Settings in parallel. Its one pairing
-        // (settings/_templates.tsx) was reported, not swept; remove this
-        // override once that work lands and the pairing is migrated.
-        files: [
-            'resources/js/pages/emar/Settings.tsx',
-            'resources/js/pages/emar/settings/**',
-        ],
-        rules: { 'design/no-primary-foreground-on-fill': 'off' },
-    },
-    {
         // Calendars use the shared Site Calendar parts (DESIGN.md
         // "Calendars — always the Site Calendar style" and the anti-pattern
         // "Module calendars that fork the shared calendar chrome"). The files

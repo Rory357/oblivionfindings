@@ -19,6 +19,7 @@ import {
     statusChip,
     ViewAssessmentDialog,
     type AssessmentRow,
+    type CompetencyPolicy,
     type StaffOpt,
 } from '@/pages/emar/_competency-dialogs';
 import { Head, router } from '@inertiajs/react';
@@ -60,6 +61,8 @@ type Props = {
     staffWithoutAssessment: UnassessedStaff[];
     staff: StaffOpt[];
     kpis: Kpis;
+    /** Pass mark, how long an assessment stays current, and when renewal is due. */
+    policy: CompetencyPolicy;
     sites: { id: number; name: string }[];
     active_site: { id: number; name: string } | null;
     site_brand_colour: string | null;
@@ -153,7 +156,7 @@ function exportCsv(rows: AssessmentRow[]) {
             a.user_name,
             a.user_role,
             a.assessment_type,
-            `${a.total_score ?? 0}/${a.pass_threshold ?? 12}`,
+            `${a.total_score ?? 0}/12`,
             statusChip(a).label,
             a.expiry_date,
             a.can_administer_unsupervised ? 'Yes' : 'No',
@@ -180,9 +183,11 @@ export default function Competency({
     staffWithoutAssessment,
     staff,
     kpis,
+    policy,
     active_site: activeSite,
     site_brand_colour: brandColour,
 }: Props) {
+    const renewalDays = policy.renewal_days;
     const [activeTab, setActiveTab] = useState('all');
     const [search, setSearch] = useState('');
     const [roleFilter, setRoleFilter] = useState<number | null>(null);
@@ -214,12 +219,12 @@ export default function Competency({
     // staff-centric "View staff member" replaces the cross-module "View client".
     const openAssessmentCtx = (e: ReactMouseEvent, a: AssessmentRow) => {
         e.preventDefault();
-        const t = ctxStatusTag(a);
+        const t = ctxStatusTag(a, renewalDays);
         const items: ShiftCtxItem[] = [
             {
                 icon: <Eye className="h-3.5 w-3.5" />,
                 label: 'View assessment',
-                sub: `${a.assessment_type ?? 'assessment'} · ${a.total_score ?? 0}/${a.pass_threshold ?? 12}`,
+                sub: `${a.assessment_type ?? 'assessment'} · ${a.total_score ?? 0}/12`,
                 tone: 'primary',
                 onClick: () => viewAssessment(a),
             },
@@ -318,7 +323,7 @@ export default function Competency({
     const expiringList = visible.filter(
         (a) =>
             a.is_passed &&
-            (daysTo(a.expiry_date) ?? 999) <= 30 &&
+            (daysTo(a.expiry_date) ?? 999) <= renewalDays &&
             (daysTo(a.expiry_date) ?? -1) >= 0,
     );
     const expiredList = visible.filter((a) => a.is_expired);
@@ -359,7 +364,7 @@ export default function Competency({
             kind: 'expiring',
             tone: 'warning' as const,
             icon: CalendarClock,
-            message: `${kpis.expiring} competenc${kpis.expiring === 1 ? 'y expires' : 'ies expire'} within 30 days — schedule reassessment.`,
+            message: `${kpis.expiring} competenc${kpis.expiring === 1 ? 'y expires' : 'ies expire'} within ${renewalDays} days — schedule reassessment.`,
             tab: 'expiring',
         },
         kpis.unassessed > 0 && {
@@ -432,7 +437,7 @@ export default function Competency({
         },
         { label: 'CD witnesses', value: kpis.cd_witnesses },
     ];
-    const description = `${kpis.in_date} of ${kpis.total_staff} staff are medication-competent and in date (${kpis.in_date_pct}%). ${kpis.expiring} expire within 30 days and ${kpis.unassessed} have no current assessment.`;
+    const description = `${kpis.in_date} of ${kpis.total_staff} staff are medication-competent and in date (${kpis.in_date_pct}%). ${kpis.expiring} expire within ${renewalDays} days and ${kpis.unassessed} have no current assessment.`;
 
     return (
         <AppLayout
@@ -566,7 +571,7 @@ export default function Competency({
                     />
                     <Kpi
                         icon={CalendarClock}
-                        label="Expiring 30d"
+                        label={`Expiring ${renewalDays}d`}
                         value={kpis.expiring}
                         tone="warning"
                     />
@@ -606,6 +611,7 @@ export default function Competency({
                                   ? expiredList
                                   : visible
                         }
+                        renewalDays={renewalDays}
                         onView={viewAssessment}
                         onRenew={renewAssessment}
                         onEdit={editAssessment}
@@ -618,7 +624,7 @@ export default function Competency({
                     <ListCard
                         empty={
                             expiringList.length === 0
-                                ? 'No assessments expiring in the next 30 days.'
+                                ? `No assessments expiring in the next ${renewalDays} days.`
                                 : null
                         }
                     >
@@ -720,6 +726,7 @@ export default function Competency({
             {modal?.type === 'new' && (
                 <AssessmentWizardDialog
                     staff={staff}
+                    policy={policy}
                     mode="new"
                     defaultUserId={modal.userId}
                     onClose={() => setModal(null)}
@@ -728,6 +735,7 @@ export default function Competency({
             {modal?.type === 'edit' && (
                 <AssessmentWizardDialog
                     staff={staff}
+                    policy={policy}
                     mode="edit"
                     assessment={modal.assessment}
                     onClose={() => setModal(null)}
@@ -736,6 +744,7 @@ export default function Competency({
             {modal?.type === 'renew' && (
                 <AssessmentWizardDialog
                     staff={staff}
+                    policy={policy}
                     mode="renew"
                     assessment={modal.assessment}
                     onClose={() => setModal(null)}
@@ -807,7 +816,10 @@ function StaffCell({ a, sub }: { a: AssessmentRow; sub?: string }) {
 // Status tag for the right-click menu header — same labels as statusChip but
 // surfaced as token CSS vars (the menu paints tagBg/tagColor inline) and with an
 // explicit "Expiring" state for in-date assessments inside the 30-day window.
-function ctxStatusTag(a: AssessmentRow): {
+function ctxStatusTag(
+    a: AssessmentRow,
+    renewalDays: number,
+): {
     tag: string;
     tagBg: string;
     tagColor: string;
@@ -826,7 +838,7 @@ function ctxStatusTag(a: AssessmentRow): {
                 tagColor: 'var(--status-warning)',
             };
         const d = daysTo(a.expiry_date);
-        if (d !== null && d >= 0 && d <= 30)
+        if (d !== null && d >= 0 && d <= renewalDays)
             return {
                 tag: 'Expiring',
                 tagBg: 'var(--status-warning-bg)',
@@ -869,6 +881,7 @@ function permissionChips(a: AssessmentRow): { label: string; cls: string }[] {
 
 function AssessmentTable({
     rows,
+    renewalDays,
     onView,
     onRenew,
     onEdit,
@@ -876,6 +889,7 @@ function AssessmentTable({
     onCtx,
 }: {
     rows: AssessmentRow[];
+    renewalDays: number;
     onView: (a: AssessmentRow) => void;
     onRenew: (a: AssessmentRow) => void;
     onEdit: (a: AssessmentRow) => void;
@@ -935,8 +949,7 @@ function AssessmentTable({
                                                     />
                                                 </div>
                                                 <span className="text-xs tabular-nums">
-                                                    {a.total_score ?? 0}/
-                                                    {a.pass_threshold ?? 12}
+                                                    {a.total_score ?? 0}/12
                                                 </span>
                                             </div>
                                         </td>
@@ -957,7 +970,7 @@ function AssessmentTable({
                                             {fmtDate(a.expiry_date)}
                                             {dte !== null &&
                                                 dte >= 0 &&
-                                                dte <= 30 && (
+                                                dte <= renewalDays && (
                                                     <span className="ml-1 text-status-warning">
                                                         · {dte}d
                                                     </span>
