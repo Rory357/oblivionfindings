@@ -413,7 +413,7 @@ export function PageHeaderPrimaryButton({
             {...(asChild ? {} : { type: 'button' as const })}
             {...rest}
             className={cn(
-                'inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50',
+                'inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary-strong shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50',
                 className,
             )}
         >
