@@ -166,8 +166,12 @@ class ComplianceMetricsService
      */
     public function whatsDue(User $viewer): array
     {
+        // Overdue and due soon. ComplianceObligation::dueSoon() means "due soon,
+        // not overdue" since 69d0b0e2b, so it can't be used here: overdue
+        // obligations vanished from this register and its overdue count.
         $obligations = ComplianceObligation::query()
-            ->dueSoon(30)
+            ->open()
+            ->whereDate('due_date', '<=', ComplianceObligation::dueSoonUntil())
             ->with('owner')
             ->orderBy('due_date')
             ->limit(30)
