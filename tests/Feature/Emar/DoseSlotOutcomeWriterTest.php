@@ -7,8 +7,8 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationDoseScheduleVersion;
 use App\Models\MedicationDoseSlot;
-use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
@@ -20,6 +20,8 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
+use InvalidArgumentException;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -267,6 +269,37 @@ class DoseSlotOutcomeWriterTest extends TestCase
 
         $this->assertSame(0, ClientMedicationAdministration::query()->count());
         $this->assertSame(0, MedicationDoseSlot::query()->whereNotNull('outcome')->count());
+    }
+
+    public function test_unreadable_order_history_never_blocks_recording_a_dose(): void
+    {
+        Exceptions::fake();
+        $order = $this->scheduledOrder();
+        // A history row that can't be read (verified and rejected at once).
+        MedicationDoseScheduleVersion::query()->where('client_medication_id', $order->id)->update([
+            'rejected_at' => now()->format('Y-m-d H:i:s'),
+        ]);
+        MedicationDoseSlot::query()->where('client_medication_id', $order->id)->delete();
+
+        $this->actingAs($this->worker)
+            ->from('/meds/today')
+            ->post('/meds/today/record', [
+                'client_medication_id' => $order->id,
+                'scheduled_for' => $this->slotTime->toIso8601String(),
+                'status' => 'given',
+                'administered_at' => now()->toIso8601String(),
+            ])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success');
+
+        // The dose is recorded; no slot outcome; the problem is reported.
+        $this->assertSame(1, ClientMedicationAdministration::query()->count());
+        $this->assertSame(0, MedicationDoseSlot::query()->whereNotNull('outcome')->count());
+        Exceptions::assertReported(InvalidArgumentException::class);
+
+        // Editing the order still saves too.
+        $order->fresh()->update(['dose_times' => ['10:00']]);
+        $this->assertSame(['10:00'], $order->fresh()->dose_times);
     }
 
     public function test_each_scheduled_administration_has_exactly_one_slot_outcome_across_days(): void

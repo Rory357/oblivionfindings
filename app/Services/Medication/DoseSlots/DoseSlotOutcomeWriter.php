@@ -8,6 +8,8 @@ use App\Models\MedicationDoseSlot;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use LogicException;
 
 /**
  * Writes a dose slot's outcome from the administrations recorded for it, in
@@ -35,17 +37,32 @@ final class DoseSlotOutcomeWriter
 
     public function __construct(private readonly DoseSlotGenerator $generator) {}
 
+    /**
+     * Before an administration row is written (saving, deleting, restoring):
+     * take its order row first, so the record's own row lock never comes
+     * before the order's — whatever the caller locked. Re-taking a lock the
+     * caller already holds (every recording and correction path) is free.
+     */
+    public function lockOrderOf(ClientMedicationAdministration $administration): void
+    {
+        $orderId = $administration->client_medication_id;
+        if (is_numeric($orderId) && (int) $orderId > 0) {
+            ClientMedication::withTrashed()->whereKey((int) $orderId)->lockForUpdate()->first(['id']);
+        }
+    }
+
     public function syncFor(ClientMedicationAdministration $administration): void
     {
         DB::transaction(function () use ($administration): void {
             $rootId = (bool) $administration->is_correction && $administration->corrected_of_id !== null
                 ? (int) $administration->corrected_of_id
                 : (int) $administration->id;
-            // A force-deleted record is gone from the table; its own values
-            // still say which slot to re-read.
+            // Which slot: the root's order and scheduled time, which never
+            // change for a record, so they are read without a lock (a lock
+            // here, before the order's, would invert the lock order). A
+            // force-deleted record is gone; its own values still say which slot.
             $root = ClientMedicationAdministration::withTrashed()
                 ->whereKey($rootId)
-                ->lockForUpdate()
                 ->first(['id', 'client_id', 'client_medication_id', 'scheduled_for'])
                 ?? ($rootId === (int) $administration->id ? $administration : null);
             $scheduledFor = DoseOrderTimelineFactory::rawInstant($root?->getRawOriginal('scheduled_for') ?? $root?->getAttributes()['scheduled_for'] ?? null);
@@ -53,8 +70,9 @@ final class DoseSlotOutcomeWriter
                 return;
             }
 
-            // The order row is the slots' mutex (see DoseSlotGenerator::lockOrder);
-            // recording and correction paths already hold it.
+            // Lock order, as every medication write: the order row (the
+            // slots' mutex, already held by this record's own write — see
+            // lockOrderOf), then the slot's administration rows, then slots.
             $order = ClientMedication::withTrashed()->whereKey($root->client_medication_id)->lockForUpdate()->first();
             if ($order === null) {
                 return;
@@ -71,11 +89,19 @@ final class DoseSlotOutcomeWriter
             );
 
             $now = CarbonImmutable::now()->utc();
-            $this->generator->ensureDay(
-                $order,
-                $dueAt->setTimezone((string) config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
-                $now,
-            );
+            try {
+                $this->generator->ensureDay(
+                    $order,
+                    $dueAt->setTimezone((string) config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
+                    $now,
+                );
+            } catch (InvalidArgumentException|LogicException $unexpectedData) {
+                // Unreadable order history must never block recording a dose:
+                // report it, write no outcome. Database errors still propagate.
+                report($unexpectedData);
+
+                return;
+            }
 
             $slots = MedicationDoseSlot::query()
                 ->where('client_medication_id', $order->id)

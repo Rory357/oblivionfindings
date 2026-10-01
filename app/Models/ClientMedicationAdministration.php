@@ -22,7 +22,14 @@ class ClientMedicationAdministration extends Model
     protected static function booted(): void
     {
         $sync = static fn (self $administration) => app(DoseSlotOutcomeWriter::class)->syncFor($administration);
+        // The order row before this row: the lock order every medication
+        // write uses (client → order → administration → slots).
+        $lockOrder = static fn (self $administration) => app(DoseSlotOutcomeWriter::class)->lockOrderOf($administration);
 
+        static::saving($lockOrder);
+        static::deleting($lockOrder);
+        static::restoring($lockOrder);
+        static::forceDeleting($lockOrder);
         static::saved($sync);
         static::deleted($sync);
         static::restored($sync);

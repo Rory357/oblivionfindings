@@ -28,11 +28,29 @@ it('syncs the slot outcome from every administration model event that can change
 
     expect($model)->toContain(
         'app(DoseSlotOutcomeWriter::class)->syncFor($administration)',
+        'static::saving($lockOrder);',
+        'static::deleting($lockOrder);',
+        'static::restoring($lockOrder);',
+        'static::forceDeleting($lockOrder);',
         'static::saved($sync);',
         'static::deleted($sync);',
         'static::restored($sync);',
         'static::forceDeleted($sync);',
+        'app(DoseSlotOutcomeWriter::class)->lockOrderOf($administration)',
     );
+});
+
+it('locks the order row before any administration row in the outcome writer', function (): void {
+    $writer = (string) file_get_contents(dirname(__DIR__, 2).'/app/Services/Medication/DoseSlots/DoseSlotOutcomeWriter.php');
+    $sync = substr($writer, (int) strpos($writer, 'public function syncFor('));
+    $rootRead = substr($sync, (int) strpos($sync, '$root = '), (int) strpos($sync, '?? ($rootId') - (int) strpos($sync, '$root = '));
+    $orderLock = strpos($sync, "whereKey(\$root->client_medication_id)->lockForUpdate()");
+    $evidenceLock = strpos($sync, '$this->lockEvidence(');
+
+    expect($rootRead)->not->toContain('lockForUpdate')
+        ->and($orderLock)->toBeInt()
+        ->and($evidenceLock)->toBeInt()
+        ->and($orderLock < $evidenceLock)->toBeTrue();
 });
 
 it('persists administrations only through the recording service and the two correction paths', function (): void {

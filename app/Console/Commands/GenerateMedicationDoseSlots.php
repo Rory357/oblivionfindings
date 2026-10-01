@@ -7,6 +7,8 @@ use App\Services\Medication\DoseSlots\DoseSlotGenerator;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use LogicException;
 
 /**
  * Keeps every order's dose slots generated for today and the next two New
@@ -34,9 +36,14 @@ class GenerateMedicationDoseSlots extends Command
             ->where(fn ($query) => $query->whereNull('ceased_at')->orWhere('ceased_at', '>=', $todayStartUtc))
             ->chunkById(200, function ($chunk) use ($generator, $now, &$orders): void {
                 foreach ($chunk as $order) {
-                    // Retried on deadlock (1213): MySQL rolls the whole attempt back.
-                    DB::transaction(fn () => $generator->generateAhead($order, $now), 3);
-                    $orders++;
+                    try {
+                        // Retried on deadlock (1213): MySQL rolls the whole attempt back.
+                        DB::transaction(fn () => $generator->generateAhead($order, $now), 3);
+                        $orders++;
+                    } catch (InvalidArgumentException|LogicException $unexpectedData) {
+                        // One unreadable order must not stop the others.
+                        report($unexpectedData);
+                    }
                 }
             });
 

@@ -120,6 +120,93 @@ class DoseSlotConcurrencyTest extends TestCase
         }
     }
 
+    public function test_a_correction_approval_racing_a_new_recording_takes_the_order_lock_before_its_own_row(): void
+    {
+        $original = $this->recordedOriginal();
+        $correction = $this->pendingCorrection($original, 'refused');
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        $connection = DB::connection();
+        $paths = $this->tempPaths(2);
+        $processes = [];
+
+        $connection->commit();
+
+        try {
+            // Hold the order row so both writers queue on it.
+            $connection->beginTransaction();
+            ClientMedication::query()->whereKey($this->order->id)->lockForUpdate()->firstOrFail();
+
+            $processes[0] = $this->startRecorder($paths['ready'][0], $paths['go'], $connection->getDatabaseName(), 'approve', $correction->id);
+            $processes[1] = $this->startRecorder($paths['ready'][1], $paths['go'], $connection->getDatabaseName());
+            foreach ([0, 1] as $i) {
+                $this->waitForFile($paths['ready'][$i], 'A worker did not start.');
+            }
+            file_put_contents($paths['go'], 'go');
+            usleep(800_000);
+            $this->assertTrue($processes[0]->isRunning(), 'The approval did not wait for the order.');
+            $this->assertTrue($processes[1]->isRunning(), 'The recording did not wait for the order.');
+
+            // Neither has locked an administration row yet: the approval took
+            // no lock on its own row before the order's (NOWAIT fails at once
+            // if it had).
+            $this->assertCount(2, ClientMedicationAdministration::query()
+                ->whereKey([$original->id, $correction->id])
+                ->lock('for update nowait')
+                ->get());
+            $connection->commit();
+
+            foreach ($processes as $process) {
+                $process->wait();
+                $this->assertTrue($this->workerResult($process)['success']);
+            }
+
+            // Whichever ran first, the approved correction is the evidence.
+            $slot = $this->theSlot();
+            $this->assertSame('refused', $slot->outcome);
+            $this->assertSame((int) $correction->id, (int) $slot->outcome_administration_id);
+            $this->assertSame(2, ClientMedicationAdministration::query()->where('client_medication_id', $this->order->id)->count());
+        } finally {
+            $this->cleanUp($connection, $processes, $paths);
+        }
+    }
+
+    public function test_deleting_a_record_racing_a_new_recording_on_its_slot_completes_both_without_deadlock(): void
+    {
+        $original = $this->recordedOriginal();
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        $connection = DB::connection();
+        $paths = $this->tempPaths(2);
+        $processes = [];
+
+        $connection->commit();
+
+        try {
+            $processes[0] = $this->startRecorder($paths['ready'][0], $paths['go'], $connection->getDatabaseName(), 'delete', $original->id);
+            $processes[1] = $this->startRecorder($paths['ready'][1], $paths['go'], $connection->getDatabaseName());
+            foreach ([0, 1] as $i) {
+                $this->waitForFile($paths['ready'][$i], 'A worker did not start.');
+            }
+            file_put_contents($paths['go'], 'go');
+
+            foreach ($processes as $process) {
+                $process->wait();
+                $this->assertTrue($this->workerResult($process)['success']);
+            }
+
+            // Either order is valid; the slot always matches the evidence.
+            $effective = ClientMedicationAdministration::query()
+                ->effectiveClinicalEvidence()
+                ->where('client_medication_id', $this->order->id)
+                ->get();
+            $this->assertLessThanOrEqual(1, $effective->count());
+            $slot = $this->theSlot();
+            $this->assertSame($effective->first()?->id, $slot->outcome_administration_id === null ? null : (int) $slot->outcome_administration_id);
+            $this->assertSame($effective->isEmpty() ? null : 'given', $slot->outcome);
+        } finally {
+            $this->cleanUp($connection, $processes, $paths);
+        }
+    }
+
     public function test_two_people_recording_the_same_dose_at_once_leave_one_record_and_one_outcome(): void
     {
         $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
@@ -185,7 +272,42 @@ class DoseSlotConcurrencyTest extends TestCase
         ];
     }
 
-    private function startRecorder(string $readyPath, ?string $goPath, string $database): Process
+    /** A given dose already recorded on the slot (committed with the fixtures). */
+    private function recordedOriginal(): ClientMedicationAdministration
+    {
+        return ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id,
+            'client_medication_id' => $this->order->id,
+            'administered_by' => $this->worker->id,
+            'scheduled_for' => $this->slotUtc,
+            'administered_at' => $this->slotUtc,
+            'status' => 'given',
+        ]);
+    }
+
+    /** A correction raised as MedicationAdministrationCorrectionController::store raises it. */
+    private function pendingCorrection(ClientMedicationAdministration $original, string $status): ClientMedicationAdministration
+    {
+        $correction = $original->replicate(['id', 'client_request_uuid', 'deleted_at', 'created_at', 'updated_at']);
+        $correction->forceFill([
+            'is_correction' => true,
+            'corrected_of_id' => $original->id,
+            'status' => $status,
+            'reason' => 'Declined',
+            'correction_requested_by' => $this->worker->id,
+            'correction_status' => 'pending',
+        ])->save();
+
+        return $correction;
+    }
+
+    /**
+     * A worker process: "record" records the slot's dose through the shared
+     * recording service; "approve" approves a correction and "delete" deletes
+     * a record, each as a plain model write in its own transaction (no order
+     * lock taken by the caller).
+     */
+    private function startRecorder(string $readyPath, ?string $goPath, string $database, string $action = 'record', ?int $targetId = null): Process
     {
         $worker = <<<'PHP'
 require $argv[1].'/vendor/autoload.php';
@@ -214,17 +336,33 @@ if ($argv[7] !== '') {
         usleep(5_000);
     }
 }
-$result = $app->make(App\Services\EnhancedMarService::class)->recordAdministration(
-    $client,
-    $medication,
-    [
-        'status' => 'given',
-        'dose_given' => '1 tablet',
-        'scheduled_for' => $argv[6],
-        'administered_at' => $argv[6],
-    ],
-    (int) $argv[4],
-);
+if ($argv[8] === 'approve') {
+    Illuminate\Support\Facades\DB::transaction(function () use ($argv): void {
+        App\Models\ClientMedicationAdministration::query()->findOrFail((int) $argv[9])->update([
+            'correction_status' => 'approved',
+            'correction_approved_at' => now(),
+            'correction_approved_by' => (int) $argv[4],
+        ]);
+    });
+    $result = ['success' => true];
+} elseif ($argv[8] === 'delete') {
+    Illuminate\Support\Facades\DB::transaction(function () use ($argv): void {
+        App\Models\ClientMedicationAdministration::query()->findOrFail((int) $argv[9])->delete();
+    });
+    $result = ['success' => true];
+} else {
+    $result = $app->make(App\Services\EnhancedMarService::class)->recordAdministration(
+        $client,
+        $medication,
+        [
+            'status' => 'given',
+            'dose_given' => '1 tablet',
+            'scheduled_for' => $argv[6],
+            'administered_at' => $argv[6],
+        ],
+        (int) $argv[4],
+    );
+}
 echo json_encode([
     'success' => (bool) ($result['success'] ?? false),
     'duplicate' => (bool) ($result['duplicate'] ?? false),
@@ -244,6 +382,8 @@ PHP;
                 $readyPath,
                 $this->slotUtc->toIso8601String(),
                 $goPath ?? '',
+                $action,
+                (string) ($targetId ?? 0),
             ],
             base_path(),
             [
