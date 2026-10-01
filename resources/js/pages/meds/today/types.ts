@@ -1,4 +1,4 @@
-import type { PendingAssessment } from '@/components/meds/pending-assessment';
+import type { MyEligibilityData } from '@/pages/emar/eligibility/_my-eligibility';
 /* Shared types for the worker-facing Meds Today board (`/meds/today`).
  * Shapes mirror the Inertia props served by Emar/WorkerMedsController. */
 import type { WitnessPinStatus } from '@/lib/witness-pin';
@@ -182,8 +182,8 @@ export interface NotGivenReasonOption {
 }
 
 export interface MedsTodayProps {
-    /** P11: the worker's own assessment waiting for their acknowledgement. */
-    pending_assessment?: PendingAssessment | null;
+    /** P11: the worker's own medication eligibility (the "My eligibility" meter). */
+    my_eligibility?: MyEligibilityData | null;
     today: string;
     date: string;
     date_label: string;

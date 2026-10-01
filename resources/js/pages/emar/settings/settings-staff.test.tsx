@@ -353,14 +353,14 @@ describe('Staff & PINs › Competency', () => {
         });
     });
 
-    it('says how competency is used today, and links to the register', () => {
+    it('says how competency is used today, and links to Staff eligibility', () => {
         renderWith(<Competency q="" show="all" clear={vi.fn()} />);
         expect(
             screen.getByText('Co-signer with witness PIN (Safety checks)'),
         ).toBeInTheDocument();
         expect(
-            screen.getByRole('link', { name: /Open the competency register/ }),
-        ).toHaveAttribute('href', '/emar/competency');
+            screen.getByRole('link', { name: /Open Staff eligibility/ }),
+        ).toHaveAttribute('href', '/emar/safety/eligibility');
     });
 
     it('shows a value the server won’t take at its field', () => {

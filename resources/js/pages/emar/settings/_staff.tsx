@@ -3,10 +3,9 @@
  * save bar like every other setting; the server reads them through
  * CompetencyPolicySettings. Witness PINs and PIN status are in _sections.tsx.
  *
- * v5 links to Staff eligibility, which arrives in P11 chunk 6; until then
- * these tabs link to the Competency register that exists today. The "How it's
- * used" cards list only what the app does today (no witnessing rows: the
- * "can witness" flag isn't checked when a dose is witnessed yet). */
+ * Both tabs link across to Safety & oversight › Staff eligibility, as in v5.
+ * The "How it's used" cards list only what the app does today (no witnessing
+ * rows: the "can witness" flag isn't checked when a dose is witnessed yet). */
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ReviewCard } from '@/components/wizard/shell';
@@ -50,10 +49,17 @@ const SAFETY_WORDS: Record<string, Record<string, string>> = {
     },
 };
 
-const RegisterLink = () => (
+/** v5's way across to Safety & oversight › Staff eligibility. */
+const EligibilityLink = ({
+    view,
+    children,
+}: {
+    view?: 'exemptions';
+    children: string;
+}) => (
     <Button variant="link" asChild>
-        <Link href="/emar/competency">
-            Open the competency register
+        <Link href={`/emar/safety/eligibility${view ? `?view=${view}` : ''}`}>
+            {children}
             <ArrowUpRight className="size-4" />
         </Link>
     </Button>
@@ -128,7 +134,7 @@ export function Competency({
             id="sc-comp"
             title="Medication competency"
             caption="Used by the assessment form and the register"
-            right={<RegisterLink />}
+            right={<EligibilityLink>Open Staff eligibility</EligibilityLink>}
         >
             <GroupGrid empty={<NoMatches q={q} clear={clear} />}>
                 <SettingGroup
@@ -275,6 +281,11 @@ export function ExemptionLimit({
             id="sc-ex"
             title="Exemption limit"
             caption="Applies to every exemption"
+            right={
+                <EligibilityLink view="exemptions">
+                    Open exemptions
+                </EligibilityLink>
+            }
         >
             <GroupGrid empty={<NoMatches q={q} clear={clear} />}>
                 <SettingGroup

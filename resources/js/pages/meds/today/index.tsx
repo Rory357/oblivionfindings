@@ -53,7 +53,6 @@ import {
     DOSE_STATUS_META,
     StatusPill,
 } from '@/components/meds/board-bits';
-import { PendingAssessmentNotice } from '@/components/meds/pending-assessment';
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { PageHero } from '@/components/page/page-hero';
 import type { PageHeroBadge } from '@/components/page/page-hero-badges';
@@ -88,6 +87,10 @@ import {
     OWN_WITNESS_PIN_PROMPT,
     OWN_WITNESS_PIN_SETTINGS_URL,
 } from '@/lib/witness-pin';
+import {
+    MyEligibility,
+    myMeter,
+} from '@/pages/emar/eligibility/_my-eligibility';
 
 import {
     DayPickerChip,
@@ -1236,6 +1239,7 @@ export default function MedsToday(props: MedsTodayProps) {
         canRecord && (!isControlled || canRecordControlled);
 
     const [tab, setTab] = useState('schedule');
+    const [meOpen, setMeOpen] = useState(false);
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(null);
     const [clientFilter, setClientFilter] = useState<number | null>(null);
@@ -1518,6 +1522,18 @@ export default function MedsToday(props: MedsTodayProps) {
         { label: 'Due now', value: board.dueNow },
         { label: 'Later', value: board.later },
         { label: 'PRN today', value: prnTodayCount },
+        // P11: the worker's own eligibility; opens My eligibility.
+        ...(props.my_eligibility
+            ? [
+                  {
+                      label: 'My eligibility',
+                      value: myMeter(props.my_eligibility).big,
+                      sub: myMeter(props.my_eligibility).cap,
+                      tone: myMeter(props.my_eligibility).tone,
+                      onClick: () => setMeOpen(true),
+                  },
+              ]
+            : []),
     ];
 
     const heroMeta = [
@@ -1774,9 +1790,13 @@ export default function MedsToday(props: MedsTodayProps) {
                     footer={heroFooter}
                 />
 
-                <PendingAssessmentNotice
-                    assessment={props.pending_assessment}
-                />
+                {meOpen && props.my_eligibility ? (
+                    <MyEligibility
+                        data={props.my_eligibility}
+                        name={board_user.name}
+                        onClose={() => setMeOpen(false)}
+                    />
+                ) : null}
 
                 {firstOverdue ? (
                     <div className="flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm">

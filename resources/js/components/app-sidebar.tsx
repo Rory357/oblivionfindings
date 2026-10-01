@@ -1,11 +1,3 @@
-import {
-    FLEET_WORKSPACES,
-    canDiscoverFleetNavigation,
-    fleetPrimaryLinkActive,
-    fleetPrimaryLinks,
-    visibleFleetGroups,
-    type FleetNavigationPermissions,
-} from '@/lib/fleet-navigation';
 import { Button } from '@/components/ui/button';
 import {
     SheetContent,
@@ -21,7 +13,6 @@ import {
 } from '@/components/ui/tooltip';
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useStableValue } from '@/hooks/use-stable-value';
-import { cn, resolveUrl } from '@/lib/utils';
 import {
     FINANCE_SECTIONS,
     financeHubContainsUrl,
@@ -29,11 +20,20 @@ import {
     visibleSectionTabs as visibleFinanceSectionTabs,
 } from '@/lib/finance-sections';
 import {
+    canDiscoverFleetNavigation,
+    FLEET_WORKSPACES,
+    fleetPrimaryLinkActive,
+    fleetPrimaryLinks,
+    visibleFleetGroups,
+    type FleetNavigationPermissions,
+} from '@/lib/fleet-navigation';
+import {
     GOVERNANCE_SECTION_GROUP_LABELS,
     GOVERNANCE_SECTIONS,
     governanceHubContainsUrl,
     visibleSectionTabs,
 } from '@/lib/governance-sections';
+import { cn, resolveUrl } from '@/lib/utils';
 import { vendorRegisterTab } from '@/lib/vendor-navigation';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
@@ -80,7 +80,6 @@ import {
     PieChart,
     Pill,
     Radio,
-    Receipt,
     Route,
     Server,
     Settings,
@@ -401,7 +400,10 @@ export function isIconActive(
     return false;
 }
 
-export function isSubItemActive(currentUrl: string, href: NavItem['href']): boolean {
+export function isSubItemActive(
+    currentUrl: string,
+    href: NavItem['href'],
+): boolean {
     if (resolveUrl(href) === '/it') {
         const path = normalizePath(resolveUrl(currentUrl));
         return path === '/it' || path.startsWith('/it/tickets/');
@@ -951,15 +953,17 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
                 ...(can?.it?.manage
                     ? [{ title: 'Setup', href: '/it/setup', icon: Settings }]
                     : []),
-                ...(can?.vendors?.view || can?.credentials?.view || can?.vendors?.contracts_view
+                ...(can?.vendors?.view ||
+                can?.credentials?.view ||
+                can?.vendors?.contracts_view
                     ? [
                           {
                               title: 'Vendors & Credentials',
                               href: can?.vendors?.view
                                   ? '/vendors?tab=vendors'
                                   : can?.credentials?.view
-                                      ? '/vendors?tab=credentials'
-                                      : '/vendors',
+                                    ? '/vendors?tab=credentials'
+                                    : '/vendors',
                               icon: Package,
                           },
                       ]
@@ -1011,14 +1015,18 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/sites/reports',
             icon: BarChart3,
         });
-    if (can?.vendors?.view || can?.credentials?.view || can?.vendors?.contracts_view)
+    if (
+        can?.vendors?.view ||
+        can?.credentials?.view ||
+        can?.vendors?.contracts_view
+    )
         items.push({
             title: 'Vendors & Credentials',
             href: can?.vendors?.view
                 ? '/vendors?tab=vendors'
                 : can?.credentials?.view
-                    ? '/vendors?tab=credentials'
-                    : '/vendors',
+                  ? '/vendors?tab=credentials'
+                  : '/vendors',
             icon: Package,
         });
     items.push({
@@ -1107,8 +1115,17 @@ function buildOperationsSubPanelGroups({
     const clientLabel = labels?.['client.singular'] ?? 'Client';
     const clientLabelPlural = labels?.['client.plural'] ?? 'Clients';
     const clientMgmt: NavItem[] = [];
-    if (can?.assets?.telemetryView && (can?.clients?.viewAny || can?.clients?.viewAssigned || can?.hazards?.manage))
-        clientMgmt.push({ title: 'People Locations', href: '/operations/people-locations', icon: MapPin });
+    if (
+        can?.assets?.telemetryView &&
+        (can?.clients?.viewAny ||
+            can?.clients?.viewAssigned ||
+            can?.hazards?.manage)
+    )
+        clientMgmt.push({
+            title: 'People Locations',
+            href: '/operations/people-locations',
+            icon: MapPin,
+        });
     if (can?.clients?.viewAny || can?.clients?.viewAssigned)
         clientMgmt.push({
             title: clientLabelPlural,
@@ -1410,8 +1427,9 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         });
     if (can?.medications?.view)
         compliance.push({
-            title: 'Competency',
-            href: '/emar/competency',
+            // P11: Safety & oversight › Staff eligibility replaced Competency.
+            title: 'Staff eligibility',
+            href: '/emar/safety/eligibility',
             icon: ClipboardCheck,
         });
     if (can?.medications?.view && can?.medications?.controlledView)
@@ -1654,10 +1672,7 @@ export function governanceActionableTabKeys(can?: any): Set<string> {
     );
     add('spend-approvals', gov.spend?.request || gov.spend?.approve);
     add('strategy', gov.strategy?.manage);
-    add(
-        'performance',
-        gov.performance?.manage || gov.performance?.reviewee,
-    );
+    add('performance', gov.performance?.manage || gov.performance?.reviewee);
     add('roadmap', can?.roadmap?.manage);
     add('policies', gov.policies?.manage);
     add('documents', gov.documents?.manage);

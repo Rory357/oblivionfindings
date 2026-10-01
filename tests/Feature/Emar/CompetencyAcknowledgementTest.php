@@ -49,17 +49,19 @@ class CompetencyAcknowledgementTest extends TestCase
         $this->assertFalse($assessment->isPassed());
         $this->assertFalse($policy->evaluate($this->worker, $this->site->id, now())['allowed']);
 
-        // Meds today shows the worker their waiting assessment.
+        // Meds today's "My eligibility" shows the worker their waiting assessment.
         $this->actingAs($this->worker)
             ->get(route('meds.today'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('pending_assessment.id', $assessment->id)
-                ->where('pending_assessment.assessor', $this->assessor->name)
-                ->where('pending_assessment.passed_areas', 10)
-                ->where('pending_assessment.not_passed', ['Insulin administration'])
-                ->where('pending_assessment.not_assessed', ['Covert administration'])
-                ->where('pending_assessment.can_give_now', false));
+                ->where('my_eligibility.person.st', 'ack')
+                ->where('my_eligibility.person.prev_valid', null)
+                ->where('my_eligibility.pending.id', $assessment->id)
+                ->where('my_eligibility.pending.assessor', $this->assessor->name)
+                ->where('my_eligibility.pending.passed_areas', 10)
+                ->where('my_eligibility.pending.not_passed', ['Insulin'])
+                ->where('my_eligibility.pending.not_assessed', ['Covert administration'])
+                ->where('my_eligibility.pending.can_give_now', false));
 
         $this->actingAs($this->worker)
             ->from(route('meds.today'))
@@ -81,7 +83,7 @@ class CompetencyAcknowledgementTest extends TestCase
 
         $this->actingAs($this->worker)
             ->get(route('meds.today'))
-            ->assertInertia(fn (Assert $page) => $page->where('pending_assessment', null));
+            ->assertInertia(fn (Assert $page) => $page->where('my_eligibility.pending', null)->where('my_eligibility.person.status', 'current'));
     }
 
     public function test_only_the_assessed_person_can_acknowledge_their_own_assessment(): void
@@ -98,7 +100,7 @@ class CompetencyAcknowledgementTest extends TestCase
         // Nobody else is shown it to acknowledge.
         $this->actingAs($colleague)
             ->get(route('meds.today'))
-            ->assertInertia(fn (Assert $page) => $page->where('pending_assessment', null));
+            ->assertInertia(fn (Assert $page) => $page->where('my_eligibility.pending', null));
     }
 
     public function test_nothing_waits_until_the_assessor_has_declared_it_and_it_passed(): void
@@ -106,14 +108,14 @@ class CompetencyAcknowledgementTest extends TestCase
         $undeclared = $this->recordAssessment(['assessor_declared' => false]);
         $this->actingAs($this->worker)
             ->get(route('meds.today'))
-            ->assertInertia(fn (Assert $page) => $page->where('pending_assessment', null));
+            ->assertInertia(fn (Assert $page) => $page->where('my_eligibility.pending', null));
         $this->actingAs($this->worker)->post(route('emar.competency.acknowledge', $undeclared))->assertNotFound();
 
         $failed = $this->recordAssessment(array_fill_keys(['medication_knowledge', 'five_rights', 'safety_checks'], false));
         $this->assertSame('failed', $failed->status);
         $this->actingAs($this->worker)
             ->get(route('meds.today'))
-            ->assertInertia(fn (Assert $page) => $page->where('pending_assessment', null));
+            ->assertInertia(fn (Assert $page) => $page->where('my_eligibility.pending', null));
     }
 
     /** Record an assessment through the app, as an assessor does. */
