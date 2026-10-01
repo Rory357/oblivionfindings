@@ -171,7 +171,7 @@ export function LeaveHero({
                             <button
                                 type="button"
                                 onClick={handlers.onRequestLeave}
-                                className="inline-flex h-[34px] items-center gap-2 rounded-[9px] bg-primary-foreground px-3.5 text-[12.5px] font-extrabold text-primary shadow-sm transition-transform hover:scale-[1.02]"
+                                className="inline-flex h-[34px] items-center gap-2 rounded-[9px] bg-primary-foreground px-3.5 text-[12.5px] font-extrabold text-primary-strong shadow-sm transition-transform hover:scale-[1.02]"
                             >
                                 <Plus className="h-[15px] w-[15px]" />
                                 Request leave
@@ -499,7 +499,7 @@ function RailTab({
             className={cn(
                 'h-6 rounded-md px-2.5 text-[11px] font-bold transition-colors',
                 active
-                    ? 'bg-primary-foreground text-primary'
+                    ? 'bg-primary-foreground text-primary-strong'
                     : 'text-primary-foreground/80 hover:text-primary-foreground',
             )}
         >

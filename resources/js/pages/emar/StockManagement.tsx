@@ -814,7 +814,7 @@ export default function StockManagement({
                                     <button
                                         key={id}
                                         onClick={() => setChip(id)}
-                                        className={`rounded-full px-3 py-1 text-xs font-medium transition ${chip === id ? 'bg-primary-foreground text-primary' : 'border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20'}`}
+                                        className={`rounded-full px-3 py-1 text-xs font-medium transition ${chip === id ? 'bg-primary-foreground text-primary-strong' : 'border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20'}`}
                                     >
                                         {label}
                                     </button>

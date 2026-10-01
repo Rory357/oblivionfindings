@@ -267,7 +267,7 @@ function HeroAction({
             className={cn(
                 'inline-flex items-center gap-2 rounded-[11px] px-4 py-2.5 text-[13px] font-bold transition-colors',
                 primary
-                    ? 'bg-primary-foreground text-primary shadow-sm hover:bg-primary-foreground/90'
+                    ? 'bg-primary-foreground text-primary-strong shadow-sm hover:bg-primary-foreground/90'
                     : 'border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
             )}
         >

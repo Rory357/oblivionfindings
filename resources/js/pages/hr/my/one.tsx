@@ -181,7 +181,7 @@ export default function MyOneOnOnes({
                                 <button
                                     type="button"
                                     onClick={() => setOpenId(latest.id)}
-                                    className="rounded-[11px] bg-primary-foreground px-4 py-2.5 text-[13px] font-bold text-primary shadow-md"
+                                    className="rounded-[11px] bg-primary-foreground px-4 py-2.5 text-[13px] font-bold text-primary-strong shadow-md"
                                 >
                                     Review last 1:1
                                 </button>

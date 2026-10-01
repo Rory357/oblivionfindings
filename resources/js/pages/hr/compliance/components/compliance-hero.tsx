@@ -257,7 +257,7 @@ export function HeroSolidButton({
         <button
             type="button"
             onClick={onClick}
-            className="inline-flex items-center gap-[7px] rounded-[9px] bg-primary-foreground px-3.5 py-2 text-[12.5px] font-bold text-primary transition-transform hover:scale-[1.02]"
+            className="inline-flex items-center gap-[7px] rounded-[9px] bg-primary-foreground px-3.5 py-2 text-[12.5px] font-bold text-primary-strong transition-transform hover:scale-[1.02]"
         >
             {Icon ? <Icon className="h-[15px] w-[15px]" /> : null}
             {children}

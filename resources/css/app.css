@@ -53,6 +53,10 @@
 
     --color-primary: var(--primary);
     --color-primary-foreground: var(--primary-foreground);
+    /* text-primary reads the mode-aware brand text shade; bg-, border-,
+       fill-, ring- and decoration-primary keep --color-primary (Tailwind
+       resolves text colours via --text-color-* before --color-*). */
+    --text-color-primary: var(--primary-text);
     --color-primary-strong: var(--primary-strong);
     --color-primary-fill: var(--primary-fill);
     --color-primary-fill-foreground: var(--primary-fill-foreground);
@@ -184,6 +188,12 @@
        Not --primary-foreground: that is also the text on the dark brand
        sky, which must stay white for mid-light brands. */
     --primary-strong: oklch(from var(--primary) min(l, 0.5) c h);
+    /* Brand-coloured text (text-primary). One --primary can't be text on
+       both white and dark surfaces, so light clamps it dark and .dark lifts
+       it light. 0.46 (not 0.50) keeps green and teal brands ≥ 4.5:1 on the
+       grey page ground once the browser gamut-maps them (at 0.48 the
+       forest preset measured 4.45:1 there). */
+    --primary-text: oklch(from var(--primary) min(l, 0.46) c h);
     --primary-fill: oklch(
         from var(--primary)
             calc(l - clamp(0, (0.585 - l) * 1000, 1) * max(0, l - 0.5)) c h
@@ -446,6 +456,10 @@
        text-bearing fills use the clamped shade instead, so the fill
        foreground resolves to white (white on L ≤ 0.50 is ≥ 6:1). */
     --primary-fill: var(--primary-strong);
+    /* Lifted so brand text stays ≥ 4.5:1 on every dark surface, up to
+       --secondary (worst hue 5.75:1); a personal accent's inline --primary
+       overrides .dark, so the lift must be derived, not a fixed value. */
+    --primary-text: oklch(from var(--primary) max(l, 0.7) c h);
     --secondary: oklch(0.2 0.015 277);
     --secondary-foreground: oklch(0.95 0.005 277);
     --muted: oklch(0.18 0.012 277);

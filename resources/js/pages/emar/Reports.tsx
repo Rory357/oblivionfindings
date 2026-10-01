@@ -521,7 +521,7 @@ export default function Reports(props: Props) {
                                     <button
                                         key={p.id}
                                         onClick={() => setPreset(p.id)}
-                                        className={`rounded-full px-3 py-1 text-xs font-medium transition ${activePreset === p.id ? 'bg-primary-foreground text-primary' : 'border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20'}`}
+                                        className={`rounded-full px-3 py-1 text-xs font-medium transition ${activePreset === p.id ? 'bg-primary-foreground text-primary-strong' : 'border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20'}`}
                                     >
                                         {p.l}
                                     </button>
