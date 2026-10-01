@@ -560,14 +560,14 @@ class ResidentTransportJourneySecurityTest extends TestCase
     {
         $journeyStartedAt = Carbon::parse('2026-08-28T09:00:00+12:00');
         $receivedAt = Carbon::parse('2026-08-28T10:00:00+12:00');
-        $this->travelTo($journeyStartedAt);
+        $this->travelTo($journeyStartedAt->copy()->utc());
 
         $site = Site::factory()->create();
         $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage']);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $transport = $this->transport($site, $client, $this->vehicle($site, 'Offline packing vehicle'), $actor);
         $medication = $this->medication($client, 'Offline packing medication');
-        $this->travelTo($receivedAt);
+        $this->travelTo($receivedAt->copy()->utc());
 
         $base = [
             ...$this->medicationPayload($client, $medication),
@@ -761,7 +761,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
     {
         $journeyStartedAt = Carbon::parse('2026-08-28T09:00:00+12:00');
         $receivedAt = Carbon::parse('2026-08-28T10:00:00+12:00');
-        $this->travelTo($journeyStartedAt);
+        $this->travelTo($journeyStartedAt->copy()->utc());
 
         $site = Site::factory()->create();
         $actor = $this->siteUser($site, ['fleet.viewAny', 'medications.administer.record']);
@@ -770,7 +770,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $transport = $this->transport($site, $client, $this->vehicle($site, 'Offline administration vehicle'), $actor);
         $medication = $this->medication($client, 'Offline fractional transit dose');
         $log = $this->log($transport, $client, $medication, $actor);
-        $this->travelTo($receivedAt);
+        $this->travelTo($receivedAt->copy()->utc());
 
         foreach ([null, '0', '0.001', '100000000.00'] as $invalidQuantity) {
             $quantityPayload = [
@@ -892,7 +892,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $journeyStartedAt = Carbon::parse('2026-08-28T09:00:00+12:00');
         $receivedAt = Carbon::parse('2026-08-28T10:00:00+12:00');
         $capturedAt = $journeyStartedAt->copy()->addMinutes(30);
-        $this->travelTo($journeyStartedAt);
+        $this->travelTo($journeyStartedAt->copy()->utc());
 
         $site = Site::factory()->create();
         $actor = $this->siteUser($site, ['fleet.viewAny', 'medications.administer.record']);
@@ -918,7 +918,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         );
         $medication = $this->medication($client, 'Shift-bound offline administration medication');
         $log = $this->log($transport, $client, $medication, $actor);
-        $this->travelTo($receivedAt);
+        $this->travelTo($receivedAt->copy()->utc());
 
         $this->actingAs($actor)
             ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", [
@@ -1369,7 +1369,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
     {
         $journeyStartedAt = Carbon::parse('2026-08-28T09:00:00+12:00');
         $receivedAt = Carbon::parse('2026-08-28T10:00:00+12:00');
-        $this->travelTo($journeyStartedAt);
+        $this->travelTo($journeyStartedAt->copy()->utc());
 
         $site = Site::factory()->create();
         $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage', 'medications.administer.record']);
@@ -1378,7 +1378,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $transport = $this->transport($site, $client, $this->vehicle($site, 'Return vehicle'), $actor);
         $medication = $this->medication($client, 'Return medication');
         $log = $this->log($transport, $client, $medication, $actor);
-        $this->travelTo($receivedAt);
+        $this->travelTo($receivedAt->copy()->utc());
         $uuid = (string) Str::uuid();
         $capturedAt = $journeyStartedAt->copy()->addMinutes(30);
         $payload = [

@@ -131,7 +131,9 @@ export function templateContextsForClient(
     clients: TemplateClientOption[],
     contexts: TemplateServiceContextOption[],
 ): TemplateServiceContextOption[] {
-    const client = clients.find((candidate) => String(candidate.id) === clientId);
+    const client = clients.find(
+        (candidate) => String(candidate.id) === clientId,
+    );
 
     return contexts.filter((context) => contextMatchesClient(context, client));
 }
@@ -142,7 +144,9 @@ export function retainedTemplateContextId(
     clients: TemplateClientOption[],
     contexts: TemplateServiceContextOption[],
 ): string {
-    const client = clients.find((candidate) => String(candidate.id) === clientId);
+    const client = clients.find(
+        (candidate) => String(candidate.id) === clientId,
+    );
     const current = contexts.find(
         (context) => String(context.id) === currentContextId,
     );
@@ -158,7 +162,9 @@ export function reconcileTemplateContextId(
     clients: TemplateClientOption[],
     contexts: TemplateServiceContextOption[],
 ): string {
-    const client = clients.find((candidate) => String(candidate.id) === clientId);
+    const client = clients.find(
+        (candidate) => String(candidate.id) === clientId,
+    );
     const retainedContextId = retainedTemplateContextId(
         clientId,
         currentContextId,
@@ -1337,7 +1343,11 @@ function DetailBody({
         [errors.preflight_warnings],
     );
     const blockLines = useMemo(
-        () => templateApplyBlockLines(errors),
+        () =>
+            templateApplyBlockLines({
+                template_shifts: errors.template_shifts,
+                preflight_blocks: errors.preflight_blocks,
+            }),
         [errors.preflight_blocks, errors.template_shifts],
     );
 
@@ -1611,7 +1621,7 @@ function DetailBody({
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            className="bg-status-critical text-white hover:bg-status-critical/90"
+                            variant="destructive"
                             onClick={() => {
                                 setConfirmDeleteOpen(false);
                                 onOpenChange(false);

@@ -1337,7 +1337,7 @@ class PrescriptionsPageTest extends TestCase
     public function test_prescriber_order_creation_enforces_chronology_and_allows_equal_and_future_effective_dates(): void
     {
         $workerNow = Carbon::parse('2026-08-28 08:00:00', 'Pacific/Auckland');
-        Carbon::setTestNow($workerNow);
+        Carbon::setTestNow($workerNow->copy()->utc());
 
         try {
             $this->seed(RbacSeeder::class);
@@ -1439,7 +1439,7 @@ class PrescriptionsPageTest extends TestCase
     {
         $workerTimezone = 'Pacific/Auckland';
         $workerNow = Carbon::parse('2026-08-28 08:00:00', $workerTimezone);
-        Carbon::setTestNow($workerNow);
+        Carbon::setTestNow($workerNow->copy()->utc());
 
         try {
             $this->seed(RbacSeeder::class);
@@ -1535,7 +1535,7 @@ class PrescriptionsPageTest extends TestCase
     public function test_invalid_pre_existing_chronology_blocks_transitions_without_mutation_or_audit(): void
     {
         $workerNow = Carbon::parse('2026-08-28 08:00:00', 'Pacific/Auckland');
-        Carbon::setTestNow($workerNow);
+        Carbon::setTestNow($workerNow->copy()->utc());
 
         try {
             $this->seed(RbacSeeder::class);
@@ -1651,7 +1651,7 @@ class PrescriptionsPageTest extends TestCase
     public function test_expired_orders_are_read_only_across_every_transition_and_expiry_day_is_inclusive(): void
     {
         $workerNow = Carbon::parse('2026-08-28 08:00:00', 'Pacific/Auckland');
-        Carbon::setTestNow($workerNow);
+        Carbon::setTestNow($workerNow->copy()->utc());
 
         try {
             $this->seed(RbacSeeder::class);
@@ -1916,7 +1916,7 @@ class PrescriptionsPageTest extends TestCase
     public function test_page_mutation_flags_require_current_work_scope_and_emit_staff_site_membership(): void
     {
         $workerNow = Carbon::parse('2026-08-28 00:30:00', 'Pacific/Auckland');
-        Carbon::setTestNow($workerNow);
+        Carbon::setTestNow($workerNow->copy()->utc());
 
         try {
             $this->seed(RbacSeeder::class);

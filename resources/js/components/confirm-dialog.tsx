@@ -64,10 +64,7 @@ export function ConfirmDialog({
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel
-                        onClick={onClose}
-                        disabled={processing}
-                    >
+                    <AlertDialogCancel onClick={onClose} disabled={processing}>
                         {cancelText}
                     </AlertDialogCancel>
                     <AlertDialogAction
@@ -82,11 +79,7 @@ export function ConfirmDialog({
                             onClose();
                         }}
                         disabled={processing}
-                        className={
-                            variant === 'destructive'
-                                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                                : ''
-                        }
+                        variant={variant}
                     >
                         {confirmText}
                     </AlertDialogAction>

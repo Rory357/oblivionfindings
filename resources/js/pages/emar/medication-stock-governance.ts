@@ -13,12 +13,43 @@ export function genericStockMedications<T extends ControlledMedicationLike>(
     return medications.filter((medication) => !medication.controlled);
 }
 
+/**
+ * A dispensed order is received through a delivery step, never a one-click
+ * advance: controlled drugs via the witnessed register, ordinary medicines
+ * via a quantity/batch confirmation (EM-10).
+ */
 export function pharmacyOrderAdvanceAction(
     order: PharmacyOrderActionLike,
-): 'advance' | 'controlled-delivery' {
-    return order.controlled && order.status === 'dispensed'
-        ? 'controlled-delivery'
-        : 'advance';
+): 'advance' | 'delivery' | 'controlled-delivery' {
+    if (order.status !== 'dispensed') return 'advance';
+
+    return order.controlled ? 'controlled-delivery' : 'delivery';
+}
+
+/**
+ * Wire shape for delivering an ordinary dispensed order. The quantity is what
+ * actually arrived (required server-side); a blank batch/expiry keeps the
+ * values already recorded rather than clearing them.
+ */
+export function buildPharmacyDeliveryRequest(input: {
+    quantityReceived: string;
+    batchNumber: string;
+    batchExpiry: string;
+    deliveryNotes: string;
+    uuid: string;
+}) {
+    return {
+        expected_status: 'dispensed',
+        quantity_received: input.quantityReceived.trim(),
+        batch_number: input.batchNumber.trim() || null,
+        batch_expiry: input.batchExpiry.trim() || null,
+        delivery_notes: input.deliveryNotes.trim() || null,
+        client_request_uuid: input.uuid,
+    };
+}
+
+export function pharmacyOrderAdvancePath(orderId: number): string {
+    return `/emar/stock/pharmacy-orders/${orderId}/advance`;
 }
 
 export function stockItemQuantityDestination(

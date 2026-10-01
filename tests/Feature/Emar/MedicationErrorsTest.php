@@ -165,6 +165,8 @@ class MedicationErrorsTest extends TestCase
             'is_active' => true,
             'start_date' => today()->subDay(),
         ]);
+        // The register is person-scoped: the reader supports this resident.
+        $client->supportWorkers()->attach($viewer->id);
         $ordinaryMedication = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'name' => 'Ordinary visible medicine',

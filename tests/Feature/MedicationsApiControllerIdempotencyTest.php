@@ -6,13 +6,17 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\Role;
 use App\Models\ServiceContext;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class MedicationsApiControllerIdempotencyTest extends TestCase
@@ -24,6 +28,9 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
     protected Client $client;
 
     protected ClientMedication $medication;
+
+    /** The medication's dose slot: the current worker-time minute, in UTC. */
+    protected CarbonInterface $slot;
 
     protected function setUp(): void
     {
@@ -60,12 +67,45 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
         ]);
         $this->client->supportWorkers()->attach($this->actor->id);
 
+        // Since 0cb4a4190 the API record path needs a genuinely qualified
+        // actor: a signed-off competency and a clocked-in Shift covering this
+        // client at its Site. Without them it answers 403 before idempotency.
+        $assessor = User::factory()->create(['role' => 'manager', 'approved_at' => now()]);
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $this->actor->id,
+            'assessor_id' => $assessor->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => today()->subMonth(),
+            'expiry_date' => today()->addYear(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'can_administer_unsupervised' => true,
+        ]);
+        Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $site->id,
+            'service_context_id' => $serviceContext->id,
+            'user_id' => $this->actor->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(2),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'started_by' => $this->actor->id,
+            'status' => 'in_progress',
+        ]);
+
+        // A scheduled dose must match a real dose_times slot, so anchor the
+        // slot to the current worker-time minute.
+        $workerSlot = now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfMinute();
+        $this->slot = $workerSlot->copy()->utc();
+
         $this->medication = ClientMedication::query()->create([
             'client_id' => $this->client->id,
             'name' => 'Metformin',
             'dosage' => '500mg',
             'frequency' => 'Once daily',
-            'dose_times' => ['08:00'],
+            'dose_times' => [$workerSlot->format('H:i')],
             'active' => true,
             'state' => 'active',
         ]);
@@ -73,12 +113,15 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
 
     public function test_duplicate_uuid_returns_cached_sync_payload(): void
     {
-        $scheduledFor = now()->setTime(8, 0);
+        $scheduledFor = $this->slot;
+        // The fixture Shift writes its own timeline snapshot; count only the
+        // administration's event.
+        $timelineBefore = DB::table('timeline_events')->count();
         $payload = [
             'status' => 'given',
             'dose_given' => '500mg',
             'scheduled_for' => $scheduledFor->toIso8601String(),
-            'administered_at' => $scheduledFor->copy()->addMinute()->toIso8601String(),
+            'administered_at' => $scheduledFor->toIso8601String(),
             'client_request_uuid' => '39b88216-6350-46d3-ad65-7d8ce327c92c',
             'captured_offline_at' => now()->toIso8601String(),
             'origin_device_id' => 'api-device',
@@ -101,7 +144,7 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
             ->assertJsonPath('sync.duplicate', true);
 
         $this->assertDatabaseCount('client_medication_administrations', 1);
-        $this->assertDatabaseCount('timeline_events', 1);
+        $this->assertSame($timelineBefore + 1, DB::table('timeline_events')->count());
         $this->assertDatabaseHas('client_medication_administrations', [
             'client_request_uuid' => $payload['client_request_uuid'],
         ]);
@@ -109,19 +152,19 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
 
     public function test_successful_api_administration_cache_expires_after_seven_days(): void
     {
-        $now = now()->startOfMinute();
+        $now = $this->slot->copy();
         $this->travelTo($now);
 
-        $scheduledFor = $now->copy()->setTime(8, 0);
+        $scheduledFor = $this->slot;
         $uuid = 'b57b4b6d-7322-4b5e-82d7-841d9453562e';
         $payload = [
             'status' => 'given',
             'dose_given' => '500mg',
             'scheduled_for' => $scheduledFor->toIso8601String(),
-            'administered_at' => $scheduledFor->copy()->addMinute()->toIso8601String(),
+            'administered_at' => $scheduledFor->toIso8601String(),
             'client_request_uuid' => $uuid,
-            'captured_offline_at' => $now->toIso8601String(),
-            'origin_device_id' => 'api-device',
+            // An online submission: offline provenance fields are prohibited
+            // unless the request was queued offline.
             'queued_offline' => false,
         ];
 
@@ -146,7 +189,7 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
 
     public function test_queued_api_replay_conflicts_with_existing_scheduled_record(): void
     {
-        $scheduledFor = now()->setTime(8, 0);
+        $scheduledFor = $this->slot;
 
         ClientMedicationAdministration::query()->create([
             'client_id' => $this->client->id,
@@ -164,7 +207,7 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
                     'status' => 'given',
                     'dose_given' => '500mg',
                     'scheduled_for' => $scheduledFor->copy()->addSeconds(30)->toIso8601String(),
-                    'administered_at' => $scheduledFor->copy()->addMinutes(5)->toIso8601String(),
+                    'administered_at' => $scheduledFor->toIso8601String(),
                     'client_request_uuid' => 'f312c7f5-686c-44b7-9354-9f52762335a6',
                     'captured_offline_at' => now()->subMinutes(10)->toIso8601String(),
                     'origin_device_id' => 'api-device',

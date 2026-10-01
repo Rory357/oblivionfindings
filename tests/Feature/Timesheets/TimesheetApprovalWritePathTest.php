@@ -146,9 +146,17 @@ class TimesheetApprovalWritePathTest extends TestCase
     protected function mockApprovalSideEffects(int $times): void
     {
         $this->mock(TimesheetHrSyncService::class, function ($mock) use ($times): void {
+            // Approval first locks the canonical HR entry and checks worker
+            // overlap (cd5d34e6b); both are covered by their own tests.
+            $mock->shouldReceive('lockCanonicalEntryForMutation')
+                ->with(Mockery::type(Timesheet::class))
+                ->andReturnNull();
+            $mock->shouldReceive('assertNoWorkerOverlapForMutation')
+                ->andReturnNull();
+            // syncToHr now also receives the locked entry and a lock flag.
             $mock->shouldReceive('syncToHr')
                 ->times($times)
-                ->with(Mockery::type(Timesheet::class));
+                ->withArgs(fn ($timesheet): bool => $timesheet instanceof Timesheet);
         });
 
         $this->mock(BillingService::class, function ($mock) use ($times): void {

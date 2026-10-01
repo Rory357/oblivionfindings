@@ -538,11 +538,7 @@ function PaneShell({
                 <Button
                     type="submit"
                     disabled={processing}
-                    className={
-                        ctaTone === 'critical'
-                            ? 'bg-status-critical text-primary-foreground hover:bg-status-critical/90'
-                            : undefined
-                    }
+                    variant={ctaTone === 'critical' ? 'destructive' : 'default'}
                 >
                     {CtaIcon ? <CtaIcon className="mr-1.5 h-4 w-4" /> : null}
                     {cta}

@@ -491,7 +491,7 @@ export function TemplatesPane({
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            className="bg-status-critical text-white hover:bg-status-critical/90"
+                            variant="destructive"
                             onClick={() => {
                                 if (pendingDelete) onDelete(pendingDelete);
                                 setPendingDelete(null);

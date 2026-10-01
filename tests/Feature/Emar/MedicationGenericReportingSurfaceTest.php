@@ -27,7 +27,7 @@ class MedicationGenericReportingSurfaceTest extends TestCase
         parent::setUp();
         // The /dashboard eMAR widget counts scheduled 09:00 slots on the
         // worker (NZ) day (NF-25): pin the clock after that slot.
-        Carbon::setTestNow(Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland'));
+        Carbon::setTestNow(Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland')->utc());
         $this->seed(RbacSeeder::class);
     }
 

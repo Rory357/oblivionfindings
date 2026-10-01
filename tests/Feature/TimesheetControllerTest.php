@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
+use App\Domain\Hr\Models\HrTimeEntry;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
@@ -825,6 +826,13 @@ class TimesheetControllerTest extends TestCase
             'timesheets.submit',
             'timesheets.manageAny',
         ]);
+        // Since cd5d34e6b timesheet mutations are Site-scoped with no global
+        // read bypass, so reassigning to another Site's client also needs the
+        // actor to work at that Site.
+        HrEmployeeProfile::query()
+            ->where('user_id', $this->finance->id)
+            ->firstOrFail()
+            ->update(['secondary_site_ids' => [$globalSite->id]]);
 
         $this->actingAs($this->finance)
             ->post(route('operations.timesheets.resubmit', $timesheet), $this->validUpdatePayload($timesheet, [
@@ -1348,6 +1356,26 @@ class TimesheetControllerTest extends TestCase
     protected function makeSubmittedTimesheet(User $staff, array $overrides = []): Timesheet
     {
         [$shift, $attendance] = $this->makeCompletedShiftWithAttendance($staff, $overrides['shift_overrides'] ?? []);
+        // Since cd5d34e6b approving an attendance-backed timesheet needs the
+        // one canonical attendance HR time entry that clock-out projects
+        // (AttendanceTimeEntryProjector, which only runs inside its lock path).
+        HrTimeEntry::factory()->create([
+            'user_id' => $staff->id,
+            'shift_id' => $shift->id,
+            'attendance_session_id' => $attendance->id,
+            'site_id' => $shift->site_id,
+            'client_id' => $shift->client_id,
+            'entry_date' => $shift->actual_starts_at->toDateString(),
+            'clock_in' => $attendance->clock_in_at,
+            'clock_out' => $attendance->clock_out_at,
+            'break_minutes' => 0,
+            'total_hours' => 8,
+            'entry_type' => 'clock',
+            'status' => 'active',
+            'source_type' => 'attendance',
+            'source_id' => $attendance->id,
+            'created_by' => $staff->id,
+        ]);
 
         return Timesheet::query()->create(array_merge([
             'user_id' => $staff->id,

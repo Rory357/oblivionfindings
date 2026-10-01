@@ -2,6 +2,7 @@ import js from '@eslint/js';
 import prettier from 'eslint-config-prettier/flat';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
+import { builtinRules } from 'eslint/use-at-your-own-risk';
 import globals from 'globals';
 import typescript from 'typescript-eslint';
 
@@ -122,6 +123,39 @@ export default [
         },
     },
     {
+        // DESIGN.md anti-pattern "Recolouring a primary button with bg-*
+        // classes": a <Button> or <AlertDialogAction> left on the default
+        // variant carries .btn-soft-primary, whose unlayered `background`
+        // gradient paints over Tailwind's layered bg-destructive /
+        // bg-status-critical, so the button renders purple. `unstyled`
+        // Buttons skip buttonVariants, so their bg-* classes do apply.
+        //
+        // This is core no-restricted-syntax under its own rule id: ~200 files
+        // open with a blanket `eslint-disable no-restricted-syntax` for the
+        // raw-colour warning above, which would silence this check too.
+        files: ['resources/js/**/*.{ts,tsx}'],
+        plugins: {
+            design: {
+                rules: {
+                    'no-recoloured-primary-button': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
+                },
+            },
+        },
+        rules: {
+            'design/no-recoloured-primary-button': [
+                'error',
+                {
+                    selector:
+                        "JSXOpeningElement[name.name=/^(Button|AlertDialogAction)$/]:not(:has(> JSXAttribute[name.name='unstyled'])):not(:has(> JSXAttribute[name.name='variant']:not([value.value='default']))) > JSXAttribute[name.name='className'] :matches(Literal[value=/\\bbg-(destructive|status-critical)/], TemplateElement[value.raw=/\\bbg-(destructive|status-critical)/])",
+                    message:
+                        'The default Button variant (.btn-soft-primary gradient) paints over bg-destructive / bg-status-critical, so this renders purple. Use variant="destructive" instead of recolouring. See DESIGN.md "Recolouring a primary button with bg-* classes".',
+                },
+            ],
+        },
+    },
+    {
         // Calendars use the shared Site Calendar parts (DESIGN.md
         // "Calendars — always the Site Calendar style" and the anti-pattern
         // "Module calendars that fork the shared calendar chrome"). The files
@@ -201,6 +235,24 @@ export default [
         },
     },
     {
+        // Node tooling (scripts/, tools/): run by node, not the browser bundle.
+        files: ['**/*.{cjs,mjs}'],
+        languageOptions: {
+            globals: {
+                ...globals.node,
+            },
+        },
+    },
+    {
+        files: ['**/*.cjs'],
+        languageOptions: {
+            sourceType: 'commonjs',
+        },
+        rules: {
+            '@typescript-eslint/no-require-imports': 'off',
+        },
+    },
+    {
         ignores: [
             'vendor',
             'collector/vendor/**',
@@ -211,11 +263,11 @@ export default [
             'playwright-report/**',
             'test-results/**',
             'tailwind.config.js',
-            // Immutable Transport design evidence is verified by its frozen manifests.
-            'docs/fleet-assets-audit/previews/PKG-05/**',
-            // Frozen Asset Profile references retain their recorded byte hashes.
-            'docs/fleet-assets-audit/previews/PKG-06B/**',
-            'docs/fleet-assets-audit/evidence/PKG-06B/v*/**',
+            // Audit evidence, design previews and before/after snapshots are
+            // records, not shipped code. Some are verified by frozen byte
+            // hashes, and `npm run lint` runs with --fix, which would
+            // rewrite them.
+            'docs/**',
             // Claude Code agent worktrees: each is a full repo checkout so
             // recursing into them duplicates lint work for every parallel
             // session and overflows ESLint's stylish formatter on machines

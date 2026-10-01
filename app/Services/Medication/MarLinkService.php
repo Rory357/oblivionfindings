@@ -39,4 +39,39 @@ final class MarLinkService
 
         return $this->openable[$key];
     }
+
+    /**
+     * The subset of $clientIds whose chart this viewer may open, so a
+     * Site-scoped list can be narrowed to people: leads and medication
+     * operations roles keep the whole Site, ordinary support workers keep the
+     * residents they are assigned to or covering. Loads the unknown clients in
+     * one query and seeds the memo, so the rows' urlFor() calls cost nothing.
+     *
+     * @param  iterable<int, mixed>  $clientIds
+     * @return array<int, int>
+     */
+    public function openableClientIds(User $viewer, iterable $clientIds): array
+    {
+        $ids = collect($clientIds)
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values();
+        $key = fn (int $id): string => $viewer->getKey().':'.$id;
+
+        $unknown = $ids->reject(fn (int $id): bool => array_key_exists($key($id), $this->openable));
+        if ($unknown->isNotEmpty()) {
+            $clients = Client::query()
+                ->whereIn('id', $unknown->all())
+                ->get()
+                ->keyBy(fn (Client $client): int => (int) $client->id);
+            foreach ($unknown as $id) {
+                $client = $clients->get($id);
+                $this->openable[$key($id)] = $client !== null
+                    && Gate::forUser($viewer)->allows('viewMedications', $client);
+            }
+        }
+
+        return $ids->filter(fn (int $id): bool => $this->openable[$key($id)])->values()->all();
+    }
 }

@@ -18,7 +18,7 @@ use Database\Factories\UserFactory;
 
 beforeEach(function () {
     Cache::flush();
-    Carbon::setTestNow(Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland'));
+    Carbon::setTestNow(Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland')->utc());
 });
 
 afterEach(function () {
@@ -48,7 +48,7 @@ it('records My Day medication actions from a non-second-aligned authorization in
     string $expectedStatus,
 ) {
     $actionAt = Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland')->setMicrosecond(123456);
-    Carbon::setTestNow($actionAt);
+    Carbon::setTestNow($actionAt->copy()->utc());
     [$worker, $medication] = makeWorkerAndMedication();
 
     $this->actingAs($worker)

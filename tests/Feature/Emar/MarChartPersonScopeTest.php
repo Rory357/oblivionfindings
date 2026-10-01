@@ -255,7 +255,9 @@ class MarChartPersonScopeTest extends TestCase
         )->keyBy('client_id');
 
         $this->assertStringContainsString('client_id='.$assigned->id, (string) $rows[$assigned->id]['mar_url']);
-        $this->assertNull($rows[$unassigned->id]['mar_url']);
+        // Site-wide lists are also person-scoped now, so the unassigned
+        // resident's row is not listed at all (EmarListPersonScopeTest).
+        $this->assertFalse($rows->has($unassigned->id));
     }
 
     /** A rostered (not yet clocked-in) shift covering one resident. */

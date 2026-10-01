@@ -1,0 +1,290 @@
+<?php
+
+namespace Tests\Feature\Emar;
+
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
+use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
+use App\Models\ClientMedicationStock;
+use App\Models\MedicationDestruction;
+use App\Models\MedicationError;
+use App\Models\MedicationReview;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\ServiceContext;
+use App\Models\Shift;
+use App\Models\Site;
+use App\Models\User;
+use Database\Seeders\RbacSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+/**
+ * Site scope is not person scope. The Site-wide eMAR lists (PRN records,
+ * Errors, Reviews, Destructions, Stock) show an ordinary support worker only
+ * the residents whose chart they may open (ClientPolicy::viewMedications):
+ * assigned, or covered by their clocked-in shift. Leads and medication
+ * operations roles keep the whole Site.
+ */
+class EmarListPersonScopeTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private Site $site;
+
+    private User $worker;
+
+    private Client $assigned;
+
+    private Client $covered;
+
+    private Client $unassigned;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RbacSeeder::class);
+        $this->site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+        $this->worker = $this->supportWorker();
+        $this->assigned = $this->resident('Aroha', 'Assigned');
+        $this->covered = $this->resident('Rewi', 'Covered');
+        $this->unassigned = $this->resident('Hemi', 'Unassigned');
+        $this->assigned->supportWorkers()->attach($this->worker->id);
+        $this->clockedInShift($this->worker, $this->covered);
+    }
+
+    public function test_prn_records_list_only_the_residents_a_support_worker_may_open(): void
+    {
+        foreach ($this->residents() as $client) {
+            $medication = $this->medication($client, 'Paracetamol PRN', prn: true);
+            ClientMedicationAdministration::query()->create([
+                'client_id' => $client->id,
+                'client_medication_id' => $medication->id,
+                'administered_by' => $this->worker->id,
+                'administered_at' => now()->subHour(),
+                'status' => 'given',
+            ]);
+        }
+
+        $page = $this->actingAs($this->worker)->get(route('emar.prn'))->assertOk();
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('administrations'), 'client_id'));
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('history.data'), 'client_id'));
+        $this->assertSame(2, $page->inertiaProps('history.meta.total'));
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('pending_reviews'), 'client_id'));
+
+        $lead = $this->actingAs($this->lead())->get(route('emar.prn'))->assertOk();
+        $this->assertSame($this->allIds(), $this->sortedIds($lead->inertiaProps('history.data'), 'client_id'));
+    }
+
+    public function test_medication_errors_list_and_stats_only_count_residents_a_support_worker_may_open(): void
+    {
+        $errorIds = collect($this->residents())->mapWithKeys(fn (Client $client) => [
+            $client->id => MedicationError::query()->create([
+                'client_id' => $client->id,
+                'error_type' => 'omission',
+                'severity' => 'near_miss',
+                'description' => 'Dose missed but caught.',
+                'status' => 'reported',
+                'reported_by' => $this->worker->id,
+                'reported_at' => now(),
+            ])->id,
+        ]);
+
+        $page = $this->actingAs($this->worker)->get(route('emar.errors'))->assertOk();
+        $this->assertSame(
+            collect([$errorIds[$this->assigned->id], $errorIds[$this->covered->id]])->sort()->values()->all(),
+            $this->sortedIds($page->inertiaProps('errors'), 'id'),
+        );
+        $this->assertSame(2, $page->inertiaProps('stats.total_open'));
+        $this->assertSame(2, $page->inertiaProps('stats.near_miss'));
+
+        $lead = $this->actingAs($this->lead())->get(route('emar.errors'))->assertOk();
+        $this->assertCount(3, $lead->inertiaProps('errors'));
+        $this->assertSame(3, $lead->inertiaProps('stats.total_open'));
+    }
+
+    public function test_medication_reviews_list_only_the_residents_a_support_worker_may_open(): void
+    {
+        foreach ($this->residents() as $client) {
+            MedicationReview::query()->create([
+                'client_id' => $client->id,
+                'review_type' => 'routine',
+                'status' => 'scheduled',
+                'scheduled_date' => now()->addWeek()->toDateString(),
+            ]);
+        }
+
+        $page = $this->actingAs($this->worker)->get(route('emar.reviews'))->assertOk();
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('reviews'), 'client_id'));
+        $this->assertSame(2, $page->inertiaProps('kpis.due_30'));
+
+        $lead = $this->actingAs($this->lead())->get(route('emar.reviews'))->assertOk();
+        $this->assertSame($this->allIds(), $this->sortedIds($lead->inertiaProps('reviews'), 'client_id'));
+    }
+
+    public function test_destructions_register_and_its_medicine_list_only_show_residents_a_support_worker_may_open(): void
+    {
+        // The seeded Support Worker role holds controlled view, so it can open
+        // the register; the person rule still narrows its rows.
+        $this->assertTrue($this->worker->canDo('medications.controlled.view'));
+        foreach ($this->residents() as $client) {
+            $this->medication($client, 'Paracetamol');
+            MedicationDestruction::create([
+                'client_id' => $client->id,
+                'medication_name' => 'Oxycodone',
+                'quantity' => 4,
+                'unit' => 'tablets',
+                'reason' => 'expired',
+                'disposal_method' => 'denaturing',
+                'destroyed_by' => $this->worker->id,
+                'witness_1_id' => User::factory()->create()->id,
+                'destroyed_at' => now(),
+                'is_controlled_drug' => true,
+            ]);
+        }
+
+        $page = $this->actingAs($this->worker)->get(route('emar.destructions'))->assertOk();
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('destructions'), 'client_id'));
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('medications'), 'client_id'));
+
+        $lead = $this->actingAs($this->lead(['medications.controlled.view']))->get(route('emar.destructions'))->assertOk();
+        $this->assertSame($this->allIds(), $this->sortedIds($lead->inertiaProps('destructions'), 'client_id'));
+    }
+
+    public function test_stock_is_only_for_medication_operations_roles_which_keep_the_whole_site(): void
+    {
+        foreach ($this->residents() as $client) {
+            ClientMedicationStock::query()->create([
+                'client_medication_id' => $this->medication($client, 'Paracetamol')->id,
+                'on_hand' => 20,
+                'unit' => 'tablets',
+                'reorder_level' => 5,
+            ]);
+        }
+
+        // An ordinary support worker cannot open the stock register at all.
+        $this->actingAs($this->worker)->get(route('emar.stock'))->assertForbidden();
+
+        // medications.stock.update is Site-wide medication authority under
+        // viewMedications, so a stock keeper sees every resident's stock.
+        $stockKeeper = $this->supportWorker(grant: ['medications.stock.update']);
+        $page = $this->actingAs($stockKeeper)->get(route('emar.stock'))->assertOk();
+        $this->assertSame($this->allIds(), $this->sortedIds($page->inertiaProps('stockItems'), 'client_id'));
+    }
+
+    /** @return array<int, Client> */
+    private function residents(): array
+    {
+        return [$this->assigned, $this->covered, $this->unassigned];
+    }
+
+    /** @return array<int, int> */
+    private function visibleIds(): array
+    {
+        return collect([$this->assigned->id, $this->covered->id])->sort()->values()->all();
+    }
+
+    /** @return array<int, int> */
+    private function allIds(): array
+    {
+        return collect($this->residents())->pluck('id')->sort()->values()->all();
+    }
+
+    /** @return array<int, int> */
+    private function sortedIds(mixed $rows, string $key): array
+    {
+        return collect($rows)->pluck($key)->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
+    }
+
+    private function resident(string $first, string $last): Client
+    {
+        return Client::factory()->create([
+            'first_name' => $first,
+            'last_name' => $last,
+            'site_id' => $this->site->id,
+            'status' => 'active',
+        ]);
+    }
+
+    private function medication(Client $client, string $name, bool $prn = false): ClientMedication
+    {
+        return ClientMedication::query()->create([
+            'client_id' => $client->id,
+            'name' => $name,
+            'dosage' => '500mg',
+            'frequency' => $prn ? 'As needed' : 'Daily',
+            'dose_times' => $prn ? [] : ['08:00'],
+            'is_prn' => $prn,
+            'controlled_drug' => false,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+        ]);
+    }
+
+    /** A clocked-in shift covering one resident (recording authority). */
+    private function clockedInShift(User $worker, Client $client): Shift
+    {
+        return Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => ServiceContext::factory()->create([
+                'type' => 'residential',
+                'is_active' => true,
+                'site_id' => $this->site->id,
+            ])->id,
+            'user_id' => $worker->id,
+            'starts_at' => now()->subHours(2),
+            'ends_at' => now()->addHours(4),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'status' => 'in_progress',
+            'started_by' => $worker->id,
+        ]);
+    }
+
+    /** The seeded Support Worker role (assignment-scoped medication reader). */
+    private function supportWorker(array $grant = []): User
+    {
+        $user = $this->siteStaff();
+        $user->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
+        $user->permissionOverrides()->sync(
+            Permission::query()->whereIn('key', $grant)->pluck('id')
+                ->mapWithKeys(fn (int $id) => [$id => ['allowed' => true]])
+                ->all(),
+        );
+
+        return $user->refresh();
+    }
+
+    /** A Site-wide reader: clients.viewAny keeps the whole Site. */
+    private function lead(array $extra = []): User
+    {
+        $user = $this->siteStaff();
+        $permissions = ['medications.view', 'clients.viewAny', ...$extra];
+        $ids = Permission::query()->whereIn('key', $permissions)->pluck('id');
+        $this->assertCount(count($permissions), $ids);
+        $user->permissionOverrides()->sync(
+            $ids->mapWithKeys(fn (int $id) => [$id => ['allowed' => true]])->all(),
+        );
+
+        return $user->refresh();
+    }
+
+    private function siteStaff(): User
+    {
+        $user = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subYear()->toDateString(),
+            'end_date' => null,
+        ]);
+
+        return $user;
+    }
+}

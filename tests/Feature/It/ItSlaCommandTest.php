@@ -194,8 +194,16 @@ test('unstamped tickets become unmeasured and settled met outcomes remain met', 
     // Resolved inside target → met; resolution drops it out of the open set.
     $met = itSlaCmdTicket($this->worker, ['priority' => 'urgent']);
     $this->actingAs($this->hr)
-        ->post("/it/tickets/{$met->id}/resolve", ['expected_version' => $met->fresh()->lock_version, 'note' => 'Swapped the charger.'])
-        ->assertRedirect();
+        ->post("/it/tickets/{$met->id}/resolve", [
+            'expected_version' => $met->fresh()->lock_version,
+            // Resolving needs an outcome and how it was checked
+            // (ItTicketResolutionInput); a bare note fails validation.
+            'resolution_code' => 'restored',
+            'resolution_verification' => 'Charger swapped and the device powered on.',
+            'note' => 'Swapped the charger.',
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
     expect($met->refresh()->sla_state)->toBe('met');
 
     $this->travel(10)->days();

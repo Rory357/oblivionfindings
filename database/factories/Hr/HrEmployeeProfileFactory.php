@@ -28,7 +28,10 @@ class HrEmployeeProfileFactory extends Factory
             'hours_per_week' => 40,
             'hourly_rate' => '30.00',
             'pay_frequency' => 'fortnightly',
-            'start_date' => fake()->dateTimeBetween('-3 years', '-1 month')->format('Y-m-d'),
+            // Relative to Carbon's now() so a frozen or travelled test clock
+            // applies: Faker's dateTimeBetween reads the real clock, which
+            // could start the profile after a test's fixed past "now".
+            'start_date' => now()->subDays(fake()->numberBetween(30, 1095))->toDateString(),
             'is_active' => true,
             'tax_code' => 'M',
             'kiwisaver_rate' => 3,

@@ -459,7 +459,7 @@ class AuditTrailTest extends TestCase
     {
         $tz = config('app.worker_timezone', 'Pacific/Auckland');
         // Freeze "now" mid-week (Wednesday) so the week boundary is unambiguous.
-        Carbon::setTestNow(Carbon::parse('2026-06-17 10:00:00', $tz));
+        Carbon::setTestNow(Carbon::parse('2026-06-17 10:00:00', $tz)->utc());
 
         try {
             ['user' => $user, 'client' => $client] = $this->seedAudit();

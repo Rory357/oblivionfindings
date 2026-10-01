@@ -1091,6 +1091,8 @@ class MedicationAdministrationOwnershipTest extends TestCase
         $localError = $this->error($localClient, $reporter, 'reported');
         $this->error($foreignClient, $reporter, 'reported');
         $reader = $this->userWithPermissions(['medications.view'], $localSite);
+        // The register is person-scoped for assignment readers too.
+        $localClient->supportWorkers()->attach($reader->id);
         $foreignStaff = $this->userWithPermissions(['medications.view'], $foreignSite);
 
         $response = $this->actingAs($reader)

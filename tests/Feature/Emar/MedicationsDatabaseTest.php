@@ -9,6 +9,7 @@ use App\Models\MedicationInteraction;
 use App\Models\MedicationScheduledStockCount;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -68,7 +69,22 @@ class MedicationsDatabaseTest extends TestCase
         $user = $this->makeRoleUser('admin');
         $this->grantPermissions($user, ['medications.view', 'medications.administer.record', 'clients.update']);
 
-        $client = Client::factory()->create(['status' => 'active']);
+        // Order actions (add, edit, discontinue) share one authority rule
+        // since 0cb4a4190: the client's Site plus a clocked-in Shift covering
+        // the client (or break-glass). Give the actor that genuine authority.
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'user_id' => $user->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(2),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'started_by' => $user->id,
+            'status' => 'in_progress',
+        ]);
         $med = ClientMedication::query()->create([
             'client_id' => $client->id,
             'name' => 'Amlodipine',
@@ -102,7 +118,9 @@ class MedicationsDatabaseTest extends TestCase
         $user = $this->makeRoleUser('admin');
         $this->grantPermissions($user, ['medications.view']);
 
-        $client = Client::factory()->create(['status' => 'active']);
+        // Medication reads are Site-scoped, so the client needs a canonical Site.
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $warfarin = ClientMedication::query()->create([
             'client_id' => $client->id,
             'name' => 'Warfarin',
