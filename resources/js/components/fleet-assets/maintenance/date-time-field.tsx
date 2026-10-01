@@ -23,6 +23,7 @@ export function DateTimeField({
   onChange,
   error,
   hint,
+  clearable = true,
 }: {
   id: string;
   label: string;
@@ -30,6 +31,9 @@ export function DateTimeField({
   onChange: (value: string) => void;
   error?: string;
   hint?: string;
+  /** Show "Clear date and time" once there is a value (the default). Pass
+   *  false for a required date and time that must not be emptied. */
+  clearable?: boolean;
 }) {
   const [date = "", time = ""] = value.split("T");
   const update = (nextDate: string, nextTime: string) =>
@@ -66,7 +70,7 @@ export function DateTimeField({
           />
         </div>
       </div>
-      {value && (
+      {clearable && value && (
         <Button
           variant="ghost"
           size="sm"
