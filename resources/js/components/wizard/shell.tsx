@@ -239,11 +239,13 @@ export function WizardShell({
                                         </span>
                                     )}
                                 </div>
+                                {/* Drawn at 28 px; frontline-hit gives it a
+                                    44 px target inside the header padding. */}
                                 <button
                                     type="button"
                                     onClick={onClose}
                                     aria-label="Close"
-                                    className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+                                    className="frontline-hit grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
                                 >
                                     <X className="h-5 w-5" />
                                 </button>
