@@ -8,9 +8,11 @@ use App\Http\Controllers\Emar\WorkerMedsController;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationCompetencyExemption;
 use App\Models\User;
 use App\Services\MarScheduleService;
 use App\Services\Medication\ClientAllergyRecordService;
+use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\WitnessPinService;
@@ -35,6 +37,9 @@ class MedsBoardPayloadService
 {
     /** Statuses that mean a dose slot has been actioned and needs no chasing. */
     private const RECORDED_STATUSES = ['given', 'refused', 'withheld', 'missed'];
+
+    /** @var array<int, bool> the competency decision per viewer, for this request */
+    private array $medCompetent = [];
 
     public function __construct(
         protected MarScheduleService $scheduleService,
@@ -497,7 +502,7 @@ class MedsBoardPayloadService
             'first_name' => Str::before(trim((string) $user->name), ' ') ?: $user->name,
             'name' => $user->name,
             'role_label' => $user->role ? Str::headline($user->role) : null,
-            'med_competent' => $user->canDo('medications.administer.record'),
+            'med_competent' => $this->isMedCompetent($user),
             'controlled_record' => $user->canDo('medications.controlled.record'),
             'cd_witness' => $user->canDo('medications.controlled.witness'),
             // NF-03: the organisation's restricted-competency rule, shown to
@@ -507,6 +512,55 @@ class MedsBoardPayloadService
             // to witness or co-sign; the board prompts them to set one.
             'witness_pin' => app(WitnessPinService::class)->status($user),
         ];
+    }
+
+    /**
+     * "Med-competent": the viewer may record doses and the competency policy
+     * allows them to give medicines now — a passed, acknowledged, in-date
+     * assessment, or an approved exemption at one of their Sites. The
+     * permission alone is not competence (no assessment, or one awaiting
+     * acknowledgement, is not). Worked out once per viewer per request.
+     */
+    public function isMedCompetent(User $user): bool
+    {
+        return $this->medCompetent[(int) $user->id] ??= $this->decideMedCompetent($user);
+    }
+
+    private function decideMedCompetent(User $user): bool
+    {
+        if (! $user->canDo('medications.administer.record')) {
+            return false;
+        }
+
+        try {
+            $policy = app(MedicationAdministratorCompetencyPolicy::class);
+            $now = now();
+            if ($policy->evaluate($user, null, $now)['allowed']) {
+                return true;
+            }
+
+            // An exemption is Site-scoped: any of the viewer's Sites will do.
+            $siteIds = $this->siteAccess->accessibleSiteIds($user, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS);
+            $exemptionSiteIds = $siteIds === [] ? collect() : MedicationCompetencyExemption::query()
+                ->where('user_id', $user->id)
+                ->where('scope', MedicationCompetencyExemption::SCOPE_ADMINISTRATION)
+                ->whereNull('revoked_at')
+                ->whereIn('site_id', $siteIds)
+                ->distinct()
+                ->pluck('site_id');
+            foreach ($exemptionSiteIds as $siteId) {
+                if ($policy->evaluate($user, (int) $siteId, $now)['allowed']) {
+                    return true;
+                }
+            }
+
+            return false;
+        } catch (\Throwable $e) {
+            report($e);
+
+            // Not shown as competent; the server still decides when a dose is signed.
+            return false;
+        }
     }
 
     /** @return array{requires_cosigner: bool, blocked: bool, message: string}|null */
