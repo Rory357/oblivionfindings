@@ -318,6 +318,20 @@ class DoseSlotRulesTest extends TestCase
         $this->assertSame([], $this->rules->slotsOn($timeline, '2026-06-16'));
     }
 
+    public function test_nothing_due_before_the_order_was_entered_is_owed(): void
+    {
+        $timeline = new DoseOrderTimeline(7, [$this->version(['08:00', '14:00', '20:00'])], [], null, $this->nz('2026-06-15 10:00'));
+
+        // Entered at 10:00 with an earlier start date: 08:00 today was never owed.
+        $this->assertSame(['14:00', '20:00'], $this->doseTimesOf($this->rules->slotsOn($timeline, '2026-06-15')));
+        $this->assertSame([], $this->rules->slotsOn($timeline, '2026-06-14'));
+        $this->assertSame(['08:00', '14:00', '20:00'], $this->doseTimesOf($this->rules->slotsOn($timeline, '2026-06-16')));
+
+        // Entered exactly at a dose time: that dose is owed.
+        $atTwo = new DoseOrderTimeline(7, [$this->version(['14:00'])], [], null, $this->nz('2026-06-15 14:00'));
+        $this->assertSame(['14:00'], $this->doseTimesOf($this->rules->slotsOn($atTwo, '2026-06-15')));
+    }
+
     // ── Guards ──────────────────────────────────────────────────────────
 
     public function test_inputs_are_validated(): void

@@ -313,6 +313,10 @@ it('attaches a RecordDoseWizard context to an unrecorded past scheduled dose', f
     // EM-01: an overdue dose is an unrecorded scheduled slot whose time has
     // passed — no `pending` administration row exists in production.
     $client = makeOverviewClient();
+    // Entered this morning, before its 09:00 dose (a dose due before an
+    // order's entry is not owed).
+    $now = Carbon::getTestNow();
+    Carbon::setTestNow(Carbon::now('Pacific/Auckland')->startOfDay()->utc());
     $med = ClientMedication::factory()->create([
         'client_id' => $client->id,
         'name' => 'Clozapine',
@@ -328,6 +332,7 @@ it('attaches a RecordDoseWizard context to an unrecorded past scheduled dose', f
         'active' => true,
         'state' => 'active',
     ]);
+    Carbon::setTestNow($now);
 
     $service = app(MedicationOverviewService::class);
     $workerToday = Carbon::now('Pacific/Auckland')->startOfDay();

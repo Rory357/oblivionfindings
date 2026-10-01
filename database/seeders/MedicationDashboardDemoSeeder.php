@@ -28,7 +28,9 @@ class MedicationDashboardDemoSeeder extends Seeder
     {
         $this->command->info('Starting Medication Dashboard Demo Seeder...');
         
-        $this->today = now()->startOfDay();
+        // The worker's (NZ) day: dose times are NZ wall-clock times, stored
+        // as UTC instants (a UTC "08:00" would be 20:00 or 21:00 in NZ).
+        $this->today = now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay();
         
         // Get existing data
         $this->serviceContext = ServiceContext::query()->first();
@@ -79,12 +81,12 @@ class MedicationDashboardDemoSeeder extends Seeder
         $shift = Shift::firstOrCreate(
             [
                 'client_id' => $client->id,
-                'starts_at' => $this->today->copy()->setTime(7, 0),
+                'starts_at' => $this->today->copy()->setTime(7, 0)->utc(),
             ],
             [
                 'user_id' => $worker->id,
                 'service_context_id' => $this->serviceContext?->id,
-                'ends_at' => $this->today->copy()->setTime(19, 0),
+                'ends_at' => $this->today->copy()->setTime(19, 0)->utc(),
                 'status' => 'active',
             ]
         );
@@ -122,7 +124,7 @@ class MedicationDashboardDemoSeeder extends Seeder
 
         // Create administrations with different patterns per client
         foreach (['08:00', '20:00'] as $timeIndex => $time) {
-            $scheduled = $this->today->copy()->setTimeFromTimeString($time);
+            $scheduled = $this->today->copy()->setTimeFromTimeString($time)->utc();
             $existing = ClientMedicationAdministration::where('client_id', $client->id)
                 ->where('client_medication_id', $regularMed->id)
                 ->where('scheduled_for', $scheduled)
@@ -222,7 +224,7 @@ class MedicationDashboardDemoSeeder extends Seeder
         );
 
         // Administer morning med based on pattern
-        $scheduledMorning = $this->today->copy()->setTime(8, 0);
+        $scheduledMorning = $this->today->copy()->setTime(8, 0)->utc();
         $existingMorning = ClientMedicationAdministration::where('client_id', $client->id)
             ->where('client_medication_id', $morningMed->id)
             ->where('scheduled_for', $scheduledMorning)
@@ -341,7 +343,7 @@ class MedicationDashboardDemoSeeder extends Seeder
                 'shift_id' => $shift->id,
                 'service_context_id' => $this->serviceContext?->id,
                 'administered_by' => $worker->id,
-                'administered_at' => $this->today->copy()->setTime(rand(9, 17), rand(0, 59)),
+                'administered_at' => $this->today->copy()->setTime(rand(9, 17), rand(0, 59))->utc(),
                 'status' => 'given',
                 'dose_given' => '1mg',
                 'reason' => 'PRN: escalating anxiety',

@@ -81,7 +81,7 @@ it('persists administrations only through the recording service and the two corr
         ->and($rawWrites)->toBe([]);
 });
 
-it('writes the slot table only from the generator and the outcome writer', function (): void {
+it('writes the slot table only from the generator, the outcome writer and the backfill', function (): void {
     $writers = [];
     foreach (doseSlotAppSources() as $path => $source) {
         if (preg_match("/MedicationDoseSlot::|table\\(\\s*'medication_dose_slots'\\s*\\)/", $source) === 1
@@ -91,6 +91,8 @@ it('writes the slot table only from the generator and the outcome writer', funct
     }
 
     expect($writers)->toBe([
+        // C5: adds missing past slots (reconstructed) and fills missing outcomes only.
+        'app/Services/Medication/DoseSlots/DoseSlotBackfill.php',
         'app/Services/Medication/DoseSlots/DoseSlotGenerator.php',
         'app/Services/Medication/DoseSlots/DoseSlotOutcomeWriter.php',
     ]);

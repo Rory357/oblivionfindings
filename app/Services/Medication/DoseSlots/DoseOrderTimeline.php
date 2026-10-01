@@ -15,12 +15,14 @@ final class DoseOrderTimeline
     /**
      * @param  list<DoseOrderVersion>  $versions  in the order they were written
      * @param  list<array{0: CarbonImmutable, 1: CarbonImmutable|null}>  $pauses  [paused at, resumed at) — null = still paused
+     * @param  CarbonImmutable|null  $enteredAt  when the order was entered: nothing due before it is owed
      */
     public function __construct(
         public readonly int $orderId,
         public readonly array $versions,
         public readonly array $pauses = [],
         public readonly ?CarbonImmutable $ceasedAt = null,
+        public readonly ?CarbonImmutable $enteredAt = null,
     ) {
         $previous = null;
         foreach ($versions as $version) {
@@ -87,5 +89,15 @@ final class DoseOrderTimeline
     public function isCeasedBy(CarbonImmutable $at): bool
     {
         return $this->ceasedAt !== null && $this->ceasedAt->lessThanOrEqualTo($at);
+    }
+
+    /**
+     * A dose due before the order was entered is not owed (Main, 2 Oct): an
+     * order entered at 10:00 — a replacement, say — owes nothing due earlier
+     * that day, so it never doubles the doses its predecessor already owed.
+     */
+    public function isBeforeEntry(CarbonImmutable $at): bool
+    {
+        return $this->enteredAt !== null && $at->lessThan($this->enteredAt);
     }
 }

@@ -307,15 +307,17 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
 
     public function test_audit_and_dashboard_fail_closed_without_sites_and_both_global_site_permissions_broaden_only_scope(): void
     {
-        // The /dashboard eMAR widget counts scheduled 09:00 slots on the
-        // worker (NZ) day (NF-25), so pin the clock after that slot and put
-        // the recorded doses on it.
-        Carbon::setTestNow(Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland')->utc());
+        // The /dashboard eMAR widget counts the 09:00 dose slots on the
+        // worker (NZ) day from the dose-slot projection (NF-25, C6a): pin the
+        // clock after the 09:00 window has ended (10:00) and put the recorded
+        // doses on that slot through the model, so the slot outcome is written.
+        Carbon::setTestNow(Carbon::parse('2026-05-21 10:30:00', 'Pacific/Auckland')->utc());
         $context = $this->context();
         $slotUtc = Carbon::parse('2026-05-21 09:00:00', 'Pacific/Auckland')->utc();
         ClientMedicationAdministration::query()
             ->whereKey([$context['local_administration']->id, $context['foreign_administration']->id])
-            ->update(['scheduled_for' => $slotUtc]);
+            ->get()
+            ->each(fn (ClientMedicationAdministration $administration) => $administration->update(['scheduled_for' => $slotUtc]));
         $empty = $this->userWithPermissions([
             'medications.view',
             'medications.audit.view',
@@ -340,16 +342,21 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         // No readable Site: no scheduled doses, so the admin rate is n/a.
         $this->assertDashboardWidgets($empty, null, 0, 0, 0, 0);
 
-        // Local ordinary 09:00 dose given → 1 of 1 due doses given.
+        // Dose numbers count the people the reader may open (the person
+        // rule) and controlled doses for every reader (P09 Q6): the local
+        // 09:00 dose given and the local controlled 09:00 dose unrecorded,
+        // now overdue → 1 of 2 due doses given, 1 due now.
         $ordinary = $this->userWithPermissions([
             'medications.view',
+            'clients.viewAny',
             'shifts.manageAny',
         ], $context['local_site']);
-        $this->assertDashboardWidgets($ordinary, 100.0, 0, 1, 1, 1);
+        $this->assertDashboardWidgets($ordinary, 50.0, 1, 1, 1, 1);
 
-        // Adds the local controlled 09:00 dose, unrecorded → overdue.
+        // The same dose numbers; the controlled alert and stock are its own.
         $controlledReader = $this->userWithPermissions([
             'medications.view',
+            'clients.viewAny',
             'medications.controlled.view',
             'shifts.manageAny',
         ], $context['local_site']);
@@ -384,9 +391,9 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
                 ->streamedContent();
             $this->assertStringContainsString('Local Resident', $globalCsv);
             $this->assertStringContainsString('Foreign Resident', $globalCsv);
-            // Local given + foreign recorded missed: 1 of 2 due doses given,
-            // nothing left due now.
-            $this->assertDashboardWidgets($global, 50.0, 0, 2, 2, 2);
+            // Both Sites: local given, foreign recorded missed, and both
+            // controlled 09:00 doses unrecorded (overdue) → 1 of 4 given.
+            $this->assertDashboardWidgets($global, 25.0, 2, 2, 2, 2);
         }
     }
 
@@ -747,9 +754,13 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         ];
     }
 
+    /** Entered at the start of today (NZ): doses due before an order's entry are not owed. */
     private function medication(Client $client, string $name, bool $controlled = false): ClientMedication
     {
-        return ClientMedication::factory()->create([
+        $startDate = today()->subDays(2)->toDateString();
+        $now = Carbon::getTestNow();
+        Carbon::setTestNow(Carbon::now('Pacific/Auckland')->startOfDay()->utc());
+        $medication = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'name' => $name,
             'controlled_drug' => $controlled,
@@ -758,9 +769,12 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
             'approval_status' => 'verified',
             'is_prn' => false,
             'dose_times' => ['09:00'],
-            'start_date' => today()->subDays(2)->toDateString(),
+            'start_date' => $startDate,
             'end_date' => null,
         ]);
+        Carbon::setTestNow($now);
+
+        return $medication;
     }
 
     private function administration(

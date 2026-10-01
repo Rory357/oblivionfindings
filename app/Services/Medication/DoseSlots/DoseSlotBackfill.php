@@ -19,7 +19,8 @@ use InvalidArgumentException;
  * - the order's schedule history: the audit log (DoseOrderHistoryReconstructor)
  *   up to when its schedule versions began being recorded (C3), the recorded
  *   versions and pauses from then on — same rules as live generation;
- * - nothing due before the order was entered, or after `now`;
+ * - nothing due before the order was entered (the timelines' rule, as in
+ *   live generation), or after `now`;
  * - a recorded scheduled dose the history doesn't explain was still owed: it
  *   gets a slot at its time. A day whose records match none of the history's
  *   times follows the records (the history is incomplete for that day).
@@ -111,7 +112,7 @@ final class DoseSlotBackfill
      * Where the order's schedule comes from. Its recorded versions (C3) are
      * exact from when recording began; before that, the audit log.
      *
-     * @return array{history: DoseOrderTimeline, recorded: DoseOrderTimeline|null, recordedFrom: CarbonImmutable|null, owedFrom: CarbonImmutable|null}
+     * @return array{history: DoseOrderTimeline, recorded: DoseOrderTimeline|null, recordedFrom: CarbonImmutable|null}
      */
     private function sources(ClientMedication $order): array
     {
@@ -123,13 +124,11 @@ final class DoseSlotBackfill
             'history' => $this->history->forOrder($order),
             'recorded' => $recordedFrom === null ? null : $this->recorded->forOrder($order),
             'recordedFrom' => $recordedFrom,
-            // No dose was owed in the system before the order was entered.
-            'owedFrom' => DoseOrderTimelineFactory::rawInstant($order->getAttributes()['created_at'] ?? null),
         ];
     }
 
     /**
-     * @param  array{history: DoseOrderTimeline, recorded: DoseOrderTimeline|null, recordedFrom: CarbonImmutable|null, owedFrom: CarbonImmutable|null}  $sources
+     * @param  array{history: DoseOrderTimeline, recorded: DoseOrderTimeline|null, recordedFrom: CarbonImmutable|null}  $sources
      * @return array{slots: int, outcomes: int, without_slot: int, days_from_records: int}
      */
     private function batch(ClientMedication $order, array $sources, string $from, string $to, CarbonImmutable $now, bool $dryRun): array
@@ -156,11 +155,11 @@ final class DoseSlotBackfill
                 $existingMinutes[$slot['due_minute']] = true;
             });
 
-        // What the history says was owed, per NZ day.
+        // What the history says was owed, per NZ day (the timelines already
+        // owe nothing before the order was entered).
         $owed = [];
         foreach ($this->historySlots($sources, $from, $to) as $slot) {
-            if ($slot->dueAt->greaterThan($now)
-                || ($sources['owedFrom'] !== null && $slot->dueAt->lessThan($sources['owedFrom']))) {
+            if ($slot->dueAt->greaterThan($now)) {
                 continue;
             }
             $owed[$slot->nzDate][$slot->key()] = $slot;
@@ -291,7 +290,7 @@ final class DoseSlotBackfill
      * The history's slots on these days: the audit-log history before the
      * order's versions began being recorded, the recorded ones after.
      *
-     * @param  array{history: DoseOrderTimeline, recorded: DoseOrderTimeline|null, recordedFrom: CarbonImmutable|null, owedFrom: CarbonImmutable|null}  $sources
+     * @param  array{history: DoseOrderTimeline, recorded: DoseOrderTimeline|null, recordedFrom: CarbonImmutable|null}  $sources
      * @return list<DoseSlot>
      */
     private function historySlots(array $sources, string $from, string $to): array
@@ -318,7 +317,7 @@ final class DoseSlotBackfill
      * its recorded time. None when it isn't due yet or the order was as
      * needed (PRN) then.
      *
-     * @param  array{history: DoseOrderTimeline, recorded: DoseOrderTimeline|null, recordedFrom: CarbonImmutable|null, owedFrom: CarbonImmutable|null}  $sources
+     * @param  array{history: DoseOrderTimeline, recorded: DoseOrderTimeline|null, recordedFrom: CarbonImmutable|null}  $sources
      */
     private function slotFromRecord(ClientMedication $order, array $sources, string $minute, CarbonImmutable $now, string $timezone): ?DoseSlot
     {

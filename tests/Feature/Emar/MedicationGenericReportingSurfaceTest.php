@@ -104,12 +104,16 @@ class MedicationGenericReportingSurfaceTest extends TestCase
             collect($medicationRows)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all(),
         );
 
-        // Ordinary reader: the local ordinary 09:00 dose (recorded missed) and
-        // the replacement order's unrecorded 09:00 dose — never the
-        // controlled one.
+        // Dose numbers come from the dose-slot projection (C6a, P09): every
+        // reader counts the same doses, controlled ones included (P09 Q6) —
+        // the unrecorded 09:00 doses of the controlled stock medicine, the
+        // replacement order and the unverified order (its verified version
+        // stays in effect, P01). At 10:00 their windows (to 10:00, inclusive)
+        // are still open: due now, none overdue yet. The ordinary and the
+        // deleted controlled 09:00 doses are recorded (missed).
         $dashboard = $this->actingAs($ordinary)->get(route('dashboard'))->assertOk();
-        $this->assertSame(1, $dashboard->inertiaProps('emarWidgets.dueNow'));
-        $this->assertSame(1, $dashboard->inertiaProps('emarWidgets.overdue'));
+        $this->assertSame(3, $dashboard->inertiaProps('emarWidgets.dueNow'));
+        $this->assertSame(0, $dashboard->inertiaProps('emarWidgets.overdue'));
         $this->assertSame(1, $dashboard->inertiaProps('emarWidgets.lowStock'));
 
         $compliance = $this->actingAs($ordinary)->get(route('compliance.index'))->assertOk();
@@ -200,8 +204,8 @@ class MedicationGenericReportingSurfaceTest extends TestCase
         $this->assertSame(1, $controlledReports->inertiaProps('kpis.openDiscrepancies'));
 
         $controlledDashboard = $this->actingAs($controlledReader)->get(route('dashboard'))->assertOk();
-        // The controlled reader also counts the active controlled 09:00 dose.
-        $this->assertSame(2, $controlledDashboard->inertiaProps('emarWidgets.dueNow'));
+        // The same dose numbers as the ordinary reader (controlled doses count for everyone).
+        $this->assertSame(3, $controlledDashboard->inertiaProps('emarWidgets.dueNow'));
         $this->assertSame(2, $controlledDashboard->inertiaProps('emarWidgets.lowStock'));
 
         $controlledCompliance = $this->actingAs($controlledReader)
@@ -236,6 +240,10 @@ class MedicationGenericReportingSurfaceTest extends TestCase
             'state' => 'active',
             'approval_status' => 'verified',
             'superseded_by' => $replacementMedication->id,
+            // Pinned (the factory picks a random frequency): an evening dose
+            // owes nothing at 10:00 either way.
+            'dose_times' => ['20:00'],
+            'frequency' => '20:00',
             'start_date' => today()->subDay()->toDateString(),
             'end_date' => null,
         ]);
@@ -274,9 +282,13 @@ class MedicationGenericReportingSurfaceTest extends TestCase
         ];
     }
 
+    /** Entered at the start of today (NZ): doses due before an order's entry are not owed. */
     private function medication(Client $client, string $name, bool $controlled = false): ClientMedication
     {
-        return ClientMedication::factory()->create([
+        $startDate = today()->subDay()->toDateString();
+        $now = Carbon::getTestNow();
+        Carbon::setTestNow(Carbon::now('Pacific/Auckland')->startOfDay()->utc());
+        $medication = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'name' => $name,
             'controlled_drug' => $controlled,
@@ -286,9 +298,12 @@ class MedicationGenericReportingSurfaceTest extends TestCase
             'is_prn' => false,
             'dose_times' => ['09:00'],
             'frequency' => '09:00',
-            'start_date' => today()->subDay()->toDateString(),
+            'start_date' => $startDate,
             'end_date' => null,
         ]);
+        Carbon::setTestNow($now);
+
+        return $medication;
     }
 
     private function administration(
