@@ -70,7 +70,7 @@ class MarChartBoardPayloadTest extends TestCase
             'status' => 'active',
         ]);
 
-        ClientMedication::query()->create([
+        $this->entered([
             'client_id' => $client->id,
             'name' => 'Morning tablets',
             'dosage' => '1 tablet',
@@ -135,7 +135,7 @@ class MarChartBoardPayloadTest extends TestCase
             'status' => 'active',
         ]);
 
-        ClientMedication::query()->create([
+        $this->entered([
             'client_id' => $client->id,
             'name' => 'Morning tablets',
             'dosage' => '1 tablet',
@@ -179,7 +179,7 @@ class MarChartBoardPayloadTest extends TestCase
         $recent = Client::factory()->create(['first_name' => 'Zeta', 'last_name' => 'Zzz', 'site_id' => $site->id, 'status' => 'active']);
 
         foreach ([$first, $recent] as $client) {
-            ClientMedication::query()->create([
+            $this->entered([
                 'client_id' => $client->id,
                 'name' => 'Tablets',
                 'dosage' => '1 tablet',
@@ -270,6 +270,22 @@ class MarChartBoardPayloadTest extends TestCase
                     ->sortKeys()
                     ->all() === ['2.5' => $warfarin->id, '4.8' => null])
             );
+    }
+
+    /**
+     * A scheduled order entered at the start of the day: a dose due before
+     * an order's entry is not owed.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function entered(array $attributes): ClientMedication
+    {
+        $now = Carbon::getTestNow();
+        Carbon::setTestNow(Carbon::now('Pacific/Auckland')->startOfDay()->utc());
+        $order = ClientMedication::query()->create($attributes);
+        Carbon::setTestNow($now);
+
+        return $order;
     }
 
     private function prnMedication(Client $client, string $name, bool $controlled = false): ClientMedication

@@ -300,7 +300,10 @@ class MarChartPersonScopeTest extends TestCase
         ?bool $witnessRequired = null,
     ): ClientMedication
     {
-        return ClientMedication::query()->create([
+        // Entered at the start of the day: a dose due before an order's entry is not owed.
+        $now = Carbon::getTestNow();
+        Carbon::setTestNow(Carbon::now('Pacific/Auckland')->startOfDay()->utc());
+        $medication = ClientMedication::query()->create([
             'client_id' => $client->id,
             'name' => $name,
             'dosage' => '1 tablet',
@@ -313,6 +316,9 @@ class MarChartPersonScopeTest extends TestCase
             'state' => 'active',
             'approval_status' => 'verified',
         ]);
+        Carbon::setTestNow($now);
+
+        return $medication;
     }
 
     /** The seeded Support Worker role (assignment-scoped medication reader). */

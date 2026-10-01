@@ -1825,7 +1825,9 @@ class MedicationRbacAuthorizationTest extends TestCase
             'state' => 'active',
             'approval_status' => 'verified',
         ]);
-        $actor = $this->userWithPermissions(['medications.view'], $site);
+        // A reader who may open the Site's people (the P02 person rule, C6b):
+        // the approved Site's client, never the foreign one.
+        $actor = $this->userWithPermissions(['medications.view', 'clients.viewAny'], $site);
 
         $this->actingAs($actor)
             ->get(route('meds.today'))
@@ -1833,6 +1835,13 @@ class MedicationRbacAuthorizationTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->has('clients', 1)
                 ->where('clients.0.id', $client->id));
+
+        // A reader who may open none of them gets no one.
+        $personless = $this->userWithPermissions(['medications.view'], $site);
+        $this->actingAs($personless)
+            ->get(route('meds.today'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->has('clients', 0));
 
         $administrationOnlyActor = $this->userWithPermissions([
             'medications.administer.record',
