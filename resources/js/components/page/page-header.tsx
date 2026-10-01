@@ -524,7 +524,7 @@ export function PageHeaderMeterBig({ children }: { children: ReactNode }) {
 /** Muted 10.5px context line ("across 3 regions", "0% occupied · 41 available"). */
 export function PageHeaderMeterCaption({ children }: { children: ReactNode }) {
     return (
-        <span className="max-w-full truncate text-[10.5px] leading-tight text-primary-foreground/50">
+        <span className="max-w-full truncate text-[10.5px] leading-tight text-primary-foreground/70">
             {children}
         </span>
     );
@@ -659,12 +659,12 @@ export function PageHeaderMeterAvatars({
                             {person.name}
                         </span>
                         {person.detail ? (
-                            <span className="block text-primary-foreground/75">
+                            <span className="block text-primary-fill-foreground">
                                 {person.detail}
                             </span>
                         ) : null}
                         {person.href ? (
-                            <span className="block text-primary-foreground/60">
+                            <span className="block text-primary-fill-foreground/90">
                                 Click to open profile
                             </span>
                         ) : null}
@@ -715,14 +715,14 @@ export function PageHeaderMeterContacts({
                         <span className="min-w-0 truncate font-medium text-primary-foreground/85">
                             {contact.name}
                             {contact.phone ? (
-                                <span className="font-normal text-primary-foreground/55">
+                                <span className="font-normal text-primary-foreground/70">
                                     {' '}
                                     · {contact.phone}
                                 </span>
                             ) : null}
                         </span>
                     ) : (
-                        <span className="text-primary-foreground/45">
+                        <span className="text-primary-foreground/70">
                             No info
                         </span>
                     )}
@@ -774,7 +774,7 @@ export function PageHeaderMeterDonut({
                 </span>
             </span>
             {caption ? (
-                <span className="text-[10.5px] leading-[1.35] text-primary-foreground/50">
+                <span className="text-[10.5px] leading-[1.35] text-primary-foreground/70">
                     {caption}
                 </span>
             ) : null}
