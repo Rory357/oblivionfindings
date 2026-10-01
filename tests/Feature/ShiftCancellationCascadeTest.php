@@ -56,6 +56,16 @@ class ShiftCancellationCascadeTest extends TestCase
 
         $this->serviceContext = ServiceContext::factory()->create();
         $this->site = Site::factory()->create();
+        // Since cd5d34e6b every shift lifecycle write, cancel included, needs
+        // the ACTOR to hold a current HR profile (admins too), else a bare 404.
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => now()->subYear()->toDateString(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
         $this->client = Client::factory()->create([
             'service_context_id' => $this->serviceContext->id,
             'site_id' => $this->site->id,
