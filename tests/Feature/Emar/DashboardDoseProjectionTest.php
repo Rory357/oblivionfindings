@@ -6,10 +6,13 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationDoseSlot;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\DoseSlots\DoseSlotGenerator;
+use App\Services\Medication\DoseSlots\DoseSlotProjection;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\MedicationOverviewService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -61,7 +64,9 @@ class DashboardDoseProjectionTest extends TestCase
 
         $this->seed(RbacSeeder::class);
         Cache::flush();
-        $this->at('2026-06-15 09:30');
+        // The orders were entered on the 1st (nothing due before an order's
+        // entry is owed); each test generates the slots it needs.
+        $this->at('2026-06-01 07:00');
 
         $this->kowhai = Site::factory()->create(['name' => 'Kōwhai House', 'is_active' => true]);
         $this->rimu = Site::factory()->create(['name' => 'Rimu House', 'is_active' => true]);
@@ -74,6 +79,8 @@ class DashboardDoseProjectionTest extends TestCase
         $this->morphine = $this->order($this->aroha, 'Morphine', ['08:00'], ['controlled_drug' => true]);
         $this->benIron = $this->order($this->ben, 'Iron', ['08:00']);
         $this->caraIron = $this->order($this->cara, 'Iron', ['08:00']);
+        MedicationDoseSlot::query()->delete();
+        $this->at('2026-06-15 09:30');
     }
 
     protected function tearDown(): void
@@ -200,6 +207,45 @@ class DashboardDoseProjectionTest extends TestCase
             ->all();
         $this->assertSame(['Iron Ben Parata', 'Morphine Aroha Ngata'], $overdue($controlled));
         $this->assertSame(['Iron Ben Parata'], $overdue($plain));
+    }
+
+    public function test_doses_waiting_for_the_order_check_are_their_own_number(): void
+    {
+        $this->generateSince('2026-06-01');
+        $this->recordTheWeek();
+        // At 07:00 Ben's iron and Aroha's morphine were changed; both changes
+        // wait for the order check, so their 08:00 doses can't be recorded.
+        $this->at('2026-06-15 07:00');
+        $this->benIron->update(['dosage' => '2 tablets']);
+        $this->morphine->update(['dosage' => '2 tablets']);
+        $this->at('2026-06-15 09:30');
+
+        $payload = app(MedicationOverviewService::class)->payload();
+        $stats = $payload['stats'];
+        // In none of the numbers: not overdue, not due, not in the rate.
+        $this->assertSame(
+            ['total' => 3, 'given' => 2, 'overdue' => 0, 'dueNow' => 0, 'pending' => 1, 'eligible' => 2, 'rate' => 100.0, 'check' => 2],
+            ['total' => $stats['totalToday'], 'given' => $stats['givenToday'], 'overdue' => $stats['overdue'], 'dueNow' => $stats['dueNow'],
+                'pending' => $stats['pendingToday'], 'eligible' => $stats['eligibleToday'], 'rate' => $stats['adminRate'], 'check' => $stats['pendingCheckToday']],
+        );
+        $this->assertSame(100.0, $payload['complianceTrend'][6]['rate']);
+        $this->assertSame([], collect($payload['actionCentre'])->where('type', 'overdue_dose')->values()->all());
+        $this->assertSame('/emar/medications?tab=awaiting', $payload['orderCheckUrl']);
+        $ben = collect($payload['clientBoard'])->firstWhere('name', 'Ben Parata');
+        $this->assertSame([0, 1, 'in_progress'], [$ben['total'], $ben['pending_check'], $ben['status']]);
+
+        // Scope still applies: a worker who supports only Aroha counts only
+        // her morphine dose — and, without controlled view, never sees it named.
+        $worker = $this->reader($this->kowhai, ['medications.view'], [$this->aroha]);
+        $workerPayload = app(MedicationOverviewService::class)->payload(null, $worker);
+        $this->assertSame(1, $workerPayload['stats']['pendingCheckToday']);
+        $this->assertSame([1], array_column($workerPayload['clientBoard'], 'pending_check'));
+        $rows = app(DoseSlotProjection::class)->rows(DoseSlotReaderScope::forViewer($worker, [$this->kowhai->id]), '2026-06-15', '2026-06-15', CarbonImmutable::now())
+            ->where('state', DoseSlotProjection::STATE_PENDING_CHECK)
+            ->values();
+        $this->assertCount(1, $rows);
+        $this->assertTrue($rows[0]['concealed']);
+        $this->assertNull($rows[0]['client_medication_id']);
     }
 
     public function test_overdue_means_the_window_has_ended(): void

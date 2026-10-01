@@ -126,6 +126,8 @@ type Stats = {
     activeClients: number;
     roundsToday: number;
     roundsCompleted: number;
+    /** Doses waiting for the order check: in none of the other numbers. */
+    pendingCheckToday: number;
     totalToday: number;
     givenToday: number;
     givenTrend: number[];
@@ -170,6 +172,8 @@ type ClientBoardItem = {
     missed: number;
     /** Scheduled doses whose time has passed with nothing recorded. */
     overdue: number;
+    /** Doses waiting for the order check (not in total). */
+    pending_check: number;
     total: number;
     done: number;
     percent: number;
@@ -258,6 +262,8 @@ type Props = {
     medicationOptions: MedicationOption[];
     witnesses: WitnessOption[];
     notGivenReasons: NotGivenReasonOption[];
+    /** Today's order-verification queue. */
+    orderCheckUrl: string;
     signedAs: {
         name: string;
         role_label: string | null;
@@ -463,6 +469,7 @@ export default function EmarHome(props: Props) {
         clientOptions,
         medicationOptions,
         witnesses,
+        orderCheckUrl,
         notGivenReasons,
         signedAs,
         can,
@@ -636,6 +643,13 @@ export default function EmarHome(props: Props) {
             tone: 'critical' as const,
             icon: AlertTriangle,
             label: `${stats.overdue} dose${stats.overdue === 1 ? '' : 's'} overdue`,
+        },
+        // Can't be recorded until the order is checked, so not overdue.
+        stats.pendingCheckToday > 0 && {
+            tone: 'info' as const,
+            icon: ClipboardCheck,
+            label: `${stats.pendingCheckToday} dose${stats.pendingCheckToday === 1 ? '' : 's'} waiting for the order check`,
+            href: orderCheckUrl,
         },
         can.view_controlled &&
             stats.activeDiscrepancies > 0 && {
@@ -1553,6 +1567,12 @@ export default function EmarHome(props: Props) {
                                             {c.missed > 0 ? (
                                                 <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 font-semibold text-status-critical">
                                                     {c.missed} missed
+                                                </span>
+                                            ) : null}
+                                            {c.pending_check > 0 ? (
+                                                <span className="rounded-full bg-status-info-bg px-1.5 py-0.5 font-semibold text-status-info">
+                                                    {c.pending_check} waiting
+                                                    for the order check
                                                 </span>
                                             ) : null}
                                         </div>

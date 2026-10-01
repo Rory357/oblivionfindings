@@ -18,6 +18,9 @@ use InvalidArgumentException;
  * clock, never stored — so it can't go stale:
  * - recorded: the outcome (given, refused, withheld, missed, away);
  * - self_managed: the person takes it themselves (not chased);
+ * - pending_check: due while a change to the order waited for its check,
+ *   with nothing recorded ("Waiting for the order check") — doses can't be
+ *   recorded against an order awaiting verification yet (until P04);
  * - not_due: before the window opens;
  * - due: inside the window (both ends included);
  * - late: the window has ended with nothing recorded, still today (NZ);
@@ -25,7 +28,10 @@ use InvalidArgumentException;
  *
  * Numbers follow P09's definitions: a dose counts once, on its NZ day, once
  * its window has ended; Away and self-managed doses are never due; a zero
- * denominator is "not applicable" (null), never 0 % or 100 %.
+ * denominator is "not applicable" (null), never 0 % or 100 %. A dose waiting
+ * for the order check is never due, overdue or not recorded: it is its own
+ * number (Main, 2 Oct; back to normal counting once P04 lets staff record
+ * against the version in effect during a check).
  *
  * The window per order comes from DoseWindowResolver (time-critical
  * overrides included). Superseded slots are never read.
@@ -42,10 +48,13 @@ final class DoseSlotProjection
 
     public const STATE_SELF_MANAGED = 'self_managed';
 
+    public const STATE_PENDING_CHECK = 'pending_check';
+
     /** Every state a slot can read as: its recorded outcome, else its live state. */
     public const STATES = [
         'given', 'refused', 'withheld', 'missed', 'away',
         self::STATE_NOT_DUE, self::STATE_DUE, self::STATE_LATE, self::STATE_NOT_RECORDED, self::STATE_SELF_MANAGED,
+        self::STATE_PENDING_CHECK,
     ];
 
     private const GROUPS = ['nz_date', 'client_id'];
@@ -237,6 +246,7 @@ final class DoseSlotProjection
                 "CASE
                     WHEN s.outcome IS NOT NULL THEN s.outcome
                     WHEN s.self_managed = 1 THEN '".self::STATE_SELF_MANAGED."'
+                    WHEN s.order_change_pending = 1 THEN '".self::STATE_PENDING_CHECK."'
                     WHEN ? < {$opens} THEN '".self::STATE_NOT_DUE."'
                     WHEN ? <= {$ends} THEN '".self::STATE_DUE."'
                     WHEN s.nz_date = ? THEN '".self::STATE_LATE."'
@@ -286,9 +296,10 @@ final class DoseSlotProjection
     private function aggregateSql(): string
     {
         // Counted: the window has ended, and the dose is a staff dose (not
-        // self-managed) that was not away.
-        $counted = "window_ended = 1 AND self_managed = 0 AND (outcome IS NULL OR outcome <> 'away')";
-        $open = "window_ended = 0 AND self_managed = 0 AND outcome IS NULL";
+        // self-managed) that was not away and isn't waiting for the order check.
+        $pendingCheck = "state = '".self::STATE_PENDING_CHECK."'";
+        $counted = "window_ended = 1 AND self_managed = 0 AND (outcome IS NULL OR outcome <> 'away') AND NOT ({$pendingCheck})";
+        $open = "window_ended = 0 AND self_managed = 0 AND outcome IS NULL AND NOT ({$pendingCheck})";
 
         return implode(', ', [
             'COUNT(*) as slots',
@@ -304,6 +315,7 @@ final class DoseSlotProjection
             "SUM(CASE WHEN {$open} AND state = '".self::STATE_DUE."' THEN 1 ELSE 0 END) as due_now",
             "SUM(CASE WHEN {$open} AND state = '".self::STATE_NOT_DUE."' THEN 1 ELSE 0 END) as not_yet_due",
             "SUM(CASE WHEN state = '".self::STATE_LATE."' THEN 1 ELSE 0 END) as late_today",
+            "SUM(CASE WHEN {$pendingCheck} THEN 1 ELSE 0 END) as pending_check",
         ]);
     }
 
@@ -312,7 +324,7 @@ final class DoseSlotProjection
      */
     private static function totalsFrom(?object $row): array
     {
-        $keys = ['slots', 'due', 'given', 'refused', 'withheld', 'missed', 'not_recorded', 'recorded_late', 'away', 'self_managed', 'due_now', 'not_yet_due', 'late_today'];
+        $keys = ['slots', 'due', 'given', 'refused', 'withheld', 'missed', 'not_recorded', 'recorded_late', 'away', 'self_managed', 'due_now', 'not_yet_due', 'late_today', 'pending_check'];
         $totals = [];
         foreach ($keys as $key) {
             $totals[$key] = (int) ($row?->{$key} ?? 0);

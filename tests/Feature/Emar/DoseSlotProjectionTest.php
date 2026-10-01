@@ -59,7 +59,9 @@ class DoseSlotProjectionTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
-        $this->freezeNz('2026-06-15 09:30');
+        // Orders entered before the two days read (nothing due before an
+        // order's entry is owed); now is Monday 09:30.
+        $this->freezeNz('2026-06-13 00:00');
         $this->kowhai = Site::factory()->create(['name' => 'Kōwhai House', 'is_active' => true]);
         $rimu = Site::factory()->create(['name' => 'Rimu House', 'is_active' => true]);
         $this->aroha = Client::factory()->create(['site_id' => $this->kowhai->id, 'first_name' => 'Aroha', 'status' => 'active']);
@@ -71,8 +73,9 @@ class DoseSlotProjectionTest extends TestCase
         $this->morphine = $this->order($this->aroha, 'Morphine', ['08:00'], ['controlled_drug' => true]);
         $iron = $this->order($this->ben, 'Iron', ['08:00']);
         $this->order($this->cara, 'Iron', ['08:00']);
+        $this->freezeNz('2026-06-15 09:30');
         foreach (ClientMedication::query()->get() as $order) {
-            DB::transaction(fn () => app(DoseSlotGenerator::class)->generate($order, '2026-06-14', '2026-06-14', CarbonImmutable::now()));
+            DB::transaction(fn () => app(DoseSlotGenerator::class)->generate($order, '2026-06-14', '2026-06-15', CarbonImmutable::now()));
         }
 
         $this->record($this->metformin, '2026-06-14 08:00', 'given', '2026-06-14 08:10');
@@ -153,6 +156,7 @@ class DoseSlotProjectionTest extends TestCase
             'due_now' => 1,         // Metformin 09:15, inside its window: named, not counted
             'not_yet_due' => 2,
             'late_today' => 2,
+            'pending_check' => 0,
             'given_rate' => 50.0,
         ], $totals);
 
