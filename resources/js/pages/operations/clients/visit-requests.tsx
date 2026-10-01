@@ -307,7 +307,7 @@ export default function VisitRequests({
                                                         <div className="flex gap-2">
                                                             <Button
                                                                 size="sm"
-                                                                className="gap-1.5 bg-status-success hover:bg-status-success"
+                                                                className="gap-1.5"
                                                                 onClick={() =>
                                                                     approve(
                                                                         req.id,

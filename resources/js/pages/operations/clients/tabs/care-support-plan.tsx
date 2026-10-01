@@ -521,7 +521,7 @@ export function CareSupportPlanTab({
                     {canEdit ? (
                         <Button
                             size="sm"
-                            className="bg-status-warning text-primary-foreground hover:bg-status-warning/90"
+                            variant="outline"
                             onClick={startReview}
                         >
                             Start review
