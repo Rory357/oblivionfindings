@@ -129,9 +129,12 @@ top to bottom:
 
 **Safety colours never retint** (non-negotiable #6): critical/warning
 accents anywhere in the band use the fixed `status-critical` /
-`status-warning` tokens (lightened toward white for AA on the dark
-sky); success uses `status-success`. Only neutral/brand accents derive
-from `--primary`.
+`status-warning` tokens; success uses `status-success`. On the dark
+sky they keep their status hue and chroma but never fall below a
+lightness floor — `oklch(from var(--status-critical) max(l, 0.84) c h)`,
+warning and success `max(l, 0.82)` (amended 2026-10-02: the old mix
+toward white left light mode's dark status tokens at 3.1–3.5:1 on the
+meter glass). Only neutral/brand accents derive from `--primary`.
 
 ## 4. Top row — identity (left) + actions (right)
 
@@ -219,6 +222,9 @@ block's full height):
 2. **Visual** (or the big number): one of the five types below.
 3. **Caption**: 10.5px muted context line ("across 3 regions",
    "0% occupied · 41 available") or a toned delta ("▲ 4 this week").
+   Muted means sky text at **70%** — never fainter: at 10.5px it is body
+   text, and the old 50% measured 3.5–4.0:1 on the glass (amended
+   2026-10-02; contact phone numbers and "No info" follow the same 70%).
 
 **The seven block types** — a page composes from these only:
 
