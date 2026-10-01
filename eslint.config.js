@@ -142,10 +142,28 @@ export default [
                     'no-recoloured-primary-button': builtinRules.get(
                         'no-restricted-syntax',
                     ),
+                    'no-primary-foreground-on-fill': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
                 },
             },
         },
         rules: {
+            // DESIGN.md "Brand-filled text on bg-primary": a solid brand
+            // fill that carries text uses the fill pair, which stays
+            // ≥ 4.5:1 for any brand in both modes; text-primary-foreground is
+            // the brand sky's text and is white on light brands (~3.6:1).
+            // Matches one class string pairing a solid `bg-primary` with
+            // `text-primary-foreground` under the same variant prefix.
+            'design/no-primary-foreground-on-fill': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/(?:^|\\s)((?:[^\\s:]+:)*)bg-primary(?=\\s|$)[\\s\\S]*(?:^|\\s)\\1text-primary-foreground(?=\\s|$|\\x2f)|(?:^|\\s)((?:[^\\s:]+:)*)text-primary-foreground(?=\\s|$|\\x2f)[\\s\\S]*(?:^|\\s)\\2bg-primary(?=\\s|$)/], TemplateElement[value.raw=/(?:^|\\s)((?:[^\\s:]+:)*)bg-primary(?=\\s|$)[\\s\\S]*(?:^|\\s)\\1text-primary-foreground(?=\\s|$|\\x2f)|(?:^|\\s)((?:[^\\s:]+:)*)text-primary-foreground(?=\\s|$|\\x2f)[\\s\\S]*(?:^|\\s)\\2bg-primary(?=\\s|$)/])',
+                    message:
+                        'Text on a solid brand fill uses the fill pair: bg-primary-fill + text-primary-fill-foreground (≥ 4.5:1 for any brand, both modes). text-primary-foreground is the brand sky text and stays white on light brands (~3.6:1). See DESIGN.md "Brand-filled text on bg-primary".',
+                },
+            ],
             'design/no-recoloured-primary-button': [
                 'error',
                 {
@@ -156,6 +174,16 @@ export default [
                 },
             ],
         },
+    },
+    {
+        // Lane A is rebuilding eMAR Settings in parallel. Its one pairing
+        // (settings/_templates.tsx) was reported, not swept; remove this
+        // override once that work lands and the pairing is migrated.
+        files: [
+            'resources/js/pages/emar/Settings.tsx',
+            'resources/js/pages/emar/settings/**',
+        ],
+        rules: { 'design/no-primary-foreground-on-fill': 'off' },
     },
     {
         // Calendars use the shared Site Calendar parts (DESIGN.md

@@ -114,7 +114,7 @@ export function TagManagerDialog({
                                             disabled={busy}
                                             onClick={() => rename(t.tag)}
                                             title="Save"
-                                            className="grid h-8 w-8 place-items-center rounded-md bg-primary text-primary-foreground disabled:opacity-50"
+                                            className="grid h-8 w-8 place-items-center rounded-md bg-primary-fill text-primary-fill-foreground disabled:opacity-50"
                                         >
                                             <Check className="h-4 w-4" />
                                         </button>

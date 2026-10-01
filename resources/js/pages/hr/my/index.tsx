@@ -458,7 +458,7 @@ function NextShiftCard({
                                 className="absolute top-0 -translate-x-1/2 whitespace-nowrap"
                                 style={{ left: `${nowPct}%` }}
                             >
-                                <span className="inline-block rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">
+                                <span className="inline-block rounded-md bg-primary-fill px-1.5 py-0.5 text-[10px] font-bold text-primary-fill-foreground">
                                     Now {fmt12(new Date(now).toISOString())}
                                 </span>
                             </div>
@@ -563,7 +563,7 @@ function NextShiftCard({
                             <button
                                 type="button"
                                 onClick={() => router.visit('/hr/my/time')}
-                                className="rounded-[10px] bg-primary px-4 py-2 text-[12.5px] font-bold text-primary-foreground transition-colors hover:opacity-90"
+                                className="rounded-[10px] bg-primary-fill px-4 py-2 text-[12.5px] font-bold text-primary-fill-foreground transition-colors hover:opacity-90"
                             >
                                 View roster
                             </button>

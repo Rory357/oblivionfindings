@@ -873,7 +873,7 @@ function OverviewTab({
                                     <button
                                         type="button"
                                         onClick={() => onSignOff(s)}
-                                        className="rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-primary-foreground"
+                                        className="rounded-lg bg-primary-fill px-2.5 py-1.5 text-[12px] font-semibold text-primary-fill-foreground"
                                     >
                                         Sign off
                                     </button>
@@ -1150,7 +1150,7 @@ function ChecklistsTab({
                             <button
                                 type="button"
                                 onClick={onStartOnboarding}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3 py-2 text-sm font-semibold text-primary-fill-foreground"
                             >
                                 <Plus className="h-4 w-4" /> Start onboarding
                             </button>
@@ -1183,7 +1183,7 @@ function ChecklistsTab({
                                             onToggleSelect(r.id);
                                         }}
                                         aria-label="Select"
-                                        className={`grid h-[18px] w-[18px] place-items-center rounded-[5px] border-[1.5px] ${checked ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}
+                                        className={`grid h-[18px] w-[18px] place-items-center rounded-[5px] border-[1.5px] ${checked ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground' : 'border-border'}`}
                                     >
                                         {checked && (
                                             <CheckCircle2 className="h-3 w-3" />
@@ -1323,7 +1323,7 @@ function TemplatesTab({
                     <button
                         type="button"
                         onClick={onNew}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary px-3.5 text-[13px] font-semibold text-primary-foreground"
+                        className="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-fill px-3.5 text-[13px] font-semibold text-primary-fill-foreground"
                     >
                         <Plus className="h-4 w-4" /> New template
                     </button>
@@ -1452,7 +1452,7 @@ function EmailsTab({
                         <button
                             type="button"
                             onClick={onNew}
-                            className="inline-flex h-8.5 items-center gap-1.5 rounded-[9px] bg-primary px-3 text-[12.5px] font-semibold text-primary-foreground"
+                            className="inline-flex h-8.5 items-center gap-1.5 rounded-[9px] bg-primary-fill px-3 text-[12.5px] font-semibold text-primary-fill-foreground"
                         >
                             <Plus className="h-3.5 w-3.5" /> New
                         </button>

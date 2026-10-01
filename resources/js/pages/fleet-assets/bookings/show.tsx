@@ -236,7 +236,7 @@ export default function BookingShow({
                                             className={cn(
                                                 'flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium transition-all',
                                                 i <= currentStepIndex
-                                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                                    ? 'bg-primary-fill text-primary-fill-foreground shadow-sm'
                                                     : 'bg-muted text-muted-foreground',
                                             )}
                                         >

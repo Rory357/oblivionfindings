@@ -132,7 +132,7 @@ export default function MyRoster({
                         className="rounded-lg border bg-card p-4"
                     >
                         <div className="flex items-start gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-fill text-primary-fill-foreground">
                                 <CalendarDays className="h-5 w-5" />
                             </div>
                             <div className="min-w-0">

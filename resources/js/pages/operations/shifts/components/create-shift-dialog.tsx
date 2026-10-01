@@ -960,7 +960,7 @@ export function CreateShiftDialog({
                                             className={cn(
                                                 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
                                                 active
-                                                    ? 'bg-primary text-primary-foreground'
+                                                    ? 'bg-primary-fill text-primary-fill-foreground'
                                                     : done
                                                       ? 'bg-status-success-bg text-status-success'
                                                       : 'bg-muted text-muted-foreground',
@@ -1476,7 +1476,7 @@ export function CreateShiftDialog({
                                                                 className={[
                                                                     'h-8 min-w-[44px] rounded-md px-3 text-xs font-semibold tabular-nums transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                                                                     active
-                                                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                                                        ? 'bg-primary-fill text-primary-fill-foreground shadow-sm'
                                                                         : 'border border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5',
                                                                 ].join(' ')}
                                                             >
@@ -1892,7 +1892,7 @@ export function CreateShiftDialog({
                                     <button
                                         type="submit"
                                         disabled={form.processing}
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-xs font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90 disabled:cursor-not-allowed disabled:opacity-70"
                                     >
                                         {form.processing ? (
                                             <>
@@ -1911,7 +1911,7 @@ export function CreateShiftDialog({
                                 ) : (
                                     <button
                                         type="submit"
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-xs font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
                                     >
                                         Continue
                                         <ChevronRight className="h-4 w-4" />
@@ -2070,7 +2070,7 @@ function ShiftTypePicker({
                             </span>
                         </span>
                         {active ? (
-                            <span className="absolute top-2 right-2 inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                            <span className="absolute top-2 right-2 inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary-fill text-primary-fill-foreground">
                                 <Check className="h-3 w-3" strokeWidth={3} />
                             </span>
                         ) : null}
@@ -2118,7 +2118,7 @@ function ScheduleStrip({
                 </div>
                 <div className="mt-1 flex items-center gap-1.5">
                     <div className="h-[3px] w-6 rounded-full bg-primary/30" />
-                    <div className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground tabular-nums">
+                    <div className="rounded-full bg-primary-fill px-2.5 py-0.5 text-xs font-semibold text-primary-fill-foreground tabular-nums">
                         {duration}
                     </div>
                     <div className="h-[3px] w-6 rounded-full bg-primary/30" />
@@ -2201,7 +2201,7 @@ function StatusPicker({
                             className={[
                                 'mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
                                 active
-                                    ? 'bg-primary text-primary-foreground'
+                                    ? 'bg-primary-fill text-primary-fill-foreground'
                                     : 'bg-muted text-muted-foreground',
                             ].join(' ')}
                         >

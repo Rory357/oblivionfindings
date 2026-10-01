@@ -555,7 +555,7 @@ function StaffMultiSelect({
                         className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors ${active ? 'bg-primary/10 text-foreground' : 'hover:bg-muted'}`}
                     >
                         <span
-                            className={`grid h-5 w-5 shrink-0 place-items-center rounded border ${active ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background'}`}
+                            className={`grid h-5 w-5 shrink-0 place-items-center rounded border ${active ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground' : 'border-border bg-background'}`}
                         >
                             {active ? (
                                 <CheckCircle2 className="h-3.5 w-3.5" />

@@ -358,7 +358,7 @@ export default function ViewTimesheetDialog({
                                                 key={idx}
                                                 className="flex items-center gap-2 rounded-lg border border-border bg-card p-2"
                                             >
-                                                <span className="grid h-5 w-5 place-items-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                                                <span className="grid h-5 w-5 place-items-center rounded-full bg-primary-fill text-[10px] font-semibold text-primary-fill-foreground">
                                                     {idx + 1}
                                                 </span>
                                                 <span className="text-[12.5px]">

@@ -242,7 +242,7 @@ function GroupPills({
                         className={cn(
                             'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors',
                             active
-                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                ? 'bg-primary-fill text-primary-fill-foreground shadow-sm'
                                 : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground',
                         )}
                     >

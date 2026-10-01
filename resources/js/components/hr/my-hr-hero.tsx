@@ -202,7 +202,7 @@ export function MyHrHero({
                                         className="absolute top-[calc(100%+11px)] left-0 z-[56] min-w-[224px] animate-in rounded-[13px] border border-border bg-popover p-1.5 text-popover-foreground shadow-[0_26px_60px_-18px_rgba(20,10,40,0.5)] duration-150 fade-in-0 slide-in-from-top-1 motion-reduce:animate-none"
                                     >
                                         <div className="flex items-center gap-3 px-2.5 pt-2 pb-2.5">
-                                            <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-full bg-primary text-[13px] font-bold text-primary-foreground">
+                                            <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-full bg-primary-fill text-[13px] font-bold text-primary-fill-foreground">
                                                 {profile.initials}
                                             </div>
                                             <div className="min-w-0">

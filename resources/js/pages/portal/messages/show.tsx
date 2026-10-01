@@ -153,7 +153,7 @@ export default function ShowConversation({
                                         <div
                                             className={`max-w-[75%] rounded-lg px-3 py-2 ${
                                                 msg.is_own
-                                                    ? 'bg-primary text-primary-foreground'
+                                                    ? 'bg-primary-fill text-primary-fill-foreground'
                                                     : 'bg-muted'
                                             }`}
                                         >

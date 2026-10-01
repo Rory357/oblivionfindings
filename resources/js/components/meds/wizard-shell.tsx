@@ -78,7 +78,7 @@ export function MedsWizardDialog({
                     {/* ── Stepper rail ── */}
                     <aside className={WIZARD_RAIL_CLASS}>
                         <div className="mb-3 flex items-center gap-2.5">
-                            <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
+                            <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary-fill text-primary-fill-foreground">
                                 <RailIcon className="h-5 w-5" />
                             </span>
                             <div>
@@ -111,7 +111,7 @@ export function MedsWizardDialog({
                                         className={cn(
                                             'grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors',
                                             active
-                                                ? 'bg-primary text-primary-foreground'
+                                                ? 'bg-primary-fill text-primary-fill-foreground'
                                                 : complete
                                                   ? 'bg-status-success-bg text-status-success'
                                                   : 'bg-muted text-muted-foreground',

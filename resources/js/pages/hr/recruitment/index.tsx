@@ -1314,7 +1314,7 @@ function PipelineTab({
                             type="button"
                             onClick={toggleAll}
                             aria-label="Select all"
-                            className={`grid h-[18px] w-[18px] place-items-center rounded border ${allChecked ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}
+                            className={`grid h-[18px] w-[18px] place-items-center rounded border ${allChecked ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground' : 'border-border'}`}
                         >
                             {allChecked ? '✓' : ''}
                         </button>
@@ -1356,7 +1356,7 @@ function PipelineTab({
                                     type="button"
                                     onClick={() => toggleSelect(c.id)}
                                     aria-label={`Select ${c.full_name}`}
-                                    className={`grid h-[18px] w-[18px] place-items-center rounded border ${selected.includes(c.id) ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}
+                                    className={`grid h-[18px] w-[18px] place-items-center rounded border ${selected.includes(c.id) ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground' : 'border-border'}`}
                                 >
                                     {selected.includes(c.id) ? '✓' : ''}
                                 </button>
@@ -1665,7 +1665,7 @@ function RequisitionsTab({
                     <button
                         type="button"
                         onClick={onNew}
-                        className="ml-auto inline-flex h-[38px] items-center gap-2 rounded-[10px] bg-primary px-4 text-[13px] font-bold text-primary-foreground"
+                        className="ml-auto inline-flex h-[38px] items-center gap-2 rounded-[10px] bg-primary-fill px-4 text-[13px] font-bold text-primary-fill-foreground"
                     >
                         <FilePlus2 className="h-3.5 w-3.5" /> New requisition
                     </button>
@@ -1816,7 +1816,7 @@ function InterviewsTab({
                     <button
                         type="button"
                         onClick={onNew}
-                        className="ml-auto inline-flex h-[38px] items-center gap-2 rounded-[10px] bg-primary px-4 text-[13px] font-bold text-primary-foreground"
+                        className="ml-auto inline-flex h-[38px] items-center gap-2 rounded-[10px] bg-primary-fill px-4 text-[13px] font-bold text-primary-fill-foreground"
                     >
                         <CalendarPlus className="h-3.5 w-3.5" /> Schedule (from
                         a candidate)
@@ -2050,7 +2050,7 @@ function OffersTab({
                                     <button
                                         type="button"
                                         onClick={() => onConvert(o)}
-                                        className="h-[34px] rounded-[9px] bg-primary px-3.5 text-[12.5px] font-bold text-primary-foreground"
+                                        className="h-[34px] rounded-[9px] bg-primary-fill px-3.5 text-[12.5px] font-bold text-primary-fill-foreground"
                                     >
                                         Convert
                                     </button>
@@ -2199,7 +2199,7 @@ function AnalyticsTab({
                 <button
                     type="button"
                     onClick={() => apply({})}
-                    className="h-9 rounded-md bg-primary px-4 text-[13px] font-bold text-primary-foreground"
+                    className="h-9 rounded-md bg-primary-fill px-4 text-[13px] font-bold text-primary-fill-foreground"
                 >
                     Apply
                 </button>
@@ -2264,7 +2264,7 @@ function AnalyticsTab({
                                     </span>
                                     <div className="relative h-[30px] flex-1 overflow-hidden rounded-lg bg-muted">
                                         <div
-                                            className="flex h-full items-center rounded-lg bg-primary px-2.5 text-[12px] font-bold text-primary-foreground"
+                                            className="flex h-full items-center rounded-lg bg-primary-fill px-2.5 text-[12px] font-bold text-primary-fill-foreground"
                                             style={{
                                                 width: `${Math.max(8, f.width)}%`,
                                             }}
@@ -2373,7 +2373,7 @@ function KitsTab({
         <button
             type="button"
             onClick={onNew}
-            className="inline-flex h-[38px] items-center gap-2 rounded-[10px] bg-primary px-4 text-[13px] font-bold text-primary-foreground"
+            className="inline-flex h-[38px] items-center gap-2 rounded-[10px] bg-primary-fill px-4 text-[13px] font-bold text-primary-fill-foreground"
         >
             <ListChecks className="h-3.5 w-3.5" /> New kit
         </button>
@@ -2665,7 +2665,7 @@ function CandidateSheet({
                                 <button
                                     type="button"
                                     onClick={onAdvance}
-                                    className="h-9 rounded-[9px] bg-primary text-[12.5px] font-bold text-primary-foreground"
+                                    className="h-9 rounded-[9px] bg-primary-fill text-[12.5px] font-bold text-primary-fill-foreground"
                                 >
                                     Advance stage
                                 </button>

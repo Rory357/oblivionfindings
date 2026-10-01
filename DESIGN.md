@@ -350,6 +350,17 @@ before.
   (`components/page/page-header.tsx`; both take `asChild` for a `<Link>` or
   `<a>`, never a `<Button>` nested in an `<a>`). ESLint covers all of these
   classes.
+- **Brand-filled text on `bg-primary`** (fixed 2026-10-02) —
+  `bg-primary text-primary-foreground` puts the brand sky's text colour
+  (white for mid-light brands) on the raw brand: 3.6:1 on orange, teal and
+  green brands, and 3.46:1 for the default in dark mode. A solid brand fill
+  that carries text uses `bg-primary-fill text-primary-fill-foreground`
+  (≥ 4.5:1 for any brand in both modes — `design_styles/DESIGN_TOKENS.md`
+  "Primary fills and foregrounds"); its hover shade is `bg-primary-fill/90`
+  and a matching border `border-primary-fill`. ESLint
+  (`design/no-primary-foreground-on-fill`) blocks the pairing in one class
+  string; 311 pairs in 185 files were migrated. A fill whose text colour is
+  set on a child element isn't caught — pair those by hand.
 - **Ad-hoc `text-2xl`/`text-xl` headings** — use the typography helpers.
 - **`dark:` colour pairs on token-styled elements** — redundant and drifts.
 - **Pinning a fixed hue to a module** (e.g. `bg-purple-500` for HR) — use

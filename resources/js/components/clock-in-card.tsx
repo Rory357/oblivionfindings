@@ -264,7 +264,7 @@ export default function ClockInCard({
                                         className={cn(
                                             'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border',
                                             picked
-                                                ? 'border-primary bg-primary text-primary-foreground'
+                                                ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                 : 'border-muted-foreground/40',
                                         )}
                                     >

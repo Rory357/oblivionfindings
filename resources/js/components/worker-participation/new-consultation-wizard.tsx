@@ -511,7 +511,7 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
                                                     className={
                                                         'grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-colors ' +
                                                         (checked
-                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                            ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                             : 'border-border bg-background')
                                                     }
                                                 >

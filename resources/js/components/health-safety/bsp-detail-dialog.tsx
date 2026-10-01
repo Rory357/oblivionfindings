@@ -358,7 +358,7 @@ function LifecycleSection({ d }: { d: PlanDetail }) {
                         return (
                             <li key={stage} className="flex items-center gap-3">
                                 <span
-                                    className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${active ? 'bg-primary text-primary-foreground' : done ? 'bg-status-success-bg text-status-success' : 'bg-muted text-muted-foreground'}`}
+                                    className={`grid h-7 w-7 shrink-0 place-items-center rounded-full ${active ? 'bg-primary-fill text-primary-fill-foreground' : done ? 'bg-status-success-bg text-status-success' : 'bg-muted text-muted-foreground'}`}
                                 >
                                     <meta.icon className="h-3.5 w-3.5" />
                                 </span>

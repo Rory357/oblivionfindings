@@ -280,7 +280,7 @@ const SEVERITY_PILL: Record<Severity, string> = {
 const SEVERITY_BTN: Record<Severity, string> = {
     critical: 'bg-status-critical text-white hover:bg-status-critical/90',
     warning: 'bg-status-warning text-white hover:bg-status-warning/90',
-    info: 'bg-primary text-primary-foreground hover:bg-primary/90',
+    info: 'bg-primary-fill text-primary-fill-foreground hover:bg-primary-fill/90',
 };
 
 const OUTCOME_COLOR: Record<string, string> = {

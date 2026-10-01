@@ -393,7 +393,7 @@ export function ClockOutWizard({
                             )}
                         </div>
                         <div className="flex items-center gap-4 rounded-xl border border-primary/30 bg-primary/10 p-4 sm:col-span-2">
-                            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
+                            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary-fill text-primary-fill-foreground">
                                 <Timer className="h-5 w-5" />
                             </span>
                             <div>

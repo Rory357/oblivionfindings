@@ -944,7 +944,7 @@ export function PageHeaderFilterCheck({
                 className={cn(
                     'flex size-3 items-center justify-center rounded-[3px] border',
                     checked
-                        ? 'border-primary bg-primary text-primary-foreground'
+                        ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                         : 'border-primary-foreground/60 text-transparent',
                 )}
             >

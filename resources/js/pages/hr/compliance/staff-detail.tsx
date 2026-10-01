@@ -352,7 +352,7 @@ export default function StaffDetail({
                                                                 status: it.status,
                                                             })
                                                         }
-                                                        className="rounded-md bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-primary-foreground"
+                                                        className="rounded-md bg-primary-fill px-2.5 py-1.5 text-[12px] font-semibold text-primary-fill-foreground"
                                                     >
                                                         Record
                                                     </GuardrailButton>

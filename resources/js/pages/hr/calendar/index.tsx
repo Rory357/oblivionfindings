@@ -1879,7 +1879,7 @@ function QuickAddPopover({
                         type="button"
                         disabled={!title.trim()}
                         onClick={() => onCreate(title.trim())}
-                        className="rounded-lg bg-primary px-3.5 py-1.5 text-[12.5px] font-bold text-primary-foreground disabled:opacity-50"
+                        className="rounded-lg bg-primary-fill px-3.5 py-1.5 text-[12.5px] font-bold text-primary-fill-foreground disabled:opacity-50"
                     >
                         Add
                     </button>

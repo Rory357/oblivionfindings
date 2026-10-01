@@ -179,7 +179,7 @@ export function CheckinWizard({
                             type="button"
                             onClick={submit}
                             disabled={form.processing}
-                            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                            className="rounded-md bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground disabled:opacity-50"
                         >
                             {form.processing ? 'Saving…' : 'Log check-in'}
                         </button>
@@ -187,7 +187,7 @@ export function CheckinWizard({
                         <button
                             type="button"
                             onClick={wizard.next}
-                            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+                            className="rounded-md bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground"
                         >
                             Continue
                         </button>

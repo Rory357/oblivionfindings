@@ -1840,7 +1840,7 @@ function LifecycleTracker({ d }: { d: ConcernDetail }) {
                             <span
                                 className={
                                     active
-                                        ? 'inline-flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground'
+                                        ? 'inline-flex items-center gap-1.5 rounded-full bg-primary-fill px-2.5 py-1 text-[11px] font-semibold text-primary-fill-foreground'
                                         : done
                                           ? 'inline-flex items-center gap-1.5 rounded-full bg-status-success-bg px-2.5 py-1 text-[11px] font-medium text-status-success'
                                           : 'inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground'

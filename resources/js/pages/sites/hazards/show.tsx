@@ -463,7 +463,7 @@ export default function HazardShow({
                                                 <div
                                                     className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-colors ${
                                                         isCurrent
-                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                            ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                             : isReached
                                                               ? 'border-primary/30 bg-primary/10 text-primary'
                                                               : 'border-muted bg-muted text-muted-foreground'

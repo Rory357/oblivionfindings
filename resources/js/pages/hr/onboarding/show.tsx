@@ -509,7 +509,7 @@ function DetailBody({
                                         }
                                         className={`mt-0.5 grid h-[21px] w-[21px] flex-none place-items-center rounded-md border-[1.5px] ${
                                             t.is_completed
-                                                ? 'border-primary bg-primary text-primary-foreground'
+                                                ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                 : t.is_overdue
                                                   ? 'border-status-critical'
                                                   : 'border-border'

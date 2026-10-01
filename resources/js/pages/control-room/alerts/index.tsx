@@ -495,7 +495,7 @@ export default function AlertsIndex({
                                 <span
                                     className={`inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1 text-xs font-semibold ${
                                         activeTab === tab.label
-                                            ? 'bg-primary text-primary-foreground'
+                                            ? 'bg-primary-fill text-primary-fill-foreground'
                                             : 'bg-muted text-muted-foreground'
                                     }`}
                                 >

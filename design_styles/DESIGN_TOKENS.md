@@ -178,7 +178,8 @@ accent, muted-foreground) for the styling.
 6. **Text on a solid brand fill uses the fill pair.** `bg-primary-fill` +
    `text-primary-fill-foreground` stay ≥ 4.5:1 for any brand in both modes;
    `bg-primary text-primary-foreground` does not (see "Primary fills and
-   foregrounds").
+   foregrounds"). ESLint `design/no-primary-foreground-on-fill` blocks the
+   pairing within one class string (swept app-wide 2026-10-02).
 
 ## Calendar source tokens
 

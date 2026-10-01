@@ -661,7 +661,7 @@ export function AssessmentsTab({
                         </div>
                         <div className="mt-3 flex items-center gap-2">
                             <Button
-                                className="bg-primary text-primary-foreground hover:bg-primary"
+                                className="bg-primary-fill text-primary-fill-foreground hover:bg-primary"
                                 onClick={submitForm}
                                 disabled={
                                     form.processing ||

@@ -463,7 +463,7 @@ export function NoteDetailDialog({
                                         unstyled
                                         type="button"
                                         onClick={() => setEditing(true)}
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3 py-2 text-xs font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
                                     >
                                         <PenLine className="h-3.5 w-3.5" />
                                         {editLabel}
@@ -502,7 +502,7 @@ export function NoteDetailDialog({
                                     type="button"
                                     onClick={save}
                                     disabled={saving || !draft.body.trim()}
-                                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-xs font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90 disabled:opacity-60"
                                 >
                                     <Check className="h-3.5 w-3.5" />
                                     {saving ? 'Saving…' : 'Save changes'}

@@ -182,7 +182,7 @@ function ActiveRoundBanner({ round }: { round: RoundInfo }) {
                         className="mt-2 h-1.5 max-w-md"
                     />
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground shadow-sm transition-colors group-hover:bg-primary/90">
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary-fill px-3 py-1.5 text-[13px] font-semibold text-primary-fill-foreground shadow-sm transition-colors group-hover:bg-primary/90">
                     {verb} round
                     <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                 </span>

@@ -308,7 +308,7 @@ function RunContextMenu({
                         type="button"
                         disabled={busy || !date}
                         onClick={reschedule}
-                        className="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-primary text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
+                        className="mt-2 flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-primary-fill text-sm font-medium text-primary-fill-foreground transition hover:bg-primary-fill/90 disabled:opacity-50"
                     >
                         {busy ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />

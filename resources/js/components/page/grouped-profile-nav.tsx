@@ -239,7 +239,7 @@ export function GroupPillRail({
 const TONE_CYCLE = [
     {
         active: 'bg-primary/12 text-primary',
-        chip: 'bg-primary text-primary-foreground',
+        chip: 'bg-primary-fill text-primary-fill-foreground',
         badge: 'bg-primary/18 text-primary',
         bar: 'bg-primary',
     },

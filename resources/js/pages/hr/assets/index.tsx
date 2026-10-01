@@ -1043,7 +1043,7 @@ function InventoryTab({
 
             {can.manage && selected.length > 0 ? (
                 <div className="sticky bottom-[18px] z-30 mx-auto mt-3.5 flex max-w-[760px] flex-wrap items-center gap-2.5 rounded-[14px] border border-border bg-popover py-2.5 pr-3 pl-4 shadow-2xl motion-safe:animate-in motion-safe:zoom-in-95">
-                    <span className="grid h-[26px] min-w-[26px] place-items-center rounded-lg bg-primary px-1.5 text-[12.5px] font-extrabold text-primary-foreground">
+                    <span className="grid h-[26px] min-w-[26px] place-items-center rounded-lg bg-primary-fill px-1.5 text-[12.5px] font-extrabold text-primary-fill-foreground">
                         {selected.length}
                     </span>
                     <span className="text-[13px] font-semibold">selected</span>
@@ -1131,7 +1131,7 @@ function CheckBox({
             className={cn(
                 'grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px] border-[1.5px] transition-colors',
                 checked
-                    ? 'border-primary bg-primary text-primary-foreground'
+                    ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                     : 'border-border bg-card',
             )}
         >

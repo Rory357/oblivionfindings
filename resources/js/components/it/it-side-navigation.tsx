@@ -112,7 +112,7 @@ export function ItSideNavigation({ groups, currentUrl }: Props) {
                                         }
                                         className={`frontline-focus flex min-h-11 items-center gap-3 rounded-xl px-3 text-[13px] font-medium transition-colors ${
                                             active
-                                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                                ? 'bg-primary-fill text-primary-fill-foreground shadow-sm'
                                                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                                         }`}
                                     >

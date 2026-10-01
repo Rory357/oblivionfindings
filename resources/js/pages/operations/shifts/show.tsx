@@ -1272,7 +1272,7 @@ export default function ShiftShow({
                                                 className={cn(
                                                     'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors',
                                                     t.is_completed
-                                                        ? 'border-primary bg-primary text-primary-foreground'
+                                                        ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                         : 'border-input bg-background',
                                                 )}
                                             >

@@ -415,7 +415,7 @@ export default function AnnouncementShow({
                                                     'Acknowledged',
                                                 )
                                             }
-                                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                                         >
                                             <CheckCircle2 className="h-4 w-4" />{' '}
                                             Acknowledge
@@ -523,7 +523,7 @@ export default function AnnouncementShow({
                                             replyForm.processing ||
                                             !replyForm.data.body.trim()
                                         }
-                                        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                                        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 text-sm font-semibold text-primary-fill-foreground hover:bg-primary-fill/90 disabled:opacity-50"
                                     >
                                         <Send className="h-4 w-4" /> Reply
                                     </button>

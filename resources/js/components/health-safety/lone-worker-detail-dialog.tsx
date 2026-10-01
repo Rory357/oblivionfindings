@@ -779,7 +779,7 @@ function AlertDetailDialog({
                             {d.cr_id && d.can_view_control_room ? (
                                 <Link
                                     href={`/control-room/alerts/${d.cr_id}`}
-                                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2.5 text-sm font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
                                 >
                                     <RadioTower className="h-4 w-4" /> Open in
                                     Control Room

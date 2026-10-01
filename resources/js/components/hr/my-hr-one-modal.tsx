@@ -127,7 +127,7 @@ export function MyHrOneOnOneModal({
                     {/* Rail */}
                     <aside className={WIZARD_RAIL_CLASS}>
                         <div className="mb-2 flex items-center gap-2.5">
-                            <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
+                            <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary-fill text-primary-fill-foreground">
                                 <MessagesSquare className="h-5 w-5" />
                             </span>
                             <div className="min-w-0">
@@ -314,7 +314,7 @@ export function MyHrOneOnOneModal({
                                         onClick={() =>
                                             onAcknowledge(session.id, comment)
                                         }
-                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-primary px-4 py-2.5 text-[13px] font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-primary-fill px-4 py-2.5 text-[13px] font-bold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
                                     >
                                         <CheckCircle2 className="h-4 w-4" />
                                         Acknowledge 1:1
