@@ -58,7 +58,7 @@ class DoseTimingSettingsTest extends TestCase
         $this->actingAs($manager)
             ->from('/emar/settings')
             ->put('/emar/settings/changes', $this->save([['early', '45', '30'], ['refusal_days', '10', '7']]))
-            ->assertSessionHasErrors('confirm_loosening', errorBag: 'medicationSettings');
+            ->assertSessionHasErrors('confirm_loosening');
         $this->assertNull(AppSetting::query()->where('key', DoseTimingSettings::EARLY_MINUTES)->first());
 
         $this->actingAs($manager)
@@ -109,14 +109,14 @@ class DoseTimingSettingsTest extends TestCase
                 ->put('/emar/settings/changes', $this->save([['late', $value, '60']], true))
                 ->assertSessionHasErrors([
                     'changes.0.value' => 'Enter a whole number from 1 to 1,440 for “Doses count as late”.',
-                ], errorBag: 'medicationSettings');
+                ]);
         }
         $this->actingAs($manager)
             ->from('/emar/settings')
             ->put('/emar/settings/changes', $this->save([['refusal_count', '51', '3']], true))
             ->assertSessionHasErrors([
                 'changes.0.value' => 'Enter a whole number from 1 to 50 for “Repeated refusals escalate”.',
-            ], errorBag: 'medicationSettings');
+            ]);
 
         $this->assertSame(0, MedicationSettingChange::query()->count());
     }
@@ -151,7 +151,7 @@ class DoseTimingSettingsTest extends TestCase
         $this->assertSame('3', AppSetting::query()->where('key', DoseTimingSettings::REFUSAL_COUNT)->value('value'));
         $this->assertSame('7', AppSetting::query()->where('key', DoseTimingSettings::REFUSAL_DAYS)->value('value'));
         $this->assertSame(
-            ['3 refusals or withholds', '7 days'],
+            ['Kept: 3 refusals or withholds', 'Kept: 7 days'],
             MedicationSettingChange::query()->orderBy('id')->pluck('after_text')->all(),
         );
     }
