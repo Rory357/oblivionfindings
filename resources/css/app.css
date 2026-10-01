@@ -885,14 +885,19 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
         transition: none;
     }
 }
+/* Status tones on the dark sky keep their fixed status hue and chroma but
+   never fall below these lightnesses. Light mode's status tokens are dark
+   (they're tuned for white cards), and a plain mix toward white left warning
+   labels at 3.5:1 and critical ones at 4.0:1 on the meter glass. Worst
+   measured with these floors, across brands and both modes: 4.86:1. */
 .eh-meter--critical {
-    --eh-meter-accent: color-mix(in oklch, var(--status-critical) 55%, white);
+    --eh-meter-accent: oklch(from var(--status-critical) max(l, 0.84) c h);
 }
 .eh-meter--warning {
-    --eh-meter-accent: color-mix(in oklch, var(--status-warning) 60%, white);
+    --eh-meter-accent: oklch(from var(--status-warning) max(l, 0.82) c h);
 }
 .eh-meter--success {
-    --eh-meter-accent: color-mix(in oklch, var(--status-success) 55%, white);
+    --eh-meter-accent: oklch(from var(--status-success) max(l, 0.82) c h);
 }
 .eh-meter--critical,
 .eh-meter--warning,
@@ -964,16 +969,16 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     opacity: 0.85;
 }
 .eh-meter-delta--good {
-    color: color-mix(in oklch, var(--status-success) 55%, white);
+    color: oklch(from var(--status-success) max(l, 0.82) c h);
 }
 .eh-meter-delta--bad {
-    color: color-mix(in oklch, var(--status-critical) 55%, white);
+    color: oklch(from var(--status-critical) max(l, 0.84) c h);
 }
 .eh-meter-donut-arc {
-    stroke: color-mix(in oklch, var(--status-success) 55%, white);
+    stroke: oklch(from var(--status-success) max(l, 0.82) c h);
 }
 .eh-meter-donut-v {
-    color: color-mix(in oklch, var(--status-success) 55%, white);
+    color: oklch(from var(--status-success) max(l, 0.82) c h);
 }
 
 /* Hide scrollbars on icon sidebar */
