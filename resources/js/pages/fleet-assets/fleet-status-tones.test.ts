@@ -14,7 +14,7 @@ const incidents = readFileSync(
 describe('Fleet semantic status tones', () => {
     it('treats unchecked daily checks as due, while failed checks remain critical', () => {
         expect(dailyCheck).toMatch(
-            /tone=\{\s*summary\.unchecked\s*>\s*0\s*\?\s*'warning'\s*:\s*'success'\s*}/,
+            /variant=\{\s*summary\.unchecked\s*>\s*0\s*\?\s*'warning'\s*:\s*'success'\s*}/,
         );
         // Token tints only: no dark: pair on the good state (DESIGN.md).
         expect(dailyCheck).toMatch(
