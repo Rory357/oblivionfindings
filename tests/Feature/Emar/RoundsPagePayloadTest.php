@@ -243,102 +243,27 @@ class RoundsPagePayloadTest extends TestCase
         $this->assertSame('completed', $foreign->fresh()->status);
     }
 
-    public function test_template_payload_reconciles_site_and_active_service_context_without_leaking_names(): void
+    /**
+     * Round templates moved to Medication › Settings › Rounds & timing (eMAR
+     * P11); their visibility rules are pinned in RoundTemplateSettingsTest.
+     */
+    public function test_rounds_page_no_longer_sends_round_templates_or_their_staff(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $site = Site::factory()->create(['is_active' => true]);
-        $foreignSite = Site::factory()->create(['is_active' => true]);
-        $reader = $this->makeSiteUser($site, ['medications.view']);
-        $applicationWideReader = $this->makeSiteUser($site, [
-            'medications.view',
-            'clinical.accessAllSites',
-        ]);
-        $foreignStaff = User::factory()->create(['name' => 'HIDDEN foreign template staff']);
-        $localContext = ServiceContext::factory()->create([
-            'site_id' => $site->id,
-            'is_active' => true,
-        ]);
-        $foreignContext = ServiceContext::factory()->create([
-            'site_id' => $foreignSite->id,
-            'is_active' => true,
-        ]);
-        $applicationWideContext = ServiceContext::factory()->create([
-            'site_id' => null,
-            'is_active' => true,
-        ]);
-        $inactiveContext = ServiceContext::factory()->create([
-            'site_id' => $site->id,
-            'is_active' => false,
-        ]);
+        $manager = $this->makeSiteUser($site, ['medications.view', 'medications.orders.manage']);
+        $this->makeTemplate('Local template', $site);
 
-        $visibleTemplates = collect([
-            $this->makeTemplate('Visible local template', $site),
-            $this->makeTemplate('Visible local application-context template', $site, $applicationWideContext),
-            $this->makeTemplate('Visible local matching-context template', $site, $localContext),
-            $this->makeTemplate('Visible context-derived template', null, $localContext),
-        ]);
-        $legacyForeignAssigneeTemplate = $visibleTemplates->first();
-        $legacyForeignAssigneeTemplate
-            ->forceFill(['default_assigned_to' => $foreignStaff->id])
-            ->save();
-        $applicationWideTemplates = collect([
-            $this->makeTemplate('Application-wide no-context template'),
-            $this->makeTemplate('Application-wide context template', null, $applicationWideContext),
-        ]);
-        collect([
-            $this->makeTemplate('HIDDEN foreign Site template', $foreignSite),
-            $this->makeTemplate('HIDDEN foreign context-derived template', null, $foreignContext),
-            $this->makeTemplate('HIDDEN conflicting context template', $site, $foreignContext),
-            $this->makeTemplate('HIDDEN inactive concrete context template', $site, $inactiveContext),
-            $this->makeTemplate('HIDDEN inactive context-derived template', null, $inactiveContext),
-        ])->each(function (MedicationRoundTemplate $template) use ($foreignStaff): void {
-            $template->forceFill(['default_assigned_to' => $foreignStaff->id])->save();
-        });
-
-        $response = $this->actingAs($reader)
+        $response = $this->actingAs($manager)
             ->get(route('emar.rounds', ['date' => '2026-05-04']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('templates', function ($templates) use ($visibleTemplates, $legacyForeignAssigneeTemplate): bool {
-                    $actualIds = collect($templates)
-                        ->pluck('id')
-                        ->map(fn ($id): int => (int) $id)
-                        ->sort()
-                        ->values()
-                        ->all();
-                    $expectedIds = $visibleTemplates
-                        ->pluck('id')
-                        ->map(fn ($id): int => (int) $id)
-                        ->sort()
-                        ->values()
-                        ->all();
-
-                    $legacyRow = collect($templates)->firstWhere('id', $legacyForeignAssigneeTemplate->id);
-
-                    return $actualIds === $expectedIds
-                        && data_get($legacyRow, 'default_assigned_to') === null
-                        && data_get($legacyRow, 'default_staff') === null;
-                }));
-
-        $this->assertStringNotContainsString('HIDDEN', $response->getContent());
-        $this->assertStringNotContainsString('Application-wide no-context template', $response->getContent());
-        $this->assertStringNotContainsString('Application-wide context template', $response->getContent());
-
-        $this->actingAs($applicationWideReader)
-            ->get(route('emar.rounds', ['date' => '2026-05-04']))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('templates', function ($templates) use ($applicationWideTemplates): bool {
-                    $templateIds = collect($templates)
-                        ->pluck('id')
-                        ->map(fn ($id): int => (int) $id);
-
-                    return $applicationWideTemplates->pluck('id')->every(
-                        fn ($id): bool => $templateIds->contains((int) $id),
-                    );
-                }));
+                ->missing('templates')
+                ->missing('staff')
+                ->where('can_manage', true));
+        $this->assertStringNotContainsString('Local template', $response->getContent());
     }
 
     public function test_worker_board_lists_only_assigned_rounds_at_approved_sites(): void

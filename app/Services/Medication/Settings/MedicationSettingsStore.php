@@ -4,6 +4,7 @@ namespace App\Services\Medication\Settings;
 
 use App\Models\AppSetting;
 use App\Models\MedicationAdminRule;
+use App\Models\MedicationRoundTemplate;
 use App\Models\MedicationSettingChange;
 use App\Models\MedicationSiteSetting;
 use App\Models\User;
@@ -34,6 +35,9 @@ class MedicationSettingsStore
 
     /** History entries for medicine rules use this group, keyed "rule:{id}". */
     public const RULES_GROUP = 'medicine_rules';
+
+    /** History entries for round templates use this group, keyed "template:{id}". */
+    public const TEMPLATES_GROUP = 'round_templates';
 
     public function __construct(private readonly MedicationSettingsRegistry $registry) {}
 
@@ -222,6 +226,38 @@ class MedicationSettingsStore
     }
 
     /**
+     * Record a round-template change (added, changed, paused, turned back on,
+     * retired) in the change history at the template's house. The audit
+     * entry is written by the caller; a template can't be "put back".
+     */
+    public function recordTemplateChange(
+        User $actor,
+        MedicationRoundTemplate $template,
+        string $label,
+        string $before,
+        string $after,
+        bool $loosens,
+        string $auditEvent,
+    ): MedicationSettingChange {
+        return MedicationSettingChange::query()->create([
+            'setting_group' => self::TEMPLATES_GROUP,
+            'setting_key' => 'template:'.$template->id,
+            'site_id' => $template->site_id,
+            'action' => MedicationSettingChange::ACTION_CHANGED,
+            'view' => MedicationSettingsRegistry::VIEW_ROUNDS,
+            'section' => 'templates',
+            'label' => $label,
+            'before_value' => null,
+            'after_value' => null,
+            'before_text' => $before,
+            'after_text' => $after,
+            'loosens' => $loosens,
+            'actor_id' => $actor->id,
+            'audit_event' => $auditEvent,
+        ]);
+    }
+
+    /**
      * The newest history entry for each medicine rule, keyed by rule id.
      *
      * @param  list<int>  $ruleIds
@@ -229,13 +265,33 @@ class MedicationSettingsStore
      */
     public function latestRuleChanges(array $ruleIds): Collection
     {
-        if ($ruleIds === []) {
+        return $this->latestChangesFor(self::RULES_GROUP, 'rule:', $ruleIds);
+    }
+
+    /**
+     * The newest history entry for each round template, keyed by template id.
+     *
+     * @param  list<int>  $templateIds
+     * @return Collection<int, MedicationSettingChange>
+     */
+    public function latestTemplateChanges(array $templateIds): Collection
+    {
+        return $this->latestChangesFor(self::TEMPLATES_GROUP, 'template:', $templateIds);
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return Collection<int, MedicationSettingChange>
+     */
+    private function latestChangesFor(string $group, string $prefix, array $ids): Collection
+    {
+        if ($ids === []) {
             return collect();
         }
-        $keys = array_map(fn (int $id): string => 'rule:'.$id, $ruleIds);
+        $keys = array_map(fn (int $id): string => $prefix.$id, $ids);
         $latestIds = MedicationSettingChange::query()
             ->selectRaw('MAX(id) as id')
-            ->where('setting_group', self::RULES_GROUP)
+            ->where('setting_group', $group)
             ->whereIn('setting_key', $keys)
             ->groupBy('setting_key')
             ->pluck('id');
@@ -244,7 +300,7 @@ class MedicationSettingsStore
             ->with('actor:id,name')
             ->whereIn('id', $latestIds->all())
             ->get()
-            ->keyBy(fn (MedicationSettingChange $change): int => (int) substr($change->setting_key, 5));
+            ->keyBy(fn (MedicationSettingChange $change): int => (int) substr($change->setting_key, strlen($prefix)));
     }
 
     /**

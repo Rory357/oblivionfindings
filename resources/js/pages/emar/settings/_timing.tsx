@@ -5,10 +5,11 @@
  * dose window resolver (P01 C6), "Remind staff to offer again" for P08a
  * follow-ups, and time-critical medicines for P01 — no stubs. */
 import { StatusBadge } from '@/components/ui/status-badge';
-import { AlarmClock, Clock, RotateCcw } from 'lucide-react';
+import { AlarmClock, Clock, Repeat, RotateCcw } from 'lucide-react';
 import { useSettings } from './_context';
 import { decisionReviewer, isDirty, savedValue } from './_model';
 import { NoMatches, useRow } from './_sections';
+import type { RoundTemplate } from './_templates';
 import {
     GroupGrid,
     GroupRow,
@@ -178,7 +179,16 @@ export function DoseTiming({
     );
 }
 
-export function RoundsOverview({ q }: { q: string }) {
+export function RoundsOverview({
+    q,
+    templates,
+}: {
+    q: string;
+    templates: RoundTemplate[];
+}) {
+    const active = templates.filter((t) => t.status === 'active');
+    const paused = templates.filter((t) => t.status === 'paused').length;
+    const houses = new Set(active.map((t) => t.site_id ?? 'all')).size;
     const { s, go } = useSettings();
     const v = (key: string) => savedValue(s, G, key);
     const notReviewed = (keys: string[]) => {
@@ -199,6 +209,18 @@ export function RoundsOverview({ q }: { q: string }) {
             title="Rounds & timing"
             caption="When doses are given and when they’re late"
             cards={[
+                {
+                    icon: Repeat,
+                    title: 'Round templates',
+                    lines: [
+                        templates.length
+                            ? `${active.length} active across ${houses} ${houses === 1 ? 'house' : 'houses'} · ${paused} paused.`
+                            : 'No round templates yet.',
+                        'Rounds are created from them at 12:05 am each day.',
+                    ],
+                    cta: 'Review round templates',
+                    onClick: () => go('rounds', 'templates'),
+                },
                 {
                     icon: Clock,
                     title: 'When a dose is due',

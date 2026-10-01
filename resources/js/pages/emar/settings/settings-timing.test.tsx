@@ -307,7 +307,7 @@ describe('Rounds & timing › Dose timing', () => {
 
 describe('Rounds & timing › Overview', () => {
     it('sums up the saved times and what is still to review', () => {
-        renderWith(<RoundsOverview q="" />);
+        renderWith(<RoundsOverview q="" templates={[]} />);
         expect(
             screen.getByText(
                 'Can be given from 30 minutes before. Late after 60 minutes.',

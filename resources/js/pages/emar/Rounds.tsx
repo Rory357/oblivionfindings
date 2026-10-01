@@ -16,8 +16,6 @@ import {
     type RoundCell,
     type RoundStatus,
     type RoundSummary,
-    type RoundTemplate,
-    type StaffOption,
 } from '@/components/emar/rounds/types';
 import {
     addDays,
@@ -40,7 +38,6 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering/shift-context-menu';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
 import {
     OWN_WITNESS_PIN_PROMPT,
@@ -49,15 +46,14 @@ import {
 } from '@/lib/witness-pin';
 import GenerateRoundsModal from '@/pages/emar/components/generate-rounds-modal';
 import GuidedRoundDialog from '@/pages/emar/components/guided-round-dialog';
-import RoundTemplateDialog from '@/pages/emar/components/round-template-dialog';
 import type {
     NotGivenReasonOption,
     WitnessOption,
 } from '@/pages/meds/today/types';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
-    Archive,
+    ArrowUpRight,
     CalendarCheck,
     CalendarDays,
     CheckCircle2,
@@ -67,9 +63,7 @@ import {
     LayoutGrid,
     LayoutList,
     List,
-    Pencil,
     Pill,
-    Plus,
     Printer,
     Zap,
 } from 'lucide-react';
@@ -78,8 +72,6 @@ import { useMemo, useState } from 'react';
 
 type Props = {
     rounds: RoundSummary[];
-    templates: RoundTemplate[];
-    staff: StaffOption[];
     date: string;
     now_label: string;
     lastGenerated: string | null;
@@ -105,27 +97,9 @@ type Props = {
 
 type StatusChip = 'all' | 'due' | 'flagged';
 
-function hasConcreteTemplateSite(template: RoundTemplate): boolean {
-    return (
-        Number.isInteger(template.site_id) &&
-        template.site_id !== null &&
-        template.site_id > 0
-    );
-}
-
-function templateSiteLabel(template: RoundTemplate): string {
-    if (!hasConcreteTemplateSite(template)) {
-        return 'No site assigned (legacy template)';
-    }
-
-    return template.site_name ?? 'Assigned site unavailable';
-}
-
 export default function Rounds(props: Props) {
     const {
         rounds,
-        templates,
-        staff,
         date,
         now_label: nowLabel,
         guidedRound,
@@ -147,9 +121,6 @@ export default function Rounds(props: Props) {
     const [statusChip, setStatusChip] = useState<StatusChip>('all');
     const [expanded, setExpanded] = useState<Record<number, boolean>>({});
     const [generateOpen, setGenerateOpen] = useState(false);
-    const [templateEditing, setTemplateEditing] = useState<
-        RoundTemplate | 'new' | null
-    >(null);
     const [auditRoundId, setAuditRoundId] = useState<number | null>(null);
     const [activityView, setActivityView] = useState<ActivityItem | null>(null);
     const [contextMenu, setContextMenu] = useState<ShiftCtxState | null>(null);
@@ -174,33 +145,6 @@ export default function Rounds(props: Props) {
 
     const toggleExpand = (id: number) =>
         setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-    const retireTemplate = (id: number) => {
-        if (
-            !window.confirm(
-                'Retire this round template? Existing rounds will be kept and no new rounds will be generated.',
-            )
-        ) {
-            return;
-        }
-
-        router.post(
-            `/emar/rounds/templates/${id}/retire`,
-            {},
-            {
-                preserveScroll: true,
-            },
-        );
-    };
-    const toggleTemplateActive = (t: RoundTemplate) => {
-        if (t.retired_at !== null) return;
-        if (!t.active && !hasConcreteTemplateSite(t)) return;
-
-        router.put(
-            `/emar/rounds/templates/${t.id}`,
-            { active: !t.active },
-            { preserveScroll: true },
-        );
-    };
     const printRoundSheet = () =>
         window.open(
             `/emar/pdf/round-sheet?date=${encodeURIComponent(date)}`,
@@ -401,7 +345,6 @@ export default function Rounds(props: Props) {
             label: 'Templates',
             icon: LayoutList,
             tone: 'violet',
-            badge: templates.length || undefined,
         },
         {
             id: 'activity',
@@ -604,16 +547,6 @@ export default function Rounds(props: Props) {
                                     Generate rounds
                                 </Button>
                             )}
-                            {canManage && (
-                                <Button
-                                    variant="outline"
-                                    className={onDarkChip}
-                                    onClick={() => setTemplateEditing('new')}
-                                >
-                                    <Plus className="h-4 w-4" />
-                                    New template
-                                </Button>
-                            )}
                         </>
                     }
                     footer={heroFooter}
@@ -681,168 +614,26 @@ export default function Rounds(props: Props) {
                 )}
 
                 {activeTab === 'templates' && (
-                    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                        <div className="flex items-center justify-between gap-3 border-b px-4 py-3.5">
-                            <div>
-                                <div className="text-sm font-semibold">
-                                    Round templates
-                                </div>
-                                <div className="mt-0.5 text-xs text-muted-foreground">
-                                    Auto-generation runs daily at 00:05 NZT for
-                                    active templates.
-                                </div>
-                            </div>
-                            {canManage && (
-                                <Button
-                                    size="sm"
-                                    onClick={() => setTemplateEditing('new')}
-                                >
-                                    <Plus className="h-4 w-4" />
-                                    New template
-                                </Button>
-                            )}
+                    <div className="rounded-2xl border bg-card p-5 shadow-sm">
+                        <div className="text-sm font-semibold">
+                            Round templates are in Settings
                         </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b bg-muted text-left text-[11px] tracking-wide text-muted-foreground uppercase">
-                                        <th className="px-4 py-2.5">Name</th>
-                                        <th className="px-4 py-2.5">Time</th>
-                                        <th className="px-4 py-2.5">Window</th>
-                                        <th className="px-4 py-2.5">Days</th>
-                                        <th className="px-4 py-2.5">
-                                            Default staff
-                                        </th>
-                                        <th className="px-4 py-2.5">Site</th>
-                                        <th className="px-4 py-2.5 text-center">
-                                            Auto-gen
-                                        </th>
-                                        <th className="px-4 py-2.5 text-right">
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {templates.length === 0 ? (
-                                        <tr>
-                                            <td
-                                                colSpan={8}
-                                                className="px-4 py-10 text-center text-muted-foreground"
-                                            >
-                                                No templates yet.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        templates.map((t) => (
-                                            <tr
-                                                key={t.id}
-                                                className="border-b last:border-b-0"
-                                            >
-                                                <td className="px-4 py-3 font-medium">
-                                                    <div className="flex items-center gap-2">
-                                                        <span>{t.name}</span>
-                                                        {t.retired_at !==
-                                                            null && (
-                                                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-                                                                Retired
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-muted-foreground">
-                                                    {t.scheduled_time}
-                                                </td>
-                                                <td className="px-4 py-3 text-muted-foreground">
-                                                    ±{t.window_minutes} min
-                                                </td>
-                                                <td className="px-4 py-3 text-muted-foreground">
-                                                    {daysLabel(t.days_of_week)}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {t.default_staff ?? (
-                                                        <span className="text-muted-foreground">
-                                                            Unassigned
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-muted-foreground">
-                                                    {templateSiteLabel(t)}
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    {t.retired_at !== null ? (
-                                                        <span className="text-muted-foreground">
-                                                            Retired
-                                                        </span>
-                                                    ) : canManage ? (
-                                                        <Switch
-                                                            checked={t.active}
-                                                            disabled={
-                                                                !t.active &&
-                                                                !hasConcreteTemplateSite(
-                                                                    t,
-                                                                )
-                                                            }
-                                                            title={
-                                                                !t.active &&
-                                                                !hasConcreteTemplateSite(
-                                                                    t,
-                                                                )
-                                                                    ? 'Assign a site before enabling auto-generation'
-                                                                    : undefined
-                                                            }
-                                                            onCheckedChange={() =>
-                                                                toggleTemplateActive(
-                                                                    t,
-                                                                )
-                                                            }
-                                                        />
-                                                    ) : (
-                                                        <span className="text-muted-foreground">
-                                                            {t.active
-                                                                ? 'On'
-                                                                : 'Off'}
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    {canManage &&
-                                                        t.retired_at ===
-                                                            null && (
-                                                            <div className="flex items-center justify-end gap-1">
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="ghost"
-                                                                    onClick={() =>
-                                                                        setTemplateEditing(
-                                                                            t,
-                                                                        )
-                                                                    }
-                                                                    aria-label="Edit template"
-                                                                >
-                                                                    <Pencil className="h-4 w-4" />
-                                                                </Button>
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="ghost"
-                                                                    onClick={() =>
-                                                                        retireTemplate(
-                                                                            t.id,
-                                                                        )
-                                                                    }
-                                                                    aria-label="Retire template"
-                                                                    title="Retire template and keep existing rounds"
-                                                                >
-                                                                    <Archive className="h-4 w-4 text-muted-foreground" />
-                                                                </Button>
-                                                            </div>
-                                                        )}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            When each round happens at a house, who does it, and
+                            pausing or retiring a template are now in Medication
+                            › Settings › Rounds &amp; timing.
+                            {canManage
+                                ? ''
+                                : ' People who manage orders at a house change its templates.'}
+                        </p>
+                        {canManage ? (
+                            <Button asChild size="sm" className="mt-3">
+                                <Link href="/emar/settings#rounds/templates">
+                                    Open round templates
+                                    <ArrowUpRight className="h-4 w-4" />
+                                </Link>
+                            </Button>
+                        ) : null}
                     </div>
                 )}
 
@@ -902,17 +693,6 @@ export default function Rounds(props: Props) {
                     open
                     onClose={() => setGenerateOpen(false)}
                     defaultDate={date}
-                />
-            )}
-
-            {templateEditing !== null && (
-                <RoundTemplateDialog
-                    template={
-                        templateEditing === 'new' ? null : templateEditing
-                    }
-                    staff={staff}
-                    sites={sites}
-                    onClose={() => setTemplateEditing(null)}
                 />
             )}
 

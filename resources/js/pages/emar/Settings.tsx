@@ -83,6 +83,16 @@ import {
     type WitnessPinProps,
 } from './settings/_sections';
 import { useStatusMessage } from './settings/_status';
+import {
+    houseOf,
+    RoundTemplates,
+    TEMPLATE_STATUS_OPTIONS,
+    TemplateDialogHost,
+    type RoundTemplate,
+    type TemplateAccess,
+    type TemplateData,
+    type TemplateStaff,
+} from './settings/_templates';
 import { DoseTiming, RoundsOverview } from './settings/_timing';
 import { SaveBar, StatusMessage } from './settings/_ui';
 
@@ -98,6 +108,11 @@ type Props = {
     settingsAccess: boolean;
     /** An auditor: every view and the change history, read-only (P11 answer 6). */
     readOnlyAudit: boolean;
+    /** Round templates this person can read (Rounds & timing › Round templates). */
+    roundTemplates: RoundTemplate[];
+    /** Whether they manage templates (orders.manage at a house), and where. */
+    templateAccess: TemplateAccess;
+    templateStaff: TemplateStaff[];
 };
 
 const VIEW_ICON: Record<ViewKey, LucideIcon> = {
@@ -113,6 +128,7 @@ const SEC_ICON: Record<string, LucideIcon> = {
     safety: Shield,
     controlled: LockKeyhole,
     photos: FileText,
+    templates: Repeat,
     timing: Clock,
     pins: KeyRound,
     status: Users,
@@ -132,6 +148,8 @@ export type Filters = {
     rulesWhere: string;
     rulesState: string;
     pinState: string;
+    tplHouse: string;
+    tplStatus: string;
     history: HistoryFilters;
 };
 const F0: Filters = {
@@ -139,6 +157,8 @@ const F0: Filters = {
     rulesWhere: 'all',
     rulesState: 'all',
     pinState: 'all',
+    tplHouse: 'all',
+    tplStatus: 'current',
     history: HISTORY_FILTERS,
 };
 
@@ -152,14 +172,24 @@ const DirtyDot = () => (
 
 export default function EmarSettings(props: Props) {
     const { settings: s, witnessPin, settingsAccess, readOnlyAudit } = props;
+    const templatesOnly = !settingsAccess && props.templateAccess.manage;
     const built: Built = useMemo(
         () => ({
             rules: settingsAccess ? ['overview', 'medicines', 'safety'] : [],
-            rounds: settingsAccess ? ['overview', 'timing'] : [],
-            staff: ['pins', 'status'],
+            // P11 F1: whoever manages a house's round templates reaches them
+            // here, and nothing else they couldn't already reach.
+            rounds: settingsAccess
+                ? ['overview', 'templates', 'timing']
+                : templatesOnly
+                  ? ['templates']
+                  : [],
+            staff:
+                settingsAccess || witnessPin.can_reset
+                    ? ['pins', 'status']
+                    : [],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
-        [settingsAccess],
+        [settingsAccess, templatesOnly, witnessPin.can_reset],
     );
     const [route, setRoute] = useState(() =>
         parseHash(window.location.hash, built),
@@ -287,6 +317,12 @@ export default function EmarSettings(props: Props) {
         if (section && section !== sec) go(view, section);
     };
 
+    const templateData: TemplateData = {
+        templates: props.roundTemplates,
+        access: props.templateAccess,
+        staff: props.templateStaff,
+        readOnlyAudit,
+    };
     const ruleData: RuleData = {
         rules: props.rules,
         options: props.ruleOptions,
@@ -305,7 +341,11 @@ export default function EmarSettings(props: Props) {
         open: (next) => {
             // The walkthrough confirms in its own success pane; the page's
             // message waits until it closes.
-            if (next?.kind === 'reviewdefaults' || next?.kind === 'rule')
+            if (
+                next?.kind === 'reviewdefaults' ||
+                next?.kind === 'rule' ||
+                next?.kind === 'tpl'
+            )
                 status.hold();
             setDialog(next);
         },
@@ -333,7 +373,7 @@ export default function EmarSettings(props: Props) {
 
     const refresh = () =>
         router.reload({
-            only: ['settings', 'witnessPin', 'rules'],
+            only: ['settings', 'witnessPin', 'rules', 'roundTemplates'],
             onSuccess: () => setLoadedAt(new Date()),
         });
     const viewGroups = Object.values(s.groups).filter((g) => g.view === view);
@@ -341,7 +381,14 @@ export default function EmarSettings(props: Props) {
     const accessText = readOnlyAudit
         ? 'Read-only for audit'
         : !settingsAccess
-          ? 'Read-only · you can reset witness PINs'
+          ? [
+                witnessPin.can_reset ? 'Witness PIN resets' : null,
+                props.templateAccess.manage ? 'round templates' : null,
+            ]
+                .filter(Boolean)
+                .join(' and ')
+                .replace(/^./, (c) => c.toUpperCase()) +
+            ' for your houses · nothing else here'
           : s.can_manage_organisation
             ? 'All-sites authority · every setting'
             : `House settings for ${props.sites.map((x) => x.name).join(' and ') || 'no houses'} · organisation rules read-only`;
@@ -439,6 +486,34 @@ export default function EmarSettings(props: Props) {
                     ],
                     (v) => setF({ ...f, history: { ...f.history, where: v } }),
                     Home,
+                )}
+            </>
+        ) : view === 'rounds' && sec === 'templates' ? (
+            <>
+                {select(
+                    'House',
+                    f.tplHouse,
+                    [
+                        { value: 'all', label: 'All houses' },
+                        ...[
+                            ...new Map(
+                                props.roundTemplates.map((t) => [
+                                    String(t.site_id ?? 'all-houses'),
+                                    houseOf(t),
+                                ]),
+                            ),
+                        ].map(([value, label]) => ({ value, label })),
+                    ],
+                    (v) => setF({ ...f, tplHouse: v }),
+                    Home,
+                )}
+                {select(
+                    'Status',
+                    f.tplStatus,
+                    TEMPLATE_STATUS_OPTIONS,
+                    (v) => setF({ ...f, tplStatus: v }),
+                    undefined,
+                    'current',
                 )}
             </>
         ) : SAVED_SECTIONS.includes(sec) ? (
@@ -564,7 +639,18 @@ export default function EmarSettings(props: Props) {
                 }}
             />
         ) : view === 'rounds' && sec === 'overview' ? (
-            <RoundsOverview q={query} />
+            <RoundsOverview q={query} templates={props.roundTemplates} />
+        ) : view === 'rounds' && sec === 'templates' ? (
+            <RoundTemplates
+                data={templateData}
+                q={query}
+                house={f.tplHouse}
+                status={f.tplStatus}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, tplHouse: 'all', tplStatus: 'current' });
+                }}
+            />
         ) : view === 'rounds' && sec === 'timing' ? (
             <DoseTiming
                 q={query}
@@ -644,6 +730,7 @@ export default function EmarSettings(props: Props) {
                 </div>
                 <DialogHost dialog={dialog} />
                 <RuleDialogHost dialog={dialog} data={ruleData} />
+                <TemplateDialogHost dialog={dialog} data={templateData} />
             </SettingsCtx.Provider>
         </AppLayout>
     );

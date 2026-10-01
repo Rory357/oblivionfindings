@@ -50,6 +50,8 @@ use App\Services\Medication\MedicationOrderLifecycleService;
 use App\Services\Medication\MedicationRoundGenerationService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\RoundTemplateCatalogue;
+use App\Services\Medication\Settings\MedicationSettingsStore;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
@@ -62,6 +64,7 @@ use App\Services\UserSiteAccessService;
 use App\Support\Medication\MedicationStockQuantity;
 use App\Support\WorkerClock;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -3274,10 +3277,6 @@ class EmarController extends Controller
             $user,
             ['clinical.accessAllSites', 'sites.viewAll'],
         );
-        $canReadApplicationWideTemplates = $canReadRounds && (
-            $user->canDo('clinical.accessAllSites')
-            || $user->canDo('sites.viewAll')
-        );
 
         if ($siteFilter !== null && ! in_array($siteFilter, $accessibleSiteIds, true)) {
             abort(404);
@@ -3361,86 +3360,7 @@ class EmarController extends Controller
 
         usort($residents, fn ($a, $b) => strcmp((string) $a['name'], (string) $b['name']));
         $residents = array_values($residents);
-        $governedTemplateStaff = $this->governanceScope
-            ->staffPicker($accessibleSiteIds)
-            ->keyBy(fn (array $staff): int => (int) $staff['id']);
-
-        $templates = MedicationRoundTemplate::query()
-            ->when(! $canReadRounds, fn ($q) => $q->whereRaw('1 = 0'))
-            ->when($canReadRounds, fn ($q) => $q->where(function ($templates) use ($readerSiteIds, $canReadApplicationWideTemplates) {
-                $templates
-                    ->whereRaw('1 = 0')
-                    ->orWhere(function ($siteBound) use ($readerSiteIds) {
-                        $siteBound
-                            ->whereIn('medication_round_templates.site_id', $readerSiteIds)
-                            ->where(function ($context) {
-                                $context
-                                    ->whereNull('medication_round_templates.service_context_id')
-                                    ->orWhereHas('serviceContext', function ($serviceContext) {
-                                        $serviceContext
-                                            ->where('service_contexts.is_active', true)
-                                            ->where(function ($contextSite) {
-                                                $contextSite
-                                                    ->whereNull('service_contexts.site_id')
-                                                    ->orWhereColumn(
-                                                        'service_contexts.site_id',
-                                                        'medication_round_templates.site_id',
-                                                    );
-                                            });
-                                    });
-                            });
-                    })
-                    ->orWhere(function ($contextBound) use ($readerSiteIds) {
-                        $contextBound
-                            ->whereNull('medication_round_templates.site_id')
-                            ->whereNotNull('medication_round_templates.service_context_id')
-                            ->whereHas('serviceContext', function ($serviceContext) use ($readerSiteIds) {
-                                $serviceContext
-                                    ->where('service_contexts.is_active', true)
-                                    ->whereIn('service_contexts.site_id', $readerSiteIds);
-                            });
-                    });
-
-                if ($canReadApplicationWideTemplates) {
-                    $templates->orWhere(function ($applicationWide) {
-                        $applicationWide
-                            ->whereNull('medication_round_templates.site_id')
-                            ->where(function ($context) {
-                                $context
-                                    ->whereNull('medication_round_templates.service_context_id')
-                                    ->orWhereHas('serviceContext', function ($serviceContext) {
-                                        $serviceContext
-                                            ->where('service_contexts.is_active', true)
-                                            ->whereNull('service_contexts.site_id');
-                                    });
-                            });
-                    });
-                }
-            }))
-            ->with(['retiredBy:id,name', 'site:id,name'])
-            ->orderBy('scheduled_time')
-            ->get()
-            ->map(function (MedicationRoundTemplate $t) use ($governedTemplateStaff): array {
-                $defaultStaff = $governedTemplateStaff->get((int) $t->default_assigned_to);
-
-                return [
-                    'id' => $t->id,
-                    'name' => $t->name,
-                    'scheduled_time' => substr((string) $t->scheduled_time, 0, 5),
-                    'window_minutes' => (int) ($t->window_minutes ?? 60),
-                    'days_of_week' => $t->days_of_week ?? [],
-                    'active' => (bool) $t->active,
-                    'retired_at' => $t->retired_at?->toIso8601String(),
-                    'retired_by' => $t->retiredBy?->name,
-                    'site_id' => $t->site_id,
-                    'site_name' => $t->site?->name,
-                    'service_context_id' => $t->service_context_id,
-                    'default_assigned_to' => $defaultStaff === null ? null : (int) $defaultStaff['id'],
-                    'default_staff' => $defaultStaff['name'] ?? null,
-                ];
-            })
-            ->all();
-
+        // Round templates live in Medication › Settings › Rounds & timing (P11).
         $lastGenerated = MedicationRound::whereNotNull('round_template_id')
             ->whereIn('site_id', $accessibleSiteIds)
             ->latest('created_at')
@@ -3562,14 +3482,9 @@ class EmarController extends Controller
 
         $sites = $this->governanceScope->sitePicker($accessibleSiteIds);
         $canManageRounds = (bool) $user?->canDo('medications.orders.manage');
-        $staff = $canManageRounds
-            ? $governedTemplateStaff->values()
-            : collect();
 
         return Inertia::render('emar/Rounds', [
             'rounds' => $rounds,
-            'templates' => $templates,
-            'staff' => $staff,
             'date' => $date,
             'now_label' => now()->setTimezone(config('app.worker_timezone', config('app.timezone')))->format('g:i a'),
             'lastGenerated' => $lastGenerated?->toIso8601String(),
@@ -5848,6 +5763,8 @@ class EmarController extends Controller
             'site_id' => 'required|integer|min:1',
             'service_context_id' => 'nullable|integer|min:1',
             'default_assigned_to' => 'nullable|integer|min:1',
+            // P11: a template can be saved as paused.
+            'active' => 'sometimes|boolean',
         ]);
         $assigneeId = isset($validated['default_assigned_to'])
             ? (int) $validated['default_assigned_to']
@@ -5876,11 +5793,18 @@ class EmarController extends Controller
                     );
                 }
 
-                $validated['active'] = true;
+                $validated['active'] = $validated['active'] ?? true;
                 $validated['site_id'] = $canonicalSiteId;
-                MedicationRoundTemplate::query()->create($validated);
+                $template = MedicationRoundTemplate::query()->create($validated);
+                $this->recordRoundTemplateChange($lockedActor, $template, 'created', 'Round template added', '—', [
+                    'status_after' => $template->active ? 'active' : 'paused',
+                ]);
 
-                return redirect()->back();
+                return redirect()->back()->with('medication_settings_saved', 'Template added: '.$template->name.'. '.(
+                    $template->active
+                        ? 'Rounds are created from it from tomorrow (12:05 am).'
+                        : 'Saved as paused — no rounds are created until someone turns it on.'
+                ));
             },
         );
     }
@@ -5976,9 +5900,53 @@ class EmarController extends Controller
             if (array_key_exists('site_id', $validated) || $resultingActive) {
                 $validated['site_id'] = $canonicalSiteId;
             }
-            $lockedTemplate->update($validated);
+            $catalogue = app(RoundTemplateCatalogue::class);
+            $lockedTemplate->loadMissing('defaultAssignedTo:id,name');
+            $before = $catalogue->describe($lockedTemplate);
+            $wasActive = (bool) $lockedTemplate->active;
+            $lockedTemplate->fill($validated);
+            // "08:00" and the stored "08:00:00" are the same time.
+            $changed = array_values(array_filter(
+                array_diff(array_keys($lockedTemplate->getDirty()), ['updated_at']),
+                fn (string $field): bool => $field !== 'scheduled_time'
+                    || substr((string) $lockedTemplate->getRawOriginal('scheduled_time'), 0, 5) !== substr((string) $lockedTemplate->scheduled_time, 0, 5),
+            ));
+            $lockedTemplate->save();
+            if ($changed === []) {
+                return redirect()->back()->with('medication_settings_saved', 'Nothing was saved — the template already had those values.');
+            }
+            $lockedTemplate->load('defaultAssignedTo:id,name');
 
-            return redirect()->back();
+            // Pausing or turning a template back on is its own event; any other
+            // edit is "changed". Pausing stops rounds being created: a loosening.
+            if ($changed === ['active']) {
+                $paused = ! $lockedTemplate->active;
+                $this->recordRoundTemplateChange(
+                    $lockedActor,
+                    $lockedTemplate,
+                    $paused ? 'paused' : 'resumed',
+                    $paused ? 'Round template paused' : 'Round template turned back on',
+                    $wasActive ? 'Active' : 'Paused',
+                    ['status_before' => $wasActive ? 'active' : 'paused', 'status_after' => $paused ? 'paused' : 'active'],
+                    afterText: $paused ? 'Paused' : 'Active',
+                    loosens: $paused,
+                );
+
+                return redirect()->back()->with('medication_settings_saved', $paused
+                    ? 'Template paused. No rounds from tomorrow.'
+                    : 'Template turned back on. Rounds are created from tomorrow.');
+            }
+            $this->recordRoundTemplateChange(
+                $lockedActor,
+                $lockedTemplate,
+                'updated',
+                'Round template changed',
+                $before,
+                ['changed' => $changed, 'status_before' => $wasActive ? 'active' : 'paused', 'status_after' => $lockedTemplate->active ? 'active' : 'paused'],
+                loosens: $wasActive && ! $lockedTemplate->active,
+            );
+
+            return redirect()->back()->with('medication_settings_saved', 'Template updated: '.$lockedTemplate->name.'. Rounds created from tomorrow use the new details; today’s rounds keep theirs.');
         },
             authorizationUserIds: array_filter([$requestedAssigneeId]),
             additionalSiteIds: array_filter([$requestedSiteId]),
@@ -5998,6 +5966,15 @@ class EmarController extends Controller
         ) {
             $statusBefore = $lockedTemplate->active ? 'active' : 'inactive';
             if ($lockedTemplate->retireGoverned((int) $lockedActor->id)) {
+                app(MedicationSettingsStore::class)->recordTemplateChange(
+                    $lockedActor,
+                    $lockedTemplate,
+                    'Round template retired — '.$lockedTemplate->name,
+                    $statusBefore === 'active' ? 'Active' : 'Paused',
+                    'Retired',
+                    true,
+                    'medications.round_template.retired',
+                );
                 AuditLogger::logOrFail('medications.round_template.retired', $lockedTemplate, [
                     'actor_id' => (int) $lockedActor->id,
                     'site_id' => $lockedTemplate->site_id !== null ? (int) $lockedTemplate->site_id : null,
@@ -6008,8 +5985,109 @@ class EmarController extends Controller
                 ]);
             }
 
-            return redirect()->back()->with('success', 'Round template retired. Existing rounds were retained.');
+            return redirect()->back()->with('medication_settings_saved', 'Template retired. No new rounds are created from it; past rounds keep it on their record.');
         });
+    }
+
+    /**
+     * eMAR P11: every round-template change is in Settings › Change history
+     * (at the template's house) and in the audit log.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private function recordRoundTemplateChange(
+        User $actor,
+        MedicationRoundTemplate $template,
+        string $event,
+        string $what,
+        string $before,
+        array $meta = [],
+        ?string $afterText = null,
+        bool $loosens = false,
+    ): void {
+        $template->loadMissing('defaultAssignedTo:id,name');
+        $auditEvent = 'medications.round_template.'.$event;
+        app(MedicationSettingsStore::class)->recordTemplateChange(
+            $actor,
+            $template,
+            $what.' — '.$template->name,
+            $before,
+            $afterText ?? app(RoundTemplateCatalogue::class)->describe($template),
+            $loosens,
+            $auditEvent,
+        );
+        AuditLogger::logOrFail($auditEvent, $template, [
+            'actor_id' => (int) $actor->id,
+            'site_id' => $template->site_id !== null ? (int) $template->site_id : null,
+            'round_template_id' => (int) $template->id,
+            ...$meta,
+        ]);
+    }
+
+    /**
+     * "Create rounds for a day" preview (eMAR P11): which rounds the same
+     * generation would create and which already exist. Writes nothing.
+     */
+    public function previewRounds(Request $request): JsonResponse
+    {
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        $allowedSiteIds = $this->governanceScope->mutationSiteIds($actor, 'medications.orders.manage');
+        $validated = $request->validate([
+            'date' => 'required|date',
+            'generate_all' => 'nullable|boolean',
+            'site_id' => 'nullable|integer|min:1',
+        ]);
+        $siteIds = $this->roundGenerationSiteIds($validated, $allowedSiteIds);
+        $date = Carbon::parse($validated['date']);
+        $generateAll = (bool) ($validated['generate_all'] ?? false);
+
+        $templates = MedicationRoundTemplate::query()
+            ->active()
+            ->whereIn('site_id', $siteIds)
+            ->orderBy('scheduled_time')
+            ->orderBy('id')
+            ->get(['id', 'name', 'scheduled_time']);
+        $rows = $templates->map(function (MedicationRoundTemplate $template) use ($date, $generateAll, $allowedSiteIds, $actor): array {
+            $result = $this->roundGeneration->generate((int) $template->id, $date, $generateAll, $allowedSiteIds, $actor, dryRun: true);
+
+            return [
+                'template_id' => (int) $template->id,
+                'name' => (string) $template->name,
+                'scheduled_time' => substr((string) $template->scheduled_time, 0, 5),
+                'status' => match ($result['status']) {
+                    MedicationRoundGenerationService::STATUS_CREATED => 'new',
+                    MedicationRoundGenerationService::STATUS_ALREADY_EXISTS => 'exists',
+                    default => 'skipped',
+                },
+                'reason' => $result['reason'],
+            ];
+        })->values();
+
+        return response()->json([
+            'rounds' => $rows->where('status', '!=', 'skipped')->values()->all(),
+            'create' => $rows->where('status', 'new')->count(),
+            'exists' => $rows->where('status', 'exists')->count(),
+        ]);
+    }
+
+    /**
+     * The houses a round generation covers: one house, when asked for and
+     * allowed, otherwise every house the person may manage.
+     *
+     * @param  array<string, mixed>  $validated
+     * @param  list<int>  $allowedSiteIds
+     * @return list<int>
+     */
+    private function roundGenerationSiteIds(array $validated, array $allowedSiteIds): array
+    {
+        if (! isset($validated['site_id'])) {
+            return $allowedSiteIds;
+        }
+        $siteId = (int) $validated['site_id'];
+        abort_unless(in_array($siteId, $allowedSiteIds, true), 404);
+
+        return [$siteId];
     }
 
     public function generateRounds(Request $request)
@@ -6020,13 +6098,14 @@ class EmarController extends Controller
         $validated = $request->validate([
             'date' => 'required|date',
             'generate_all' => 'nullable|boolean',
+            'site_id' => 'nullable|integer|min:1',
         ]);
 
         $date = Carbon::parse($validated['date']);
         $generateAll = (bool) ($validated['generate_all'] ?? false);
         $templateIds = MedicationRoundTemplate::query()
             ->active()
-            ->whereIn('site_id', $allowedSiteIds)
+            ->whereIn('site_id', $this->roundGenerationSiteIds($validated, $allowedSiteIds))
             ->orderBy('id')
             ->pluck('id');
         $results = $templateIds->map(fn ($templateId): array => $this->roundGeneration->generate(
@@ -6046,7 +6125,15 @@ class EmarController extends Controller
                 ->all(),
         ];
 
-        return redirect()->back()->with('round_generation', $summary);
+        return redirect()->back()
+            ->with('round_generation', $summary)
+            ->with('medication_settings_saved', sprintf(
+                '%d %s created (%d already existed and %s skipped).',
+                $summary['created'],
+                $summary['created'] === 1 ? 'round' : 'rounds',
+                $summary['already_exists'],
+                $summary['already_exists'] === 1 ? 'was' : 'were',
+            ));
     }
 
     public function startRound(Request $request, MedicationRound $round)

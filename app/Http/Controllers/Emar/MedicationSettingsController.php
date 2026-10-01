@@ -10,6 +10,7 @@ use App\Models\MedicationAdminRule;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\RoundTemplateCatalogue;
 use App\Services\Medication\Settings\MedicationSettingDefinition;
 use App\Services\Medication\Settings\MedicationSettingsRegistry;
 use App\Services\Medication\Settings\MedicationSettingsStore;
@@ -51,6 +52,7 @@ class MedicationSettingsController extends Controller
         private readonly MedicationSettingsStore $settingsStore,
         private readonly MedicineRuleWording $ruleWording,
         private readonly MedicineRuleScope $ruleScope,
+        private readonly RoundTemplateCatalogue $roundTemplates,
     ) {}
 
     private const WITNESS_PIN_STAFF_LIMIT = 500;
@@ -331,7 +333,10 @@ class MedicationSettingsController extends Controller
         // P11 answer 6: auditors read Settings and its change history, never change it.
         $readOnlyAudit = ! $canManage && (bool) $actor?->canDo('medications.audit.view');
         $canView = $canManage || $readOnlyAudit;
-        abort_unless($canView || $canResetPins, 403);
+        // P11 F1: whoever manages round templates at a house (orders.manage)
+        // reaches Rounds & timing › Round templates, and only that.
+        $canTemplates = $actor !== null && $this->roundTemplates->canManageAny($actor);
+        abort_unless($canView || $canResetPins || $canTemplates, 403);
 
         $canManageGlobal = $this->canManageGlobalRules($actor);
         $siteIds = $canView ? $this->accessibleSiteIds($actor) : [];
@@ -359,12 +364,15 @@ class MedicationSettingsController extends Controller
             'staff' => $this->witnessPinStaffRows($actor, $canResetPins),
         ];
 
-        // House leads can reset staff PINs without managing medication rules:
-        // they see only Staff & PINs, read-only apart from resets.
+        $roundTemplates = $this->roundTemplatePayload($actor, $canTemplates);
+
+        // House leads can reset staff PINs and manage their houses' round
+        // templates without managing medication rules: they see only those.
         if (! $canView) {
             return Inertia::render('emar/Settings', [
                 'settings' => $settings,
                 'witnessPin' => $witnessPin,
+                ...$roundTemplates,
                 'settingsAccess' => false,
                 'readOnlyAudit' => false,
                 'rules' => [],
@@ -441,6 +449,7 @@ class MedicationSettingsController extends Controller
         return Inertia::render('emar/Settings', [
             'settings' => $settings,
             'witnessPin' => $witnessPin,
+            ...$roundTemplates,
             'settingsAccess' => true,
             'readOnlyAudit' => $readOnlyAudit,
             'rules' => $rules,
@@ -462,6 +471,33 @@ class MedicationSettingsController extends Controller
                 'manage_global' => $canManage && $canManageGlobal,
             ],
         ]);
+    }
+
+    /**
+     * Round templates (P11 Rounds & timing): the rows this person may read,
+     * the houses where they may add one, and the staff who can be a default.
+     *
+     * @return array{roundTemplates: list<array<string, mixed>>, templateAccess: array<string, mixed>, templateStaff: list<array<string, mixed>>}
+     */
+    private function roundTemplatePayload(User $actor, bool $canTemplates): array
+    {
+        $manageable = $canTemplates ? $this->roundTemplates->manageableSiteIds($actor) : [];
+
+        return [
+            'roundTemplates' => $this->roundTemplates->rows($actor),
+            'templateAccess' => [
+                'manage' => $canTemplates,
+                'all_houses' => $canTemplates && $this->roundTemplates->hasAllHouses($actor),
+                'sites' => Site::query()
+                    ->whereIn('id', $manageable)
+                    ->where('is_active', true)
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn (Site $site): array => ['id' => (int) $site->id, 'name' => (string) $site->name])
+                    ->all(),
+            ],
+            'templateStaff' => $canTemplates ? $this->roundTemplates->staffPicker($actor)->all() : [],
+        ];
     }
 
     public function store(Request $request)

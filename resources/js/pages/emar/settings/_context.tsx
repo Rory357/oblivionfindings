@@ -16,7 +16,12 @@ export type Dialog =
     | { kind: 'rule'; id: number | 'new' }
     | { kind: 'ruleview'; id: number }
     | { kind: 'ruletoggle'; id: number }
-    | { kind: 'rulehistory'; id: number };
+    | { kind: 'rulehistory'; id: number }
+    | { kind: 'tpl'; id: number | 'new' }
+    | { kind: 'tplview'; id: number }
+    | { kind: 'tpltoggle'; id: number }
+    | { kind: 'tplretire'; id: number }
+    | { kind: 'gen' };
 
 export type SettingsContext = {
     s: SettingsPayload;

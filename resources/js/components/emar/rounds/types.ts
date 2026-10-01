@@ -68,22 +68,6 @@ export interface Resident {
     site_name: string | null;
 }
 
-export interface RoundTemplate {
-    id: number;
-    name: string;
-    scheduled_time: string; // HH:MM
-    window_minutes: number;
-    days_of_week: number[]; // ISO 1-7 (Mon-Sun); [] = every day
-    active: boolean;
-    retired_at: string | null;
-    retired_by: string | null;
-    site_id: number | null;
-    site_name?: string | null;
-    service_context_id: number | null;
-    default_assigned_to: number | null;
-    default_staff: string | null;
-}
-
 export interface RoundItemAdministration {
     id: number;
     status: string;

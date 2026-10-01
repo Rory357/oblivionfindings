@@ -423,7 +423,7 @@ class MedicationRoundLifecycleRetirementTest extends TestCase
         $this->actingAs($this->actor)
             ->post(route('emar.rounds.templates.retire', $template))
             ->assertRedirect()
-            ->assertSessionHas('success', 'Round template retired. Existing rounds were retained.');
+            ->assertSessionHas('medication_settings_saved', 'Template retired. No new rounds are created from it; past rounds keep it on their record.');
 
         $retired = $template->fresh();
         $this->assertNotNull($retired);
