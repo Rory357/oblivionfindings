@@ -113,7 +113,8 @@ class WorkerMedsController extends Controller
         $windowStart = $now->copy()->subHours(2);
         $windowEnd = $now->copy()->addHours(8);
         $medsDue = array_values(array_filter($schedule, function (array $row) use ($windowStart, $windowEnd) {
-            if ($row['recorded'] !== null) {
+            // Recorded, or waiting for the order check (can't be recorded yet).
+            if ($row['recorded'] !== null || $row['status'] === 'pending_check') {
                 return false;
             }
             $scheduled = Carbon::parse($row['scheduled_for']);
@@ -652,15 +653,16 @@ class WorkerMedsController extends Controller
         }
 
         // A medication lead with no shift today still gets a useful board, but
-        // only for clients at Sites that are currently approved for them.
+        // only for clients at Sites that are currently approved for them —
+        // and only the people they may open (the P02 person rule, C6b).
         try {
-            return ClientMedication::active()
+            return app(MarLinkService::class)->openableClientIds($user, ClientMedication::active()
                 ->whereHas('client', fn ($clients) => $clients->whereIn('site_id', $siteIds))
                 ->pluck('client_id')
                 ->filter()
                 ->unique()
                 ->values()
-                ->all();
+                ->all());
         } catch (\Throwable $e) {
             report($e);
 

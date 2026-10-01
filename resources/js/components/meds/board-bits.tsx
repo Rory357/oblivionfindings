@@ -67,6 +67,12 @@ export const DOSE_STATUS_META: Record<
         tagBg: 'var(--status-critical-bg)',
         tagColor: 'var(--status-critical)',
     },
+    pending_check: {
+        label: 'Waiting for the order check',
+        pillClass: 'border-status-info/30 bg-status-info-bg text-status-info',
+        tagBg: 'var(--status-info-bg)',
+        tagColor: 'var(--status-info)',
+    },
 };
 
 export function StatusPill({

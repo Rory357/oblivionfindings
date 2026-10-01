@@ -15,6 +15,8 @@ use App\Models\MedicationRound;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\Medication\DoseSlots\DoseSlotProjection;
+use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
@@ -118,21 +120,25 @@ class EnhancedMarService
             ->values()
             ->all();
 
-        // Build scheduled rows
+        // Build scheduled rows: the doses each order owes this NZ day and their
+        // state, from the dose-slot projection (C6b, ScheduledDoseStates).
         $scheduledRows = [];
         $prnRows = [];
+        $doses = app(ScheduledDoseStates::class)->dosesOn(
+            $medications->reject(fn (ClientMedication $medication): bool => (bool) $medication->is_prn),
+            $date,
+            $now,
+        );
 
         foreach ($medications as $medication) {
             // Build scheduled doses for non-PRN medications
             if (! $medication->is_prn) {
-                $scheduledTimes = $this->scheduleService->scheduledTimesForDate($medication, $date);
-
-                foreach ($scheduledTimes as $scheduledFor) {
+                foreach ($doses[(int) $medication->id] ?? [] as $dose) {
                     $row = $this->buildScheduledRow(
                         $medication,
-                        $scheduledFor,
+                        $dose,
                         $now,
-                        $date,
+                        $isToday,
                         $client,
                         $activeShiftId,
                         $includeControlled,
@@ -297,15 +303,21 @@ class EnhancedMarService
     /**
      * Build a scheduled medication row
      */
+    /**
+     * @param  array{due_at: Carbon, ordered_time: string, state: string, outcome: string|null, window_opens_at: Carbon, window_ends_at: Carbon, due_soon: bool, order_change_pending: bool}  $dose
+     */
     private function buildScheduledRow(
         ClientMedication $medication,
-        Carbon $scheduledFor,
+        array $dose,
         Carbon $now,
-        Carbon $date,
+        bool $isToday,
         Client $client,
         ?int $activeShiftId,
         bool $includeControlled,
     ): array {
+        // The slot's due time (on the spring-forward day a 02:30 dose is due at 03:00).
+        $scheduledFor = $dose['due_at'];
+
         // Get existing administration for this slot
         [$slotStartUtc, $slotEndUtc] = $this->scheduleService->utcSlotWindow($scheduledFor);
 
@@ -317,8 +329,9 @@ class EnhancedMarService
             ->with(['administeredBy:id,name', 'witnessedBy:id,name'])
             ->first();
 
-        $scheduleState = $this->getScheduleState($scheduledFor, $now, $date->isToday(), $existing);
-        [$windowStart, $windowEnd] = $this->scheduleService->windowForScheduled($scheduledFor);
+        $scheduleState = $this->getScheduleState($dose, $now, $isToday, $existing);
+        // The order's dose window (time-critical overrides included).
+        [$windowStart, $windowEnd] = [$dose['window_opens_at'], $dose['window_ends_at']];
 
         // Perform safety check
         $safetyCheck = $existing
@@ -469,36 +482,34 @@ class EnhancedMarService
     /**
      * Get schedule state
      */
-    private function getScheduleState(Carbon $scheduledFor, Carbon $now, bool $isToday, ?ClientMedicationAdministration $existing): string
+    /**
+     * The MAR row's state, from the dose-slot projection's (C6b) — no
+     * hard-coded minutes: due soon from "shows as due soon"
+     * (DoseTimingSettings), due through the order's window
+     * (DoseWindowResolver, both ends included), late once the window has
+     * ended today; an earlier day's unrecorded dose is missed.
+     *
+     * @param  array{due_at: Carbon, state: string, due_soon: bool}  $dose
+     */
+    private function getScheduleState(array $dose, Carbon $now, bool $isToday, ?ClientMedicationAdministration $existing): string
     {
         if ($existing) {
             return 'completed';
         }
 
         if (! $isToday) {
-            return $scheduledFor->isPast() ? 'missed_auto' : 'future';
+            return $dose['due_at']->lt($now) ? 'missed_auto' : 'future';
         }
 
-        $dueSoonMinutes = 60;
-        $lateAfterMinutes = 30;
-        $missAfterMinutes = 180;
-
-        $diff = $scheduledFor->diffInMinutes($now, false);
-
-        if ($diff < -$dueSoonMinutes) {
-            return 'upcoming';
-        }
-        if ($diff >= -$dueSoonMinutes && $diff < 0) {
-            return 'due_soon';
-        }
-        if ($diff >= 0 && $diff <= $lateAfterMinutes) {
-            return 'due';
-        }
-        if ($diff > $lateAfterMinutes && $diff <= $missAfterMinutes) {
-            return 'late';
-        }
-
-        return 'missed_auto';
+        return match ($dose['state']) {
+            DoseSlotProjection::STATE_DUE => 'due',
+            DoseSlotProjection::STATE_LATE => 'late',
+            DoseSlotProjection::STATE_NOT_RECORDED => 'missed_auto',
+            DoseSlotProjection::STATE_NOT_DUE => $dose['due_soon'] ? 'due_soon' : 'upcoming',
+            // Self-managed, or waiting for the order check (only orders that
+            // can be given are listed here): not chased.
+            default => 'upcoming',
+        };
     }
 
     /**
