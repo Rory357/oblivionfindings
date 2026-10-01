@@ -14,7 +14,8 @@ use LogicException;
  * A slot exists for each dose time of the version in effect at the dose's
  * due instant, on every NZ day from the start date to the end date
  * inclusive (the end date is the order's last day), unless the order is
- * PRN, paused at that instant, or ceased by then.
+ * PRN, paused at that instant, ceased by then, or not yet entered (a dose
+ * due before the order was entered is not owed).
  *
  * - Wall-clock times are New Zealand times. On the day the clocks go
  *   forward, a time in the skipped hour is due at the first minute that
@@ -69,6 +70,7 @@ final class DoseSlotRules
 
                 // Only the version in effect when the dose is due owes it.
                 if ($timeline->versionInEffectAt($dueAt) !== $version
+                    || $timeline->isBeforeEntry($dueAt)
                     || $timeline->isPausedAt($dueAt)
                     || $timeline->isCeasedBy($dueAt)) {
                     continue;

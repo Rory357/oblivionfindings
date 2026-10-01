@@ -349,9 +349,12 @@ class DoseSlotOutcomeWriterTest extends TestCase
 
     // ── Helpers ─────────────────────────────────────────────────────────
 
+    /** Entered on its start date: a dose due before an order's entry is not owed. */
     private function scheduledOrder(array $overrides = []): ClientMedication
     {
-        return ClientMedication::query()->create(array_merge([
+        $now = Carbon::getTestNow();
+        Carbon::setTestNow(Carbon::parse('2026-04-01 00:00:00', 'Pacific/Auckland')->utc());
+        $order = ClientMedication::query()->create(array_merge([
             'client_id' => $this->client->id,
             'name' => 'Morning tablets',
             'dosage' => '1 tablet',
@@ -362,6 +365,9 @@ class DoseSlotOutcomeWriterTest extends TestCase
             'state' => 'active',
             'start_date' => '2026-04-01',
         ], $overrides));
+        Carbon::setTestNow($now);
+
+        return $order;
     }
 
     /** A record written straight to the model, as the recording service does. */

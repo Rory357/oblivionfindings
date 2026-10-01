@@ -232,9 +232,12 @@ class DashboardScheduleCountsTest extends TestCase
         return $this->worker->fresh();
     }
 
+    /** An order entered at the start of today (NZ): doses due before an order's entry are not owed. */
     private function order(string $name, string $doseTime): ClientMedication
     {
-        return ClientMedication::query()->create([
+        $now = Carbon::getTestNow();
+        Carbon::setTestNow(Carbon::now(self::TZ)->startOfDay()->utc());
+        $order = ClientMedication::query()->create([
             'client_id' => $this->client->id,
             'name' => $name,
             'dosage' => '1 tablet',
@@ -244,5 +247,8 @@ class DashboardScheduleCountsTest extends TestCase
             'active' => true,
             'state' => 'active',
         ]);
+        Carbon::setTestNow($now);
+
+        return $order;
     }
 }

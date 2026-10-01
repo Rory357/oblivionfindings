@@ -754,9 +754,13 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
         ];
     }
 
+    /** Entered at the start of today (NZ): doses due before an order's entry are not owed. */
     private function medication(Client $client, string $name, bool $controlled = false): ClientMedication
     {
-        return ClientMedication::factory()->create([
+        $startDate = today()->subDays(2)->toDateString();
+        $now = Carbon::getTestNow();
+        Carbon::setTestNow(Carbon::now('Pacific/Auckland')->startOfDay()->utc());
+        $medication = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'name' => $name,
             'controlled_drug' => $controlled,
@@ -765,9 +769,12 @@ class MedicationGovernanceResidualSurfaceTest extends TestCase
             'approval_status' => 'verified',
             'is_prn' => false,
             'dose_times' => ['09:00'],
-            'start_date' => today()->subDays(2)->toDateString(),
+            'start_date' => $startDate,
             'end_date' => null,
         ]);
+        Carbon::setTestNow($now);
+
+        return $medication;
     }
 
     private function administration(
