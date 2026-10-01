@@ -21,9 +21,15 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * EM-01: the eMAR dashboard counts due/overdue doses from the same schedule
- * as Meds today, on the worker's (NZ) day — never from `pending`
- * administration rows, which production does not write.
+ * EM-01: the eMAR dashboard counts due/overdue doses from the scheduled
+ * dose slots on the worker's (NZ) day — never from `pending` administration
+ * rows, which production does not write.
+ *
+ * C6(a): the dashboard and the /dashboard widget read the dose-slot
+ * projection (P09): overdue = the dose window has ended with nothing
+ * recorded; admin rate = given ÷ doses whose window has ended. Meds today
+ * still builds its own board (time passed = overdue) until it moves onto the
+ * projection, so mid-window the two differ on "overdue".
  */
 class DashboardScheduleCountsTest extends TestCase
 {
@@ -46,13 +52,19 @@ class DashboardScheduleCountsTest extends TestCase
      * 09:00 NZST is 21:00 UTC on the previous calendar day, so a UTC
      * whereDate would read the wrong day. 23:30 is the late-shift check.
      *
-     * @return array<string, array{string, string}>
+     * At 09:00 the 06:00 dose is given and 07:00's window (to 08:00) has
+     * ended unrecorded: 1 overdue. 08:00 (window to 09:00, inclusive) and
+     * 08:30 are inside their windows: due now, not overdue. Admin rate =
+     * 1 given of the 2 doses whose window has ended. By 23:30 every window
+     * has ended: 3 overdue, 1 of 4 given.
+     *
+     * @return array<string, array{string, string, int, int, float}>
      */
     public static function workerClockTimes(): array
     {
         return [
-            'morning 09:00 NZ (previous UTC day)' => ['2026-06-15 09:00:00', '9:00 AM'],
-            'late 23:30 NZ' => ['2026-06-15 23:30:00', '11:30 PM'],
+            'morning 09:00 NZ (previous UTC day)' => ['2026-06-15 09:00:00', '9:00 AM', 1, 2, 50.0],
+            'late 23:30 NZ' => ['2026-06-15 23:30:00', '11:30 PM', 3, 4, 25.0],
         ];
     }
 
@@ -60,6 +72,9 @@ class DashboardScheduleCountsTest extends TestCase
     public function test_three_unrecorded_past_slots_show_as_three_on_the_dashboard_and_meds_today(
         string $localNow,
         string $nowLabel,
+        int $overdue,
+        int $due,
+        float $adminRate,
     ): void {
         Carbon::setTestNow(Carbon::parse($localNow, self::TZ)->utc());
         $this->seedOneClientOnShift();
@@ -87,22 +102,23 @@ class DashboardScheduleCountsTest extends TestCase
                 ->where('nowLabel', $nowLabel)
                 ->where('stats.totalToday', 4)
                 ->where('stats.givenToday', 1)
-                ->where('stats.overdue', 3)
+                ->where('stats.overdue', $overdue)
                 ->where('stats.dueNow', 3)
                 ->where('stats.pendingToday', 3)
-                ->where('stats.eligibleToday', 4)
-                // 1 given ÷ 4 eligible — JSON round-trips 25.0 as 25.
-                ->where('stats.adminRate', 25)
+                ->where('stats.eligibleToday', $due)
+                ->where('stats.adminRate', fn ($rate) => (float) $rate === $adminRate)
                 ->where('clientBoard', fn ($board) => collect($board)->count() === 1
-                    && collect($board)->first()['overdue'] === 3
+                    && collect($board)->first()['overdue'] === $overdue
                     && collect($board)->first()['given'] === 1
                     && collect($board)->first()['done'] === 1
                     && collect($board)->first()['total'] === 4
                     && collect($board)->first()['status'] === 'attention')
                 ->where('actionCentre', fn ($items) => collect($items)
                     ->where('type', 'overdue_dose')
-                    ->count() === 3));
+                    ->count() === $overdue));
 
+        // Meds today's own board (until it moves onto the projection): every
+        // unrecorded dose whose time has passed is "overdue".
         $this->actingAs($this->worker)
             ->get('/meds/today')
             ->assertOk()
@@ -112,14 +128,14 @@ class DashboardScheduleCountsTest extends TestCase
                     && collect($rows)->where('status', 'overdue')->count() === 3
                     && collect($rows)->where('status', 'given')->count() === 1));
 
-        // NF-25: the home /dashboard eMAR widget shows the same numbers.
+        // NF-25: the home /dashboard eMAR widget shows the dashboard's numbers.
         $this->actingAs($this->asManager())
             ->get('/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('emarWidgets.dueNow', 3)
-                ->where('emarWidgets.overdue', 3)
-                ->where('emarWidgets.adminRate', 25));
+                ->where('emarWidgets.overdue', $overdue)
+                ->where('emarWidgets.adminRate', fn ($rate) => (float) $rate === $adminRate));
     }
 
     public function test_admin_rate_is_not_applicable_before_any_dose_is_due(): void
