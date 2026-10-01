@@ -119,7 +119,7 @@ export function TicketAdvancedFilters({
                     <SlidersHorizontal className="h-3.5 w-3.5" />
                     More filters
                     {activeCount > 0 ? (
-                        <span className="rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground tabular-nums">
+                        <span className="rounded-full bg-primary-fill px-1.5 text-[11px] font-bold text-primary-fill-foreground tabular-nums">
                             {activeCount}
                         </span>
                     ) : null}

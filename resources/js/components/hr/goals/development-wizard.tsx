@@ -75,7 +75,7 @@ function LevelPicker({
                     className={cn(
                         'h-9 w-9 rounded-lg border text-sm font-bold transition-colors',
                         value === n
-                            ? 'border-primary bg-primary text-primary-foreground'
+                            ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                             : 'border-border bg-card text-foreground hover:border-primary/50',
                     )}
                 >

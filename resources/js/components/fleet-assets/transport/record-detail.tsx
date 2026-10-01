@@ -153,7 +153,7 @@ export function TransportRecordContent({
                                 <b
                                     className={
                                         index <= journeyStep
-                                            ? 'bg-primary text-primary-foreground'
+                                            ? 'bg-primary-fill text-primary-fill-foreground'
                                             : ''
                                     }
                                 >

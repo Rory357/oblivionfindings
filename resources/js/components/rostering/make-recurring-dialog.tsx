@@ -124,7 +124,7 @@ export function MakeRecurringDialog({
                                         className={cn(
                                             'rounded-full border px-3 py-1 text-xs font-medium',
                                             on
-                                                ? 'border-primary bg-primary text-primary-foreground'
+                                                ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                 : 'border-border bg-background text-foreground hover:bg-accent',
                                         )}
                                     >

@@ -130,7 +130,7 @@ export default function ReferenceQuestionnaire({
                                                         'h-10 w-10 rounded-lg border text-sm font-bold transition-colors',
                                                         answers[q.key] ===
                                                             String(n)
-                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                            ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                             : 'border-border bg-card hover:border-primary/50',
                                                     )}
                                                 >

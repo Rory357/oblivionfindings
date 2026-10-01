@@ -958,7 +958,7 @@ export default function PortalMessages({
                                                                     'audio',
                                                                 ) && (
                                                                     <div
-                                                                        className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 ${isMe ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+                                                                        className={`inline-flex items-center gap-2 rounded-2xl px-3 py-2 ${isMe ? 'bg-primary-fill text-primary-fill-foreground' : 'bg-muted'}`}
                                                                     >
                                                                         <Mic className="h-4 w-4 shrink-0" />
                                                                         {msg
@@ -1020,7 +1020,7 @@ export default function PortalMessages({
                                                                             : msg.content;
                                                                     return (
                                                                         <div
-                                                                            className={`inline-block rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${isMe ? 'bg-primary text-primary-foreground' : 'bg-muted'} ${msg.is_pinned ? 'ring-2 ring-status-warning' : ''}`}
+                                                                            className={`inline-block rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${isMe ? 'bg-primary-fill text-primary-fill-foreground' : 'bg-muted'} ${msg.is_pinned ? 'ring-2 ring-status-warning' : ''}`}
                                                                         >
                                                                             {msg.is_pinned && (
                                                                                 <Pin className="mr-1 inline h-3 w-3 opacity-60" />

@@ -302,7 +302,7 @@ export function RequestAccessDialog({
                                     type="button"
                                     aria-pressed={duration === d}
                                     onClick={() => setDuration(d)}
-                                    className={`rounded-full px-3 py-1 text-xs font-medium ${duration === d ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:bg-muted'}`}
+                                    className={`rounded-full px-3 py-1 text-xs font-medium ${duration === d ? 'bg-primary-fill text-primary-fill-foreground' : 'border border-border text-muted-foreground hover:bg-muted'}`}
                                 >
                                     {fmtDur(d)}
                                 </button>

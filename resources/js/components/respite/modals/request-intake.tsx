@@ -393,7 +393,7 @@ function Segmented<T extends string>({
                                     ? 'border-transparent bg-status-critical text-white'
                                     : o.tone === 'warning'
                                       ? 'border-transparent bg-status-warning text-white'
-                                      : 'border-transparent bg-primary text-primary-foreground'
+                                      : 'border-transparent bg-primary-fill text-primary-fill-foreground'
                                 : 'border-border bg-card text-muted-foreground hover:bg-muted',
                         )}
                     >

@@ -315,7 +315,7 @@ function ReactionBar({
                         onClick={submit}
                         disabled={posting || !replyBody.trim()}
                         className={cn(
-                            'inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground',
+                            'inline-flex h-9 items-center gap-1.5 rounded-md bg-primary-fill px-3 text-sm font-semibold text-primary-fill-foreground',
                             (posting || !replyBody.trim()) &&
                                 'cursor-not-allowed opacity-50',
                         )}
@@ -609,7 +609,7 @@ export function AnnouncementCard({
                                         <button
                                             type="button"
                                             onClick={acknowledge}
-                                            className="rounded-md bg-primary px-3.5 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                                            className="rounded-md bg-primary-fill px-3.5 py-1.5 text-sm font-semibold text-primary-fill-foreground hover:opacity-90"
                                         >
                                             Acknowledge
                                         </button>

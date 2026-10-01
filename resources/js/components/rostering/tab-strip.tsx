@@ -26,7 +26,7 @@ export type RosterTabItem = {
 
 const TONE_ACTIVE: Record<RosterTabTone, string> = {
     primary:
-        'bg-primary/10 text-primary [&_.chip]:bg-primary [&_.chip]:text-primary-foreground [&_.underline-bar]:bg-primary',
+        'bg-primary/10 text-primary [&_.chip]:bg-primary-fill [&_.chip]:text-primary-fill-foreground [&_.underline-bar]:bg-primary',
     warning:
         'bg-status-warning-bg text-status-warning [&_.chip]:bg-status-warning [&_.chip]:text-white [&_.underline-bar]:bg-status-warning',
     success:
@@ -37,7 +37,7 @@ const TONE_ACTIVE: Record<RosterTabTone, string> = {
     // in app.css), so a "violet" accent is brand purple by design — not a clashing
     // hue. Kept as a named tone so callers read semantically; it uses the same
     // tokens as `primary` (no raw colour literals).
-    violet: 'bg-primary/10 text-primary [&_.chip]:bg-primary [&_.chip]:text-primary-foreground [&_.underline-bar]:bg-primary',
+    violet: 'bg-primary/10 text-primary [&_.chip]:bg-primary-fill [&_.chip]:text-primary-fill-foreground [&_.underline-bar]:bg-primary',
     critical:
         'bg-status-critical-bg text-status-critical [&_.chip]:bg-status-critical [&_.chip]:text-white [&_.underline-bar]:bg-status-critical',
 };

@@ -227,7 +227,7 @@ export function SecurityDevicesWorkspaceTabs({
                                             ? 'border-primary-foreground bg-primary-foreground text-primary-strong shadow-sm'
                                             : 'border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground/80 hover:bg-primary-foreground/20 hover:text-primary-foreground'
                                         : active
-                                          ? 'border-primary bg-primary text-primary-foreground'
+                                          ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                           : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
                                 }`}
                             >

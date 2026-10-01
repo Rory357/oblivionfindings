@@ -185,7 +185,7 @@ export function TicketSavedFilters({
                                 onClick={() => onApply(savedFilter.id)}
                                 className={
                                     activeId === savedFilter.id
-                                        ? 'rounded-l-full bg-primary px-3 py-1 text-[12px] font-semibold text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
+                                        ? 'rounded-l-full bg-primary-fill px-3 py-1 text-[12px] font-semibold text-primary-fill-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
                                         : 'rounded-l-full px-3 py-1 text-[12px] font-medium text-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
                                 }
                             >

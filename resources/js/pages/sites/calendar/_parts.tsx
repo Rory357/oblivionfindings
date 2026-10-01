@@ -242,7 +242,7 @@ export function MiniMonth({
                     const isToday = sameDay(d, today);
                     const isSelected = sameDay(d, selected);
                     const tone = isSelected
-                        ? 'bg-primary font-semibold text-primary-foreground'
+                        ? 'bg-primary-fill font-semibold text-primary-fill-foreground'
                         : isToday
                           ? 'font-semibold text-primary ring-1 ring-primary/40 hover:bg-muted'
                           : inMonth
@@ -1647,7 +1647,7 @@ export function MonthView({
                                     )}
                                     <div className="mb-1 flex items-center justify-between px-0.5">
                                         <span
-                                            className={`tnum inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] font-semibold ${isToday ? 'bg-primary text-primary-foreground shadow-sm' : inMonth ? 'text-foreground' : 'text-muted-foreground/60'}`}
+                                            className={`tnum inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] font-semibold ${isToday ? 'bg-primary-fill text-primary-fill-foreground shadow-sm' : inMonth ? 'text-foreground' : 'text-muted-foreground/60'}`}
                                         >
                                             {d.getDate()}
                                         </span>
@@ -1739,7 +1739,7 @@ export function WeekView({
                                 {WD[d.getDay()]}
                             </span>
                             <span
-                                className={`tnum flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-semibold ${isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'}`}
+                                className={`tnum flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-semibold ${isToday ? 'bg-primary-fill text-primary-fill-foreground' : 'text-foreground'}`}
                             >
                                 {d.getDate()}
                             </span>
@@ -2085,7 +2085,7 @@ export function TimelineView({
                                         {WD[d.getDay()][0]}
                                     </span>
                                     <span
-                                        className={`tnum flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'}`}
+                                        className={`tnum flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${isToday ? 'bg-primary-fill text-primary-fill-foreground' : 'text-foreground'}`}
                                     >
                                         {d.getDate()}
                                     </span>

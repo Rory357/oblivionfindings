@@ -131,7 +131,7 @@ export function Toolbar({
                                 className={cn(
                                     'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold transition-colors',
                                     view === v.id
-                                        ? 'bg-primary text-primary-foreground'
+                                        ? 'bg-primary-fill text-primary-fill-foreground'
                                         : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                                 )}
                             >

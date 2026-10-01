@@ -202,7 +202,7 @@ export function JobCard({
             )}
         >
             {isStrongMatch ? (
-                <div className="absolute top-0 left-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full bg-primary px-2.5 py-[3px] text-[10.5px] font-bold tracking-wide text-primary-foreground uppercase shadow-[0_6px_14px_-6px_color-mix(in_oklch,var(--primary)_55%,transparent)]">
+                <div className="absolute top-0 left-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full bg-primary-fill px-2.5 py-[3px] text-[10.5px] font-bold tracking-wide text-primary-fill-foreground uppercase shadow-[0_6px_14px_-6px_color-mix(in_oklch,var(--primary)_55%,transparent)]">
                     <Sparkles className="h-2.5 w-2.5" strokeWidth={2.5} />
                     Strong match
                 </div>

@@ -1253,7 +1253,7 @@ function CommandBar({
                     <button
                         type="button"
                         onClick={() => b.openWiz(newKey)}
-                        className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground shadow-sm"
+                        className="inline-flex items-center gap-2 rounded-[10px] bg-primary-fill px-3.5 py-2 text-[13px] font-semibold text-primary-fill-foreground shadow-sm"
                     >
                         <Plus className="h-[15px] w-[15px]" />
                         {newLabel}
@@ -1877,7 +1877,7 @@ function CompetenciesBody(b: BodyProps) {
                         <button
                             type="button"
                             onClick={() => b.openWiz('assess')}
-                            className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground shadow-sm"
+                            className="inline-flex items-center gap-2 rounded-[10px] bg-primary-fill px-3.5 py-2 text-[13px] font-semibold text-primary-fill-foreground shadow-sm"
                         >
                             <Plus className="h-[15px] w-[15px]" />
                             Assess
@@ -1894,7 +1894,7 @@ function CompetenciesBody(b: BodyProps) {
                         className={cn(
                             'rounded-lg px-3.5 py-1.5 text-[13px] font-semibold',
                             b.compSub === k
-                                ? 'bg-primary text-primary-foreground'
+                                ? 'bg-primary-fill text-primary-fill-foreground'
                                 : 'text-muted-foreground',
                         )}
                     >
@@ -2123,7 +2123,7 @@ function SuccessionBody(b: BodyProps) {
                         <button
                             type="button"
                             onClick={b.openSuccession}
-                            className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground shadow-sm"
+                            className="inline-flex items-center gap-2 rounded-[10px] bg-primary-fill px-3.5 py-2 text-[13px] font-semibold text-primary-fill-foreground shadow-sm"
                         >
                             <Plus className="h-[15px] w-[15px]" />
                             New plan

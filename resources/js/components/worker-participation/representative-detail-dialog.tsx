@@ -522,7 +522,7 @@ function OverviewSection({
             {/* Person header */}
             {/* eslint-disable-next-line no-restricted-syntax -- bespoke avatar + name + status-pill banner, not a plain Card body */}
             <div className="flex items-center gap-3 rounded-xl border border-border bg-card/70 p-4 sm:col-span-2">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-base font-semibold text-primary-foreground">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary-fill text-base font-semibold text-primary-fill-foreground">
                     {initials(name)}
                 </span>
                 <div className="min-w-0">

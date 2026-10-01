@@ -435,7 +435,7 @@ function DayCell({
                     className={cn(
                         'inline-flex h-6 w-6 items-center justify-center rounded-lg text-[13px] font-semibold',
                         isToday &&
-                            'bg-primary font-bold text-primary-foreground',
+                            'bg-primary-fill font-bold text-primary-fill-foreground',
                         !inMonth && !isToday && 'text-muted-foreground/50',
                     )}
                 >
@@ -468,7 +468,7 @@ function DayCell({
                                 e.stopPropagation();
                                 onQuickAdd(key);
                             }}
-                            className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-[7px] bg-accent text-primary opacity-0 transition-all group-hover/cell:opacity-100 hover:bg-primary hover:text-primary-foreground focus-visible:opacity-100"
+                            className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-[7px] bg-accent text-primary opacity-0 transition-all group-hover/cell:opacity-100 hover:bg-primary-fill hover:text-primary-fill-foreground focus-visible:opacity-100"
                         >
                             <Plus className="h-[13px] w-[13px]" />
                         </button>
@@ -884,7 +884,7 @@ function MiniCalendar({
                                 y === today.getFullYear() &&
                                     'text-primary shadow-[inset_0_0_0_1.5px_var(--primary)]',
                                 y === vm.getFullYear() &&
-                                    'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground',
+                                    'bg-primary-fill text-primary-fill-foreground hover:bg-primary-fill hover:text-primary-fill-foreground',
                             )}
                         >
                             {y}
@@ -923,7 +923,7 @@ function MiniCalendar({
                                         k === todayKey &&
                                             'text-primary shadow-[inset_0_0_0_1.5px_var(--primary)]',
                                         sel &&
-                                            'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground',
+                                            'bg-primary-fill text-primary-fill-foreground hover:bg-primary-fill hover:text-primary-fill-foreground',
                                     )}
                                 >
                                     {date.getDate()}

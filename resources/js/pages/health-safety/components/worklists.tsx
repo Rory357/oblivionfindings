@@ -174,7 +174,7 @@ function titleCase(value?: string | null): string {
 }
 
 const AVATAR_TONES = [
-    'bg-primary text-primary-foreground',
+    'bg-primary-fill text-primary-fill-foreground',
     'bg-status-info text-white',
     'bg-status-success text-white',
     'bg-status-warning text-white',

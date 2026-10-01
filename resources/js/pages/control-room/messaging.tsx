@@ -590,7 +590,7 @@ export default function ControlRoomMessaging({ threads, staff, can }: Props) {
                                                                 className={`max-w-[70%] rounded-lg px-4 py-2 ${
                                                                     msg.direction ===
                                                                     'outbound'
-                                                                        ? 'bg-primary text-primary-foreground'
+                                                                        ? 'bg-primary-fill text-primary-fill-foreground'
                                                                         : 'bg-muted'
                                                                 }`}
                                                             >

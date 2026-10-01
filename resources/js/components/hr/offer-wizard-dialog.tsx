@@ -209,7 +209,7 @@ export function OfferWizardDialog({
                             onClick={submit}
                             disabled={!canSubmit || form.processing}
                             className={cn(
-                                'rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity',
+                                'rounded-md bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground transition-opacity',
                                 (!canSubmit || form.processing) &&
                                     'cursor-not-allowed opacity-50',
                             )}
@@ -220,7 +220,7 @@ export function OfferWizardDialog({
                         <button
                             type="button"
                             onClick={wizard.next}
-                            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+                            className="rounded-md bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground"
                         >
                             Continue
                         </button>
@@ -606,7 +606,7 @@ export function OfferRespondDialog({
                         <button
                             type="submit"
                             disabled={form.processing}
-                            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                            className="rounded-md bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground disabled:opacity-50"
                         >
                             {form.processing ? 'Saving…' : 'Record response'}
                         </button>

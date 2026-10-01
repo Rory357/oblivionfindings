@@ -181,7 +181,7 @@ export function EntityCard({
                             className={cn(
                                 'mt-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[7px] border transition-colors',
                                 selected
-                                    ? 'border-primary bg-primary text-primary-foreground'
+                                    ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                     : 'border-input bg-card text-transparent',
                             )}
                         >

@@ -358,7 +358,7 @@ export function ProcedureWizardDialog({
                 type="button"
                 onClick={() => submit(false)}
                 disabled={form.processing}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-sm font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90 disabled:opacity-60"
             >
                 <FilePlus2 className="h-4 w-4" />{' '}
                 {isEdit ? 'Save changes' : 'Create procedure'}
@@ -378,7 +378,7 @@ export function ProcedureWizardDialog({
                 unstyled
                 type="button"
                 onClick={next}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-sm font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
             >
                 Continue <ChevronRight className="h-4 w-4" />
             </GuardrailButton>
@@ -451,7 +451,7 @@ export function ProcedureWizardDialog({
                                             close();
                                             onOpenProcedure(id);
                                         }}
-                                        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                                        className="rounded-lg bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                                     >
                                         Open procedure
                                     </GuardrailButton>
@@ -460,7 +460,7 @@ export function ProcedureWizardDialog({
                                         unstyled
                                         type="button"
                                         onClick={close}
-                                        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                                        className="rounded-lg bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                                     >
                                         Done
                                     </GuardrailButton>

@@ -151,7 +151,7 @@ export function FamilyChatPopup({
                 onMouseDown={(e) => e.stopPropagation()}
             >
                 {/* header */}
-                <div className="flex items-center gap-3 bg-primary px-3 py-2.5 text-primary-foreground">
+                <div className="flex items-center gap-3 bg-primary-fill px-3 py-2.5 text-primary-fill-foreground">
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-foreground/15">
                         <Users className="h-5 w-5" />
                     </span>
@@ -212,7 +212,7 @@ export function FamilyChatPopup({
                                     className={cn(
                                         'max-w-[78%] px-3 py-2 text-[13.5px] leading-snug shadow-sm',
                                         m.mine
-                                            ? 'rounded-[12px_12px_3px_12px] bg-primary text-primary-foreground'
+                                            ? 'rounded-[12px_12px_3px_12px] bg-primary-fill text-primary-fill-foreground'
                                             : 'rounded-[12px_12px_12px_3px] border border-border bg-card',
                                     )}
                                 >

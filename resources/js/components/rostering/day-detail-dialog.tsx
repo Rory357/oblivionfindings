@@ -589,7 +589,7 @@ export function DayDetailDialog({
                                     className={cn(
                                         'flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
                                         isActive &&
-                                            'bg-primary text-primary-foreground',
+                                            'bg-primary-fill text-primary-fill-foreground',
                                     )}
                                     style={
                                         isActive
@@ -616,7 +616,7 @@ export function DayDetailDialog({
                                     className={cn(
                                         'shrink-0 self-center rounded-full px-1.5 py-px text-[10.5px] font-bold tabular-nums',
                                         isActive
-                                            ? 'bg-primary text-primary-foreground'
+                                            ? 'bg-primary-fill text-primary-fill-foreground'
                                             : 'bg-muted text-muted-foreground',
                                     )}
                                 >

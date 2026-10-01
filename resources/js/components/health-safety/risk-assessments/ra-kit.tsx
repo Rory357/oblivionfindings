@@ -37,7 +37,7 @@ export const RA_TONE_CHIP: Record<RaTone, string> = {
 
 export const RA_TONE_SOLID: Record<RaTone, string> = {
     success: 'bg-status-success text-white',
-    info: 'bg-primary text-primary-foreground',
+    info: 'bg-primary-fill text-primary-fill-foreground',
     warning: 'bg-status-warning text-white',
     critical: 'bg-status-critical text-white',
     neutral: 'bg-muted-foreground text-white',

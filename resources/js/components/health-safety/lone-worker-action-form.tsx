@@ -240,7 +240,7 @@ export function LoneWorkerActionForm({
     const ctaClass =
         meta.tone === 'critical'
             ? 'bg-status-critical text-white hover:bg-status-critical/90'
-            : 'bg-primary text-primary-foreground hover:bg-primary/90';
+            : 'bg-primary-fill text-primary-fill-foreground hover:bg-primary-fill/90';
 
     return (
         <div className="flex flex-col gap-5">

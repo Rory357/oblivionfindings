@@ -796,7 +796,7 @@ export default function CreateTimesheetDialog({
                                     className={cn(
                                         'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-semibold transition',
                                         mode === 'shift'
-                                            ? 'bg-primary text-primary-foreground shadow-sm'
+                                            ? 'bg-primary-fill text-primary-fill-foreground shadow-sm'
                                             : 'text-foreground/70 hover:bg-muted',
                                     )}
                                     aria-pressed={mode === 'shift'}
@@ -813,7 +813,7 @@ export default function CreateTimesheetDialog({
                                     className={cn(
                                         'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-semibold transition',
                                         mode === 'manual'
-                                            ? 'bg-primary text-primary-foreground shadow-sm'
+                                            ? 'bg-primary-fill text-primary-fill-foreground shadow-sm'
                                             : 'text-foreground/70 hover:bg-muted',
                                     )}
                                     aria-pressed={mode === 'manual'}
@@ -953,7 +953,7 @@ export default function CreateTimesheetDialog({
                                                         className={cn(
                                                             'mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg',
                                                             active
-                                                                ? 'bg-primary text-primary-foreground'
+                                                                ? 'bg-primary-fill text-primary-fill-foreground'
                                                                 : 'bg-muted text-foreground/60',
                                                         )}
                                                     >
@@ -1410,7 +1410,7 @@ export default function CreateTimesheetDialog({
                                                     key={idx}
                                                     className="flex items-center gap-2 rounded-lg border border-border bg-card p-2"
                                                 >
-                                                    <span className="grid h-5 w-5 place-items-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                                                    <span className="grid h-5 w-5 place-items-center rounded-full bg-primary-fill text-[10px] font-semibold text-primary-fill-foreground">
                                                         {idx + 1}
                                                     </span>
                                                     <span className="min-w-0 flex-1 truncate text-[12.5px]">
@@ -1473,7 +1473,7 @@ export default function CreateTimesheetDialog({
                                                 }
                                             }}
                                             disabled={!newActivityItem.trim()}
-                                            className="grid h-9 w-9 place-items-center rounded-md bg-primary text-primary-foreground disabled:opacity-40"
+                                            className="grid h-9 w-9 place-items-center rounded-md bg-primary-fill text-primary-fill-foreground disabled:opacity-40"
                                             aria-label="Add activity item"
                                         >
                                             <Plus className="h-3.5 w-3.5" />

@@ -128,7 +128,7 @@ export function buildShiftHeroWorkflowNote(
 
 const tabToneClasses: Record<ShiftShowTabTone, string> = {
     primary:
-        'bg-primary/10 text-primary [&_.shift-tab-chip]:bg-primary [&_.shift-tab-chip]:text-primary-foreground [&_.shift-tab-bar]:bg-primary',
+        'bg-primary/10 text-primary [&_.shift-tab-chip]:bg-primary-fill [&_.shift-tab-chip]:text-primary-fill-foreground [&_.shift-tab-bar]:bg-primary',
     warning:
         'bg-status-warning-bg text-status-warning [&_.shift-tab-chip]:bg-status-warning [&_.shift-tab-chip]:text-white [&_.shift-tab-bar]:bg-status-warning',
     success:

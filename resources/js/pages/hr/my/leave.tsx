@@ -284,7 +284,7 @@ export default function MyLeave({
                     <button
                         type="button"
                         onClick={openNew}
-                        className="ml-auto inline-flex items-center gap-1.5 rounded-[10px] bg-primary px-4 py-2.5 text-[13px] font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+                        className="ml-auto inline-flex items-center gap-1.5 rounded-[10px] bg-primary-fill px-4 py-2.5 text-[13px] font-bold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
                     >
                         <Plus className="h-4 w-4" />
                         Request leave

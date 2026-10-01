@@ -98,7 +98,7 @@ export function TextPromptDialog({
                         type="button"
                         onClick={submit}
                         disabled={!canSubmit}
-                        className="h-9 rounded-md bg-primary px-4 text-[13px] font-bold text-primary-foreground disabled:opacity-50"
+                        className="h-9 rounded-md bg-primary-fill px-4 text-[13px] font-bold text-primary-fill-foreground disabled:opacity-50"
                     >
                         {submitLabel}
                     </button>

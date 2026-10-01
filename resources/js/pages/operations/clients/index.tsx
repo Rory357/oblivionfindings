@@ -327,7 +327,7 @@ function BulkBar({
     return (
         <div className="fixed bottom-5 left-1/2 z-40 flex max-w-[calc(100vw-40px)] -translate-x-1/2 animate-in flex-wrap items-center gap-1.5 rounded-2xl border border-border bg-popover py-2 pr-2.5 pl-4 shadow-xl duration-200 fade-in slide-in-from-bottom-2">
             <span className="inline-flex items-center gap-2 text-sm font-semibold whitespace-nowrap">
-                <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground tabular-nums">
+                <span className="rounded-full bg-primary-fill px-2 py-0.5 text-xs text-primary-fill-foreground tabular-nums">
                     {count}
                 </span>
                 selected

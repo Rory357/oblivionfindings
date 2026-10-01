@@ -262,7 +262,7 @@ export function DayPickerChip({
                                                   className={cn(
                                                       'grid h-8 place-items-center rounded-md text-[13px] tabular-nums transition-colors',
                                                       isSelected
-                                                          ? 'bg-primary font-bold text-primary-foreground'
+                                                          ? 'bg-primary-fill font-bold text-primary-fill-foreground'
                                                           : 'hover:bg-accent',
                                                       !isSelected &&
                                                           isPast &&

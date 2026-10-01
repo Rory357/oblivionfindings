@@ -63,7 +63,7 @@ function UnreadBadge({
             className={cn(
                 'absolute -top-1 -right-1 inline-flex min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] leading-[18px] font-bold shadow-sm',
                 variant === 'primary'
-                    ? 'bg-primary text-primary-foreground'
+                    ? 'bg-primary-fill text-primary-fill-foreground'
                     : 'bg-status-critical text-white',
             )}
         >

@@ -282,7 +282,7 @@ function MultiSelectBadges({
                         className={`h-7 rounded-full px-2.5 text-xs ${
                             isSelected
                                 ? (customColor ??
-                                  'border-primary bg-primary text-primary-foreground')
+                                  'border-primary-fill bg-primary-fill text-primary-fill-foreground')
                                 : 'border-border bg-background text-muted-foreground hover:bg-muted'
                         }`}
                     >
@@ -554,7 +554,7 @@ function SlaFormDialog({
                                                         formData.business_hours_days.includes(
                                                             day,
                                                         )
-                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                            ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                             : 'border-border bg-background text-muted-foreground hover:bg-muted'
                                                     }`}
                                                 >

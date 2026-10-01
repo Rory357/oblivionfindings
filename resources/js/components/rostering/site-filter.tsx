@@ -76,7 +76,7 @@ export function SiteFilter({
         : cn(
               'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent',
               !allSelected &&
-                  'border-primary bg-primary text-primary-foreground',
+                  'border-primary-fill bg-primary-fill text-primary-fill-foreground',
           );
 
     return (
@@ -144,7 +144,7 @@ export function SiteFilter({
                                     className={cn(
                                         'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
                                         allSelected
-                                            ? 'border-primary bg-primary text-primary-foreground'
+                                            ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                             : 'border-input bg-background',
                                     )}
                                     aria-hidden="true"
@@ -184,7 +184,7 @@ export function SiteFilter({
                                                     className={cn(
                                                         'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
                                                         checked
-                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                            ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                             : 'border-input bg-background',
                                                     )}
                                                     aria-hidden="true"

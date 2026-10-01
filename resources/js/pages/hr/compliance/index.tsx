@@ -648,7 +648,7 @@ function Checkbox({
             onClick={onChange}
             aria-checked={checked}
             role="checkbox"
-            className={`grid h-[18px] w-[18px] place-items-center rounded-[5px] border-[1.5px] ${checked ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}
+            className={`grid h-[18px] w-[18px] place-items-center rounded-[5px] border-[1.5px] ${checked ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground' : 'border-border'}`}
         >
             {checked ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
         </GuardrailButton>

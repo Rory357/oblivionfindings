@@ -966,7 +966,7 @@ function HistorySection({ detail }: { detail: ProcedureDetail }) {
         <ol className="relative ml-1 flex flex-col gap-4 border-l border-border pl-5">
             {detail.versions.map((v) => (
                 <li key={v.id} className="relative">
-                    <span className="absolute -left-[26px] grid h-4 w-4 place-items-center rounded-full bg-primary text-primary-foreground ring-4 ring-background">
+                    <span className="absolute -left-[26px] grid h-4 w-4 place-items-center rounded-full bg-primary-fill text-primary-fill-foreground ring-4 ring-background">
                         <span className="text-[8px] font-bold">
                             {v.version}
                         </span>

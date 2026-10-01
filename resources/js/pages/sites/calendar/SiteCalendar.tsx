@@ -1178,7 +1178,7 @@ export default function SiteCalendar({
                             tabIndex={view === v.key ? 0 : -1}
                             onClick={() => setView(v.key)}
                             onKeyDown={onViewTabsKey}
-                            className={`inline-flex h-7 items-center gap-1.5 rounded px-2 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${view === v.key ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            className={`inline-flex h-7 items-center gap-1.5 rounded px-2 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${view === v.key ? 'bg-primary-fill text-primary-fill-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                         >
                             <v.icon
                                 aria-hidden="true"
@@ -1504,7 +1504,7 @@ export default function SiteCalendar({
                                         unstyled
                                         key={c}
                                         onClick={() => setColorBy(c)}
-                                        className={`rounded-md px-2 py-1.5 text-[12px] font-medium capitalize transition-colors ${colorBy === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
+                                        className={`rounded-md px-2 py-1.5 text-[12px] font-medium capitalize transition-colors ${colorBy === c ? 'bg-primary-fill text-primary-fill-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
                                     >
                                         {c}
                                     </Button>
@@ -1523,7 +1523,7 @@ export default function SiteCalendar({
                                         unstyled
                                         key={d}
                                         onClick={() => setDensity(d)}
-                                        className={`rounded-md px-2 py-1.5 text-[12px] font-medium capitalize transition-colors ${density === d ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
+                                        className={`rounded-md px-2 py-1.5 text-[12px] font-medium capitalize transition-colors ${density === d ? 'bg-primary-fill text-primary-fill-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
                                     >
                                         {d}
                                     </Button>
@@ -2009,7 +2009,7 @@ function HouseSelector({
                         className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${currentId === 'all' ? 'bg-primary/10' : 'hover:bg-accent/60'}`}
                     >
                         <span
-                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${currentId === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${currentId === 'all' ? 'bg-primary-fill text-primary-fill-foreground' : 'bg-muted text-muted-foreground'}`}
                         >
                             <LayoutGrid className="h-4 w-4" />
                         </span>
@@ -2036,7 +2036,7 @@ function HouseSelector({
                                 className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${active ? 'bg-primary/10' : 'hover:bg-accent/60'}`}
                             >
                                 <span
-                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-primary-fill text-primary-fill-foreground' : 'bg-muted text-muted-foreground'}`}
                                 >
                                     <Home className="h-4 w-4" />
                                 </span>

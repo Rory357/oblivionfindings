@@ -98,7 +98,7 @@ export function AppHeader({
     return (
         <>
             {auth.impersonating && (
-                <div className="flex items-center justify-between gap-2 bg-primary px-6 py-2 text-sm font-medium text-primary-foreground md:px-4">
+                <div className="flex items-center justify-between gap-2 bg-primary-fill px-6 py-2 text-sm font-medium text-primary-fill-foreground md:px-4">
                     <div className="flex items-center gap-2">
                         <ShieldAlert className="h-4 w-4 shrink-0" />
                         <span>
@@ -206,7 +206,7 @@ export function AppHeader({
                         >
                             <MessageSquareText className="size-5" />
                             {unreadMessages > 0 && (
-                                <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-none font-bold text-primary-foreground shadow-sm">
+                                <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary-fill px-1 text-[10px] leading-none font-bold text-primary-fill-foreground shadow-sm">
                                     {unreadMessages > 99
                                         ? '99+'
                                         : unreadMessages}

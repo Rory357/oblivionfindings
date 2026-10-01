@@ -872,7 +872,7 @@ function HistoryFilters({
             <div className="flex items-end gap-2">
                 <button
                     type="submit"
-                    className="frontline-focus min-h-11 flex-1 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+                    className="frontline-focus min-h-11 flex-1 rounded-lg bg-primary-fill px-4 text-sm font-semibold text-primary-fill-foreground"
                 >
                     Apply filters
                 </button>

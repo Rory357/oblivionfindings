@@ -334,7 +334,7 @@ export function OpenShiftsPane({
                                                         : isWarning
                                                           ? 'border-status-warning bg-status-warning-bg text-foreground hover:bg-status-warning-bg/80'
                                                           : isBest
-                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                            ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                             : 'border-border bg-background text-foreground hover:bg-accent',
                                                 )}
                                             >

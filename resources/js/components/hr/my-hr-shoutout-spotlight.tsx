@@ -557,7 +557,7 @@ export function MyHrShoutoutSpotlight({
                             type="button"
                             onClick={sendDraft}
                             disabled={!draft.trim()}
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-primary px-4 py-2 text-[12px] font-bold text-primary-foreground disabled:opacity-50"
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-primary-fill px-4 py-2 text-[12px] font-bold text-primary-fill-foreground disabled:opacity-50"
                         >
                             <Send className="h-3.5 w-3.5" /> Send
                         </button>
