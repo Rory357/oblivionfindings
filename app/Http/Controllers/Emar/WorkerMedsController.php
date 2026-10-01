@@ -19,6 +19,7 @@ use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\CompetencyAcknowledgement;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
@@ -163,6 +164,8 @@ class WorkerMedsController extends Controller
             'not_given_reasons' => $this->boardPayload->notGivenReasons(),
             'shift_label' => $this->shiftLabel($user, $date, $timezone),
             'board_user' => $this->boardPayload->boardUser($user),
+            // P11 Acknowledge: the worker's own assessment waiting for them.
+            'pending_assessment' => app(CompetencyAcknowledgement::class)->pendingFor($user),
             'board_can' => [
                 'view_emar' => $user->canDo('medications.view'),
                 'view_audit' => $user->canDo('medications.audit.view'),

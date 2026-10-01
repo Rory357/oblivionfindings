@@ -5744,9 +5744,15 @@ class EmarController extends Controller
 
             if ($locked->staff_acknowledged_at === null) {
                 $locked->forceFill(['staff_acknowledged_at' => now()])->save();
+                AuditLogger::logOrFail('medications.competency.acknowledged', $locked, [
+                    'actor_id' => (int) $actor->id,
+                    'assessment_id' => (int) $locked->id,
+                    'assessor_id' => (int) $locked->assessor_id,
+                ]);
             }
 
-            return redirect()->back();
+            return redirect()->back()->with('success', 'Assessment acknowledged. You can record doses as given until '
+                .($locked->expiry_date?->format('j M Y') ?? 'its end date').'.');
         });
     }
 

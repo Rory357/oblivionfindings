@@ -53,6 +53,7 @@ import {
     DOSE_STATUS_META,
     StatusPill,
 } from '@/components/meds/board-bits';
+import { PendingAssessmentNotice } from '@/components/meds/pending-assessment';
 import { PageHero } from '@/components/page/page-hero';
 import type { PageHeroBadge } from '@/components/page/page-hero-badges';
 import type { PageHeroStat } from '@/components/page/page-hero-stats';
@@ -1775,6 +1776,10 @@ export default function MedsToday(props: MedsTodayProps) {
                         </>
                     }
                     footer={heroFooter}
+                />
+
+                <PendingAssessmentNotice
+                    assessment={props.pending_assessment}
                 />
 
                 {firstOverdue ? (
