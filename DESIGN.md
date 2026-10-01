@@ -34,7 +34,7 @@ lucide-react icons, Recharts.
    respect the global reduced-motion block; ≥44 px tap targets on frontline
    surfaces (`.frontline-tap`, or `.frontline-hit` where a compact control
    must keep its drawn size — row kebabs, pagination, tier-2 tabs, the
-   dialog ✕).
+   `Dialog` and `WizardShell` ✕).
 6. **Safety colours are brand-independent.** Allergen/conflict/emergency
    surfaces use fixed `status-critical`/`status-warning` pairs, never
    brand-derived tints — an admin's brand hue must not be able to push a

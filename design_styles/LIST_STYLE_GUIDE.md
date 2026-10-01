@@ -128,7 +128,12 @@ per page.
    `components/lists/entity-menu.tsx` (`EntityKebab`,
    `EntityContextMenu`, `useEntityContextMenu`, `compactMenu`) — do
    not fork it, and verify every existing menu item survives each
-   migration.
+   migration. An action that is blocked for this record right now sets
+   `MenuItem.disabled` to the reason (e.g. "You are not on shift at this
+   house"): it stays listed in both menus, aria-disabled with the reason
+   as a muted second line, focusable so a screen reader announces it, and
+   inert to click and Enter/Space. Actions with no backend are still left
+   out, not disabled.
 3. Sites (2026-09-06) and the clients index (2026-09-07) are
    migrated; migrate every other listable next. Tracked as DESIGN.md
    conformance probe 18.

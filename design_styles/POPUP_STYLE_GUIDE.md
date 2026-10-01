@@ -46,10 +46,17 @@ already compose it.
 
 Anatomy (all provided by the shell — you supply content only):
 
-- **Stepper rail** (248px, hidden below `sm`): entity icon tile, `railTitle` /
-  `railSub` ("Add site" / "New location"), one button per step with icon,
-  label, and one-line `blurb` ("Type, name & lead"). Completed steps show a
-  green check; the active step is primary-tinted. Clickable via `onStepClick`.
+- **Stepper rail** (248px column from a 1024 CSS px viewport): entity icon
+  tile, `railTitle` / `railSub` ("Add site" / "New location"), one button per
+  step with icon, label, and one-line `blurb` ("Type, name & lead"). Completed
+  steps show a green check; the active step is primary-tinted and carries
+  `aria-current="step"`. Clickable via `onStepClick`. Below 1024 CSS px (200 %
+  zoom on a 1440 px screen is 720) the shell collapses the rail into a one-line
+  top stepper so the body keeps its width: icon tile + title, 44 px step
+  buttons with only the current step's label visible (the others keep label +
+  blurb as their accessible name), the completeness percentage, and
+  `railExtra` moved to the end of the body. Don't hide or rebuild the rail per
+  dialog.
 - **Completeness meter** (`pct` + `pctLabel`) pinned to the rail's bottom —
   compute it from the fields worth filling in, not just required ones.
 - **Header**: "Step x of y · Label" (automatic) and the close button. Detail
