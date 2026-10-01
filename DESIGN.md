@@ -116,9 +116,13 @@ Implemented (2026-09-06, meter-row revision included) as **one
 / `.eh-meter` utilities in `app.css`; reference migration
 `pages/sites/index.tsx`. The sky is **always the branding colour's
 own ramp** (approved 2026-09-06): whatever colour Settings → Branding
-sets, a dark shade of `--primary` at the top fades into the actual
-`--primary` at the bottom (relative-colour oklch keeps the hue) —
-never a neutral/ink top, never a hand-picked palette.
+sets, a dark shade of `--primary` at the top fades into the brand, no
+lighter than L 0.46, at the bottom (relative-colour oklch keeps the hue;
+the floor keeps the rail's tab labels at 4.5:1 for every hue — amended
+2026-10-02) — never a neutral/ink top, never a hand-picked palette.
+Settings → Branding warns, without blocking, when a chosen colour still
+can't keep header text at 4.5:1 (very light brands) and offers a darker
+shade.
 
 This supersedes the `PageHero` banner system
 (`components/page/page-hero.tsx`), the Governance Hero Guide, the
