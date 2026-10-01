@@ -165,8 +165,10 @@ class ControlledMedicineConcealmentTest extends TestCase
         $actor = User::factory()->create();
         $site = Site::factory()->create(['name' => 'Kōwhai House']);
         $client = Client::factory()->create(['site_id' => $site->id, 'suppress_med_admin_alerts' => false]);
-        // A dose slot earlier today (the overdue check reads today's slots).
-        $overdueSlot = now()->subHour()->isSameDay(now()) ? now()->subHour() : now()->startOfDay();
+        // A dose an hour ago on the New Zealand clock. Dose times are NZ wall
+        // times; this fixture used the UTC wall time, which only raised the
+        // overdue alert while the check misread dose times as UTC (EM-02).
+        $overdueSlot = now(config('app.worker_timezone', 'Pacific/Auckland'))->subHour();
         $controlled = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'name' => 'Morphine sulfate',
