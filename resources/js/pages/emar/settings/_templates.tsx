@@ -90,6 +90,8 @@ export type RoundTemplate = {
     can_change: boolean;
 };
 export type TemplateAccess = {
+    /** Can read the templates at their houses (medications.view, or more). */
+    read: boolean;
     manage: boolean;
     all_houses: boolean;
     /** Houses where this person can add a template. */

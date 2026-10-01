@@ -334,9 +334,12 @@ class MedicationSettingsController extends Controller
         $readOnlyAudit = ! $canManage && (bool) $actor?->canDo('medications.audit.view');
         $canView = $canManage || $readOnlyAudit;
         // P11 F1: whoever manages round templates at a house (orders.manage)
-        // reaches Rounds & timing › Round templates, and only that.
+        // reaches Rounds & timing › Round templates, and only that. Q2: anyone
+        // who could read templates on Meds today › Rounds (medications.view)
+        // still can, read-only.
         $canTemplates = $actor !== null && $this->roundTemplates->canManageAny($actor);
-        abort_unless($canView || $canResetPins || $canTemplates, 403);
+        $canReadTemplates = $canTemplates || (bool) $actor?->canDo('medications.view');
+        abort_unless($canView || $canResetPins || $canReadTemplates, 403);
 
         $canManageGlobal = $this->canManageGlobalRules($actor);
         $siteIds = $canView ? $this->accessibleSiteIds($actor) : [];
@@ -361,10 +364,12 @@ class MedicationSettingsController extends Controller
         ];
         $witnessPin = [
             'can_reset' => $canResetPins,
-            'staff' => $this->witnessPinStaffRows($actor, $canResetPins),
+            // PIN status is for settings readers and PIN resetters only, not
+            // for people here just for round templates.
+            'staff' => $canView || $canResetPins ? $this->witnessPinStaffRows($actor, $canResetPins) : [],
         ];
 
-        $roundTemplates = $this->roundTemplatePayload($actor, $canTemplates);
+        $roundTemplates = $this->roundTemplatePayload($actor, $canTemplates, $canView || $canReadTemplates);
 
         // House leads can reset staff PINs and manage their houses' round
         // templates without managing medication rules: they see only those.
@@ -479,13 +484,14 @@ class MedicationSettingsController extends Controller
      *
      * @return array{roundTemplates: list<array<string, mixed>>, templateAccess: array<string, mixed>, templateStaff: list<array<string, mixed>>}
      */
-    private function roundTemplatePayload(User $actor, bool $canTemplates): array
+    private function roundTemplatePayload(User $actor, bool $canTemplates, bool $canRead): array
     {
         $manageable = $canTemplates ? $this->roundTemplates->manageableSiteIds($actor) : [];
 
         return [
-            'roundTemplates' => $this->roundTemplates->rows($actor),
+            'roundTemplates' => $canRead ? $this->roundTemplates->rows($actor) : [],
             'templateAccess' => [
+                'read' => $canRead,
                 'manage' => $canTemplates,
                 'all_houses' => $canTemplates && $this->roundTemplates->hasAllHouses($actor),
                 'sites' => Site::query()

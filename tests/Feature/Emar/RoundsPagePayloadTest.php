@@ -262,7 +262,8 @@ class RoundsPagePayloadTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->missing('templates')
                 ->missing('staff')
-                ->where('can_manage', true));
+                ->where('can_manage', true)
+                ->where('can_read_templates', true));
         $this->assertStringNotContainsString('Local template', $response->getContent());
     }
 

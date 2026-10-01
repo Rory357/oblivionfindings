@@ -3501,6 +3501,8 @@ class EmarController extends Controller
             'not_given_reasons' => $this->boardPayload->notGivenReasons(),
             'board_user' => $this->boardPayload->boardUser($user),
             'can_manage' => $canManageRounds,
+            // Round templates are read and changed in Settings › Rounds & timing (P11).
+            'can_read_templates' => $canReadRounds,
             'can_export' => (bool) ($user?->canDo('medications.reports.export') || $user?->canDo('reports.viewAny')),
         ]);
     }
