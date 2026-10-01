@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    BRAND_CONTRAST_TARGET,
     BRAND_PRESETS,
+    brandContrastChecks,
+    brandContrastReport,
     contrastRatio,
     derivePalette,
+    hexToOklch,
     INK_FOREGROUND,
     pickForeground,
     relativeLuminance,
@@ -90,6 +94,57 @@ describe('skyForeground — text on the brand sky', () => {
     it('only switches to ink for very light brands', () => {
         expect(skyForeground('#facc15')).toBe(INK_FOREGROUND);
         expect(skyForeground('#ffffff')).toBe(INK_FOREGROUND);
+    });
+});
+
+describe('brandContrastReport — Settings → Branding guidance', () => {
+    const minRatio = (hex: string) =>
+        Math.min(...brandContrastChecks(hex).map((c) => c.ratio));
+
+    it.each([
+        ...Object.values(BRAND_PRESETS).map((p) => p.hex),
+        // Settings → Branding theme presets.
+        '#7c3aed',
+        '#2563eb',
+        '#059669',
+        '#f43f5e',
+    ])('keeps shipped preset %s readable in the header', (hex) => {
+        expect(brandContrastReport(hex).passes).toBe(true);
+    });
+
+    it('passes a dark brand without a suggestion', () => {
+        const report = brandContrastReport(BRAND_PRESETS['high-contrast'].hex);
+        expect(report.passes).toBe(true);
+        expect(report.suggestion).toBeNull();
+    });
+
+    it('flags a very light brand on the sky title, description and white button', () => {
+        const byId = Object.fromEntries(
+            brandContrastChecks('#facc15').map((c) => [c.id, c.ratio]),
+        );
+        expect(byId.title).toBeLessThan(BRAND_CONTRAST_TARGET);
+        expect(byId.subline).toBeLessThan(BRAND_CONTRAST_TARGET);
+        expect(byId.heroButton).toBeLessThan(BRAND_CONTRAST_TARGET);
+    });
+
+    it.each(['#facc15', '#ffffff', '#ea580c', '#0891b2', '#059669', '#0ea5e9'])(
+        'suggests a darker shade of %s that passes every check',
+        (hex) => {
+            const { passes, suggestion } = brandContrastReport(hex);
+            if (passes) return;
+            expect(suggestion).not.toBeNull();
+            expect(minRatio(suggestion!)).toBeGreaterThanOrEqual(
+                BRAND_CONTRAST_TARGET,
+            );
+            expect(hexToOklch(suggestion!)[0]).toBeLessThan(hexToOklch(hex)[0]);
+        },
+    );
+
+    it('round-trips hex through oklch', () => {
+        const [L, C, h] = hexToOklch('#7c3aed');
+        expect(L).toBeCloseTo(0.541, 2);
+        expect(C).toBeCloseTo(0.247, 2);
+        expect(h).toBeCloseTo(293, 0);
     });
 });
 
