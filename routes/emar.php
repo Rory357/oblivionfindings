@@ -273,9 +273,10 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // ─── Facility Medication Admin Rules (1CHART §6.1 — countersign / observation prompts) ───
     // House leads with the PIN reset permission reach the settings page for the
-    // second-person confirmation section only (PIN-1).
+    // second-person confirmation section only (PIN-1); auditors read every
+    // setting and its change history, read-only (P11 answer 6).
     Route::get('/settings', [MedicationSettingsController::class, 'index'])
-        ->middleware('permission:medications.settings.manage|medications.witness_pin.reset')
+        ->middleware('permission:medications.settings.manage|medications.witness_pin.reset|medications.audit.view')
         ->name('emar.settings');
     Route::post('/settings/witness-pins/{user}/reset', [MedicationSettingsController::class, 'resetWitnessPin'])
         ->middleware('permission:medications.witness_pin.reset')
@@ -284,10 +285,11 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::post('/settings/rules', [MedicationSettingsController::class, 'store'])->name('emar.settings.rules.store');
         Route::put('/settings/rules/{rule}', [MedicationSettingsController::class, 'update'])->name('emar.settings.rules.update');
         Route::delete('/settings/rules/{rule}', [MedicationSettingsController::class, 'destroy'])->name('emar.settings.rules.destroy');
-        // Organisation-wide safety rules (EM-07 profile allergies, NF-03 competency).
-        Route::put('/settings/safety-policy', [MedicationSettingsController::class, 'updateSafetyPolicy'])->name('emar.settings.safety_policy.update');
-        // Witness PIN rules (PIN-1): attempt limit, lockout, renewal.
-        Route::put('/settings/witness-pin-rules', [MedicationSettingsController::class, 'updateWitnessPinRules'])->name('emar.settings.witness_pin_rules.update');
+        // P11: save one Settings view's draft (safety checks, witness PIN rules, …),
+        // and "Keep today's value" for defaults nobody has reviewed. Both are
+        // recorded in the change history and the audit log.
+        Route::put('/settings/changes', [MedicationSettingsController::class, 'saveChanges'])->name('emar.settings.changes.save');
+        Route::post('/settings/keep', [MedicationSettingsController::class, 'keepDefaults'])->name('emar.settings.keep');
     });
 
     // ─── End CRUD Routes ────────────────────────────────────

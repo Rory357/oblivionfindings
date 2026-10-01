@@ -351,6 +351,9 @@ class HandleInertiaRequests extends Middleware
                 'created_alert_id' => session('created_alert_id'),
                 // Sensor triage confirm flashes the incident it created.
                 'confirmed_incident_id' => session('confirmed_incident_id'),
+                // Medication Settings shows its own in-page status message after a
+                // save or "Keep today's value" (Fleet Settings pattern), not a toast.
+                'medication_settings_saved' => session('medication_settings_saved'),
                 // The quick-flag dialog reads these so its success pane can show
                 // the CR-/INC- chips and open either record.
                 'flagged_incident_id' => session('flagged_incident_id'),

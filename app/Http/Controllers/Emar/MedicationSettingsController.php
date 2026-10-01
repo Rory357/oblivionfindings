@@ -8,11 +8,11 @@ use App\Http\Controllers\Controller;
 use App\Models\MedicationAdminRule;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\AuditLogger;
 use App\Services\Medication\MedicationGovernanceScopeService;
-use App\Services\Medication\MedicationSafetyPolicySettings;
+use App\Services\Medication\Settings\MedicationSettingDefinition;
+use App\Services\Medication\Settings\MedicationSettingsRegistry;
+use App\Services\Medication\Settings\MedicationSettingsStore;
 use App\Services\Medication\WitnessPinService;
-use App\Services\Medication\WitnessPinSettings;
 use App\Services\MedicationRuleService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,16 +20,21 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 /**
- * Facility medication administration rules (1CHART §6.1).
+ * Medication › Settings (eMAR P11).
  *
- * Lets clinical managers define rules so that any medication whose name / route /
- * NZULM code matches a keyword will, at the point of administration, prompt for a
- * countersignature and/or require a clinical observation (BSL, pulse, BP) — without
- * a code change. Enforcement lives in MedicationRuleService + EnhancedMarService;
- * this controller is the authoring surface the plan (PR 4) was missing.
+ * Settings values (safety checks, witness PIN rules, …) are edited as a draft
+ * and saved a view at a time through "Review changes"; every save and every
+ * "Keep today's value" is recorded in the change history and the audit log
+ * (MedicationSettingsStore).
+ *
+ * Facility medication administration rules (1CHART §6.1) let clinical
+ * managers require a countersignature and/or a clinical observation (BSL,
+ * pulse, BP) whenever a medicine's name / route / NZULM code matches — without
+ * a code change. Enforcement lives in MedicationRuleService + EnhancedMarService.
  */
 class MedicationSettingsController extends Controller
 {
@@ -37,17 +42,10 @@ class MedicationSettingsController extends Controller
         private readonly UserSiteAccessService $siteAccess,
         private readonly MedicationRuleService $ruleService,
         private readonly PeopleMutationLockService $peopleLocks,
-        private readonly MedicationSafetyPolicySettings $safetyPolicy,
-        private readonly WitnessPinSettings $witnessPinSettings,
         private readonly WitnessPinService $witnessPins,
+        private readonly MedicationSettingsRegistry $settingsRegistry,
+        private readonly MedicationSettingsStore $settingsStore,
     ) {}
-
-    /** Request field → app_settings key for the witness PIN rules (PIN-1). */
-    private const WITNESS_PIN_FIELDS = [
-        'max_attempts' => WitnessPinSettings::MAX_ATTEMPTS,
-        'lockout_minutes' => WitnessPinSettings::LOCKOUT_MINUTES,
-        'renewal_months' => WitnessPinSettings::RENEWAL_MONTHS,
-    ];
 
     private const WITNESS_PIN_STAFF_LIMIT = 500;
 
@@ -59,37 +57,150 @@ class MedicationSettingsController extends Controller
     ];
 
     /**
-     * Witness PIN rules apply at every Site: organisation-wide eMAR settings
-     * managers only, audited, like the safety rules.
+     * Save one Settings view's draft. Organisation settings need eMAR settings
+     * management with all-Sites authority; a house setting needs authority
+     * over that house. Each change names the saved value it was edited from,
+     * so a change someone else saved meanwhile is never overwritten.
      */
-    public function updateWitnessPinRules(Request $request)
+    public function saveChanges(Request $request)
     {
         $actor = $request->user();
-        abort_unless($this->canManageSettings($actor) && $this->canManageGlobalRules($actor), 403);
+        abort_unless($this->canManageSettings($actor), 403);
 
-        $validated = $request->validate(collect(self::WITNESS_PIN_FIELDS)
-            ->mapWithKeys(fn (string $key, string $field) => [
-                $field => ['required', 'string', Rule::in(WitnessPinSettings::OPTIONS[$key])],
-            ])
-            ->all());
+        $validated = $request->validate([
+            'view' => ['required', 'string', Rule::in($this->settingsRegistry->views())],
+            'changes' => ['required', 'array', 'min:1', 'max:200'],
+            'changes.*.group' => ['required', 'string', 'max:40'],
+            'changes.*.key' => ['required', 'string', 'max:80'],
+            'changes.*.site_id' => ['nullable', 'integer'],
+            'changes.*.value' => ['present', 'nullable', 'string', 'max:255'],
+            'changes.*.from' => ['present', 'nullable', 'string', 'max:255'],
+            'confirm_loosening' => ['sometimes', 'boolean'],
+        ]);
 
-        DB::transaction(function () use ($actor, $validated): void {
+        $changes = $this->resolveSettings($validated['changes'], 'changes', $validated['view']);
+        foreach ($changes as $index => $change) {
+            if (! $change['definition']->accepts($change['value'])) {
+                throw ValidationException::withMessages([
+                    "changes.{$index}.value" => 'Choose one of the listed values for “'.$change['definition']->label.'”.',
+                ]);
+            }
+        }
+        $this->assertSettingsAuthority($actor, $changes);
+
+        $result = DB::transaction(function () use ($actor, $changes, $validated): array {
             $lockedActor = $this->lockCurrentRuleActor($actor);
-            abort_unless($this->canManageGlobalRules($lockedActor), 403);
+            $this->assertCurrentSettingsAuthority($lockedActor, $changes);
 
-            $before = $this->witnessPinSettings->all();
-            $this->witnessPinSettings->save(collect(self::WITNESS_PIN_FIELDS)
-                ->mapWithKeys(fn (string $key, string $field) => [$key => $validated[$field]])
-                ->all());
-
-            AuditLogger::logOrFail('medications.witness_pin_rules.updated', null, [
-                'actor_id' => $lockedActor->id,
-                'before' => $this->witnessPinRequestValues($before),
-                'after' => $this->witnessPinRequestValues($this->witnessPinSettings->all()),
-            ]);
+            return $this->settingsStore->apply($lockedActor, $changes, (bool) ($validated['confirm_loosening'] ?? false));
         }, 3);
 
-        return redirect()->back()->with('success', 'Witness PIN rules saved.');
+        $message = $result['saved'] === 0
+            ? 'Nothing was saved — these settings already had those values.'
+            : sprintf('%d %s saved. %s.', $result['saved'], $result['saved'] === 1 ? 'change' : 'changes', $result['effect']);
+
+        return redirect()->back()->with('medication_settings_saved', $message);
+    }
+
+    /**
+     * "Keep today's value": confirm defaults nobody has reviewed, one at a
+     * time or from the "Review the defaults" walkthrough. Nothing about how
+     * doses are recorded changes; each is recorded and audited.
+     */
+    public function keepDefaults(Request $request)
+    {
+        $actor = $request->user();
+        abort_unless($this->canManageSettings($actor), 403);
+
+        $validated = $request->validate([
+            'items' => ['required', 'array', 'min:1', 'max:200'],
+            'items.*.group' => ['required', 'string', 'max:40'],
+            'items.*.key' => ['required', 'string', 'max:80'],
+            'items.*.site_id' => ['nullable', 'integer'],
+        ]);
+
+        $items = $this->resolveSettings($validated['items'], 'items');
+        $this->assertSettingsAuthority($actor, $items);
+
+        $kept = DB::transaction(function () use ($actor, $items): int {
+            $lockedActor = $this->lockCurrentRuleActor($actor);
+            $this->assertCurrentSettingsAuthority($lockedActor, $items);
+
+            return $this->settingsStore->keep($lockedActor, $items);
+        }, 3);
+
+        $message = $kept === 1
+            ? 'Kept today’s value for “'.$items[0]['definition']->label.'”. It now shows as reviewed.'
+            : $kept.' values kept. They now show as reviewed, and each is in the change history.';
+
+        return redirect()->back()->with('medication_settings_saved', $message);
+    }
+
+    /**
+     * Match each requested setting to its definition: it must exist, belong to
+     * the view being saved, name a house only when it is a house setting, and
+     * appear once.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array{definition: MedicationSettingDefinition, site_id: int|null, value: string, from: string}>
+     */
+    private function resolveSettings(array $rows, string $field, ?string $view = null): array
+    {
+        $seen = [];
+        $resolved = [];
+        foreach (array_values($rows) as $index => $row) {
+            $definition = $this->settingsRegistry->definition((string) $row['group'], (string) $row['key']);
+            $siteId = isset($row['site_id']) ? (int) $row['site_id'] : null;
+            $group = $definition ? $this->settingsRegistry->group($definition->group) : null;
+            if (! $definition
+                || ($view !== null && $group?->view !== $view)
+                || $definition->isSiteScoped() !== ($siteId !== null)) {
+                throw ValidationException::withMessages([
+                    "{$field}.{$index}.key" => 'This setting can’t be changed here.',
+                ]);
+            }
+            $slot = $definition->id().'@'.($siteId ?? 'org');
+            if (isset($seen[$slot])) {
+                throw ValidationException::withMessages([
+                    "{$field}.{$index}.key" => '“'.$definition->label.'” is listed twice.',
+                ]);
+            }
+            $seen[$slot] = true;
+            $resolved[] = [
+                'definition' => $definition,
+                'site_id' => $siteId,
+                'value' => (string) ($row['value'] ?? ''),
+                'from' => (string) ($row['from'] ?? ''),
+            ];
+        }
+
+        return $resolved;
+    }
+
+    /** @param  list<array{definition: MedicationSettingDefinition, site_id: int|null}>  $items */
+    private function assertSettingsAuthority(User $actor, array $items): void
+    {
+        if (collect($items)->contains(fn (array $item): bool => ! $item['definition']->isSiteScoped())) {
+            abort_unless($this->canManageGlobalRules($actor), 403);
+        }
+    }
+
+    /**
+     * Re-check authority with the actor and the houses locked, inside the save.
+     *
+     * @param  list<array{definition: MedicationSettingDefinition, site_id: int|null}>  $items
+     */
+    private function assertCurrentSettingsAuthority(User $lockedActor, array $items): void
+    {
+        $this->assertSettingsAuthority($lockedActor, $items);
+        $siteIds = collect($items)->pluck('site_id')->filter()->unique()->values()->all();
+        if ($siteIds === []) {
+            return;
+        }
+        $lockedSites = $this->lockCurrentRuleSites($siteIds);
+        foreach ($siteIds as $siteId) {
+            $this->assertCurrentRuleSite($lockedActor, (int) $siteId, $lockedSites, false);
+        }
     }
 
     /**
@@ -191,77 +302,6 @@ class MedicationSettingsController extends Controller
     }
 
     /**
-     * @param  array<string, string|bool>  $values  Keyed by app_settings key.
-     * @return array<string, string|bool> Keyed by request field.
-     */
-    private function witnessPinRequestValues(array $values): array
-    {
-        return collect(self::WITNESS_PIN_FIELDS)
-            ->mapWithKeys(fn (string $key, string $field) => [$field => $values[$key]])
-            ->all();
-    }
-
-    /**
-     * Request field → app_settings key for the organisation-wide safety rules
-     * (EM-07 profile allergies, NF-03 competency). Short request names keep
-     * dotted setting keys out of the validator.
-     */
-    private const SAFETY_POLICY_FIELDS = [
-        'profile_allergy_match' => MedicationSafetyPolicySettings::PROFILE_ALLERGY_MATCH,
-        'restricted_competency' => MedicationSafetyPolicySettings::RESTRICTED_COMPETENCY,
-        'competency_areas' => MedicationSafetyPolicySettings::COMPETENCY_AREAS,
-    ];
-
-    /**
-     * Organisation-wide medication safety rules. They apply to every Site, so
-     * only an eMAR settings manager with organisation-wide authority may
-     * change them; every change is audited.
-     */
-    public function updateSafetyPolicy(Request $request)
-    {
-        $actor = $request->user();
-        abort_unless($this->canManageSettings($actor) && $this->canManageGlobalRules($actor), 403);
-
-        $validated = $request->validate(collect(self::SAFETY_POLICY_FIELDS)
-            ->mapWithKeys(fn (string $key, string $field) => [
-                $field => ['required', 'string', Rule::in(MedicationSafetyPolicySettings::OPTIONS[$key])],
-            ])
-            ->all());
-
-        DB::transaction(function () use ($actor, $validated): void {
-            $lockedActor = $this->lockCurrentRuleActor($actor);
-            abort_unless($this->canManageGlobalRules($lockedActor), 403);
-
-            $before = $this->safetyPolicy->all();
-            $after = collect(self::SAFETY_POLICY_FIELDS)
-                ->mapWithKeys(fn (string $key, string $field) => [$key => $validated[$field]])
-                ->all();
-            $this->safetyPolicy->save($after);
-
-            AuditLogger::logOrFail('medications.safety_policy.updated', null, [
-                'actor_id' => $lockedActor->id,
-                'before' => $this->safetyPolicyRequestValues($before),
-                'after' => $this->safetyPolicyRequestValues($this->safetyPolicy->all()),
-            ]);
-        }, 3);
-
-        return redirect()->back()->with('success', 'Medication safety rules saved.');
-    }
-
-    /**
-     * @template T of string|bool
-     *
-     * @param  array<string, T>  $values  Keyed by app_settings key.
-     * @return array<string, T> Keyed by request field.
-     */
-    private function safetyPolicyRequestValues(array $values): array
-    {
-        return collect(self::SAFETY_POLICY_FIELDS)
-            ->mapWithKeys(fn (string $key, string $field) => [$field => $values[$key]])
-            ->all();
-    }
-
-    /**
      * Observation tokens must match EnhancedMarService::validateRequiredObservations().
      */
     public const OBSERVATION_OPTIONS = [
@@ -280,24 +320,38 @@ class MedicationSettingsController extends Controller
     {
         $actor = $request->user();
         $canResetPins = (bool) $actor?->canDo('medications.witness_pin.reset');
-        abort_unless($this->canManageSettings($actor) || $canResetPins, 403);
+        $canManage = $this->canManageSettings($actor);
+        // P11 answer 6: auditors read Settings and its change history, never change it.
+        $readOnlyAudit = ! $canManage && (bool) $actor?->canDo('medications.audit.view');
+        $canView = $canManage || $readOnlyAudit;
+        abort_unless($canView || $canResetPins, 403);
 
+        $canManageGlobal = $this->canManageGlobalRules($actor);
+        $siteIds = $canView ? $this->accessibleSiteIds($actor) : [];
+        $settings = [
+            ...$this->settingsRegistry->toClient(),
+            'values' => $this->settingsStore->organisationValues(),
+            // null = still the default; nobody has deliberately saved or kept it.
+            'reviewed' => $this->settingsStore->reviewed(),
+            'site_values' => $this->settingsStore->siteValues($siteIds),
+            'site_reviewed' => $this->settingsStore->siteReviewed($siteIds),
+            // Organisation-wide changes, plus changes at the houses this person can see.
+            'history' => $canView ? $this->settingsStore->history($canManageGlobal ? null : $siteIds) : [],
+            'can_manage_organisation' => $canManage && $canManageGlobal,
+        ];
         $witnessPin = [
-            'values' => $this->witnessPinRequestValues($this->witnessPinSettings->all()),
-            // false = still the shipped default, never deliberately saved.
-            'reviewed' => $this->witnessPinRequestValues($this->witnessPinSettings->reviewed()),
-            'can_manage' => $this->canManageSettings($actor) && $this->canManageGlobalRules($actor),
             'can_reset' => $canResetPins,
             'staff' => $this->witnessPinStaffRows($actor, $canResetPins),
         ];
 
         // House leads can reset staff PINs without managing medication rules:
-        // they see only the second-person confirmation section.
-        if (! $this->canManageSettings($actor)) {
+        // they see only Staff & PINs, read-only apart from resets.
+        if (! $canView) {
             return Inertia::render('emar/Settings', [
+                'settings' => $settings,
                 'witnessPin' => $witnessPin,
                 'settingsAccess' => false,
-                'safetyPolicy' => null,
+                'readOnlyAudit' => false,
                 'rules' => [],
                 'sites' => [],
                 'observationOptions' => self::OBSERVATION_OPTIONS,
@@ -306,9 +360,8 @@ class MedicationSettingsController extends Controller
             ]);
         }
 
-        $siteIds = $this->accessibleSiteIds($actor);
-        $canManageGlobal = $this->canManageGlobalRules($actor);
-        $rules = $this->visibleRulesQuery($actor, $siteIds, $canManageGlobal)
+        // Auditors also read the organisation-wide rules; they change nothing.
+        $rules = $this->visibleRulesQuery($actor, $siteIds, $canManageGlobal || $readOnlyAudit)
             ->with(['site:id,name', 'creator:id,name'])
             ->orderByDesc('active')
             ->orderBy('match_type')
@@ -328,14 +381,10 @@ class MedicationSettingsController extends Controller
             ]);
 
         return Inertia::render('emar/Settings', [
+            'settings' => $settings,
             'witnessPin' => $witnessPin,
             'settingsAccess' => true,
-            'safetyPolicy' => [
-                'values' => $this->safetyPolicyRequestValues($this->safetyPolicy->all()),
-                // false = still the default, never deliberately saved.
-                'reviewed' => $this->safetyPolicyRequestValues($this->safetyPolicy->reviewed()),
-                'can_manage' => $canManageGlobal,
-            ],
+            'readOnlyAudit' => $readOnlyAudit,
             'rules' => $rules,
             'sites' => Site::query()
                 ->whereIn('id', $siteIds)
@@ -344,8 +393,8 @@ class MedicationSettingsController extends Controller
             'observationOptions' => self::OBSERVATION_OPTIONS,
             'matchTypes' => self::MATCH_TYPES,
             'can' => [
-                'manage' => $canManageGlobal || $siteIds !== [],
-                'manage_global' => $canManageGlobal,
+                'manage' => $canManage && ($canManageGlobal || $siteIds !== []),
+                'manage_global' => $canManage && $canManageGlobal,
             ],
         ]);
     }

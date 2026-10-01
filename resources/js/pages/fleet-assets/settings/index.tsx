@@ -10,6 +10,7 @@ import {
     PageHeaderRail,
     PageHeaderSearch,
 } from '@/components/page/page-header';
+import { SettingsModal } from '@/components/settings/settings-modal';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -27,7 +28,6 @@ import { Maps } from './_maps';
 import { Notifications, type NotificationSummary } from './_notifications';
 import { ChangeHistory, Setup, Tracking } from './_owners';
 import type { MapSnapshot, NotificationSnapshot, Policy } from './_types';
-import { Modal } from './_ui';
 
 const tabs = [
     { key: 'maps', label: 'Maps', icon: Map },
@@ -374,7 +374,7 @@ export default function SettingsWorkspace({
                 {view === 'setup' && <Setup query={query} />}
                 {view === 'history' && <ChangeHistory query={query} />}
                 {leaving && (
-                    <Modal
+                    <SettingsModal
                         title="Leave with an unsaved draft?"
                         description="Your saved settings will stay unchanged. This browser keeps the draft where storage is available."
                         onClose={() => setLeaving(null)}
@@ -399,7 +399,7 @@ export default function SettingsWorkspace({
                     >
                         Review and save your changes before leaving if you want
                         them applied.
-                    </Modal>
+                    </SettingsModal>
                 )}
             </div>
         </AppLayout>

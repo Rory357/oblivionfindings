@@ -1,558 +1,562 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
+/* Medication › Settings (eMAR P11 v5). The Fleet Settings workspace pattern:
+ * one PageHeader page with a rail of views, Sections (TierTwoTabs) inside each
+ * view, titled groups of Switch rows, drafts that survive moving between tabs
+ * and views, a sticky save bar with "Review … changes", an unsaved-draft
+ * guard, and a change history every save and "Keep today's value" writes. */
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import AppLayout from '@/layouts/app-layout';
+import { formatTime } from '@/lib/datetime';
+import { Sections } from '@/pages/fleet-assets/settings/_ui';
 import { Head, router } from '@inertiajs/react';
 import {
+    Activity,
+    Eye,
+    FileText,
+    HelpCircle,
+    History,
+    Home,
+    KeyRound,
+    Layers,
+    LockKeyhole,
     Pencil,
-    Plus,
-    Settings2,
-    ShieldCheck,
-    Stethoscope,
-    Trash2,
+    Pill,
+    RefreshCw,
+    Repeat,
+    Settings as SettingsIcon,
+    Shield,
+    UserCheck,
+    Users,
+    type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
-import { toast } from 'sonner';
-
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    SafetyPolicyCard,
-    type SafetyPolicyReviewed,
-    type SafetyPolicyValues,
-} from './_safety-policy-card';
-import { WitnessPinCard, type WitnessPinProps } from './_witness-pin-card';
+    SettingsCtx,
+    type Dialog,
+    type SettingsContext,
+} from './settings/_context';
+import { DialogHost } from './settings/_dialogs';
+import {
+    AllChanges,
+    HISTORY_FILTERS,
+    StillToDecide,
+    type HistoryFilters,
+} from './settings/_history';
+import {
+    changes,
+    stillToDecide,
+    type Draft,
+    type SettingsPayload,
+    type ViewKey,
+} from './settings/_model';
+import {
+    parseHash,
+    sectionLabel,
+    SET_VIEWS,
+    settingsHash,
+    visibleSections,
+    visibleViews,
+    type Built,
+} from './settings/_nav';
+import {
+    MedicineRules,
+    PIN_STATUS_OPTIONS,
+    PinStatus,
+    SafetyChecks,
+    WitnessPins,
+    type MedicineRuleProps,
+    type WitnessPinProps,
+} from './settings/_sections';
+import { SaveBar, StatusMessage } from './settings/_ui';
 
-type Option = { value: string; label: string };
-
-type Rule = {
-    id: number;
-    site_id: number | null;
-    site_name: string | null;
-    match_type: string;
-    match_value: string;
-    requires_countersign: boolean;
-    required_observations: string[];
-    active: boolean;
-    created_by: string | null;
-    created_at: string | null;
-};
-
-type Props = {
-    /** PIN-1: organisation witness PIN rules and staff PIN status. */
+type Props = MedicineRuleProps & {
+    settings: SettingsPayload;
     witnessPin: WitnessPinProps;
-    /** false = a house lead who can only reset PINs sees just that section. */
+    /** false = a house lead who can only reset PINs sees Staff & PINs, read-only. */
     settingsAccess: boolean;
-    safetyPolicy: {
-        values: SafetyPolicyValues;
-        reviewed: SafetyPolicyReviewed;
-        can_manage: boolean;
-    } | null;
-    rules: Rule[];
-    sites: { id: number; name: string }[];
-    observationOptions: Option[];
-    matchTypes: Option[];
-    can: { manage: boolean; manage_global: boolean };
+    /** An auditor: every view and the change history, read-only (P11 answer 6). */
+    readOnlyAudit: boolean;
 };
 
-const GLOBAL_SITE = 'global';
+const VIEW_ICON: Record<ViewKey, LucideIcon> = {
+    rules: Pill,
+    rounds: Repeat,
+    staff: UserCheck,
+    alerts: Shield,
+    history: History,
+};
+const SEC_ICON: Record<string, LucideIcon> = {
+    overview: Activity,
+    medicines: Pill,
+    safety: Shield,
+    controlled: LockKeyhole,
+    photos: FileText,
+    pins: KeyRound,
+    status: Users,
+    decide: HelpCircle,
+    changes: History,
+};
+/** Tabs whose settings are saved through the save bar. */
+const SAVED_SECTIONS = ['safety', 'pins'];
+const SHOW_OPTIONS = [
+    { value: 'all', label: 'All settings' },
+    { value: 'open', label: 'Not yet reviewed' },
+    { value: 'changed', label: 'Unsaved changes' },
+];
 
-type FormState = {
-    site_id: string;
-    match_type: string;
-    match_value: string;
-    requires_countersign: boolean;
-    required_observations: string[];
-    active: boolean;
+export type Filters = {
+    show: string;
+    rulesWhere: string;
+    rulesState: string;
+    pinState: string;
+    history: HistoryFilters;
+};
+const F0: Filters = {
+    show: 'all',
+    rulesWhere: 'all',
+    rulesState: 'all',
+    pinState: 'all',
+    history: HISTORY_FILTERS,
 };
 
-function blankForm(
-    matchTypes: Option[],
-    sites: Props['sites'],
-    canManageGlobal: boolean,
-): FormState {
-    return {
-        site_id: canManageGlobal
-            ? GLOBAL_SITE
-            : (sites[0]?.id.toString() ?? ''),
-        match_type: matchTypes[0]?.value ?? 'medicine_name',
-        match_value: '',
-        requires_countersign: true,
-        required_observations: [],
-        active: true,
-    };
-}
+const DirtyDot = () => (
+    <span
+        role="img"
+        aria-label="Unsaved changes"
+        className="size-2 rounded-full bg-status-warning"
+    />
+);
 
-export default function EmarSettings({
-    witnessPin,
-    settingsAccess,
-    safetyPolicy,
-    rules,
-    sites,
-    observationOptions,
-    matchTypes,
-    can,
-}: Props) {
-    const [open, setOpen] = useState(false);
-    const [editing, setEditing] = useState<Rule | null>(null);
-    const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState<FormState>(
-        blankForm(matchTypes, sites, can.manage_global),
+export default function EmarSettings(props: Props) {
+    const { settings: s, witnessPin, settingsAccess, readOnlyAudit } = props;
+    const built: Built = useMemo(
+        () => ({
+            rules: settingsAccess ? ['medicines', 'safety'] : [],
+            staff: ['pins', 'status'],
+            history: settingsAccess ? ['decide', 'changes'] : [],
+        }),
+        [settingsAccess],
+    );
+    const [route, setRoute] = useState(() =>
+        parseHash(window.location.hash, built),
+    );
+    const { view, sec } = route;
+    const [draft, setDraftState] = useState<Draft>({});
+    const [dialog, setDialog] = useState<Dialog | null>(null);
+    const [message, setMessage] = useState<string | null>(null);
+    const [query, setQuery] = useState('');
+    const [f, setF] = useState<Filters>(F0);
+    const [page, setPage] = useState(1);
+    const [loadedAt, setLoadedAt] = useState(() => new Date());
+    const [freshAfter] = useState(() =>
+        Math.max(0, ...s.history.map((h) => h.id)),
+    );
+    const allowLeave = useRef(false);
+    const unsaved = changes(s, draft);
+    const pending = stillToDecide(s);
+
+    const go = useCallback(
+        (nextView: ViewKey, nextSec?: string) => {
+            const next = parseHash(settingsHash(nextView, nextSec), built);
+            setRoute(next);
+            setQuery('');
+            setPage(1);
+            setMessage(null);
+            window.history.replaceState(
+                window.history.state,
+                '',
+                settingsHash(next.view, next.sec),
+            );
+        },
+        [built],
+    );
+    useEffect(() => {
+        const onHash = () => {
+            setRoute(parseHash(window.location.hash, built));
+            setMessage(null);
+        };
+        window.addEventListener('hashchange', onHash);
+        return () => window.removeEventListener('hashchange', onHash);
+    }, [built]);
+
+    // The server says what was saved; show it on the page (Fleet's status
+    // message). A save redirects back without the #view/tab, so put it back.
+    useEffect(
+        () =>
+            router.on('success', (event) => {
+                const saved = (
+                    event.detail.page.props.flash as
+                        | { medication_settings_saved?: string | null }
+                        | undefined
+                )?.medication_settings_saved;
+                if (saved) setMessage(saved);
+                if (!window.location.hash)
+                    window.history.replaceState(
+                        window.history.state,
+                        '',
+                        settingsHash(view, sec),
+                    );
+            }),
+        [view, sec],
     );
 
-    const matchTypeLabel = (value: string) =>
-        matchTypes.find((t) => t.value === value)?.label ?? value;
-    const observationLabel = (value: string) =>
-        observationOptions.find((o) => o.value === value)?.label ?? value;
-
-    function openCreate() {
-        setEditing(null);
-        setForm(blankForm(matchTypes, sites, can.manage_global));
-        setOpen(true);
-    }
-
-    function openEdit(rule: Rule) {
-        setEditing(rule);
-        setForm({
-            site_id: rule.site_id ? rule.site_id.toString() : GLOBAL_SITE,
-            match_type: rule.match_type,
-            match_value: rule.match_value,
-            requires_countersign: rule.requires_countersign,
-            required_observations: rule.required_observations ?? [],
-            active: rule.active,
-        });
-        setOpen(true);
-    }
-
-    function toggleObservation(value: string) {
-        setForm((current) => ({
-            ...current,
-            required_observations: current.required_observations.includes(value)
-                ? current.required_observations.filter((o) => o !== value)
-                : [...current.required_observations, value],
-        }));
-    }
-
-    function submit() {
-        if (!form.match_value.trim()) {
-            toast.error(
-                'Enter a keyword to match (e.g. Warfarin, Intravenous).',
-            );
-            return;
-        }
-        if (
-            !form.requires_countersign &&
-            form.required_observations.length === 0
-        ) {
-            toast.error(
-                'A rule must require a countersignature and/or at least one observation.',
-            );
-            return;
-        }
-
-        const payload = {
-            site_id: form.site_id === GLOBAL_SITE ? null : Number(form.site_id),
-            match_type: form.match_type,
-            match_value: form.match_value.trim(),
-            requires_countersign: form.requires_countersign,
-            required_observations: form.required_observations,
-            active: form.active,
+    // Fleet's leave guard: leaving with an unsaved draft asks first.
+    const dirty = unsaved.length > 0;
+    useEffect(() => {
+        const beforeUnload = (event: BeforeUnloadEvent) => {
+            if (dirty && !allowLeave.current) {
+                event.preventDefault();
+                event.returnValue = '';
+            }
         };
-
-        const options = {
-            preserveScroll: true,
-            onStart: () => setSaving(true),
-            onFinish: () => setSaving(false),
-            onSuccess: () => setOpen(false),
-        };
-
-        if (editing) {
-            router.put(`/emar/settings/rules/${editing.id}`, payload, options);
-        } else {
-            router.post('/emar/settings/rules', payload, options);
-        }
-    }
-
-    function remove(rule: Rule) {
-        if (!window.confirm(`Remove the rule for "${rule.match_value}"?`))
-            return;
-        router.delete(`/emar/settings/rules/${rule.id}`, {
-            preserveScroll: true,
+        window.addEventListener('beforeunload', beforeUnload);
+        const remove = router.on('before', (event) => {
+            if (
+                dirty &&
+                !allowLeave.current &&
+                event.detail.visit.method === 'get' &&
+                !event.detail.visit.only.length
+            ) {
+                event.preventDefault();
+                setDialog({
+                    kind: 'guard',
+                    url: event.detail.visit.url.toString(),
+                });
+            }
         });
-    }
+        return () => {
+            window.removeEventListener('beforeunload', beforeUnload);
+            remove();
+        };
+    }, [dirty]);
+
+    const canEdit = (group: string) =>
+        !!s.groups[group] && s.can_manage_organisation;
+    const ctx: SettingsContext = {
+        s,
+        draft,
+        setDraft: (fn) => setDraftState(fn),
+        canEdit,
+        go,
+        open: setDialog,
+        close: () => setDialog(null),
+        flash: setMessage,
+        freshAfter,
+        leave: (url) => {
+            allowLeave.current = true;
+            setDialog(null);
+            setDraftState({});
+            router.visit(url);
+        },
+    };
+
+    const refresh = () =>
+        router.reload({
+            only: ['settings', 'witnessPin', 'rules'],
+            onSuccess: () => setLoadedAt(new Date()),
+        });
+    const viewGroups = Object.values(s.groups).filter((g) => g.view === view);
+    const editable = viewGroups.some((g) => canEdit(g.key));
+    const accessText = readOnlyAudit
+        ? 'Read-only for audit'
+        : !settingsAccess
+          ? 'Read-only · you can reset witness PINs'
+          : s.can_manage_organisation
+            ? 'All-sites authority · every setting'
+            : `House settings for ${props.sites.map((x) => x.name).join(' and ') || 'no houses'} · organisation rules read-only`;
+    const select = (
+        label: string,
+        value: string,
+        options: { value: string; label: string }[],
+        onChange: (v: string) => void,
+        icon?: LucideIcon,
+        allValue = 'all',
+    ) => (
+        <PageHeaderFilterSelect
+            key={label}
+            icon={icon}
+            label={label}
+            value={value}
+            allValue={allValue}
+            options={options}
+            onChange={(v) => {
+                onChange(v);
+                setPage(1);
+            }}
+        />
+    );
+    const historyWho = [
+        ...new Set(s.history.map((h) => h.who).filter(Boolean)),
+    ] as string[];
+    const historyWhere = [
+        ...new Set(s.history.map((h) => h.site_name ?? 'All houses')),
+    ];
+    const sectionFilters =
+        view === 'rules' && sec === 'medicines' ? (
+            <>
+                {select(
+                    'Where',
+                    f.rulesWhere,
+                    [
+                        { value: 'all', label: 'All rules' },
+                        { value: 'all-houses', label: 'All-houses rules' },
+                        ...props.sites.map((x) => ({
+                            value: String(x.id),
+                            label: `Applies at ${x.name}`,
+                        })),
+                    ],
+                    (v) => setF({ ...f, rulesWhere: v }),
+                    Home,
+                )}
+                {select(
+                    'Status',
+                    f.rulesState,
+                    [
+                        { value: 'all', label: 'Any status' },
+                        { value: 'active', label: 'Active' },
+                        { value: 'paused', label: 'Paused' },
+                    ],
+                    (v) => setF({ ...f, rulesState: v }),
+                )}
+            </>
+        ) : view === 'staff' && sec === 'status' ? (
+            select('PIN status', f.pinState, PIN_STATUS_OPTIONS, (v) =>
+                setF({ ...f, pinState: v }),
+            )
+        ) : view === 'history' && sec === 'changes' ? (
+            <>
+                {select(
+                    'Area',
+                    f.history.area,
+                    [
+                        { value: 'all', label: 'All areas' },
+                        ...visibleViews(built)
+                            .filter((v) => v !== 'history')
+                            .map((v) => ({
+                                value: v,
+                                label: SET_VIEWS[v].label,
+                            })),
+                    ],
+                    (v) => setF({ ...f, history: { ...f.history, area: v } }),
+                    Layers,
+                )}
+                {select(
+                    'Changed by',
+                    f.history.who,
+                    [
+                        { value: 'all', label: 'Anyone' },
+                        ...historyWho.map((w) => ({ value: w, label: w })),
+                    ],
+                    (v) => setF({ ...f, history: { ...f.history, who: v } }),
+                )}
+                {select(
+                    'Where',
+                    f.history.where,
+                    [
+                        { value: 'all', label: 'Anywhere' },
+                        ...historyWhere.map((w) => ({ value: w, label: w })),
+                    ],
+                    (v) => setF({ ...f, history: { ...f.history, where: v } }),
+                    Home,
+                )}
+            </>
+        ) : SAVED_SECTIONS.includes(sec) ? (
+            select('All settings', f.show, SHOW_OPTIONS, (v) =>
+                setF({ ...f, show: v }),
+            )
+        ) : null;
+
+    const header = (
+        <PageHeader
+            className="overflow-clip!"
+            icon={SettingsIcon}
+            title="Settings"
+            titleChip={
+                <PageHeaderStatusChip variant="neutral">
+                    Organisation
+                </PageHeaderStatusChip>
+            }
+            subline="Medication rules and house settings · times in NZDT (Pacific/Auckland)"
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={query}
+                        onChange={setQuery}
+                        placeholder={`Search ${sectionLabel(view, sec).replace(/^[A-Z](?![A-Z])/, (c) => c.toLowerCase())}`}
+                    />
+                    {settingsAccess ? (
+                        <PageHeaderGlassButton
+                            icon={History}
+                            onClick={() => go('history', 'changes')}
+                        >
+                            Changes
+                        </PageHeaderGlassButton>
+                    ) : null}
+                </>
+            }
+            filters={
+                <>
+                    <span className="mr-2 inline-flex items-center gap-1.5 text-[11px] text-primary-foreground/80">
+                        {editable ? (
+                            <Shield className="size-3" />
+                        ) : (
+                            <Eye className="size-3" />
+                        )}
+                        {accessText}
+                    </span>
+                    {sectionFilters}
+                    <PageHeaderFilterButton
+                        icon={RefreshCw}
+                        onClick={refresh}
+                        aria-label={`Updated ${formatTime(loadedAt)} NZDT — refresh`}
+                    >
+                        Updated {formatTime(loadedAt)}
+                    </PageHeaderFilterButton>
+                    {unsaved.length ? (
+                        <PageHeaderFilterButton
+                            active
+                            icon={Pencil}
+                            onClick={() => setDialog({ kind: 'unsaved' })}
+                        >
+                            {unsaved.length} unsaved{' '}
+                            {unsaved.length === 1 ? 'change' : 'changes'}
+                        </PageHeaderFilterButton>
+                    ) : null}
+                </>
+            }
+            rail={
+                <PageHeaderRail
+                    items={visibleViews(built).map((key) => ({
+                        key,
+                        label: SET_VIEWS[key].label,
+                        icon: VIEW_ICON[key],
+                        ...(key === 'history' && pending.length
+                            ? { count: pending.length }
+                            : {}),
+                    }))}
+                    value={view}
+                    onSelect={(k) => go(k)}
+                    ariaLabel="Settings views"
+                    decorations={Object.fromEntries(
+                        visibleViews(built)
+                            .filter((v) => changes(s, draft, v).length)
+                            .map((v) => [v, <DirtyDot key={v} />]),
+                    )}
+                />
+            }
+        />
+    );
+
+    const secChanges = (k: string) =>
+        changes(s, draft, view).filter((c) => c.section === k).length;
+    const tabs = visibleSections(built, view).map(([key, label]) => ({
+        key,
+        label,
+        icon: SEC_ICON[key],
+        ...(key === 'decide' && pending.length
+            ? { count: pending.length }
+            : {}),
+        ...(secChanges(key) ? { warningCount: secChanges(key) } : {}),
+    }));
+    const clearQ = () => setQuery('');
+    const body =
+        view === 'rules' && sec === 'medicines' ? (
+            <MedicineRules
+                {...props}
+                q={query}
+                where={f.rulesWhere}
+                state={f.rulesState}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, rulesWhere: 'all', rulesState: 'all' });
+                }}
+            />
+        ) : view === 'rules' && sec === 'safety' ? (
+            <SafetyChecks
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'staff' && sec === 'pins' ? (
+            <WitnessPins
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'staff' && sec === 'status' ? (
+            <PinStatus
+                witnessPin={witnessPin}
+                q={query}
+                state={f.pinState}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, pinState: 'all' });
+                }}
+            />
+        ) : view === 'history' && sec === 'decide' ? (
+            <StillToDecide q={query} />
+        ) : view === 'history' && sec === 'changes' ? (
+            <AllChanges
+                q={query}
+                clearQ={clearQ}
+                filters={f.history}
+                setFilters={(h) => setF({ ...f, history: h })}
+                page={page}
+                setPage={setPage}
+            />
+        ) : null;
 
     return (
-        <AppLayout>
-            <Head title="eMAR - Administration Rules" />
-            <PageHero
-                icon={Settings2}
-                title="Medication Administration Rules"
-                description="Require a countersignature or a clinical observation (BSL, pulse, blood pressure) when a medication name, route, or NZULM code matches a keyword. Rules apply automatically at the point of administration."
-                backHref="/emar"
-                backLabel="Back to eMAR"
-            />
-            <PageShell>
-                {safetyPolicy ? (
-                    <SafetyPolicyCard
-                        values={safetyPolicy.values}
-                        reviewed={safetyPolicy.reviewed}
-                        canManage={safetyPolicy.can_manage}
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Medication', href: '/emar' },
+                { title: 'Settings', href: '/emar/settings' },
+            ]}
+        >
+            <Head title="Medication settings" />
+            <SettingsCtx.Provider value={ctx}>
+                <div className="space-y-5">
+                    {header}
+                    <Sections
+                        tabs={tabs}
+                        value={sec}
+                        onChange={(k) => go(view, k)}
                     />
-                ) : null}
-                <WitnessPinCard witnessPin={witnessPin} />
-                {settingsAccess ? (
-                    <>
-                        <div className="mb-4 flex items-center justify-between gap-4">
-                            <p className="text-sm text-muted-foreground">
-                                {rules.length} rule
-                                {rules.length === 1 ? '' : 's'} configured
-                            </p>
-                            {can.manage && (
-                                <Button onClick={openCreate} size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add Rule
-                                </Button>
-                            )}
-                        </div>
-
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium">
-                                    Active &amp; inactive rules
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b text-left text-xs font-medium text-muted-foreground">
-                                                <th className="pr-4 pb-2">
-                                                    Match
-                                                </th>
-                                                <th className="pr-4 pb-2">
-                                                    Keyword
-                                                </th>
-                                                <th className="pr-4 pb-2">
-                                                    Scope
-                                                </th>
-                                                <th className="pr-4 pb-2">
-                                                    Requirements
-                                                </th>
-                                                <th className="pr-4 pb-2">
-                                                    Status
-                                                </th>
-                                                {can.manage && (
-                                                    <th className="pb-2 text-right">
-                                                        Actions
-                                                    </th>
-                                                )}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {rules.map((rule) => (
-                                                <tr
-                                                    key={rule.id}
-                                                    className="border-b last:border-0"
-                                                >
-                                                    <td className="py-2.5 pr-4 font-medium">
-                                                        {matchTypeLabel(
-                                                            rule.match_type,
-                                                        )}
-                                                    </td>
-                                                    <td className="py-2.5 pr-4">
-                                                        {rule.match_value}
-                                                    </td>
-                                                    <td className="py-2.5 pr-4 text-muted-foreground">
-                                                        {rule.site_name ??
-                                                            'All sites'}
-                                                    </td>
-                                                    <td className="py-2.5 pr-4">
-                                                        <div className="flex flex-wrap gap-1.5">
-                                                            {rule.requires_countersign && (
-                                                                <Badge
-                                                                    variant="secondary"
-                                                                    className="gap-1"
-                                                                >
-                                                                    <ShieldCheck className="h-3 w-3" />{' '}
-                                                                    Countersign
-                                                                </Badge>
-                                                            )}
-                                                            {rule.required_observations.map(
-                                                                (obs) => (
-                                                                    <Badge
-                                                                        key={
-                                                                            obs
-                                                                        }
-                                                                        variant="outline"
-                                                                        className="gap-1"
-                                                                    >
-                                                                        <Stethoscope className="h-3 w-3" />
-                                                                        {observationLabel(
-                                                                            obs,
-                                                                        )}
-                                                                    </Badge>
-                                                                ),
-                                                            )}
-                                                            {!rule.requires_countersign &&
-                                                                rule
-                                                                    .required_observations
-                                                                    .length ===
-                                                                    0 && (
-                                                                    <span className="text-muted-foreground">
-                                                                        —
-                                                                    </span>
-                                                                )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-2.5 pr-4">
-                                                        <Badge
-                                                            variant={
-                                                                rule.active
-                                                                    ? 'default'
-                                                                    : 'outline'
-                                                            }
-                                                        >
-                                                            {rule.active
-                                                                ? 'Active'
-                                                                : 'Inactive'}
-                                                        </Badge>
-                                                    </td>
-                                                    {can.manage && (
-                                                        <td className="py-2.5 text-right">
-                                                            <div className="flex justify-end gap-1">
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="ghost"
-                                                                    className="h-8 w-8"
-                                                                    aria-label="Edit rule"
-                                                                    onClick={() =>
-                                                                        openEdit(
-                                                                            rule,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <Pencil className="h-4 w-4" />
-                                                                </Button>
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="ghost"
-                                                                    className="h-8 w-8 text-status-critical"
-                                                                    aria-label="Remove rule"
-                                                                    onClick={() =>
-                                                                        remove(
-                                                                            rule,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                </Button>
-                                                            </div>
-                                                        </td>
-                                                    )}
-                                                </tr>
-                                            ))}
-                                            {rules.length === 0 && (
-                                                <tr>
-                                                    <td
-                                                        colSpan={
-                                                            can.manage ? 6 : 5
-                                                        }
-                                                        className="py-10 text-center text-muted-foreground"
-                                                    >
-                                                        No administration rules
-                                                        yet. Add one to require
-                                                        countersigning or
-                                                        observations for
-                                                        matching medications.
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </>
-                ) : null}
-            </PageShell>
-
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>
-                            {editing ? 'Edit rule' : 'Add administration rule'}
-                        </DialogTitle>
-                        <DialogDescription>
-                            Matching is case-insensitive. A name/route rule
-                            matches when the medication contains the keyword; an
-                            NZULM rule matches the exact code.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-4">
-                        <div className="space-y-1.5">
-                            <Label>Match on</Label>
-                            <div className="grid grid-cols-3 gap-2">
-                                {matchTypes.map((type) => (
-                                    <Button
-                                        key={type.value}
-                                        type="button"
-                                        variant={
-                                            form.match_type === type.value
-                                                ? 'default'
-                                                : 'outline'
-                                        }
-                                        size="sm"
-                                        onClick={() =>
-                                            setForm((c) => ({
-                                                ...c,
-                                                match_type: type.value,
-                                            }))
-                                        }
-                                    >
-                                        {type.label}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label htmlFor="match-value">Keyword</Label>
-                            <Input
-                                id="match-value"
-                                value={form.match_value}
-                                onChange={(e) =>
-                                    setForm((c) => ({
-                                        ...c,
-                                        match_value: e.target.value,
-                                    }))
-                                }
-                                placeholder={
-                                    form.match_type === 'route'
-                                        ? 'e.g. Intravenous'
-                                        : form.match_type === 'nzulm_code'
-                                          ? 'e.g. a12345'
-                                          : 'e.g. Warfarin'
-                                }
-                            />
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label>Applies to</Label>
-                            <Select
-                                value={form.site_id}
-                                onValueChange={(value) =>
-                                    setForm((c) => ({ ...c, site_id: value }))
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {can.manage_global && (
-                                        <SelectItem value={GLOBAL_SITE}>
-                                            All sites (global)
-                                        </SelectItem>
-                                    )}
-                                    {sites.map((site) => (
-                                        <SelectItem
-                                            key={site.id}
-                                            value={site.id.toString()}
-                                        >
-                                            {site.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="flex items-center justify-between rounded-md border p-3">
-                            <div>
-                                <p className="text-sm font-medium">
-                                    Require countersignature
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    A second checker must authenticate at
-                                    administration.
-                                </p>
-                            </div>
-                            <Switch
-                                checked={form.requires_countersign}
-                                onCheckedChange={(checked) =>
-                                    setForm((c) => ({
-                                        ...c,
-                                        requires_countersign: checked,
-                                    }))
-                                }
-                            />
-                        </div>
-
-                        <div className="space-y-2 rounded-md border p-3">
-                            <p className="text-sm font-medium">
-                                Require observation at sign-off
-                            </p>
-                            {observationOptions.map((obs) => (
-                                <label
-                                    key={obs.value}
-                                    className="flex items-center gap-2 text-sm"
-                                >
-                                    <Checkbox
-                                        checked={form.required_observations.includes(
-                                            obs.value,
-                                        )}
-                                        onCheckedChange={() =>
-                                            toggleObservation(obs.value)
-                                        }
-                                    />
-                                    {obs.label}
-                                </label>
-                            ))}
-                        </div>
-
-                        <div className="flex items-center justify-between rounded-md border p-3">
-                            <p className="text-sm font-medium">Active</p>
-                            <Switch
-                                checked={form.active}
-                                onCheckedChange={(checked) =>
-                                    setForm((c) => ({ ...c, active: checked }))
-                                }
-                            />
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                            disabled={saving}
-                        >
-                            Cancel
-                        </Button>
-                        <Button onClick={submit} disabled={saving}>
-                            {editing ? 'Save changes' : 'Add rule'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    <StatusMessage message={message} />
+                    {body}
+                    {SAVED_SECTIONS.includes(sec) ? (
+                        <SaveBar
+                            count={changes(s, draft, view).length}
+                            onDiscard={() =>
+                                setDialog({ kind: 'discard', view })
+                            }
+                            onReview={() => setDialog({ kind: 'review', view })}
+                            readOnly={
+                                editable
+                                    ? undefined
+                                    : readOnlyAudit
+                                      ? 'Read-only — auditors can view settings and their history, not change them.'
+                                      : 'Only someone who manages medication settings for all houses can change these.'
+                            }
+                        />
+                    ) : null}
+                </div>
+                <DialogHost dialog={dialog} />
+            </SettingsCtx.Provider>
         </AppLayout>
     );
 }
