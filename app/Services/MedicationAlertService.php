@@ -15,6 +15,7 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationSignalService;
 use App\Support\Medication\MedicationStockQuantity;
 use App\Support\WorkerClock;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -460,7 +461,14 @@ class MedicationAlertService
      */
     private function checkOverdueDoses(Client $client): ?array
     {
-        $now = now();
+        // EM-02 (1): dose times are New Zealand wall-clock times. Build each
+        // slot on the worker's calendar with the shared schedule rule and
+        // compare instants; reading "08:00" on a UTC date raised the alert at
+        // 21:00 NZDT and missed real morning doses. Which slots count as
+        // overdue (due in the last 3 hours, nothing recorded) is unchanged
+        // until the dose-slot projection replaces this check.
+        $schedule = app(MarScheduleService::class);
+        $now = Carbon::now($schedule->workerTimezone());
         $cutoff = $now->copy()->subHours(3);
 
         $medications = $client->medications()
@@ -472,19 +480,18 @@ class MedicationAlertService
         $overdueMeds = [];
 
         foreach ($medications as $medication) {
-            $doseTimes = $medication->dose_times ?? [];
+            // The 3-hour lookback can cross NZ midnight, so walk each NZ day it touches.
+            for ($day = $cutoff->copy()->startOfDay(); $day->lte($now); $day->addDay()) {
+                foreach ($schedule->scheduledTimesForDate($medication, $day) as $scheduledTime) {
+                    if (! $scheduledTime->lessThan($now) || ! $scheduledTime->greaterThan($cutoff)) {
+                        continue;
+                    }
 
-            foreach ($doseTimes as $time) {
-                $scheduledTime = $now->copy()->setTimeFromTimeString($time);
-
-                if ($scheduledTime->isPast() && $scheduledTime->greaterThan($cutoff)) {
+                    [$slotStartUtc, $slotEndUtc] = $schedule->utcSlotWindow($scheduledTime);
                     $recorded = ClientMedicationAdministration::query()
                         ->effectiveClinicalEvidence()
                         ->where('client_medication_id', $medication->id)
-                        ->whereBetween('scheduled_for', [
-                            $scheduledTime->copy()->subMinute(),
-                            $scheduledTime->copy()->addMinute(),
-                        ])
+                        ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
                         ->exists();
 
                     if (! $recorded) {
