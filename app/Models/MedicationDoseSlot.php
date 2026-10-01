@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * One scheduled dose obligation: an order × NZ calendar day × ordered time
- * (P01 foundation C3). Written only by the dose-slot generator and the
- * outcome writer; nothing reads it yet (C6).
+ * (P01 foundation C3). Written only by the dose-slot generator, the outcome
+ * writer and the backfill (C5: `reconstructed` rows); nothing reads it yet (C6).
  */
 class MedicationDoseSlot extends Model
 {
@@ -29,6 +29,7 @@ class MedicationDoseSlot extends Model
         'outcome_administration_id',
         'outcome_at',
         'generated_at',
+        'reconstructed',
     ];
 
     protected $casts = [
@@ -41,6 +42,7 @@ class MedicationDoseSlot extends Model
         'superseded_at' => 'datetime',
         'outcome_at' => 'datetime',
         'generated_at' => 'datetime',
+        'reconstructed' => 'boolean',
     ];
 
     public function client(): BelongsTo
