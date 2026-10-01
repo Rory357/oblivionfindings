@@ -80,6 +80,8 @@ function renderWith(node: ReactNode) {
         flash: vi.fn(),
         freshAfter: 0,
         leave: vi.fn(),
+        errors: {},
+        clearError: vi.fn(),
     };
     return {
         ctx,

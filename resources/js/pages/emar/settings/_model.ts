@@ -18,6 +18,12 @@ export type SettingDefinition = {
     label: string;
     options: { value: string; label: string }[];
     default: string;
+    /** A whole number in this range (no options): the smallest and largest it accepts. */
+    range: [number, number] | null;
+    /** The words after a number ("minutes before the dose time"). */
+    unit: string | null;
+    /** A setting decided together with this one: reviewed, kept and listed as one. */
+    paired_with: string | null;
     /** Option values from loosest to strictest. */
     rank: string[] | null;
     numeric: {
@@ -89,7 +95,24 @@ export function definitionOf(
     return s.definitions[group]?.[key];
 }
 
+export const isNumber = (def: SettingDefinition) =>
+    def.options.length === 0 && def.range !== null;
+
+/** Is this a value the setting accepts? (The server checks the same.) */
+export function accepts(def: SettingDefinition, value: string): boolean {
+    if (isNumber(def)) {
+        const [min, max] = def.range!;
+        return /^\d{1,6}$/.test(value) && +value >= min && +value <= max;
+    }
+    return def.options.some((o) => o.value === value);
+}
+
+/** What to say when a number isn't accepted (the server's words). */
+export const numberError = (def: SettingDefinition) =>
+    `Enter a whole number from ${def.range![0].toLocaleString('en-NZ')} to ${def.range![1].toLocaleString('en-NZ')}.`;
+
 export function format(def: SettingDefinition, value: string): string {
+    if (isNumber(def)) return [value, def.unit].filter(Boolean).join(' ');
     return def.options.find((o) => o.value === value)?.label ?? value;
 }
 
@@ -224,13 +247,44 @@ export type Pending = {
     until: string;
 };
 
+/** The second of a pair is decided with the first, so it isn't listed on its own. */
+export const isSecondOfPair = (s: SettingsPayload, def: SettingDefinition) => {
+    if (!def.paired_with) return false;
+    const keys = s.groups[def.group]?.keys ?? [];
+    return keys.indexOf(def.paired_with) < keys.indexOf(def.key);
+};
+
+/** A pair is one decision: saving or keeping either half reviews it. */
+export function decisionReviewer(
+    s: SettingsPayload,
+    group: string,
+    key: string,
+): Reviewer {
+    const paired = definitionOf(s, group, key)?.paired_with;
+    return (
+        reviewerOf(s, group, key) ??
+        (paired ? reviewerOf(s, group, paired) : null)
+    );
+}
+
+/** The settings "Keep today's value" confirms together: one, or a pair. */
+export function keptTogether(s: SettingsPayload, group: string, key: string) {
+    const def = definitionOf(s, group, key);
+    return def?.paired_with ? [key, def.paired_with] : [key];
+}
+
 export function stillToDecide(s: SettingsPayload): Pending[] {
     const out: Pending[] = [];
     Object.values(s.groups).forEach((g) => {
         g.keys.forEach((key) => {
             const def = definitionOf(s, g.key, key);
             if (!def || def.scope !== 'organisation') return;
-            if (reviewerOf(s, g.key, key)) return;
+            if (isSecondOfPair(s, def)) return;
+            if (decisionReviewer(s, g.key, key)) return;
+            const pair = def.paired_with
+                ? definitionOf(s, g.key, def.paired_with)
+                : undefined;
+            const value = format(def, savedValue(s, g.key, key));
             out.push({
                 group: g.key,
                 key,
@@ -238,11 +292,32 @@ export function stillToDecide(s: SettingsPayload): Pending[] {
                 section: def.section,
                 label: def.label,
                 state: 'default',
-                until: `Behaves as: ${format(def, savedValue(s, g.key, key))}`,
+                until: isNumber(def)
+                    ? `Today’s rule: ${pair ? `${value} within ${format(pair, savedValue(s, g.key, pair.key))}` : value}`
+                    : `Behaves as: ${value}`,
             });
         });
     });
     return out;
+}
+
+/** Number settings in a view whose draft isn't a value they accept, by "group.key". */
+export function validateView(
+    s: SettingsPayload,
+    draft: Draft,
+    view: ViewKey,
+): Record<string, string> {
+    const errors: Record<string, string> = {};
+    Object.values(s.groups).forEach((g) => {
+        if (g.view !== view) return;
+        g.keys.forEach((key) => {
+            const def = definitionOf(s, g.key, key);
+            const to = draft[g.key]?.[key];
+            if (def && isNumber(def) && to !== undefined && !accepts(def, to))
+                errors[`${g.key}.${key}`] = numberError(def);
+        });
+    });
+    return errors;
 }
 
 /** Can this history entry's earlier value be put back into the draft? */
@@ -256,6 +331,6 @@ export function canRestore(
         return false;
     const def = definitionOf(s, h.group, h.key);
     if (!def || !canEdit(h.group)) return false;
-    if (!def.options.some((o) => o.value === h.before_value)) return false;
+    if (!accepts(def, h.before_value)) return false;
     return draftValue(s, draft, h.group, h.key) !== h.before_value;
 }

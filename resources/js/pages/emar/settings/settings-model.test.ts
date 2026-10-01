@@ -25,6 +25,9 @@ const restricted: SettingDefinition = {
     default: 'off',
     rank: ['off', 'cosigner', 'block'],
     numeric: null,
+    range: null,
+    unit: null,
+    paired_with: null,
 };
 const renewal: SettingDefinition = {
     group: 'pin',
@@ -44,6 +47,9 @@ const renewal: SettingDefinition = {
         off: 'none',
         off_is_loosest: true,
     },
+    range: null,
+    unit: null,
+    paired_with: null,
 };
 
 const payload = (over: Partial<SettingsPayload> = {}): SettingsPayload => ({

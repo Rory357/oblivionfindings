@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
-use App\Models\AppSetting;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Services\Medication\DoseSlots\DoseTimeParser;
+use App\Services\Medication\DoseTimingSettings;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -125,22 +125,20 @@ class MarScheduleService
             : Carbon::createFromTimestamp(0, 'UTC');
     }
 
+    /** Medication › Settings › Rounds & timing (DoseTimingSettings is the one reader). */
     public function windowBeforeMinutes(): int
     {
-        return (int) (AppSetting::query()->where('key', 'medications.mar.window_before_minutes')->value('value')
-            ?? config('medications.mar.window_before_minutes', 30));
+        return app(DoseTimingSettings::class)->earlyMinutes();
     }
 
     public function windowAfterMinutes(): int
     {
-        return (int) (AppSetting::query()->where('key', 'medications.mar.window_after_minutes')->value('value')
-            ?? config('medications.mar.window_after_minutes', 60));
+        return app(DoseTimingSettings::class)->lateMinutes();
     }
 
     public function dueSoonMinutes(): int
     {
-        return (int) (AppSetting::query()->where('key', 'medications.mar.due_soon_minutes')->value('value')
-            ?? config('medications.mar.due_soon_minutes', 60));
+        return app(DoseTimingSettings::class)->dueSoonMinutes();
     }
 
     /**

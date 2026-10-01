@@ -27,9 +27,15 @@ final class MedicationSettingDefinition
      * number values: whether a higher number is looser, which value means
      * "off", and whether switching off is the loosest choice.
      *
+     * A setting with no `$options` and a `$range` is typed as a whole number
+     * within that range (P11 v5 number inputs); `$unit` is the words after it
+     * ("minutes before the dose time"). `$pairedWith` names a setting decided
+     * together with this one: it is reviewed, kept and listed as one.
+     *
      * @param  array<string, string>  $options  Accepted value => the words for it.
      * @param  list<string>|null  $rank
      * @param  array{direction: string, off: string|null, off_is_loosest: bool}|null  $numeric
+     * @param  array{0: int, 1: int}|null  $range
      */
     public function __construct(
         public readonly string $group,
@@ -42,7 +48,15 @@ final class MedicationSettingDefinition
         public readonly string $default,
         public readonly ?array $rank = null,
         public readonly ?array $numeric = null,
+        public readonly ?array $range = null,
+        public readonly ?string $unit = null,
+        public readonly ?string $pairedWith = null,
     ) {}
+
+    public function isNumber(): bool
+    {
+        return $this->options === [] && $this->range !== null;
+    }
 
     public function id(): string
     {
@@ -56,17 +70,45 @@ final class MedicationSettingDefinition
 
     public function accepts(mixed $value): bool
     {
-        return is_string($value) && array_key_exists($value, $this->options);
+        if (! is_string($value)) {
+            return false;
+        }
+        if ($this->isNumber()) {
+            return preg_match('/^\d{1,6}$/', $value) === 1
+                && (int) $value >= $this->range[0]
+                && (int) $value <= $this->range[1];
+        }
+
+        return array_key_exists($value, $this->options);
     }
 
-    /** A stored value the setting no longer accepts reads as its default. */
+    /** What to say when a value isn't accepted. */
+    public function invalidMessage(): string
+    {
+        return $this->isNumber()
+            ? 'Enter a whole number from '.number_format($this->range[0]).' to '.number_format($this->range[1]).' for “'.$this->label.'”.'
+            : 'Choose one of the listed values for “'.$this->label.'”.';
+    }
+
+    /**
+     * A stored value the setting no longer accepts reads as its default. A
+     * number saved as a JSON number reads as its digits.
+     */
     public function normalise(mixed $value): string
     {
+        if ($this->isNumber() && is_int($value)) {
+            $value = (string) $value;
+        }
+
         return $this->accepts($value) ? $value : $this->default;
     }
 
     public function format(string $value): string
     {
+        if ($this->isNumber()) {
+            return trim($value.' '.($this->unit ?? ''));
+        }
+
         return $this->options[$value] ?? $value;
     }
 
@@ -117,6 +159,9 @@ final class MedicationSettingDefinition
                 ->values()
                 ->all(),
             'default' => $this->default,
+            'range' => $this->range,
+            'unit' => $this->unit,
+            'paired_with' => $this->pairedWith,
             'rank' => $this->rank,
             'numeric' => $this->numeric,
         ];

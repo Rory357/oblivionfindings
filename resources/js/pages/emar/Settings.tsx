@@ -18,6 +18,7 @@ import { Sections } from '@/pages/fleet-assets/settings/_ui';
 import { Head, router } from '@inertiajs/react';
 import {
     Activity,
+    Clock,
     Eye,
     FileText,
     HelpCircle,
@@ -52,6 +53,7 @@ import {
 import {
     changes,
     stillToDecide,
+    validateView,
     type Draft,
     type SettingsPayload,
     type ViewKey,
@@ -81,6 +83,7 @@ import {
     type WitnessPinProps,
 } from './settings/_sections';
 import { useStatusMessage } from './settings/_status';
+import { DoseTiming, RoundsOverview } from './settings/_timing';
 import { SaveBar, StatusMessage } from './settings/_ui';
 
 type Props = {
@@ -110,13 +113,14 @@ const SEC_ICON: Record<string, LucideIcon> = {
     safety: Shield,
     controlled: LockKeyhole,
     photos: FileText,
+    timing: Clock,
     pins: KeyRound,
     status: Users,
     decide: HelpCircle,
     changes: History,
 };
 /** Tabs whose settings are saved through the save bar. */
-const SAVED_SECTIONS = ['safety', 'pins'];
+const SAVED_SECTIONS = ['safety', 'timing', 'pins'];
 const SHOW_OPTIONS = [
     { value: 'all', label: 'All settings' },
     { value: 'open', label: 'Not yet reviewed' },
@@ -151,6 +155,7 @@ export default function EmarSettings(props: Props) {
     const built: Built = useMemo(
         () => ({
             rules: settingsAccess ? ['overview', 'medicines', 'safety'] : [],
+            rounds: settingsAccess ? ['overview', 'timing'] : [],
             staff: ['pins', 'status'],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
@@ -168,6 +173,7 @@ export default function EmarSettings(props: Props) {
     const [f, setF] = useState<Filters>(F0);
     const [page, setPage] = useState(1);
     const [loadedAt, setLoadedAt] = useState(() => new Date());
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [freshAfter] = useState(() =>
         Math.max(0, ...s.history.map((h) => h.id)),
     );
@@ -250,6 +256,37 @@ export default function EmarSettings(props: Props) {
         };
     }, [dirty]);
 
+    // A value "Review changes" can't save: its field takes focus (v5). A
+    // discarded or saved draft takes its message with it.
+    useEffect(() => {
+        document
+            .querySelector<HTMLElement>('main [aria-invalid="true"]')
+            ?.focus();
+    }, [errors]);
+    useEffect(() => {
+        setErrors((e) => {
+            const kept = Object.entries(e).filter(([id]) => {
+                const [group, key] = id.split('.');
+                return draft[group]?.[key] !== undefined;
+            });
+            return kept.length === Object.keys(e).length
+                ? e
+                : Object.fromEntries(kept);
+        });
+    }, [draft]);
+    const review = () => {
+        const found = validateView(s, draft, view);
+        setErrors(found);
+        const first = Object.keys(found)[0];
+        if (!first) {
+            setDialog({ kind: 'review', view });
+            return;
+        }
+        const [group, key] = first.split('.');
+        const section = s.definitions[group]?.[key]?.section;
+        if (section && section !== sec) go(view, section);
+    };
+
     const ruleData: RuleData = {
         rules: props.rules,
         options: props.ruleOptions,
@@ -278,6 +315,14 @@ export default function EmarSettings(props: Props) {
         },
         flash: setMessage,
         freshAfter,
+        errors,
+        clearError: (id) =>
+            setErrors((e) => {
+                if (!e[id]) return e;
+                const next = { ...e };
+                delete next[id];
+                return next;
+            }),
         leave: (url) => {
             allowLeave.current = true;
             setDialog(null);
@@ -518,6 +563,17 @@ export default function EmarSettings(props: Props) {
                     setF({ ...f, show: 'all' });
                 }}
             />
+        ) : view === 'rounds' && sec === 'overview' ? (
+            <RoundsOverview q={query} />
+        ) : view === 'rounds' && sec === 'timing' ? (
+            <DoseTiming
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
         ) : view === 'staff' && sec === 'pins' ? (
             <WitnessPins
                 q={query}
@@ -575,7 +631,7 @@ export default function EmarSettings(props: Props) {
                             onDiscard={() =>
                                 setDialog({ kind: 'discard', view })
                             }
-                            onReview={() => setDialog({ kind: 'review', view })}
+                            onReview={review}
                             readOnly={
                                 editable
                                     ? undefined

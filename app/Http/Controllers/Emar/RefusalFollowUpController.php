@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\RefusalEscalationPolicy;
 use App\Services\MedicationIncidentIntegrationService;
 use Closure;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class RefusalFollowUpController extends Controller
     public function __construct(
         private readonly MedicationScopeDecisionService $medicationScope,
         private readonly MedicationGovernanceScopeService $governanceScope,
+        private readonly RefusalEscalationPolicy $refusalEscalation,
     ) {}
 
     /**
@@ -95,16 +97,13 @@ class RefusalFollowUpController extends Controller
                     $attributes['family_notified_at'] = now();
                 }
 
-                // Check for refusal cluster: 3+ refusals in 7 days for the same medication.
-                $recentRefusals = ClientMedicationAdministration::query()
-                    ->effectiveClinicalEvidence()
-                    ->where('client_id', $scope->client->id)
-                    ->where('client_medication_id', $effectiveAdministration->client_medication_id)
-                    ->whereIn('status', ['refused', 'withheld'])
-                    ->where('administered_at', '>=', now()->subDays(7))
-                    ->count();
+                // Repeated refusals escalate (Medication › Settings › Rounds & timing).
+                $recentRefusals = $this->refusalEscalation->countFor(
+                    (int) $scope->client->id,
+                    (int) $effectiveAdministration->client_medication_id,
+                );
 
-                if ($recentRefusals >= 3) {
+                if ($this->refusalEscalation->escalates($recentRefusals)) {
                     $attributes['escalated_to_manager'] = true;
                     $attributes['escalated_at'] = now();
                     $attributes['gp_notification_required'] = true;

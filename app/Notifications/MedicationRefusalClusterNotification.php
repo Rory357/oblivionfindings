@@ -15,6 +15,7 @@ class MedicationRefusalClusterNotification extends Notification
         public int $count,
         public ?int $clientId = null,
         public ?int $clientMedicationId = null,
+        public int $days = 7,
     ) {}
 
     public function via(object $notifiable): array
@@ -27,7 +28,7 @@ class MedicationRefusalClusterNotification extends Notification
         return [
             'type' => 'medication_refusal_cluster',
             'title' => 'Repeated Medication Refusals',
-            'message' => "{$this->clientName} has refused {$this->medication} {$this->count} times in the last 7 days",
+            'message' => "{$this->clientName}: {$this->medication} refused or withheld {$this->count} times in the last {$this->days} ".($this->days === 1 ? 'day' : 'days'),
             'severity' => 'warning',
             'action_url' => $this->clientId ? "/emar/mar?client_id={$this->clientId}" : '/emar/mar',
             'client_name' => $this->clientName,

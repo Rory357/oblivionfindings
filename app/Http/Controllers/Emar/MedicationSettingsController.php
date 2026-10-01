@@ -88,7 +88,7 @@ class MedicationSettingsController extends Controller
         foreach ($changes as $index => $change) {
             if (! $change['definition']->accepts($change['value'])) {
                 throw ValidationException::withMessages([
-                    "changes.{$index}.value" => 'Choose one of the listed values for “'.$change['definition']->label.'”.',
+                    "changes.{$index}.value" => $change['definition']->invalidMessage(),
                 ]);
             }
         }

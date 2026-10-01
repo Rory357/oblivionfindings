@@ -32,6 +32,9 @@ export type SettingsContext = {
     freshAfter: number;
     /** Leave the page with an unsaved draft (after the guard). */
     leave: (url: string) => void;
+    /** Values "Review changes" can't save yet, by "group.key". */
+    errors: Record<string, string>;
+    clearError: (id: string) => void;
 };
 
 export const SettingsCtx = createContext<SettingsContext | null>(null);

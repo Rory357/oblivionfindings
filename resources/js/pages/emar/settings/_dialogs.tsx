@@ -44,7 +44,9 @@ import {
     changes,
     definitionOf,
     format,
+    keptTogether,
     loosens,
+    reviewerOf,
     savedValue,
     stillToDecide,
     VIEW_LABEL,
@@ -504,6 +506,12 @@ export function RestoreValue({ id }: { id: number }) {
     );
 }
 
+/** A setting and its pair, where the pair is still a default nobody reviewed. */
+const keepItems = (s: SettingsPayload, group: string, key: string) =>
+    keptTogether(s, group, key)
+        .filter((k) => k === key || !reviewerOf(s, group, k))
+        .map((k) => ({ group, key: k, site_id: null }));
+
 /** Keep today's value: confirms a default as reviewed without changing it (records who and when). */
 export function KeepDefault({
     group,
@@ -518,7 +526,13 @@ export function KeepDefault({
     const def = definitionOf(s, group, keyName);
     if (!def || !canEdit(group) || s.reviewed[group]?.[keyName])
         return <NotFound what="setting" />;
+    const pair = def.paired_with
+        ? definitionOf(s, group, def.paired_with)
+        : undefined;
     const value = format(def, savedValue(s, group, keyName));
+    const pairValue = pair
+        ? format(pair, savedValue(s, group, pair.key))
+        : null;
     return (
         <ConfirmDialog
             open
@@ -530,7 +544,8 @@ export function KeepDefault({
             description={
                 <>
                     <p>
-                        <b className="text-foreground">{def.label}</b>: {value}.
+                        <b className="text-foreground">{def.label}</b>: {value}
+                        {pairValue ? ` within ${pairValue}` : ''}.
                     </p>
                     <p className="mt-2">
                         Nothing changes in how doses are recorded. The setting
@@ -545,7 +560,7 @@ export function KeepDefault({
             onConfirm={() =>
                 router.post(
                     '/emar/settings/keep',
-                    { items: [{ group, key: keyName, site_id: null }] },
+                    { items: keepItems(s, group, keyName) },
                     {
                         preserveScroll: true,
                         preserveState: true,
@@ -649,11 +664,7 @@ export function ReviewDefaults() {
         router.post(
             '/emar/settings/keep',
             {
-                items: kept.map((i) => ({
-                    group: i.group,
-                    key: i.key,
-                    site_id: null,
-                })),
+                items: kept.flatMap((i) => keepItems(s, i.group, i.key)),
             },
             {
                 preserveScroll: true,

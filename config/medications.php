@@ -1,6 +1,9 @@
 <?php
 
 return [
+    // Dose timing defaults. Medication › Settings › Rounds & timing saves the
+    // organisation's own values; DoseTimingSettings reads them, falling back
+    // to these until someone saves one.
     'mar' => [
         // How early a scheduled dose can be administered (minutes before scheduled time)
         'window_before_minutes' => 30,
@@ -10,6 +13,16 @@ return [
 
         // When to mark a scheduled dose as "due soon" (minutes before scheduled time)
         'due_soon_minutes' => 60,
+
+        // A dose recorded this many minutes after its scheduled time raises a late-dose incident
+        'late_incident_minutes' => 120,
+    ],
+
+    // This many refusals or withholds of the same medicine within this many
+    // days escalate to a manager and the GP.
+    'refusal_escalation' => [
+        'count' => 3,
+        'days' => 7,
     ],
 
     'witness_pin' => [

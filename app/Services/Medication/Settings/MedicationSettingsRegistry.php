@@ -2,6 +2,7 @@
 
 namespace App\Services\Medication\Settings;
 
+use App\Services\Medication\DoseTimingSettings;
 use App\Services\Medication\MedicationSafetyPolicySettings;
 use App\Services\Medication\WitnessPinSettings;
 
@@ -17,6 +18,8 @@ use App\Services\Medication\WitnessPinSettings;
 class MedicationSettingsRegistry
 {
     public const VIEW_RULES = 'rules';
+
+    public const VIEW_ROUNDS = 'rounds';
 
     public const VIEW_STAFF = 'staff';
 
@@ -76,7 +79,7 @@ class MedicationSettingsRegistry
     /** @return list<MedicationSettingGroup> */
     protected function build(): array
     {
-        return [$this->safetyChecks(), $this->witnessPinRules()];
+        return [$this->safetyChecks(), $this->doseTiming(), $this->witnessPinRules()];
     }
 
     private function safetyChecks(): MedicationSettingGroup
@@ -134,6 +137,43 @@ class MedicationSettingsRegistry
                     default: $safety::DEFAULTS[$safety::COMPETENCY_AREAS],
                     rank: ['off', 'failed', 'failed_or_not_seen'],
                 ),
+            ],
+        );
+    }
+
+    private function doseTiming(): MedicationSettingGroup
+    {
+        $timing = DoseTimingSettings::class;
+        $numeric = fn (string $direction): array => ['direction' => $direction, 'off' => null, 'off_is_loosest' => false];
+        $number = fn (string $key, string $storageKey, string $label, string $unit, ?array $loosening, ?string $pairedWith = null): MedicationSettingDefinition => new MedicationSettingDefinition(
+            group: 'timing',
+            key: $key,
+            storageKey: $storageKey,
+            scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+            section: 'timing',
+            label: $label,
+            options: [],
+            default: $timing::default($storageKey),
+            numeric: $loosening,
+            range: $timing::RANGES[$storageKey],
+            unit: $unit,
+            pairedWith: $pairedWith,
+        );
+        $looser = $numeric(MedicationSettingDefinition::HIGHER_IS_LOOSER);
+
+        return new MedicationSettingGroup(
+            key: 'timing',
+            view: self::VIEW_ROUNDS,
+            effect: 'From the next dose shown on Meds today, at every house — recording is never blocked',
+            auditEvent: 'medications.mar_timing.updated',
+            definitions: [
+                // "Doses show as due soon" (v5) waits until Meds today reads its
+                // dose states from DoseWindowResolver (P01): nothing shows it yet.
+                $number('early', $timing::EARLY_MINUTES, 'Doses can be given from', 'minutes before the dose time', $looser),
+                $number('late', $timing::LATE_MINUTES, 'Doses count as late', 'minutes after the dose time', $looser),
+                $number('late_incident', $timing::LATE_INCIDENT_MINUTES, 'A late dose raises an incident', 'minutes after the dose time', $looser),
+                $number('refusal_count', $timing::REFUSAL_COUNT, 'Repeated refusals escalate', 'refusals or withholds', $looser, 'refusal_days'),
+                $number('refusal_days', $timing::REFUSAL_DAYS, 'Repeated refusals escalate — within', 'days', $numeric(MedicationSettingDefinition::HIGHER_IS_STRICTER), 'refusal_count'),
             ],
         );
     }

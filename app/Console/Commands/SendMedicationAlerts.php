@@ -14,6 +14,7 @@ use App\Notifications\MedicationRefusalClusterNotification;
 use App\Notifications\MedicationStockLowNotification;
 use App\Services\MarScheduleService;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\RefusalEscalationPolicy;
 use App\Services\UserSiteAccessService;
 use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Console\Command;
@@ -289,20 +290,20 @@ class SendMedicationAlerts extends Command
     }
 
     /**
-     * Check for refusal clusters: clients with 3+ refusals of the same medication
-     * in the last 7 days. Notify team leaders.
+     * Check for refusal clusters: repeated refusals or withholds of the same
+     * medicine, as Rounds & timing defines them (RefusalEscalationPolicy).
+     * Notify team leaders.
      */
     protected function checkRefusalClusters(): void
     {
         $this->info('Checking for medication refusal clusters...');
 
-        $clusters = ClientMedicationAdministration::query()
-            ->effectiveClinicalEvidence()
-            ->where('status', 'refused')
-            ->where('scheduled_for', '>=', now()->subDays(7))
+        $escalation = app(RefusalEscalationPolicy::class);
+        $days = $escalation->days();
+        $clusters = $escalation->recent()
             ->select('client_id', 'client_medication_id', DB::raw('COUNT(*) as refusal_count'))
             ->groupBy('client_id', 'client_medication_id')
-            ->having('refusal_count', '>=', 3)
+            ->having('refusal_count', '>=', $escalation->threshold())
             ->tap(fn ($query) => app(MedicationGovernanceScopeService::class)
                 ->scopeCanonicalClientMedicationRows($query, null, false))
             ->get();
@@ -363,6 +364,7 @@ class SendMedicationAlerts extends Command
                     count: (int) $cluster->refusal_count,
                     clientId: $cluster->client_id,
                     clientMedicationId: $medication->id,
+                    days: $days,
                 ));
             }
             $count++;

@@ -2,13 +2,16 @@
 
 namespace App\Services\Medication\DoseSlots;
 
+use App\Services\Medication\DoseTimingSettings;
+
 /**
  * The one place a dose window comes from (P01 foundation, C2).
  *
- * Today it reads config/medications.php (30 minutes before, 60 after). P11's
- * Dose timing settings (Lane A, chunk 4) replace the defaults and register a
- * DoseWindowOverride for time-critical medicines; callers keep asking
- * forOrder() and nothing else hard-codes a window.
+ * The general window is Medication › Settings › Rounds & timing ("can be
+ * given from", "counts as late"), read through DoseTimingSettings; until
+ * someone saves them they are config/medications.php's 30 minutes before and
+ * 60 after. A DoseWindowOverride gives a time-critical medicine its own late
+ * time. Callers ask forOrder() and nothing else hard-codes a window.
  */
 final class DoseWindowResolver
 {
@@ -23,8 +26,8 @@ final class DoseWindowResolver
 
     public function forOrder(int $orderId): DoseWindow
     {
-        $before = $this->beforeMinutes ?? (int) config('medications.mar.window_before_minutes', 30);
-        $after = $this->afterMinutes ?? (int) config('medications.mar.window_after_minutes', 60);
+        $before = $this->beforeMinutes ?? app(DoseTimingSettings::class)->earlyMinutes();
+        $after = $this->afterMinutes ?? app(DoseTimingSettings::class)->lateMinutes();
 
         foreach ($this->overrides as $override) {
             $late = $override->lateMinutesForOrder($orderId);

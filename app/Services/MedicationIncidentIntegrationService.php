@@ -14,6 +14,7 @@ use App\Models\MedicationError;
 use App\Models\MedicationRefusalFollowup;
 use App\Models\User;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Medication\DoseTimingSettings;
 use App\Services\Medication\MedicationSignalService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
@@ -381,13 +382,15 @@ class MedicationIncidentIntegrationService
     }
 
     /**
-     * Handle late dose
+     * Handle late dose: a dose given more than "A late dose raises an
+     * incident" minutes after its dose time (Medication › Settings › Rounds &
+     * timing) raises a draft incident. This is the only place that decides it.
      */
     public function handleLateDose(
         ClientMedicationAdministration $administration,
         int $lateMinutes
     ): ?ClientIncident {
-        if ($lateMinutes < 120) {
+        if ($lateMinutes <= app(DoseTimingSettings::class)->lateIncidentMinutes()) {
             return null;
         }
         $hoursLate = round($lateMinutes / 60, 1);

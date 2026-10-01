@@ -17,6 +17,7 @@ import {
     CommandItem,
     CommandList,
 } from '@/components/ui/command';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Popover,
@@ -104,6 +105,54 @@ export function Choice<T extends string>({
                 disabled,
             }))}
         />
+    );
+}
+
+/** A whole number with its unit after it ("30 minutes before"). */
+export function NumberInput({
+    id,
+    value,
+    onChange,
+    unit,
+    disabled,
+    error,
+    errorId,
+    min = 1,
+    max,
+    label,
+}: {
+    id: string;
+    value: string;
+    onChange: (v: string) => void;
+    unit: string;
+    disabled?: boolean;
+    error?: string;
+    /** The row's error message, when two inputs share one. */
+    errorId?: string;
+    min?: number;
+    max?: number;
+    label?: string;
+}) {
+    return (
+        <span className="inline-flex items-center gap-2">
+            <Input
+                id={id}
+                type="number"
+                inputMode="numeric"
+                min={min}
+                max={max}
+                value={value}
+                disabled={disabled}
+                aria-label={label}
+                aria-invalid={!!error || undefined}
+                aria-describedby={
+                    error ? (errorId ?? `${id}-error`) : undefined
+                }
+                onChange={(e) => onChange(e.target.value.trim())}
+                className="h-9 w-24 tabular-nums"
+            />
+            <span className="text-subtle">{unit}</span>
+        </span>
     );
 }
 

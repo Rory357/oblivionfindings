@@ -1774,7 +1774,7 @@ class EnhancedMarService
             $incidents->handleRefusedDose($admin);
         }
 
-        if ($admin->late_minutes && $admin->late_minutes > 120) {
+        if ($admin->late_minutes) {
             $incidents->handleLateDose($admin, $admin->late_minutes);
         }
     }

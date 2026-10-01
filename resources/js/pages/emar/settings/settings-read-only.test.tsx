@@ -30,6 +30,9 @@ const def = (
     default: dflt,
     rank: options.map((o) => o.value),
     numeric: null,
+    range: null,
+    unit: null,
+    paired_with: null,
 });
 
 /** What an auditor receives: every value, the history, and no authority to change anything. */
@@ -184,6 +187,8 @@ function renderAsAuditor(node: ReactNode) {
         flash: vi.fn(),
         freshAfter: 99,
         leave: vi.fn(),
+        errors: {},
+        clearError: vi.fn(),
     };
     return {
         ctx,

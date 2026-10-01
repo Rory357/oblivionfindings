@@ -46,7 +46,7 @@ import {
 const match = (q: string, ...s: (string | null | undefined)[]) =>
     !q || s.some((x) => (x ?? '').toLowerCase().includes(q.toLowerCase()));
 
-function useRow(group: string) {
+export function useRow(group: string) {
     const { s, draft, setDraft, canEdit } = useSettings();
     const value = (key: string) => draftValue(s, draft, group, key);
     const edit = (key: string, v: string) =>
@@ -68,7 +68,7 @@ function useRow(group: string) {
     return { s, value, edit, state, disabled, shown };
 }
 
-function NoMatches({ q, clear }: { q: string; clear: () => void }) {
+export function NoMatches({ q, clear }: { q: string; clear: () => void }) {
     return (
         <EmptyState
             icon={ListChecks}
