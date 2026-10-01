@@ -17,6 +17,7 @@ import {
     periodLabel,
     viewRange,
     type CalView,
+    type CalendarMenuItem,
     type Decorated,
     type SourceDef,
 } from '@/pages/sites/calendar/_parts';
@@ -45,6 +46,24 @@ export type TransportCalendarItem = CalendarItem & {
     vehicle_name: string;
     statusLabel?: string;
 };
+/**
+ * The record's list actions (the same MenuItem[] as its kebab and row menu)
+ * as calendar menu items. Separators and items with nothing to do are left
+ * out; a blocked action (`MenuItem.disabled`, the reason) stays listed,
+ * aria-disabled and inert, with the reason as its second line.
+ */
+export function recordMenuItems(items: MenuItem[]): CalendarMenuItem[] {
+    return items
+        .filter((item) => item.label && (item.onClick || item.disabled))
+        .map((item, i) => ({
+            key: String(i),
+            label: item.label!,
+            destructive: item.disabled ? undefined : item.danger,
+            leading: item.icon ? <item.icon className="size-4" /> : undefined,
+            disabledReason: item.disabled || undefined,
+            onSelect: item.disabled ? () => undefined : item.onClick!,
+        }));
+}
 export const dayKey = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 export function calendarPeriod(view: CalView, date: Date) {
@@ -414,21 +433,11 @@ export function TransportCalendar({
                                             ]
                                           : []),
                                       ...(menuEntry?.transport
-                                          ? recordActions(menuEntry.transport)
-                                                .filter(
-                                                    (item) =>
-                                                        item.label &&
-                                                        item.onClick,
-                                                )
-                                                .map((item, i) => ({
-                                                    key: String(i),
-                                                    label: item.label!,
-                                                    destructive: item.danger,
-                                                    leading: item.icon ? (
-                                                        <item.icon className="size-4" />
-                                                    ) : undefined,
-                                                    onSelect: item.onClick!,
-                                                }))
+                                          ? recordMenuItems(
+                                                recordActions(
+                                                    menuEntry.transport,
+                                                ),
+                                            )
                                           : [
                                                 {
                                                     key: 'source',

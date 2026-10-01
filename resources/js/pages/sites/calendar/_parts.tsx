@@ -54,6 +54,7 @@ import {
     createContext,
     useContext,
     useEffect,
+    useId,
     useRef,
     useState,
     type CSSProperties,
@@ -430,6 +431,14 @@ export type CalendarMenuItem = {
     /** A second line, e.g. why the item is unavailable. */
     detail?: string;
     disabled?: boolean;
+    /**
+     * Why the item can't be used right now (the list menus' `MenuItem.disabled`).
+     * Unlike `disabled`, the item stays focusable in the arrow-key order so a
+     * screen reader announces the reason: it is aria-disabled, shows the
+     * reason as its second line (and description), and does nothing when
+     * chosen, leaving the menu open.
+     */
+    disabledReason?: string;
     destructive?: boolean;
     /** A quieter secondary item, such as "Open full form…". */
     muted?: boolean;
@@ -618,6 +627,9 @@ function CalendarMenuButton({
     onChoose: () => void;
 }) {
     const ItemIcon = item.icon;
+    const ids = useId();
+    const blocked = Boolean(item.disabledReason);
+    const detail = item.disabledReason || item.detail;
     const tone = item.destructive
         ? 'text-destructive'
         : item.muted
@@ -630,9 +642,11 @@ function CalendarMenuButton({
             data-menuitem
             tabIndex={-1}
             disabled={item.disabled}
-            aria-disabled={item.disabled || undefined}
-            onClick={onChoose}
-            className={`grid w-full grid-cols-[26px_1fr_auto] items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12.5px] transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent max-md:min-h-[44px] ${tone}`}
+            aria-disabled={item.disabled || blocked || undefined}
+            aria-labelledby={blocked ? `${ids}-label` : undefined}
+            aria-describedby={blocked ? `${ids}-reason` : undefined}
+            onClick={blocked ? undefined : onChoose}
+            className={`grid w-full grid-cols-[26px_1fr_auto] items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12.5px] transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent max-md:min-h-[44px] ${blocked ? 'cursor-not-allowed opacity-60 aria-disabled:hover:bg-transparent' : ''} ${tone}`}
         >
             {item.leading ?? (
                 <span
@@ -644,13 +658,17 @@ function CalendarMenuButton({
             )}
             <span className="min-w-0">
                 <span
+                    id={blocked ? `${ids}-label` : undefined}
                     className={`block truncate ${item.muted ? '' : 'font-medium'}`}
                 >
                     {item.label}
                 </span>
-                {item.detail && (
-                    <span className="block text-[11px] leading-snug font-normal text-muted-foreground">
-                        {item.detail}
+                {detail && (
+                    <span
+                        id={blocked ? `${ids}-reason` : undefined}
+                        className="block text-[11px] leading-snug font-normal text-muted-foreground"
+                    >
+                        {detail}
                     </span>
                 )}
             </span>

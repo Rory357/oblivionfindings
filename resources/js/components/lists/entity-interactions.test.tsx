@@ -1,8 +1,18 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import {
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within,
+} from '@testing-library/react';
 import { useState, type AnchorHTMLAttributes } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { EntityCard } from './entity-card';
-import { EntityContextMenu, useEntityContextMenu } from './entity-menu';
+import {
+    EntityContextMenu,
+    EntityKebab,
+    useEntityContextMenu,
+} from './entity-menu';
 import { EntityTable } from './entity-table';
 
 vi.mock('@inertiajs/react', () => ({
@@ -162,5 +172,95 @@ describe('Canonical list interactions', () => {
         fireEvent.keyDown(menu, { key: 'Escape' });
         expect(screen.queryByRole('menu')).not.toBeInTheDocument();
         expect(row).toHaveFocus();
+    });
+});
+
+describe('Disabled menu items with a reason', () => {
+    const reason = 'You are not on shift at Kōwhai House';
+
+    it('lists a disabled kebab item with its reason, focusable but inert', async () => {
+        const opened = vi.fn();
+        const recorded = vi.fn();
+        render(
+            <EntityKebab
+                label="Dose actions"
+                actions={[
+                    { label: 'Open', onClick: opened },
+                    {
+                        label: 'Record dose',
+                        onClick: recorded,
+                        disabled: reason,
+                    },
+                ]}
+            />,
+        );
+        fireEvent.keyDown(
+            screen.getByRole('button', { name: 'Dose actions' }),
+            {
+                key: 'Enter',
+            },
+        );
+        const menu = screen.getByRole('menu');
+        const item = within(menu).getByRole('menuitem', {
+            name: 'Record dose',
+        });
+        expect(item).toHaveAttribute('aria-disabled', 'true');
+        expect(item).toHaveAccessibleDescription(reason);
+        expect(within(item).getByText(reason)).toBeInTheDocument();
+
+        // Still in the keyboard order, so the reason is announced.
+        expect(
+            within(menu).getByRole('menuitem', { name: 'Open' }),
+        ).toHaveFocus();
+        fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+        await waitFor(() => expect(item).toHaveFocus());
+
+        // Neither a click nor Enter/Space acts or closes the menu.
+        fireEvent.click(item);
+        fireEvent.keyDown(item, { key: 'Enter' });
+        fireEvent.keyDown(item, { key: ' ' });
+        expect(recorded).not.toHaveBeenCalled();
+        expect(screen.getByRole('menu')).toBeInTheDocument();
+
+        // Enabled items behave exactly as before.
+        fireEvent.click(within(menu).getByRole('menuitem', { name: 'Open' }));
+        expect(opened).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    });
+
+    it('lists a disabled context-menu item with its reason, focusable but inert', () => {
+        const onClose = vi.fn();
+        const recorded = vi.fn();
+        render(
+            <EntityContextMenu
+                x={10}
+                y={10}
+                title="Dose actions"
+                items={[
+                    { label: 'Open', onClick: vi.fn() },
+                    {
+                        label: 'Record dose',
+                        onClick: recorded,
+                        disabled: reason,
+                    },
+                ]}
+                onClose={onClose}
+            />,
+        );
+        const menu = screen.getByRole('menu', { name: 'Dose actions' });
+        const item = within(menu).getByRole('menuitem', {
+            name: 'Record dose',
+        });
+        expect(item).toHaveAttribute('aria-disabled', 'true');
+        expect(item).toHaveAccessibleDescription(reason);
+        expect(within(item).getByText(reason)).toBeInTheDocument();
+
+        fireEvent.keyDown(menu, { key: 'End' });
+        expect(item).toHaveFocus();
+
+        fireEvent.click(item);
+        expect(recorded).not.toHaveBeenCalled();
+        expect(onClose).not.toHaveBeenCalled();
+        expect(screen.getByRole('menu')).toBeInTheDocument();
     });
 });

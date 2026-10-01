@@ -14,6 +14,7 @@ import {
     type MouseEvent as ReactMouseEvent,
     useCallback,
     useEffect,
+    useId,
     useRef,
     useState,
 } from 'react';
@@ -35,7 +36,52 @@ export type MenuItem = {
     icon?: IconType;
     onClick?: () => void;
     danger?: boolean;
+    /**
+     * Why the action can't be taken right now. A blocked action stays listed
+     * rather than silently missing: the item renders aria-disabled with this
+     * reason as a muted second line, stays focusable so a screen reader
+     * announces the reason (as the item's description), and neither a click
+     * nor Enter/Space calls `onClick` or closes the menu.
+     */
+    disabled?: string;
 };
+
+const DISABLED_ITEM_CLASS =
+    'cursor-not-allowed items-start text-muted-foreground';
+
+/** Label plus the muted reason line of a disabled item. */
+function DisabledItemBody({
+    item,
+    idBase,
+}: {
+    item: MenuItem;
+    idBase: string;
+}) {
+    return (
+        <>
+            {item.icon ? (
+                <item.icon className="mt-0.5 size-4 shrink-0" />
+            ) : null}
+            <span className="min-w-0 text-left">
+                <span id={`${idBase}-label`} className="block">
+                    {item.label}
+                </span>
+                <span id={`${idBase}-reason`} className="text-caption block">
+                    {item.disabled}
+                </span>
+            </span>
+        </>
+    );
+}
+
+/** Name = the label, description = the reason (not one run-on name). */
+function disabledItemAria(idBase: string) {
+    return {
+        'aria-disabled': true,
+        'aria-labelledby': `${idBase}-label`,
+        'aria-describedby': `${idBase}-reason`,
+    } as const;
+}
 
 /** Remove falsy entries and collapse / trim separators. */
 export function compactMenu(
@@ -63,6 +109,8 @@ export function EntityKebab({
     className?: string;
     label?: string;
 }) {
+    const menuId = useId();
+
     if (actions.length === 0) return null;
 
     return (
@@ -84,6 +132,30 @@ export function EntityKebab({
                     {actions.map((it, i) =>
                         it.separator ? (
                             <DropdownMenuSeparator key={`s${i}`} />
+                        ) : it.disabled ? (
+                            <DropdownMenuItem
+                                key={i}
+                                {...disabledItemAria(`${menuId}-${i}`)}
+                                textValue={it.label}
+                                // Keep the menu open and never select: no
+                                // onClick is passed, and Enter/Space/click
+                                // all route through this cancelled select.
+                                onSelect={(event) => event.preventDefault()}
+                                // No hover highlight, as for Radix's own
+                                // disabled items; keyboard focus still lands.
+                                onPointerMove={(event) =>
+                                    event.preventDefault()
+                                }
+                                className={cn(
+                                    DISABLED_ITEM_CLASS,
+                                    'focus:text-muted-foreground',
+                                )}
+                            >
+                                <DisabledItemBody
+                                    item={it}
+                                    idBase={`${menuId}-${i}`}
+                                />
+                            </DropdownMenuItem>
                         ) : (
                             <DropdownMenuItem
                                 key={i}
@@ -127,6 +199,7 @@ export function EntityContextMenu({
     onClose: () => void;
 }) {
     const ref = useRef<HTMLDivElement>(null);
+    const menuId = useId();
     const [pos, setPos] = useState({ x, y });
     const returnFocus = useRef<HTMLElement | null>(null);
 
@@ -232,6 +305,22 @@ export function EntityContextMenu({
                         key={`s${i}`}
                         className="my-1 h-px bg-border"
                     />
+                ) : it.disabled ? (
+                    // Focusable and in the arrow-key order (so the reason is
+                    // announced), but clicking or Enter/Space does nothing and
+                    // leaves the menu open.
+                    <button
+                        key={i}
+                        role="menuitem"
+                        type="button"
+                        {...disabledItemAria(`${menuId}-${i}`)}
+                        className={cn(
+                            DISABLED_ITEM_CLASS,
+                            'flex w-full gap-2.5 rounded-md px-2.5 py-2 text-[13px]',
+                        )}
+                    >
+                        <DisabledItemBody item={it} idBase={`${menuId}-${i}`} />
+                    </button>
                 ) : (
                     <button
                         key={i}

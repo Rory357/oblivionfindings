@@ -127,10 +127,13 @@ function SheetContent({
                 }}
             >
                 {children}
+                {/* Drawn at 1rem; frontline-hit gives it a 44 px target. The
+                    16 px floor on the inset keeps that target inside the
+                    screen edge when the sheet touches it (14 px root). */}
                 <SheetPrimitive.Close
                     data-slot="sheet-close"
                     className={cn(
-                        'ring-offset-background focus:ring-ring data-[state=open]:bg-secondary rounded-xs focus:outline-hidden absolute right-4 top-4 opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none',
+                        'frontline-hit ring-offset-background focus:ring-ring data-[state=open]:bg-secondary rounded-xs focus:outline-hidden absolute right-[max(1rem,16px)] top-[max(1rem,16px)] opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none',
                         closeButtonClassName,
                     )}
                 >

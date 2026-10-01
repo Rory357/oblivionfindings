@@ -4,18 +4,39 @@
  * close button. Every colour is a semantic design token. */
 /* Shared multi-step wizard dialog chrome, extracted from the Add Client wizard
  * (resources/js/components/clients/add-client-dialog.tsx — the reference
- * contract for every popup workflow): 248px stepper rail that collapses below
- * `sm`, "Step x of y" header with close button, 3px progress strip, scrollable
- * body, muted footer band, and the green-check success pane. */
+ * contract for every popup workflow): 248px stepper rail (from a 1024 CSS px
+ * viewport; below that it collapses into a one-line top stepper so the body
+ * keeps its width at 200 % zoom), "Step x of y" header with close button, 3px
+ * progress strip, scrollable body, muted footer band, and the green-check
+ * success pane. */
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { useIsDesktopLg } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { Check, Pencil, Sparkles, X } from 'lucide-react';
-import type { ComponentProps, ComponentType, ReactNode } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useRef,
+    type ComponentProps,
+    type ComponentType,
+    type ReactNode,
+} from 'react';
+
+/** On the collapsed top stepper, scroll the current step into view. */
+function keepCurrentStepInView(strip: HTMLElement | null) {
+    if (!strip || strip.dataset.layout !== 'strip') return;
+    const current = strip.querySelector<HTMLElement>('[aria-current="step"]');
+    if (!current) return;
+    const s = strip.getBoundingClientRect();
+    const c = current.getBoundingClientRect();
+    if (c.left < s.left) strip.scrollLeft -= s.left - c.left + 12;
+    else if (c.right > s.right) strip.scrollLeft += c.right - s.right + 12;
+}
 
 export type WizardStep = {
     key: string;
@@ -86,6 +107,21 @@ export function WizardShell({
     maxHeight?: string;
     children?: ReactNode;
 }) {
+    // The rail is a column from Tailwind's `lg` (1024 CSS px). Below that —
+    // 200 % zoom on a 1440 px screen is 720 CSS px — a 248px column would
+    // leave the body about 385 px wide, so the rail becomes a top stepper.
+    const wideRail = useIsDesktopLg();
+    const railRef = useRef<HTMLElement | null>(null);
+    // The dialog content mounts after this component's first commit (portal),
+    // so a callback ref catches the mount and the effect catches step changes.
+    const attachRail = useCallback((node: HTMLElement | null) => {
+        railRef.current = node;
+        keepCurrentStepInView(node);
+    }, []);
+    useEffect(() => {
+        keepCurrentStepInView(railRef.current);
+    }, [wideRail, stepIndex]);
+
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent
@@ -104,23 +140,66 @@ export function WizardShell({
                     success
                 ) : (
                     <div
-                        className="flex min-h-0 overflow-hidden"
+                        className={cn(
+                            'flex min-h-0 overflow-hidden',
+                            !wideRail && 'flex-col',
+                        )}
                         style={{ height: maxHeight }}
                     >
-                        {/* ── Stepper rail ── */}
+                        {/* ── Stepper rail: a 248px column from 1024 CSS px,
+                            a one-line top stepper below (200 % zoom on a
+                            1440 px screen is 720 CSS px). ── */}
                         <aside
+                            ref={attachRail}
                             data-wizard-region="rail"
-                            className="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex"
+                            data-layout={wideRail ? 'rail' : 'strip'}
+                            className={cn(
+                                'shrink-0 border-border bg-muted/30 text-foreground',
+                                wideRail
+                                    ? 'flex w-[248px] flex-col gap-1 overflow-y-auto border-r p-4'
+                                    : 'scrollbar-pretty flex items-center gap-0.5 overflow-x-auto border-b px-3',
+                            )}
                         >
-                            <div className="mb-3 flex items-center gap-2.5">
-                                <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
-                                    <RailIcon className="h-5 w-5" />
+                            <div
+                                className={cn(
+                                    'flex items-center',
+                                    wideRail
+                                        ? 'mb-3 gap-2.5'
+                                        : 'mr-1.5 shrink-0 gap-2 border-r border-border pr-3',
+                                )}
+                            >
+                                <span
+                                    className={cn(
+                                        'grid place-items-center rounded-lg bg-primary text-primary-foreground',
+                                        wideRail
+                                            ? 'h-9 w-9'
+                                            : 'h-7 w-7 shrink-0',
+                                    )}
+                                >
+                                    <RailIcon
+                                        className={
+                                            wideRail ? 'h-5 w-5' : 'h-4 w-4'
+                                        }
+                                    />
                                 </span>
-                                <div>
-                                    <div className="text-sm leading-tight font-bold">
+                                <div
+                                    className={wideRail ? undefined : 'min-w-0'}
+                                >
+                                    <div
+                                        className={cn(
+                                            'text-sm leading-tight font-bold',
+                                            !wideRail &&
+                                                'max-w-[9rem] truncate text-[13px]',
+                                        )}
+                                    >
                                         {railTitle}
                                     </div>
-                                    <div className="text-[11px] text-muted-foreground">
+                                    <div
+                                        className={cn(
+                                            'text-[11px] text-muted-foreground',
+                                            !wideRail && 'hidden',
+                                        )}
+                                    >
                                         {railSub}
                                     </div>
                                 </div>
@@ -130,14 +209,24 @@ export function WizardShell({
                                 const active = i === stepIndex;
                                 const complete = sequential && i < stepIndex;
                                 const Icon = s.icon;
+                                // On the strip only the active step shows its
+                                // name; the others keep it as their accessible
+                                // name, visually hidden.
+                                const textHidden = !wideRail && !active;
                                 return (
                                     <button
                                         key={s.key}
                                         type="button"
                                         disabled={s.disabled}
+                                        aria-current={
+                                            active ? 'step' : undefined
+                                        }
                                         onClick={() => onStepClick(i)}
                                         className={cn(
-                                            'flex items-center gap-2.5 rounded-md p-2 text-left transition-colors disabled:pointer-events-none',
+                                            'flex items-center rounded-md text-left transition-colors disabled:pointer-events-none',
+                                            wideRail
+                                                ? 'gap-2.5 p-2'
+                                                : 'frontline-tap relative shrink-0 justify-center gap-2 px-2',
                                             active
                                                 ? 'bg-primary/10'
                                                 : 'hover:bg-accent',
@@ -159,10 +248,18 @@ export function WizardShell({
                                                 <Icon className="h-3.5 w-3.5" />
                                             )}
                                         </span>
-                                        <span className="min-w-0">
+                                        <span
+                                            className={
+                                                textHidden
+                                                    ? 'sr-only'
+                                                    : 'min-w-0'
+                                            }
+                                        >
                                             <span
                                                 className={cn(
                                                     'block text-[13px]',
+                                                    !wideRail &&
+                                                        'whitespace-nowrap',
                                                     active
                                                         ? 'font-bold text-foreground'
                                                         : complete
@@ -172,7 +269,13 @@ export function WizardShell({
                                             >
                                                 {s.label}
                                             </span>
-                                            <span className="block truncate text-[11px] text-muted-foreground">
+                                            <span
+                                                className={
+                                                    wideRail
+                                                        ? 'block truncate text-[11px] text-muted-foreground'
+                                                        : 'sr-only'
+                                                }
+                                            >
                                                 {s.blurb}
                                             </span>
                                         </span>
@@ -180,25 +283,44 @@ export function WizardShell({
                                 );
                             })}
 
-                            {railExtra ? (
+                            {railExtra && wideRail ? (
                                 <div className="mt-auto pt-4">{railExtra}</div>
                             ) : null}
 
                             {pct != null ? (
                                 <div
                                     className={cn(
-                                        'pt-4',
-                                        railExtra ? '' : 'mt-auto',
+                                        wideRail
+                                            ? cn(
+                                                  'pt-4',
+                                                  railExtra ? '' : 'mt-auto',
+                                              )
+                                            : 'ml-auto flex shrink-0 items-center gap-2 pl-3',
                                     )}
                                 >
-                                    <div className="mb-1.5 flex justify-between text-[11px] text-muted-foreground">
-                                        <span>{pctLabel}</span>
+                                    <div
+                                        className={cn(
+                                            'flex text-[11px] text-muted-foreground',
+                                            wideRail &&
+                                                'mb-1.5 justify-between',
+                                        )}
+                                    >
+                                        <span
+                                            className={
+                                                wideRail ? undefined : 'sr-only'
+                                            }
+                                        >
+                                            {pctLabel}
+                                        </span>
                                         <span className="font-bold text-primary">
                                             {pct}%
                                         </span>
                                     </div>
                                     <div
-                                        className="h-1.5 overflow-hidden rounded-full bg-muted"
+                                        className={cn(
+                                            'h-1.5 overflow-hidden rounded-full bg-muted',
+                                            !wideRail && 'w-14',
+                                        )}
                                         role="progressbar"
                                         aria-valuenow={pct ?? 0}
                                         aria-valuemin={0}
@@ -239,11 +361,13 @@ export function WizardShell({
                                         </span>
                                     )}
                                 </div>
+                                {/* Drawn at 28 px; frontline-hit gives it a
+                                    44 px target inside the header padding. */}
                                 <button
                                     type="button"
                                     onClick={onClose}
                                     aria-label="Close"
-                                    className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+                                    className="frontline-hit grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
                                 >
                                     <X className="h-5 w-5" />
                                 </button>
@@ -268,6 +392,19 @@ export function WizardShell({
                                 className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6"
                             >
                                 {children}
+                                {/* The strip has no room for rail extras
+                                    (running totals, balances, notes), so
+                                    they follow the step content. */}
+                                {railExtra && !wideRail ? (
+                                    <div
+                                        data-wizard-region="rail-extra"
+                                        className="mt-6 border-t border-border pt-4"
+                                    >
+                                        <div className="max-w-sm">
+                                            {railExtra}
+                                        </div>
+                                    </div>
+                                ) : null}
                             </div>
 
                             <footer
