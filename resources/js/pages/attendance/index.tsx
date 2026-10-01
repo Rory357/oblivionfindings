@@ -7,6 +7,7 @@
 import { AddClientDialog } from '@/components/clients/add-client-dialog';
 import { PageHero, type PageHeroBadge } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { ReasonDialog } from '@/components/reason-dialog';
 import {
     ShiftContextMenu,
@@ -1284,17 +1285,15 @@ export default function AttendanceIndex({
                             <>
                                 {openSession ? (
                                     <>
-                                        <Button
-                                            size="sm"
-                                            className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                        <PageHeaderPrimaryButton
+                                            icon={LogOut}
                                             onClick={() =>
                                                 setClockOutOpen(true)
                                             }
                                             data-test="attendance-clock-out"
                                         >
-                                            <LogOut className="mr-1 h-4 w-4" />
                                             Clock out
-                                        </Button>
+                                        </PageHeaderPrimaryButton>
                                         <Button
                                             size="sm"
                                             variant="outline"
@@ -1329,15 +1328,13 @@ export default function AttendanceIndex({
                                         ) : null}
                                     </>
                                 ) : (
-                                    <Button
-                                        size="sm"
-                                        className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                    <PageHeaderPrimaryButton
+                                        icon={LogIn}
                                         onClick={() => setClockInOpen(true)}
                                         data-test="attendance-clock-in"
                                     >
-                                        <LogIn className="mr-1 h-4 w-4" />
                                         Clock in
-                                    </Button>
+                                    </PageHeaderPrimaryButton>
                                 )}
                                 <Button
                                     size="icon"

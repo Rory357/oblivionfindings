@@ -17,6 +17,7 @@ import {
     ProcedureWizardDialog,
     type ProcedureWizardOptions,
 } from '@/components/health-safety/procedure-wizard-dialog';
+import { PageHeaderGlassButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -25,7 +26,6 @@ import {
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
-import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Popover,
@@ -607,29 +607,23 @@ export default function ProceduresIndex({
 
                         <div className="flex items-center gap-2">
                             {can.create ? (
-                                <Button
-                                    size="sm"
+                                <PageHeaderGlassButton
+                                    icon={Plus}
                                     onClick={() =>
                                         setWizard({ mode: 'create' })
                                     }
-                                    className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                                 >
-                                    <Plus className="mr-1.5 h-4 w-4" /> New
-                                    procedure
-                                </Button>
+                                    New procedure
+                                </PageHeaderGlassButton>
                             ) : null}
                             <Popover>
                                 <PopoverTrigger asChild>
-                                    <Button
-                                        size="sm"
-                                        className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                    >
-                                        <BarChart3 className="mr-1.5 h-4 w-4" />{' '}
+                                    <PageHeaderGlassButton icon={BarChart3}>
                                         Library reports
                                         <span aria-hidden className="ml-1">
                                             ▾
                                         </span>
-                                    </Button>
+                                    </PageHeaderGlassButton>
                                 </PopoverTrigger>
                                 <PopoverContent
                                     align="end"

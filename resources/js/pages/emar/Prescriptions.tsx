@@ -11,6 +11,7 @@ import {
     type PrescriptionOrder,
 } from '@/components/emar/prescriptions/types';
 import { PageHero, type PageHeroStat } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -681,13 +682,12 @@ export default function Prescriptions(props: Props) {
                     actions={
                         <>
                             {can.manage_orders && canCreateManualOrder && (
-                                <Button
-                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
                                     onClick={() => setModal({ type: 'order' })}
                                 >
-                                    <Plus className="h-4 w-4" />
                                     New prescriber order
-                                </Button>
+                                </PageHeaderPrimaryButton>
                             )}
                             {can.manage_orders && canCreateCovert && (
                                 <Button

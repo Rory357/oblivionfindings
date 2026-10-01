@@ -343,9 +343,13 @@ before.
   theme's status fills fails AA). Affirmative actions (Approve, Accept,
   Complete) stay the default primary; a call to action inside an amber or
   green status banner uses `variant="outline"`; info is already the primary
-  tone. A white button on the brand sky is `PageHeaderPrimaryButton`. ESLint
-  covers these tones too; the `bg-primary-foreground` hero buttons are the
-  same bug but are not yet covered.
+  tone. On a hero or the brand sky, a default `<Button>` recoloured
+  `bg-primary-foreground` rendered purple text on purple (the "white
+  primary" was invisible; fixed 2026-10-01, 46 sites): the white primary is
+  `PageHeaderPrimaryButton` and a glass action is `PageHeaderGlassButton`
+  (`components/page/page-header.tsx`; both take `asChild` for a `<Link>` or
+  `<a>`, never a `<Button>` nested in an `<a>`). ESLint covers all of these
+  classes.
 - **Ad-hoc `text-2xl`/`text-xl` headings** — use the typography helpers.
 - **`dark:` colour pairs on token-styled elements** — redundant and drifts.
 - **Pinning a fixed hue to a module** (e.g. `bg-purple-500` for HR) — use

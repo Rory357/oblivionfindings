@@ -21,6 +21,7 @@
  * (safety tones stay the fixed status tokens).
  */
 import { Link, router } from '@inertiajs/react';
+import { Slot, Slottable } from '@radix-ui/react-slot';
 import {
     ArrowUpRight,
     Check,
@@ -359,23 +360,32 @@ export function PageHeaderSearchTrigger({
     );
 }
 
+/**
+ * `asChild` renders the single child element (a `<Link>` or `<a>`) with the
+ * button's styling, so navigation keeps real link semantics; `icon` is
+ * placed inside that child.
+ */
+type HeaderButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+    icon?: IconType;
+    asChild?: boolean;
+};
+
 /** Glass secondary action (36px, radius 10). `active` inverts to solid. */
 export function PageHeaderGlassButton({
     icon: Icon,
     active = false,
+    asChild = false,
     className,
     children,
     ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
-    icon?: IconType;
-    active?: boolean;
-}) {
+}: HeaderButtonProps & { active?: boolean }) {
+    const Comp = asChild ? Slot : 'button';
     return (
-        <button
-            type="button"
+        <Comp
+            {...(asChild ? {} : { type: 'button' as const })}
             {...rest}
             className={cn(
-                'inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70',
+                'inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 disabled:pointer-events-none disabled:opacity-50',
                 children == null && 'w-9 justify-center px-0',
                 active
                     ? 'border-primary-foreground bg-primary-foreground text-primary'
@@ -384,30 +394,32 @@ export function PageHeaderGlassButton({
             )}
         >
             {Icon ? <Icon className="size-4" /> : null}
-            {children}
-        </button>
+            <Slottable>{children}</Slottable>
+        </Comp>
     );
 }
 
 /** THE primary action — white fill, brand-dark text. Never render two. */
 export function PageHeaderPrimaryButton({
     icon: Icon,
+    asChild = false,
     className,
     children,
     ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { icon?: IconType }) {
+}: HeaderButtonProps) {
+    const Comp = asChild ? Slot : 'button';
     return (
-        <button
-            type="button"
+        <Comp
+            {...(asChild ? {} : { type: 'button' as const })}
             {...rest}
             className={cn(
-                'inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]',
+                'inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50',
                 className,
             )}
         >
             {Icon ? <Icon className="size-4" /> : null}
-            {children}
-        </button>
+            <Slottable>{children}</Slottable>
+        </Comp>
     );
 }
 

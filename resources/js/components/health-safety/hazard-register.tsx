@@ -19,6 +19,7 @@ import {
     type HazardRow,
     type HazardSectionKey,
 } from '@/components/health-safety/hazard-kit';
+import { PageHeaderGlassButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -27,7 +28,6 @@ import {
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
-import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Popover,
@@ -646,14 +646,12 @@ export function HazardRegister({
                         </div>
                         <div className="flex items-center gap-2">
                             {can.create ? (
-                                <Button
-                                    size="sm"
-                                    className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                <PageHeaderGlassButton
+                                    icon={Plus}
                                     onClick={() => setCreateOpen(true)}
                                 >
-                                    <Plus className="mr-1.5 h-4 w-4" /> Log
-                                    hazard
-                                </Button>
+                                    Log hazard
+                                </PageHeaderGlassButton>
                             ) : null}
                             {canGovernance ? (
                                 <Popover
@@ -661,16 +659,12 @@ export function HazardRegister({
                                     onOpenChange={setBoardOpen}
                                 >
                                     <PopoverTrigger asChild>
-                                        <Button
-                                            size="sm"
-                                            className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                        >
-                                            <FileText className="mr-1.5 h-4 w-4" />{' '}
+                                        <PageHeaderGlassButton icon={FileText}>
                                             Board reports
                                             <span aria-hidden className="ml-1">
                                                 ▾
                                             </span>
-                                        </Button>
+                                        </PageHeaderGlassButton>
                                     </PopoverTrigger>
                                     <PopoverContent
                                         align="end"

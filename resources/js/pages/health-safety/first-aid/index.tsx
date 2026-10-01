@@ -8,6 +8,7 @@ import {
     type FirstAidSectionKey,
 } from '@/components/health-safety/first-aid-detail-dialog';
 import { FirstAidReportDialog } from '@/components/health-safety/first-aid-report-dialog';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -16,7 +17,6 @@ import {
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
-import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
 import {
@@ -544,13 +544,12 @@ export default function FirstAidIndex({
                                 </div>
                             </div>
                             {can.create ? (
-                                <Button
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
                                     onClick={() => setReportOpen(true)}
-                                    className="border border-primary-foreground/25 bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                                 >
-                                    <Plus className="mr-1.5 h-4 w-4" /> Record
-                                    first aid
-                                </Button>
+                                    Record first aid
+                                </PageHeaderPrimaryButton>
                             ) : null}
                         </div>
 

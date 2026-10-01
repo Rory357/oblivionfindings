@@ -2,6 +2,7 @@
    hero month stepper are custom-layout bordered surfaces / chip buttons (not Card/Button); colours
    are semantic tokens. */
 import { PageHero, type PageHeroStat } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -548,13 +549,12 @@ export default function MedicationErrors({
                     stats={heroStats}
                     actions={
                         can.record ? (
-                            <Button
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
                                 onClick={() => setModal({ type: 'report' })}
                             >
-                                <Plus className="h-4 w-4" />
                                 Report an error
-                            </Button>
+                            </PageHeaderPrimaryButton>
                         ) : null
                     }
                     footer={

@@ -14,6 +14,7 @@ import {
     type EventDetail,
     type EventSectionKey,
 } from '@/components/health-safety/event-detail-dialog';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -677,16 +678,14 @@ export default function CorrectiveActionsIndex({
                         </div>
 
                         {can.viewReports ? (
-                            <Button
-                                size="sm"
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                            <PageHeaderPrimaryButton
+                                icon={FileText}
                                 onClick={() =>
                                     router.visit(TRACEABILITY_REPORT)
                                 }
                             >
-                                <FileText className="mr-1.5 h-4 w-4" />{' '}
                                 Traceability report
-                            </Button>
+                            </PageHeaderPrimaryButton>
                         ) : null}
                     </div>
 

@@ -17,6 +17,7 @@ import {
 import { useRef, useState, type ReactNode } from 'react';
 
 import { PageHero, type PageHeroBadge } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     WeekPicker,
     weekLabel as isoWeekLabel,
@@ -178,13 +179,12 @@ export function JobBoardHero({
                         {alertsEnabled ? 'Alerts on' : 'Alert me'}
                     </Button>
                     {canPostPosition ? (
-                        <Button
-                            size="sm"
-                            className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
                             onClick={onPostPosition}
                         >
-                            <Plus className="mr-1 h-4 w-4" /> Post position
-                        </Button>
+                            Post position
+                        </PageHeaderPrimaryButton>
                     ) : null}
                 </>
             }

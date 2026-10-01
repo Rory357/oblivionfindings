@@ -1,4 +1,5 @@
 import { PageHero, type PageHeroBadge } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { WeekPicker } from '@/components/rostering/week-picker';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -256,16 +257,13 @@ export default function TimesheetsHero({
                 actions={
                     <>
                         {canCreate ? (
-                            <Button
-                                type="button"
-                                size="sm"
+                            <PageHeaderPrimaryButton
+                                icon={FilePlus2}
                                 onClick={onCreateTimesheet}
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                                 data-testid="open-create-timesheet"
                             >
-                                <FilePlus2 className="mr-1.5 h-4 w-4" />
                                 Create timesheet
-                            </Button>
+                            </PageHeaderPrimaryButton>
                         ) : null}
                         {onMore ? (
                             <Button

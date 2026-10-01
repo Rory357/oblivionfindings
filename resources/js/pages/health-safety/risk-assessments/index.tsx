@@ -17,6 +17,7 @@ import type {
     RaPickers,
     RaRow,
 } from '@/components/health-safety/risk-assessments/types';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -499,14 +500,12 @@ export default function RiskAssessmentsIndex({
                                 </a>
                             ) : null}
                             {can.manage ? (
-                                <Button
-                                    size="sm"
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
                                     onClick={openNew}
-                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                                 >
-                                    <Plus className="h-4 w-4" /> New risk
-                                    assessment
-                                </Button>
+                                    New risk assessment
+                                </PageHeaderPrimaryButton>
                             ) : null}
                         </div>
                     </div>
