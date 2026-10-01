@@ -78,6 +78,8 @@ class WorkerMedsTodayPayloadTest extends TestCase
             'status' => 'scheduled',
         ]);
 
+        // Entered at the start of the day: a dose due before an order's entry is not owed.
+        Carbon::setTestNow(Carbon::parse('2026-04-30 00:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         ClientMedication::query()->create([
             'client_id' => $client->id,
             'name' => 'Morning tablets',
@@ -88,6 +90,7 @@ class WorkerMedsTodayPayloadTest extends TestCase
             'active' => true,
             'state' => 'active',
         ]);
+        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
 
         $prn = ClientMedication::query()->create([
             'client_id' => $client->id,

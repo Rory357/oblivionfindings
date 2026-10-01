@@ -25,7 +25,17 @@ export type DoseStatus =
     | 'given'
     | 'refused'
     | 'withheld'
-    | 'missed';
+    | 'missed'
+    /** Waiting for the order check: the order's change awaits verification. */
+    | 'pending_check';
+
+/**
+ * A dose waiting for the order check is shown but never overdue, and can't
+ * be recorded until the order is checked (the server refuses it too).
+ */
+export function awaitsOrderCheck(row: { status: DoseStatus }): boolean {
+    return row.status === 'pending_check';
+}
 
 export interface RecordedInfo {
     id: number;

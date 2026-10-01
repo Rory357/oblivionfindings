@@ -12,6 +12,8 @@ use App\Models\MedicationCompetencyExemption;
 use App\Models\User;
 use App\Services\MarScheduleService;
 use App\Services\Medication\ClientAllergyRecordService;
+use App\Services\Medication\DoseSlots\DoseSlotProjection;
+use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
@@ -109,6 +111,14 @@ class MedsBoardPayloadService
      * Every scheduled (non-PRN) dose slot for the selected day — recorded or
      * not — for the given clients.
      *
+     * The doses and their states are the dose-slot projection's (C6b, via
+     * ScheduledDoseStates): due at the slot's due time; "due" from the moment
+     * a dose shows as due soon (DoseTimingSettings) through its window
+     * (DoseWindowResolver); "overdue" once the window has ended with nothing
+     * recorded; "pending_check" — Waiting for the order check — for a dose of
+     * an order whose change waits for its check: shown, never overdue, and
+     * not recordable until the order is checked.
+     *
      * @param  array<int, int>  $clientIds
      * @param  Collection<string, ClientMedicationAdministration>  $bySlot
      * @return array<int, array<string, mixed>>
@@ -122,8 +132,10 @@ class MedsBoardPayloadService
         try {
             $timezone = $this->scheduleService->workerTimezone();
 
+            // Verified orders, and orders whose change waits for the order
+            // check (their verified version's doses are still owed).
             $medications = ClientMedication::whereIn('client_id', $clientIds)
-                ->active()
+                ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
                 ->where('is_prn', false)
                 ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
                 ->where(function ($query) {
@@ -132,11 +144,13 @@ class MedsBoardPayloadService
                 })
                 ->with('client:id,first_name,last_name,site_id')
                 ->get();
+            $doses = app(ScheduledDoseStates::class)->dosesOn($medications, $date, $now);
 
             $rows = [];
 
             foreach ($medications as $med) {
-                foreach ($this->scheduleService->scheduledTimesForDate($med, $date) as $scheduled) {
+                foreach ($doses[(int) $med->id] ?? [] as $dose) {
+                    $scheduled = $dose['due_at'];
                     $administration = $bySlot->get(
                         $this->scheduleService->slotKey((int) $med->client_id, (int) $med->id, $scheduled),
                     );
@@ -145,15 +159,7 @@ class MedsBoardPayloadService
                         $administration = null;
                     }
 
-                    if ($administration) {
-                        $status = $administration->status;
-                    } elseif ($scheduled->lt($now)) {
-                        $status = 'overdue';
-                    } elseif ($scheduled->lte($now->copy()->addHour())) {
-                        $status = 'due';
-                    } else {
-                        $status = 'upcoming';
-                    }
+                    $status = $administration ? $administration->status : self::boardStatus($dose);
 
                     $clientName = $med->client
                         ? trim($med->client->first_name.' '.$med->client->last_name)
@@ -194,6 +200,27 @@ class MedsBoardPayloadService
 
             return [];
         }
+    }
+
+    /**
+     * The board's status for an unrecorded dose, from its projection state.
+     *
+     * @param  array{state: string, outcome: string|null, due_soon: bool}  $dose
+     */
+    private static function boardStatus(array $dose): string
+    {
+        if ($dose['outcome'] !== null) {
+            // Recorded, though not matched to a record row here: Away reads as withheld.
+            return $dose['outcome'] === 'away' ? 'withheld' : $dose['outcome'];
+        }
+
+        return match ($dose['state']) {
+            DoseSlotProjection::STATE_PENDING_CHECK => DoseSlotProjection::STATE_PENDING_CHECK,
+            DoseSlotProjection::STATE_DUE => 'due',
+            DoseSlotProjection::STATE_LATE, DoseSlotProjection::STATE_NOT_RECORDED => 'overdue',
+            DoseSlotProjection::STATE_NOT_DUE => $dose['due_soon'] ? 'due' : 'upcoming',
+            default => 'upcoming',
+        };
     }
 
     /** @return array<string, mixed> */

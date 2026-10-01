@@ -101,14 +101,15 @@ import { PrnEffectDialog } from './components/prn-effect-dialog';
 import { PrnWizard } from './components/prn-wizard';
 import { RecordDoseWizard } from './components/record-dose-wizard';
 import { RecordedDetailDialog } from './components/recorded-detail-dialog';
-import type {
-    ActivityItem,
-    ClientInfo,
-    MedsTodayProps,
-    PrnFollowUp,
-    RoundInfo,
-    ScheduleRow,
-    StockAlert,
+import {
+    awaitsOrderCheck,
+    type ActivityItem,
+    type ClientInfo,
+    type MedsTodayProps,
+    type PrnFollowUp,
+    type RoundInfo,
+    type ScheduleRow,
+    type StockAlert,
 } from './types';
 
 /* ------------------------------------------------------------------ */
@@ -126,7 +127,8 @@ function computeBoard(schedule: ScheduleRow[]) {
     const later = schedule.filter((r) => r.status === 'upcoming').length;
     const done = schedule.filter((r) => r.recorded !== null).length;
     const given = schedule.filter((r) => r.status === 'given').length;
-    const total = schedule.length;
+    // Doses waiting for the order check are shown but not counted.
+    const total = schedule.filter((r) => !awaitsOrderCheck(r)).length;
     return {
         overdue,
         due,
@@ -217,6 +219,7 @@ function DoseRow({
 }) {
     const actionable =
         row.recorded === null &&
+        !awaitsOrderCheck(row) &&
         canRecord &&
         (!row.is_controlled || canRecordControlled);
     return (
@@ -1347,7 +1350,9 @@ export default function MedsToday(props: MedsTodayProps) {
         const client = clientById.get(row.client_id);
         const meta = DOSE_STATUS_META[row.status] ?? DOSE_STATUS_META.upcoming;
         const actionable =
-            row.recorded === null && canRecordMedication(row.is_controlled);
+            row.recorded === null &&
+            !awaitsOrderCheck(row) &&
+            canRecordMedication(row.is_controlled);
         const preferred = client?.preferred ?? row.client_name.split(' ')[0];
         const isMac =
             typeof navigator !== 'undefined' &&
@@ -1458,7 +1463,8 @@ export default function MedsToday(props: MedsTodayProps) {
                 !event.ctrlKey &&
                 !event.metaKey &&
                 !event.altKey &&
-                ctxRow.recorded === null
+                ctxRow.recorded === null &&
+                !awaitsOrderCheck(ctxRow)
             ) {
                 event.preventDefault();
                 setWizard({ type: 'dose', row: ctxRow });

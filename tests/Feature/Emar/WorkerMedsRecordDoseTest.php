@@ -1425,9 +1425,12 @@ class WorkerMedsRecordDoseTest extends TestCase
             );
     }
 
+    /** Entered at the start of the day: a dose due before an order's entry is not owed. */
     private function scheduledMedication(array $doseTimes, array $overrides = []): ClientMedication
     {
-        return ClientMedication::query()->create(array_merge([
+        $now = Carbon::getTestNow();
+        Carbon::setTestNow(Carbon::now('Pacific/Auckland')->startOfDay()->utc());
+        $medication = ClientMedication::query()->create(array_merge([
             'client_id' => $this->client->id,
             'name' => 'Morning tablets',
             'dosage' => '1 tablet',
@@ -1437,6 +1440,9 @@ class WorkerMedsRecordDoseTest extends TestCase
             'active' => true,
             'state' => 'active',
         ], $overrides));
+        Carbon::setTestNow($now);
+
+        return $medication;
     }
 
     private function currentWitnessAt(

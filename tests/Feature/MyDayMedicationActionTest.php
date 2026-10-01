@@ -456,6 +456,9 @@ function makeWorkerAndMedication(array $medicationOverrides = []): array
     $client = Client::factory()->create(['site_id' => $site->id]);
     $client->supportWorkers()->attach($worker->id);
 
+    // Entered at the start of the day: a dose due before an order's entry is not owed.
+    $now = Carbon::getTestNow();
+    Carbon::setTestNow(Carbon::now('Pacific/Auckland')->startOfDay()->utc());
     $medication = ClientMedication::factory()->create(array_merge([
         'client_id' => $client->id,
         'name' => 'Donepezil',
@@ -467,6 +470,7 @@ function makeWorkerAndMedication(array $medicationOverrides = []): array
         'start_date' => Carbon::parse('2026-05-01', 'Pacific/Auckland')->toDateString(),
         'end_date' => null,
     ], $medicationOverrides));
+    Carbon::setTestNow($now);
 
     Shift::factory()->create([
         'client_id' => $client->id,
