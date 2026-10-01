@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\Medication\DoseSlots\DoseSlotOrderSync;
 use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -116,6 +117,16 @@ class ClientMedication extends Model
         'version' => 'integer',
     ];
 
+    /**
+     * Fields whose change sends the order back for verification.
+     *
+     * @return list<string>
+     */
+    public static function verificationSensitiveFields(): array
+    {
+        return self::VERIFICATION_SENSITIVE_FIELDS;
+    }
+
     protected static function booted(): void
     {
         static::creating(function (self $medication): void {
@@ -168,6 +179,16 @@ class ClientMedication extends Model
                 || $medication->ceased_by !== null) {
                 throw new \LogicException('Medication cessation evidence is only valid for ceased orders.');
             }
+        });
+
+        // P01 foundation C3: record the schedule history and regenerate the
+        // order's dose slots in the same transaction as the order change.
+        static::created(function (self $medication): void {
+            app(DoseSlotOrderSync::class)->created($medication);
+        });
+
+        static::updated(function (self $medication): void {
+            app(DoseSlotOrderSync::class)->updated($medication);
         });
 
         static::deleting(function (): never {

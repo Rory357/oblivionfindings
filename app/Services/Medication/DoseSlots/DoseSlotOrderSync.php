@@ -1,0 +1,44 @@
+<?php
+
+namespace App\Services\Medication\DoseSlots;
+
+use App\Models\ClientMedication;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Order changes → schedule history → slots ahead, in the same transaction as
+ * the change (P01 foundation C3). Runs from ClientMedication's model events:
+ * create, verify, reject, edit, pause, resume, stop.
+ */
+final class DoseSlotOrderSync
+{
+    public function __construct(
+        private readonly DoseScheduleHistory $history,
+        private readonly DoseSlotGenerator $generator,
+    ) {}
+
+    public function created(ClientMedication $order): void
+    {
+        DB::transaction(function () use ($order): void {
+            $this->history->created($order);
+            $this->generator->generateAhead($order);
+        });
+    }
+
+    public function updated(ClientMedication $order): void
+    {
+        if (array_intersect_key($order->getChanges(), array_flip([
+            ...ClientMedication::verificationSensitiveFields(),
+            ...DoseScheduleHistory::SLOT_RELEVANT_FIELDS,
+        ])) === []) {
+            return;
+        }
+
+        $now = CarbonImmutable::now()->utc();
+        DB::transaction(function () use ($order, $now): void {
+            $this->history->updated($order, $now);
+            $this->generator->generateAhead($order, $now);
+        });
+    }
+}
