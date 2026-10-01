@@ -347,7 +347,10 @@ class MedsBoardPayloadService
                     ->where('status', 'given')
                     ->selectRaw(
                         'client_medication_id, SUM(CASE WHEN administered_at >= ? THEN 1 ELSE 0 END) as given_count, MAX(administered_at) as last_given_at',
-                        [$now->copy()->subHours(24)],
+                        // A bound Carbon is formatted without converting its
+                        // timezone, and administered_at is stored in UTC: an
+                        // NZ "now" here counted only the last ~11–13 hours.
+                        [$now->copy()->utc()->subHours(24)],
                     )
                     ->groupBy('client_medication_id')
                     ->get()

@@ -47,6 +47,10 @@ class ControlRoomControlledMedicationAlertVisibilityTest extends TestCase
         $this->site = Site::factory()->create(['name' => 'Visible Kauri House']);
         $this->foreignSite = Site::factory()->create(['name' => 'Hidden Rimu House']);
         $this->viewer = $this->siteBoundTeamLead($this->site);
+        // Since the eMAR role baseline (1 Oct 2026) team leads hold
+        // medications.controlled.view through their role. This viewer is the
+        // reader without it; tests that need it grant it back explicitly.
+        $this->setPermission($this->viewer, 'medications.controlled.view', false);
         $this->queue = TriageQueue::query()->create([
             'name' => 'Medication response queue',
             'code' => 'medication-response-queue',

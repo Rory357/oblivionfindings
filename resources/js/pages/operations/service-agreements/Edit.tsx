@@ -1140,7 +1140,6 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                                         <Button
                                             type="button"
                                             onClick={handleSubmitForApproval}
-                                            className="bg-status-warning hover:bg-status-warning"
                                         >
                                             <Send className="mr-1.5 h-3.5 w-3.5" />
                                             Submit for Approval

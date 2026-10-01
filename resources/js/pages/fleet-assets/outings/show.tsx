@@ -838,7 +838,6 @@ export default function OutingShow({ outing, vehicle_state, can }: Props) {
                                     );
                                     setShowReturnAllDialog(false);
                                 }}
-                                className="bg-status-success hover:bg-status-success"
                             >
                                 <UserCheck className="mr-2 h-4 w-4" />
                                 Return All (

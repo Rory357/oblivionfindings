@@ -5,9 +5,9 @@ namespace App\Services;
 use App\Models\AppSetting;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Services\Medication\DoseSlots\DoseTimeParser;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 
 class MarScheduleService
 {
@@ -173,97 +173,13 @@ class MarScheduleService
             return [];
         }
 
-        $times = $this->doseTimesFromColumn($medication);
-
-        if ($times === []) {
-            $times = $this->doseTimesFromFrequency($medication);
-        }
+        $times = DoseTimeParser::parse($medication->dose_times, $medication->frequency);
 
         if ($times === []) {
             return [];
         }
 
         return array_map(fn ($t) => $date->copy()->setTimeFromTimeString($t), $times);
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function doseTimesFromColumn(ClientMedication $medication): array
-    {
-        $doseTimes = is_array($medication->dose_times) ? $medication->dose_times : [];
-
-        return collect($doseTimes)
-            ->filter(fn ($time) => is_string($time) && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time) === 1)
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function doseTimesFromFrequency(ClientMedication $medication): array
-    {
-        $freq = trim((string) ($medication->frequency ?? ''));
-        if ($freq === '') {
-            return [];
-        }
-
-        $times = [];
-
-        // 24h times: 8:00 or 08:00
-        if (preg_match_all('/\b([01]?\d|2[0-3])\s*[:.]\s*([0-5]\d)\b/', $freq, $m)) {
-            foreach ($m[1] as $i => $h) {
-                $hh = str_pad((string) ((int) $h), 2, '0', STR_PAD_LEFT);
-                $mm = str_pad((string) ((int) $m[2][$i]), 2, '0', STR_PAD_LEFT);
-                $times[] = "$hh:$mm";
-            }
-        }
-
-        // 12h times: 8am / 8 pm / 8:30am
-        if (preg_match_all('/\b(1[0-2]|0?\d)(?:\s*[:.]\s*([0-5]\d))?\s*(am|pm)\b/i', $freq, $m2)) {
-            foreach ($m2[1] as $i => $h) {
-                $hour = (int) $h;
-                $min = isset($m2[2][$i]) && $m2[2][$i] !== '' ? (int) $m2[2][$i] : 0;
-                $ampm = strtolower($m2[3][$i]);
-                if ($ampm === 'pm' && $hour < 12) {
-                    $hour += 12;
-                }
-                if ($ampm === 'am' && $hour === 12) {
-                    $hour = 0;
-                }
-                $times[] = str_pad((string) $hour, 2, '0', STR_PAD_LEFT).':'.str_pad((string) $min, 2, '0', STR_PAD_LEFT);
-            }
-        }
-
-        // Keywords
-        $lower = Str::lower($freq);
-        $keywordMap = [
-            'morning' => '08:00',
-            'noon' => '12:00',
-            'midday' => '12:00',
-            'afternoon' => '15:00',
-            'evening' => '18:00',
-            'night' => '21:00',
-            'bedtime' => '21:00',
-        ];
-        foreach ($keywordMap as $key => $time) {
-            if (Str::contains($lower, $key)) {
-                $times[] = $time;
-            }
-        }
-
-        $times = collect($times)
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
-        sort($times);
-
-        return $times;
     }
 
     public function windowForScheduled(Carbon $scheduled): array

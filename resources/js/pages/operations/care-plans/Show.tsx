@@ -984,7 +984,7 @@ export default function CarePlanShow({
                                         {goal.status !== 'completed' && (
                                             <Button
                                                 size="sm"
-                                                className="h-7 gap-1 bg-status-success px-3 text-xs text-white hover:bg-status-success"
+                                                className="h-7 gap-1 px-3 text-xs"
                                                 onClick={() =>
                                                     updateGoalProgress(
                                                         goal.id,
