@@ -318,11 +318,28 @@ export function ChipMulti({
     );
 }
 
+/**
+ * Tile-picker grid (POPUP_STYLE_GUIDE "Type picker"): two columns, three once
+ * the picker ITSELF is wide enough. These are container queries on the
+ * picker's own width, not viewport breakpoints, so a narrow wizard pane, a
+ * small dialog or 200% zoom falls back by itself: one column under 24rem, two
+ * from 24rem, three from 42rem. `max` caps the columns, and two or four
+ * options stay two-up so no tile sits alone on a row. Render the grid inside
+ * an `@container` element.
+ */
+export function tilePickerGridClass(optionCount: number, max: 2 | 3 = 3) {
+    const three = max === 3 && optionCount !== 2 && optionCount !== 4;
+    return cn(
+        'grid grid-cols-1 gap-2 @sm:grid-cols-2',
+        three && '@2xl:grid-cols-3',
+    );
+}
+
 export function TilePicker({
     value,
     onChange,
     options,
-    cols = 2,
+    cols = 3,
 }: {
     value: string;
     onChange: (v: string) => void;
@@ -335,69 +352,65 @@ export function TilePicker({
         /** Optional highlighted line under the description (e.g. eligibility). */
         meta?: string;
     }[];
+    /** Most columns the picker may use when wide (default 3). */
     cols?: 2 | 3;
 }) {
     return (
-        <div
-            className={cn(
-                'grid gap-2',
-                cols === 3
-                    ? 'grid-cols-2 sm:grid-cols-3'
-                    : 'grid-cols-1 sm:grid-cols-2',
-            )}
-        >
-            {options.map((o) => {
-                const Icon = o.icon;
-                const active = value === o.key;
-                return (
-                    <button
-                        key={o.key}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => onChange(o.key)}
-                        className={cn(
-                            'flex items-start gap-2.5 rounded-lg border bg-card/50 p-3 text-left transition-all hover:border-primary/50 hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                            active
-                                ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
-                                : 'border-border',
-                        )}
-                    >
-                        {Icon ? (
-                            <span
-                                className={cn(
-                                    'mt-0.5 shrink-0 rounded-lg p-1.5',
-                                    active ? 'bg-primary/15' : 'bg-muted',
-                                )}
-                            >
-                                <Icon
+        <div className="@container">
+            <div className={tilePickerGridClass(options.length, cols)}>
+                {options.map((o) => {
+                    const Icon = o.icon;
+                    const active = value === o.key;
+                    return (
+                        <button
+                            key={o.key}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => onChange(o.key)}
+                            className={cn(
+                                'flex items-start gap-2.5 rounded-lg border bg-card/50 p-3 text-left transition-all hover:border-primary/50 hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                                active
+                                    ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
+                                    : 'border-border',
+                            )}
+                        >
+                            {Icon ? (
+                                <span
                                     className={cn(
-                                        'h-4 w-4',
-                                        active
-                                            ? 'text-primary'
-                                            : (o.accent ??
-                                                  'text-muted-foreground'),
+                                        'mt-0.5 shrink-0 rounded-lg p-1.5',
+                                        active ? 'bg-primary/15' : 'bg-muted',
                                     )}
-                                />
-                            </span>
-                        ) : null}
-                        <span className="min-w-0">
-                            <span className="block text-sm font-semibold">
-                                {o.label}
-                            </span>
-                            {o.description ? (
-                                <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                                    {o.description}
+                                >
+                                    <Icon
+                                        className={cn(
+                                            'h-4 w-4',
+                                            active
+                                                ? 'text-primary'
+                                                : (o.accent ??
+                                                      'text-muted-foreground'),
+                                        )}
+                                    />
                                 </span>
                             ) : null}
-                            {o.meta ? (
-                                <span className="mt-1 block text-[11px] font-medium text-primary">
-                                    {o.meta}
+                            <span className="min-w-0">
+                                <span className="block text-sm font-semibold">
+                                    {o.label}
                                 </span>
-                            ) : null}
-                        </span>
-                    </button>
-                );
-            })}
+                                {o.description ? (
+                                    <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                                        {o.description}
+                                    </span>
+                                ) : null}
+                                {o.meta ? (
+                                    <span className="mt-1 block text-[11px] font-medium text-primary">
+                                        {o.meta}
+                                    </span>
+                                ) : null}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
         </div>
     );
 }
