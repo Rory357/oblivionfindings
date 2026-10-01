@@ -2,7 +2,11 @@
    <button> dose cells (84×46 tap targets) and a bordered panel that intentionally
    diverge from <Button>/<Card>; see design_styles/POPUP_STYLE_GUIDE.md and the MAR handoff. */
 import { cn } from '@/lib/utils';
-import type { DoseStatus, ScheduleRow } from '@/pages/meds/today/types';
+import {
+    awaitsOrderCheck,
+    type DoseStatus,
+    type ScheduleRow,
+} from '@/pages/meds/today/types';
 import { Pill } from 'lucide-react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 
@@ -65,6 +69,11 @@ const STATUS_CELL: Record<DoseStatus, { label: string; className: string }> = {
     upcoming: {
         label: 'Due',
         className: 'border-border/70 bg-muted/40 text-muted-foreground',
+    },
+    // Waiting for the order check: shown, not recordable until checked.
+    pending_check: {
+        label: 'Order check',
+        className: 'border-status-info/40 bg-status-info-bg text-status-info',
     },
 };
 
@@ -254,6 +263,7 @@ export default function MarGrid({
                                         const cell = STATUS_CELL[row.status];
                                         const isRecordable =
                                             canRecord &&
+                                            !awaitsOrderCheck(row) &&
                                             (!row.is_controlled ||
                                                 canRecordControlled);
                                         const recordedTime =

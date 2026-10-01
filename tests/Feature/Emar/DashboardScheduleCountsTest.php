@@ -25,11 +25,10 @@ use Tests\TestCase;
  * dose slots on the worker's (NZ) day — never from `pending` administration
  * rows, which production does not write.
  *
- * C6(a): the dashboard and the /dashboard widget read the dose-slot
- * projection (P09): overdue = the dose window has ended with nothing
- * recorded; admin rate = given ÷ doses whose window has ended. Meds today
- * still builds its own board (time passed = overdue) until it moves onto the
- * projection, so mid-window the two differ on "overdue".
+ * C6(a)/(b): the dashboard, the /dashboard widget and Meds today read the
+ * dose-slot projection (P09): overdue = the dose window has ended with
+ * nothing recorded; admin rate = given ÷ doses whose window has ended. All
+ * three agree on every dose.
  */
 class DashboardScheduleCountsTest extends TestCase
 {
@@ -117,15 +116,16 @@ class DashboardScheduleCountsTest extends TestCase
                     ->where('type', 'overdue_dose')
                     ->count() === $overdue));
 
-        // Meds today's own board (until it moves onto the projection): every
-        // unrecorded dose whose time has passed is "overdue".
+        // Meds today reads the same projection (C6b): overdue once the window
+        // has ended; a dose inside its window is due.
         $this->actingAs($this->worker)
             ->get('/meds/today')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('meds/today/index')
                 ->where('schedule', fn ($rows) => collect($rows)->count() === 4
-                    && collect($rows)->where('status', 'overdue')->count() === 3
+                    && collect($rows)->where('status', 'overdue')->count() === $overdue
+                    && collect($rows)->where('status', 'due')->count() === 3 - $overdue
                     && collect($rows)->where('status', 'given')->count() === 1));
 
         // NF-25: the home /dashboard eMAR widget shows the dashboard's numbers.

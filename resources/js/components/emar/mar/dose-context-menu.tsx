@@ -17,7 +17,11 @@ import {
     ShiftContextMenu,
     type ShiftCtxItem,
 } from '@/components/rostering/shift-context-menu';
-import type { DoseStatus, ScheduleRow } from '@/pages/meds/today/types';
+import {
+    awaitsOrderCheck,
+    type DoseStatus,
+    type ScheduleRow,
+} from '@/pages/meds/today/types';
 import { router } from '@inertiajs/react';
 import { Ban, Check, ClipboardCheck, Eye, Hand, History } from 'lucide-react';
 
@@ -48,6 +52,10 @@ const TAG_TONE: Record<DoseStatus, { bg: string; color: string }> = {
     },
     due: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
     upcoming: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
+    pending_check: {
+        bg: 'var(--status-info-bg)',
+        color: 'var(--status-info)',
+    },
 };
 
 const STATUS_LABEL: Record<DoseStatus, string> = {
@@ -58,6 +66,7 @@ const STATUS_LABEL: Record<DoseStatus, string> = {
     overdue: 'Overdue',
     due: 'Due',
     upcoming: 'Due',
+    pending_check: 'Waiting for the order check',
 };
 
 function nowHm(): string {
@@ -147,7 +156,7 @@ export function DoseContextMenu({
             { sep: true },
             viewHistory,
         ];
-    } else if (canRecord) {
+    } else if (canRecord && !awaitsOrderCheck(row)) {
         items = [
             {
                 icon: <Check className="h-3.5 w-3.5" />,

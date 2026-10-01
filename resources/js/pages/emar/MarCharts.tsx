@@ -33,12 +33,13 @@ import MarGovernanceDialogs, {
 } from '@/pages/emar/components/mar-governance-dialogs';
 import { PrnWizard } from '@/pages/meds/today/components/prn-wizard';
 import { RecordDoseWizard } from '@/pages/meds/today/components/record-dose-wizard';
-import type {
-    ClientInfo,
-    NotGivenReasonOption,
-    PrnMedication,
-    ScheduleRow,
-    WitnessOption,
+import {
+    awaitsOrderCheck,
+    type ClientInfo,
+    type NotGivenReasonOption,
+    type PrnMedication,
+    type ScheduleRow,
+    type WitnessOption,
 } from '@/pages/meds/today/types';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -313,7 +314,8 @@ export default function MarCharts(props: Props) {
             )
                 cdDue += 1;
         }
-        const total = schedule.length;
+        // Doses waiting for the order check are shown but not counted.
+        const total = schedule.filter((row) => !awaitsOrderCheck(row)).length;
         return {
             recorded,
             total,
