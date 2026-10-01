@@ -35,11 +35,15 @@ class ComplianceDashboardSiteScopeTest extends TestCase
     {
         $visibleSite = Site::factory()->create(['name' => 'Visible Site']);
         $hiddenSite = Site::factory()->create(['name' => 'Hidden Site']);
+        // Since cd5d34e6b the CD discrepancy KPI and trend are shown only to
+        // readers with controlled-medicine view (EM-12 concealment); this test
+        // proves their Site scoping, so its reader holds that view.
         $viewer = $this->makeViewer($visibleSite, [
             'compliance.view',
             'governance.compliance.manage',
             'controlRoom.viewAny',
             'audit.viewAny',
+            'medications.controlled.view',
         ]);
 
         $visibleOwner = $this->makeCurrentStaff($visibleSite, ['name' => 'Visible Owner']);
@@ -72,8 +76,18 @@ class ComplianceDashboardSiteScopeTest extends TestCase
             'title' => 'Hidden incident',
         ]);
 
-        ClientControlledDrugDiscrepancy::create(['client_id' => $visibleClient->id, 'status' => 'open']);
-        ClientControlledDrugDiscrepancy::create(['client_id' => $hiddenClient->id, 'status' => 'open']);
+        // Since cd5d34e6b a discrepancy counts only when it is linked to its
+        // client's own controlled order (canonical client/medication rows).
+        foreach ([$visibleClient, $hiddenClient] as $discrepancyClient) {
+            ClientControlledDrugDiscrepancy::create([
+                'client_id' => $discrepancyClient->id,
+                'client_medication_id' => ClientMedication::factory()->create([
+                    'client_id' => $discrepancyClient->id,
+                    'controlled_drug' => true,
+                ])->id,
+                'status' => 'open',
+            ]);
+        }
 
         $visibleMedication = ClientMedication::factory()->create(['client_id' => $visibleClient->id]);
         $hiddenMedication = ClientMedication::factory()->create(['client_id' => $hiddenClient->id]);
@@ -163,7 +177,8 @@ class ComplianceDashboardSiteScopeTest extends TestCase
     public function test_viewer_without_a_current_site_fails_closed_for_operational_data_but_keeps_application_governance(): void
     {
         $site = Site::factory()->create();
-        $viewer = $this->makeViewer(null, ['compliance.view', 'governance.compliance.manage']);
+        // Controlled-medicine view, so the CD KPI is shown and must fail closed (cd5d34e6b).
+        $viewer = $this->makeViewer(null, ['compliance.view', 'governance.compliance.manage', 'medications.controlled.view']);
         $client = Client::factory()->create(['site_id' => $site->id]);
         ClientIncident::factory()->submitted()->atSite($site)->create(['client_id' => $client->id]);
         ControlRoomAlert::factory()->open()->create(['site_id' => $site->id]);
