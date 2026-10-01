@@ -112,7 +112,7 @@ class MedicationSettingsAuditorAccessTest extends TestCase
         ])->assertForbidden();
         $this->post('/emar/settings/rules', $ruleFields)->assertForbidden();
         $this->put("/emar/settings/rules/{$rule->id}", $ruleFields)->assertForbidden();
-        $this->delete("/emar/settings/rules/{$rule->id}")->assertForbidden();
+        $this->post("/emar/settings/rules/{$rule->id}/active", ['active' => false])->assertForbidden();
         $this->post("/emar/settings/witness-pins/{$colleague->id}/reset")->assertForbidden();
 
         $this->assertSame('off', app(MedicationSafetyPolicySettings::class)->restrictedCompetencyMode());

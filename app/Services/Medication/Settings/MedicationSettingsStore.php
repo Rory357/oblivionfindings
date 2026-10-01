@@ -200,6 +200,7 @@ class MedicationSettingsStore
         string $after,
         bool $loosens,
         string $auditEvent,
+        bool $controlled = false,
     ): MedicationSettingChange {
         return MedicationSettingChange::query()->create([
             'setting_group' => self::RULES_GROUP,
@@ -214,6 +215,7 @@ class MedicationSettingsStore
             'before_text' => $before,
             'after_text' => $after,
             'loosens' => $loosens,
+            'controlled' => $controlled,
             'actor_id' => $actor->id,
             'audit_event' => $auditEvent,
         ]);
@@ -247,13 +249,19 @@ class MedicationSettingsStore
 
     /**
      * The newest changes first, organisation-wide ones plus those at the
-     * given houses (null = every house).
+     * given houses (null = every house). For someone without
+     * controlled-medicine access, a change to a rule that names a controlled
+     * medicine — flagged when written, or a rule that does now — keeps only
+     * who, when and where.
      *
      * @param  list<int>|null  $siteIds
+     * @param  list<int>  $controlledRuleIds
      * @return Collection<int, array<string, mixed>>
      */
-    public function history(?array $siteIds, int $limit = 500): Collection
+    public function history(?array $siteIds, int $limit = 500, bool $canSeeControlled = true, array $controlledRuleIds = []): Collection
     {
+        $concealedKeys = array_flip(array_map(fn (int $id): string => 'rule:'.$id, $controlledRuleIds));
+
         return MedicationSettingChange::query()
             ->with(['actor:id,name', 'site:id,name'])
             ->when($siteIds !== null, fn ($query) => $query->where(fn ($scope) => $scope
@@ -262,7 +270,7 @@ class MedicationSettingsStore
             ->orderByDesc('id')
             ->limit($limit)
             ->get()
-            ->map(fn (MedicationSettingChange $change): array => [
+            ->map(fn (MedicationSettingChange $change): array => $this->concealIfNeeded([
                 'id' => $change->id,
                 'at' => $change->created_at?->toIso8601String(),
                 'who' => $change->actor?->name,
@@ -281,7 +289,28 @@ class MedicationSettingsStore
                 'loosens' => $change->loosens,
                 'note' => $change->note,
                 'event' => $change->audit_event,
-            ]);
+                'concealed' => false,
+            ], ! $canSeeControlled && ($change->controlled || ($change->setting_group === self::RULES_GROUP && isset($concealedKeys[$change->setting_key])))));
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function concealIfNeeded(array $row, bool $conceal): array
+    {
+        if (! $conceal) {
+            return $row;
+        }
+
+        return [
+            ...$row,
+            'label' => 'Controlled-medicine rule',
+            'before_text' => '',
+            'after_text' => 'Details need controlled-medicine access',
+            'note' => null,
+            'concealed' => true,
+        ];
     }
 
     /**

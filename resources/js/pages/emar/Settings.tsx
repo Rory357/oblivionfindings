@@ -68,6 +68,7 @@ import {
 import {
     MedicineRules,
     RuleDialogHost,
+    RulesOverview,
     type MedicineRule,
     type RuleData,
     type RuleOptions,
@@ -149,7 +150,7 @@ export default function EmarSettings(props: Props) {
     const { settings: s, witnessPin, settingsAccess, readOnlyAudit } = props;
     const built: Built = useMemo(
         () => ({
-            rules: settingsAccess ? ['medicines', 'safety'] : [],
+            rules: settingsAccess ? ['overview', 'medicines', 'safety'] : [],
             staff: ['pins', 'status'],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
@@ -417,7 +418,7 @@ export default function EmarSettings(props: Props) {
                     <PageHeaderSearch
                         value={query}
                         onChange={setQuery}
-                        placeholder={`Search ${sectionLabel(view, sec).replace(/^[A-Z](?![A-Z])/, (c) => c.toLowerCase())}`}
+                        placeholder={`Search ${(sec === 'overview' ? SET_VIEWS[view].label : sectionLabel(view, sec)).replace(/^[A-Z](?![A-Z])/, (c) => c.toLowerCase())}`}
                     />
                     {settingsAccess ? (
                         <PageHeaderGlassButton
@@ -495,7 +496,9 @@ export default function EmarSettings(props: Props) {
     }));
     const clearQ = () => setQuery('');
     const body =
-        view === 'rules' && sec === 'medicines' ? (
+        view === 'rules' && sec === 'overview' ? (
+            <RulesOverview data={ruleData} q={query} />
+        ) : view === 'rules' && sec === 'medicines' ? (
             <MedicineRules
                 data={ruleData}
                 q={query}

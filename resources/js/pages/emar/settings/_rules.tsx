@@ -16,6 +16,7 @@ import { SettingsModal } from '@/components/settings/settings-modal';
 import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
     Field,
     InfoCard,
@@ -41,6 +42,8 @@ import {
     Eye,
     History,
     Home,
+    Layers,
+    LockKeyhole,
     Pause,
     Pencil,
     Pill,
@@ -49,13 +52,16 @@ import {
     Route as RouteIcon,
     Shield,
     Tag,
+    Users,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSettings, type Dialog } from './_context';
-import { ERROR_BAG, NotFound, whenText } from './_dialogs';
+import { dayText, ERROR_BAG, NotFound, whenText } from './_dialogs';
+import { format } from './_model';
 import {
     Note,
     OnOff,
+    Overview,
     RecordPicker,
     RowMenu,
     Section,
@@ -79,6 +85,10 @@ export type MedicineRule = {
     last_changed_at: string | null;
     paused_note: string | null;
     can_change: boolean;
+    /** Names a controlled medicine this person can't see: details withheld. */
+    concealed: boolean;
+    /** Other active rules that apply to some of the same orders. */
+    overlaps: number[];
 };
 export type RuleOptions = {
     names: { name: string; routes: string[] }[];
@@ -134,6 +144,11 @@ export const ruleSentence = (r: RuleShape, where: string) =>
 
 const whereOf = (r: Pick<MedicineRule, 'site_name' | 'site_id'>) =>
     r.site_id === null ? ALL_HOUSES : (r.site_name ?? 'a house');
+
+const overlapText = (r: MedicineRule) =>
+    r.overlaps.length
+        ? `${r.needs} · overlaps ${r.overlaps.length} other ${r.overlaps.length === 1 ? 'rule' : 'rules'} — both apply`
+        : r.needs;
 
 const match = (q: string, ...s: (string | null | undefined)[]) =>
     !q || s.some((x) => (x ?? '').toLowerCase().includes(q.toLowerCase()));
@@ -237,11 +252,19 @@ export function MedicineRules({
                     identityLabel="Rule"
                     identityWidth="2.2fr"
                     minWidth={860}
-                    identity={(r) => ({
-                        icon: Pill,
-                        name: r.what,
-                        subline: r.needs,
-                    })}
+                    identity={(r) =>
+                        r.concealed
+                            ? {
+                                  icon: LockKeyhole,
+                                  name: r.what,
+                                  subline: r.needs,
+                              }
+                            : {
+                                  icon: Pill,
+                                  name: r.what,
+                                  subline: overlapText(r),
+                              }
+                    }
                     columns={[
                         {
                             key: 'where',
@@ -292,7 +315,7 @@ export function MedicineRules({
                                     </div>
                                     <div className="text-caption">
                                         {r.last_changed_at
-                                            ? whenText(r.last_changed_at)
+                                            ? dayText(r.last_changed_at)
                                             : ''}
                                     </div>
                                 </div>
@@ -709,11 +732,28 @@ export function RuleWizard({
                                         : 'You can add rules for your own houses. Rules for all houses need all-sites authority.'
                                 }
                             />
-                            {valueOk ? (
-                                <InfoCard icon={Check}>
-                                    <b>{sentence}</b>
+                            {valueOk && scopeOk ? (
+                                <>
+                                    <InfoCard icon={Check}>
+                                        <b>{sentence}</b>
+                                    </InfoCard>
+                                    <RulePreview
+                                        rule={{ ...shape, id: src?.id ?? null }}
+                                    />
+                                </>
+                            ) : (
+                                <InfoCard icon={Users}>
+                                    Choose{' '}
+                                    {r.match_type === 'medicine_name'
+                                        ? 'a medicine'
+                                        : r.match_type === 'route'
+                                          ? 'a route'
+                                          : r.match_type === 'nzulm_code'
+                                            ? 'a product'
+                                            : 'where it applies'}{' '}
+                                    to see who this rule affects.
                                 </InfoCard>
-                            ) : null}
+                            )}
                         </div>
                     ) : step === 1 ? (
                         <div className="space-y-4">
@@ -856,6 +896,10 @@ export function RuleWizard({
                                     />
                                 </ReviewCard>
                             </div>
+                            <RulePreview
+                                rule={{ ...shape, id: src?.id ?? null }}
+                                showOverlaps
+                            />
                             <Recorded />
                         </div>
                     )}
@@ -875,10 +919,161 @@ export function RuleWizard({
     );
 }
 
+/* ── Who a rule would apply to now: the reader's own person scope (MAR &
+ * medicines), without controlled medicines they can't see, with no count of
+ * anything hidden. The overlap warning uses the same matching. ── */
+type Preview = {
+    medicines: number;
+    people: number;
+    rows: { person: string; medicine: string; house: string | null }[];
+    more: number;
+    limited: boolean;
+    overlaps: { id: number; sentence: string }[];
+};
+type PreviewRule = Pick<
+    MedicineRule,
+    'match_type' | 'match_value' | 'site_id'
+> & {
+    id: number | null;
+};
+export function RulePreview({
+    rule,
+    showOverlaps,
+}: {
+    rule: PreviewRule;
+    showOverlaps?: boolean;
+}) {
+    const [state, setState] = useState<{
+        key: string;
+        data: Preview | null;
+        failed: boolean;
+    }>({ key: '', data: null, failed: false });
+    const [retry, setRetry] = useState(0);
+    const params = new URLSearchParams({
+        match_type: rule.match_type,
+        match_value: rule.match_value,
+        ...(rule.site_id !== null ? { site_id: String(rule.site_id) } : {}),
+        ...(rule.id ? { rule_id: String(rule.id) } : {}),
+    }).toString();
+    const key = `${params}#${retry}`;
+    useEffect(() => {
+        const abort = new AbortController();
+        const timer = setTimeout(() => {
+            fetch(`/emar/settings/rules/preview?${params}`, {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+                signal: abort.signal,
+            })
+                .then(async (response) => {
+                    if (!response.ok) throw new Error(String(response.status));
+                    return (await response.json()) as Preview;
+                })
+                .then((data) => setState({ key, data, failed: false }))
+                .catch(() => {
+                    if (!abort.signal.aborted)
+                        setState({ key, data: null, failed: true });
+                });
+        }, 250);
+        return () => {
+            clearTimeout(timer);
+            abort.abort();
+        };
+    }, [key, params]);
+    const loading = state.key !== key;
+    if (state.failed && !loading)
+        return (
+            <SettingsNotice>
+                <span>
+                    Couldn’t work out who this rule applies to.{' '}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRetry(retry + 1)}
+                    >
+                        Retry
+                    </Button>
+                </span>
+            </SettingsNotice>
+        );
+    const data = state.data;
+    if (loading || !data)
+        return (
+            <ReviewCard
+                icon={Users}
+                title="Working out who this rule applies to…"
+            >
+                <p className="text-caption">Checking current orders.</p>
+            </ReviewCard>
+        );
+    return (
+        <>
+            <ReviewCard
+                icon={Users}
+                title={`Would apply now to ${data.medicines} ${data.medicines === 1 ? 'medicine' : 'medicines'} for ${data.people} ${data.people === 1 ? 'person' : 'people'}`}
+            >
+                {data.rows.length ? (
+                    data.rows.map((x, i) => (
+                        <ReviewRow
+                            key={i}
+                            label={x.person}
+                            value={`${x.medicine}${x.house ? ` · ${x.house}` : ''}`}
+                        />
+                    ))
+                ) : (
+                    <p className="text-caption">
+                        No current orders match. The rule applies when a
+                        matching order is added.
+                    </p>
+                )}
+                {data.more ? (
+                    <p className="text-caption mt-2">And {data.more} more.</p>
+                ) : null}
+                {data.limited ? (
+                    <p className="text-caption mt-2">
+                        Showing medicines your role can see.
+                    </p>
+                ) : null}
+            </ReviewCard>
+            {showOverlaps && data.overlaps.length ? (
+                <InfoCard icon={Layers} tone="warn">
+                    <b>
+                        Overlaps with{' '}
+                        {data.overlaps.length === 1
+                            ? 'another rule'
+                            : `${data.overlaps.length} other rules`}
+                        .
+                    </b>{' '}
+                    {data.overlaps.map((o) => o.sentence).join(' ')} Both apply
+                    where they overlap: the dose needs everything either rule
+                    asks for.
+                </InfoCard>
+            ) : null}
+        </>
+    );
+}
+
 export function RuleView({ id, data }: { id: number; data: RuleData }) {
     const { close } = useSettings();
     const r = data.rules.find((x) => x.id === id);
     if (!r) return <NotFound what="rule" />;
+    if (r.concealed)
+        return (
+            <SettingsModal
+                title="Controlled-medicine rule"
+                description={`${whereOf(r)} · ${r.active ? 'Active' : 'Paused'}`}
+                onClose={close}
+            >
+                <SettingsNotice role="note">
+                    <span>
+                        <b>
+                            Only people with controlled-medicine access can see
+                            this rule’s details
+                        </b>{' '}
+                        — which medicine it covers and what it asks for.
+                    </span>
+                </SettingsNotice>
+            </SettingsModal>
+        );
     return (
         <SettingsModal
             title="Medicine rule"
@@ -895,9 +1090,17 @@ export function RuleView({ id, data }: { id: number; data: RuleData }) {
                 />
                 <ReviewRow
                     label="Last changed"
-                    value={`${r.last_changed_by ?? '—'}${r.last_changed_at ? ` · ${whenText(r.last_changed_at)}` : ''}`}
+                    value={`${r.last_changed_by ?? '—'}${r.last_changed_at ? ` · ${dayText(r.last_changed_at)}` : ''}`}
                 />
             </ReviewCard>
+            <RulePreview
+                rule={{
+                    match_type: r.match_type,
+                    match_value: r.match_value,
+                    site_id: r.site_id,
+                    id: r.id,
+                }}
+            />
             <SettingsNotice role="note">
                 <span>
                     {r.site_id === null
@@ -1018,4 +1221,63 @@ export function RuleDialogHost({
         default:
             return null;
     }
+}
+
+/* ── Medication rules › Overview (Fleet Tracking): only cards whose
+ * settings are built — Medicine rules and Safety checks. Controlled drugs
+ * arrives with P07a and Medicine photos with P06. ── */
+const SAFETY_KEYS = [
+    'profile_allergy_match',
+    'restricted_competency',
+    'competency_areas',
+];
+export function RulesOverview({ data, q }: { data: RuleData; q: string }) {
+    const { s, go } = useSettings();
+    const active = data.rules.filter((r) => r.active).length;
+    const word = (key: string) => {
+        const def = s.definitions.safety?.[key];
+        const value = s.values.safety?.[key] ?? def?.default ?? '';
+        return (def ? format(def, value) : value).split(' — ')[0];
+    };
+    const open = SAFETY_KEYS.filter((k) => !s.reviewed.safety?.[k]).length;
+    return (
+        <Overview
+            q={q}
+            title="Medication rules"
+            caption="What’s checked before a dose is saved"
+            cards={[
+                {
+                    icon: Pill,
+                    title: 'Medicine rules',
+                    lines: [
+                        data.rules.length
+                            ? `${active} active · ${data.rules.length - active} paused.`
+                            : 'No rules yet.',
+                        'A second person or an observation for specific medicines.',
+                    ],
+                    cta: 'Review medicine rules',
+                    onClick: () => go('rules', 'medicines'),
+                },
+                {
+                    icon: Shield,
+                    title: 'Safety checks',
+                    lines: [
+                        `Allergy match: ${word('profile_allergy_match')}. Restricted competency: ${word('restricted_competency')}.`,
+                        `Area not passed: ${word('competency_areas')}.`,
+                    ],
+                    badge: open ? (
+                        <StatusBadge variant="warning" size="sm">
+                            {open} not yet reviewed
+                        </StatusBadge>
+                    ) : (
+                        <StatusBadge variant="success" size="sm">
+                            All reviewed
+                        </StatusBadge>
+                    ),
+                    cta: 'Review safety checks',
+                    onClick: () => go('rules', 'safety'),
+                },
+            ]}
+        />
+    );
 }

@@ -278,6 +278,10 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::get('/settings', [MedicationSettingsController::class, 'index'])
         ->middleware('permission:medications.settings.manage|medications.witness_pin.reset|medications.audit.view')
         ->name('emar.settings');
+    // P11: who a medicine rule would apply to now, in the reader's own person scope.
+    Route::get('/settings/rules/preview', [MedicationSettingsController::class, 'previewRule'])
+        ->middleware('permission:medications.settings.manage|medications.audit.view')
+        ->name('emar.settings.rules.preview');
     Route::post('/settings/witness-pins/{user}/reset', [MedicationSettingsController::class, 'resetWitnessPin'])
         ->middleware('permission:medications.witness_pin.reset')
         ->name('emar.settings.witness_pins.reset');
@@ -286,7 +290,6 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::put('/settings/rules/{rule}', [MedicationSettingsController::class, 'update'])->name('emar.settings.rules.update');
         // P00 v5: rules are paused and turned back on, recorded in the change history.
         Route::post('/settings/rules/{rule}/active', [MedicationSettingsController::class, 'setActive'])->name('emar.settings.rules.active');
-        Route::delete('/settings/rules/{rule}', [MedicationSettingsController::class, 'destroy'])->name('emar.settings.rules.destroy');
         // P11: save one Settings view's draft (safety checks, witness PIN rules, …),
         // and "Keep today's value" for defaults nobody has reviewed. Both are
         // recorded in the change history and the audit log.

@@ -13,11 +13,13 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\Settings\MedicationSettingDefinition;
 use App\Services\Medication\Settings\MedicationSettingsRegistry;
 use App\Services\Medication\Settings\MedicationSettingsStore;
+use App\Services\Medication\Settings\MedicineRuleScope;
 use App\Services\Medication\Settings\MedicineRuleWording;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationRuleService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -48,6 +50,7 @@ class MedicationSettingsController extends Controller
         private readonly MedicationSettingsRegistry $settingsRegistry,
         private readonly MedicationSettingsStore $settingsStore,
         private readonly MedicineRuleWording $ruleWording,
+        private readonly MedicineRuleScope $ruleScope,
     ) {}
 
     private const WITNESS_PIN_STAFF_LIMIT = 500;
@@ -332,6 +335,12 @@ class MedicationSettingsController extends Controller
 
         $canManageGlobal = $this->canManageGlobalRules($actor);
         $siteIds = $canView ? $this->accessibleSiteIds($actor) : [];
+        // Rules that name a controlled medicine are concealed from anyone
+        // without controlled-medicine access, here and in the history (EM-12).
+        $canSeeControlled = $this->ruleScope->canSeeControlled($actor);
+        $controlledRuleIds = $canView && ! $canSeeControlled
+            ? $this->ruleScope->controlledRuleIds(MedicationAdminRule::query()->get())
+            : [];
         $settings = [
             ...$this->settingsRegistry->toClient(),
             'values' => $this->settingsStore->organisationValues(),
@@ -340,7 +349,9 @@ class MedicationSettingsController extends Controller
             'site_values' => $this->settingsStore->siteValues($siteIds),
             'site_reviewed' => $this->settingsStore->siteReviewed($siteIds),
             // Organisation-wide changes, plus changes at the houses this person can see.
-            'history' => $canView ? $this->settingsStore->history($canManageGlobal ? null : $siteIds) : [],
+            'history' => $canView
+                ? $this->settingsStore->history($canManageGlobal ? null : $siteIds, 500, $canSeeControlled, $controlledRuleIds)
+                : [],
             'can_manage_organisation' => $canManage && $canManageGlobal,
         ];
         $witnessPin = [
@@ -376,8 +387,32 @@ class MedicationSettingsController extends Controller
             $ruleModels->map(fn (MedicationAdminRule $rule): int => (int) $rule->id)->all(),
         );
         $workerTimezone = config('app.worker_timezone', 'Pacific/Auckland');
-        $rules = $ruleModels->map(function (MedicationAdminRule $rule) use ($latestRuleChanges, $actor, $canManage, $workerTimezone): array {
+        // Overlaps use the same person scope as the preview (MAR & medicines).
+        $visibleOrders = $this->ruleScope->visibleOrders($actor, $canManageGlobal ? null : $siteIds);
+        $concealed = array_flip($controlledRuleIds);
+        $rules = $ruleModels->map(function (MedicationAdminRule $rule) use ($latestRuleChanges, $actor, $canManage, $workerTimezone, $visibleOrders, $ruleModels, $concealed): array {
             $change = $latestRuleChanges->get((int) $rule->id);
+            if (isset($concealed[(int) $rule->id])) {
+                return [
+                    'id' => $rule->id,
+                    'site_id' => $rule->site_id,
+                    'site_name' => $rule->site?->name,
+                    'match_type' => $rule->match_type,
+                    'match_value' => '',
+                    'requires_countersign' => false,
+                    'required_observations' => [],
+                    'active' => $rule->active,
+                    'what' => 'Controlled-medicine rule',
+                    'needs' => 'Details need controlled-medicine access',
+                    'sentence' => 'Only people with controlled-medicine access can see this rule’s details.',
+                    'last_changed_by' => $change?->actor?->name ?? $rule->creator?->name,
+                    'last_changed_at' => ($change?->created_at ?? $rule->created_at)?->toIso8601String(),
+                    'paused_note' => null,
+                    'can_change' => false,
+                    'concealed' => true,
+                    'overlaps' => [],
+                ];
+            }
 
             return [
                 'id' => $rule->id,
@@ -397,6 +432,8 @@ class MedicationSettingsController extends Controller
                     ? 'Paused '.$change->created_at->copy()->timezone($workerTimezone)->format('j M Y').' by '.($change->actor?->name ?? 'someone')
                     : null,
                 'can_change' => $canManage && $this->canUseRuleSiteNow($actor, $rule->site_id),
+                'concealed' => false,
+                'overlaps' => $rule->active ? $this->ruleScope->overlaps($visibleOrders, $rule, $ruleModels) : [],
             ];
         })->values();
 
@@ -406,7 +443,13 @@ class MedicationSettingsController extends Controller
             'settingsAccess' => true,
             'readOnlyAudit' => $readOnlyAudit,
             'rules' => $rules,
-            'ruleOptions' => $this->ruleOptions($actor, $siteIds, $canManageGlobal || $readOnlyAudit, $ruleModels),
+            // A concealed rule's medicine never becomes a choice either.
+            'ruleOptions' => $this->ruleOptions(
+                $actor,
+                $siteIds,
+                $canManageGlobal || $readOnlyAudit,
+                $ruleModels->reject(fn (MedicationAdminRule $rule): bool => isset($concealed[(int) $rule->id]))->values(),
+            ),
             'sites' => Site::query()
                 ->whereIn('id', $siteIds)
                 ->orderBy('name')
@@ -435,6 +478,7 @@ class MedicationSettingsController extends Controller
             $lockedSites = $this->lockCurrentRuleSites([$validated['site_id']]);
             $this->assertCurrentRuleSite($lockedActor, $validated['site_id'], $lockedSites, false);
 
+            $controlled = $this->assertMayNameMedicine($lockedActor, new MedicationAdminRule($validated));
             $rule = MedicationAdminRule::create([
                 ...$validated,
                 'created_by' => $lockedActor->id,
@@ -447,6 +491,7 @@ class MedicationSettingsController extends Controller
                 $this->ruleWording->sentence($rule->load('site:id,name')),
                 false,
                 'medicationadminrule.create',
+                $controlled,
             );
         }, 3);
 
@@ -474,6 +519,8 @@ class MedicationSettingsController extends Controller
             ]);
             $this->assertCurrentRuleSite($lockedActor, $lockedRule->site_id, $lockedSites, true);
             $this->assertCurrentRuleSite($lockedActor, $validated['site_id'], $lockedSites, false);
+            $wasControlled = $this->assertMayChangeRule($lockedActor, $lockedRule);
+            $controlled = $this->assertMayNameMedicine($lockedActor, new MedicationAdminRule($validated)) || $wasControlled;
 
             $before = $this->ruleWording->sentence($lockedRule->load('site:id,name'));
             $lockedRule->update($validated);
@@ -487,6 +534,7 @@ class MedicationSettingsController extends Controller
                     $after,
                     $lockedRule->wasChanged('active') && ! $lockedRule->active,
                     'medicationadminrule.update',
+                    $controlled,
                 );
             }
         }, 3);
@@ -512,6 +560,7 @@ class MedicationSettingsController extends Controller
             $lockedActor = $this->lockCurrentRuleActor($actor);
             $lockedSites = $this->lockCurrentRuleSites([$lockedRule->site_id]);
             $this->assertCurrentRuleSite($lockedActor, $lockedRule->site_id, $lockedSites, true);
+            $controlled = $this->assertMayChangeRule($lockedActor, $lockedRule);
             if ($lockedRule->active === $active) {
                 return false;
             }
@@ -525,6 +574,7 @@ class MedicationSettingsController extends Controller
                 $this->ruleWording->sentence($lockedRule->load('site:id,name')),
                 ! $active,
                 'medicationadminrule.update',
+                $controlled,
             );
 
             return true;
@@ -535,23 +585,87 @@ class MedicationSettingsController extends Controller
             : ($active ? 'Rule turned back on. It applies from the next dose saved.' : 'Rule paused. Doses no longer need it.'));
     }
 
-    public function destroy(Request $request, MedicationAdminRule $rule)
+    /**
+     * "Would apply now to N medicines for M people" for a rule being built
+     * or viewed, and which other active rules overlap it. Same person scope
+     * as MAR & medicines: people whose chart this person can open, at houses
+     * they can see; controlled orders only with controlled-medicine access;
+     * no count of anything hidden.
+     */
+    public function previewRule(Request $request): JsonResponse
     {
         $actor = $request->user();
-        abort_unless($this->canManageSettings($actor), 403);
+        $readOnlyAudit = ! $this->canManageSettings($actor) && (bool) $actor?->canDo('medications.audit.view');
+        abort_unless($this->canManageSettings($actor) || $readOnlyAudit, 403);
 
-        DB::transaction(function () use ($actor, $rule): void {
-            $rules = $this->ruleService->lockRuleSet();
-            /** @var MedicationAdminRule|null $lockedRule */
-            $lockedRule = $rules->get((int) $rule->getKey());
-            abort_unless($lockedRule instanceof MedicationAdminRule, 404);
-            $lockedActor = $this->lockCurrentRuleActor($actor);
-            $lockedSites = $this->lockCurrentRuleSites([$lockedRule->site_id]);
-            $this->assertCurrentRuleSite($lockedActor, $lockedRule->site_id, $lockedSites, true);
-            $lockedRule->delete();
-        }, 3);
+        $validated = $request->validate([
+            'match_type' => ['required', 'string', Rule::in(array_column(self::MATCH_TYPES, 'value'))],
+            'match_value' => ['nullable', 'string', 'max:255'],
+            'site_id' => ['nullable', 'integer'],
+            'rule_id' => ['nullable', 'integer'],
+        ]);
+        $global = $this->canManageGlobalRules($actor);
+        $siteIds = $this->accessibleSiteIds($actor);
+        $siteId = isset($validated['site_id']) ? (int) $validated['site_id'] : null;
+        abort_if($siteId !== null && ! $global && ! in_array($siteId, $siteIds, true), 404);
 
-        return redirect()->back()->with('success', 'Medication administration rule removed.');
+        $rule = new MedicationAdminRule([
+            'site_id' => $siteId,
+            'match_type' => $validated['match_type'],
+            'match_value' => $validated['match_type'] === 'controlled' ? '' : trim((string) ($validated['match_value'] ?? '')),
+            'active' => true,
+        ]);
+        $rule->id = (int) ($validated['rule_id'] ?? 0);
+
+        $orders = $this->ruleScope->visibleOrders($actor, $global ? null : $siteIds);
+        $others = $this->visibleRulesQuery($actor, $siteIds, $global || $readOnlyAudit)->with('site:id,name')->get();
+        $overlapIds = array_flip($this->ruleScope->overlaps($orders, $rule, $others));
+        $concealed = $this->ruleScope->canSeeControlled($actor) ? [] : array_flip($this->ruleScope->controlledRuleIds($others));
+
+        return response()->json([
+            ...$this->ruleScope->preview($orders, $rule),
+            // Controlled medicines are left out for people who can't see them.
+            'limited' => ! $this->ruleScope->canSeeControlled($actor),
+            'overlaps' => $others
+                ->filter(fn (MedicationAdminRule $other): bool => isset($overlapIds[(int) $other->id]))
+                ->map(fn (MedicationAdminRule $other): array => [
+                    'id' => $other->id,
+                    'sentence' => isset($concealed[(int) $other->id])
+                        ? 'A controlled-medicine rule (details need controlled-medicine access).'
+                        : $this->ruleWording->sentence($other),
+                ])
+                ->values()
+                ->all(),
+        ]);
+    }
+
+    /**
+     * A rule that names a controlled medicine is hidden from anyone without
+     * controlled-medicine access, so they can't change or pause it either:
+     * it answers as if it weren't there. Returns whether it is controlled.
+     */
+    private function assertMayChangeRule(User $actor, MedicationAdminRule $rule): bool
+    {
+        $controlled = $this->ruleScope->isControlled($rule);
+        abort_if($controlled && ! $this->ruleScope->canSeeControlled($actor), 404);
+
+        return $controlled;
+    }
+
+    /**
+     * Only someone with controlled-medicine access may write a rule that
+     * names a controlled medicine. Returns whether the rule does.
+     */
+    private function assertMayNameMedicine(User $actor, MedicationAdminRule $rule): bool
+    {
+        $controlled = $this->ruleScope->isControlled($rule);
+        if ($controlled && ! $this->ruleScope->canSeeControlled($actor)) {
+            throw ValidationException::withMessages([
+                'match_value' => 'Choose which medicines this rule applies to.',
+            ]);
+        }
+
+        return $controlled;
     }
 
     /**

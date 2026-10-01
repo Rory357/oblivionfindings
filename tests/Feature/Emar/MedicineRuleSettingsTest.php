@@ -209,6 +209,134 @@ class MedicineRuleSettingsTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->has('rules', 0));
     }
 
+    public function test_a_rule_naming_a_controlled_medicine_is_concealed_from_a_settings_manager_without_controlled_access(): void
+    {
+        $client = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active']);
+        $this->order($client, 'Methylphenidate', controlled: true);
+        $this->order($client, 'Metformin');
+        $cdManager = $this->staff(['medications.settings.manage', 'sites.viewAll', 'clients.viewAny']);
+        $rule = fn (string $name): array => [
+            'site_id' => null,
+            'match_type' => 'medicine_name',
+            'match_value' => $name,
+            'requires_countersign' => true,
+            'required_observations' => [],
+            'active' => true,
+        ];
+        $this->actingAs($cdManager)->post('/emar/settings/rules', $rule('Methylphenidate'))->assertSessionHasNoErrors();
+        $this->actingAs($cdManager)->post('/emar/settings/rules', $rule('Metformin'))->assertSessionHasNoErrors();
+        $controlledRule = MedicationAdminRule::query()->where('match_value', 'Methylphenidate')->sole();
+        $this->assertTrue(MedicationSettingChange::query()->where('setting_key', 'rule:'.$controlledRule->id)->sole()->controlled);
+
+        $manager = $this->staff(['medications.settings.manage', 'sites.viewAll', 'clients.viewAny'], deny: ['medications.controlled.view']);
+
+        // The list and the history say nothing about the controlled medicine.
+        $this->actingAs($manager)
+            ->get('/emar/settings')
+            ->assertDontSee('Methylphenidate')
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('rules', 2)
+                ->where('rules', fn ($rules) => collect($rules)->contains(fn ($r) => $r['id'] === $controlledRule->id
+                    && $r['concealed'] === true
+                    && $r['what'] === 'Controlled-medicine rule'
+                    && $r['match_value'] === ''
+                    && $r['can_change'] === false)
+                    && collect($rules)->contains(fn ($r) => $r['what'] === 'Metformin' && $r['concealed'] === false))
+                ->where('settings.history', fn ($history) => collect($history)->contains(fn ($h) => $h['key'] === 'rule:'.$controlledRule->id
+                    && $h['label'] === 'Controlled-medicine rule'
+                    && $h['after_text'] === 'Details need controlled-medicine access'
+                    && $h['concealed'] === true)));
+
+        // The preview leaves controlled orders out.
+        $this->actingAs($manager)
+            ->getJson('/emar/settings/rules/preview?match_type=medicine_name&match_value=Methylphenidate')
+            ->assertOk()
+            ->assertJson(['medicines' => 0, 'people' => 0, 'rows' => [], 'limited' => true]);
+
+        // Changing, pausing or writing it answers as if it weren't there.
+        $this->actingAs($manager)
+            ->put("/emar/settings/rules/{$controlledRule->id}", $rule('Methylphenidate'))
+            ->assertNotFound();
+        $this->actingAs($manager)
+            ->post("/emar/settings/rules/{$controlledRule->id}/active", ['active' => false])
+            ->assertNotFound();
+        $this->actingAs($manager)
+            ->from('/emar/settings')
+            ->post('/emar/settings/rules', $rule('Methylphenidate'))
+            ->assertSessionHasErrors('match_value');
+        $this->assertTrue($controlledRule->fresh()->active);
+        $this->assertSame(2, MedicationAdminRule::query()->count());
+
+        // With controlled-medicine access, everything shows.
+        $this->actingAs($cdManager)
+            ->get('/emar/settings')
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('rules', fn ($rules) => collect($rules)->contains(fn ($r) => $r['what'] === 'Methylphenidate' && $r['can_change'] === true)));
+        $this->actingAs($cdManager)
+            ->getJson('/emar/settings/rules/preview?match_type=medicine_name&match_value=Methylphenidate')
+            ->assertJson(['medicines' => 1, 'people' => 1, 'limited' => false]);
+    }
+
+    public function test_the_preview_and_overlaps_follow_the_mar_person_scope(): void
+    {
+        $otherSite = Site::factory()->create(['is_active' => true, 'name' => 'Rimu House']);
+        $aroha = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active', 'first_name' => 'Aroha', 'last_name' => 'Ngata', 'preferred_name' => null]);
+        $ben = Client::factory()->create(['site_id' => $otherSite->id, 'status' => 'active', 'first_name' => 'Ben', 'last_name' => 'Clarke', 'preferred_name' => null]);
+        $this->order($aroha, 'Insulin glargine', route: 'Subcutaneous injection');
+        $this->order($ben, 'Insulin glargine', route: 'Subcutaneous injection');
+        $routeRule = MedicationAdminRule::query()->create([
+            'site_id' => null,
+            'match_type' => 'route',
+            'match_value' => 'Subcutaneous injection',
+            'requires_countersign' => true,
+            'required_observations' => [],
+            'active' => true,
+        ]);
+        $query = '/emar/settings/rules/preview?match_type=medicine_name&match_value=Insulin%20glargine';
+
+        // A house manager sees only the people at their house: no count of anyone else.
+        $houseManager = $this->staff(['medications.settings.manage', 'clients.viewAny']);
+        $this->actingAs($houseManager)
+            ->getJson($query)
+            ->assertOk()
+            ->assertExactJson([
+                'medicines' => 1,
+                'people' => 1,
+                'rows' => [['person' => 'Aroha Ngata', 'medicine' => 'Insulin glargine', 'house' => 'Kōwhai House']],
+                'more' => 0,
+                'limited' => false,
+                // House managers don't see rules for every house (MedicationSettingsSiteScopeTest).
+                'overlaps' => [],
+            ]);
+        // A house they can't see is refused, not previewed.
+        $this->actingAs($houseManager)->getJson($query.'&site_id='.$otherSite->id)->assertNotFound();
+
+        $allSites = $this->staff(['medications.settings.manage', 'sites.viewAll', 'clients.viewAny']);
+        $this->actingAs($allSites)
+            ->getJson($query)
+            ->assertJson([
+                'medicines' => 1,
+                'people' => 2,
+                'overlaps' => [['id' => $routeRule->id, 'sentence' => 'Before saving a dose of any medicine given by subcutaneous injection at All houses: a second person confirms with their witness PIN.']],
+            ]);
+        $this->actingAs($allSites)
+            ->getJson($query.'&site_id='.$otherSite->id)
+            ->assertJson(['people' => 1, 'rows' => [['person' => 'Ben Clarke', 'house' => 'Rimu House']]]);
+
+        // The list shows the same overlap on the route rule's row.
+        $this->actingAs($allSites)->post('/emar/settings/rules', [
+            'site_id' => null,
+            'match_type' => 'medicine_name',
+            'match_value' => 'Insulin glargine',
+            'requires_countersign' => false,
+            'required_observations' => ['blood_glucose'],
+        ])->assertSessionHasNoErrors();
+        $this->actingAs($allSites)
+            ->get('/emar/settings')
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('rules', fn ($rules) => collect($rules)->firstWhere('id', $routeRule->id)['overlaps'] === [MedicationAdminRule::query()->where('match_type', 'medicine_name')->value('id')]));
+    }
+
     private function order(Client $client, string $name, string $route = 'Oral', ?string $nzulm = null, bool $controlled = false): ClientMedication
     {
         $order = ClientMedication::query()->create([

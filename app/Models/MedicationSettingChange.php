@@ -30,6 +30,7 @@ class MedicationSettingChange extends Model
         'before_text',
         'after_text',
         'loosens',
+        'controlled',
         'note',
         'actor_id',
         'audit_event',
@@ -41,6 +42,7 @@ class MedicationSettingChange extends Model
         'before_value' => 'json',
         'after_value' => 'json',
         'loosens' => 'boolean',
+        'controlled' => 'boolean',
         'created_at' => 'datetime',
     ];
 
