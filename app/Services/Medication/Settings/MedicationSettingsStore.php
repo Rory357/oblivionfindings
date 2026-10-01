@@ -3,6 +3,7 @@
 namespace App\Services\Medication\Settings;
 
 use App\Models\AppSetting;
+use App\Models\MedicationAdminRule;
 use App\Models\MedicationSettingChange;
 use App\Models\MedicationSiteSetting;
 use App\Models\User;
@@ -30,6 +31,9 @@ class MedicationSettingsStore
     public const REVISION_KEY = 'medications.settings.revision';
 
     public const NOT_YET_REVIEWED = 'Default — not yet reviewed';
+
+    /** History entries for medicine rules use this group, keyed "rule:{id}". */
+    public const RULES_GROUP = 'medicine_rules';
 
     public function __construct(private readonly MedicationSettingsRegistry $registry) {}
 
@@ -181,6 +185,64 @@ class MedicationSettingsStore
 
             return count($planned);
         });
+    }
+
+    /**
+     * Record a medicine-rule change (added, changed, paused, turned back on)
+     * in the change history, worded like the rule itself. The rule's own
+     * audit entry is written by the model; a rule can't be "put back".
+     */
+    public function recordRuleChange(
+        User $actor,
+        MedicationAdminRule $rule,
+        string $label,
+        string $before,
+        string $after,
+        bool $loosens,
+        string $auditEvent,
+    ): MedicationSettingChange {
+        return MedicationSettingChange::query()->create([
+            'setting_group' => self::RULES_GROUP,
+            'setting_key' => 'rule:'.$rule->id,
+            'site_id' => $rule->site_id,
+            'action' => MedicationSettingChange::ACTION_CHANGED,
+            'view' => MedicationSettingsRegistry::VIEW_RULES,
+            'section' => 'medicines',
+            'label' => $label,
+            'before_value' => null,
+            'after_value' => null,
+            'before_text' => $before,
+            'after_text' => $after,
+            'loosens' => $loosens,
+            'actor_id' => $actor->id,
+            'audit_event' => $auditEvent,
+        ]);
+    }
+
+    /**
+     * The newest history entry for each medicine rule, keyed by rule id.
+     *
+     * @param  list<int>  $ruleIds
+     * @return Collection<int, MedicationSettingChange>
+     */
+    public function latestRuleChanges(array $ruleIds): Collection
+    {
+        if ($ruleIds === []) {
+            return collect();
+        }
+        $keys = array_map(fn (int $id): string => 'rule:'.$id, $ruleIds);
+        $latestIds = MedicationSettingChange::query()
+            ->selectRaw('MAX(id) as id')
+            ->where('setting_group', self::RULES_GROUP)
+            ->whereIn('setting_key', $keys)
+            ->groupBy('setting_key')
+            ->pluck('id');
+
+        return MedicationSettingChange::query()
+            ->with('actor:id,name')
+            ->whereIn('id', $latestIds->all())
+            ->get()
+            ->keyBy(fn (MedicationSettingChange $change): int => (int) substr($change->setting_key, 5));
     }
 
     /**

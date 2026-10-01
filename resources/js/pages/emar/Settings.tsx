@@ -67,17 +67,27 @@ import {
 } from './settings/_nav';
 import {
     MedicineRules,
+    RuleDialogHost,
+    type MedicineRule,
+    type RuleData,
+    type RuleOptions,
+} from './settings/_rules';
+import {
     PIN_STATUS_OPTIONS,
     PinStatus,
     SafetyChecks,
     WitnessPins,
-    type MedicineRuleProps,
     type WitnessPinProps,
 } from './settings/_sections';
 import { useStatusMessage } from './settings/_status';
 import { SaveBar, StatusMessage } from './settings/_ui';
 
-type Props = MedicineRuleProps & {
+type Props = {
+    rules: MedicineRule[];
+    ruleOptions: RuleOptions;
+    /** Houses this person can see; the house choices for medicine rules. */
+    sites: { id: number; name: string }[];
+    can: { manage: boolean; manage_global: boolean };
     settings: SettingsPayload;
     witnessPin: WitnessPinProps;
     /** false = a house lead who can only reset PINs sees Staff & PINs, read-only. */
@@ -239,6 +249,13 @@ export default function EmarSettings(props: Props) {
         };
     }, [dirty]);
 
+    const ruleData: RuleData = {
+        rules: props.rules,
+        options: props.ruleOptions,
+        sites: props.sites,
+        can: props.can,
+        readOnlyAudit,
+    };
     const canEdit = (group: string) =>
         !!s.groups[group] && s.can_manage_organisation;
     const ctx: SettingsContext = {
@@ -250,7 +267,8 @@ export default function EmarSettings(props: Props) {
         open: (next) => {
             // The walkthrough confirms in its own success pane; the page's
             // message waits until it closes.
-            if (next?.kind === 'reviewdefaults') status.hold();
+            if (next?.kind === 'reviewdefaults' || next?.kind === 'rule')
+                status.hold();
             setDialog(next);
         },
         close: () => {
@@ -479,7 +497,7 @@ export default function EmarSettings(props: Props) {
     const body =
         view === 'rules' && sec === 'medicines' ? (
             <MedicineRules
-                {...props}
+                data={ruleData}
                 q={query}
                 where={f.rulesWhere}
                 state={f.rulesState}
@@ -566,6 +584,7 @@ export default function EmarSettings(props: Props) {
                     ) : null}
                 </div>
                 <DialogHost dialog={dialog} />
+                <RuleDialogHost dialog={dialog} data={ruleData} />
             </SettingsCtx.Provider>
         </AppLayout>
     );

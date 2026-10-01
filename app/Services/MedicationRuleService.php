@@ -70,6 +70,11 @@ class MedicationRuleService
 
     private function matches(MedicationAdminRule $rule, ClientMedication $medication): bool
     {
+        // P11 / P00 v5: "Controlled status" matches any order flagged controlled.
+        if ($rule->match_type === 'controlled') {
+            return (bool) $medication->controlled_drug;
+        }
+
         $needle = Str::lower(trim((string) $rule->match_value));
 
         if ($needle === '') {

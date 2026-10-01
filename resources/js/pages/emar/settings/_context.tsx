@@ -12,7 +12,11 @@ export type Dialog =
     | { kind: 'hist'; id: number }
     | { kind: 'restore'; id: number }
     | { kind: 'keep'; group: string; key: string }
-    | { kind: 'reviewdefaults' };
+    | { kind: 'reviewdefaults' }
+    | { kind: 'rule'; id: number | 'new' }
+    | { kind: 'ruleview'; id: number }
+    | { kind: 'ruletoggle'; id: number }
+    | { kind: 'rulehistory'; id: number };
 
 export type SettingsContext = {
     s: SettingsPayload;

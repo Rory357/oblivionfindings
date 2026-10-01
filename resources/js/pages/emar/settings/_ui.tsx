@@ -10,14 +10,32 @@ import { ListCaption } from '@/components/lists/list-caption';
 import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+    Command,
+    CommandEmpty,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
 import { Label } from '@/components/ui/label';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Switch } from '@/components/ui/switch';
 import { FieldErr, Segmented } from '@/components/wizard/primitives';
 import { ReviewCard } from '@/components/wizard/shell';
 import { cn } from '@/lib/utils';
-import { ArrowUpRight, type LucideIcon } from 'lucide-react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import {
+    ArrowUpRight,
+    Check,
+    ChevronDown,
+    Search,
+    type LucideIcon,
+} from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 export const DefaultNotReviewed = () => (
     <StatusBadge variant="warning" size="sm">
@@ -389,6 +407,141 @@ export function Overview({
                 ))}
             </div>
             {note ? <Note>{note}</Note> : null}
+        </div>
+    );
+}
+
+/** Searchable record selector (POPUP guide: Popover + Command over a small,
+ * complete authorised list). Items that can't be chosen stay listed with why. */
+export type PickItem = {
+    id: string;
+    name: string;
+    sub: string;
+    ok: boolean;
+    why?: string;
+};
+export function RecordPicker({
+    id,
+    label,
+    value,
+    items,
+    onChange,
+    error,
+    required,
+    foot,
+    placeholder = 'Search and choose a person',
+    search = 'Search by name…',
+    disabled,
+}: {
+    id: string;
+    label: string;
+    value: string;
+    items: PickItem[];
+    onChange: (id: string) => void;
+    error?: string;
+    required?: boolean;
+    foot?: string;
+    placeholder?: string;
+    search?: string;
+    disabled?: boolean;
+}) {
+    const [open, setOpen] = useState(false);
+    const sel = items.find((x) => x.id === value);
+    return (
+        <div className="min-w-0">
+            <Label
+                id={`${id}-label`}
+                htmlFor={id}
+                className="mb-1.5 flex items-center gap-1.5"
+            >
+                {label}
+                {required ? (
+                    <span className="text-status-critical">*</span>
+                ) : null}
+            </Label>
+            <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                    <Button
+                        id={id}
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={open}
+                        aria-invalid={!!error || undefined}
+                        aria-describedby={error ? `${id}-error` : undefined}
+                        disabled={disabled}
+                        className={cn(
+                            'h-auto min-h-10 w-full justify-between py-2 text-left font-normal',
+                            !sel && 'text-muted-foreground',
+                        )}
+                    >
+                        <span className="flex min-w-0 items-center gap-2">
+                            <Search className="size-4 shrink-0" />
+                            {sel ? (
+                                <span className="min-w-0">
+                                    <span className="block truncate font-semibold text-foreground">
+                                        {sel.name}
+                                    </span>
+                                    <span className="text-caption block truncate">
+                                        {sel.sub}
+                                    </span>
+                                </span>
+                            ) : (
+                                placeholder
+                            )}
+                        </span>
+                        <ChevronDown className="size-4 shrink-0 opacity-60" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                    className="w-[--radix-popover-trigger-width] min-w-[360px] p-0"
+                    align="start"
+                >
+                    <Command>
+                        <CommandInput placeholder={search} />
+                        <CommandList>
+                            <CommandEmpty>
+                                No one matches. Check the spelling, or clear the
+                                search.
+                            </CommandEmpty>
+                            {items.map((x) => (
+                                <CommandItem
+                                    key={x.id}
+                                    value={`${x.name} ${x.sub}`}
+                                    disabled={!x.ok}
+                                    onSelect={() => {
+                                        onChange(x.id);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    <Check
+                                        className={cn(
+                                            'size-4',
+                                            value === x.id
+                                                ? 'opacity-100'
+                                                : 'opacity-0',
+                                        )}
+                                    />
+                                    <span className="min-w-0">
+                                        <span className="block font-medium">
+                                            {x.name}
+                                        </span>
+                                        <span className="text-caption block">
+                                            {x.sub}
+                                            {x.ok
+                                                ? ''
+                                                : ` · can’t be chosen: ${x.why}`}
+                                        </span>
+                                    </span>
+                                </CommandItem>
+                            ))}
+                        </CommandList>
+                    </Command>
+                    {foot ? (
+                        <p className="text-caption border-t p-2">{foot}</p>
+                    ) : null}
+                </PopoverContent>
+            </Popover>
+            <FieldErr id={`${id}-error`}>{error}</FieldErr>
         </div>
     );
 }

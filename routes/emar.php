@@ -284,6 +284,8 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::middleware('permission:medications.settings.manage')->group(function () {
         Route::post('/settings/rules', [MedicationSettingsController::class, 'store'])->name('emar.settings.rules.store');
         Route::put('/settings/rules/{rule}', [MedicationSettingsController::class, 'update'])->name('emar.settings.rules.update');
+        // P00 v5: rules are paused and turned back on, recorded in the change history.
+        Route::post('/settings/rules/{rule}/active', [MedicationSettingsController::class, 'setActive'])->name('emar.settings.rules.active');
         Route::delete('/settings/rules/{rule}', [MedicationSettingsController::class, 'destroy'])->name('emar.settings.rules.destroy');
         // P11: save one Settings view's draft (safety checks, witness PIN rules, …),
         // and "Keep today's value" for defaults nobody has reviewed. Both are

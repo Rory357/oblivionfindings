@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Emar;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\PeopleMutationLockService;
 use App\Http\Controllers\Controller;
+use App\Models\ClientMedication;
 use App\Models\MedicationAdminRule;
 use App\Models\Site;
 use App\Models\User;
@@ -12,6 +13,7 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\Settings\MedicationSettingDefinition;
 use App\Services\Medication\Settings\MedicationSettingsRegistry;
 use App\Services\Medication\Settings\MedicationSettingsStore;
+use App\Services\Medication\Settings\MedicineRuleWording;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationRuleService;
 use App\Services\UserSiteAccessService;
@@ -45,6 +47,7 @@ class MedicationSettingsController extends Controller
         private readonly WitnessPinService $witnessPins,
         private readonly MedicationSettingsRegistry $settingsRegistry,
         private readonly MedicationSettingsStore $settingsStore,
+        private readonly MedicineRuleWording $ruleWording,
     ) {}
 
     private const WITNESS_PIN_STAFF_LIMIT = 500;
@@ -219,7 +222,7 @@ class MedicationSettingsController extends Controller
 
         $this->witnessPins->resetByAdmin($user, $actor);
 
-        return redirect()->back()->with('success', $user->name.'’s witness PIN was reset. They must choose a new one before they can co-sign or witness.');
+        return redirect()->back()->with('medication_settings_saved', $user->name.'’s witness PIN was reset. They must choose a new one before they can co-sign or witness.');
     }
 
     /**
@@ -314,6 +317,7 @@ class MedicationSettingsController extends Controller
         ['value' => 'medicine_name', 'label' => 'Medicine name'],
         ['value' => 'route', 'label' => 'Route'],
         ['value' => 'nzulm_code', 'label' => 'NZULM code'],
+        ['value' => 'controlled', 'label' => 'Controlled status'],
     ];
 
     public function index(Request $request)
@@ -353,6 +357,7 @@ class MedicationSettingsController extends Controller
                 'settingsAccess' => false,
                 'readOnlyAudit' => false,
                 'rules' => [],
+                'ruleOptions' => ['names' => [], 'routes' => [], 'nzulm' => []],
                 'sites' => [],
                 'observationOptions' => self::OBSERVATION_OPTIONS,
                 'matchTypes' => self::MATCH_TYPES,
@@ -361,13 +366,20 @@ class MedicationSettingsController extends Controller
         }
 
         // Auditors also read the organisation-wide rules; they change nothing.
-        $rules = $this->visibleRulesQuery($actor, $siteIds, $canManageGlobal || $readOnlyAudit)
+        $ruleModels = $this->visibleRulesQuery($actor, $siteIds, $canManageGlobal || $readOnlyAudit)
             ->with(['site:id,name', 'creator:id,name'])
             ->orderByDesc('active')
             ->orderBy('match_type')
             ->orderBy('match_value')
-            ->get()
-            ->map(fn (MedicationAdminRule $rule) => [
+            ->get();
+        $latestRuleChanges = $this->settingsStore->latestRuleChanges(
+            $ruleModels->map(fn (MedicationAdminRule $rule): int => (int) $rule->id)->all(),
+        );
+        $workerTimezone = config('app.worker_timezone', 'Pacific/Auckland');
+        $rules = $ruleModels->map(function (MedicationAdminRule $rule) use ($latestRuleChanges, $actor, $canManage, $workerTimezone): array {
+            $change = $latestRuleChanges->get((int) $rule->id);
+
+            return [
                 'id' => $rule->id,
                 'site_id' => $rule->site_id,
                 'site_name' => $rule->site?->name,
@@ -376,9 +388,17 @@ class MedicationSettingsController extends Controller
                 'requires_countersign' => $rule->requires_countersign,
                 'required_observations' => $rule->required_observations ?? [],
                 'active' => $rule->active,
-                'created_by' => $rule->creator?->name,
-                'created_at' => $rule->created_at?->toDateString(),
-            ]);
+                'what' => $this->ruleWording->what($rule),
+                'needs' => $this->ruleWording->needs($rule),
+                'sentence' => $this->ruleWording->sentence($rule),
+                'last_changed_by' => $change?->actor?->name ?? $rule->creator?->name,
+                'last_changed_at' => ($change?->created_at ?? $rule->created_at)?->toIso8601String(),
+                'paused_note' => ! $rule->active && $change
+                    ? 'Paused '.$change->created_at->copy()->timezone($workerTimezone)->format('j M Y').' by '.($change->actor?->name ?? 'someone')
+                    : null,
+                'can_change' => $canManage && $this->canUseRuleSiteNow($actor, $rule->site_id),
+            ];
+        })->values();
 
         return Inertia::render('emar/Settings', [
             'settings' => $settings,
@@ -386,6 +406,7 @@ class MedicationSettingsController extends Controller
             'settingsAccess' => true,
             'readOnlyAudit' => $readOnlyAudit,
             'rules' => $rules,
+            'ruleOptions' => $this->ruleOptions($actor, $siteIds, $canManageGlobal || $readOnlyAudit, $ruleModels),
             'sites' => Site::query()
                 ->whereIn('id', $siteIds)
                 ->orderBy('name')
@@ -414,13 +435,24 @@ class MedicationSettingsController extends Controller
             $lockedSites = $this->lockCurrentRuleSites([$validated['site_id']]);
             $this->assertCurrentRuleSite($lockedActor, $validated['site_id'], $lockedSites, false);
 
-            MedicationAdminRule::create([
+            $rule = MedicationAdminRule::create([
                 ...$validated,
                 'created_by' => $lockedActor->id,
             ]);
+            $this->settingsStore->recordRuleChange(
+                $lockedActor,
+                $rule,
+                'Medicine rule added',
+                '—',
+                $this->ruleWording->sentence($rule->load('site:id,name')),
+                false,
+                'medicationadminrule.create',
+            );
         }, 3);
 
-        return redirect()->back()->with('success', 'Medication administration rule added.');
+        return redirect()->back()->with('medication_settings_saved', $validated['active']
+            ? 'Rule added. It applies from the next dose saved.'
+            : 'Rule saved as paused. It doesn’t apply until someone turns it on.');
     }
 
     public function update(Request $request, MedicationAdminRule $rule)
@@ -442,10 +474,65 @@ class MedicationSettingsController extends Controller
             ]);
             $this->assertCurrentRuleSite($lockedActor, $lockedRule->site_id, $lockedSites, true);
             $this->assertCurrentRuleSite($lockedActor, $validated['site_id'], $lockedSites, false);
+
+            $before = $this->ruleWording->sentence($lockedRule->load('site:id,name'));
             $lockedRule->update($validated);
+            $after = $this->ruleWording->sentence($lockedRule->load('site:id,name'));
+            if ($before !== $after || $lockedRule->wasChanged('active')) {
+                $this->settingsStore->recordRuleChange(
+                    $lockedActor,
+                    $lockedRule,
+                    'Medicine rule changed',
+                    $before,
+                    $after,
+                    $lockedRule->wasChanged('active') && ! $lockedRule->active,
+                    'medicationadminrule.update',
+                );
+            }
         }, 3);
 
-        return redirect()->back()->with('success', 'Medication administration rule updated.');
+        return redirect()->back()->with('medication_settings_saved', 'Rule updated. It applies from the next dose saved.');
+    }
+
+    /**
+     * Pause a rule or turn it back on (P00 v5: rules are paused, never
+     * deleted). Pausing loosens a check: doses no longer need it.
+     */
+    public function setActive(Request $request, MedicationAdminRule $rule)
+    {
+        $actor = $request->user();
+        abort_unless($this->canManageSettings($actor), 403);
+        $active = (bool) $request->validate(['active' => ['required', 'boolean']])['active'];
+
+        $changed = DB::transaction(function () use ($actor, $rule, $active): bool {
+            $rules = $this->ruleService->lockRuleSet();
+            /** @var MedicationAdminRule|null $lockedRule */
+            $lockedRule = $rules->get((int) $rule->getKey());
+            abort_unless($lockedRule instanceof MedicationAdminRule, 404);
+            $lockedActor = $this->lockCurrentRuleActor($actor);
+            $lockedSites = $this->lockCurrentRuleSites([$lockedRule->site_id]);
+            $this->assertCurrentRuleSite($lockedActor, $lockedRule->site_id, $lockedSites, true);
+            if ($lockedRule->active === $active) {
+                return false;
+            }
+
+            $lockedRule->update(['active' => $active]);
+            $this->settingsStore->recordRuleChange(
+                $lockedActor,
+                $lockedRule,
+                $active ? 'Medicine rule turned back on' : 'Medicine rule paused',
+                $active ? 'Paused' : 'Active',
+                $this->ruleWording->sentence($lockedRule->load('site:id,name')),
+                ! $active,
+                'medicationadminrule.update',
+            );
+
+            return true;
+        }, 3);
+
+        return redirect()->back()->with('medication_settings_saved', ! $changed
+            ? ($active ? 'This rule is already on.' : 'This rule is already paused.')
+            : ($active ? 'Rule turned back on. It applies from the next dose saved.' : 'Rule paused. Doses no longer need it.'));
     }
 
     public function destroy(Request $request, MedicationAdminRule $rule)
@@ -474,22 +561,32 @@ class MedicationSettingsController extends Controller
     {
         $validated = $request->validate([
             'site_id' => ['nullable', 'integer', Rule::in($siteIds)],
-            'match_type' => ['required', 'string', Rule::in(['medicine_name', 'route', 'nzulm_code'])],
-            'match_value' => ['required', 'string', 'max:255'],
+            'match_type' => ['required', 'string', Rule::in(array_column(self::MATCH_TYPES, 'value'))],
+            // "Controlled status" matches the order's controlled flag, so it names no medicine.
+            'match_value' => ['required_unless:match_type,controlled', 'nullable', 'string', 'max:255'],
             'requires_countersign' => ['nullable', 'boolean'],
             'required_observations' => ['nullable', 'array'],
-            'required_observations.*' => ['string', Rule::in(['blood_glucose', 'pulse', 'blood_pressure'])],
+            'required_observations.*' => ['string', Rule::in(array_column(self::OBSERVATION_OPTIONS, 'value'))],
             'active' => ['nullable', 'boolean'],
+        ], [
+            'match_value.required_unless' => 'Choose which medicines this rule applies to.',
         ]);
 
-        return [
+        $rule = [
             'site_id' => $validated['site_id'] ?? null,
             'match_type' => $validated['match_type'],
-            'match_value' => trim($validated['match_value']),
+            'match_value' => $validated['match_type'] === 'controlled' ? '' : trim((string) $validated['match_value']),
             'requires_countersign' => (bool) ($validated['requires_countersign'] ?? false),
             'required_observations' => array_values(array_unique($validated['required_observations'] ?? [])),
             'active' => (bool) ($validated['active'] ?? true),
         ];
+        if (! $rule['requires_countersign'] && $rule['required_observations'] === []) {
+            throw ValidationException::withMessages([
+                'requires_countersign' => 'Turn on at least one: a second person or an observation.',
+            ]);
+        }
+
+        return $rule;
     }
 
     /**
@@ -526,6 +623,76 @@ class MedicationSettingsController extends Controller
         if ($siteId === null) {
             abort_unless($this->canManageGlobalRules($actor), 403);
         }
+    }
+
+    /**
+     * What a rule can match, from current orders at the houses this person can
+     * see (P00 v5 builder: medicines and products are chosen, never typed).
+     * Controlled orders are left out for anyone without controlled-medicine
+     * access. Values already used by a visible rule stay choosable.
+     *
+     * @param  list<int>  $siteIds
+     * @param  Collection<int, MedicationAdminRule>  $rules
+     * @return array{names: list<array{name: string, routes: list<string>}>, routes: list<string>, nzulm: list<array{code: string, name: string}>}
+     */
+    private function ruleOptions(User $actor, array $siteIds, bool $allSites, Collection $rules): array
+    {
+        $orders = ClientMedication::query()
+            ->active()
+            ->when(! $allSites, fn (Builder $query) => $query->whereHas(
+                'client',
+                fn (Builder $client) => $client->whereIn('site_id', $siteIds),
+            ))
+            ->when(! $actor->canDo('medications.controlled.view'), fn (Builder $query) => $query->where('controlled_drug', false))
+            ->get(['id', 'client_id', 'name', 'route', 'nzulm_code']);
+
+        $names = $orders
+            ->filter(fn (ClientMedication $order): bool => trim((string) $order->name) !== '')
+            ->groupBy(fn (ClientMedication $order): string => trim((string) $order->name))
+            ->map(fn (Collection $group, string $name): array => [
+                'name' => $name,
+                'routes' => $group->pluck('route')->filter()->unique()->sort()->values()->all(),
+            ]);
+        foreach ($rules->where('match_type', 'medicine_name') as $rule) {
+            $names->put($rule->match_value, $names->get($rule->match_value) ?? ['name' => $rule->match_value, 'routes' => []]);
+        }
+
+        return [
+            'names' => $names->sortKeys(SORT_NATURAL | SORT_FLAG_CASE)->values()->all(),
+            'routes' => $orders->pluck('route')
+                ->merge($rules->where('match_type', 'route')->pluck('match_value'))
+                ->map(fn (mixed $route): string => trim((string) $route))
+                ->filter()
+                ->unique()
+                ->sort(SORT_NATURAL | SORT_FLAG_CASE)
+                ->values()
+                ->all(),
+            'nzulm' => $orders
+                ->filter(fn (ClientMedication $order): bool => trim((string) $order->nzulm_code) !== '')
+                ->unique('nzulm_code')
+                ->map(fn (ClientMedication $order): array => ['code' => trim((string) $order->nzulm_code), 'name' => (string) $order->name])
+                ->merge($rules->where('match_type', 'nzulm_code')->map(fn (MedicationAdminRule $rule): array => ['code' => $rule->match_value, 'name' => '']))
+                ->unique('code')
+                ->sortBy('code')
+                ->values()
+                ->all(),
+        ];
+    }
+
+    /** Can this person change rules at this house now (null = all houses)? Mirrors assertCurrentRuleSite. */
+    private function canUseRuleSiteNow(User $actor, ?int $siteId): bool
+    {
+        if ($this->canManageGlobalRules($actor)) {
+            return true;
+        }
+        if ($siteId === null) {
+            return false;
+        }
+        $profile = $actor->hrEmployeeProfile;
+
+        return $profile instanceof HrEmployeeProfile
+            && collect([$profile->primary_site_id, ...($profile->secondary_site_ids ?? [])])
+                ->contains(fn (mixed $assigned): bool => (int) $assigned === $siteId);
     }
 
     private function canManageGlobalRules(User $actor): bool

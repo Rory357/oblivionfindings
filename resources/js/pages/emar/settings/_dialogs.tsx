@@ -912,5 +912,8 @@ export function DialogHost({ dialog }: { dialog: Dialog | null }) {
             return <KeepDefault group={dialog.group} keyName={dialog.key} />;
         case 'reviewdefaults':
             return <ReviewDefaults />;
+        default:
+            // Medicine-rule dialogs are hosted by RuleDialogHost.
+            return null;
     }
 }
