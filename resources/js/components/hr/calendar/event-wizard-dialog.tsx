@@ -649,7 +649,7 @@ export function EventWizardDialog({
                                               }
                                     }
                                     className={cn(
-                                        'inline-flex items-center gap-2 rounded-[10px] bg-primary px-[18px] py-2.5 text-sm font-semibold whitespace-nowrap text-primary-foreground hover:brightness-95',
+                                        'inline-flex items-center gap-2 rounded-[10px] bg-primary-fill px-[18px] py-2.5 text-sm font-semibold whitespace-nowrap text-primary-fill-foreground hover:brightness-95',
                                         (!canSubmit || form.processing) &&
                                             'cursor-not-allowed opacity-50',
                                     )}
@@ -672,7 +672,7 @@ export function EventWizardDialog({
                                     boxShadow:
                                         '0 6px 16px -6px oklch(from var(--primary) l c h / 0.7)',
                                 }}
-                                className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-[18px] py-2.5 text-sm font-semibold whitespace-nowrap text-primary-foreground hover:brightness-95"
+                                className="inline-flex items-center gap-2 rounded-[10px] bg-primary-fill px-[18px] py-2.5 text-sm font-semibold whitespace-nowrap text-primary-fill-foreground hover:brightness-95"
                             >
                                 Continue
                                 <ArrowRight className="h-[15px] w-[15px]" />

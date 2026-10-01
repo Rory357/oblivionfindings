@@ -63,11 +63,11 @@ export function EntityFilter({
         ? cn(
               'inline-flex items-center gap-1.5 rounded-full border border-primary-foreground/30 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20',
               selected &&
-                  'border-primary-foreground bg-primary-foreground text-primary',
+                  'border-primary-foreground bg-primary-foreground text-primary-strong',
           )
         : cn(
               'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent',
-              selected && 'border-primary bg-primary text-primary-foreground',
+              selected && 'border-primary-fill bg-primary-fill text-primary-fill-foreground',
           );
 
     return (

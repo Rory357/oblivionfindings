@@ -9,7 +9,10 @@ the `--primary` hex, the entire UI retints automatically.
 
 | Use case | Token utilities |
 |---|---|
-| Primary brand (buttons, active nav, focus ring) | `bg-primary`, `text-primary`, `border-primary`, `ring-ring` |
+| Primary brand (active nav, accents, focus ring) | `bg-primary`, `text-primary`, `border-primary`, `ring-ring` |
+| Solid brand fill that carries text (default button, badge, tooltip) | `bg-primary-fill`, `text-primary-fill-foreground` |
+| Brand-coloured text on cards, page ground, tints | `text-primary` (reads `--primary-text`, mode-aware) |
+| Brand-coloured text on an always-white surface (hero white button / pill) | `text-primary-strong` |
 | Tint / subtle primary background | `bg-primary/10`, `bg-accent` |
 | Secondary surfaces (cards, panels) | `bg-card`, `bg-popover`, `bg-background` |
 | Subtle backgrounds (muted section fills) | `bg-muted`, `bg-muted/50` |
@@ -17,6 +20,48 @@ the `--primary` hex, the entire UI retints automatically.
 | Secondary text | `text-muted-foreground` |
 | Destructive / danger actions | `bg-destructive`, `text-destructive-foreground` |
 | Borders / inputs | `border-border`, `border-input` |
+
+## Primary fills and foregrounds (added 2026-10-02)
+
+`--primary` does three jobs: the brand fill, brand-coloured text, and the
+base of the Event Horizon sky. One value can't keep text readable in all of
+them, so `app.css` derives four tokens from it. They are **derived only** —
+not a branding setting — and follow whatever `--primary` resolves to on
+`<html>`: the default, an org theme, or a personal accent's inline style.
+
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `--primary-fill` | the brand; a brand that carries white text is never lighter than L 0.50 | the brand clamped to L ≤ 0.50 | solid fills that carry text: `.btn-soft-primary`, default badge, tooltip, checked checkbox, dropzone drag state, text selection |
+| `--primary-fill-foreground` | white, or ink when the fill is L ≥ 0.585 | white | text on `--primary-fill` |
+| `--primary-strong` | the brand clamped to L ≤ 0.50 | same | brand text on a surface that is white in both modes (`PageHeaderPrimaryButton`, the active white pills on hero rails and filters) |
+| `--primary-text` (added 2026-10-02) | the brand clamped to L ≤ 0.46 | the brand lifted to L ≥ 0.70 | `text-primary` everywhere — registered as `--text-color-primary`, so Tailwind's `text-primary` (and `/opacity`, variants) reads it while `bg-`, `border-`, `fill-`, `ring-`, `decoration-primary` keep the fill colour |
+
+`text-primary` measured ≥ 4.8:1 on the card, page ground, muted and
+secondary surfaces for every brand above (including a personal accent's
+inline `--primary`, which overrides `.dark`, and an org theme), in both
+modes; brand icon tiles (`bg-primary/10` + `text-primary`) ≥ 5.6:1. The
+light clamp is 0.46, not 0.50, because green and teal brands fell to 4.45:1
+on the grey page ground at 0.48 once the browser gamut-maps them. Text on a
+surface that stays white in dark mode (`bg-primary-foreground`, `bg-white`)
+uses `text-primary-strong` — the lifted `text-primary` would be ~2.7:1 there.
+
+Measured (WCAG 2.1) across the default brand, the five brand presets, the
+Branding theme presets and a personal accent, light and dark: default-button
+text ≥ 5.2:1 on the base and ≥ 4.6:1 on the top highlight; hero
+white-button text ≥ 5.4:1. White text on a clamped fill holds for every hue
+(worst case green: 5.6:1 base, 4.57:1 highlight). Ink holds for every hue
+from L 0.62; a saturated magenta or violet brand between L 0.585 and 0.62
+can fall to about 3.9:1 (no current preset is in that band).
+
+**The foreground rule.** Text on a solid brand fill is white or ink,
+whichever has the higher WCAG contrast — never a fixed luminance cut-off (the
+old `> 0.5` gave white text at 3.6:1 on orange, teal and green brands).
+`pickForeground()` in `lib/derive-palette.ts` applies it in JS (the sidebar
+logo tile); `--primary-fill-foreground` applies the same crossover in CSS.
+`--primary-foreground` is **not** a fill foreground: it is also the text on
+the brand sky, whose upper shades are fixed dark (L 0.30–0.42), so it stays
+white unless the brand itself is very light. New text-bearing fills use the
+fill pair, never `bg-primary text-primary-foreground`.
 
 ## Status tokens — for badges and severity states
 
@@ -130,6 +175,11 @@ accent, muted-foreground) for the styling.
    `bg-category-hr` so rebrand cascades.
 5. **Dark mode is automatic.** Semantic tokens have light + dark
    variants; you don't need `dark:bg-*` pairs if you use the token.
+6. **Text on a solid brand fill uses the fill pair.** `bg-primary-fill` +
+   `text-primary-fill-foreground` stay ≥ 4.5:1 for any brand in both modes;
+   `bg-primary text-primary-foreground` does not (see "Primary fills and
+   foregrounds"). ESLint `design/no-primary-foreground-on-fill` blocks the
+   pairing within one class string (swept app-wide 2026-10-02).
 
 ## Calendar source tokens
 

@@ -1434,7 +1434,7 @@ function DerivedWorker({
 function SubHead({ n, text }: { n: number; text: string }) {
     return (
         <div className="flex items-center gap-2 pt-1 text-[13px] font-bold">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] text-primary-foreground">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-fill text-[11px] text-primary-fill-foreground">
                 {n}
             </span>
             {text}

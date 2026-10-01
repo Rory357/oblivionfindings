@@ -496,7 +496,7 @@ export function PrnWizard({
                                         className={cn(
                                             'grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 transition-colors',
                                             active
-                                                ? 'border-primary bg-primary text-primary-foreground'
+                                                ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                 : 'border-muted-foreground/30 text-transparent',
                                         )}
                                     >

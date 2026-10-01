@@ -73,7 +73,7 @@ export function ReportsPane({
                 </a>
                 <a
                     href={pdfHref}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-primary px-3.5 text-[12.5px] font-semibold text-primary-foreground hover:brightness-95"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-primary-fill px-3.5 text-[12.5px] font-semibold text-primary-fill-foreground hover:brightness-95"
                 >
                     <FileText className="h-[15px] w-[15px]" /> PDF report
                 </a>

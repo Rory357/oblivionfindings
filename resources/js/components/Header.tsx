@@ -97,7 +97,7 @@ const Header: React.FC = () => {
 
                 <Link
                     href="/contact"
-                    className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30"
+                    className="rounded-full bg-primary-fill px-4 py-2 text-sm font-medium text-primary-fill-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary-fill/90 hover:shadow-primary/30"
                 >
                     Book a demo
                 </Link>

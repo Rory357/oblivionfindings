@@ -496,7 +496,7 @@ export function DailyNotesTab({
                                 data-test={`client-daily-notes-type-${key}`}
                                 className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                                     active
-                                        ? 'bg-primary text-primary-foreground'
+                                        ? 'bg-primary-fill text-primary-fill-foreground'
                                         : 'bg-muted text-muted-foreground hover:text-foreground'
                                 }`}
                             >

@@ -585,7 +585,7 @@ export default function GoalsHub({
                                                 parentId: null,
                                             })
                                         }
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[13px] font-semibold text-primary hover:bg-white/90"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[13px] font-semibold text-primary-strong hover:bg-white/90"
                                     >
                                         <Plus className="h-4 w-4" /> New
                                         objective
@@ -694,7 +694,7 @@ export default function GoalsHub({
                                         className={cn(
                                             'grid h-[22px] w-[22px] place-items-center rounded-md',
                                             active
-                                                ? 'bg-primary text-primary-foreground'
+                                                ? 'bg-primary-fill text-primary-fill-foreground'
                                                 : 'bg-muted text-muted-foreground',
                                         )}
                                     >
@@ -1152,7 +1152,7 @@ function ObjectivesTab(props: {
                             className={cn(
                                 'grid h-7 w-8 place-items-center rounded-md',
                                 view === k
-                                    ? 'bg-primary text-primary-foreground'
+                                    ? 'bg-primary-fill text-primary-fill-foreground'
                                     : 'text-muted-foreground hover:bg-muted',
                             )}
                         >
@@ -1845,7 +1845,7 @@ function DevelopmentTab({
                     <button
                         type="button"
                         onClick={onNew}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-semibold text-primary-foreground shadow-sm"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-[12.5px] font-semibold text-primary-fill-foreground shadow-sm"
                     >
                         <Plus className="h-4 w-4" /> New development plan
                     </button>
@@ -2273,7 +2273,7 @@ function ReparentDialog({
                                     : Number(parentId),
                             )
                         }
-                        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+                        className="rounded-lg bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground"
                     >
                         Move
                     </button>

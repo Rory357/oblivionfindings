@@ -439,7 +439,7 @@ const Contact: React.FC = () => {
                                 <button
                                     type="submit"
                                     disabled={processing}
-                                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-4 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+                                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-fill px-8 py-4 text-sm font-medium text-primary-fill-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary-fill/90 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                                 >
                                     {processing ? (
                                         <>

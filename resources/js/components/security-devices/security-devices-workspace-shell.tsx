@@ -224,10 +224,10 @@ export function SecurityDevicesWorkspaceTabs({
                                 className={`frontline-focus inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
                                     onDark
                                         ? active
-                                            ? 'border-primary-foreground bg-primary-foreground text-primary shadow-sm'
+                                            ? 'border-primary-foreground bg-primary-foreground text-primary-strong shadow-sm'
                                             : 'border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground/80 hover:bg-primary-foreground/20 hover:text-primary-foreground'
                                         : active
-                                          ? 'border-primary bg-primary text-primary-foreground'
+                                          ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                           : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
                                 }`}
                             >

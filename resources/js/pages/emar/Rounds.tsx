@@ -732,7 +732,7 @@ function StatusChips({
                     variant="ghost"
                     className={
                         value === c.id
-                            ? 'h-7 bg-primary-foreground text-primary hover:bg-primary-foreground'
+                            ? 'h-7 bg-primary-foreground text-primary-strong hover:bg-primary-foreground'
                             : 'h-7 text-primary-foreground hover:bg-primary-foreground/15'
                     }
                     onClick={() => onChange(c.id)}

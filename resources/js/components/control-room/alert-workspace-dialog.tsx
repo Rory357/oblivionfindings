@@ -2402,7 +2402,7 @@ function StatusFlow({ a }: { a: WorkspaceAlert }) {
                         <span
                             className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                                 isNow
-                                    ? 'bg-primary text-primary-foreground'
+                                    ? 'bg-primary-fill text-primary-fill-foreground'
                                     : isDone
                                       ? 'bg-status-success-bg text-status-success'
                                       : 'bg-muted text-muted-foreground'
@@ -3054,7 +3054,7 @@ function PlaybookSection({
                                         : s.status === 'skipped'
                                           ? 'bg-muted text-muted-foreground'
                                           : active
-                                            ? 'bg-primary text-primary-foreground'
+                                            ? 'bg-primary-fill text-primary-fill-foreground'
                                             : 'bg-muted text-muted-foreground'
                                 }`}
                             >

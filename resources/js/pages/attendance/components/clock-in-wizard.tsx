@@ -284,7 +284,7 @@ export function ClockInWizard({
                     />
                     <div className="grid gap-4">
                         <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4">
-                            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
+                            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary-fill text-primary-fill-foreground">
                                 <MapPin className="h-5 w-5" />
                             </span>
                             <div className="min-w-0">

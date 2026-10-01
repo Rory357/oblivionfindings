@@ -90,7 +90,7 @@ export function SchedulePane({
                                     className={cn(
                                         'flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold',
                                         isToday
-                                            ? 'bg-primary text-primary-foreground'
+                                            ? 'bg-primary-fill text-primary-fill-foreground'
                                             : 'text-foreground',
                                     )}
                                 >

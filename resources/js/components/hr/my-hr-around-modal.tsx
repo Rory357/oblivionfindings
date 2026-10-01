@@ -311,7 +311,7 @@ export function MyHrAroundModal({
                         <button
                             type="button"
                             onClick={primary.onClick}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[13px] font-bold text-primary-foreground"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-4 py-2 text-[13px] font-bold text-primary-fill-foreground"
                         >
                             {v === 'celebrations' ? (
                                 <Send className="h-3.5 w-3.5" />

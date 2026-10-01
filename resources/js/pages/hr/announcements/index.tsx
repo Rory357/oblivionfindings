@@ -986,7 +986,7 @@ function ListPanel(props: ListPanelProps) {
                 {can.manage && (
                     <button
                         onClick={openComposer}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-[12.5px] font-semibold text-primary-foreground hover:bg-primary/90"
+                        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-fill px-4 text-[12.5px] font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                     >
                         <Plus className="h-4 w-4" /> New
                     </button>
@@ -1092,7 +1092,7 @@ function ListPanel(props: ListPanelProps) {
                                                             ? 'Deselect'
                                                             : 'Select'
                                                     }
-                                                    className={`grid h-4 w-4 place-items-center rounded border ${sel ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}
+                                                    className={`grid h-4 w-4 place-items-center rounded border ${sel ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground' : 'border-border'}`}
                                                 >
                                                     {sel && (
                                                         <CheckCheck className="h-2.5 w-2.5" />
@@ -1184,7 +1184,7 @@ function ListPanel(props: ListPanelProps) {
                                     <button
                                         onClick={() => toggleSelect(a.id)}
                                         aria-label={sel ? 'Deselect' : 'Select'}
-                                        className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border ${sel ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card'}`}
+                                        className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border ${sel ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground' : 'border-border bg-card'}`}
                                     >
                                         {sel && (
                                             <CheckCheck className="h-3 w-3" />
@@ -1513,7 +1513,7 @@ function TrackingPanel(
                                             'Reminders sent',
                                         )
                                     }
-                                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-[12.5px] font-semibold text-primary-foreground hover:bg-primary/90"
+                                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 text-[12.5px] font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                                 >
                                     <BellRing className="h-4 w-4" /> Remind
                                     outstanding
@@ -1789,7 +1789,7 @@ function ScheduledPanel(
                     can.manage ? (
                         <button
                             onClick={openComposer}
-                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-[12.5px] font-semibold text-primary-foreground hover:bg-primary/90"
+                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-fill px-4 text-[12.5px] font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                         >
                             <Plus className="h-4 w-4" /> New announcement
                         </button>
@@ -1806,7 +1806,7 @@ function ScheduledPanel(
                 {can.manage && (
                     <button
                         onClick={openComposer}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary-fill px-3 text-xs font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                     >
                         <Plus className="h-4 w-4" /> New draft
                     </button>
@@ -1907,7 +1907,7 @@ function ScheduledPanel(
                                                         'Published',
                                                     )
                                                 }
-                                                className="rounded-lg bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90"
+                                                className="rounded-lg bg-primary-fill px-2.5 py-1 text-[11px] font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                                             >
                                                 Publish now
                                             </button>

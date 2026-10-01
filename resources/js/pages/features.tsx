@@ -276,7 +276,7 @@ const Features: React.FC = () => {
                                 <div className="mt-8">
                                     <Link
                                         href="/smart-monitoring"
-                                        className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90"
+                                        className="inline-flex items-center gap-2 rounded-full bg-primary-fill px-6 py-3 text-sm font-medium text-primary-fill-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary-fill/90"
                                     >
                                         Explore Smart Monitoring
                                         <ArrowRight size={16} />

@@ -251,7 +251,7 @@ export function EntityTable<T>({
                                             className={cn(
                                                 'flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border transition-colors',
                                                 selected
-                                                    ? 'border-primary bg-primary text-primary-foreground'
+                                                    ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                     : 'border-input bg-card text-transparent',
                                             )}
                                         >

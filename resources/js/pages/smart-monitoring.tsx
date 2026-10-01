@@ -126,7 +126,7 @@ const SmartMonitoring: React.FC = () => {
                     <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
                         <Link
                             href="/contact"
-                            className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-4 text-base font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90"
+                            className="inline-flex items-center justify-center gap-2 rounded-full bg-primary-fill px-8 py-4 text-base font-medium text-primary-fill-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary-fill/90"
                         >
                             Book a Smart Monitoring demo
                             <ArrowRight size={18} />

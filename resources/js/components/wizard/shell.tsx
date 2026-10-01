@@ -170,7 +170,7 @@ export function WizardShell({
                             >
                                 <span
                                     className={cn(
-                                        'grid place-items-center rounded-lg bg-primary text-primary-foreground',
+                                        'grid place-items-center rounded-lg bg-primary-fill text-primary-fill-foreground',
                                         wideRail
                                             ? 'h-9 w-9'
                                             : 'h-7 w-7 shrink-0',
@@ -236,7 +236,7 @@ export function WizardShell({
                                             className={cn(
                                                 'grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors',
                                                 active
-                                                    ? 'bg-primary text-primary-foreground'
+                                                    ? 'bg-primary-fill text-primary-fill-foreground'
                                                     : complete
                                                       ? 'bg-status-success-bg text-status-success'
                                                       : 'bg-muted text-muted-foreground',

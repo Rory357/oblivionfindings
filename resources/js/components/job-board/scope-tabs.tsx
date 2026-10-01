@@ -107,7 +107,7 @@ export function ScopeTabs({
                             className={cn(
                                 'min-w-[22px] rounded-full px-1.5 py-[1px] text-center text-[11px] font-bold',
                                 isActive
-                                    ? 'bg-primary text-primary-foreground'
+                                    ? 'bg-primary-fill text-primary-fill-foreground'
                                     : 'bg-muted text-muted-foreground',
                             )}
                         >

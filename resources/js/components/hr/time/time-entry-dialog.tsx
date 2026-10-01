@@ -639,7 +639,7 @@ export function TimeEntryDialog({
                         <button
                             type="button"
                             onClick={next}
-                            className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-[18px] py-2.5 text-sm font-semibold text-primary-foreground hover:brightness-95"
+                            className="inline-flex items-center gap-2 rounded-[10px] bg-primary-fill px-[18px] py-2.5 text-sm font-semibold text-primary-fill-foreground hover:brightness-95"
                         >
                             Continue
                             <ArrowRight className="h-[15px] w-[15px]" />

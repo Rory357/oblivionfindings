@@ -582,7 +582,7 @@ export default function MedicationErrors({
                                 {month !== null && (
                                     <button
                                         onClick={() => setMonth(null)}
-                                        className="rounded-full bg-primary-foreground px-3 py-1 text-xs font-medium text-primary"
+                                        className="rounded-full bg-primary-foreground px-3 py-1 text-xs font-medium text-primary-strong"
                                     >
                                         All time
                                     </button>

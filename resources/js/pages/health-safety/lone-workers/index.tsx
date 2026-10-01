@@ -690,7 +690,7 @@ export default function LoneWorkerIndex({
                                     <button
                                         type="button"
                                         onClick={() => setWizardOpen(true)}
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary-foreground px-3.5 py-2 text-sm font-semibold text-primary shadow-sm transition-colors hover:bg-primary-foreground/90"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary-foreground px-3.5 py-2 text-sm font-semibold text-primary-strong shadow-sm transition-colors hover:bg-primary-foreground/90"
                                     >
                                         <Plus className="h-4 w-4" /> Start
                                         session
@@ -806,7 +806,11 @@ export default function LoneWorkerIndex({
                             </Link>
                         ) : null}
                     </HeroShell>
-                    <GuardrailButton asChild variant="outline"><Link href="/operations/people-location-reports/staff">Build a safety report</Link></GuardrailButton>
+                    <GuardrailButton asChild variant="outline">
+                        <Link href="/operations/people-location-reports/staff">
+                            Build a safety report
+                        </Link>
+                    </GuardrailButton>
                 </div>
 
                 <TabStrip

@@ -146,7 +146,7 @@ export function ChecklistDrawer({
                                     }
                                     className={`grid h-5 w-5 flex-none place-items-center rounded-md border-[1.5px] ${
                                         t.is_completed
-                                            ? 'border-primary bg-primary text-primary-foreground'
+                                            ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                             : t.is_overdue
                                               ? 'border-status-critical'
                                               : 'border-border'
@@ -194,7 +194,7 @@ export function ChecklistDrawer({
                         <button
                             type="button"
                             onClick={onReassign}
-                            className="flex-1 rounded-[9px] bg-primary py-2.5 text-[12.5px] font-semibold text-primary-foreground hover:opacity-90"
+                            className="flex-1 rounded-[9px] bg-primary-fill py-2.5 text-[12.5px] font-semibold text-primary-fill-foreground hover:opacity-90"
                         >
                             Reassign owner
                         </button>

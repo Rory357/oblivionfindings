@@ -146,7 +146,7 @@ function HandoverCard({
                             unstyled
                             type="button"
                             onClick={() => onAcknowledge(h)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-2.5 py-1.5 text-xs font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
                         >
                             <Check className="h-3.5 w-3.5" />
                             Acknowledge

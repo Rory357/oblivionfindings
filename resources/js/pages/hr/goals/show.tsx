@@ -317,7 +317,7 @@ export default function GoalShow({
                             <button
                                 type="button"
                                 onClick={() => setCheckinOpen(true)}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-semibold text-primary-foreground"
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-[12.5px] font-semibold text-primary-fill-foreground"
                             >
                                 <CheckCircle2 className="h-4 w-4" /> Log
                                 check-in
@@ -820,7 +820,7 @@ function AddKrDialog({
                         type="button"
                         onClick={submit}
                         disabled={form.processing || !form.data.title.trim()}
-                        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                        className="rounded-lg bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground disabled:opacity-50"
                     >
                         {form.processing ? 'Saving…' : 'Add key result'}
                     </button>

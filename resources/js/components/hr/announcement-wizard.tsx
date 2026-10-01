@@ -631,7 +631,7 @@ export function AnnouncementWizard({
                             className={cn(
                                 'grid h-5 w-5 place-items-center rounded-full border',
                                 targetAll
-                                    ? 'border-primary bg-primary text-primary-foreground'
+                                    ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                     : 'border-border',
                             )}
                         >

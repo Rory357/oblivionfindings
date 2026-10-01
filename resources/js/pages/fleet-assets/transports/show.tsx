@@ -1069,7 +1069,7 @@ export default function TransportShow({
                                 <div className="space-y-6">
                                     <div className="flex gap-4">
                                         <div className="flex flex-col items-center">
-                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-fill text-primary-fill-foreground shadow-sm">
                                                 <MapPin className="h-5 w-5" />
                                             </div>
                                             <div
@@ -1134,7 +1134,7 @@ export default function TransportShow({
                                                 className={cn(
                                                     'flex h-10 w-10 items-center justify-center rounded-full shadow-sm',
                                                     t.arrived_at
-                                                        ? 'bg-primary text-primary-foreground'
+                                                        ? 'bg-primary-fill text-primary-fill-foreground'
                                                         : 'bg-muted text-muted-foreground',
                                                 )}
                                             >

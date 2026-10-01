@@ -96,7 +96,7 @@ export function SmartMatchesStrip({
                                     No conflict
                                 </li>
                             </ul>
-                            <span className="mt-1 inline-flex items-center gap-1 self-start rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
+                            <span className="mt-1 inline-flex items-center gap-1 self-start rounded-full bg-primary-fill px-2 py-0.5 text-[11px] font-bold text-primary-fill-foreground">
                                 <Hand
                                     className="h-2.5 w-2.5"
                                     strokeWidth={2.5}

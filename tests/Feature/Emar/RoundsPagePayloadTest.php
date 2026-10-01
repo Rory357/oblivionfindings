@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationRound;
 use App\Models\MedicationRoundTemplate;
 use App\Models\Permission;
@@ -41,6 +42,18 @@ class RoundsPagePayloadTest extends TestCase
 
         $site = Site::factory()->create(['is_active' => true]);
         $user = $this->makeSiteUser($site, ['medications.administer.record']);
+        // "Med-competent" is the competency policy's decision, not the permission.
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $user->id,
+            'assessor_id' => User::factory()->create(['approved_at' => now()])->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => now()->subMonth()->toDateString(),
+            'expiry_date' => now()->addYear()->toDateString(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'can_administer_unsupervised' => true,
+        ]);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $this->activeShift($user, $client);
         $round = $this->makeRound($site, [

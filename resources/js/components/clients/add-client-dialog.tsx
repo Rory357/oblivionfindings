@@ -947,7 +947,7 @@ function AddClientBody({
             {/* ── Stepper rail ── */}
             <aside className="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex">
                 <div className="mb-3 flex items-center gap-2.5">
-                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
+                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary-fill text-primary-fill-foreground">
                         {isEditMode ? (
                             <ClipboardCheck className="h-5 w-5" />
                         ) : (
@@ -984,7 +984,7 @@ function AddClientBody({
                                 className={cn(
                                     'grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors',
                                     active
-                                        ? 'bg-primary text-primary-foreground'
+                                        ? 'bg-primary-fill text-primary-fill-foreground'
                                         : complete
                                           ? 'bg-status-success-bg text-status-success'
                                           : 'bg-muted text-muted-foreground',
@@ -2190,7 +2190,7 @@ function StepContacts({ ctx }: { ctx: StepCtx }) {
                     >
                         <div className="mb-3.5 flex items-center justify-between">
                             <div className="flex items-center gap-2.5">
-                                <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+                                <span className="grid h-6 w-6 place-items-center rounded-full bg-primary-fill text-[11px] font-bold text-primary-fill-foreground">
                                     {i + 1}
                                 </span>
                                 <span className="text-sm font-semibold">

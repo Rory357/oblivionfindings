@@ -213,7 +213,7 @@ export function Imports({
                             className={`flex items-center gap-2 text-sm ${phase === i ? 'font-semibold text-primary' : 'text-muted-foreground'}`}
                         >
                             <span
-                                className={`grid size-7 place-items-center rounded-full ${phase === i ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+                                className={`grid size-7 place-items-center rounded-full ${phase === i ? 'bg-primary-fill text-primary-fill-foreground' : 'bg-muted'}`}
                             >
                                 {i + 1}
                             </span>

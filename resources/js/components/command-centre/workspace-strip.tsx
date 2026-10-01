@@ -80,7 +80,7 @@ export function WorkspaceStrip({
                             className={cn(
                                 'flex min-h-11 min-w-max flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none',
                                 active
-                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                    ? 'bg-primary-fill text-primary-fill-foreground shadow-sm'
                                     : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                             )}
                         >

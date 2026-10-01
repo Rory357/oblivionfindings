@@ -707,7 +707,7 @@ export function WeekGridPane({
                                     className={cn(
                                         'rounded-sm px-3 py-1 text-xs font-semibold transition-colors',
                                         active
-                                            ? 'bg-primary text-primary-foreground'
+                                            ? 'bg-primary-fill text-primary-fill-foreground'
                                             : 'text-muted-foreground hover:bg-accent',
                                     )}
                                 >
@@ -736,7 +736,7 @@ export function WeekGridPane({
                                         className={cn(
                                             'rounded-sm px-3 py-1 text-xs font-semibold transition-colors',
                                             active
-                                                ? 'bg-primary text-primary-foreground'
+                                                ? 'bg-primary-fill text-primary-fill-foreground'
                                                 : 'text-muted-foreground hover:bg-accent',
                                         )}
                                     >

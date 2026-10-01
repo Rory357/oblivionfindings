@@ -266,7 +266,7 @@ describe('ConfirmDialog', () => {
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeVisible();
         expect(screen.getByRole('button', { name: 'Close trip' })).toHaveClass(
             'btn-soft-primary',
-            'text-primary-foreground',
+            'text-primary-fill-foreground',
         );
     });
 });

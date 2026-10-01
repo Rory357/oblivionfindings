@@ -100,7 +100,7 @@ export function AnalyticsPane({
                             </button>
                             <button
                                 type="button"
-                                className="rounded-sm bg-primary px-2 py-1 font-semibold text-primary-foreground"
+                                className="rounded-sm bg-primary-fill px-2 py-1 font-semibold text-primary-fill-foreground"
                             >
                                 8w
                             </button>

@@ -430,7 +430,7 @@ export default function ControlRoomShifts({
                                                                 newShiftTeam.includes(
                                                                     s.id.toString(),
                                                                 )
-                                                                    ? 'border-primary bg-primary text-primary-foreground'
+                                                                    ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                                     : 'hover:bg-muted'
                                                             }`}
                                                         >
@@ -896,7 +896,7 @@ export default function ControlRoomShifts({
                                                                         newShiftTeam.includes(
                                                                             s.id.toString(),
                                                                         )
-                                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                                            ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                                             : 'hover:bg-muted'
                                                                     }`}
                                                                 >

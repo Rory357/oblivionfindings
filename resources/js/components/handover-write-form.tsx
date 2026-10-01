@@ -90,7 +90,7 @@ function YesNoToggle({
                         className={cn(
                             'h-11 flex-1 rounded-full px-4 text-sm font-medium transition-colors',
                             active
-                                ? 'bg-primary text-primary-foreground'
+                                ? 'bg-primary-fill text-primary-fill-foreground'
                                 : 'border-border bg-background hover:bg-muted',
                             disabled && 'opacity-60',
                         )}
@@ -304,7 +304,7 @@ export default function HandoverWriteForm({
                                 className={cn(
                                     'h-11 min-w-24 flex-1 rounded-full px-4 text-sm font-medium transition-colors sm:flex-none',
                                     active
-                                        ? 'bg-primary text-primary-foreground'
+                                        ? 'bg-primary-fill text-primary-fill-foreground'
                                         : 'border-border bg-background hover:bg-muted',
                                     disabled && 'opacity-60',
                                 )}

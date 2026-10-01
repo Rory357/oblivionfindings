@@ -388,7 +388,7 @@ export function PageHeaderGlassButton({
                 'inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 disabled:pointer-events-none disabled:opacity-50',
                 children == null && 'w-9 justify-center px-0',
                 active
-                    ? 'border-primary-foreground bg-primary-foreground text-primary'
+                    ? 'border-primary-foreground bg-primary-foreground text-primary-strong'
                     : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
                 className,
             )}
@@ -413,7 +413,7 @@ export function PageHeaderPrimaryButton({
             {...(asChild ? {} : { type: 'button' as const })}
             {...rest}
             className={cn(
-                'inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50',
+                'inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary-strong shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50',
                 className,
             )}
         >
@@ -816,7 +816,7 @@ export function PageHeaderFilterButton({
                 FILTER_FIELD,
                 children == null && 'w-[23px] justify-center px-0',
                 active
-                    ? 'border-primary-foreground bg-primary-foreground text-primary'
+                    ? 'border-primary-foreground bg-primary-foreground text-primary-strong'
                     : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
                 className,
             )}
@@ -856,7 +856,7 @@ export function PageHeaderFilterSelect({
                     'inline-flex items-center',
                     FILTER_FIELD,
                     active
-                        ? 'border-primary-foreground bg-primary-foreground text-primary'
+                        ? 'border-primary-foreground bg-primary-foreground text-primary-strong'
                         : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
                 )}
             >
@@ -935,7 +935,7 @@ export function PageHeaderFilterCheck({
                 'inline-flex items-center gap-1.5 px-2',
                 FILTER_FIELD,
                 checked
-                    ? 'border-primary-foreground bg-primary-foreground text-primary'
+                    ? 'border-primary-foreground bg-primary-foreground text-primary-strong'
                     : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
             )}
         >
@@ -944,7 +944,7 @@ export function PageHeaderFilterCheck({
                 className={cn(
                     'flex size-3 items-center justify-center rounded-[3px] border',
                     checked
-                        ? 'border-primary bg-primary text-primary-foreground'
+                        ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                         : 'border-primary-foreground/60 text-transparent',
                 )}
             >
@@ -990,7 +990,7 @@ export function PageHeaderViewToggle<K extends string>({
                         className={cn(
                             'inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70',
                             on
-                                ? 'bg-primary-foreground text-primary'
+                                ? 'bg-primary-foreground text-primary-strong'
                                 : 'text-primary-foreground/80 hover:text-primary-foreground',
                         )}
                     >

@@ -126,7 +126,7 @@ export function ScoreDialog({
                                                     'h-8 w-8 rounded-md border text-[13px] font-bold transition-colors',
                                                     (ratings[c.label] ?? 3) ===
                                                         n
-                                                        ? 'border-primary bg-primary text-primary-foreground'
+                                                        ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                         : 'border-border bg-card hover:border-primary/50',
                                                 )}
                                             >
@@ -203,7 +203,7 @@ export function ScoreDialog({
                         type="button"
                         onClick={submit}
                         disabled={form.processing}
-                        className="h-9 rounded-md bg-primary px-4 text-[13px] font-bold text-primary-foreground disabled:opacity-50"
+                        className="h-9 rounded-md bg-primary-fill px-4 text-[13px] font-bold text-primary-fill-foreground disabled:opacity-50"
                     >
                         Save scorecard
                     </button>

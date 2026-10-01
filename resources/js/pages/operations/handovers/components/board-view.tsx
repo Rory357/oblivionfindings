@@ -145,7 +145,7 @@ function BoardCard({
                             unstyled
                             type="button"
                             onClick={() => onAcknowledge(h)}
-                            className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                            className="inline-flex items-center gap-1 rounded-md bg-primary-fill px-2 py-1 text-[11px] font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
                         >
                             <Check className="h-3 w-3" />
                             Ack

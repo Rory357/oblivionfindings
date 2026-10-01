@@ -211,7 +211,7 @@ function WizardBody<D extends FormDataType<D>>({
             {/* ── Stepper rail ── */}
             <aside className="hidden w-[248px] shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 sm:flex">
                 <div className="mb-4 flex items-center gap-2.5">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-primary text-primary-foreground">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-primary-fill text-primary-fill-foreground">
                         <Icon className="h-[18px] w-[18px]" />
                     </span>
                     <div className="min-w-0">
@@ -244,7 +244,7 @@ function WizardBody<D extends FormDataType<D>>({
                                     className={cn(
                                         'grid h-[26px] w-[26px] shrink-0 place-items-center rounded-full text-[12px] font-bold',
                                         active
-                                            ? 'bg-primary text-primary-foreground'
+                                            ? 'bg-primary-fill text-primary-fill-foreground'
                                             : complete
                                               ? 'bg-status-success-bg text-status-success'
                                               : 'bg-muted text-muted-foreground',

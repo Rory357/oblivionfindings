@@ -906,7 +906,7 @@ export function PerformanceWizards({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm"
+                            className="rounded-lg bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground shadow-sm"
                         >
                             Done
                         </button>
@@ -951,7 +951,7 @@ export function PerformanceWizards({
                             type="button"
                             disabled={saving}
                             onClick={() => submit(false)}
-                            className="rounded-lg bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground shadow-sm disabled:opacity-50"
+                            className="rounded-lg bg-primary-fill px-4 py-2 text-[13px] font-semibold text-primary-fill-foreground shadow-sm disabled:opacity-50"
                         >
                             {state.kind === 'signoff' ? 'Confirm' : 'Create'}
                         </button>
@@ -960,7 +960,7 @@ export function PerformanceWizards({
                     <button
                         type="button"
                         onClick={next}
-                        className="rounded-lg bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground shadow-sm"
+                        className="rounded-lg bg-primary-fill px-4 py-2 text-[13px] font-semibold text-primary-fill-foreground shadow-sm"
                     >
                         Continue
                     </button>

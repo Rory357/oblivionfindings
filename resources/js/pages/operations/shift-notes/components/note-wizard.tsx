@@ -293,7 +293,7 @@ export function NoteWizard({
                                                 className={cn(
                                                     'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
                                                     active
-                                                        ? 'bg-primary text-primary-foreground'
+                                                        ? 'bg-primary-fill text-primary-fill-foreground'
                                                         : isDone
                                                           ? 'bg-status-success-bg text-status-success'
                                                           : 'bg-muted text-muted-foreground',
@@ -709,7 +709,7 @@ export function NoteWizard({
                                             type="button"
                                             onClick={submit}
                                             disabled={saving || pct < 50}
-                                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-xs font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90 disabled:opacity-60"
                                         >
                                             {saving ? (
                                                 <>
@@ -728,7 +728,7 @@ export function NoteWizard({
                                             type="button"
                                             onClick={next}
                                             disabled={!canContinue()}
-                                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-xs font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90 disabled:opacity-60"
                                         >
                                             Continue
                                             <ChevronRight className="h-4 w-4" />
@@ -809,7 +809,7 @@ function SuccessPane({
                 <button
                     type="button"
                     onClick={onView}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-xs font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
                 >
                     <ListChecks className="h-3.5 w-3.5" />
                     View in week

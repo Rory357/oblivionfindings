@@ -50,7 +50,7 @@ export function CalendarDayHeading({
 }) {
     return (
         <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
-            <span className="flex size-11 shrink-0 flex-col items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <span className="flex size-11 shrink-0 flex-col items-center justify-center rounded-xl bg-primary-fill text-primary-fill-foreground">
                 <span className="text-caption font-semibold uppercase">
                     {formatDate(date).split(' ')[0]}
                 </span>

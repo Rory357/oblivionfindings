@@ -31,7 +31,7 @@ export default function AuthSimpleLayout({
                     <div className="w-full max-w-[420px] rounded-2xl border border-white/70 bg-card/45 p-6 shadow-2xl backdrop-blur-[32px] md:p-8">
                         <div className="mb-4 flex flex-col gap-3">
                             <div className="flex items-center gap-2">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-fill text-primary-fill-foreground">
                                     <AppLogoIcon className="size-4 fill-current" />
                                 </div>
                             </div>

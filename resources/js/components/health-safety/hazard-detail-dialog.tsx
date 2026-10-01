@@ -256,7 +256,7 @@ export function HazardDetailDialog({
     const footerEnd = pane ? null : readOnly ? (
         <Link
             href={`${registerHref}?site_id=${d.site?.id ?? ''}&hazard=${d.id}`}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3 py-2 text-sm font-medium text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
         >
             <ExternalLink className="h-4 w-4" /> Open in register
         </Link>
@@ -1282,7 +1282,7 @@ function MitigatePane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
                                 className={`flex items-center gap-3 rounded-lg border p-2.5 text-left transition-colors ${on ? 'border-primary/40 bg-primary/5' : 'border-border hover:bg-muted'}`}
                             >
                                 <span
-                                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${on ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${on ? 'bg-primary-fill text-primary-fill-foreground' : 'bg-muted text-muted-foreground'}`}
                                 >
                                     {on ? (
                                         <CheckCircle2 className="h-3.5 w-3.5" />

@@ -96,7 +96,7 @@ export function FileDropzone({
                 <span
                     className={cn(
                         'grid h-14 w-14 place-items-center rounded-2xl transition-colors',
-                        dragging ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary',
+                        dragging ? 'bg-primary-fill text-primary-fill-foreground' : 'bg-primary/10 text-primary',
                     )}
                 >
                     <UploadCloud className="h-7 w-7" />

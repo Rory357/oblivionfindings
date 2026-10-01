@@ -210,7 +210,7 @@ export function AvatarPopoverContent({
                 {popover.primaryAction ? (
                     <Link
                         href={popover.primaryAction.href}
-                        className="mb-2 flex items-center gap-2 rounded-md bg-primary px-2.5 py-2 text-[12.5px] font-semibold text-primary-foreground"
+                        className="mb-2 flex items-center gap-2 rounded-md bg-primary-fill px-2.5 py-2 text-[12.5px] font-semibold text-primary-fill-foreground"
                     >
                         <span className="flex-1">
                             {popover.primaryAction.label}

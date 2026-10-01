@@ -599,7 +599,7 @@ export default function Reviews({
                             <div className="flex flex-wrap items-center gap-1.5">
                                 <button
                                     onClick={() => setCycle(null)}
-                                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${cycle === null ? 'bg-primary-foreground text-primary' : 'border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20'}`}
+                                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${cycle === null ? 'bg-primary-foreground text-primary-strong' : 'border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20'}`}
                                 >
                                     All year
                                 </button>
@@ -607,7 +607,7 @@ export default function Reviews({
                                     <button
                                         key={c}
                                         onClick={() => setCycle(i)}
-                                        className={`rounded-full px-3 py-1 text-xs font-medium transition ${cycle === i ? 'bg-primary-foreground text-primary' : 'border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20'}`}
+                                        className={`rounded-full px-3 py-1 text-xs font-medium transition ${cycle === i ? 'bg-primary-foreground text-primary-strong' : 'border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20'}`}
                                     >
                                         {c}
                                     </button>

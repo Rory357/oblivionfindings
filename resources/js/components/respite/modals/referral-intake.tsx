@@ -340,7 +340,7 @@ function Stepper({ step }: { step: number }) {
                                     'grid h-6 w-6 place-items-center rounded-full text-[11px] font-bold',
                                     state === 'todo'
                                         ? 'bg-muted text-muted-foreground'
-                                        : 'bg-primary text-primary-foreground',
+                                        : 'bg-primary-fill text-primary-fill-foreground',
                                 )}
                             >
                                 {state === 'done' ? (
@@ -434,7 +434,7 @@ function Segmented<T extends string>({
                                     ? 'border-transparent bg-status-critical text-white'
                                     : o.tone === 'warning'
                                       ? 'border-transparent bg-status-warning text-white'
-                                      : 'border-transparent bg-primary text-primary-foreground'
+                                      : 'border-transparent bg-primary-fill text-primary-fill-foreground'
                                 : 'border-border bg-card text-muted-foreground hover:bg-muted',
                         )}
                     >

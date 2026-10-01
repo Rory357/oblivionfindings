@@ -485,7 +485,7 @@ export function MyHrCalendar({
                                             className={cn(
                                                 'rounded-lg py-2.5 text-[12.5px] font-semibold transition-colors',
                                                 active
-                                                    ? 'bg-primary text-primary-foreground'
+                                                    ? 'bg-primary-fill text-primary-fill-foreground'
                                                     : 'text-foreground hover:bg-muted',
                                             )}
                                         >

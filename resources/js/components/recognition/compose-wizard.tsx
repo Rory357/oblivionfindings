@@ -188,7 +188,7 @@ export function ComposeWizard({
                 <button
                     type="button"
                     onClick={close}
-                    className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                    className="rounded-md bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground hover:opacity-90"
                 >
                     Done
                 </button>
@@ -236,7 +236,7 @@ export function ComposeWizard({
                             onClick={submit}
                             disabled={!stepValid(1) || form.processing}
                             className={cn(
-                                'rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity',
+                                'rounded-md bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground transition-opacity',
                                 (!stepValid(1) || form.processing) &&
                                     'cursor-not-allowed opacity-50',
                             )}
@@ -249,7 +249,7 @@ export function ComposeWizard({
                             onClick={wizard.next}
                             disabled={!stepValid(wizard.index)}
                             className={cn(
-                                'rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground',
+                                'rounded-md bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground',
                                 !stepValid(wizard.index) &&
                                     'cursor-not-allowed opacity-50',
                             )}

@@ -280,7 +280,7 @@ export function LoneWorkerWizard({
                 type="button"
                 onClick={() => submit(false)}
                 disabled={form.processing}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-sm font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90 disabled:opacity-60"
             >
                 <Radio className="h-4 w-4" /> Start session
             </GuardrailButton>
@@ -299,7 +299,7 @@ export function LoneWorkerWizard({
                 unstyled
                 type="button"
                 onClick={next}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-sm font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
             >
                 Continue <ChevronRight className="h-4 w-4" />
             </GuardrailButton>
@@ -354,7 +354,7 @@ export function LoneWorkerWizard({
                                     unstyled
                                     type="button"
                                     onClick={close}
-                                    className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                                    className="rounded-lg bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                                 >
                                     Done
                                 </GuardrailButton>
