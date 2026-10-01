@@ -6,6 +6,10 @@ import {
 } from '@/components/health-safety/drill-detail-dialog';
 import { DrillScheduleDialog } from '@/components/health-safety/drill-schedule-dialog';
 import {
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
+import {
     EntityFilter,
     ShiftContextMenu,
     TabStrip,
@@ -13,7 +17,6 @@ import {
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
-import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Popover,
@@ -592,16 +595,12 @@ export default function DrillsIndex({
                             <div className="flex items-center gap-2">
                                 <Popover>
                                     <PopoverTrigger asChild>
-                                        <Button
-                                            size="sm"
-                                            className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                        >
-                                            <FileText className="mr-1.5 h-4 w-4" />{' '}
+                                        <PageHeaderGlassButton icon={FileText}>
                                             Board reports
                                             <span aria-hidden className="ml-1">
                                                 ▾
                                             </span>
-                                        </Button>
+                                        </PageHeaderGlassButton>
                                     </PopoverTrigger>
                                     <PopoverContent
                                         align="end"
@@ -635,14 +634,12 @@ export default function DrillsIndex({
                                     </PopoverContent>
                                 </Popover>
                                 {can.manage ? (
-                                    <Button
-                                        size="sm"
+                                    <PageHeaderPrimaryButton
+                                        icon={Plus}
                                         onClick={() => setScheduleOpen(true)}
-                                        className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                                     >
-                                        <Plus className="mr-1.5 h-4 w-4" />{' '}
                                         Schedule drill
-                                    </Button>
+                                    </PageHeaderPrimaryButton>
                                 ) : null}
                             </div>
                         </div>

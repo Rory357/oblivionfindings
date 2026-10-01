@@ -12,6 +12,7 @@ import {
     parseYmd,
 } from '@/components/meds/day-picker-chip';
 import { PageHero, type PageHeroStat } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     Donut,
     DonutLegend,
@@ -688,13 +689,12 @@ export default function PrnRecords(props: Props) {
                     stats={heroStats}
                     actions={
                         canRecord ? (
-                            <Button
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
                                 onClick={() => setModal({ type: 'record' })}
                             >
-                                <Plus className="h-4 w-4" />
                                 Record PRN dose
-                            </Button>
+                            </PageHeaderPrimaryButton>
                         ) : null
                     }
                     footer={

@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax -- The hero footer uses custom on-dark
  * search/clear controls (the sanctioned H&S hero pattern); semantic tokens only. */
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     PrivacyActionModal,
     type PrivacyActionKind,
@@ -597,14 +598,12 @@ export default function PrivacyDashboard({
                             </div>
                             <div className="flex items-center gap-2">
                                 {can.manage ? (
-                                    <Button
-                                        size="sm"
-                                        className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                    <PageHeaderPrimaryButton
+                                        icon={Plus}
                                         onClick={() => setWizard('request')}
                                     >
-                                        <Plus className="mr-1.5 h-4 w-4" /> New
-                                        privacy request
-                                    </Button>
+                                        New privacy request
+                                    </PageHeaderPrimaryButton>
                                 ) : null}
                                 <Popover>
                                     <PopoverTrigger asChild>

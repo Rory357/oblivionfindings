@@ -5,6 +5,7 @@ import {
 import GlobalNavSearch from '@/components/global-nav-search';
 import GlobalQueryBar from '@/components/global-query-bar';
 import InboxMenus from '@/components/inbox-menus';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -108,13 +109,12 @@ export function AppHeader({
                             )}
                         </span>
                     </div>
-                    <Button
-                        size="sm"
-                        className="shrink-0 border border-primary-foreground/30 bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                    <PageHeaderPrimaryButton
+                        className="shrink-0"
                         onClick={handleStopImpersonating}
                     >
                         Stop Impersonating
-                    </Button>
+                    </PageHeaderPrimaryButton>
                 </div>
             )}
 

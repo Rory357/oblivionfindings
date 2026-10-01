@@ -6,6 +6,7 @@ import {
     type PageHeroBadge,
     type PageHeroStat,
 } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     TabStrip,
@@ -412,13 +413,12 @@ export default function EmergencyAccess({
                     ]}
                     actions={
                         <>
-                            <Button
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
                                 onClick={() => setWizardOpen(true)}
                             >
-                                <Plus className="h-4 w-4" />
                                 Request emergency access
-                            </Button>
+                            </PageHeaderPrimaryButton>
                             <Button
                                 variant="outline"
                                 className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"

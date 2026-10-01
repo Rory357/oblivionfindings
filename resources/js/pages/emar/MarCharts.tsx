@@ -18,6 +18,7 @@ import {
     type PageHeroMetaItem,
     type PageHeroStat,
 } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     TabStrip,
@@ -531,14 +532,11 @@ export default function MarCharts(props: Props) {
                     stats={heroStats}
                     actions={
                         <>
-                            <Button
-                                asChild
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                            >
+                            <PageHeaderPrimaryButton asChild>
                                 <a href="/emar/rounds">
                                     Start medication round
                                 </a>
-                            </Button>
+                            </PageHeaderPrimaryButton>
                             {can.record && (
                                 <Button
                                     variant="outline"

@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- review tables, KPI cards, kanban cards and the cycle
    stepper are custom-layout bordered surfaces / chip buttons (not Card/Button); colours are tokens. */
 import { PageHero, type PageHeroStat } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -586,13 +587,12 @@ export default function Reviews({
                     description={description}
                     stats={heroStats}
                     actions={
-                        <Button
-                            className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
                             onClick={() => setModal({ type: 'schedule' })}
                         >
-                            <Plus className="h-4 w-4" />
                             Schedule review
-                        </Button>
+                        </PageHeaderPrimaryButton>
                     }
                     footer={
                         <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">

@@ -5,6 +5,10 @@ import {
 } from '@/components/health-safety/substance-detail-dialog';
 import { SubstanceWizardDialog } from '@/components/health-safety/substance-wizard-dialog';
 import {
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
+import {
     EntityFilter,
     ShiftContextMenu,
     TabStrip,
@@ -12,7 +16,6 @@ import {
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
@@ -630,23 +633,19 @@ export default function SubstancesIndex({
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 {can.create ? (
-                                    <Button
-                                        size="sm"
-                                        className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                    <PageHeaderPrimaryButton
+                                        icon={Plus}
                                         onClick={startAdd}
                                     >
-                                        <Plus className="mr-1.5 h-4 w-4" /> Add
-                                        substance
-                                    </Button>
+                                        Add substance
+                                    </PageHeaderPrimaryButton>
                                 ) : null}
                                 {canViewBoardReports ? (
                                     <Popover>
                                         <PopoverTrigger asChild>
-                                            <Button
-                                                size="sm"
-                                                className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                            <PageHeaderGlassButton
+                                                icon={FileText}
                                             >
-                                                <FileText className="mr-1.5 h-4 w-4" />{' '}
                                                 Board reports
                                                 <span
                                                     aria-hidden
@@ -654,7 +653,7 @@ export default function SubstancesIndex({
                                                 >
                                                     ▾
                                                 </span>
-                                            </Button>
+                                            </PageHeaderGlassButton>
                                         </PopoverTrigger>
                                         <PopoverContent
                                             align="end"

@@ -1,3 +1,4 @@
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -6,7 +7,6 @@ import {
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
@@ -622,13 +622,9 @@ export default function WorkerParticipationIndex({
                                     onOpenChange={setNewOpen}
                                 >
                                     <PopoverTrigger asChild>
-                                        <Button
-                                            size="sm"
-                                            className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                        >
-                                            <Plus className="mr-1.5 h-4 w-4" />{' '}
+                                        <PageHeaderPrimaryButton icon={Plus}>
                                             New
-                                        </Button>
+                                        </PageHeaderPrimaryButton>
                                     </PopoverTrigger>
                                     <PopoverContent
                                         align="end"

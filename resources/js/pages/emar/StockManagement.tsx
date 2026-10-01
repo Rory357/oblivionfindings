@@ -5,6 +5,7 @@ import {
     type OpenOrderSummary,
 } from '@/components/emar/stock-detail-dialog';
 import { PageHero, type PageHeroStat } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -773,13 +774,12 @@ export default function StockManagement({
                     stats={heroStats}
                     actions={
                         <>
-                            <Button
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
                                 onClick={() => setModal({ type: 'order' })}
                             >
-                                <Plus className="h-4 w-4" />
                                 New pharmacy order
-                            </Button>
+                            </PageHeaderPrimaryButton>
                             <Button
                                 variant="outline"
                                 className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"

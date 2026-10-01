@@ -127,10 +127,10 @@ export default [
         // classes": a <Button> or <AlertDialogAction> left on the default
         // variant carries .btn-soft-primary, whose unlayered `background`
         // gradient paints over Tailwind's layered bg-destructive /
-        // bg-status-* / bg-white, so the button renders purple. `unstyled`
-        // Buttons skip buttonVariants, so their bg-* classes do apply.
-        // (bg-primary-foreground hero buttons have the same bug but are
-        // not covered yet — see DESIGN.md.)
+        // bg-status-* / bg-white / bg-primary-foreground, so the button
+        // renders purple (hero "white primary" buttons: purple text on
+        // purple). `unstyled` Buttons skip buttonVariants, so their bg-*
+        // classes do apply.
         //
         // This is core no-restricted-syntax under its own rule id: ~200 files
         // open with a blanket `eslint-disable no-restricted-syntax` for the
@@ -150,9 +150,9 @@ export default [
                 'error',
                 {
                     selector:
-                        "JSXOpeningElement[name.name=/^(Button|AlertDialogAction)$/]:not(:has(> JSXAttribute[name.name='unstyled'])):not(:has(> JSXAttribute[name.name='variant']:not([value.value='default']))) > JSXAttribute[name.name='className'] :matches(Literal[value=/\\bbg-(destructive|status-(critical|success|warning|info)|white)/], TemplateElement[value.raw=/\\bbg-(destructive|status-(critical|success|warning|info)|white)/])",
+                        "JSXOpeningElement[name.name=/^(Button|AlertDialogAction)$/]:not(:has(> JSXAttribute[name.name='unstyled'])):not(:has(> JSXAttribute[name.name='variant']:not([value.value='default']))) > JSXAttribute[name.name='className'] :matches(Literal[value=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground)/], TemplateElement[value.raw=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground)/])",
                     message:
-                        'The default Button variant (.btn-soft-primary gradient) paints over bg-destructive / bg-status-* / bg-white, so this renders purple. Use variant="destructive" for destructive actions; otherwise keep the default primary, or variant="outline" inside a status banner. There are no success/warning/info variants. See DESIGN.md "Recolouring a primary button with bg-* classes".',
+                        'The default Button variant (.btn-soft-primary gradient) paints over bg-destructive / bg-status-* / bg-white / bg-primary-foreground, so this renders purple. Use variant="destructive" for destructive actions; otherwise keep the default primary, or variant="outline" inside a status banner. On a hero, use PageHeaderPrimaryButton (white primary) or PageHeaderGlassButton (glass secondary). See DESIGN.md "Recolouring a primary button with bg-* classes".',
                 },
             ],
         },

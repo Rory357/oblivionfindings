@@ -1,3 +1,4 @@
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -13,7 +14,6 @@ import {
     type SectionKey,
 } from '@/components/safeguarding/concern-dialog';
 import { SafeguardingRaiseWizard } from '@/components/safeguarding/raise-wizard';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
@@ -705,14 +705,12 @@ export default function SafeguardingIndex({
                         </div>
 
                         {can.create ? (
-                            <Button
-                                size="sm"
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
                                 onClick={() => setRaiseOpen(true)}
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                             >
-                                <Plus className="mr-1.5 h-4 w-4" /> Raise
-                                concern
-                            </Button>
+                                Raise concern
+                            </PageHeaderPrimaryButton>
                         ) : null}
                     </div>
 
