@@ -19,10 +19,15 @@ function restrictedAuthorityRoleKeys(string $role): array
 test('revoke migration removes restricted independent authority from an already-seeded admin role', function () {
     $this->seed(RbacSeeder::class);
     $restricted = RbacSeeder::RESTRICTED_INDEPENDENT_AUTHORITY;
+    // The pre-fix backfill seeders could only leave behind keys that existed
+    // when this migration was written (24 Sep). assets.telemetry.history
+    // joined the list on 27 Sep, created with no implicit grant, so it was
+    // never left on admin; a later key that was would need its own migration.
+    $leftBehind = array_values(array_diff($restricted, ['assets.telemetry.history']));
 
     // What the pre-fix admin backfill seeders left behind.
     Role::query()->where('name', 'admin')->firstOrFail()->permissions()->syncWithoutDetaching(
-        Permission::query()->whereIn('key', $restricted)->pluck('id'),
+        Permission::query()->whereIn('key', $leftBehind)->pluck('id'),
     );
     $policyRoles = ['team_lead', 'health_safety_officer', 'compliance_lead'];
     $policyGrantsBefore = collect($policyRoles)->mapWithKeys(fn (string $role) => [$role => restrictedAuthorityRoleKeys($role)])->all();
