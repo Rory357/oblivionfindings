@@ -194,10 +194,10 @@ class MedicineRuleSettingsTest extends TestCase
         ]);
         $houseManager = $this->staff(['medications.settings.manage']);
 
-        // A house manager can't change a rule for every house (concealed, like editing it).
+        // A house manager reads a rule for every house but can't change it.
         $this->actingAs($houseManager)
             ->post("/emar/settings/rules/{$rule->id}/active", ['active' => false])
-            ->assertNotFound();
+            ->assertForbidden();
         $this->actingAs($this->staff(['medications.view', 'medications.audit.view']))
             ->post("/emar/settings/rules/{$rule->id}/active", ['active' => false])
             ->assertForbidden();
@@ -206,7 +206,10 @@ class MedicineRuleSettingsTest extends TestCase
         $this->assertSame(0, MedicationSettingChange::query()->count());
         $this->actingAs($houseManager)
             ->get('/emar/settings')
-            ->assertInertia(fn (Assert $page) => $page->has('rules', 0));
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('rules', 1)
+                ->where('rules.0.id', $rule->id)
+                ->where('rules.0.can_change', false));
     }
 
     public function test_a_rule_naming_a_controlled_medicine_is_concealed_from_a_settings_manager_without_controlled_access(): void
@@ -305,8 +308,8 @@ class MedicineRuleSettingsTest extends TestCase
                 'rows' => [['person' => 'Aroha Ngata', 'medicine' => 'Insulin glargine', 'house' => 'Kōwhai House']],
                 'more' => 0,
                 'limited' => false,
-                // House managers don't see rules for every house (MedicationSettingsSiteScopeTest).
-                'overlaps' => [],
+                // The rule for every house applies at their house too, so it overlaps.
+                'overlaps' => [['id' => $routeRule->id, 'sentence' => 'Before saving a dose of any medicine given by subcutaneous injection at All houses: a second person confirms with their witness PIN.']],
             ]);
         // A house they can't see is refused, not previewed.
         $this->actingAs($houseManager)->getJson($query.'&site_id='.$otherSite->id)->assertNotFound();

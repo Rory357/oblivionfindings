@@ -376,8 +376,9 @@ class MedicationSettingsController extends Controller
             ]);
         }
 
-        // Auditors also read the organisation-wide rules; they change nothing.
-        $ruleModels = $this->visibleRulesQuery($actor, $siteIds, $canManageGlobal || $readOnlyAudit)
+        // Everyone who opens Settings reads the rules for every house as well as
+        // their own houses' rules; only all-sites authority changes them (P11 v5).
+        $ruleModels = $this->visibleRulesQuery($actor, $siteIds, true)
             ->with(['site:id,name', 'creator:id,name'])
             ->orderByDesc('active')
             ->orderBy('match_type')
@@ -618,7 +619,7 @@ class MedicationSettingsController extends Controller
         $rule->id = (int) ($validated['rule_id'] ?? 0);
 
         $orders = $this->ruleScope->visibleOrders($actor, $global ? null : $siteIds);
-        $others = $this->visibleRulesQuery($actor, $siteIds, $global || $readOnlyAudit)->with('site:id,name')->get();
+        $others = $this->visibleRulesQuery($actor, $siteIds, true)->with('site:id,name')->get();
         $overlapIds = array_flip($this->ruleScope->overlaps($orders, $rule, $others));
         $concealed = $this->ruleScope->canSeeControlled($actor) ? [] : array_flip($this->ruleScope->controlledRuleIds($others));
 
@@ -704,20 +705,22 @@ class MedicationSettingsController extends Controller
     }
 
     /**
+     * Rules at the given houses, plus the rules for every house when asked.
+     *
      * @param  array<int, int>  $siteIds
      * @return Builder<MedicationAdminRule>
      */
     private function visibleRulesQuery(
         User $actor,
         array $siteIds,
-        ?bool $canManageGlobal = null,
+        ?bool $includeOrganisationRules = null,
     ): Builder {
-        $canManageGlobal ??= $this->canManageGlobalRules($actor);
+        $includeOrganisationRules ??= $this->canManageGlobalRules($actor);
 
         return MedicationAdminRule::query()
-            ->where(function (Builder $scope) use ($canManageGlobal, $siteIds): void {
+            ->where(function (Builder $scope) use ($includeOrganisationRules, $siteIds): void {
                 $scope->whereIn('site_id', $siteIds);
-                if ($canManageGlobal) {
+                if ($includeOrganisationRules) {
                     $scope->orWhereNull('site_id');
                 }
             });
@@ -878,9 +881,9 @@ class MedicationSettingsController extends Controller
         };
 
         if ($siteId === null) {
-            if (! $this->canManageGlobalRules($actor)) {
-                $deny();
-            }
+            // Rules for every house are visible to everyone in Settings, so a
+            // refused change says so rather than pretending the rule is absent.
+            abort_unless($this->canManageGlobalRules($actor), 403);
 
             return;
         }
