@@ -172,7 +172,9 @@ const DirtyDot = () => (
 
 export default function EmarSettings(props: Props) {
     const { settings: s, witnessPin, settingsAccess, readOnlyAudit } = props;
-    const templatesOnly = !settingsAccess && props.templateAccess.manage;
+    // P11 F1 + Q2: people who manage or read a house's round templates
+    // reach them here without other Settings access.
+    const templatesOnly = !settingsAccess && props.templateAccess.read;
     const built: Built = useMemo(
         () => ({
             rules: settingsAccess ? ['overview', 'medicines', 'safety'] : [],
@@ -383,7 +385,11 @@ export default function EmarSettings(props: Props) {
         : !settingsAccess
           ? [
                 witnessPin.can_reset ? 'Witness PIN resets' : null,
-                props.templateAccess.manage ? 'round templates' : null,
+                props.templateAccess.manage
+                    ? 'round templates'
+                    : props.templateAccess.read
+                      ? 'round templates (read-only)'
+                      : null,
             ]
                 .filter(Boolean)
                 .join(' and ')

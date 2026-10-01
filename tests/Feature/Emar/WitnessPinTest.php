@@ -458,7 +458,17 @@ class WitnessPinTest extends TestCase
                     && ! collect($rows)->pluck('id')->contains($lead->id)
                     && collect($rows)->every(fn ($row) => ! array_key_exists('pin_hash', (array) $row))));
 
-        $this->actingAs($colleague)->get('/emar/settings')->assertForbidden();
+        // A colleague who reads medications reaches only the round templates
+        // (P11 Q2), with no PIN list and no way to reset a PIN.
+        $this->actingAs($colleague)
+            ->get('/emar/settings')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('settingsAccess', false)
+                ->where('witnessPin.can_reset', false)
+                ->where('witnessPin.staff', [])
+                ->where('templateAccess.read', true)
+                ->where('templateAccess.manage', false));
         $this->actingAs($colleague)->post("/emar/settings/witness-pins/{$worker->id}/reset")->assertForbidden();
         $this->actingAs($lead)->post("/emar/settings/witness-pins/{$lead->id}/reset")->assertForbidden();
         $this->actingAs($lead)->post("/emar/settings/witness-pins/{$elsewhere->id}/reset")->assertNotFound();

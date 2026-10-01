@@ -59,6 +59,7 @@ class RoundTemplateSettingsTest extends TestCase
                 ->where('settingsAccess', false)
                 ->where('readOnlyAudit', false)
                 ->where('witnessPin.can_reset', false)
+                ->where('witnessPin.staff', [])
                 ->where('templateAccess.manage', true)
                 ->where('templateAccess.sites', [['id' => $this->site->id, 'name' => $this->site->name]])
                 ->where('roundTemplates.0.id', $template->id)
@@ -83,10 +84,64 @@ class RoundTemplateSettingsTest extends TestCase
             ])
             ->assertForbidden();
 
-        // Without orders.manage (or another Settings permission) the page stays closed.
-        $this->actingAs($this->staff(['medications.view']))
+        // With no medication permission that reaches Settings, it stays closed.
+        $this->actingAs($this->staff([], deny: ['medications.view']))
             ->get('/emar/settings')
             ->assertForbidden();
+    }
+
+    public function test_a_medications_view_holder_reads_round_templates_only_and_every_write_is_refused(): void
+    {
+        $reader = $this->staff(['medications.view'], deny: ['medications.orders.manage']);
+        $template = $this->template('Morning round', $this->site);
+        $foreign = $this->template('HIDDEN foreign round', Site::factory()->create(['is_active' => true]));
+
+        $response = $this->actingAs($reader)
+            ->get('/emar/settings')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('settingsAccess', false)
+                ->where('witnessPin.can_reset', false)
+                ->where('witnessPin.staff', [])
+                ->where('templateAccess.read', true)
+                ->where('templateAccess.manage', false)
+                ->where('templateAccess.sites', [])
+                ->where('templateStaff', [])
+                ->where('roundTemplates.0.id', $template->id)
+                ->where('roundTemplates.0.can_change', false)
+                ->has('roundTemplates', 1)
+                ->where('rules', [])
+                ->where('settings.history', []));
+        $this->assertStringNotContainsString('HIDDEN', $response->getContent());
+
+        // Every write is refused.
+        $this->actingAs($reader)->post(route('emar.rounds.templates.store'), $this->payload())->assertForbidden();
+        $this->actingAs($reader)->put(route('emar.rounds.templates.update', $template), ['active' => false])->assertForbidden();
+        $this->actingAs($reader)->post(route('emar.rounds.templates.retire', $template))->assertForbidden();
+        $this->actingAs($reader)->post(route('emar.rounds.generate'), ['date' => '2026-05-04'])->assertForbidden();
+        $this->actingAs($reader)->getJson(route('emar.rounds.generate.preview', ['date' => '2026-05-04']))->assertForbidden();
+        $this->actingAs($reader)
+            ->put('/emar/settings/changes', ['view' => 'rounds', 'changes' => [[
+                'group' => 'timing', 'key' => 'late', 'site_id' => null, 'value' => '30', 'from' => '60',
+            ]]])
+            ->assertForbidden();
+        $this->actingAs($reader)
+            ->post('/emar/settings/keep', ['items' => [['group' => 'timing', 'key' => 'late', 'site_id' => null]]])
+            ->assertForbidden();
+        $this->actingAs($reader)
+            ->post(route('emar.settings.rules.store'), [
+                'site_id' => $this->site->id,
+                'match_type' => 'medicine_name',
+                'match_value' => 'Anything',
+                'requires_countersign' => true,
+                'required_observations' => [],
+                'active' => true,
+            ])
+            ->assertForbidden();
+        $this->assertTrue($template->fresh()->active);
+        $this->assertSame(0, MedicationRound::query()->count());
+        $this->assertSame(0, MedicationSettingChange::query()->count());
+        $this->assertTrue($foreign->fresh()->active);
     }
 
     public function test_templates_follow_the_house_scope_and_never_name_another_houses_staff(): void
@@ -317,13 +372,18 @@ class RoundTemplateSettingsTest extends TestCase
     /**
      * @param  list<string>  $permissions
      * @param  list<int>  $secondarySiteIds
+     * @param  list<string>  $deny
      */
-    private function staff(array $permissions, array $secondarySiteIds = []): User
+    private function staff(array $permissions, array $secondarySiteIds = [], array $deny = []): User
     {
         $user = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        // Keyed by permission id: "+" keeps the ids (a spread would renumber them).
         $user->permissionOverrides()->sync(
             Permission::query()->whereIn('key', $permissions)->pluck('id')
                 ->mapWithKeys(fn (int $id) => [$id => ['allowed' => true]])
+                ->all()
+            + Permission::query()->whereIn('key', $deny)->pluck('id')
+                ->mapWithKeys(fn (int $id) => [$id => ['allowed' => false]])
                 ->all(),
         );
         HrEmployeeProfile::factory()->create([

@@ -276,9 +276,10 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     // House leads with the PIN reset permission reach the settings page for the
     // second-person confirmation section only (PIN-1); auditors read every
     // setting and its change history, read-only (P11 answer 6); people who
-    // manage orders at a house reach its round templates only (P11 F1).
+    // manage orders at a house reach its round templates only (P11 F1), and
+    // medications.view holders read them, read-only (P11 Q2).
     Route::get('/settings', [MedicationSettingsController::class, 'index'])
-        ->middleware('permission:medications.settings.manage|medications.witness_pin.reset|medications.audit.view|medications.orders.manage')
+        ->middleware('permission:medications.settings.manage|medications.witness_pin.reset|medications.audit.view|medications.orders.manage|medications.view')
         ->name('emar.settings');
     // P11: who a medicine rule would apply to now, in the reader's own person scope.
     Route::get('/settings/rules/preview', [MedicationSettingsController::class, 'previewRule'])

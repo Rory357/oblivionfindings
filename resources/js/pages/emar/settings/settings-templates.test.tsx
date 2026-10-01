@@ -83,6 +83,7 @@ const templates: RoundTemplate[] = [
 const data = (over: Partial<TemplateData> = {}): TemplateData => ({
     templates,
     access: {
+        read: true,
         manage: true,
         all_houses: false,
         sites: [{ id: 10, name: 'Kōwhai House' }],
@@ -239,7 +240,12 @@ describe('Rounds & timing › Round templates', () => {
         renderWith(
             <RoundTemplates
                 data={data({
-                    access: { manage: false, all_houses: false, sites: [] },
+                    access: {
+                        read: true,
+                        manage: false,
+                        all_houses: false,
+                        sites: [],
+                    },
                     readOnlyAudit: true,
                     templates: templates.map((t) => ({
                         ...t,

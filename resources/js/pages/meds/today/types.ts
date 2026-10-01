@@ -1,3 +1,4 @@
+import type { PendingAssessment } from '@/components/meds/pending-assessment';
 /* Shared types for the worker-facing Meds Today board (`/meds/today`).
  * Shapes mirror the Inertia props served by Emar/WorkerMedsController. */
 import type { WitnessPinStatus } from '@/lib/witness-pin';
@@ -181,6 +182,8 @@ export interface NotGivenReasonOption {
 }
 
 export interface MedsTodayProps {
+    /** P11: the worker's own assessment waiting for their acknowledgement. */
+    pending_assessment?: PendingAssessment | null;
     today: string;
     date: string;
     date_label: string;

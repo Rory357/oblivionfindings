@@ -15,9 +15,18 @@ app-wide `default` and `outline` button treatments.
 
 ## Primary — "Create client"
 
-- Text: `--primary-foreground` (white)
+- Text: `--primary-fill-foreground` — white on the default brand; ink only
+  for a brand light enough for ink text (amended 2026-10-02).
 - Background (gradient-lit, top-lightened):
-  `linear-gradient(180deg, color-mix(in oklch, var(--primary) 82%, white) 0%, var(--primary) 55%)`
+  `linear-gradient(180deg, color-mix(in oklch, var(--primary-fill) 90%, white) 0%, var(--primary-fill) 55%)`
+  - `--primary-fill` is the brand, except that a fill carrying white text is
+    never lighter than L 0.50 — and in dark mode every brand is clamped to
+    0.50 (`--primary` itself stays light there, because it is also text on
+    dark surfaces). White text then measures ≥ 5.6:1 on the base and
+    ≥ 4.57:1 on the highlight for every hue.
+  - The highlight mix was 82%; 90% (amended 2026-10-02) keeps the lightened
+    top above WCAG AA under white text. It always mixes with white, so it
+    stays a highlight when a light brand takes ink text.
 - Shadow (inner highlight + violet glow):
   - `inset 0 1px 0 rgb(255 255 255 / 0.25)`
   - `0 1px 2px color-mix(in oklch, var(--color-purple-700) 50%, transparent)`
@@ -35,9 +44,12 @@ app-wide `default` and `outline` button treatments.
 
 ## Theming
 
-All colours come from semantic tokens (`--primary`, `--card`, `--border`,
-`--ring`, hue-277 purple scale), so dark mode derives automatically — no
-hard-coded hex anywhere.
+All colours come from semantic tokens (`--primary-fill`,
+`--primary-fill-foreground`, `--primary`, `--card`, `--border`, `--ring`,
+hue-277 purple scale), so dark mode and branding derive automatically — no
+hard-coded hex anywhere. The fill tokens are derived from `--primary` in
+`app.css` (see `DESIGN_TOKENS.md` § "Primary fills and foregrounds"); they
+are not a branding setting.
 
 ---
 

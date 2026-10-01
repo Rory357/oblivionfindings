@@ -72,13 +72,23 @@ class MedicationSettingsAuditorAccessTest extends TestCase
                 ->has('rules', 1)
                 ->where('rules.0.match_value', 'Insulin glargine'));
 
-        // A manager is not read-only, and someone with none of the keys is refused.
+        // A manager is not read-only. Someone who only reads medications
+        // reaches the round templates, read-only (P11 Q2), and nothing an
+        // auditor sees: no settings history, no rules, no PIN list.
         $this->actingAs($manager)
             ->get('/emar/settings')
             ->assertInertia(fn (Assert $page) => $page->where('readOnlyAudit', false));
         $this->actingAs($this->staff(['medications.view']))
             ->get('/emar/settings')
-            ->assertForbidden();
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('settingsAccess', false)
+                ->where('readOnlyAudit', false)
+                ->where('rules', [])
+                ->where('settings.history', [])
+                ->where('witnessPin.staff', [])
+                ->where('templateAccess.read', true)
+                ->where('templateAccess.manage', false));
     }
 
     public function test_every_settings_write_refuses_an_auditor(): void

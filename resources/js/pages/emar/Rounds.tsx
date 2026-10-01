@@ -93,6 +93,8 @@ type Props = {
         witness_pin?: WitnessPinStatus;
     };
     can_manage: boolean;
+    /** Can open Settings › Rounds & timing › Round templates (read or change). */
+    can_read_templates: boolean;
     can_export: boolean;
 };
 
@@ -112,6 +114,7 @@ export default function Rounds(props: Props) {
         not_given_reasons: notGivenReasons,
         board_user: signer,
         can_manage: canManage,
+        can_read_templates: canReadTemplates,
         can_export: canExport,
     } = props;
 
@@ -341,12 +344,16 @@ export default function Rounds(props: Props) {
             tone: 'info',
             badge: counts.totalDoses || undefined,
         },
-        {
-            id: 'templates',
-            label: 'Templates',
-            icon: LayoutList,
-            tone: 'violet',
-        },
+        ...(canReadTemplates
+            ? [
+                  {
+                      id: 'templates',
+                      label: 'Templates',
+                      icon: LayoutList,
+                      tone: 'violet' as const,
+                  },
+              ]
+            : []),
         {
             id: 'activity',
             label: 'Activity',
@@ -613,7 +620,7 @@ export default function Rounds(props: Props) {
                     </div>
                 )}
 
-                {activeTab === 'templates' && (
+                {activeTab === 'templates' && canReadTemplates && (
                     <div className="rounded-2xl border bg-card p-5 shadow-sm">
                         <div className="text-sm font-semibold">
                             Round templates are in Settings
@@ -624,16 +631,14 @@ export default function Rounds(props: Props) {
                             › Settings › Rounds &amp; timing.
                             {canManage
                                 ? ''
-                                : ' People who manage orders at a house change its templates.'}
+                                : ' You can read them there; people who manage orders at a house change them.'}
                         </p>
-                        {canManage ? (
-                            <Button asChild size="sm" className="mt-3">
-                                <Link href="/emar/settings#rounds/templates">
-                                    Open round templates
-                                    <ArrowUpRight className="h-4 w-4" />
-                                </Link>
-                            </Button>
-                        ) : null}
+                        <Button asChild size="sm" className="mt-3">
+                            <Link href="/emar/settings#rounds/templates">
+                                Open round templates
+                                <ArrowUpRight className="h-4 w-4" />
+                            </Link>
+                        </Button>
                     </div>
                 )}
 
