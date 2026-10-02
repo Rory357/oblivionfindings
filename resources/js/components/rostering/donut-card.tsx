@@ -6,7 +6,16 @@ import { Donut, DonutLegend, type DonutSegment } from './donut';
 
 export type DonutCardTone = 'primary' | 'warning' | 'success';
 
-export type DonutCardProps = {
+/**
+ * Where the card goes. A card whose viewer has nowhere to go (e.g. no
+ * permission for the report it summarises) passes neither and renders as a
+ * static card with no call-to-action, rather than a button that 403s.
+ */
+export type DonutCardTarget =
+    | { cta: string; onClick: () => void }
+    | { cta?: undefined; onClick?: undefined };
+
+export type DonutCardProps = DonutCardTarget & {
     tone: DonutCardTone;
     title: string;
     subtitle: string;
@@ -15,8 +24,6 @@ export type DonutCardProps = {
     centerLabel: string;
     accentKeys?: string[];
     active: boolean;
-    cta: string;
-    onClick: () => void;
     ariaControls?: string;
     /** Optional per-row value formatter (e.g. money), forwarded to DonutLegend. */
     formatValue?: (value: number) => ReactNode;
@@ -65,26 +72,8 @@ export function DonutCard({
     showPercent,
 }: DonutCardProps): ReactNode {
     const t = TONE_STYLES[tone];
-    return (
-        // eslint-disable-next-line no-restricted-syntax -- bespoke donut stat-card selector, not a shadcn Button.
-        <button
-            type="button"
-            // Toggle-button semantics (not role="tab"): these stat cards sit
-            // outside the TabStrip's tablist, and a lone role="tab" without a
-            // tablist parent is an axe critical (aria-required-parent).
-            aria-pressed={active}
-            aria-controls={ariaControls}
-            data-active={active}
-            onClick={onClick}
-            className={cn(
-                'group relative overflow-hidden rounded-[14px] border border-border bg-card p-4 pl-5 text-left transition',
-                'hover:-translate-y-px hover:shadow-sm',
-                'data-[active=true]:ring-4',
-                t.activeBorder,
-                t.activeRing,
-                'cursor-pointer',
-            )}
-        >
+    const body = (
+        <>
             <span
                 aria-hidden="true"
                 className={cn(
@@ -111,17 +100,51 @@ export function DonutCard({
                         formatValue={formatValue}
                         showPercent={showPercent}
                     />
-                    <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-muted-foreground transition-colors group-hover:text-foreground">
-                        <span>{cta}</span>
-                        <span
-                            aria-hidden="true"
-                            className="transition-transform group-hover:translate-x-1"
-                        >
-                            →
-                        </span>
-                    </div>
+                    {cta ? (
+                        <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-muted-foreground transition-colors group-hover:text-foreground">
+                            <span>{cta}</span>
+                            <span
+                                aria-hidden="true"
+                                className="transition-transform group-hover:translate-x-1"
+                            >
+                                →
+                            </span>
+                        </div>
+                    ) : null}
                 </div>
             </div>
+        </>
+    );
+    const surface =
+        'relative overflow-hidden rounded-[14px] border border-border bg-card p-4 pl-5 text-left';
+
+    if (!onClick) {
+        return <div className={surface}>{body}</div>;
+    }
+
+    return (
+        // eslint-disable-next-line no-restricted-syntax -- bespoke donut stat-card selector, not a shadcn Button.
+        <button
+            type="button"
+            // Toggle-button semantics (not role="tab"): these stat cards sit
+            // outside the TabStrip's tablist, and a lone role="tab" without a
+            // tablist parent is an axe critical (aria-required-parent).
+            aria-pressed={active}
+            aria-controls={ariaControls}
+            data-active={active}
+            onClick={onClick}
+            className={cn(
+                'group',
+                surface,
+                'transition',
+                'hover:-translate-y-px hover:shadow-sm',
+                'data-[active=true]:ring-4',
+                t.activeBorder,
+                t.activeRing,
+                'cursor-pointer',
+            )}
+        >
+            {body}
         </button>
     );
 }

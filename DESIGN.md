@@ -129,6 +129,11 @@ This supersedes the `PageHero` banner system
 hero-unification plans, and the client/site profile heroes as
 references — all of those are migration targets (conformance probe
 12), not precedents. Do not consult or extend them for new work.
+Until a page migrates, its `PageHero` band follows the sky's contrast
+rules (amended 2026-10-02): `.page-hero` in `app.css` paints the brand,
+category or Site colour (`--hero-base`) floored to L ≤ 0.36 and
+opaque; faint text on it is never below 70%; status tones on it use
+the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
 Both profile heroes are now migrated and deleted (sites 2026-09-06,
 clients 2026-09-07 — `pages/operations/clients/show.tsx` is on the
 `PageHeader` profile variant with its alert ribbon folded into the
@@ -683,6 +688,15 @@ before.
   ancestor. Check any tap target by measuring the rendered px
   (`getBoundingClientRect`, or `elementFromPoint` 21 px from the centre
   for `.frontline-hit`), not by its class name or a "44px" comment.
+- **Personal contact details copied into work fields** (corrected
+  2026-10-02, Settings › Profile). A generic "Phone number" field saved the
+  user's own number and also copied it into the HR work phone, which the
+  My HR directory shows to every staff member. Self-service contact fields
+  say whose number they are ("Personal mobile"), state who can see them, and
+  never write HR's work contact fields (`work_phone`, `work_email`) or fall
+  back to them on read-back. The sign-in email can be personal too, so it is
+  not copied into `work_email` either. Work contact details are edited only
+  on HR's screens, with HR's permissions.
 
 ## File viewing and downloading (approved by Stephan 2026-09-27)
 

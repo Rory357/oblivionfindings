@@ -157,9 +157,11 @@ function HeroVariant(props: PageHeroProps) {
     const supportingText = description ?? subtitle;
 
     // Resolve the hero's base colour: an explicit site brand colour wins, then
-    // the category token, else the --primary default gradient. The site colour
-    // is injected as a CSS variable *value* (runtime string) so the gradient
-    // utility stays token-based and the raw-colour ESLint guard stays green.
+    // the category token, else --primary (the .page-hero default). The site
+    // colour is injected as a CSS variable *value* (runtime string) so the
+    // band stays token-based and the raw-colour ESLint guard stays green.
+    // .page-hero (app.css) floors whichever colour it is dark enough for the
+    // band's white text, so admin-chosen light Site colours stay readable.
     const heroBase =
         brandColour && brandColour.trim() !== ''
             ? brandColour.trim()
@@ -170,10 +172,6 @@ function HeroVariant(props: PageHeroProps) {
     const style: CSSProperties | undefined = heroBase
         ? ({ ['--hero-base' as string]: heroBase } as CSSProperties)
         : undefined;
-
-    const gradientClass = heroBase
-        ? 'bg-[linear-gradient(to_bottom_right,color-mix(in_oklch,var(--hero-base)_90%,transparent),var(--hero-base),color-mix(in_oklch,var(--hero-base)_80%,transparent))]'
-        : 'bg-gradient-to-br from-primary/90 via-primary to-primary/80';
 
     const renderedIcon =
         avatar || avatarStack
@@ -193,8 +191,7 @@ function HeroVariant(props: PageHeroProps) {
             data-page-hero-variant="hero"
             style={style}
             className={cn(
-                '@container relative rounded-2xl text-primary-foreground',
-                gradientClass,
+                'page-hero @container relative rounded-2xl text-primary-foreground',
                 className,
             )}
         >
@@ -210,7 +207,7 @@ function HeroVariant(props: PageHeroProps) {
                 {backHref ? (
                     <Link
                         href={backHref}
-                        className="frontline-focus frontline-tap mb-1 -ml-2 inline-flex items-center gap-1.5 rounded-md px-2 text-xs text-primary-foreground/60 transition-colors hover:text-primary-foreground/90"
+                        className="frontline-focus frontline-tap mb-1 -ml-2 inline-flex items-center gap-1.5 rounded-md px-2 text-xs text-primary-foreground/70 transition-colors hover:text-primary-foreground/90"
                     >
                         <ArrowLeft className="h-3.5 w-3.5" />
                         {backLabel}
