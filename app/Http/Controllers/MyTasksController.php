@@ -843,7 +843,12 @@ class MyTasksController extends Controller
                 ->with('client:id,first_name,last_name')
                 ->get()
                 ->partition(fn (ClientMedication $order): bool => ! $canAccessControlled && (bool) $order->controlled_drug);
-            $doses = app(ScheduledDoseStates::class)->dosesBetween($medications->concat($controlled), $windowStart, $windowEnd, $now);
+            $states = app(ScheduledDoseStates::class);
+            // With the words for an Away dose, as this reader may read them (C7).
+            $doses = $states->withAwayReasons(
+                $states->dosesBetween($medications->concat($controlled), $windowStart, $windowEnd, $now),
+                auth()->user(),
+            );
 
             // One administration query for the whole window, matched in memory
             // per slot — replaces the old per-dose-slot query (an N+1 that

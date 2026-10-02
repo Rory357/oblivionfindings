@@ -172,12 +172,13 @@ final class ClientCalendarDoses
             ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
             ->get()
             ->keyBy('id');
-        $doses = $this->states->dosesBetween(
+        // With the words for an Away dose, as this reader may read them (C7).
+        $doses = $this->states->withAwayReasons($this->states->dosesBetween(
             $orders,
             Carbon::parse($from, $timezone),
             Carbon::parse($to, $timezone),
             $now,
-        );
+        ), auth()->user());
 
         $listed = [];
         foreach ($doses as $orderId => $orderDoses) {

@@ -119,7 +119,7 @@ export interface MyDayMedDue {
     /**
      * pending_check: waiting for the order check — shown, not recordable.
      * missed: recorded as missed — "Missed (recorded)", never overdue.
-     * away: the person is away (approved leave, respite at another Site) —
+     * away: the person is away (checked in at respite at another Site) —
      * shown as "Away · reason", never due or overdue.
      */
     status:
@@ -132,7 +132,7 @@ export interface MyDayMedDue {
         | 'missed'
         | 'pending_check'
         | 'away';
-    /** Why the person is away, e.g. "On leave (until Tue 16 Jun)"; set when status is away. */
+    /** Why the person is away, e.g. "Respite at another house (since Mon 15 Jun, 7:00 am)"; set when status is away. */
     away_reason?: string | null;
     flag?: string | null;
     /** Admin eMAR deep-link; null for record-only frontline workers. */

@@ -17,10 +17,11 @@ use InvalidArgumentException;
  * Live state is worked out in SQL against a bound `now` — never the database
  * clock, never stored — so it can't go stale:
  * - recorded: the outcome (given, refused, withheld, missed, away);
- * - away: due while the person is away by a record that says so —
- *   approved client leave, respite booked at another Site
- *   (DoseAwaySources; C7) — read live, so withdrawing the record makes the
- *   dose owed again. A recorded outcome always wins;
+ * - away: due while the person is away by a record that says so — checked
+ *   in at respite at another Site, from the stay's actual start until its
+ *   discharge (DoseAwaySources; C7) — read live, so withdrawing the record
+ *   makes the dose owed again. A dose due before the person left is owed. A
+ *   recorded outcome always wins;
  * - self_managed: the person takes it themselves (not chased);
  * - pending_check: due while a change to the order waited for its check,
  *   with nothing recorded ("Waiting for the order check") — doses can't be

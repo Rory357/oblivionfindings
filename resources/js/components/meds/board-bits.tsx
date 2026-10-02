@@ -82,7 +82,7 @@ export const DOSE_STATUS_META: Record<
 };
 
 /**
- * A dose status as words: "Away · On leave (until Tue 16 Jun)" when the
+ * A dose status as words: "Away · Respite at another house (since Mon 15 Jun, 7:00 am)" when the
  * person is away (the reason is always shown), else the status label.
  */
 export function doseStatusLabel(

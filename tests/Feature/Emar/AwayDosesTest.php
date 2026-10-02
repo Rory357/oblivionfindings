@@ -7,9 +7,12 @@ use App\Models\Client;
 use App\Models\ClientLeaveRequest;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ControlRoomAlert;
 use App\Models\MedicationRound;
 use App\Models\Permission;
 use App\Models\RespiteBooking;
+use App\Models\RespiteStay;
+use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\EnhancedMarService;
@@ -17,19 +20,27 @@ use App\Services\GuidedRoundService;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\DoseSlots\OverdueDoses;
+use App\Services\Medication\DoseSlots\ScheduledDoseStates;
+use App\Services\Medication\MedicationSignalService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
- * C7: a dose due while the person is away — approved client leave, or
- * respite booked at another Site — reads as "Away · reason" everywhere: never
- * due, late, overdue, badged or alerted, its own number in P09 and never
- * hidden. Away is read live: withdraw or change the record and the dose is
- * owed again, overdue included. A recorded outcome always wins.
+ * C7: a dose is Away only with positive evidence the person is elsewhere at
+ * its due time — checked in at respite at another Site, from the stay's
+ * actual start until its discharge (Main, 3 Oct). The booking's planned
+ * times are never read. A dose due before the person left is owed, overdue
+ * included. Away reads "Away · reason" everywhere — the respite house named
+ * only to a reader who may access its Site — is never due, late, overdue,
+ * badged or alerted, and counts on its own. Withdraw the record and the dose
+ * is owed again. A recorded outcome always wins. Approved leave is switched
+ * off as a source for now.
  *
  * Monday 15 June 2026 (NZST, UTC+12); orders entered Friday 12 June.
  */
@@ -52,12 +63,19 @@ class AwayDosesTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
+        // The schema dump records this migration as run without its rows:
+        // replay it so overdue signals route to an alert.
+        (require database_path('migrations/2026_04_10_240000_seed_medication_signal_types_and_rules.php'))->up();
         Cache::flush();
         $this->at('2026-06-12 00:00');
         $this->home = Site::factory()->create(['name' => 'Aurora House', 'is_active' => true, 'archived' => false]);
         $this->kowhai = Site::factory()->create(['name' => 'Kowhai House', 'is_active' => true, 'archived' => false]);
-        $this->aroha = Client::factory()->create(['first_name' => 'Aroha', 'last_name' => 'Ngata', 'site_id' => $this->home->id, 'status' => 'active']);
-        $this->reader = $this->staff(['clients.viewAssigned', 'calendar.view', 'medications.view']);
+        $context = ServiceContext::factory()->create(['name' => 'Away', 'type' => 'residential', 'is_active' => true, 'site_id' => $this->home->id]);
+        $this->aroha = Client::factory()->create([
+            'first_name' => 'Aroha', 'last_name' => 'Ngata', 'site_id' => $this->home->id,
+            'service_context_id' => $context->id, 'status' => 'active', 'suppress_med_admin_alerts' => false,
+        ]);
+        $this->reader = $this->staff($this->home, ['clients.viewAssigned', 'calendar.view', 'medications.view']);
         $this->aroha->supportWorkers()->attach($this->reader->id);
         $this->metformin = ClientMedication::query()->create([
             'client_id' => $this->aroha->id,
@@ -81,98 +99,161 @@ class AwayDosesTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_a_dose_on_approved_leave_is_away_everywhere_and_never_overdue(): void
+    public function test_a_dose_during_a_checked_in_stay_elsewhere_is_away_everywhere_and_never_alerted(): void
     {
-        $leave = $this->leave('2026-06-15', '2026-06-16', 'approved');
+        $stay = $this->stay('2026-06-15 07:00');
         $this->at('2026-06-15 09:30');
+        $reason = 'Respite at another house (since Mon 15 Jun, 7:00 am)';
 
-        // The projection: away, by the leave; its own number in P09.
+        // The projection: away, by the stay; its own number in P09.
         $rows = $this->rows('2026-06-15');
         $this->assertSame(['away', 'away'], $rows->pluck('state')->all());
-        $this->assertSame(['source' => 'leave', 'id' => $leave->id], $rows->first()['away']);
+        $this->assertSame(['source' => 'respite', 'id' => $stay->id], $rows->first()['away']);
         $totals = app(DoseSlotProjection::class)->totals(DoseSlotReaderScope::internal([$this->aroha->id]), '2026-06-15', '2026-06-15', CarbonImmutable::now());
         $this->assertSame([2, 0, 0, null], [$totals['away'], $totals['due'], $totals['not_recorded'], $totals['given_rate']]);
 
         // Meds today: shown, away with its reason, not due or overdue.
         $schedule = $this->medsToday('2026-06-15');
         $this->assertSame(['away', 'away'], array_column($schedule, 'status'));
-        $this->assertSame('On leave (until Tue 16 Jun)', $schedule[0]['away_reason']);
+        $this->assertSame($reason, $schedule[0]['away_reason']);
 
         // The MAR: "Away · reason", never overdue.
+        $this->actingAs($this->reader->fresh());
         $mar = app(EnhancedMarService::class)->build($this->aroha->fresh(), Carbon::parse('2026-06-15'), null, null, true)['scheduled'];
         $this->assertSame(['away', 'away'], array_column($mar, 'schedule_state'));
-        $this->assertSame('Away · On leave (until Tue 16 Jun)', $mar[0]['schedule_state_label']['label']);
+        $this->assertSame('Away · '.$reason, $mar[0]['schedule_state_label']['label']);
         $this->assertFalse($mar[0]['is_overdue']);
 
         // The profile calendar.
-        $titles = collect($this->calendar('2026-06-15T00:00:00+12:00', '2026-06-16T00:00:00+12:00'))->pluck('title')->all();
-        $this->assertSame(['Metformin — Away · On leave (until Tue 16 Jun)', 'Metformin — Away · On leave (until Tue 16 Jun)'], $titles);
+        $this->assertSame(
+            ['Metformin — Away · '.$reason, 'Metformin — Away · '.$reason],
+            collect($this->calendar('2026-06-15T00:00:00+12:00', '2026-06-16T00:00:00+12:00'))->pluck('title')->all(),
+        );
 
-        // Never alerted (Sunday's unrecorded doses, before the leave, still are).
+        // Never alerted (Sunday's unrecorded doses, before the stay, still are).
         $this->assertSame([], $this->overdueOn('2026-06-15'));
         $this->assertSame(['2026-06-14 08:00', '2026-06-14 20:00'], $this->overdueOn('2026-06-14'));
     }
 
-    public function test_withdrawn_or_unapproved_leave_leaves_the_dose_owed(): void
+    public function test_the_respite_house_is_named_only_to_a_reader_who_may_access_its_site(): void
     {
-        $leave = $this->leave('2026-06-15', '2026-06-16', 'requested');
+        $this->stay('2026-06-15 07:00');
         $this->at('2026-06-15 09:30');
-        $this->assertSame(['late', 'not_due'], $this->rows('2026-06-15')->pluck('state')->all());
+        $kowhaiLead = $this->staff($this->kowhai, ['medications.view']);
+        $states = app(ScheduledDoseStates::class);
+        $reason = fn (?User $viewer): ?string => $states->withAwayReasons(
+            $states->dosesOn([$this->metformin->fresh()], Carbon::parse('2026-06-15', 'Pacific/Auckland'), now()),
+            $viewer,
+        )[$this->metformin->id][0]['away_reason'];
 
-        $leave->update(['status' => 'approved']);
-        $this->assertSame(['away', 'away'], $this->rows('2026-06-15')->pluck('state')->all());
-        $this->assertSame([], $this->overdueOn('2026-06-15'));
+        $this->assertSame('Respite at another house (since Mon 15 Jun, 7:00 am)', $reason($this->reader));
+        $this->assertSame('Respite at Kowhai House (since Mon 15 Jun, 7:00 am)', $reason($kowhaiLead));
+        $this->assertSame('Respite at another house (since Mon 15 Jun, 7:00 am)', $reason(null));
+        // Without asking, no words are loaded.
+        $this->assertNull($states->dosesOn([$this->metformin->fresh()], Carbon::parse('2026-06-15', 'Pacific/Auckland'), now())[$this->metformin->id][0]['away_reason']);
+    }
 
-        // Withdrawn: owed again, and overdue.
-        $leave->update(['status' => 'cancelled']);
+    public function test_a_dose_due_before_check_in_stays_owed_and_its_alert_stays_open(): void
+    {
+        $this->at('2026-06-15 09:30');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->assertSame(['2026-06-15 08:00'], $this->overdueOn('2026-06-15'));
+        $this->assertCount(1, $this->openAlerts());
+
+        // Checked in at 15:00, after the 08:00 dose was overdue.
+        $this->at('2026-06-15 15:00');
+        $this->stay('2026-06-15 15:00');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+
+        $this->assertSame(['late', 'away'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->assertSame(['2026-06-15 08:00'], $this->overdueOn('2026-06-15'));
+        $this->assertCount(1, $this->openAlerts());
+    }
+
+    public function test_the_alert_follows_the_stay_through_its_model_hooks(): void
+    {
+        // Every other dose in the look-back recorded: only 20:00 is overdue.
+        $this->record('2026-06-14 08:00', 'given');
+        $this->record('2026-06-14 20:00', 'given');
+        $this->record('2026-06-15 08:00', 'given');
+        $this->at('2026-06-15 21:30');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->assertCount(1, $this->openAlerts());
+
+        // A stay recorded as begun at 19:00: the 20:00 dose is away, the
+        // alert settles straight away (no sweep).
+        $stay = $this->stay('2026-06-15 19:00');
+        $this->assertSame(['given', 'away'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->assertCount(0, $this->openAlerts());
+
+        // The stay withdrawn: owed again and overdue at once; the overdue
+        // job's next run raises a new alert (as when a record is withdrawn).
+        DB::transaction(fn () => $stay->delete());
+        $this->assertSame(['given', 'late'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->assertSame(['2026-06-15 20:00'], $this->overdueOn('2026-06-15'));
+        $this->at('2026-06-15 21:45');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->assertCount(1, $this->openAlerts());
+        $this->assertSame(2, $this->overdueAlertCount());
+    }
+
+    public function test_an_early_discharge_ends_away_there_and_then(): void
+    {
+        $stay = $this->stay('2026-06-15 07:00');
+        $this->at('2026-06-15 12:00');
+        DB::transaction(fn () => $stay->update(['status' => 'discharged', 'actual_end' => now()]));
+        $this->at('2026-06-15 12:30');
+
+        $this->assertSame(['away', 'not_due'], $this->rows('2026-06-15')->pluck('state')->all());
+    }
+
+    public function test_no_dose_is_away_without_a_checked_in_stay_at_another_site(): void
+    {
+        // A confirmed booking not yet checked in (its planned times cover the day).
+        $this->booking($this->kowhai->id, 'confirmed');
+        // A cancelled booking whose stay was admitted but never checked in.
+        $this->stay('2026-06-15 07:00', status: 'admitted', bookingStatus: 'cancelled');
+        // A no-show.
+        $this->booking($this->kowhai->id, 'no_show');
+        // Respite at the person's own Site, and with no Site recorded.
+        $this->stay('2026-06-15 07:00', siteId: $this->home->id);
+        $this->stay('2026-06-15 07:00', siteId: null);
+        $this->at('2026-06-15 09:30');
+
         $this->assertSame(['late', 'not_due'], $this->rows('2026-06-15')->pluck('state')->all());
         $this->assertSame(['overdue', 'upcoming'], array_column($this->medsToday('2026-06-15'), 'status'));
-        $this->assertSame(['2026-06-15 08:00'], $this->overdueOn('2026-06-15'));
     }
 
-    public function test_respite_at_another_site_is_away_from_its_start_until_its_end(): void
+    public function test_a_refusal_recorded_during_away_wins(): void
     {
-        $booking = RespiteBooking::query()->create([
-            'client_id' => $this->aroha->id,
-            'location_id' => $this->kowhai->id,
-            'start_at' => Carbon::parse('2026-06-15 10:00', 'Pacific/Auckland')->utc(),
-            'end_at' => Carbon::parse('2026-06-16 10:00', 'Pacific/Auckland')->utc(),
-            'status' => 'confirmed',
-        ]);
-        $this->at('2026-06-15 21:30');
+        $this->stay('2026-06-15 07:00');
+        $this->record('2026-06-15 08:00', 'refused');
+        $this->at('2026-06-15 09:30');
 
-        // 08:00 was before the stay: owed. 20:00 and the next morning: away.
-        $this->assertSame(['late', 'away'], $this->rows('2026-06-15')->pluck('state')->all());
-        $this->assertSame(['away', 'not_due'], $this->rows('2026-06-16')->pluck('state')->all());
-        $schedule = $this->medsToday('2026-06-15');
-        $this->assertSame(['overdue', 'away'], array_column($schedule, 'status'));
-        $this->assertSame('Respite at Kowhai House (until Tue 16 Jun)', $schedule[1]['away_reason']);
-
-        // Respite at the person's own Site is not away.
-        $booking->update(['location_id' => $this->home->id]);
-        $this->assertSame(['late', 'late'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->assertSame(['refused', 'away'], $this->rows('2026-06-15')->pluck('state')->all());
+        $this->assertSame(['refused', 'away'], array_column($this->medsToday('2026-06-15'), 'status'));
     }
 
-    public function test_a_recorded_outcome_wins_over_away(): void
+    public function test_approved_leave_is_not_an_away_source_until_it_is_switched_on(): void
     {
-        $this->leave('2026-06-15', '2026-06-15', 'approved');
-        ClientMedicationAdministration::query()->create([
+        ClientLeaveRequest::query()->create([
             'client_id' => $this->aroha->id,
-            'client_medication_id' => $this->metformin->id,
-            'administered_by' => $this->reader->id,
-            'scheduled_for' => Carbon::parse('2026-06-15 08:00', 'Pacific/Auckland')->utc(),
-            'administered_at' => Carbon::parse('2026-06-15 08:05', 'Pacific/Auckland')->utc(),
-            'status' => 'given',
+            'starts_on' => '2026-06-15',
+            'ends_on' => '2026-06-16',
+            'status' => 'approved',
+            'requested_by' => $this->reader->id,
         ]);
         $this->at('2026-06-15 09:30');
 
-        $this->assertSame(['given', 'away'], $this->rows('2026-06-15')->pluck('state')->all());
-        $this->assertSame(['given', 'away'], array_column($this->medsToday('2026-06-15'), 'status'));
+        $this->assertSame(['late', 'not_due'], $this->rows('2026-06-15')->pluck('state')->all());
+
+        config(['medications.away.from_leave' => true]);
+        $this->assertSame(['away', 'away'], $this->rows('2026-06-15')->pluck('state')->all());
     }
 
     public function test_an_away_dose_does_not_hold_a_round_open(): void
     {
-        $this->leave('2026-06-15', '2026-06-15', 'approved');
+        $this->stay('2026-06-15 07:00');
         $round = MedicationRound::query()->create([
             'site_id' => $this->home->id,
             'name' => 'Morning round',
@@ -188,7 +269,8 @@ class AwayDosesTest extends TestCase
         $service = app(GuidedRoundService::class);
         $cells = $service->cells($round->fresh(), true);
         $this->assertSame(['away'], array_column($cells, 'status'));
-        $this->assertSame('On leave (until Mon 15 Jun)', $cells[0]['away_reason']);
+        $item = $service->items($round->fresh(), true)[0];
+        $this->assertSame('respite', $item['away_source']);
         // Not owed in the round: left out of the total, the round 100% recorded.
         $progress = $service->progress($round->fresh(), true);
         $this->assertSame([0, 0, 100, 1], [$progress['total'], $progress['pending'], $progress['percent'], $progress['away']]);
@@ -197,12 +279,12 @@ class AwayDosesTest extends TestCase
 
     public function test_a_day_past_live_generation_reads_away_from_the_same_records(): void
     {
-        $this->leave('2026-06-15', '2026-06-20', 'approved');
+        $this->stay('2026-06-15 07:00');
         $this->at('2026-06-15 09:30');
 
         // The 18th is past live generation (today + 2): the order as it is now.
         $titles = collect($this->calendar('2026-06-18T00:00:00+12:00', '2026-06-19T00:00:00+12:00'))->pluck('title')->all();
-        $this->assertSame(['Metformin — Away · On leave (until Sat 20 Jun)', 'Metformin — Away · On leave (until Sat 20 Jun)'], $titles);
+        $this->assertSame(array_fill(0, 2, 'Metformin — Away · Respite at another house (since Mon 15 Jun, 7:00 am)'), $titles);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────
@@ -212,16 +294,42 @@ class AwayDosesTest extends TestCase
         Carbon::setTestNow(Carbon::parse($nz, 'Pacific/Auckland')->utc());
     }
 
-    private function leave(string $from, string $to, string $status): ClientLeaveRequest
+    /** A booking whose planned times cover the whole week (never read for Away). */
+    private function booking(?int $siteId, string $status): RespiteBooking
     {
-        return ClientLeaveRequest::query()->create([
+        return DB::transaction(fn (): RespiteBooking => RespiteBooking::query()->create([
             'client_id' => $this->aroha->id,
-            'starts_on' => $from,
-            'ends_on' => $to,
-            'destination' => 'Whānau in Rotorua',
+            'location_id' => $siteId,
+            'start_at' => Carbon::parse('2026-06-14 00:00', 'Pacific/Auckland')->utc(),
+            'end_at' => Carbon::parse('2026-06-21 00:00', 'Pacific/Auckland')->utc(),
             'status' => $status,
-            'requested_by' => $this->reader->id,
-        ]);
+        ]));
+    }
+
+    /** A respite stay begun at $startNz (as the system writes it at admission). */
+    private function stay(string $startNz, string $status = 'active', ?string $bookingStatus = 'in_progress', ?int $siteId = -1): RespiteStay
+    {
+        $booking = $this->booking($siteId === -1 ? $this->kowhai->id : $siteId, $bookingStatus);
+
+        return DB::transaction(fn (): RespiteStay => RespiteStay::query()->create([
+            'booking_id' => $booking->id,
+            'client_id' => $this->aroha->id,
+            'status' => $status,
+            'actual_start' => Carbon::parse($startNz, 'Pacific/Auckland')->utc(),
+        ]));
+    }
+
+    private function record(string $dueNz, string $status): ClientMedicationAdministration
+    {
+        return DB::transaction(fn (): ClientMedicationAdministration => ClientMedicationAdministration::query()->create([
+            'client_id' => $this->aroha->id,
+            'client_medication_id' => $this->metformin->id,
+            'administered_by' => $this->reader->id,
+            'scheduled_for' => Carbon::parse($dueNz, 'Pacific/Auckland')->utc(),
+            'administered_at' => Carbon::parse($dueNz, 'Pacific/Auckland')->utc()->addMinutes(5),
+            'status' => $status,
+            'reason' => $status === 'given' ? null : 'Declined.',
+        ]));
     }
 
     /**
@@ -238,8 +346,26 @@ class AwayDosesTest extends TestCase
             ->all();
     }
 
-    /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
-    private function rows(string $nzDate): \Illuminate\Support\Collection
+    /** @return Collection<int, ControlRoomAlert> */
+    private function openAlerts(): Collection
+    {
+        return ControlRoomAlert::query()
+            ->unresolved()
+            ->where('source', 'medication')
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(context, '$.signal_type_code')) = ?", [MedicationSignalService::TYPE_OVERDUE])
+            ->get();
+    }
+
+    private function overdueAlertCount(): int
+    {
+        return ControlRoomAlert::query()
+            ->where('source', 'medication')
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(context, '$.signal_type_code')) = ?", [MedicationSignalService::TYPE_OVERDUE])
+            ->count();
+    }
+
+    /** @return Collection<int, array<string, mixed>> */
+    private function rows(string $nzDate): Collection
     {
         return app(DoseSlotProjection::class)->rows(DoseSlotReaderScope::internal([$this->aroha->id]), $nzDate, $nzDate, CarbonImmutable::now());
     }
@@ -267,7 +393,7 @@ class AwayDosesTest extends TestCase
     }
 
     /** @param list<string> $permissions */
-    private function staff(array $permissions): User
+    private function staff(Site $site, array $permissions): User
     {
         $user = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
         $user->permissionOverrides()->syncWithoutDetaching(
@@ -277,7 +403,7 @@ class AwayDosesTest extends TestCase
         );
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
-            'primary_site_id' => $this->home->id,
+            'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
             'start_date' => '2026-01-01',
             'end_date' => null,

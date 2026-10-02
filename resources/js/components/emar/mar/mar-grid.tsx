@@ -75,7 +75,7 @@ const STATUS_CELL: Record<DoseStatus, { label: string; className: string }> = {
         label: 'Order check',
         className: 'border-status-info/40 bg-status-info-bg text-status-info',
     },
-    // The person is away (approved leave, respite at another Site): shown
+    // The person is away (checked in at respite at another Site): shown
     // with its reason, never due or overdue.
     away: {
         label: 'Away',

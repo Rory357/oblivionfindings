@@ -74,7 +74,7 @@ const STATUS_LABEL: Record<DoseStatus, string> = {
     away: 'Away',
 };
 
-/** "Away · On leave (until Tue 16 Jun)" when away, else the status label. */
+/** "Away · Respite at another house (since Mon 15 Jun, 7:00 am)" when away, else the status label. */
 function statusLabel(row: { status: DoseStatus; away_reason?: string | null }) {
     return row.status === 'away' && row.away_reason
         ? `${STATUS_LABEL.away} · ${row.away_reason}`

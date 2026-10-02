@@ -97,12 +97,13 @@ class RespiteBooking extends Model
 
     protected static function booted(): void
     {
-        // A dose due during respite at another Site reads as Away (P01 C7):
-        // when the stay's times, place or status change, the person's
-        // overdue alerts follow.
+        // A dose due during a checked-in respite stay at another Site reads as
+        // Away (P01 C7); the stay's Site is its booking's. When that changes,
+        // or the booking goes, the person's overdue alerts follow. (The
+        // booking's planned times are never read for Away.)
         $resync = static fn (self $booking) => OverdueDoseAlerts::queueAfterCommit((int) $booking->client_id);
         static::saved(function (self $booking) use ($resync): void {
-            if ($booking->wasRecentlyCreated || $booking->wasChanged(['status', 'start_at', 'end_at', 'location_id', 'client_id', 'deleted_at'])) {
+            if (! $booking->wasRecentlyCreated && $booking->wasChanged(['location_id', 'client_id', 'deleted_at'])) {
                 $resync($booking);
             }
         });

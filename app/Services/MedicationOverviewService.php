@@ -168,8 +168,9 @@ class MedicationOverviewService
      *   ("n/a") when nothing was due — never a reassuring 0 %;
      * - controlled doses are counted for every reader (P09 Q6);
      * - Away — a Withheld dose for an absence, or a dose due while the person
-     *   is away (approved leave, respite at another Site; C7) — is its own
-     *   number, never due;
+     *   is checked in at respite at another Site (C7) — is its own number:
+     *   never due, left out of the total and the given %, never "done" (the
+     *   rule rounds and P09 use);
      * - a dose due while its order's change waits for the order check can't
      *   be recorded yet (until P04): it is in none of these numbers, only in
      *   its own — pendingCheck, "Waiting for the order check" (Main, 2 Oct).
@@ -186,14 +187,15 @@ class MedicationOverviewService
         $overdue = $states[DoseSlotProjection::STATE_LATE] + $states[DoseSlotProjection::STATE_NOT_RECORDED];
         $due = $states[DoseSlotProjection::STATE_DUE];
         $pendingCheck = $states[DoseSlotProjection::STATE_PENDING_CHECK];
+        $away = $states[DoseSlotProjection::STATE_AWAY];
 
         return [
-            'total' => array_sum($states) - $pendingCheck,
+            'total' => array_sum($states) - $pendingCheck - $away,
             'pendingCheck' => $pendingCheck,
             'given' => $states['given'],
             'refused' => $states['refused'],
             'withheld' => $states['withheld'],
-            'away' => $states[DoseSlotProjection::STATE_AWAY],
+            'away' => $away,
             'missed' => $states['missed'],
             'overdue' => $overdue,
             'due' => $due,
@@ -545,16 +547,17 @@ class MedicationOverviewService
             ['key' => 'refused', 'label' => 'Refused', 'count' => $stats['refusedToday'], 'tone' => 'warning'],
             ['key' => 'missed', 'label' => 'Missed', 'count' => $stats['missedToday'], 'tone' => 'critical'],
             ['key' => 'withheld', 'label' => 'Withheld', 'count' => $stats['withheldToday'], 'tone' => 'slate'],
-            // Due while the person is away (C7): its own segment, never due.
-            ['key' => 'away', 'label' => 'Away', 'count' => $stats['awayToday'] ?? 0, 'tone' => 'info'],
         ];
 
+        // Away doses (C7) aren't owed: out of the total and the given %, as
+        // in rounds and P09 — their own number alongside.
         $total = (int) $stats['totalToday'];
 
         return [
             'total' => $total,
             'givenPct' => $total > 0 ? round(($stats['givenToday'] / $total) * 100) : 0,
             'segments' => $segments,
+            'away' => (int) ($stats['awayToday'] ?? 0),
         ];
     }
 
@@ -1039,10 +1042,11 @@ class MedicationOverviewService
                 $missed = $count('missed');
                 $overdue = $count(DoseSlotProjection::STATE_LATE, DoseSlotProjection::STATE_NOT_RECORDED);
                 $pending = $count(DoseSlotProjection::STATE_DUE, DoseSlotProjection::STATE_NOT_DUE);
-                $recorded = $count('given', 'refused', 'withheld', 'away', 'missed');
-                // Waiting for the order check: its own number, not in the total.
+                $recorded = $count('given', 'refused', 'withheld', 'missed');
+                // Waiting for the order check, and Away (C7): their own
+                // numbers, not in the total and never "done".
                 $pendingCheck = $count(DoseSlotProjection::STATE_PENDING_CHECK);
-                $total = array_sum($states) - $pendingCheck;
+                $total = array_sum($states) - $pendingCheck - $count(DoseSlotProjection::STATE_AWAY);
                 $status = $missed > 0 || $overdue > 0
                     ? 'attention'
                     // Not complete while doses wait for the order check.

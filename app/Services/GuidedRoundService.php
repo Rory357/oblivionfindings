@@ -125,7 +125,9 @@ class GuidedRoundService
             $medicationQuery->lockForUpdate();
         }
         $medications = $medicationQuery->get()->keyBy('id');
-        $doses = app(ScheduledDoseStates::class)->dosesOn($medications, $date, now());
+        $states = app(ScheduledDoseStates::class);
+        // With the words for an Away dose, as this reader may read them (C7).
+        $doses = $states->withAwayReasons($states->dosesOn($medications, $date, now()), auth()->user());
 
         // A dose's record wherever it was made — in this round, another, or
         // Meds today — so a dose already recorded is never offered again.
@@ -183,6 +185,7 @@ class GuidedRoundService
                     $admin,
                     $doseState,
                     $doseState === DoseSlotProjection::STATE_AWAY ? $dose['away_reason'] : null,
+                    $doseState === DoseSlotProjection::STATE_AWAY ? ($dose['away']['source'] ?? null) : null,
                 ));
             }
         }
@@ -491,6 +494,7 @@ class GuidedRoundService
     /**
      * @param  string|null  $doseState  the dose's list status (ScheduledDoseStates::listStatus) when it has no record
      * @param  string|null  $awayReason  why the person is away, when the dose is away (C7)
+     * @param  string|null  $awaySource  the away record's kind (DoseAwaySources::RESPITE or LEAVE)
      * @return array<string, mixed>
      */
     private function formatItem(
@@ -499,6 +503,7 @@ class GuidedRoundService
         ?ClientMedicationAdministration $administration,
         ?string $doseState = null,
         ?string $awayReason = null,
+        ?string $awaySource = null,
     ): array {
         $client = $medication->client;
         $clientName = $client
@@ -529,6 +534,8 @@ class GuidedRoundService
             // overdue, pending_check (Waiting for the order check) or away.
             'dose_state' => $administration?->status ?? $doseState ?? 'due',
             'away_reason' => $administration === null ? $awayReason : null,
+            // respite or leave: what staff can do if the person is back.
+            'away_source' => $administration === null ? $awaySource : null,
             'administration' => $administration ? [
                 'id' => $administration->id,
                 'status' => $administration->status,

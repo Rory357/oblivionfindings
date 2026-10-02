@@ -124,11 +124,13 @@ class EnhancedMarService
         // state, from the dose-slot projection (C6b, ScheduledDoseStates).
         $scheduledRows = [];
         $prnRows = [];
-        $doses = app(ScheduledDoseStates::class)->dosesOn(
+        $states = app(ScheduledDoseStates::class);
+        // With the words for an Away dose, as this reader may read them (C7).
+        $doses = $states->withAwayReasons($states->dosesOn(
             $medications->reject(fn (ClientMedication $medication): bool => (bool) $medication->is_prn),
             $date,
             $now,
-        );
+        ), auth()->user());
 
         foreach ($medications as $medication) {
             // Build scheduled doses for non-PRN medications

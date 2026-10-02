@@ -4,6 +4,7 @@ namespace App\Services\Medication\DoseSlots;
 
 use App\Models\ClientMedication;
 use App\Models\MedicationDoseSlot;
+use App\Models\User;
 use App\Services\MarScheduleService;
 use App\Services\Medication\DoseTimingSettings;
 use Carbon\Carbon;
@@ -143,16 +144,19 @@ final class ScheduledDoseStates
             usort($doses[$orderId], fn (array $a, array $b): int => $a['due_at'] <=> $b['due_at']);
         }
 
-        return $this->withAwayReasons($doses);
+        return $doses;
     }
 
     /**
-     * Each away dose's reason, after "Away · " (C7).
+     * Each away dose's reason, after "Away · " (C7), as $viewer may read it
+     * (a respite house is named only to a reader who may access its Site).
+     * Opt-in: only the surfaces that show the words pay for them — the badge,
+     * clock-out and the overdue sweep never ask.
      *
-     * @param  array<int, list<array<string, mixed>>>  $doses
+     * @param  array<int, list<array<string, mixed>>>  $doses  dosesOn() / dosesBetween() output
      * @return array<int, list<array<string, mixed>>>
      */
-    private function withAwayReasons(array $doses): array
+    public function withAwayReasons(array $doses, ?User $viewer): array
     {
         $refs = [];
         foreach ($doses as $orderDoses) {
@@ -166,7 +170,7 @@ final class ScheduledDoseStates
             return $doses;
         }
 
-        $reasons = app(DoseAwaySources::class)->reasons($refs);
+        $reasons = app(DoseAwaySources::class)->reasons($refs, $viewer);
         foreach ($doses as $orderId => $orderDoses) {
             foreach ($orderDoses as $i => $dose) {
                 if ($dose['away'] !== null) {

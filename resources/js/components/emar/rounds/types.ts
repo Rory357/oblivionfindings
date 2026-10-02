@@ -102,12 +102,14 @@ export interface RoundItem {
     scheduled_for: string;
     /** The record's outcome, else due | upcoming | overdue | pending_check | away (as Meds today). */
     dose_state?: string;
-    /** Why the person is away, e.g. "On leave (until Tue 16 Jun)"; set when dose_state is away. */
+    /** Why the person is away, e.g. "Respite at another house (since Mon 15 Jun, 3:05 pm)"; set when dose_state is away. */
     away_reason?: string | null;
+    /** The away record's kind: respite (leave is switched off for now). */
+    away_source?: 'respite' | 'leave' | null;
     administration: RoundItemAdministration | null;
 }
 
-/** The person is away (approved leave, respite at another Site): nothing to do here. */
+/** The person is away (checked in at respite at another Site): nothing to do here. */
 export function isAway(item: RoundItem): boolean {
     return !item.administration && item.dose_state === 'away';
 }

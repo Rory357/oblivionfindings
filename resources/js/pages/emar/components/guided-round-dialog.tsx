@@ -643,8 +643,10 @@ function AwayPane({ item }: { item: RoundItem }) {
                 <span className="font-semibold">
                     {item.away_reason ? `Away · ${item.away_reason}.` : 'Away.'}
                 </span>{' '}
-                This dose isn’t owed here while they’re away. If they’re back,
-                update the leave or respite record and the dose is owed again.
+                This dose isn’t owed here while they’re away.{' '}
+                {item.away_source === 'leave'
+                    ? 'If they’re back, ask a lead to update their leave.'
+                    : 'If they’re back, ask a lead to record the discharge in Respite.'}
             </InfoCard>
         </div>
     );

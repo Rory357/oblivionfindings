@@ -62,7 +62,7 @@ describe('My Day medication states (C6)', () => {
     it('shows a dose the person is away for as "Away · reason", with nothing to do and never overdue', () => {
         const item = med('away');
         if (item.kind === 'med') {
-            item.data.away_reason = 'On leave (until Tue 16 Jun)';
+            item.data.away_reason = 'Respite at another house (since Mon 15 Jun, 7:00 am)';
         }
         render(
             <StreamItemRow
@@ -76,15 +76,15 @@ describe('My Day medication states (C6)', () => {
         );
 
         expect(
-            screen.getAllByText('Away · On leave (until Tue 16 Jun)').length,
+            screen.getAllByText('Away · Respite at another house (since Mon 15 Jun, 7:00 am)').length,
         ).toBeGreaterThan(0);
         expect(screen.queryByText('Overdue')).toBeNull();
         expect(screen.queryByTitle('Mark as given')).toBeNull();
         expect(workIsDone(item)).toBe(true);
         // The label Meds today uses for the same state.
         expect(
-            doseStatusLabel('away', 'On leave (until Tue 16 Jun)'),
-        ).toBe('Away · On leave (until Tue 16 Jun)');
+            doseStatusLabel('away', 'Respite at another house (since Mon 15 Jun, 7:00 am)'),
+        ).toBe('Away · Respite at another house (since Mon 15 Jun, 7:00 am)');
     });
 
     it('says how many controlled doses a list leaves out, naming none', () => {
