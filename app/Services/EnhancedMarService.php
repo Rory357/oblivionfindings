@@ -487,7 +487,9 @@ class EnhancedMarService
      * hard-coded minutes: due soon from "shows as due soon"
      * (DoseTimingSettings), due through the order's window
      * (DoseWindowResolver, both ends included), late once the window has
-     * ended today; an earlier day's unrecorded dose is missed.
+     * ended today; an earlier day's unrecorded dose is "not recorded"
+     * (missed_auto) once its window has ended — not before (C6k): a 23:30
+     * dose is still due at 00:10 the next day. A later day's dose is future.
      *
      * @param  array{due_at: Carbon, state: string, due_soon: bool}  $dose
      */
@@ -497,18 +499,14 @@ class EnhancedMarService
             return 'completed';
         }
 
-        if (! $isToday) {
-            return $dose['due_at']->lt($now) ? 'missed_auto' : 'future';
-        }
-
         return match ($dose['state']) {
             DoseSlotProjection::STATE_DUE => 'due',
             DoseSlotProjection::STATE_LATE => 'late',
             DoseSlotProjection::STATE_NOT_RECORDED => 'missed_auto',
-            DoseSlotProjection::STATE_NOT_DUE => $dose['due_soon'] ? 'due_soon' : 'upcoming',
+            DoseSlotProjection::STATE_NOT_DUE => ! $isToday ? 'future' : ($dose['due_soon'] ? 'due_soon' : 'upcoming'),
             // Self-managed, or waiting for the order check (only orders that
             // can be given are listed here): not chased.
-            default => 'upcoming',
+            default => $isToday || $dose['due_at']->lt($now) ? 'upcoming' : 'future',
         };
     }
 
@@ -522,7 +520,9 @@ class EnhancedMarService
             'due_soon' => ['label' => 'Due Soon', 'color' => 'yellow', 'icon' => 'alert-circle'],
             'due' => ['label' => 'Due', 'color' => 'blue', 'icon' => 'check-circle'],
             'late' => ['label' => 'Late', 'color' => 'orange', 'icon' => 'alert-triangle'],
-            'missed_auto' => ['label' => 'Missed', 'color' => 'red', 'icon' => 'x-circle'],
+            // Window ended with nothing recorded (P09's "Not recorded"); a
+            // dose recorded as missed is its record, "Missed (recorded)".
+            'missed_auto' => ['label' => 'Not recorded', 'color' => 'red', 'icon' => 'x-circle'],
             'completed' => ['label' => 'Given', 'color' => 'green', 'icon' => 'check'],
             'future' => ['label' => 'Future', 'color' => 'slate', 'icon' => 'calendar'],
             default => ['label' => $state, 'color' => 'gray', 'icon' => 'help-circle'],

@@ -99,7 +99,9 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
         // clock time that only matches when the suite runs at that time.
         $this->doseSlot = now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfMinute();
 
-        $this->medication = ClientMedication::query()->create([
+        // Entered before that minute: a dose due before an order was entered
+        // is not owed (P01 entry rule), and the recording guard checks the slot.
+        $this->medication = $this->travelTo(now()->subMinutes(5), fn () => ClientMedication::query()->create([
             'client_id' => $this->client->id,
             'name' => 'Amoxicillin',
             'dosage' => '500mg',
@@ -108,7 +110,7 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
             'controlled_drug' => true,
             'active' => true,
             'state' => 'active',
-        ]);
+        ]));
 
         ClientMedicationStock::query()->create([
             'client_medication_id' => $this->medication->id,

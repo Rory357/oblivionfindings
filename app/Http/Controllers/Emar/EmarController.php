@@ -46,6 +46,7 @@ use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\CompetencyPolicySettings;
+use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationOrderLifecycleService;
 use App\Services\Medication\MedicationRoundGenerationService;
@@ -1418,8 +1419,10 @@ class EmarController extends Controller
     {
         $ruleService = app(MedicationRuleService::class);
         $scheduleService = app(MarScheduleService::class);
+        // The orders the MAR's schedule rows list (C6k): verified, or with a
+        // change waiting for the order check — whose doses show as waiting.
         $medications = $client->medications()
-            ->active()
+            ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
             ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
             ->with([
                 'stock',
@@ -1442,19 +1445,25 @@ class EmarController extends Controller
             ])->get();
 
         $scheduled = $medications->where('is_prn', false)->values();
-        $prn = $medications->where('is_prn', true)->values();
+        // PRN: only orders that can be given.
+        $prn = $medications->where('is_prn', true)->filter(fn (ClientMedication $med): bool => $med->isAdministrable())->values();
+        // Each order's doses that day, from the dose-slot projection (C6k):
+        // the slot's due time is the grid's column (the spring-forward 02:30
+        // dose at 03:00), as the schedule rows carry it.
+        $doses = app(ScheduledDoseStates::class)->dosesOn($scheduled, $date, now());
 
-        $scheduledPayload = $scheduled->map(function ($med) use ($client, $date, $ruleService, $scheduleService) {
+        $scheduledPayload = $scheduled->map(function ($med) use ($client, $date, $ruleService, $scheduleService, $doses) {
             $adminRules = $ruleService->requirementsFor($med);
-            $scheduledSlots = $scheduleService->scheduledTimesForDate($med, $date);
-            $doseTimes = collect($scheduledSlots)
-                ->map(fn (Carbon $slot) => $slot->format('H:i'))
+            $medDoses = collect($doses[(int) $med->id] ?? []);
+            $doseTimes = $medDoses
+                ->map(fn (array $dose) => $dose['due_at']->copy()->timezone($scheduleService->workerTimezone())->format('H:i'))
                 ->values()
                 ->all();
             $matchedAdministrationIds = [];
 
-            // Build administration slots: for each dose_time, find matching admin record
-            $administrations = collect($scheduledSlots)->map(function (Carbon $scheduledAt) use ($med, &$matchedAdministrationIds, $scheduleService) {
+            // Build administration slots: for each dose, find matching admin record
+            $administrations = $medDoses->map(function (array $dose) use ($med, &$matchedAdministrationIds, $scheduleService) {
+                $scheduledAt = $dose['due_at'];
                 [$slotStartUtc, $slotEndUtc] = $scheduleService->utcSlotWindow($scheduledAt);
                 // Find an administration record matching this time slot
                 $admin = $med->administrations->first(function ($a) use ($slotStartUtc, $slotEndUtc) {
@@ -1469,11 +1478,10 @@ class EmarController extends Controller
                     return $this->serializeAdministration($admin);
                 }
 
-                // No record yet: determine if pending or missed
-                $now = now($scheduleService->workerTimezone());
-                $status = $now->greaterThan($scheduledAt->copy()->addHour()) ? 'missed' : 'pending';
-
-                return $this->serializeAdministration(null, $status, $scheduledAt->toIso8601String());
+                // No record yet: the dose's state as Meds today shows it
+                // (overdue once its window has ended — not "missed" an hour
+                // after its time; C6k).
+                return $this->serializeAdministration(null, ScheduledDoseStates::listStatus($dose), $scheduledAt->toIso8601String());
             })->values();
 
             // Also include any administration records that don't match a dose_time slot
