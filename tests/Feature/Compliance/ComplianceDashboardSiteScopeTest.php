@@ -16,6 +16,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -31,8 +32,18 @@ class ComplianceDashboardSiteScopeTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
     public function test_site_bound_dashboard_scopes_operational_metrics_and_pickers_but_keeps_governance_obligations_application_wide(): void
     {
+        // A fixed NZ morning: the MAR KPI and trend count scheduled doses by
+        // the NZ day they were due (C6h).
+        Carbon::setTestNow(Carbon::parse('2026-06-15 07:00', 'Pacific/Auckland')->utc());
         $visibleSite = Site::factory()->create(['name' => 'Visible Site']);
         $hiddenSite = Site::factory()->create(['name' => 'Hidden Site']);
         // Since cd5d34e6b the CD discrepancy KPI and trend are shown only to
@@ -84,25 +95,27 @@ class ComplianceDashboardSiteScopeTest extends TestCase
                 'client_medication_id' => ClientMedication::factory()->create([
                     'client_id' => $discrepancyClient->id,
                     'controlled_drug' => true,
+                    'is_prn' => true,
                 ])->id,
                 'status' => 'open',
             ]);
         }
 
-        $visibleMedication = ClientMedication::factory()->create(['client_id' => $visibleClient->id]);
-        $hiddenMedication = ClientMedication::factory()->create(['client_id' => $hiddenClient->id]);
+        $scheduled = ['dose_times' => ['08:00'], 'frequency' => 'Daily', 'is_prn' => false, 'start_date' => '2026-06-01', 'end_date' => null, 'state' => 'active', 'active' => true, 'approval_status' => 'verified'];
+        $visibleMedication = ClientMedication::factory()->create([...$scheduled, 'client_id' => $visibleClient->id]);
+        $hiddenMedication = ClientMedication::factory()->create([...$scheduled, 'client_id' => $hiddenClient->id]);
         ClientMedicationAdministration::create([
             'client_id' => $visibleClient->id,
             'client_medication_id' => $visibleMedication->id,
             'administered_by' => $viewer->id,
-            'scheduled_for' => now(),
+            'scheduled_for' => Carbon::parse('2026-06-15 08:00', 'Pacific/Auckland')->utc(),
             'status' => 'missed',
         ]);
         ClientMedicationAdministration::create([
             'client_id' => $hiddenClient->id,
             'client_medication_id' => $hiddenMedication->id,
             'administered_by' => $viewer->id,
-            'scheduled_for' => now(),
+            'scheduled_for' => Carbon::parse('2026-06-15 08:00', 'Pacific/Auckland')->utc(),
             'status' => 'refused',
         ]);
 
@@ -141,6 +154,8 @@ class ComplianceDashboardSiteScopeTest extends TestCase
 
         $obligation = $this->makeOverdueObligation($hiddenOwner);
 
+        // 10:00: the 08:00 doses' windows have ended.
+        Carbon::setTestNow(Carbon::parse('2026-06-15 10:00', 'Pacific/Auckland')->utc());
         $response = $this->actingAs($viewer)->get('/compliance')->assertOk();
         $props = $response->inertiaProps();
         $kpis = collect($props['kpis'])->keyBy('key');

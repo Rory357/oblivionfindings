@@ -286,11 +286,14 @@ class MedicationReportCanonicalScopeTest extends TestCase
         $emarPage = $this->actingAs($reader)
             ->get(route('emar.reports'))
             ->assertOk();
-        $this->assertSame(1, (int) $emarPage->inertiaProps('adminSummary.total'));
-        $this->assertSame(1, (int) $emarPage->inertiaProps('adminSummary.given'));
+        // The dose numbers are the scheduled doses due, from the dose-slot
+        // projection (C6h), which no forged record reaches. These medicines
+        // are PRN, so none is due; the PRN figures below still count records.
+        $this->assertSame(0, (int) $emarPage->inertiaProps('adminSummary.total'));
+        $this->assertSame(0, (int) $emarPage->inertiaProps('adminSummary.given'));
         $this->assertSame(0, (int) $emarPage->inertiaProps('adminSummary.missed'));
-        $this->assertSame(1, (int) collect($emarPage->inertiaProps('dailyAdmin'))->sum('total'));
-        $this->assertSame(1, (int) collect($emarPage->inertiaProps('clientBreakdown'))->sum('total'));
+        $this->assertSame([], $emarPage->inertiaProps('dailyAdmin'));
+        $this->assertSame([], $emarPage->inertiaProps('clientBreakdown'));
         $this->assertSame(
             [$localMedication->name],
             collect($emarPage->inertiaProps('topPrnMeds'))->pluck('medication')->all(),
@@ -389,8 +392,9 @@ class MedicationReportCanonicalScopeTest extends TestCase
             ->get(route('emar.reports'))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('adminSummary.total', 2)
-                ->where('adminSummary.given', 2)
+                // PRN medicines: no scheduled dose due (C6h).
+                ->where('adminSummary.total', 0)
+                ->where('adminSummary.given', 0)
                 ->where('errorSummary.total', 2)
                 ->where('errorSummary.open', 2));
         $this->actingAs($reader)

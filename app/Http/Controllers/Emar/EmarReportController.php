@@ -14,12 +14,16 @@ use App\Models\MedicationDestruction;
 use App\Models\MedicationError;
 use App\Models\MedicationRound;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\GuidedRoundService;
 use App\Services\Medication\CompetencyPolicySettings;
+use App\Services\Medication\DoseSlots\DoseSlotProjection;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\MedicationReportingService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -57,16 +61,23 @@ class EmarReportController extends Controller
         );
         $bySite = fn ($query) => $query->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds));
 
-        $dateFrom = isset($filters['date_from']) && $filters['date_from']
-            ? Carbon::parse($filters['date_from'])->startOfDay()
-            : now()->subDays(30)->startOfDay();
-        $dateTo = isset($filters['date_to']) && $filters['date_to']
-            ? Carbon::parse($filters['date_to'])->endOfDay()
-            : now()->endOfDay();
+        // NZ days (C6h): the period's bounds are NZ midnights, held as UTC
+        // instants for the record queries.
+        [$fromDay, $toDay, $dateFrom, $dateTo] = $this->period($filters['date_from'] ?? null, $filters['date_to'] ?? null);
 
         $careLevel = $filters['care_level'] ?? null;
 
-        // ─── Administration Summary ──────────────────────────
+        // ─── Administration summary: the scheduled doses (C6h) ───
+        // The dose-slot projection's numbers (P09): doses due — the window
+        // has ended, owed, not away or waiting for the order check — and what
+        // happened to each, by the NZ day the dose was due. Controlled doses
+        // count for every reader (P09 Q6); no row here names one.
+        $doses = $this->doseNumbers($actor, $readerSiteIds, $clientId, $careLevel, $fromDay, $toDay);
+        $adminSummary = $doses['summary'];
+        $dailyAdmin = $doses['daily'];
+        $clientBreakdown = $doses['by_client'];
+
+        // ─── Records (coded reasons): the period's recordings ───
         $adminQuery = $this->governanceScope->scopeCanonicalClientMedicationRows(
             ClientMedicationAdministration::query()->effectiveClinicalEvidence(),
             $readerSiteIds,
@@ -82,74 +93,6 @@ class EmarReportController extends Controller
         if ($careLevel) {
             $adminQuery->whereHas('client', fn ($query) => $query->where('care_level', $careLevel));
         }
-
-        $adminTotals = (clone $adminQuery)->selectRaw("
-            COUNT(*) as total,
-            SUM(CASE WHEN status = 'given' THEN 1 ELSE 0 END) as given_count,
-            SUM(CASE WHEN status = 'refused' THEN 1 ELSE 0 END) as refused_count,
-            SUM(CASE WHEN status = 'withheld' THEN 1 ELSE 0 END) as withheld_count,
-            SUM(CASE WHEN status = 'missed' THEN 1 ELSE 0 END) as missed_count
-        ")->first();
-
-        $adminSummary = [
-            'total' => (int) ($adminTotals->total ?? 0),
-            'given' => (int) ($adminTotals->given_count ?? 0),
-            'refused' => (int) ($adminTotals->refused_count ?? 0),
-            'withheld' => (int) ($adminTotals->withheld_count ?? 0),
-            'missed' => (int) ($adminTotals->missed_count ?? 0),
-            'compliance_rate' => $adminTotals->total > 0
-                ? round(($adminTotals->given_count / $adminTotals->total) * 100, 1)
-                : 0,
-        ];
-
-        // Daily breakdown for chart
-        $dailyAdmin = (clone $adminQuery)
-            ->selectRaw("
-                DATE(administered_at) as date,
-                SUM(CASE WHEN status = 'given' THEN 1 ELSE 0 END) as given_count,
-                SUM(CASE WHEN status = 'refused' THEN 1 ELSE 0 END) as refused_count,
-                SUM(CASE WHEN status = 'missed' THEN 1 ELSE 0 END) as missed_count,
-                COUNT(*) as total
-            ")
-            ->groupByRaw('DATE(administered_at)')
-            ->orderByRaw('DATE(administered_at)')
-            ->get()
-            ->map(fn ($row) => [
-                'date' => Carbon::parse($row->date)->format('M d'),
-                'given' => (int) $row->given_count,
-                'refused' => (int) $row->refused_count,
-                'missed' => (int) $row->missed_count,
-                'total' => (int) $row->total,
-            ])
-            ->values();
-
-        // Breakdown by client
-        $clientBreakdown = (clone $adminQuery)
-            ->join('clients', 'clients.id', '=', 'client_medication_administrations.client_id')
-            ->selectRaw("
-                client_medication_administrations.client_id,
-                CONCAT(clients.first_name, ' ', clients.last_name) as client_name,
-                COUNT(*) as total,
-                SUM(CASE WHEN client_medication_administrations.status = 'given' THEN 1 ELSE 0 END) as given_count,
-                SUM(CASE WHEN client_medication_administrations.status = 'refused' THEN 1 ELSE 0 END) as refused_count,
-                SUM(CASE WHEN client_medication_administrations.status = 'withheld' THEN 1 ELSE 0 END) as withheld_count,
-                SUM(CASE WHEN client_medication_administrations.status = 'missed' THEN 1 ELSE 0 END) as missed_count
-            ")
-            ->groupBy('client_medication_administrations.client_id', 'clients.first_name', 'clients.last_name')
-            ->orderByDesc('total')
-            ->limit(50)
-            ->get()
-            ->map(fn ($row) => [
-                'client_id' => $row->client_id,
-                'client_name' => $row->client_name,
-                'total' => (int) $row->total,
-                'given' => (int) $row->given_count,
-                'refused' => (int) $row->refused_count,
-                'withheld' => (int) $row->withheld_count,
-                'missed' => (int) $row->missed_count,
-                'compliance' => $row->total > 0 ? round(($row->given_count / $row->total) * 100, 1) : 0,
-            ])
-            ->values();
 
         // ─── Reason not given (coded reasons) ────────────────
         $classOf = ['refused' => 'refusal', 'withheld' => 'clinical', 'missed' => 'omission'];
@@ -396,7 +339,7 @@ class EmarReportController extends Controller
         // ─── Round Completion ────────────────────────────────
         $roundQuery = MedicationRound::query()
             ->whereIn('site_id', $readerSiteIds)
-            ->whereBetween('round_date', [$dateFrom->toDateString(), $dateTo->toDateString()]);
+            ->whereBetween('round_date', [$fromDay, $toDay]);
 
         $roundTotals = (clone $roundQuery)->selectRaw("
             COUNT(*) as total,
@@ -536,8 +479,8 @@ class EmarReportController extends Controller
 
         return Inertia::render('emar/Reports', [
             'filters' => [
-                'date_from' => $dateFrom->toDateString(),
-                'date_to' => $dateTo->toDateString(),
+                'date_from' => $fromDay,
+                'date_to' => $toDay,
                 'client_id' => $clientId ? (int) $clientId : null,
                 'site_id' => $siteId ? (int) $siteId : null,
                 'care_level' => $careLevel,
@@ -555,6 +498,9 @@ class EmarReportController extends Controller
             'adminSummary' => $adminSummary,
             'dailyAdmin' => $dailyAdmin,
             'clientBreakdown' => $clientBreakdown,
+            // "Not available before …" when the period starts before the
+            // dose-slot projection's days (C6h).
+            'dose_notice' => $doses['notice'],
             'topPrnMeds' => $topPrnMeds,
             'prnByClient' => $prnByClient,
             'controlledDrugs' => [
@@ -603,15 +549,10 @@ class EmarReportController extends Controller
             'report_type' => ['nullable', 'string', 'in:administration,prn,controlled,rounds,errors,regular,short_course,observations,chart_reviews,syringe_drivers'],
         ]);
 
-        $dateFrom = isset($filters['date_from']) && $filters['date_from']
-            ? Carbon::parse($filters['date_from'])->startOfDay()
-            : now()->subDays(30)->startOfDay();
-        $dateTo = isset($filters['date_to']) && $filters['date_to']
-            ? Carbon::parse($filters['date_to'])->endOfDay()
-            : now()->endOfDay();
+        [, , $dateFrom, $dateTo] = $this->period($filters['date_from'] ?? null, $filters['date_to'] ?? null);
 
         if ($dateFrom->diffInDays($dateTo) > 93) {
-            $dateFrom = $dateTo->copy()->subMonthsNoOverflow(3)->startOfDay();
+            $dateFrom = $dateTo->copy()->timezone($this->timezone())->subMonthsNoOverflow(3)->startOfDay()->utc();
         }
 
         $clientId = $filters['client_id'] ?? null;
@@ -767,9 +708,13 @@ class EmarReportController extends Controller
     {
         $this->putCsv($out, ['Date', 'Name', 'Status', 'Scheduled Time', 'Started At', 'Completed At', 'Total Meds', 'Administered', 'Refused', 'Missed']);
 
+        $timezone = $this->timezone();
         MedicationRound::query()
             ->whereIn('site_id', $siteIds)
-            ->whereBetween('round_date', [$dateFrom->toDateString(), $dateTo->toDateString()])
+            ->whereBetween('round_date', [
+                $dateFrom->copy()->timezone($timezone)->toDateString(),
+                $dateTo->copy()->timezone($timezone)->toDateString(),
+            ])
             ->orderBy('round_date')
             ->chunk(500, function ($rows) use ($out, $includeControlled) {
                 $guidedRounds = app(GuidedRoundService::class);
@@ -824,6 +769,88 @@ class EmarReportController extends Controller
                     ]);
                 }
             });
+    }
+
+    /**
+     * The period as NZ days (Y-m-d) and the UTC instants of their bounds:
+     * the last 30 days by default.
+     *
+     * @return array{0: string, 1: string, 2: Carbon, 3: Carbon}
+     */
+    private function period(?string $from, ?string $to): array
+    {
+        $timezone = $this->timezone();
+        $now = Carbon::now($timezone);
+        $start = $from ? Carbon::parse($from, $timezone)->startOfDay() : $now->copy()->subDays(30)->startOfDay();
+        $end = $to ? Carbon::parse($to, $timezone)->endOfDay() : $now->copy()->endOfDay();
+
+        return [$start->toDateString(), $end->toDateString(), $start->copy()->utc(), $end->copy()->utc()];
+    }
+
+    private function timezone(): string
+    {
+        return (string) config('app.worker_timezone', 'Pacific/Auckland');
+    }
+
+    /**
+     * The period's scheduled-dose numbers from the dose-slot projection (P09
+     * definitions): overall, per NZ day and per person, with the coverage
+     * notice. "compliance" is "given as due" — null (Not applicable) when no
+     * dose was due.
+     *
+     * @param  array<int, int>  $siteIds
+     * @return array{summary: array<string, int|float|null>, daily: list<array<string, mixed>>, by_client: list<array<string, mixed>>, notice: string|null}
+     */
+    private function doseNumbers(User $viewer, array $siteIds, ?int $clientId, ?string $careLevel, string $fromDay, string $toDay): array
+    {
+        $people = Client::query()
+            ->whereIn('site_id', $siteIds)
+            ->when($clientId, fn ($clients) => $clients->whereKey($clientId))
+            ->when($careLevel, fn ($clients) => $clients->where('care_level', $careLevel))
+            ->get(['id', 'first_name', 'last_name'])
+            ->keyBy('id');
+        $scope = DoseSlotReaderScope::forAuthorisedClients($viewer, $people->keys()->all());
+        $projection = app(DoseSlotProjection::class);
+        $now = CarbonImmutable::now();
+
+        $numbers = fn (array $t): array => [
+            'total' => $t['due'],
+            'given' => $t['given'],
+            'refused' => $t['refused'],
+            'withheld' => $t['withheld'],
+            'missed' => $t['missed'],
+            'not_recorded' => $t['not_recorded'],
+            'away' => $t['away'],
+            'recorded_late' => $t['recorded_late'],
+        ];
+
+        $summary = $projection->totals($scope, $fromDay, $toDay, $now);
+        $daily = collect($projection->totalsBy('nz_date', $scope, $fromDay, $toDay, $now))
+            ->map(fn (array $t, string $day): array => [
+                'date' => Carbon::parse($day)->format('M d'),
+                ...$numbers($t),
+            ])
+            ->values()
+            ->all();
+        $byClient = collect($projection->totalsBy('client_id', $scope, $fromDay, $toDay, $now))
+            ->filter(fn (array $t): bool => $t['slots'] > 0)
+            ->map(fn (array $t, int $id): array => [
+                'client_id' => $id,
+                'client_name' => trim(($people[$id]->first_name ?? '').' '.($people[$id]->last_name ?? '')),
+                ...$numbers($t),
+                'compliance' => $t['given_rate'],
+            ])
+            ->sortByDesc('total')
+            ->take(50)
+            ->values()
+            ->all();
+
+        return [
+            'summary' => [...$numbers($summary), 'compliance_rate' => $summary['given_rate']],
+            'daily' => $daily,
+            'by_client' => $byClient,
+            'notice' => $projection->coverage($fromDay, $now)['notice'],
+        ];
     }
 
     private function exportServiceRecords($out, array $report): void
