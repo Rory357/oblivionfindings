@@ -44,6 +44,7 @@ use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\Emar\ShiftMedicationSnapshotService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
@@ -8786,6 +8787,12 @@ class EmarController extends Controller
                     ->where('status', 'active')
                     ->get()
                     ->each(fn ($alert) => $alert->resolve('Balance check recorded.'));
+                // The house's "balance check overdue" alert (P11 B2) is dealt
+                // with once no controlled order there is overdue.
+                if ($client->site_id !== null) {
+                    $siteId = (int) $client->site_id;
+                    DB::afterCommit(fn () => app(MedicationAlertSources::class)->controlledCheckRecorded($siteId));
+                }
 
                 $stock->refresh();
                 $payload = [

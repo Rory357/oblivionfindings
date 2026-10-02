@@ -8,6 +8,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\MedicationDashboardAlert;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\ControlRoom\SignalProcessingService;
+use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\DoseSlots\OverdueDoses;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -319,6 +320,13 @@ final class OverdueDoseAlerts
         }
 
         $this->releaseEndedSpells($clientIds, $now);
+
+        // P11 B2: the people told about a dose's spell see it dealt with once
+        // the dose is settled (the alert log's record for that spell).
+        app(MedicationAlertSources::class)->overdueSettled(
+            fn (array $doseKeys): array => $this->overdue->settled($doseKeys, $now),
+            $clientIds,
+        );
 
         // The dashboard copy (the lookback's overdue doses): resolved for
         // people with none, the count kept current for the rest.

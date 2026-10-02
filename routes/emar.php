@@ -19,7 +19,6 @@ use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\MedicationsController;
 use App\Http\Controllers\MedicationsReportController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -111,14 +110,12 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->name('emar.prescriptions');
 
     // P11 chunk 6: Safety & oversight › Staff eligibility replaces
-    // Medication › Competency; old links (and ?site_id) land on it.
+    // Medication › Competency; old links land on it — a ?site_id only after
+    // the same reader check as before (a foreign house is 404).
     Route::get('/safety/eligibility', [StaffEligibilityController::class, 'index'])
         ->middleware('permission:medications.view')
         ->name('emar.safety.eligibility');
-    Route::get('/competency', fn (Request $request) => redirect()->route(
-        'emar.safety.eligibility',
-        array_filter(['house' => $request->integer('site_id') ?: null]),
-    ))
+    Route::get('/competency', [StaffEligibilityController::class, 'legacyCompetency'])
         ->middleware('permission:medications.view')
         ->name('emar.competency');
 
@@ -314,12 +311,16 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::put('/settings/rules/{rule}', [MedicationSettingsController::class, 'update'])->name('emar.settings.rules.update');
         // P00 v5: rules are paused and turned back on, recorded in the change history.
         Route::post('/settings/rules/{rule}/active', [MedicationSettingsController::class, 'setActive'])->name('emar.settings.rules.active');
-        // P11: save one Settings view's draft (safety checks, witness PIN rules, …),
-        // and "Keep today's value" for defaults nobody has reviewed. Both are
-        // recorded in the change history and the audit log.
-        Route::put('/settings/changes', [MedicationSettingsController::class, 'saveChanges'])->name('emar.settings.changes.save');
+        // P11: "Keep today's value" for defaults nobody has reviewed, recorded
+        // in the change history and the audit log.
         Route::post('/settings/keep', [MedicationSettingsController::class, 'keepDefaults'])->name('emar.settings.keep');
     });
+    // P11: save one Settings view's draft (safety checks, witness PIN rules, …),
+    // recorded in the change history and the audit log. House managers save
+    // only their own houses' alert extras (B2 Q3); the controller checks each change.
+    Route::put('/settings/changes', [MedicationSettingsController::class, 'saveChanges'])
+        ->middleware('permission:medications.settings.manage|medications.alerts.manage_house')
+        ->name('emar.settings.changes.save');
 
     // ─── End CRUD Routes ────────────────────────────────────
 

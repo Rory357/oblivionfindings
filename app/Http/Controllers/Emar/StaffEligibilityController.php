@@ -9,6 +9,7 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\StaffEligibilityRegister;
 use App\Services\Medication\WitnessPinResetAuthority;
 use App\Services\UserSiteAccessService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,6 +34,25 @@ class StaffEligibilityController extends Controller
         private readonly StaffEligibilityRegister $register,
         private readonly UserSiteAccessService $siteAccess,
     ) {}
+
+    /**
+     * The old Medication › Competency address. A link naming a Site is
+     * checked like any eMAR reader first (B2 C1 review, direct-object denial):
+     * a Site this person can't read — another house, or none — is 404, the
+     * same as before the move. Then it lands on Staff eligibility at that
+     * house.
+     */
+    public function legacyCompetency(Request $request): RedirectResponse
+    {
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        $siteId = $request->filled('site_id') ? $request->integer('site_id') : null;
+        if ($siteId !== null) {
+            $this->governanceScope->readerSiteIds($actor, MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY, $siteId);
+        }
+
+        return redirect()->route('emar.safety.eligibility', array_filter(['house' => $siteId ?: null]));
+    }
 
     public function index(Request $request): Response
     {

@@ -61,12 +61,15 @@ export function OnOff({
     onChange,
     disabled,
     label,
+    invalid,
 }: {
     id: string;
     checked: boolean;
     onChange: (v: boolean) => void;
     disabled?: boolean;
     label?: string;
+    /** "Review changes" found a problem here; focus moves to it. */
+    invalid?: boolean;
 }) {
     return (
         <span className="inline-flex items-center gap-3">
@@ -76,6 +79,7 @@ export function OnOff({
                 onCheckedChange={onChange}
                 disabled={disabled}
                 aria-label={label}
+                aria-invalid={invalid || undefined}
             />
             <span className="text-subtle w-7" aria-hidden="true">
                 {checked ? 'On' : 'Off'}

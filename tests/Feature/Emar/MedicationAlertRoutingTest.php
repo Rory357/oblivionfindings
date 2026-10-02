@@ -11,10 +11,9 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Models\UserNotificationPreference;
+use App\Models\MedicationAlert;
 use App\Notifications\AppEventNotification;
-use App\Notifications\MedicationCompetencyExpiringNotification;
-use App\Notifications\MedicationRefusalClusterNotification;
-use App\Notifications\MedicationStockLowNotification;
+use App\Notifications\MedicationAlertNotification;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -22,10 +21,30 @@ use Illuminate\Support\Facades\Notification;
 
 /*
  * Medication alert routing faults found while designing P11
- * (docs/emar-design/P11/v1/README.md, "Facts from today's app").
- * Recipients stay as they are today apart from the break-glass daily report,
- * which Stephan narrowed to its configured groups (29 Sep 2026).
+ * (docs/emar-design/P11/v1/README.md, "Facts from today's app"). Since P11
+ * B2, who is told comes from Medication Settings › Alerts & access, starting
+ * from v5's defaults (B2 Q1); the break-glass daily report keeps the routing
+ * Stephan narrowed it to (29 Sep 2026) until B3.
  */
+
+/** Was this alert sent to this person? */
+function medicationAlertTo(User $user, string $alert, ?callable $check = null): void
+{
+    Notification::assertSentTo(
+        $user,
+        MedicationAlertNotification::class,
+        fn (MedicationAlertNotification $n) => $n->alert->type === $alert && ($check === null || $check($n)),
+    );
+}
+
+function medicationAlertNotTo(User $user, string $alert): void
+{
+    Notification::assertNotSentTo(
+        $user,
+        MedicationAlertNotification::class,
+        fn (MedicationAlertNotification $n) => $n->alert->type === $alert,
+    );
+}
 
 beforeEach(function () {
     Cache::flush();
@@ -121,15 +140,10 @@ it('sends refusal-cluster alerts to team leads at the house instead of failing o
 
     $this->artisan('emar:send-alerts')->assertExitCode(0);
 
-    Notification::assertSentTo(
-        $lead,
-        MedicationRefusalClusterNotification::class,
-        fn (MedicationRefusalClusterNotification $notification) => $notification->clientId === $order->client_id
-            && $notification->medication === 'Risperidone'
-            && $notification->count === 3,
-    );
-    Notification::assertNotSentTo($otherHouseLead, MedicationRefusalClusterNotification::class);
-    Notification::assertNotSentTo($worker, MedicationRefusalClusterNotification::class);
+    medicationAlertTo($lead, 'refusals', fn (MedicationAlertNotification $n) => $n->alert->client_id === $order->client_id
+        && str_contains($n->alert->message, 'Risperidone refused or withheld 3 times'));
+    medicationAlertNotTo($otherHouseLead, 'refusals');
+    medicationAlertNotTo($worker, 'refusals');
 });
 
 it('conceals controlled-drug refusal clusters from team leads without controlled-drug view', function () {
@@ -149,25 +163,33 @@ it('conceals controlled-drug refusal clusters from team leads without controlled
 
     $this->artisan('emar:send-alerts')->assertExitCode(0);
 
-    Notification::assertNotSentTo($lead, MedicationRefusalClusterNotification::class);
-    Notification::assertSentTo($controlledLead, MedicationRefusalClusterNotification::class);
+    medicationAlertNotTo($lead, 'refusals');
+    medicationAlertTo($controlledLead, 'refusals');
 });
 
-it('sends a refusal-cluster alert once a day per lead and medication, not every 15-minute run', function () {
+it('tells people about a refusal cluster once while it lasts, and again only after it has ended', function () {
     $site = Site::factory()->create();
     $lead = medicationAlertStaff($site, 'team_lead');
     medicationRefusalCluster($site);
-    $sent = fn () => $lead->notifications()->where('type', MedicationRefusalClusterNotification::class)->count();
+    $sent = fn () => $lead->notifications()->where('type', MedicationAlertNotification::class)->where('data->alert_key', 'refusals')->count();
 
     $this->artisan('emar:send-alerts')->assertExitCode(0);
     Carbon::setTestNow(now()->addMinutes(15));
     $this->artisan('emar:send-alerts')->assertExitCode(0);
-
-    expect($sent())->toBe(1);
-
     Carbon::setTestNow(now()->addDay());
     $this->artisan('emar:send-alerts')->assertExitCode(0);
 
+    // One open alert, shared by everyone told (P11 B2): no reminder every run or every day.
+    expect($sent())->toBe(1);
+
+    // The refusals fall outside the 7-day window: the alert is dealt with…
+    Carbon::setTestNow(now()->addDays(8));
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+    expect(MedicationAlert::query()->where('type', 'refusals')->value('status'))->toBe('dealt_with');
+
+    // …and a new cluster alerts again.
+    medicationRefusalCluster($site);
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
     expect($sent())->toBe(2);
 });
 
@@ -175,7 +197,7 @@ it('sends each competency renewal reminder once, not every 15-minute run', funct
     $site = Site::factory()->create();
     $staff = medicationAlertStaff($site);
     medicationCompetency($staff, medicationAlertStaff($site));
-    $sent = fn () => $staff->notifications()->where('type', MedicationCompetencyExpiringNotification::class)->count();
+    $sent = fn () => $staff->notifications()->where('type', MedicationAlertNotification::class)->where('data->alert_key', 'renewals')->count();
 
     $this->artisan('emar:send-alerts')->assertExitCode(0);
     Carbon::setTestNow(now()->addMinutes(15));
@@ -203,8 +225,8 @@ it('does not send a renewal reminder for an assessment that has already been ren
 
     $this->artisan('emar:send-alerts')->assertExitCode(0);
 
-    Notification::assertNotSentTo($renewed, MedicationCompetencyExpiringNotification::class);
-    Notification::assertSentTo($notRenewed, MedicationCompetencyExpiringNotification::class);
+    medicationAlertNotTo($renewed, 'renewals');
+    medicationAlertTo($notRenewed, 'renewals');
 });
 
 it('sends the break-glass daily report under its catalogued key so notification settings apply', function () {
@@ -243,7 +265,8 @@ it('sends the break-glass daily report only to provider managers, admins and aud
 it('still sends the low-stock notification after the 06:00 stock check has run', function () {
     Notification::fake();
     $site = Site::factory()->create();
-    $recipient = medicationAlertStaff($site, null, ['medications.view']);
+    // v5's default for "Stock running low": the house lead and people who update stock there.
+    $recipient = medicationAlertStaff($site, 'team_lead');
     $client = Client::factory()->create(['site_id' => $site->id]);
     $order = ClientMedication::factory()->create([
         'client_id' => $client->id,
@@ -263,7 +286,7 @@ it('still sends the low-stock notification after the 06:00 stock check has run',
     $this->artisan('emar:check-medication-stock')->assertExitCode(0);
     $this->artisan('emar:send-alerts')->assertExitCode(0);
 
-    Notification::assertSentTo($recipient, MedicationStockLowNotification::class);
+    medicationAlertTo($recipient, 'stock');
 });
 
 it('treats a medication order as expiring soon only inside the window', function () {

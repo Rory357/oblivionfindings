@@ -11,6 +11,7 @@ use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationReview;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\Medication\OverdueDoseAlerts;
@@ -155,6 +156,10 @@ class MedicationAlertService
         if ($discrepancyAlert) {
             $alerts[] = $discrepancyAlert;
         }
+
+        // People are told — as-needed limits, reviews due, open discrepancies
+        // — as Medication Settings › Alerts & access says (P11 B2).
+        app(MedicationAlertSources::class)->forClient($client, $medications);
 
         return $alerts;
     }

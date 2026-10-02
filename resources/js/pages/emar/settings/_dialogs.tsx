@@ -43,6 +43,8 @@ import {
     canRestore,
     changes,
     definitionOf,
+    fallbackHouses,
+    fallbackWarnings,
     format,
     keptTogether,
     loosens,
@@ -102,6 +104,18 @@ export function ReviewChanges({ view }: { view: ViewKey }) {
         return acc;
     }, {});
     const looser = ch.filter((c) => c.loosens);
+    // P11 B2 safety net: not a loosening, but shown before saving.
+    const fallbacks = [
+        ...new Set(
+            ch
+                .filter((c) => c.group === 'alerts' || c.group === 'alertExtra')
+                .map((c) => c.key),
+        ),
+    ].flatMap((k) =>
+        fallbackWarnings(fallbackHouses(s, draft, k)).map(
+            (w) => `${s.definitions.alerts?.[k]?.alert?.label ?? k}: ${w}.`,
+        ),
+    );
 
     const save = () => {
         let outcome: 'none' | 'ok' | 'invalid' = 'none';
@@ -112,7 +126,7 @@ export function ReviewChanges({ view }: { view: ViewKey }) {
                 changes: ch.map((c) => ({
                     group: c.group,
                     key: c.key,
-                    site_id: null,
+                    site_id: c.site_id,
                     value: c.to,
                     from: c.from,
                 })),
@@ -227,7 +241,7 @@ export function ReviewChanges({ view }: { view: ViewKey }) {
                 >
                     {list.map((c) => (
                         <ReviewRow
-                            key={c.key}
+                            key={`${c.key}@${c.site_id ?? 'org'}`}
                             label={c.label}
                             value={
                                 <>
@@ -246,6 +260,21 @@ export function ReviewChanges({ view }: { view: ViewKey }) {
                     ))}
                 </ReviewCard>
             ))}
+            {fallbacks.length ? (
+                <InfoCard icon={AlertTriangle} tone="warn">
+                    <b>
+                        After saving, nobody in the chosen groups would be told
+                        at some houses.
+                    </b>{' '}
+                    Their alerts go to the people who manage medication settings
+                    there instead.
+                    <ul className="mt-1 list-disc pl-5">
+                        {fallbacks.map((f) => (
+                            <li key={f}>{f}</li>
+                        ))}
+                    </ul>
+                </InfoCard>
+            ) : null}
             {looser.length ? (
                 <InfoCard icon={AlertTriangle} tone="warn">
                     <b>
@@ -282,7 +311,9 @@ export function DiscardView({ view }: { view: ViewKey }) {
                     </p>
                     <ul className="mt-2 list-disc pl-5">
                         {ch.map((c) => (
-                            <li key={c.group + c.key}>
+                            <li
+                                key={`${c.group}.${c.key}@${c.site_id ?? 'org'}`}
+                            >
                                 <b>{c.label}:</b> {c.toText}
                             </li>
                         ))}
@@ -315,7 +346,7 @@ export function UnsavedList() {
                         .filter((c) => c.view === v)
                         .map((c) => (
                             <ReviewRow
-                                key={c.group + c.key}
+                                key={`${c.group}.${c.key}@${c.site_id ?? 'org'}`}
                                 label={c.label}
                                 value={c.toText}
                             />
@@ -359,7 +390,7 @@ export function LeaveGuard({ url }: { url: string }) {
             </p>
             <ul className="list-disc space-y-1 pl-5 text-[13px]">
                 {changes(s, draft).map((c) => (
-                    <li key={c.group + c.key}>
+                    <li key={`${c.group}.${c.key}@${c.site_id ?? 'org'}`}>
                         <b>{VIEW_LABEL[c.view]}</b> — {c.label}: {c.toText}
                     </li>
                 ))}
