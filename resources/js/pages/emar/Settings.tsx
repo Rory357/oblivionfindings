@@ -488,21 +488,12 @@ export default function EmarSettings(props: Props) {
     const editable = viewGroups.some((g) => canEdit(g.key));
     // Part of the one-line subline, so it stays short: houses are counted
     // past one ("At a house" names them).
+    // Without Settings access the rail shows what they reach (alert extras,
+    // PIN resets, round templates); the subline only says where.
     const accessText = readOnlyAudit
         ? 'Read-only for audit'
         : !settingsAccess
-          ? [
-                alertAccess.house_ids.length ? 'Alert extras' : null,
-                witnessPin.can_reset ? 'witness PIN resets' : null,
-                props.templateAccess.manage
-                    ? 'round templates'
-                    : props.templateAccess.read
-                      ? 'round templates (read-only)'
-                      : null,
-            ]
-                .filter(Boolean)
-                .join(' and ')
-                .replace(/^./, (c) => c.toUpperCase()) + ' for your houses'
+          ? 'Your houses only'
           : s.can_manage_organisation
             ? 'All-sites authority'
             : `${props.sites.length === 1 ? props.sites[0].name : `${props.sites.length || 'No'} houses`} · organisation rules read-only`;

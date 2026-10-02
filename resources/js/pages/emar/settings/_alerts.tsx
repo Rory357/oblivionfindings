@@ -629,9 +629,6 @@ export function AlertWho({ k, data }: { k: string; data: AlertData }) {
                 steps={AWHO_STEPS}
                 stepIndex={step}
                 onStepClick={setStep}
-                sequential={false}
-                pct={null}
-                headerLabel={AWHO_STEPS[step].label}
                 footerStart={
                     <div className="flex gap-2">
                         <Button variant="outline" onClick={onClose}>
@@ -834,17 +831,40 @@ export function AlertWho({ k, data }: { k: string; data: AlertData }) {
                                     onEdit={() => setStep(2)}
                                     span
                                 >
-                                    {houses.map((h) => (
+                                    {/* Houses with extras by name; the rest as one row, so many houses stay readable. */}
+                                    {houses
+                                        .filter(
+                                            (h) => (extra[h.id] ?? []).length,
+                                        )
+                                        .map((h) => (
+                                            <ReviewRow
+                                                key={h.id}
+                                                label={h.name}
+                                                value={names(
+                                                    (extra[h.id] ?? []).map(
+                                                        (id) => nameOf(s, id),
+                                                    ),
+                                                )}
+                                            />
+                                        ))}
+                                    {houses.some(
+                                        (h) => !(extra[h.id] ?? []).length,
+                                    ) ? (
                                         <ReviewRow
-                                            key={h.id}
-                                            label={h.name}
-                                            value={names(
-                                                (extra[h.id] ?? []).map((id) =>
-                                                    nameOf(s, id),
-                                                ),
-                                            )}
+                                            label={
+                                                houses.some(
+                                                    (h) =>
+                                                        (extra[h.id] ?? [])
+                                                            .length,
+                                                )
+                                                    ? 'Other houses'
+                                                    : houses.length === 1
+                                                      ? houses[0].name
+                                                      : 'Every house'
+                                            }
+                                            value="Nobody"
                                         />
-                                    ))}
+                                    ) : null}
                                 </ReviewCard>
                             </div>
                         </div>

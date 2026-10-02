@@ -348,7 +348,7 @@ describe('Alerts & access › Alerts', () => {
         fireEvent.click(screen.getByRole('button', { name: /Apply to draft/ }));
 
         expect(JSON.parse(draft.alerts.stock)).toMatchObject({
-            groups: ['houseLead', 'stockStaff', 'rostered'],
+            groups: ['houseLead', 'stockStaff'],
             people: [],
         });
         expect(draft.alertExtra[siteSlot('stock', 3)]).toBe('[]');
