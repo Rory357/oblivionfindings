@@ -85,6 +85,8 @@ type Props = {
     active_site: { id: number; name: string } | null;
     site_brand_colour: string | null;
     user_first_name: string | null;
+    /** "Not available before …" when the period starts before the dose record. */
+    omissions_notice?: string | null;
 };
 
 const CATEGORIES = [
@@ -214,6 +216,7 @@ export default function AuditLog({
     active_site: activeSite,
     site_brand_colour: brandColour,
     user_first_name: userFirstName,
+    omissions_notice: omissionsNotice = null,
 }: Props) {
     const [view, setView] = useState('timeline');
     const [cat, setCat] = useState('all');
@@ -718,6 +721,14 @@ export default function AuditLog({
                         )}
                     </div>
                 </div>
+                {omissionsNotice ? (
+                    <p className="text-caption">
+                        MAR omissions{' '}
+                        {omissionsNotice.charAt(0).toLowerCase() +
+                            omissionsNotice.slice(1)}{' '}
+                        — the dose record starts then.
+                    </p>
+                ) : null}
 
                 <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                     {view !== 'gaps' && (

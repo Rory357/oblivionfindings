@@ -16,9 +16,11 @@ use App\Models\MedicationPrescriberOrder;
 use App\Models\MedicationReview;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Emar\MarOmissionService;
+use App\Services\Medication\DoseSlots\DoseOmissions;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -28,7 +30,7 @@ class AuditLogController extends Controller
         private MedicationGovernanceScopeService $governanceScope,
     ) {}
 
-    public function index(Request $request, MarOmissionService $omissions)
+    public function index(Request $request, DoseOmissions $omissions)
     {
         $user = $request->user();
         abort_unless($user, 403);
@@ -669,19 +671,22 @@ class AuditLogController extends Controller
             }
         }
 
-        // 10. Omissions — scheduled doses never recorded (real "blank MAR slot"
-        //     detection over a bounded recent window; reuses MarScheduleService).
+        // 10. Omissions — doses whose window ended with nothing recorded, over
+        //     the whole period, from the dose-slot projection (C6g).
+        $omissionsNotice = null;
         if (empty($eventTypes) || in_array('omission', $eventTypes)) {
-            $omissionClientIds = $clientId !== null ? [$clientId] : $allowedClientIds;
-            foreach ($omissionClientIds as $omissionClientId) {
-                foreach ($omissions->omissionsForRange(
-                    $dateFrom ? Carbon::parse($dateFrom) : null,
-                    $dateTo ? Carbon::parse($dateTo) : null,
-                    $omissionClientId,
-                    $canViewControlled,
-                ) as $omission) {
-                    $events->push($omission);
-                }
+            $found = $omissions->forPeriod(
+                DoseSlotReaderScope::forAuthorisedClients(
+                    $user,
+                    $clientId !== null ? array_values(array_intersect([$clientId], $allowedClientIds)) : $allowedClientIds,
+                ),
+                $dateFrom,
+                $dateTo,
+                CarbonImmutable::now(),
+            );
+            $omissionsNotice = $found['notice'];
+            foreach ($found['events'] as $omission) {
+                $events->push($omission);
             }
         }
 
@@ -810,6 +815,9 @@ class AuditLogController extends Controller
                 'date_to' => $dateTo,
                 'event_types' => $eventTypes,
             ],
+            // A period starting before the dose-slot projection's days:
+            // omissions are "Not available before …" (C6g).
+            'omissions_notice' => $omissionsNotice,
         ]);
     }
 

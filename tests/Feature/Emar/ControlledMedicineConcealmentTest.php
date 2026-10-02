@@ -26,6 +26,7 @@ use App\Models\User;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -39,6 +40,13 @@ use Tests\TestCase;
 class ControlledMedicineConcealmentTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
 
     public function test_meds_today_hides_controlled_rows_from_a_worker_with_record_but_not_view(): void
     {
@@ -54,6 +62,10 @@ class ControlledMedicineConcealmentTest extends TestCase
             'service_context_id' => $serviceContext->id,
             'status' => 'active',
         ]);
+        // A fixed NZ morning, with the orders entered at the start of the day:
+        // on the real clock an evening run found no dose owed after the
+        // orders' entry, so the schedule was empty.
+        Carbon::setTestNow(Carbon::parse('2026-06-15 00:00', 'Pacific/Auckland')->utc());
         foreach ([['Everyday tablets', false], ['PRIVATE CONTROLLED TODAY', true]] as [$name, $controlled]) {
             ClientMedication::query()->create([
                 'client_id' => $client->id,
@@ -67,6 +79,9 @@ class ControlledMedicineConcealmentTest extends TestCase
                 'state' => 'active',
             ]);
         }
+        // 8:30: the worker's covering shift (an hour ago … three hours on) is
+        // under way; the 08:00 and 20:00 doses are both on today's board.
+        Carbon::setTestNow(Carbon::parse('2026-06-15 08:30', 'Pacific/Auckland')->utc());
 
         $recordOnly = $this->coveringWorker($site, $serviceContext, $client, deny: ['medications.controlled.view']);
         $this->assertTrue($recordOnly->canDo('medications.controlled.record'));
