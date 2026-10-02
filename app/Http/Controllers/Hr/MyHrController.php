@@ -1001,7 +1001,7 @@ class MyHrController extends Controller
             ->whereIn('user_id', $visibleStaffIds)
             ->whereNotNull('user_id')
             ->with([
-                'user:id,name,email',
+                'user:id,name',
                 'primarySite:id,name',
                 'departmentRelation:id,name',
             ])
@@ -1019,7 +1019,9 @@ class MyHrController extends Controller
                     'role' => $p->position_title,
                     'department' => $p->departmentRelation?->name ?? $p->department,
                     'site' => $p->primarySite?->name,
-                    'email' => $p->work_email ?: $p->user?->email,
+                    // Work email only: the sign-in email can be personal, so
+                    // someone without an HR work email shows no email here.
+                    'email' => $p->work_email ?: null,
                     'phone' => $p->work_phone,
                     'avatar' => $p->profile_photo_path,
                     'is_first_aider' => (bool) $p->is_first_aider,

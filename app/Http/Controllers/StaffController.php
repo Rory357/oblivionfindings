@@ -328,7 +328,7 @@ class StaffController extends Controller
                     ['sites.viewAll'],
                 );
                 $lockedProfile = $profileQuery->lockForUpdate()->firstOrFail();
-                $this->persistStaffProfile($lockedProfile, $lockedUser, $profileData, $lockedActor->id);
+                $this->persistStaffProfile($lockedProfile, $profileData, $lockedActor->id);
             }
         });
 
@@ -562,15 +562,19 @@ class StaffController extends Controller
         return $query->firstOrFail();
     }
 
-    /** @param array<string, mixed> $profileData */
+    /**
+     * The form's email is the sign-in address, which can be personal, so it is
+     * never copied into work_email. HR sets the work email on the employee
+     * profile.
+     *
+     * @param  array<string, mixed>  $profileData
+     */
     private function persistStaffProfile(
         HrEmployeeProfile $profile,
-        User $user,
         array $profileData,
         int $actorId,
     ): void {
         $values = [
-            'work_email' => $user->email,
             'updated_by' => $actorId,
         ];
 
