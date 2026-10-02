@@ -2,6 +2,7 @@
 
 namespace App\Services\Medication\Settings;
 
+use App\Services\Medication\Alerts\MedicationAlertCatalogue;
 use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\DoseTimingSettings;
 use App\Services\Medication\MedicationSafetyPolicySettings;
@@ -23,6 +24,14 @@ class MedicationSettingsRegistry
     public const VIEW_ROUNDS = 'rounds';
 
     public const VIEW_STAFF = 'staff';
+
+    public const VIEW_ALERTS = 'alerts';
+
+    /** Who gets each alert, organisation-wide: `medications.alerts.{alert}`. */
+    public const ALERT_STORAGE_PREFIX = 'medications.alerts.';
+
+    /** A house's extra people for each alert: `medications.alert_extras.{alert}` per Site. */
+    public const ALERT_EXTRAS_STORAGE_PREFIX = 'medications.alert_extras.';
 
     /** @var array<string, MedicationSettingGroup>|null */
     private ?array $groups = null;
@@ -80,7 +89,74 @@ class MedicationSettingsRegistry
     /** @return list<MedicationSettingGroup> */
     protected function build(): array
     {
-        return [$this->safetyChecks(), $this->doseTiming(), $this->competencyPolicy(), $this->witnessPinRules()];
+        return [
+            $this->safetyChecks(),
+            $this->doseTiming(),
+            $this->competencyPolicy(),
+            $this->witnessPinRules(),
+            $this->alertRecipients(),
+            $this->alertExtras(),
+        ];
+    }
+
+    /**
+     * Who gets each medication alert (P11 v5 Alerts & access › Alerts): one
+     * setting per alert something raises today, organisation-wide. Each
+     * starts as v5's proposal (approved with P11 v5, B2 Q1), shown as
+     * "Default — not yet reviewed".
+     */
+    private function alertRecipients(): MedicationSettingGroup
+    {
+        return new MedicationSettingGroup(
+            key: 'alerts',
+            view: self::VIEW_ALERTS,
+            effect: 'From the next alert sent, at every house',
+            auditEvent: 'medications.alert_recipients.updated',
+            definitions: array_map(function (string $key): MedicationSettingDefinition {
+                $codec = new AlertRecipientsCodec($key);
+                $label = MedicationAlertCatalogue::ALERTS[$key]['label'];
+
+                return new MedicationSettingDefinition(
+                    group: 'alerts',
+                    key: $key,
+                    storageKey: self::ALERT_STORAGE_PREFIX.$key,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'alerts',
+                    label: 'Who gets “'.$label.'”',
+                    options: [],
+                    default: $codec->defaultValue(),
+                    codec: $codec,
+                    decideLabel: 'Alert: '.$label,
+                );
+            }, MedicationAlertCatalogue::built()),
+        );
+    }
+
+    /**
+     * Extra people a house adds to an alert, only when the alert is about
+     * that house (P11 v5 "House extras"). House managers change their own
+     * houses' extras (`medications.alerts.manage_house`, B2 Q3).
+     */
+    private function alertExtras(): MedicationSettingGroup
+    {
+        return new MedicationSettingGroup(
+            key: 'alertExtra',
+            view: self::VIEW_ALERTS,
+            effect: 'From the next alert at that house',
+            auditEvent: 'medications.alert_recipients.updated',
+            definitions: array_map(fn (string $key): MedicationSettingDefinition => new MedicationSettingDefinition(
+                group: 'alertExtra',
+                key: $key,
+                storageKey: self::ALERT_EXTRAS_STORAGE_PREFIX.$key,
+                scope: MedicationSettingDefinition::SCOPE_SITE,
+                section: 'alerts',
+                label: MedicationAlertCatalogue::ALERTS[$key]['label'].' — extra people',
+                options: [],
+                default: '[]',
+                codec: new PeopleListCodec,
+                houseManaged: true,
+            ), MedicationAlertCatalogue::built()),
+        );
     }
 
     private function safetyChecks(): MedicationSettingGroup

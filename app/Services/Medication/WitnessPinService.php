@@ -97,8 +97,9 @@ final class WitnessPinService
     {
         $ids = collect($userIds)->map(fn ($id): int => (int) $id)->filter()->unique()->values();
         $pins = UserWitnessPin::query()->whereIn('user_id', $ids)->get()->keyBy('user_id');
+        $renewal = $this->settings->renewalMonths();
 
-        return $ids->mapWithKeys(fn (int $id): array => [$id => $this->statusOf($pins->get($id))])->all();
+        return $ids->mapWithKeys(fn (int $id): array => [$id => $this->statusWith($pins->get($id), $renewal)])->all();
     }
 
     /**
@@ -125,6 +126,12 @@ final class WitnessPinService
 
     public function statusOf(?UserWitnessPin $pin): string
     {
+        return $this->statusWith($pin, $pin === null ? null : $this->settings->renewalMonths());
+    }
+
+    /** statusOf() with the renewal setting read once for a whole list (B2 C1 review: Settings page cost). */
+    private function statusWith(?UserWitnessPin $pin, ?int $renewal): string
+    {
         if ($pin === null) {
             return self::STATUS_NOT_SET;
         }
@@ -134,7 +141,6 @@ final class WitnessPinService
         if ($pin->locked_until !== null && $pin->locked_until->isFuture()) {
             return self::STATUS_LOCKED;
         }
-        $renewal = $this->settings->renewalMonths();
         if ($renewal !== null && $pin->set_at !== null && $pin->set_at->copy()->addMonths($renewal)->isPast()) {
             return self::STATUS_EXPIRED;
         }
@@ -462,14 +468,15 @@ final class WitnessPinService
     public function statusRows(Collection $users): Collection
     {
         $pins = UserWitnessPin::query()->whereIn('user_id', $users->pluck('id'))->get()->keyBy('user_id');
+        $renewal = $this->settings->renewalMonths();
 
-        return $users->map(function (User $user) use ($pins): array {
+        return $users->map(function (User $user) use ($pins, $renewal): array {
             $pin = $pins->get($user->id);
 
             return [
                 'id' => (int) $user->id,
                 'name' => (string) $user->name,
-                'status' => $this->statusOf($pin),
+                'status' => $this->statusWith($pin, $renewal),
                 'set_at' => $pin?->set_at?->toIso8601String(),
                 'locked_until' => $pin?->locked_until?->isFuture() ? $pin->locked_until->toIso8601String() : null,
                 'reset_at' => $pin?->must_change ? $pin->reset_at?->toIso8601String() : null,

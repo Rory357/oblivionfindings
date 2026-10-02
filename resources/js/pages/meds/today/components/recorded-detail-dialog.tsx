@@ -34,7 +34,10 @@ export function RecordedDetailDialog({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         MAR entry
-                        <StatusPill status={row.status} />
+                        <StatusPill
+                            status={row.status}
+                            awayReason={row.away_reason}
+                        />
                     </DialogTitle>
                     <DialogDescription>
                         {row.client_name} · {row.medication_name}

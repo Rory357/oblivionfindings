@@ -82,7 +82,7 @@ class RoundDoseSlotsTest extends TestCase
         // Metformin recorded in the round: nothing left to do.
         $this->record($this->metformin, '2026-06-15 08:00', 'given', $round);
         $this->assertSame(
-            ['total' => 2, 'completed' => 2, 'pending' => 0, 'given' => 2, 'refused' => 0, 'held' => 0, 'next_index' => null, 'percent' => 100],
+            ['total' => 2, 'completed' => 2, 'pending' => 0, 'given' => 2, 'refused' => 0, 'held' => 0, 'next_index' => null, 'percent' => 100, 'waiting' => 0, 'away' => 0],
             $this->service()->progress($round->fresh(), true),
         );
         $this->assertTrue($this->service()->canCompleteCanonicalRound($round->fresh()));
@@ -136,8 +136,13 @@ class RoundDoseSlotsTest extends TestCase
         $this->assertSame(['pending_check', 'due'], array_column($this->service()->cells($round->fresh(), true), 'status'));
 
         $this->record($this->iron, '2026-06-15 08:00', 'given', $round);
+        // Not owed in the round: out of the total and the percent, counted
+        // on its own — the round is 100% recorded (Main, 3 Oct).
         $progress = $this->service()->progress($round->fresh(), true);
-        $this->assertSame([2, 1, 0, null], [$progress['total'], $progress['completed'], $progress['pending'], $progress['next_index']]);
+        $this->assertSame(
+            ['total' => 1, 'completed' => 1, 'pending' => 0, 'next_index' => null, 'percent' => 100, 'waiting' => 1, 'away' => 0],
+            array_intersect_key($progress, array_flip(['total', 'completed', 'pending', 'next_index', 'percent', 'waiting', 'away'])),
+        );
         $this->assertTrue($this->service()->canCompleteCanonicalRound($round->fresh()));
     }
 

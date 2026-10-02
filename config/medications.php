@@ -45,4 +45,15 @@ return [
         // them. On by default (Stephan, 30 Sep 2026: approved with PIN-1).
         'login_check_to_set' => (bool) env('MEDICATION_WITNESS_PIN_LOGIN_CHECK', true),
     ],
+
+    // Away (P01 C7): which records say a person is away, so a dose due then
+    // reads "Away · reason" and is never chased (DoseAwaySources).
+    'away' => [
+        // Approved client leave. OFF (Main, 3 Oct): leave is stored in whole
+        // days and nothing yet records it approved, ended early or the person
+        // back with a time, so someone home on day 3 of 10 would stay Away
+        // until day 10. Back on once leave gets approve / withdraw / returned
+        // actions with times (logged for Stephan and P04 reconciliation).
+        'from_leave' => (bool) env('MEDICATION_AWAY_FROM_LEAVE', false),
+    ],
 ];

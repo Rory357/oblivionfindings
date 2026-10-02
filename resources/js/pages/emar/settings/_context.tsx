@@ -21,7 +21,9 @@ export type Dialog =
     | { kind: 'tplview'; id: number }
     | { kind: 'tpltoggle'; id: number }
     | { kind: 'tplretire'; id: number }
-    | { kind: 'gen' };
+    | { kind: 'gen' }
+    | { kind: 'alertwho'; key: string }
+    | { kind: 'alertperson'; key: string };
 
 export type SettingsContext = {
     s: SettingsPayload;

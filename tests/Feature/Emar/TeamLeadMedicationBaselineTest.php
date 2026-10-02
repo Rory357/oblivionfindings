@@ -86,6 +86,8 @@ class TeamLeadMedicationBaselineTest extends TestCase
             'medications.view',
             'medications.orders.verify',
             'medications.witness_pin.reset',
+            // P11 B2 Q3: their own houses' alert extras, quiet hours and on-call contact.
+            'medications.alerts.manage_house',
             ...self::FRONTLINE_KEYS,
         ], $teamLead);
     }

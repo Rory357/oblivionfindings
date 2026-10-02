@@ -75,6 +75,12 @@ const STATUS_CELL: Record<DoseStatus, { label: string; className: string }> = {
         label: 'Order check',
         className: 'border-status-info/40 bg-status-info-bg text-status-info',
     },
+    // The person is away (checked in at respite at another Site): shown
+    // with its reason, never due or overdue.
+    away: {
+        label: 'Away',
+        className: 'border-status-info/40 bg-status-info-bg text-status-info',
+    },
 };
 
 function MedFlag({
@@ -173,6 +179,10 @@ export default function MarGrid({
                         label="Not given"
                         className="border-status-warning/40 bg-status-warning-bg"
                     />
+                    <LegendItem
+                        label="Away"
+                        className="border-status-info/40 bg-status-info-bg"
+                    />
                 </div>
             </div>
 
@@ -268,6 +278,13 @@ export default function MarGrid({
                                                 canRecordControlled);
                                         const recordedTime =
                                             row.recorded?.time ?? row.time;
+                                        const awayReason =
+                                            row.status === 'away'
+                                                ? (row.away_reason ?? null)
+                                                : null;
+                                        const cellLabel = awayReason
+                                            ? `${cell.label} · ${awayReason}`
+                                            : cell.label;
                                         return (
                                             <td
                                                 key={time}
@@ -284,8 +301,8 @@ export default function MarGrid({
                                                     onContextMenu={(event) =>
                                                         onContext(event, row)
                                                     }
-                                                    title={`${med.name} — ${cell.label} ${recordedTime}`}
-                                                    aria-label={`${med.name}, ${cell.label} at ${recordedTime} — record dose (right-click for quick actions)`}
+                                                    title={`${med.name} — ${cellLabel} ${recordedTime}`}
+                                                    aria-label={`${med.name}, ${cellLabel} at ${recordedTime} — record dose (right-click for quick actions)`}
                                                     className={cn(
                                                         'mx-auto flex h-[46px] w-[84px] flex-col items-center justify-center rounded-lg border text-[11px] font-semibold transition hover:ring-2 hover:ring-primary/30',
                                                         !isRecordable &&
@@ -294,9 +311,19 @@ export default function MarGrid({
                                                     )}
                                                 >
                                                     <span>{cell.label}</span>
-                                                    <span className="text-[10px] font-normal opacity-80">
-                                                        {recordedTime}
-                                                    </span>
+                                                    {awayReason ? (
+                                                        // Where they are; the full reason (with "until") is in the title.
+                                                        <span className="line-clamp-2 max-w-[78px] text-[9.5px] leading-tight font-normal opacity-80">
+                                                            {awayReason.replace(
+                                                                / \(until [^)]*\)$/,
+                                                                '',
+                                                            )}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] font-normal opacity-80">
+                                                            {recordedTime}
+                                                        </span>
+                                                    )}
                                                 </button>
                                             </td>
                                         );

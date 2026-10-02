@@ -56,6 +56,10 @@ const TAG_TONE: Record<DoseStatus, { bg: string; color: string }> = {
         bg: 'var(--status-info-bg)',
         color: 'var(--status-info)',
     },
+    away: {
+        bg: 'var(--status-info-bg)',
+        color: 'var(--status-info)',
+    },
 };
 
 const STATUS_LABEL: Record<DoseStatus, string> = {
@@ -67,7 +71,15 @@ const STATUS_LABEL: Record<DoseStatus, string> = {
     due: 'Due',
     upcoming: 'Due',
     pending_check: 'Waiting for the order check',
+    away: 'Away',
 };
+
+/** "Away · Respite at another house (since Mon 15 Jun, 7:00 am)" when away, else the status label. */
+function statusLabel(row: { status: DoseStatus; away_reason?: string | null }) {
+    return row.status === 'away' && row.away_reason
+        ? `${STATUS_LABEL.away} · ${row.away_reason}`
+        : STATUS_LABEL[row.status];
+}
 
 function nowHm(): string {
     const d = new Date();
@@ -149,7 +161,7 @@ export function DoseContextMenu({
             {
                 icon: <Eye className="h-3.5 w-3.5" />,
                 label: 'Recorded',
-                sub: `${STATUS_LABEL[row.status]}${row.recorded?.time ? ` at ${row.recorded.time}` : ''}${row.recorded?.by ? ` · ${row.recorded.by}` : ''}`,
+                sub: `${statusLabel(row)}${row.recorded?.time ? ` at ${row.recorded.time}` : ''}${row.recorded?.by ? ` · ${row.recorded.by}` : ''}`,
                 tone: 'primary',
                 onClick: onViewHistory,
             },
@@ -209,7 +221,7 @@ export function DoseContextMenu({
             ctx={{
                 x: target.x,
                 y: target.y,
-                tag: STATUS_LABEL[row.status],
+                tag: statusLabel(row),
                 tagBg: tone.bg,
                 tagColor: tone.color,
                 meta: `${row.medication_name}${row.dose ? ` · ${row.dose}` : ''}`,

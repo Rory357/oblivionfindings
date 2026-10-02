@@ -9,14 +9,14 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\ControlRoom\MaintenanceWindow;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
+use App\Models\MedicationAlert;
 use App\Models\MedicationDashboardAlert;
-use App\Models\MedicationRound;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
-use App\Notifications\MedicationOverdueNotification;
+use App\Notifications\MedicationAlertNotification;
 use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\MedicationAlertService;
@@ -397,31 +397,58 @@ class OverdueDoseAlertsTest extends TestCase
         $this->assertNull($this->dashboardRow($this->aroha));
     }
 
-    public function test_the_round_assignee_is_told_once_per_dose(): void
+    public function test_everyone_rostered_is_told_once_per_overdue_spell_of_a_dose(): void
     {
+        // P11 B2: who is told comes from Medication Settings — for overdue
+        // doses, everyone rostered on a covering shift and the house lead
+        // (Stephan's decision, locked on).
         $worker = $this->staff();
-        MedicationRound::query()->create([
+        Shift::factory()->create([
+            'client_id' => $this->aroha->id,
             'site_id' => $this->site->id,
-            'name' => 'Morning round',
-            'round_type' => 'morning',
-            'scheduled_time' => '08:00',
-            'window_minutes' => 60,
-            'round_date' => '2026-06-15',
-            'status' => 'pending',
-            'assigned_to' => $worker->id,
+            'user_id' => $worker->id,
+            'starts_at' => $this->nz('2026-06-15 07:00'),
+            'ends_at' => $this->nz('2026-06-15 15:00'),
+            'status' => 'in_progress',
         ]);
 
         $this->at('2026-06-15 09:30');
         $this->artisan('emar:send-alerts')->assertSuccessful();
-        // A deploy clears the cache; the stored notification still counts.
+        // A deploy clears the cache; the open alert record still counts.
         Cache::flush();
         $this->at('2026-06-15 09:45');
         $this->artisan('emar:send-alerts')->assertSuccessful();
 
-        $told = $worker->notifications()->where('type', MedicationOverdueNotification::class)->get()
-            ->map(fn ($notification): string => $notification->data['medication'].' '.$notification->data['scheduled_time'])
+        $told = $worker->notifications()->where('type', MedicationAlertNotification::class)->get()
+            ->filter(fn ($notification): bool => $notification->data['alert_key'] === 'overdue')
+            ->map(fn ($notification): string => $notification->data['message'])
             ->sort()->values()->all();
-        $this->assertSame(['Metformin 07:00', 'Morphine 08:00'], $told);
+        $this->assertCount(2, $told);
+        $this->assertStringContainsString('Metformin, 7:00 am dose — has no outcome', $told[0]);
+        $this->assertStringContainsString('Morphine, 8:00 am dose — has no outcome', $told[1]);
+        // The spell's alert record is keyed like its Control Room signal.
+        $this->assertSame(
+            Signal::query()->where('signal_type_code', MedicationSignalService::TYPE_OVERDUE)->get()
+                ->map(fn (Signal $signal): string => 'overdue:'.data_get($signal->normalized_data, 'dose_spell_key'))
+                ->sort()->values()->all(),
+            MedicationAlert::query()->where('type', 'overdue')->pluck('dedupe_key')->sort()->values()->all(),
+        );
+    }
+
+    public function test_a_doses_alert_record_is_dealt_with_once_the_dose_is_settled(): void
+    {
+        $this->staff();
+        $this->at('2026-06-15 09:30');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->assertSame(2, MedicationAlert::query()->where('type', 'overdue')->whereNotNull('open_key')->count());
+
+        $this->at('2026-06-15 09:40');
+        $this->record('Metformin', '07:00', 'given');
+        $this->record('Morphine', '08:00', 'given');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+
+        $this->assertSame(0, MedicationAlert::query()->where('type', 'overdue')->whereNotNull('open_key')->count());
+        $this->assertSame(['dealt_with'], MedicationAlert::query()->where('type', 'overdue')->distinct()->pluck('status')->all());
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────

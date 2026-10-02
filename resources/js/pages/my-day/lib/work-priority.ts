@@ -1,9 +1,12 @@
 import type { StreamItem } from './stream-grouping';
 
+/** Nothing left to do: a completed task, a recorded dose, or a dose the person is away for. */
 export function workIsDone(item: StreamItem): boolean {
     return item.kind === 'task'
         ? item.data.is_completed
-        : ['given', 'refused', 'withheld', 'missed'].includes(item.data.status);
+        : ['given', 'refused', 'withheld', 'missed', 'away'].includes(
+              item.data.status,
+          );
 }
 
 export function workDueAt(item: StreamItem): number {

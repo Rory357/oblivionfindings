@@ -15,6 +15,7 @@ import {
 import type { MouseEvent } from 'react';
 import { DoseStatusBadge, RoundStatusBadge } from './round-bits';
 import {
+    notOwedCaption,
     roundActionLabel,
     roundCounts,
     type RoundCell,
@@ -320,6 +321,12 @@ export default function RoundBoard({
                                     <span>
                                         {counts.recorded} of {counts.total}{' '}
                                         recorded
+                                        {notOwedCaption(
+                                            counts.waiting,
+                                            counts.away,
+                                        )
+                                            ? ` · ${notOwedCaption(counts.waiting, counts.away)}`
+                                            : ''}
                                     </span>
                                     <span className="font-semibold text-foreground">
                                         {counts.pct}%

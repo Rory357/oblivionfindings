@@ -11,6 +11,7 @@ use App\Models\UserWitnessPin;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class SystemUsersSeeder extends Seeder
 {
@@ -153,6 +154,11 @@ class SystemUsersSeeder extends Seeder
             $this->upsertHrEmployeeProfile($w, $staff);
         }
 
+        // P11 B2 (b): a house lead for each demo house and a clinical lead, so
+        // demo medication alerts reach the people they're routed to (house
+        // lead, clinical lead) rather than only the safety net.
+        $leads = $this->seedHouseLeadsAndClinicalLead($password);
+
         // Ensure every staff user has an HR profile, even if the legacy staff
         // record is missing or incomplete.
         User::staff()->with('staffProfile')->get()->each(function (User $staffUser): void {
@@ -195,7 +201,78 @@ class SystemUsersSeeder extends Seeder
             $boardUser->roles()->sync([$boardRole->id]);
         }
 
-        $this->command?->info('Created ' . (count($users) + 8 + 1) . ' users with staff records.');
+        $this->command?->info('Created ' . (count($users) + 8 + $leads + 1) . ' users with staff records.');
+    }
+
+    /**
+     * One team_lead per demo house (their HR profile's primary site) and one
+     * clinical_lead covering every house. Head office gets no house lead.
+     *
+     * @return int The users created or updated.
+     */
+    private function seedHouseLeadsAndClinicalLead(string $password): int
+    {
+        $people = [];
+        $houses = Site::query()->active()->notArchived()
+            ->where(fn ($sites) => $sites->where('type', '!=', 'head_office')->orWhereNull('type'))
+            ->orderBy('id')
+            ->get(['id', 'name']);
+        foreach ($houses as $house) {
+            $people[] = [
+                'email' => 'lead.'.Str::slug((string) $house->name).'@demo.test',
+                'name' => 'Demo Team Lead ('.$house->name.')',
+                'role' => 'team_lead',
+                'job_title' => 'Team Lead',
+                'site_id' => (int) $house->id,
+                'all_sites' => false,
+            ];
+        }
+        $people[] = [
+            'email' => 'clinical@demo.test',
+            'name' => 'Demo Clinical Lead',
+            'role' => 'clinical_lead',
+            'job_title' => 'Clinical Lead',
+            'site_id' => null,
+            'all_sites' => true,
+        ];
+
+        foreach ($people as $person) {
+            $user = User::query()->firstOrNew(['email' => $person['email']]);
+            $user->forceFill([
+                'name' => $person['name'],
+                'password' => $password,
+                'role' => $person['role'],
+                'approved_at' => now(),
+                'email_verified_at' => now(),
+                'two_factor_secret' => null,
+                'two_factor_recovery_codes' => null,
+                'two_factor_confirmed_at' => null,
+            ])->save();
+            $role = Role::query()->where('name', $person['role'])->first();
+            if ($role) {
+                $user->roles()->sync([$role->id]);
+            }
+            $staff = Staff::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'employee_id' => strtoupper(substr($person['role'], 0, 3)) . str_pad($user->id, 3, '0', STR_PAD_LEFT),
+                    'job_title' => $person['job_title'],
+                    'department' => 'Clinical',
+                    'status' => 'active',
+                    'hire_date' => now()->subYears(2),
+                ]
+            );
+            $this->upsertHrEmployeeProfile($user, $staff);
+            if ($person['all_sites']) {
+                $this->assignEveryActiveSite($user);
+            } else {
+                HrEmployeeProfile::query()->where('user_id', $user->id)->first()?->update([
+                    'primary_site_id' => $person['site_id'],
+                ]);
+            }
+        }
+
+        return count($people);
     }
 
     private function upsertHrEmployeeProfile(User $user, ?Staff $staff): void
@@ -265,6 +342,8 @@ class SystemUsersSeeder extends Seeder
             'auditor' => 'Internal Auditor',
             'health_safety_officer' => 'Health & Safety Officer',
             'compliance_lead' => 'Compliance Lead',
+            'team_lead' => 'Team Lead',
+            'clinical_lead' => 'Clinical Lead',
             default => 'Support Worker',
         };
     }

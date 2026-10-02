@@ -20,8 +20,9 @@ use Illuminate\Support\Collection;
  * dose-slot projection through ScheduledDoseStates — the same orders, due
  * times and states as Meds today — for today and three NZ days either side,
  * never before the day the projection's coverage starts: Waiting for the
- * order check, Due, Due now, Overdue (window ended, today) or Not recorded
- * (an earlier day). Nothing is owed before an order was entered.
+ * order check, Due, Due now, Overdue (window ended, today), Not recorded
+ * (an earlier day) or "Away · reason" (the person is away; C7). Nothing is
+ * owed before an order was entered.
  *
  * Controlled medicines are left out for a reader without controlled-medicine
  * access (EM-12).
@@ -38,6 +39,7 @@ final class ClientCalendarDoses
         'withheld' => 'Withheld',
         'missed' => 'Missed (recorded)',
         'pending_check' => 'Waiting for the order check',
+        'away' => 'Away',
         'self_managed' => 'Self-managed',
         'upcoming' => 'Due',
         'due' => 'Due now',
@@ -52,6 +54,7 @@ final class ClientCalendarDoses
         'withheld' => '#eab308',
         'missed' => '#ef4444',
         'pending_check' => '#64748b',
+        'away' => '#6366f1',
         'self_managed' => '#64748b',
         'upcoming' => '#ec4899',
         'due' => '#ec4899',
@@ -169,12 +172,13 @@ final class ClientCalendarDoses
             ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
             ->get()
             ->keyBy('id');
-        $doses = $this->states->dosesBetween(
+        // With the words for an Away dose, as this reader may read them (C7).
+        $doses = $this->states->withAwayReasons($this->states->dosesBetween(
             $orders,
             Carbon::parse($from, $timezone),
             Carbon::parse($to, $timezone),
             $now,
-        );
+        ), auth()->user());
 
         $listed = [];
         foreach ($doses as $orderId => $orderDoses) {
@@ -224,10 +228,14 @@ final class ClientCalendarDoses
     private function doseEvent(ClientMedication $order, array $dose, string $timezone): array
     {
         $status = self::statusFor($dose);
+        // Away always shows its reason (C7): "Away · On leave (until …)".
+        $label = $status === 'away' && ($dose['away_reason'] ?? null)
+            ? self::label($status).' · '.$dose['away_reason']
+            : self::label($status);
 
         return [
             'id' => 'medsched-'.$order->id.'-'.$dose['due_at']->copy()->utc()->format('YmdHi'),
-            'title' => $order->name.' — '.self::label($status),
+            'title' => $order->name.' — '.$label,
             'start' => $dose['due_at']->copy()->timezone($timezone)->toIso8601String(),
             'end' => null,
             'allDay' => false,

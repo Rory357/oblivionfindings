@@ -14,6 +14,7 @@ use App\Models\MedicationError;
 use App\Models\MedicationRefusalFollowup;
 use App\Models\User;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\DoseTimingSettings;
 use App\Services\Medication\MedicationSignalService;
 use Carbon\Carbon;
@@ -208,6 +209,7 @@ class MedicationIncidentIntegrationService
                     'occurred_at' => $attemptedAt->toIso8601String(),
                 ],
             );
+            app(MedicationAlertSources::class)->prnOverLimit($lockedClient, $lockedMedication);
 
             return $incident->fresh();
         });
@@ -290,6 +292,7 @@ class MedicationIncidentIntegrationService
                     'occurred_at' => $lockedDiscrepancy->reported_at?->toIso8601String(),
                 ],
             );
+            app(MedicationAlertSources::class)->discrepancy($lockedDiscrepancy);
 
             return $incident->fresh();
         });
@@ -723,6 +726,7 @@ class MedicationIncidentIntegrationService
                     'queued_offline' => (bool) ($syncProvenance['queued_offline'] ?? false),
                 ],
             );
+            app(MedicationAlertSources::class)->lossReport($lockedReport);
 
             return $incident->fresh();
         });
@@ -795,6 +799,7 @@ class MedicationIncidentIntegrationService
                 'resolved_by_user_id' => $resolvedBy,
             ], fn ($value) => $value !== null)
         );
+        app(MedicationAlertSources::class)->discrepancyResolved($discrepancy);
     }
 
     public function resolveControlledLossReport(
@@ -818,6 +823,7 @@ class MedicationIncidentIntegrationService
                 'resolved_by_user_id' => $resolvedBy,
             ], fn ($value) => $value !== null)
         );
+        app(MedicationAlertSources::class)->lossReportResolved($report);
     }
 
     public function resolveTransitException(
@@ -921,6 +927,8 @@ class MedicationIncidentIntegrationService
                 'resolved_by_user_id' => $resolvedBy,
             ], fn ($value) => $value !== null)
         );
+
+        app(MedicationAlertSources::class)->errorResolved($error, 'The error was resolved');
     }
 
     /**
