@@ -70,9 +70,8 @@ describe('Settings header meters', () => {
     it('counts what is still to decide and how much was never configured', () => {
         meters(everything);
         expect(screen.getByText('3')).toBeInTheDocument();
-        expect(
-            screen.getByText('2 not configured · the rest are defaults'),
-        ).toBeInTheDocument();
+        // The short form: the long one truncated at 1280 and at 200 %.
+        expect(screen.getByText('2 not configured')).toBeInTheDocument();
         expect(screen.getByText('2 active')).toBeInTheDocument();
         expect(screen.getByText('1 paused · 2 overlap')).toBeInTheDocument();
         expect(screen.getByText('3 active')).toBeInTheDocument();

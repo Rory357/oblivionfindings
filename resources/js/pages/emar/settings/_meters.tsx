@@ -53,13 +53,12 @@ export function SettingsMeters({
         pins.filter((x) => st.includes(x.status)).length;
     const pinSet = pinCount('set');
     const nc = pending.filter((p) => p.state === 'nc').length;
+    // Short form: "· the rest are defaults" truncated at 1280 and at 200 %.
     const pendingCaption = !pending.length
         ? 'Nothing to decide'
         : !nc
           ? 'All are defaults'
-          : nc === pending.length
-            ? `${nc} not configured`
-            : `${nc} not configured · the rest are defaults`;
+          : `${nc} not configured`;
 
     return (
         <>
