@@ -251,14 +251,7 @@ class MedsBoardPayloadService
      */
     private function scheduledOrders(array $clientIds): Builder
     {
-        return ClientMedication::query()
-            ->whereIn('client_id', $clientIds)
-            ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
-            ->where('is_prn', false)
-            ->where(function ($query) {
-                $query->whereNotNull('dose_times')
-                    ->orWhereNotNull('frequency');
-            });
+        return ScheduledDoseStates::listedOrders($clientIds);
     }
 
     /** @return array<string, mixed> */
