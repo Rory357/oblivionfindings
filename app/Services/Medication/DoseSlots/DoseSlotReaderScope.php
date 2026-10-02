@@ -6,6 +6,8 @@ use App\Models\Client;
 use App\Models\User;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\UserSiteAccessService;
 
 /**
  * Who a dose-slot read is for (P01 foundation C4).
@@ -54,6 +56,42 @@ final class DoseSlotReaderScope
 
         return new self(
             array_values(app(MarLinkService::class)->openableClientIds($viewer, $clientIds)),
+            $viewer->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
+        );
+    }
+
+    /**
+     * A screen's own people (a worker's shift residents, a My Day site) narrowed
+     * to the ones the viewer may open — or, for someone who records doses, the
+     * people they support (assigned, at a Site they work at) or may record for
+     * right now (a clocked-in shift covering them: the recording authority's
+     * own rule). Neither needs medications.view.
+     *
+     * @param  array<int, int>  $clientIds
+     */
+    public static function forViewerClients(User $viewer, array $clientIds): self
+    {
+        $people = app(MarLinkService::class)->openableClientIds($viewer, $clientIds);
+        if ($viewer->canDo('medications.administer.record') && $clientIds !== []) {
+            $siteIds = app(UserSiteAccessService::class)->accessibleSiteIds(
+                $viewer,
+                MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
+            );
+            $assigned = $siteIds === [] ? [] : Client::query()
+                ->whereIn('id', $clientIds)
+                ->whereIn('site_id', $siteIds)
+                ->whereHas('supportWorkers', fn ($users) => $users->whereKey($viewer->id))
+                ->pluck('id')
+                ->all();
+            $people = array_merge(
+                $people,
+                $assigned,
+                app(MedicationScopeDecisionService::class)->clientIdsWithCurrentAuthority($viewer, $clientIds, now()),
+            );
+        }
+
+        return new self(
+            array_values(array_unique(array_map('intval', $people))),
             $viewer->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
         );
     }

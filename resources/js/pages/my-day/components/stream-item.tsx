@@ -293,6 +293,14 @@ function MedRow({
                             Overdue
                         </Badge>
                     ) : null}
+                    {med.status === 'pending_check' ? (
+                        <Badge
+                            variant="outline"
+                            className="border-status-info/30 bg-status-info-bg text-[10px] text-status-info"
+                        >
+                            Waiting for the order check
+                        </Badge>
+                    ) : null}
                     {resolved ? (
                         <Badge
                             variant="outline"

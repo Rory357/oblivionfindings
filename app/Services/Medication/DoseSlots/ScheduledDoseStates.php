@@ -115,6 +115,55 @@ final class ScheduledDoseStates
     }
 
     /**
+     * A dose's status in the lists frontline screens share — Meds today, the
+     * MAR schedule, My Day — when no record row is matched to it: overdue
+     * once its window has ended; due from when it shows as due soon through
+     * its window; pending_check while its order's change waits for the
+     * check; else upcoming. A recorded dose reads as its outcome (Away as
+     * withheld).
+     *
+     * @param  array{state: string, outcome: string|null, due_soon: bool}  $dose
+     */
+    public static function listStatus(array $dose): string
+    {
+        if ($dose['outcome'] !== null) {
+            return $dose['outcome'] === 'away' ? 'withheld' : $dose['outcome'];
+        }
+
+        return match ($dose['state']) {
+            DoseSlotProjection::STATE_PENDING_CHECK => DoseSlotProjection::STATE_PENDING_CHECK,
+            DoseSlotProjection::STATE_DUE => 'due',
+            DoseSlotProjection::STATE_LATE, DoseSlotProjection::STATE_NOT_RECORDED => 'overdue',
+            DoseSlotProjection::STATE_NOT_DUE => $dose['due_soon'] ? 'due' : 'upcoming',
+            default => 'upcoming',
+        };
+    }
+
+    /**
+     * The doses each order owes on every NZ day from $from's to $to's,
+     * oldest due first.
+     *
+     * @param  iterable<ClientMedication>  $orders
+     * @return array<int, list<array{due_at: Carbon, ordered_time: string, state: string, outcome: string|null, window_opens_at: Carbon, window_ends_at: Carbon, due_soon: bool, order_change_pending: bool}>>
+     */
+    public function dosesBetween(iterable $orders, Carbon $from, Carbon $to, Carbon $now): array
+    {
+        $timezone = $this->schedule->workerTimezone();
+        $orders = Collection::make($orders);
+        $doses = [];
+        $day = $from->copy()->timezone($timezone)->startOfDay();
+        $last = $to->copy()->timezone($timezone)->startOfDay();
+        while ($day->lessThanOrEqualTo($last)) {
+            foreach ($this->dosesOn($orders, $day, $now) as $orderId => $orderDoses) {
+                $doses[$orderId] = array_merge($doses[$orderId] ?? [], $orderDoses);
+            }
+            $day->addDay();
+        }
+
+        return $doses;
+    }
+
+    /**
      * Shows as due soon: not yet in its window, but within the "shows as due
      * soon" minutes before its dose time (P11 Rounds & timing).
      */

@@ -27,6 +27,8 @@ use App\Models\User;
 use App\Services\GuidedRoundService;
 use App\Services\HandoverWorkerNotes;
 use App\Services\MarScheduleService;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
+use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\MyDay\ShiftTaskHelpService;
@@ -130,7 +132,8 @@ class MyTasksController extends Controller
         $todayShifts = $shifts->filter(fn ($s) => $s['is_today']);
         $stats = [
             'shifts_today' => $todayShifts->count(),
-            'meds_due' => count($medicationsDue),
+            // Doses waiting for the order check are listed but not counted.
+            'meds_due' => collect($medicationsDue)->where('status', '!=', 'pending_check')->count(),
             'meds_overdue' => collect($medicationsDue)->where('status', 'overdue')->count(),
             'tasks_open' => $todayShifts->sum(fn ($s) => collect($s['tasks'])->where('is_completed', false)->count()),
             'timesheets_pending' => collect($timesheets)->count(),
@@ -804,8 +807,19 @@ class MyTasksController extends Controller
                 }
             }
 
+            // C6(d): the people the viewer may open (the P02 person rule), and
+            // each dose and its state from the dose-slot projection — the same
+            // doses and states as Meds today and the MAR. Controlled doses are
+            // listed only for readers who may see them named.
+            $clientIds = DoseSlotReaderScope::forViewerClients(auth()->user(), $clientIds)->clientIds ?? [];
+            if ($clientIds === []) {
+                return [];
+            }
+
+            // Verified orders, and orders whose change waits for the order
+            // check (shown, not recordable until checked).
             $medications = ClientMedication::whereIn('client_id', $clientIds)
-                ->active()
+                ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
                 ->where('is_prn', false)
                 ->when(! $canAccessControlled, fn ($query) => $query->where('controlled_drug', false))
                 ->where(function ($query) {
@@ -814,6 +828,7 @@ class MyTasksController extends Controller
                 })
                 ->with('client:id,first_name,last_name')
                 ->get();
+            $doses = app(ScheduledDoseStates::class)->dosesBetween($medications, $windowStart, $windowEnd, $now);
 
             // One administration query for the whole window, matched in memory
             // per slot — replaces the old per-dose-slot query (an N+1 that
@@ -823,84 +838,80 @@ class MyTasksController extends Controller
             $result = [];
 
             foreach ($medications as $med) {
-                $day = $windowStart->copy()->startOfDay();
-                $lastDay = $windowEnd->copy()->startOfDay();
-
-                while ($day->lessThanOrEqualTo($lastDay)) {
-                    foreach ($scheduleService->scheduledTimesForDate($med, $day) as $scheduled) {
-                        if ($scheduled->lt($windowStart) || $scheduled->gt($windowEnd)) {
-                            continue;
-                        }
-
-                        $scheduledIso = $scheduled->toIso8601String();
-                        $snoozeKey = sprintf(
-                            'my-day.med-snooze.user-%d.med-%d.%s',
-                            auth()->id(),
-                            $med->id,
-                            $scheduledIso,
-                        );
-
-                        if (Cache::has($snoozeKey)) {
-                            continue;
-                        }
-
-                        $administration = $administrations->get(
-                            $scheduleService->slotKey((int) $med->client_id, (int) $med->id, $scheduled),
-                        );
-
-                        if ($administration && in_array($administration->status, ['given', 'refused', 'withheld'], true)) {
-                            $status = $administration->status;
-                        } elseif ($scheduled->lt($now)) {
-                            $status = 'overdue';
-                        } elseif ($scheduled->lte($now->copy()->addHour())) {
-                            $status = 'due';
-                        } else {
-                            $status = 'upcoming';
-                        }
-
-                        $clientName = $med->client
-                            ? trim($med->client->first_name.' '.$med->client->last_name)
-                            : 'Unknown';
-
-                        $result[] = [
-                            // Compound id: medication + dose-time slot. Stable per
-                            // dose-row so the front-end can key rows and target
-                            // mutations (administer/refuse/snooze) at the right
-                            // occurrence. A medication with two in-window doses
-                            // (e.g. Paracetamol 09:00 + 13:00) yields distinct ids.
-                            // `medication_id` carries the bare ClientMedication id
-                            // the action endpoints still resolve via route-model
-                            // binding — the occurrence is addressed by that id plus
-                            // `scheduled_for`.
-                            'id' => $med->id.':'.$scheduledIso,
-                            'medication_id' => $med->id,
-                            'client_id' => $med->client_id,
-                            'client_name' => $clientName,
-                            'medication_name' => $med->name,
-                            'dose' => $med->dosage,
-                            'route' => $med->route ?? 'Oral',
-                            'flag' => $med->is_prn ? 'PRN' : null,
-                            'is_controlled' => (bool) $med->controlled_drug,
-                            'can_record' => $canRecord
-                                && (! $med->controlled_drug || $canRecordControlled),
-                            // My Day has no authenticated second-checker flow;
-                            // controlled doses must be given from an eMAR surface.
-                            'can_give' => $canRecord && ! $med->controlled_drug,
-                            'scheduled_for' => $scheduledIso,
-                            'status' => $status,
-                            'emar_url' => $canOpenEmar
-                                ? $this->marUrlFor($med->client_id, $scheduled->toDateString())
-                                : null,
-                        ];
+                foreach ($doses[(int) $med->id] ?? [] as $dose) {
+                    // The slot's due time (the time the record dialog sends).
+                    $scheduled = $dose['due_at']->copy()->timezone($this->workerTimezone());
+                    if ($scheduled->lt($windowStart) || $scheduled->gt($windowEnd)) {
+                        continue;
                     }
 
-                    $day->addDay();
+                    $scheduledIso = $scheduled->toIso8601String();
+                    $snoozeKey = sprintf(
+                        'my-day.med-snooze.user-%d.med-%d.%s',
+                        auth()->id(),
+                        $med->id,
+                        $scheduledIso,
+                    );
+
+                    if (Cache::has($snoozeKey)) {
+                        continue;
+                    }
+
+                    $administration = $administrations->get(
+                        $scheduleService->slotKey((int) $med->client_id, (int) $med->id, $scheduled),
+                    );
+
+                    // My Day has no "missed" status: a dose recorded as missed
+                    // still reads as overdue here, as before.
+                    $status = $administration && in_array($administration->status, ['given', 'refused', 'withheld'], true)
+                        ? $administration->status
+                        : ScheduledDoseStates::listStatus($dose);
+                    if ($status === 'missed') {
+                        $status = 'overdue';
+                    }
+                    // Waiting for the order check: shown, never recordable here.
+                    $awaitingCheck = $status === 'pending_check';
+
+                    $clientName = $med->client
+                        ? trim($med->client->first_name.' '.$med->client->last_name)
+                        : 'Unknown';
+
+                    $result[] = [
+                        // Compound id: medication + dose-time slot. Stable per
+                        // dose-row so the front-end can key rows and target
+                        // mutations (administer/refuse/snooze) at the right
+                        // occurrence. A medication with two in-window doses
+                        // (e.g. Paracetamol 09:00 + 13:00) yields distinct ids.
+                        // `medication_id` carries the bare ClientMedication id
+                        // the action endpoints still resolve via route-model
+                        // binding — the occurrence is addressed by that id plus
+                        // `scheduled_for`.
+                        'id' => $med->id.':'.$scheduledIso,
+                        'medication_id' => $med->id,
+                        'client_id' => $med->client_id,
+                        'client_name' => $clientName,
+                        'medication_name' => $med->name,
+                        'dose' => $med->dosage,
+                        'route' => $med->route ?? 'Oral',
+                        'flag' => $med->is_prn ? 'PRN' : null,
+                        'is_controlled' => (bool) $med->controlled_drug,
+                        'can_record' => ! $awaitingCheck && $canRecord
+                            && (! $med->controlled_drug || $canRecordControlled),
+                        // My Day has no authenticated second-checker flow;
+                        // controlled doses must be given from an eMAR surface.
+                        'can_give' => ! $awaitingCheck && $canRecord && ! $med->controlled_drug,
+                        'scheduled_for' => $scheduledIso,
+                        'status' => $status,
+                        'emar_url' => $canOpenEmar
+                            ? $this->marUrlFor($med->client_id, $scheduled->toDateString())
+                            : null,
+                    ];
                 }
             }
 
             // Sort: overdue first, then due, then upcoming
             usort($result, function ($a, $b) {
-                $order = ['overdue' => 0, 'due' => 1, 'upcoming' => 2, 'given' => 3, 'refused' => 4, 'withheld' => 5];
+                $order = ['overdue' => 0, 'due' => 1, 'upcoming' => 2, 'pending_check' => 2, 'given' => 3, 'refused' => 4, 'withheld' => 5];
 
                 return ($order[$a['status']] ?? 3) <=> ($order[$b['status']] ?? 3);
             });
@@ -1030,11 +1041,10 @@ class MyTasksController extends Controller
         }
 
         try {
-            $scheduleService = app(MarScheduleService::class);
             $start = $shift->starts_at->copy()->timezone($workerNow->getTimezone());
             $end = $shift->ends_at->copy()->timezone($workerNow->getTimezone());
 
-            return ClientMedication::query()
+            $medications = ClientMedication::query()
                 ->where('client_id', $shift->client_id)
                 ->active()
                 ->where('is_prn', false)
@@ -1043,27 +1053,25 @@ class MyTasksController extends Controller
                     $query->whereNotNull('dose_times')
                         ->orWhereNotNull('frequency');
                 })
-                ->get()
-                ->flatMap(function (ClientMedication $medication) use ($start, $end, $scheduleService, $canOpenEmar) {
+                ->get();
+            // The same doses (and due times) as Meds today and the MAR (C6d).
+            $doses = app(ScheduledDoseStates::class)->dosesBetween($medications, $start, $end, $workerNow);
+
+            return $medications
+                ->flatMap(function (ClientMedication $medication) use ($start, $end, $doses, $canOpenEmar) {
                     $items = [];
-                    $day = $start->copy()->startOfDay();
-                    $lastDay = $end->copy()->startOfDay();
-
-                    while ($day->lessThanOrEqualTo($lastDay)) {
-                        foreach ($scheduleService->scheduledTimesForDate($medication, $day) as $scheduled) {
-                            if ($scheduled->betweenIncluded($start, $end)) {
-                                $items[] = [
-                                    'medication_name' => $medication->name,
-                                    'dose' => $medication->dosage,
-                                    'scheduled_for' => $scheduled->toIso8601String(),
-                                    'emar_url' => $canOpenEmar
-                                        ? $this->marUrlFor($medication->client_id, $scheduled->toDateString())
-                                        : null,
-                                ];
-                            }
+                    foreach ($doses[(int) $medication->id] ?? [] as $dose) {
+                        $scheduled = $dose['due_at']->copy()->timezone($start->getTimezone());
+                        if ($scheduled->betweenIncluded($start, $end)) {
+                            $items[] = [
+                                'medication_name' => $medication->name,
+                                'dose' => $medication->dosage,
+                                'scheduled_for' => $scheduled->toIso8601String(),
+                                'emar_url' => $canOpenEmar
+                                    ? $this->marUrlFor($medication->client_id, $scheduled->toDateString())
+                                    : null,
+                            ];
                         }
-
-                        $day->addDay();
                     }
 
                     return $items;

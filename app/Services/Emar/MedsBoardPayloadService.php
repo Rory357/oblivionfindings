@@ -12,7 +12,6 @@ use App\Models\MedicationCompetencyExemption;
 use App\Models\User;
 use App\Services\MarScheduleService;
 use App\Services\Medication\ClientAllergyRecordService;
-use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
@@ -159,7 +158,7 @@ class MedsBoardPayloadService
                         $administration = null;
                     }
 
-                    $status = $administration ? $administration->status : self::boardStatus($dose);
+                    $status = $administration ? $administration->status : ScheduledDoseStates::listStatus($dose);
 
                     $clientName = $med->client
                         ? trim($med->client->first_name.' '.$med->client->last_name)
@@ -200,27 +199,6 @@ class MedsBoardPayloadService
 
             return [];
         }
-    }
-
-    /**
-     * The board's status for an unrecorded dose, from its projection state.
-     *
-     * @param  array{state: string, outcome: string|null, due_soon: bool}  $dose
-     */
-    private static function boardStatus(array $dose): string
-    {
-        if ($dose['outcome'] !== null) {
-            // Recorded, though not matched to a record row here: Away reads as withheld.
-            return $dose['outcome'] === 'away' ? 'withheld' : $dose['outcome'];
-        }
-
-        return match ($dose['state']) {
-            DoseSlotProjection::STATE_PENDING_CHECK => DoseSlotProjection::STATE_PENDING_CHECK,
-            DoseSlotProjection::STATE_DUE => 'due',
-            DoseSlotProjection::STATE_LATE, DoseSlotProjection::STATE_NOT_RECORDED => 'overdue',
-            DoseSlotProjection::STATE_NOT_DUE => $dose['due_soon'] ? 'due' : 'upcoming',
-            default => 'upcoming',
-        };
     }
 
     /** @return array<string, mixed> */

@@ -50,9 +50,11 @@ export function DayWorkList(p: Props) {
                   ]
             : item.kind === 'med' && item.data.status === 'overdue'
               ? 'Overdue'
-              : at <= p.now
-                ? 'Due now'
-                : 'To do';
+              : item.kind === 'med' && item.data.status === 'pending_check'
+                ? 'Waiting for the order check'
+                : at <= p.now
+                  ? 'Due now'
+                  : 'To do';
         return {
             key: `${item.kind}-${item.data.id}`,
             at: Number.isFinite(at) ? at : null,
