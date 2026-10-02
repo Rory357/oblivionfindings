@@ -8,6 +8,7 @@ use App\Services\MarScheduleService;
 use App\Services\Medication\DoseTimingSettings;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
@@ -41,6 +42,27 @@ final class ScheduledDoseStates
         private readonly DoseSlotCoverage $coverage,
         private readonly MarScheduleService $schedule,
     ) {}
+
+    /**
+     * The scheduled (non-PRN) orders whose doses the lists show — Meds today
+     * and the profile calendar: verified orders, and orders whose change
+     * waits for the order check (their verified version's doses are still
+     * owed).
+     *
+     * @param  array<int, int>  $clientIds
+     * @return Builder<ClientMedication>
+     */
+    public static function listedOrders(array $clientIds): Builder
+    {
+        return ClientMedication::query()
+            ->whereIn('client_id', $clientIds)
+            ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
+            ->where('is_prn', false)
+            ->where(function ($query) {
+                $query->whereNotNull('dose_times')
+                    ->orWhereNotNull('frequency');
+            });
+    }
 
     /**
      * The doses each order owes on the NZ day of $date, oldest due first.

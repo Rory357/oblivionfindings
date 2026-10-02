@@ -679,9 +679,12 @@ class WorkerMedsController extends Controller
 
         // A medication lead with no shift today still gets a useful board, but
         // only for clients at Sites that are currently approved for them —
-        // and only the people they may open (the P02 person rule, C6b).
+        // and only the people they may open (the P02 person rule, C6b). A
+        // person whose order change waits for the order check is still owed
+        // its doses (shown as Waiting for the order check).
         try {
-            return [app(MarLinkService::class)->openableClientIds($user, ClientMedication::active()
+            return [app(MarLinkService::class)->openableClientIds($user, ClientMedication::query()
+                ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
                 ->whereHas('client', fn ($clients) => $clients->whereIn('site_id', $siteIds))
                 ->pluck('client_id')
                 ->filter()

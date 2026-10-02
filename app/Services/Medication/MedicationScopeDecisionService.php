@@ -15,15 +15,20 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\MarScheduleService;
+use App\Services\Medication\DoseSlots\DoseSlotGenerator;
+use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\MedicationRuleService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
+use LogicException;
 
 /**
  * The server-authoritative relationship and work-scope boundary for medication
@@ -789,15 +794,58 @@ class MedicationScopeDecisionService
             ->get(['id']);
     }
 
+    /**
+     * A scheduled dose must be one the order owes (P01 C6k): its dose-slot
+     * projection slot — at the slot's due time (on the spring-forward day a
+     * 02:30 dose is due at 03:00), and nothing due before the order was
+     * entered — or, on a day the projection doesn't hold, the order's
+     * schedule as ScheduledDoseStates reads it. Within a minute either side.
+     * An order that can't be given yet (waiting for its check) keeps the
+     * order's own times here, so recording it is refused with the reason.
+     */
     private function assertScheduledCell(ClientMedication $medication, ?Carbon $scheduledFor): void
     {
         $this->notFoundUnless($scheduledFor !== null && ! $medication->is_prn);
         $date = $this->schedule->dateFromInput(
             $scheduledFor->copy()->timezone($this->schedule->workerTimezone())->toDateString(),
         );
-        $matches = collect($this->schedule->scheduledTimesForDate($medication, $date))
+        $dueTimes = $medication->isAdministrable()
+            ? $this->owedDueTimes($medication, $date)
+            : $this->schedule->scheduledTimesForDate($medication, $date);
+        $matches = collect($dueTimes)
             ->contains(fn (Carbon $slot): bool => abs($slot->copy()->utc()->diffInSeconds($scheduledFor->copy()->utc(), false)) < 60);
         $this->notFoundUnless($matches);
+    }
+
+    /**
+     * The due times the order owes on the NZ day of $date. The record path
+     * holds the order's lock, so — as the outcome writer does — the day's
+     * slots are made sure of first: a late or missed hourly generation run
+     * never blocks recording a dose.
+     *
+     * @return list<Carbon>
+     */
+    private function owedDueTimes(ClientMedication $medication, Carbon $date): array
+    {
+        $states = app(ScheduledDoseStates::class);
+        $nzDate = $date->copy()->timezone($this->schedule->workerTimezone())->toDateString();
+        $now = CarbonImmutable::now()->utc();
+        if ($states->holdsDay($nzDate, $now)) {
+            try {
+                app(DoseSlotGenerator::class)->ensureDay($medication, $nzDate, $now);
+            } catch (InvalidArgumentException|LogicException $unreadable) {
+                // An unreadable order history must never block recording:
+                // the order's own times decide, as before the projection.
+                report($unreadable);
+
+                return $this->schedule->scheduledTimesForDate($medication, $date);
+            }
+        }
+
+        return array_map(
+            fn (array $dose): Carbon => $dose['due_at'],
+            $states->dosesOn([$medication], $date, now())[(int) $medication->id] ?? [],
+        );
     }
 
     private function assertMedicationIsActiveFor(ClientMedication $medication, Carbon $at): void
