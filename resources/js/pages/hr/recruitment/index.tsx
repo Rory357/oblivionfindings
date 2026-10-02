@@ -2644,7 +2644,7 @@ function CandidateSheet({
             />
             <div className="pointer-events-none fixed inset-0 z-[51] grid place-items-center p-5">
                 <div className="pointer-events-auto flex h-[min(88vh,640px)] w-[min(95vw,860px)] overflow-hidden rounded-[18px] bg-card shadow-2xl motion-safe:animate-in motion-safe:zoom-in-95">
-                    <aside className="flex w-[252px] flex-none flex-col border-r border-sidebar-border bg-sidebar p-5">
+                    <aside className="flex w-[252px] flex-none flex-col border-r border-border bg-muted/30 p-5">
                         <span style={avatarStyle(candidate.full_name, 56)}>
                             {initials(candidate.full_name)}
                         </span>
