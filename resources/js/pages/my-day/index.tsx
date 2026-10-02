@@ -794,6 +794,12 @@ export default function MyDay() {
                             onAdd={openNewTask}
                             onOpenTask={setOpenTaskId}
                             onAddNote={handleAddNote}
+                            hiddenControlled={
+                                props.medications_hidden_controlled ?? 0
+                            }
+                            hiddenControlledOverdue={
+                                props.medications_hidden_controlled_overdue ?? 0
+                            }
                         />
                     )}
                     {view === 'handover' && (
@@ -1484,7 +1490,12 @@ function LoneWorkerCheckInCard({
                     <AlertTriangle className="h-4 w-4" />I need help
                 </Button>
             </div>
-        <Link href="/my-day/safety-reports" className="mt-3 inline-flex min-h-11 items-center text-sm text-primary underline">My safety history</Link>
+            <Link
+                href="/my-day/safety-reports"
+                className="mt-3 inline-flex min-h-11 items-center text-sm text-primary underline"
+            >
+                My safety history
+            </Link>
         </section>
     );
 }

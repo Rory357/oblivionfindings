@@ -19,6 +19,7 @@ use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\StaffEligibilityRegister;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationScopeDecision;
@@ -86,7 +87,7 @@ class WorkerMedsController extends Controller
         $date = $this->scheduleService->dateFromInput($request->query('date'));
         $isToday = $date->isSameDay($now);
 
-        $assignedClientIds = $this->assignedClientIdsFor(
+        [$assignedClientIds, $peopleAfterClockIn, $hasShift] = $this->boardPeopleFor(
             $user,
             $date->copy()->utc(),
             $date->copy()->addDay()->endOfDay()->utc(),
@@ -99,9 +100,13 @@ class WorkerMedsController extends Controller
         $dayAdministrations = $this->boardPayload->administrationsForDay($assignedClientIds, $date, $includeControlled);
         $bySlot = $this->boardPayload->slotIndex($dayAdministrations);
 
-        $schedule = $this->boardPayload->scheduleForDate($assignedClientIds, $date, $now, $bySlot, $includeControlled);
-        // The board is roster-scoped; the MAR is person-scoped (assignment or
-        // a clocked-in covering shift). Link only charts this worker may open.
+        // EM-12: controlled doses are left off the list for a reader without
+        // controlled-medicine access; the list says how many (and how many of
+        // those are overdue), naming none, so it reconciles with the badge
+        // (which counts them, P09 Q6).
+        $schedule = $this->boardPayload->scheduleForDate($assignedClientIds, $date, $now, $bySlot, $includeControlled, $hiddenControlled);
+        // The MAR link: only charts this worker may open (a lead's fallback
+        // board can include people outside the frontline person rule).
         $marLinks = app(MarLinkService::class);
         $schedule = array_map(fn (array $row): array => [
             ...$row,
@@ -113,8 +118,9 @@ class WorkerMedsController extends Controller
         $windowStart = $now->copy()->subHours(2);
         $windowEnd = $now->copy()->addHours(8);
         $medsDue = array_values(array_filter($schedule, function (array $row) use ($windowStart, $windowEnd) {
-            // Recorded, or waiting for the order check (can't be recorded yet).
-            if ($row['recorded'] !== null || $row['status'] === 'pending_check') {
+            // Recorded (Missed (recorded) included), or waiting for the order
+            // check (can't be recorded yet).
+            if ($row['recorded'] !== null || ! in_array($row['status'], ['overdue', 'due', 'upcoming'], true)) {
                 return false;
             }
             $scheduled = Carbon::parse($row['scheduled_for']);
@@ -178,7 +184,12 @@ class WorkerMedsController extends Controller
                 'manage_stock' => $user->canDo('medications.view')
                     && $user->canDo('medications.stock.update'),
             ],
-            'has_shift_context' => ! empty($assignedClientIds),
+            'has_shift_context' => $hasShift || ! empty($assignedClientIds),
+            // People on their shift whose medicines show once they're clocked
+            // in to it (the person rule), and controlled doses not shown.
+            'people_after_clock_in' => $peopleAfterClockIn,
+            'hidden_controlled_doses' => $hiddenControlled['total'],
+            'hidden_controlled_overdue' => $hiddenControlled['overdue'],
         ]);
     }
 
@@ -594,20 +605,27 @@ class WorkerMedsController extends Controller
     }
 
     /**
-     * Clients this worker has a shift for on the selected day (or the day
-     * after, so late shifts crossing midnight keep their context). When a
-     * worker has no shift context (e.g. a medication lead opening the worker
-     * view) we still want to degrade gracefully rather than wipe the page —
-     * fall back to all clients they can see meds for.
+     * The people on this worker's board: those they have a shift with on the
+     * selected day (or the day after, so late shifts crossing midnight keep
+     * their context) whom they may open — the person rule My Day and the
+     * badge use (C6): people they're assigned to at their Sites, or on a
+     * shift they're clocked in to now. So before clock-in a worker sees no
+     * other person's medicines unless they're assigned to them. With no
+     * shift context (e.g. a medication lead opening the worker view) the
+     * board falls back to the people at their Sites they may open.
+     *
+     * @return array{0: list<int>, 1: int, 2: bool} the people; how many more
+     *                                              on their shift show once they clock in; whether
+     *                                              they have a shift context
      */
-    private function assignedClientIdsFor(User $user, Carbon $from, Carbon $to): array
+    private function boardPeopleFor(User $user, Carbon $from, Carbon $to): array
     {
         $siteIds = $this->siteAccess->accessibleSiteIds(
             $user,
             ['clinical.accessAllSites', 'sites.viewAll'],
         );
         if ($siteIds === []) {
-            return [];
+            return [[], 0, false];
         }
 
         try {
@@ -639,7 +657,13 @@ class WorkerMedsController extends Controller
                 ->all();
 
             if (! empty($shiftClientIds)) {
-                return $shiftClientIds;
+                $people = DoseSlotReaderScope::forViewerClients($user, $shiftClientIds)->clientIds ?? [];
+                $people = array_values(array_filter(
+                    $shiftClientIds,
+                    fn ($clientId): bool => in_array((int) $clientId, $people, true),
+                ));
+
+                return [$people, count($shiftClientIds) - count($people), true];
             }
         } catch (\Throwable $e) {
             report($e);
@@ -650,24 +674,24 @@ class WorkerMedsController extends Controller
         // reader/lead may expand an empty shift context to all approved-Site
         // medication clients.
         if (! $user->canDo('medications.view')) {
-            return [];
+            return [[], 0, false];
         }
 
         // A medication lead with no shift today still gets a useful board, but
         // only for clients at Sites that are currently approved for them —
         // and only the people they may open (the P02 person rule, C6b).
         try {
-            return app(MarLinkService::class)->openableClientIds($user, ClientMedication::active()
+            return [app(MarLinkService::class)->openableClientIds($user, ClientMedication::active()
                 ->whereHas('client', fn ($clients) => $clients->whereIn('site_id', $siteIds))
                 ->pluck('client_id')
                 ->filter()
                 ->unique()
                 ->values()
-                ->all());
+                ->all()), 0, false];
         } catch (\Throwable $e) {
             report($e);
 
-            return [];
+            return [[], 0, false];
         }
     }
 

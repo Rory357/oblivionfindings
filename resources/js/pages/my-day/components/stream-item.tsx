@@ -173,12 +173,16 @@ function MedRow({
     const overdue = med.status === 'overdue';
     const given = med.status === 'given';
     const notGiven = med.status === 'refused' || med.status === 'withheld';
-    const resolved = given || notGiven;
+    // Recorded as missed: done, never overdue (the label Meds today uses).
+    const missed = med.status === 'missed';
+    const resolved = given || notGiven || missed;
     const resolvedLabel = given
         ? 'Given'
-        : med.status === 'withheld'
-          ? 'Withheld'
-          : 'Refused';
+        : missed
+          ? 'Missed (recorded)'
+          : med.status === 'withheld'
+            ? 'Withheld'
+            : 'Refused';
 
     const handleContext = (e: MouseEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -222,9 +226,11 @@ function MedRow({
                         ? 'border-status-success bg-status-success text-status-success-foreground'
                         : notGiven
                           ? 'border-status-warning bg-status-warning text-status-warning-foreground'
-                          : overdue
-                            ? 'border-status-critical text-transparent'
-                            : 'border-muted-foreground text-transparent',
+                          : missed
+                            ? 'border-status-critical bg-status-critical text-status-critical-foreground'
+                            : overdue
+                              ? 'border-status-critical text-transparent'
+                              : 'border-muted-foreground text-transparent',
                 )}
             >
                 {resolved ? <Check className="h-2.5 w-2.5" /> : null}
@@ -237,7 +243,7 @@ function MedRow({
                         ? 'bg-status-success-bg text-status-success'
                         : notGiven
                           ? 'bg-status-warning-bg text-status-warning'
-                          : overdue
+                          : overdue || missed
                             ? 'bg-status-critical-bg text-status-critical'
                             : 'bg-accent text-primary',
                 )}
@@ -308,7 +314,9 @@ function MedRow({
                                 'text-[10px]',
                                 given
                                     ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                    : 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+                                    : missed
+                                      ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
+                                      : 'border-status-warning/30 bg-status-warning-bg text-status-warning',
                             )}
                         >
                             {resolvedLabel}

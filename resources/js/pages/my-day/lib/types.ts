@@ -116,7 +116,10 @@ export interface MyDayMedDue {
     can_record: boolean;
     can_give: boolean;
     scheduled_for: string;
-    /** pending_check: waiting for the order check — shown, not recordable. */
+    /**
+     * pending_check: waiting for the order check — shown, not recordable.
+     * missed: recorded as missed — "Missed (recorded)", never overdue.
+     */
     status:
         | 'overdue'
         | 'due'
@@ -124,6 +127,7 @@ export interface MyDayMedDue {
         | 'given'
         | 'refused'
         | 'withheld'
+        | 'missed'
         | 'pending_check';
     flag?: string | null;
     /** Admin eMAR deep-link; null for record-only frontline workers. */
@@ -500,6 +504,10 @@ export interface MyDayPageProps {
     today_iso?: string;
     shifts: MyDayShift[];
     medications_due: MyDayMedDue[];
+    /** Controlled doses in the same window not listed for this reader. */
+    medications_hidden_controlled?: number;
+    /** …and how many of those are overdue (counted by the badge). */
+    medications_hidden_controlled_overdue?: number;
     timesheets: MyDayTimesheet[];
     incidents: MyDayIncident[];
     tasks: MyDayTaskFollowup[];

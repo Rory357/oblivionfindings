@@ -711,7 +711,10 @@ app(Schedule::class)
 app(Schedule::class)
     ->command('emar:send-alerts')
     ->timezone('Pacific/Auckland')
-    ->everyFifteenMinutes();
+    ->everyFifteenMinutes()
+    // The overdue sweep raises and resolves Control Room alerts: one run at a time.
+    ->onOneServer()
+    ->withoutOverlapping();
 
 // Keep dose slots generated for today and the next two NZ days (P01 C3): hourly
 app(Schedule::class)
