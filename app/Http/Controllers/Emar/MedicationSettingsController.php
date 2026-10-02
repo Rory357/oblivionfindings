@@ -290,7 +290,7 @@ class MedicationSettingsController extends Controller
             ->where(fn ($holders) => $holders
                 ->whereHas('roles.permissions', fn ($p) => $p->where('key', 'medications.view'))
                 ->orWhereHas('permissionOverrides', fn ($p) => $p->where('permissions.key', 'medications.view')))
-            ->with(['roles:id,name,label', 'hrEmployeeProfile'])
+            ->with(['roles:id,name,label', 'roles.permissions', 'permissionOverrides', 'hrEmployeeProfile'])
             ->orderBy('name')
             ->limit(self::WITNESS_PIN_STAFF_LIMIT)
             ->get()
@@ -456,8 +456,11 @@ class MedicationSettingsController extends Controller
     /** Null when the actor can see no Site's staff. */
     private function witnessPinStaffQuery(User $actor): ?Builder
     {
+        // Permissions loaded with each person, so isSecondPerson() and the
+        // reset check answer from memory — the same canDo() checks, cached.
         $query = User::query()->staff()->whereNotNull('approved_at')->orderBy('name')->orderBy('id')
-            ->select(['id', 'name', 'approved_at', 'role']);
+            ->select(['id', 'name', 'approved_at', 'role'])
+            ->with(['roles.permissions', 'permissionOverrides']);
         if (! $this->canManageGlobalRules($actor)) {
             $siteIds = $this->siteAccess->accessibleSiteIds($actor, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS);
             if ($siteIds === []) {
@@ -774,7 +777,9 @@ class MedicationSettingsController extends Controller
         }
 
         $recipients = app(MedicationAlertRecipients::class);
-        $readable = array_values(array_unique([...$named, ...collect($manageOrg ? [] : $this->alertPeopleIds($houseIds))->all()]));
+        // Worked out once per page: the picker and the warning share it.
+        $housePeople = $manageOrg ? [] : ($houseIds !== [] ? $this->alertPeople($houseIds) : []);
+        $readable = array_values(array_unique([...$named, ...array_column($housePeople, 'id')]));
 
         return [
             'alertAccess' => [
@@ -795,7 +800,7 @@ class MedicationSettingsController extends Controller
                 ->when(! $canManageGlobal, fn ($query) => $query->whereIn('site_id', $siteIds))
                 ->count(),
             // Organisation editors name anyone; house managers people at their houses.
-            'alertPeople' => $manageOrg ? $this->alertPeople(null) : ($houseIds !== [] ? $this->alertPeople($houseIds) : []),
+            'alertPeople' => $manageOrg ? $this->alertPeople(null) : $housePeople,
             'alertNames' => $named === [] ? [] : User::query()
                 ->whereIn('id', array_values(array_unique($named)))
                 ->pluck('name', 'id')
@@ -830,14 +835,6 @@ class MedicationSettingsController extends Controller
             ->all();
     }
 
-    /**
-     * @param  list<int>  $houseIds
-     * @return list<int>
-     */
-    private function alertPeopleIds(array $houseIds): array
-    {
-        return $houseIds === [] ? [] : array_column($this->alertPeople($houseIds), 'id');
-    }
 
     /**
      * A person's own houses: their current HR profile's primary and other

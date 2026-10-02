@@ -40,6 +40,12 @@ class MedicationAlertRecipients
 
     public const FALLBACK_PERMISSION = 'medications.settings.manage';
 
+    /**
+     * Loaded with every person, so canDo() and the house lookup answer from
+     * memory (User::canDo uses loaded relations). The same checks, cached.
+     */
+    private const PRELOAD = ['roles.permissions', 'permissionOverrides', 'hrEmployeeProfile'];
+
     /** @var array<int, list<int>> */
     private array $sites = [];
 
@@ -265,6 +271,7 @@ class MedicationAlertRecipients
         return $this->groupCache['role:'.$role] ??= User::query()
             ->whereNotNull('approved_at')
             ->whereHas('roles', fn ($roles) => $roles->where('name', $role))
+            ->with(self::PRELOAD)
             ->orderBy('id')
             ->get();
     }
@@ -277,6 +284,7 @@ class MedicationAlertRecipients
             ->where(fn ($holders) => $holders
                 ->whereHas('roles.permissions', fn ($p) => $p->where('key', $permission))
                 ->orWhereHas('permissionOverrides', fn ($p) => $p->where('permissions.key', $permission)))
+            ->with(self::PRELOAD)
             ->orderBy('id')
             ->get()
             ->filter(fn (User $user): bool => $this->can($user, $permission))
@@ -293,7 +301,7 @@ class MedicationAlertRecipients
             return collect();
         }
 
-        return User::query()->whereIn('id', $ids)->whereNotNull('approved_at')->orderBy('id')->get();
+        return User::query()->whereIn('id', $ids)->whereNotNull('approved_at')->with(self::PRELOAD)->orderBy('id')->get();
     }
 
     /** @return list<int> */
