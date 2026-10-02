@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 import type { MouseEvent } from 'react';
 import { DoseDot } from './round-bits';
 import {
+    doseStatusMeta,
+    isRecordedStatus,
     roundCounts,
     type Resident,
     type RoundCell,
@@ -101,7 +103,7 @@ export default function RoundChart({
                                     );
                                 }
                                 const anyDue = cells.some(
-                                    (c) => c.status === 'due',
+                                    (c) => !isRecordedStatus(c.status),
                                 );
                                 return (
                                     <td
@@ -123,7 +125,7 @@ export default function RoundChart({
                                                 <DoseDot
                                                     key={`${c.medication_id}-${c.scheduled_for}`}
                                                     status={c.status}
-                                                    title={`${c.medication_name} — ${c.status}`}
+                                                    title={`${c.medication_name} — ${doseStatusMeta(c.status).label}`}
                                                 />
                                             ))}
                                         </div>

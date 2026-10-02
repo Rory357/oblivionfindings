@@ -1264,7 +1264,7 @@ export function TrainingWizardDialog({
                 ) : (
                     <div className="flex min-w-0 flex-1">
                         {/* LEFT RAIL */}
-                        <div className="flex w-[236px] flex-none flex-col border-r border-border bg-sidebar p-[22px_18px]">
+                        <div className="flex w-[236px] flex-none flex-col border-r border-border bg-muted/30 p-[22px_18px]">
                             <div className="text-[11px] font-bold tracking-[.08em] text-primary uppercase">
                                 {TITLES[type]}
                             </div>

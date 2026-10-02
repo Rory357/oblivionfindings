@@ -644,7 +644,7 @@ export function ObjectiveWizard({
                                 {krs.map((k, i) => (
                                     <div
                                         key={k.key}
-                                        className="rounded-xl border border-border bg-sidebar p-3.5"
+                                        className="rounded-xl border border-border bg-muted/30 p-3.5"
                                     >
                                         <div className="mb-2.5 flex items-center gap-2">
                                             <span className="grid h-[22px] w-[22px] place-items-center rounded-md bg-primary-fill text-[11px] font-bold text-primary-fill-foreground">
@@ -924,7 +924,7 @@ export function ObjectiveWizard({
                             </ReviewCard>
                         </div>
                         {!isEdit && (
-                            <div className="w-[170px] shrink-0 rounded-xl border border-border bg-sidebar p-4 text-center">
+                            <div className="w-[170px] shrink-0 rounded-xl border border-border bg-muted/30 p-4 text-center">
                                 <div className="mb-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
                                     Roll-up
                                 </div>

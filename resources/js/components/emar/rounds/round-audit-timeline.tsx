@@ -16,6 +16,7 @@ import {
 import type { ComponentType } from 'react';
 import {
     doseStatusMeta,
+    isRecordedStatus,
     type RoundCell,
     type RoundItem,
     type RoundSummary,
@@ -70,7 +71,7 @@ function fmtTime(iso: string | null): string {
 /** Flatten round cells → actioned audit entries (skips still-due doses). */
 export function cellsToAuditEntries(cells: RoundCell[]): AuditAdminEntry[] {
     return cells
-        .filter((c) => c.status !== 'due')
+        .filter((c) => isRecordedStatus(c.status))
         .map((c) => ({
             status: c.status,
             medication_name: c.medication_name,

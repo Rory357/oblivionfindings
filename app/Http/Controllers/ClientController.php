@@ -99,6 +99,7 @@ use App\Services\Clients\ClientWorkerEligibility;
 use App\Services\ConsentValidationService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\HealthSafety\HsModuleSummaryService;
+use App\Services\Medication\DoseSlots\ClientCalendarDoses;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationTimelineVisibilityService;
 use App\Services\NotificationService;
@@ -1661,7 +1662,7 @@ class ClientController extends Controller
                 'next_review_date' => MedicationReview::where('client_id', $client->id)
                     ->where('status', '!=', 'completed')
                     ->whereNotNull('scheduled_date')
-                    ->where('scheduled_date', '>=', now()->toDateString())
+                    ->where('scheduled_date', '>=', now((string) config('app.worker_timezone', 'Pacific/Auckland'))->toDateString())
                     ->orderBy('scheduled_date')
                     ->value('scheduled_date'),
             ] : null,
@@ -2020,8 +2021,10 @@ class ClientController extends Controller
         bool $includeMedicationData,
         bool $includeControlledMedicationData,
     ): array {
-        $start = now()->startOfMonth();
-        $end = now()->endOfMonth()->addDays(7);
+        // The NZ month and the next week, as UTC instants.
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $start = now($timezone)->startOfMonth()->utc();
+        $end = now($timezone)->endOfMonth()->addDays(7)->utc();
         $events = collect();
 
         if ($includeShifts) {
@@ -2045,16 +2048,20 @@ class ClientController extends Controller
         if ($includeFamilyVisits) {
             $visits = FamilyVisitRequest::where('client_id', $client->id)
                 ->where('status', 'approved')
-                ->whereBetween('requested_date', [$start->toDateString(), $end->toDateString()])
+                ->whereBetween('requested_date', [
+                    $start->copy()->timezone($timezone)->toDateString(),
+                    $end->copy()->timezone($timezone)->toDateString(),
+                ])
                 ->with('user:id,name')
                 ->get();
             foreach ($visits as $v) {
-                $vStart = $v->requested_date->copy();
+                // The requested date and times are NZ wall-clock.
+                $vStart = Carbon::parse($v->requested_date->toDateString(), $timezone);
                 if ($v->preferred_time_start) {
                     [$h, $m] = explode(':', $v->preferred_time_start);
                     $vStart->setTime((int) $h, (int) $m);
                 }
-                $vEnd = $v->requested_date->copy();
+                $vEnd = $vStart->copy()->startOfDay();
                 if ($v->preferred_time_end) {
                     [$h, $m] = explode(':', $v->preferred_time_end);
                     $vEnd->setTime((int) $h, (int) $m);
@@ -2093,101 +2100,14 @@ class ClientController extends Controller
         }
 
         if ($includeMedicationData) {
-            $medicationGovernance = app(MedicationGovernanceScopeService::class);
-            // Medication administrations
-            $medAdmins = ClientMedicationAdministration::query()
-                ->effectiveClinicalEvidence()
-                ->where('client_id', $client->id)
-                ->whereBetween('scheduled_for', [$start, $end])
-                ->with('medication:id,client_id,name,dosage,route,controlled_drug');
-            $medicationGovernance->scopeCanonicalClientMedicationRows(
-                $medAdmins,
-                is_numeric($client->site_id) ? [(int) $client->site_id] : [],
-                allowNullMedication: false,
-            );
-            if (! $includeControlledMedicationData) {
-                $medicationGovernance->scopeWithoutControlledMedicationRows($medAdmins);
+            // Recorded doses, and the projection's scheduled doses with the
+            // states Meds today shows (C6i).
+            foreach (app(ClientCalendarDoses::class)->events($client, $start, $end, $includeControlledMedicationData) as $event) {
+                $events->push($event);
             }
-            $medAdmins = $medAdmins->get();
-            foreach ($medAdmins as $ma) {
-                $medName = $ma->medication?->name ?? 'Medication';
-                $statusColor = match ($ma->status) {
-                    'given' => '#10b981', 'refused' => '#f97316', 'withheld' => '#eab308', 'missed' => '#ef4444', default => '#ec4899'
-                };
-                $statusLabel = match ($ma->status) {
-                    'given' => 'Given', 'refused' => 'Refused', 'withheld' => 'Withheld', 'missed' => 'Missed', default => 'Scheduled'
-                };
-                $events->push([
-                    'id' => 'med-'.$ma->id,
-                    'title' => $medName.' — '.$statusLabel,
-                    'start' => $ma->scheduled_for?->toIso8601String() ?? $ma->administered_at?->toIso8601String(),
-                    'backgroundColor' => $statusColor,
-                    'borderColor' => 'transparent',
-                    'extendedProps' => ['type' => 'medication', 'status' => $ma->status, 'medication_name' => $medName, 'dosage' => $ma->medication?->dosage],
-                ]);
-            }
-
-            // Scheduled medication doses — only show for today ± 3 days to avoid clutter
-            $medStart = now()->subDays(3)->startOfDay();
-            $medEnd = now()->addDays(3)->endOfDay();
-            $activeMeds = ClientMedication::where('client_id', $client->id)
-                ->active()
-                ->whereNull('ceased_at')
-                ->where('is_prn', false)
-                ->when(! $includeControlledMedicationData, fn ($query) => $query
-                    ->where('controlled_drug', false))
-                ->get();
-            foreach ($activeMeds as $med) {
-                $times = $this->parseFrequencyTimes($med->frequency);
-                if (empty($times)) {
-                    continue;
-                }
-                $current = $medStart->copy();
-                while ($current->lte($medEnd)) {
-                    foreach ($times as $time) {
-                        $scheduledAt = $current->copy()->setTimeFromTimeString($time);
-                        $alreadyRecorded = $medAdmins->contains(fn ($ma) => $ma->client_medication_id === $med->id && $ma->scheduled_for && $ma->scheduled_for->format('Y-m-d H:i') === $scheduledAt->format('Y-m-d H:i'));
-                        if (! $alreadyRecorded && $scheduledAt->gte($start) && $scheduledAt->lte($end)) {
-                            $isPast = $scheduledAt->lt(now());
-                            $events->push([
-                                'id' => 'medsched-'.$med->id.'-'.$scheduledAt->format('YmdHi'),
-                                'title' => $med->name.($isPast ? ' — Overdue' : ' — Due'),
-                                'start' => $scheduledAt->toIso8601String(),
-                                'backgroundColor' => $isPast ? '#ef4444' : '#ec4899',
-                                'borderColor' => 'transparent',
-                                'extendedProps' => ['type' => 'medication', 'status' => $isPast ? 'overdue' : 'scheduled', 'medication_name' => $med->name, 'dosage' => $med->dosage],
-                            ]);
-                        }
-                    }
-                    $current->addDay();
-                }
-            }
-
         }
 
         return $events->values()->toArray();
-    }
-
-    private function parseFrequencyTimes(?string $frequency): array
-    {
-        if (! $frequency) {
-            return [];
-        }
-        $freq = strtolower(trim($frequency));
-        if (preg_match_all('/(\d{1,2}):(\d{2})/', $freq, $matches, PREG_SET_ORDER)) {
-            return array_map(fn ($m) => sprintf('%02d:%02d', $m[1], $m[2]), $matches);
-        }
-
-        return match (true) {
-            str_contains($freq, 'twice daily'), str_contains($freq, 'bd'), str_contains($freq, 'bid') => ['08:00', '20:00'],
-            str_contains($freq, 'three times'), str_contains($freq, 'tds'), str_contains($freq, 'tid') => ['08:00', '14:00', '20:00'],
-            str_contains($freq, 'four times'), str_contains($freq, 'qds'), str_contains($freq, 'qid') => ['08:00', '12:00', '16:00', '20:00'],
-            str_contains($freq, 'lunch') => ['12:00'],
-            str_contains($freq, 'evening'), str_contains($freq, 'night'), str_contains($freq, 'nocte') => ['20:00'],
-            str_contains($freq, 'morning'), str_contains($freq, 'mane') => ['08:00'],
-            str_contains($freq, 'once daily'), str_contains($freq, 'daily'), str_contains($freq, 'od') => ['08:00'],
-            default => [],
-        };
     }
 
     private function buildHealthSummary(Client $client): array

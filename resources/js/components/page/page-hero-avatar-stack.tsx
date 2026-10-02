@@ -77,8 +77,8 @@ export function PageHeroAvatarStack({
                 <div
                     className={cn(
                         'relative z-0 -ml-[18px] flex h-14 w-14 items-center justify-center rounded-full',
-                        'border-4 border-primary-foreground/20 bg-primary-foreground/20',
-                        'text-base font-semibold text-primary-foreground',
+                        'border-4 border-band-foreground/20 bg-band-foreground/20',
+                        'text-base font-semibold text-band-foreground',
                     )}
                 >
                     +{extra}
@@ -128,10 +128,10 @@ function StackedAvatar({
                 aria-label={resident.name}
                 className={cn(
                     'flex h-[76px] w-[76px] cursor-pointer items-center justify-center rounded-full',
-                    'border-4 border-primary-foreground/20 text-2xl font-semibold',
+                    'border-4 border-band-foreground/20 text-2xl font-semibold',
                     'shadow-[0_6px_22px_-8px_rgba(0,0,0,0.30)] transition-shadow duration-200',
                     isHover &&
-                        'shadow-[0_14px_30px_-10px_rgba(0,0,0,0.45),0_0_0_3px_var(--primary-foreground)]',
+                        'shadow-[0_14px_30px_-10px_rgba(0,0,0,0.45),0_0_0_3px_var(--band-foreground)]',
                 )}
                 style={{ background, color: foreground }}
             >

@@ -9,7 +9,7 @@ interface PageHeroActionsProps {
 
 /**
  * Wraps action buttons inside the hero gradient and forces them to use
- * primary-foreground tokens for contrast against the brand background.
+ * band-foreground tokens for contrast against the brand background.
  *
  * Why a separate wrapper instead of a `variant`: the buttons inside the hero
  * are otherwise stock <Button>s with their own variants (default, outline, etc.).
@@ -21,11 +21,11 @@ export function PageHeroActions({ children, className }: PageHeroActionsProps) {
         <div
             className={cn(
                 'flex flex-wrap items-center gap-2',
-                '[&_[data-slot=button]]:border-primary-foreground/20',
-                '[&_[data-slot=button]]:bg-primary-foreground/10',
-                '[&_[data-slot=button]]:text-primary-foreground',
+                '[&_[data-slot=button]]:border-band-foreground/20',
+                '[&_[data-slot=button]]:bg-band-foreground/10',
+                '[&_[data-slot=button]]:text-band-foreground',
                 '[&_[data-slot=button]]:shadow-none',
-                '[&_[data-slot=button]:hover]:bg-primary-foreground/20',
+                '[&_[data-slot=button]:hover]:bg-band-foreground/20',
                 className,
             )}
         >

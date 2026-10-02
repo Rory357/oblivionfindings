@@ -42,11 +42,11 @@ export function PageHeroQuickActions({
     return (
         <div
             className={cn(
-                'flex w-full flex-wrap gap-1 rounded-xl border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-2',
+                'flex w-full flex-wrap gap-1 rounded-xl border border-band-foreground/20 bg-band-foreground/10 px-2.5 py-2',
                 className,
             )}
         >
-            <div className="w-full px-1 pt-0.5 pb-1 text-[10px] font-bold tracking-[0.10em] text-primary-foreground/80 uppercase">
+            <div className="w-full px-1 pt-0.5 pb-1 text-[10px] font-bold tracking-[0.10em] text-band-foreground/80 uppercase">
                 {heading}
             </div>
             <TooltipProvider delayDuration={200}>
@@ -65,13 +65,13 @@ function QuickActionButton({ action }: { action: PageHeroQuickAction }) {
     const inner = (
         <span
             className={cn(
-                'relative flex h-9 w-9 items-center justify-center rounded-md text-primary-foreground transition-colors',
-                'hover:bg-primary-foreground/25',
+                'relative flex h-9 w-9 items-center justify-center rounded-md text-band-foreground transition-colors',
+                'hover:bg-band-foreground/25',
             )}
         >
             <Icon className="h-[15px] w-[15px]" />
             {action.badge != null ? (
-                <span className="absolute top-0.5 right-0.5 inline-flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-primary-foreground px-1 text-[9px] font-bold text-primary-strong">
+                <span className="absolute top-0.5 right-0.5 inline-flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-band-foreground px-1 text-[9px] font-bold text-primary-strong">
                     {action.badge}
                 </span>
             ) : null}

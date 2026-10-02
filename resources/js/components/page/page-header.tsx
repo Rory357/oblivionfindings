@@ -15,7 +15,7 @@
  * PageHeaderFilterSelect, PageHeaderRail, …).
  *
  * Theme purity (enforced by the components/page/** ESLint scope): light
- * glass is --primary-foreground tokens, the sky/ring/meter surfaces are
+ * glass is --band-foreground tokens, the sky/ring/meter surfaces are
  * the `.eh-header` / `.eh-mark-ring` / `.eh-meter` utilities in app.css —
  * all --primary-derived via color-mix so branding retints everything
  * (safety tones stay the fixed status tokens).
@@ -124,7 +124,7 @@ export function PageHeader({
     className,
 }: PageHeaderProps) {
     return (
-        <header className={cn('eh-header text-primary-foreground', className)}>
+        <header className={cn('eh-header text-band-foreground', className)}>
             <div className="relative z-[1] flex h-full flex-col">
                 <div className="flex flex-col px-[22px] pt-[18px]">
                     {/* top row — identity left, search/actions right */}
@@ -144,7 +144,7 @@ export function PageHeader({
                                 <Link
                                     href={backHref}
                                     aria-label="Back"
-                                    className="mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 transition-colors outline-none hover:bg-primary-foreground/20 focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+                                    className="mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-band-foreground/20 bg-band-foreground/10 transition-colors outline-none hover:bg-band-foreground/20 focus-visible:ring-2 focus-visible:ring-band-foreground/70"
                                 >
                                     <ChevronLeft className="size-4" />
                                 </Link>
@@ -171,7 +171,7 @@ export function PageHeader({
                                     {titleChip}
                                 </div>
                                 {subline ? (
-                                    <p className="mt-[3px] text-[13px] text-primary-foreground/65">
+                                    <p className="mt-[3px] text-[13px] text-band-foreground/65">
                                         {subline}
                                     </p>
                                 ) : null}
@@ -302,7 +302,7 @@ export function PageHeaderSearch({
                 className,
             )}
         >
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60" />
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-band-foreground/60" />
             <input
                 ref={inputRef}
                 type="search"
@@ -311,11 +311,11 @@ export function PageHeaderSearch({
                 onKeyDown={onKeyDown}
                 placeholder={placeholder}
                 aria-label={ariaLabel ?? placeholder}
-                className="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                className="h-9 w-full rounded-[10px] border border-band-foreground/20 bg-band-foreground/10 pr-8 pl-9 text-[13px] text-band-foreground outline-none placeholder:text-band-foreground/55 focus-visible:border-band-foreground/50 focus-visible:bg-band-foreground/15 focus-visible:ring-2 focus-visible:ring-band-foreground/40"
             />
             <kbd
                 aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-band-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-band-foreground/55"
             >
                 /
             </kbd>
@@ -344,15 +344,15 @@ export function PageHeaderSearchTrigger({
             type="button"
             onClick={onOpen}
             className={cn(
-                'relative inline-flex h-9 min-w-[200px] flex-1 items-center rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground/55 transition-colors outline-none hover:bg-primary-foreground/15 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 lg:w-[250px] lg:flex-none',
+                'relative inline-flex h-9 min-w-[200px] flex-1 items-center rounded-[10px] border border-band-foreground/20 bg-band-foreground/10 pr-8 pl-9 text-[13px] text-band-foreground/55 transition-colors outline-none hover:bg-band-foreground/15 focus-visible:border-band-foreground/50 focus-visible:bg-band-foreground/15 focus-visible:ring-2 focus-visible:ring-band-foreground/40 lg:w-[250px] lg:flex-none',
                 className,
             )}
         >
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60" />
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-band-foreground/60" />
             <span className="truncate">{placeholder}</span>
             <kbd
                 aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-band-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-band-foreground/55"
             >
                 /
             </kbd>
@@ -385,11 +385,11 @@ export function PageHeaderGlassButton({
             {...(asChild ? {} : { type: 'button' as const })}
             {...rest}
             className={cn(
-                'inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70 disabled:pointer-events-none disabled:opacity-50',
+                'inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-band-foreground/70 disabled:pointer-events-none disabled:opacity-50',
                 children == null && 'w-9 justify-center px-0',
                 active
-                    ? 'border-primary-foreground bg-primary-foreground text-primary-strong'
-                    : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
+                    ? 'border-band-foreground bg-band-foreground text-primary-strong'
+                    : 'border-band-foreground/20 bg-band-foreground/10 text-band-foreground hover:bg-band-foreground/20',
                 className,
             )}
         >
@@ -413,7 +413,7 @@ export function PageHeaderPrimaryButton({
             {...(asChild ? {} : { type: 'button' as const })}
             {...rest}
             className={cn(
-                'inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary-strong shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50',
+                'inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-band-foreground px-3.5 text-[13px] font-semibold text-primary-strong shadow-sm transition-all outline-none hover:bg-band-foreground/90 focus-visible:ring-2 focus-visible:ring-band-foreground/70 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50',
                 className,
             )}
         >
@@ -492,7 +492,7 @@ export function PageHeaderMeterBlock({
     const shared = {
         'aria-label': ariaLabel ?? `View ${label.toLowerCase()}`,
         className: cn(
-            'eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70',
+            'eh-meter outline-none focus-visible:ring-2 focus-visible:ring-band-foreground/70',
             tone !== 'brand' && `eh-meter--${tone}`,
             className,
         ),
@@ -531,7 +531,7 @@ export function PageHeaderMeterBig({ children }: { children: ReactNode }) {
 /** Muted 10.5px context line ("across 3 regions", "0% occupied · 41 available"). */
 export function PageHeaderMeterCaption({ children }: { children: ReactNode }) {
     return (
-        <span className="max-w-full truncate text-[10.5px] leading-tight text-primary-foreground/70">
+        <span className="max-w-full truncate text-[10.5px] leading-tight text-band-foreground/70">
             {children}
         </span>
     );
@@ -648,14 +648,14 @@ export function PageHeaderMeterAvatars({
                                 index > 0 && (tight ? '-ml-3' : '-ml-2'),
                             )}
                         >
-                            <Avatar className="size-[26px] border-2 border-primary-foreground/35">
+                            <Avatar className="size-[26px] border-2 border-band-foreground/35">
                                 {person.photo_url ? (
                                     <AvatarImage
                                         src={person.photo_url}
                                         alt={person.name}
                                     />
                                 ) : null}
-                                <AvatarFallback className="bg-primary-foreground/15 text-[9px] font-semibold text-primary-foreground">
+                                <AvatarFallback className="bg-band-foreground/15 text-[9px] font-semibold text-band-foreground">
                                     {avatarInitials(person.name)}
                                 </AvatarFallback>
                             </Avatar>
@@ -681,7 +681,7 @@ export function PageHeaderMeterAvatars({
             {overflow > 0 ? (
                 <span
                     className={cn(
-                        'z-[1] inline-flex size-[26px] items-center justify-center rounded-full border-2 border-primary-foreground/35 bg-primary-foreground/15 text-[9px] font-bold text-primary-foreground tabular-nums',
+                        'z-[1] inline-flex size-[26px] items-center justify-center rounded-full border-2 border-band-foreground/35 bg-band-foreground/15 text-[9px] font-bold text-band-foreground tabular-nums',
                         people.length > 0 && (tight ? '-ml-3' : '-ml-2'),
                     )}
                 >
@@ -719,19 +719,17 @@ export function PageHeaderMeterContacts({
                         {contact.label}
                     </span>
                     {contact.name ? (
-                        <span className="min-w-0 truncate font-medium text-primary-foreground/85">
+                        <span className="min-w-0 truncate font-medium text-band-foreground/85">
                             {contact.name}
                             {contact.phone ? (
-                                <span className="font-normal text-primary-foreground/70">
+                                <span className="font-normal text-band-foreground/70">
                                     {' '}
                                     · {contact.phone}
                                 </span>
                             ) : null}
                         </span>
                     ) : (
-                        <span className="text-primary-foreground/70">
-                            No info
-                        </span>
+                        <span className="text-band-foreground/70">No info</span>
                     )}
                 </span>
             ))}
@@ -763,7 +761,7 @@ export function PageHeaderMeterDonut({
                         r="16"
                         fill="none"
                         strokeWidth="4"
-                        className="stroke-primary-foreground/15"
+                        className="stroke-band-foreground/15"
                     />
                     <circle
                         cx="20"
@@ -781,7 +779,7 @@ export function PageHeaderMeterDonut({
                 </span>
             </span>
             {caption ? (
-                <span className="text-[10.5px] leading-[1.35] text-primary-foreground/70">
+                <span className="text-[10.5px] leading-[1.35] text-band-foreground/70">
                     {caption}
                 </span>
             ) : null}
@@ -794,7 +792,7 @@ export function PageHeaderMeterDonut({
 /* ------------------------------------------------------------------ */
 
 const FILTER_FIELD =
-    'box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70';
+    'box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-band-foreground/70';
 
 /**
  * Generic 23px glass filter-row button for page-specific controls that
@@ -823,8 +821,8 @@ export function PageHeaderFilterButton({
                 FILTER_FIELD,
                 children == null && 'w-[23px] justify-center px-0',
                 active
-                    ? 'border-primary-foreground bg-primary-foreground text-primary-strong'
-                    : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
+                    ? 'border-band-foreground bg-band-foreground text-primary-strong'
+                    : 'border-band-foreground/20 bg-band-foreground/10 text-band-foreground hover:bg-band-foreground/20',
                 className,
             )}
         >
@@ -863,8 +861,8 @@ export function PageHeaderFilterSelect({
                     'inline-flex items-center',
                     FILTER_FIELD,
                     active
-                        ? 'border-primary-foreground bg-primary-foreground text-primary-strong'
-                        : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
+                        ? 'border-band-foreground bg-band-foreground text-primary-strong'
+                        : 'border-band-foreground/20 bg-band-foreground/10 text-band-foreground hover:bg-band-foreground/20',
                 )}
             >
                 <PopoverTrigger asChild>
@@ -942,8 +940,8 @@ export function PageHeaderFilterCheck({
                 'inline-flex items-center gap-1.5 px-2',
                 FILTER_FIELD,
                 checked
-                    ? 'border-primary-foreground bg-primary-foreground text-primary-strong'
-                    : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
+                    ? 'border-band-foreground bg-band-foreground text-primary-strong'
+                    : 'border-band-foreground/20 bg-band-foreground/10 text-band-foreground hover:bg-band-foreground/20',
             )}
         >
             <span
@@ -952,7 +950,7 @@ export function PageHeaderFilterCheck({
                     'flex size-3 items-center justify-center rounded-[3px] border',
                     checked
                         ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
-                        : 'border-primary-foreground/60 text-transparent',
+                        : 'border-band-foreground/60 text-transparent',
                 )}
             >
                 <Check className="size-2.5" />
@@ -981,7 +979,7 @@ export function PageHeaderViewToggle<K extends string>({
             className={cn(
                 'inline-flex items-stretch gap-0.5 p-[2px]',
                 FILTER_FIELD,
-                'border-primary-foreground/20 bg-primary-foreground/10',
+                'border-band-foreground/20 bg-band-foreground/10',
             )}
         >
             {options.map((o) => {
@@ -995,10 +993,10 @@ export function PageHeaderViewToggle<K extends string>({
                         aria-checked={on}
                         onClick={() => onChange(o.value)}
                         className={cn(
-                            'inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70',
+                            'inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-band-foreground/70',
                             on
-                                ? 'bg-primary-foreground text-primary-strong'
-                                : 'text-primary-foreground/80 hover:text-primary-foreground',
+                                ? 'bg-band-foreground text-primary-strong'
+                                : 'text-band-foreground/80 hover:text-band-foreground',
                         )}
                     >
                         {Icon ? <Icon className="size-2.5" /> : null}
@@ -1028,7 +1026,7 @@ const RAIL_GAP = 4;
 
 const railTabClass = (on: boolean) =>
     cn(
-        'inline-flex shrink-0 items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80',
+        'inline-flex shrink-0 items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-band-foreground/80',
         on
             ? // pb-[6px] keeps the active label on the
               // inactive pills' optical text line: their
@@ -1036,12 +1034,12 @@ const railTabClass = (on: boolean) =>
               // the band edge; (40 − 6)/2 + 6 = 23px here
               // (DESIGN.md "Sunken active-rail labels").
               'h-10 rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary'
-            : 'mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground',
+            : 'mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-band-foreground/80 transition-colors hover:bg-band-foreground/10 hover:text-band-foreground',
     );
 
 /** Ghost utility pills at the rail's end (⋯ More, ⌕ Find) — inactive-pill geometry. */
 const railPillClass =
-    'mb-[6px] inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80';
+    'mb-[6px] inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-band-foreground/80 transition-colors outline-none hover:bg-band-foreground/10 hover:text-band-foreground focus-visible:ring-2 focus-visible:ring-band-foreground/80';
 
 /** Inner content of a rail tab — shared by the live row and the measurement row. */
 function RailTabInner({
@@ -1067,7 +1065,7 @@ function RailTabInner({
                             ? 'bg-status-critical-bg text-status-critical'
                             : on
                               ? 'bg-primary/15 text-primary'
-                              : 'bg-primary-foreground/15 text-primary-foreground',
+                              : 'bg-band-foreground/15 text-band-foreground',
                     )}
                 >
                     {item.count}
@@ -1247,7 +1245,7 @@ export function PageHeaderRail<K extends string>({
             {onFind ? (
                 <kbd
                     aria-hidden="true"
-                    className="hidden rounded-[5px] border border-primary-foreground/30 px-1 text-[10px] sm:inline"
+                    className="hidden rounded-[5px] border border-band-foreground/30 px-1 text-[10px] sm:inline"
                 >
                     /
                 </kbd>

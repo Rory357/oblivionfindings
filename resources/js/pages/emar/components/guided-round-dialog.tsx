@@ -8,6 +8,8 @@ import RoundAuditTimeline, {
 import { DoseStatusBadge } from '@/components/emar/rounds/round-bits';
 import {
     doseStatusMeta,
+    isRecordable,
+    isWaitingForCheck,
     type GuidedRound,
     type RoundItem,
     type StaffOption,
@@ -164,7 +166,9 @@ export default function GuidedRoundDialog({
                         ? CheckCircle2
                         : status === 'refused' || status === 'withheld'
                           ? Ban
-                          : Pill;
+                          : isWaitingForCheck(it)
+                            ? Clock
+                            : Pill;
                 return {
                     key: `${it.medication_id}-${it.scheduled_for}`,
                     label: `${firstName(it.client_name)} · ${shortMed(it.medication_name)}`,
@@ -247,7 +251,7 @@ export default function GuidedRoundDialog({
                 return next;
             });
             const nextDue = items.findIndex(
-                (it, i) => i > stepIndex && !it.administration,
+                (it, i) => i > stepIndex && isRecordable(it),
             );
             goTo(nextDue === -1 ? items.length : nextDue);
         };
@@ -298,7 +302,7 @@ export default function GuidedRoundDialog({
     };
 
     const goToFirstDue = () => {
-        const idx = items.findIndex((it) => !it.administration);
+        const idx = items.findIndex((it) => isRecordable(it));
         goTo(idx === -1 ? items.length : idx);
     };
 
@@ -435,7 +439,9 @@ export default function GuidedRoundDialog({
                     meta={summaryMeta(guided)}
                 />
             ) : item ? (
-                showRecorded ? (
+                isWaitingForCheck(item) ? (
+                    <WaitingForCheckPane item={item} />
+                ) : showRecorded ? (
                     <RecordedPane
                         item={item}
                         onReRecord={
@@ -598,6 +604,22 @@ function DoseCard({ item }: { item: RoundItem }) {
                     </div>
                 ) : null}
             </div>
+        </div>
+    );
+}
+
+/** A dose whose order change waits for the order check: shown, not recordable. */
+function WaitingForCheckPane({ item }: { item: RoundItem }) {
+    return (
+        <div className="flex flex-col gap-4">
+            <DoseCard item={item} />
+            <InfoCard icon={Clock}>
+                <span className="font-semibold">
+                    Waiting for the order check.
+                </span>{' '}
+                A change to this order is waiting for its check. This dose can
+                be recorded once the order has been checked.
+            </InfoCard>
         </div>
     );
 }
