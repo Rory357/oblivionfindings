@@ -22,6 +22,8 @@ use App\Models\UserPushSubscription;
 use App\Notifications\MedicationAlertNotification;
 use App\Notifications\Channels\PushChannel;
 use App\Services\Medication\Alerts\MedicationAlertRecipients;
+use App\Services\Medication\Alerts\MedicationAlertAttendance;
+use App\Services\Medication\Alerts\MedicationAlertFollowUps;
 use App\Services\Medication\Alerts\MedicationAlerts;
 use App\Services\Medication\Alerts\MedicationAlertSettings;
 use App\Services\Medication\Alerts\MedicationAlertSources;
@@ -754,4 +756,176 @@ it('keeps a controlled alert behind the controlled gate on email and push too', 
 
     expect(b2Sent($cleared, 'stock'))->not->toBeEmpty()
         ->and(b2Sent($notCleared, 'stock'))->toHaveCount(0);
+});
+
+/*
+ * B2 chunk 3: follow-up — re-alert until attended, escalation, one shared
+ * "attended" record per alert.
+ */
+
+/** Settings › Delivery follow-up, as the settings store saves it. */
+function b2FollowUp(array $values): void
+{
+    foreach ($values as $key => $value) {
+        AppSetting::query()->updateOrCreate(['key' => 'medications.alert_delivery.'.$key], ['value' => $value]);
+    }
+}
+
+function b2Kinds(User $user, string $type): array
+{
+    return b2Sent($user, $type)->map(fn (MedicationAlertNotification $n) => $n->kind)->all();
+}
+
+it('re-alerts everyone told so far and escalates, one step when both are due, until the re-alerts run out', function () {
+    $site = Site::factory()->create();
+    $lead = b2Staff($site, 'team_lead');
+    $clinical = b2Staff(null, 'clinical_lead');
+    b2Setting('stock', ['inapp' => true, 'email' => false, 'push' => false, 'follow_up' => true, 'groups' => ['houseLead'], 'people' => []]);
+    b2FollowUp(['realert_every' => '30', 'realert_max' => '2', 'escalate_after' => '30', 'escalate_to' => '["clinicalLead"]']);
+    $start = now();
+
+    $alert = app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:1'));
+    expect($alert->next_follow_up_at->equalTo($start->copy()->addMinutes(30)))->toBeTrue();
+    $followUps = app(MedicationAlertFollowUps::class);
+
+    expect($followUps->tick($start->copy()->addMinutes(29)))->toBe(0);
+    // Both due at 30 minutes: one step — the clinical lead is escalated to,
+    // the house lead re-alerted (not both to the clinical lead).
+    expect($followUps->tick($start->copy()->addMinutes(30)))->toBe(1);
+    expect(b2Kinds($lead, 'stock'))->toBe(['first', 'realert'])
+        ->and(b2Kinds($clinical, 'stock'))->toBe(['escalation'])
+        ->and(b2Sent($clinical, 'stock')->last()->toArray($clinical)['title'])->toBe('Escalated: Test alert')
+        ->and(b2Sent($lead, 'stock')->last()->toArray($lead)['title'])->toBe('Reminder: Test alert');
+    $alert->refresh();
+    expect($alert->realert_count)->toBe(1)
+        ->and($alert->escalated_at)->not->toBeNull()
+        ->and($alert->recipients()->where('step', 1)->pluck('reason', 'user_id')->all())
+        ->toEqualCanonicalizing([$lead->id => 'houseLead', $clinical->id => 'clinicalLead'])
+        ->and($alert->events()->pluck('event')->all())->toContain(MedicationAlertEvent::ESCALATED, MedicationAlertEvent::RE_ALERTED);
+
+    // Then re-alerts go to everyone told so far, up to the most.
+    expect($followUps->tick($start->copy()->addMinutes(60)))->toBe(1);
+    expect(b2Kinds($lead, 'stock'))->toBe(['first', 'realert', 'realert'])
+        ->and(b2Kinds($clinical, 'stock'))->toBe(['escalation', 'realert'])
+        ->and($alert->fresh()->next_follow_up_at)->toBeNull();
+    expect($followUps->tick($start->copy()->addMinutes(90)))->toBe(0);
+});
+
+it('stops follow-up for everyone once someone acknowledges — opening isn’t enough by default', function () {
+    $site = Site::factory()->create();
+    $first = b2Staff($site, 'team_lead');
+    $second = b2Staff($site, 'team_lead');
+    b2Setting('stock', ['inapp' => true, 'email' => false, 'push' => false, 'follow_up' => true, 'groups' => ['houseLead'], 'people' => []]);
+    b2FollowUp(['realert_every' => '30', 'realert_max' => '3']);
+    $alert = app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:1'));
+    $attendance = app(MedicationAlertAttendance::class);
+
+    // A Follow up alert in "acknowledges" mode asks for an acknowledgement in the bell.
+    expect(b2Sent($first, 'stock')->first()->toArray($first)['ack_required'])->toBeTrue();
+    expect($attendance->record($alert->id, $first, MedicationAlertAttendance::OPENED))->toBeFalse();
+    expect($alert->fresh()->attended_at)->toBeNull();
+
+    expect($attendance->record($alert->id, $second, MedicationAlertAttendance::ACKNOWLEDGED))->toBeTrue();
+    $alert->refresh();
+    expect($alert->attended_by)->toBe($second->id)
+        ->and($alert->attended_how)->toBe('acknowledged')
+        ->and($alert->status)->toBe('attended')
+        ->and($alert->next_follow_up_at)->toBeNull()
+        ->and($alert->events()->where('event', 'opened')->value('user_id'))->toBe($first->id);
+    expect(app(MedicationAlertFollowUps::class)->tick(now()->addMinutes(30)))->toBe(0);
+    expect(b2Kinds($first, 'stock'))->toBe(['first']);
+
+    // Someone it wasn't sent to can't attend it.
+    $stranger = b2Staff($site, 'support_worker', ['medications.view']);
+    expect($attendance->record($alert->id, $stranger, MedicationAlertAttendance::ACKNOWLEDGED))->toBeFalse();
+});
+
+it('counts an open as attended when the setting says so, from the bell', function () {
+    $site = Site::factory()->create();
+    $lead = b2Staff($site, 'team_lead');
+    b2Setting('stock', ['inapp' => true, 'email' => false, 'push' => false, 'follow_up' => true, 'groups' => ['houseLead'], 'people' => []]);
+    b2FollowUp(['realert_every' => '30', 'realert_max' => '3', 'attended' => 'open']);
+    $alert = app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:1'));
+    // The bell's own row (Notification::fake keeps none): what markRead finds.
+    $notification = $lead->notifications()->create([
+        'id' => (string) Str::uuid(),
+        'type' => MedicationAlertNotification::class,
+        'data' => ['type' => 'medication_alert', 'medication_alert_id' => $alert->id, 'title' => 'Test alert'],
+    ]);
+
+    $this->actingAs($lead)->post('/inbox/notifications/'.$notification->id.'/read')->assertRedirect();
+
+    $alert->refresh();
+    expect($alert->attended_by)->toBe($lead->id)
+        ->and($alert->attended_how)->toBe('opened')
+        ->and($alert->next_follow_up_at)->toBeNull();
+});
+
+it('does nothing when an attend lands before the tick takes the alert’s lock', function () {
+    $site = Site::factory()->create();
+    $lead = b2Staff($site, 'team_lead');
+    b2Setting('stock', ['inapp' => true, 'email' => false, 'push' => false, 'follow_up' => true, 'groups' => ['houseLead'], 'people' => []]);
+    b2FollowUp(['realert_every' => '30', 'realert_max' => '3']);
+    $alert = app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:1'));
+    $at = now()->addMinutes(30);
+    $followUps = app(MedicationAlertFollowUps::class);
+
+    // The tick has picked the alert as due…
+    $due = MedicationAlert::query()->whereNotNull('next_follow_up_at')->where('next_follow_up_at', '<=', $at)->pluck('id')->all();
+    expect($due)->toBe([$alert->id]);
+    // …the acknowledgement lands first…
+    app(MedicationAlertAttendance::class)->record($alert->id, $lead, MedicationAlertAttendance::ACKNOWLEDGED);
+    // …so the step, re-checking under the lock, sends nothing.
+    expect($followUps->step($alert->id, $at))->toBeFalse();
+    expect(b2Kinds($lead, 'stock'))->toBe(['first'])
+        ->and($alert->recipients()->count())->toBe(1)
+        ->and($alert->fresh()->realert_count)->toBe(0);
+});
+
+it('never re-alerts after an attend that lands after a re-alert', function () {
+    $site = Site::factory()->create();
+    $lead = b2Staff($site, 'team_lead');
+    b2Setting('stock', ['inapp' => true, 'email' => false, 'push' => false, 'follow_up' => true, 'groups' => ['houseLead'], 'people' => []]);
+    b2FollowUp(['realert_every' => '30', 'realert_max' => '3']);
+    $alert = app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:1'));
+    $followUps = app(MedicationAlertFollowUps::class);
+
+    expect($followUps->step($alert->id, now()->addMinutes(30)))->toBeTrue();
+    app(MedicationAlertAttendance::class)->record($alert->id, $lead, MedicationAlertAttendance::ACKNOWLEDGED);
+
+    expect($followUps->tick(now()->addMinutes(60)))->toBe(0)
+        ->and($followUps->tick(now()->addMinutes(90)))->toBe(0)
+        ->and(b2Kinds($lead, 'stock'))->toBe(['first', 'realert']);
+});
+
+it('stops follow-up when the alert is dealt with, and never schedules it without Follow up or with both off', function () {
+    $site = Site::factory()->create();
+    b2Staff($site, 'team_lead');
+    b2Setting('stock', ['inapp' => true, 'email' => false, 'push' => false, 'follow_up' => true, 'groups' => ['houseLead'], 'people' => []]);
+    $alerts = app(MedicationAlerts::class);
+
+    // Follow up on, but re-alerting and escalation off (today): sent once.
+    expect($alerts->raise('stock', b2Subject($site, 'stock:1'))->next_follow_up_at)->toBeNull();
+
+    b2FollowUp(['realert_every' => '30', 'realert_max' => '3']);
+    $followed = $alerts->raise('stock', b2Subject($site, 'stock:2'));
+    expect($followed->next_follow_up_at)->not->toBeNull();
+    $alerts->resolve('stock', 'stock:2', 'Restocked');
+    $followed->refresh();
+    expect($followed->attended_how)->toBe('dealt_with')
+        ->and($followed->next_follow_up_at)->toBeNull()
+        ->and(app(MedicationAlertFollowUps::class)->tick(now()->addMinutes(30)))->toBe(0);
+
+    b2Setting('stock', ['inapp' => true, 'email' => false, 'push' => false, 'follow_up' => false, 'groups' => ['houseLead'], 'people' => []]);
+    expect($alerts->raise('stock', b2Subject($site, 'stock:3'))->next_follow_up_at)->toBeNull();
+});
+
+it('runs the follow-up tick every 15 minutes, one run at a time on one server', function () {
+    $event = collect(app(Illuminate\Console\Scheduling\Schedule::class)->events())
+        ->first(fn ($e) => str_contains((string) $e->command, 'emar:alert-follow-ups'));
+
+    expect($event)->not->toBeNull()
+        ->and($event->expression)->toBe('*/15 * * * *')
+        ->and($event->withoutOverlapping)->toBeTrue()
+        ->and($event->onOneServer)->toBeTrue();
 });

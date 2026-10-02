@@ -716,6 +716,14 @@ app(Schedule::class)
     ->onOneServer()
     ->withoutOverlapping();
 
+// Re-alert and escalate medication alerts nobody has attended (P11 B2 C3): every 15 minutes
+app(Schedule::class)
+    ->command('emar:alert-follow-ups')
+    ->timezone('Pacific/Auckland')
+    ->everyFifteenMinutes()
+    ->onOneServer()
+    ->withoutOverlapping();
+
 // Keep dose slots generated for today and the next two NZ days (P01 C3): hourly
 app(Schedule::class)
     ->command('emar:generate-dose-slots')

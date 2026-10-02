@@ -36,6 +36,27 @@ class MedicationSettingsRegistry
     /** Email and push leave out client names and medicines (P11 v5 Delivery › Email). */
     public const DELIVERY_PRIVATE = 'medications.alert_delivery.private';
 
+    /** Follow-up (P11 v5 Delivery, B2 chunk 3): re-alerting, attended, escalation. */
+    public const DELIVERY_REALERT_EVERY = 'medications.alert_delivery.realert_every';
+
+    public const DELIVERY_REALERT_MAX = 'medications.alert_delivery.realert_max';
+
+    public const DELIVERY_ATTENDED = 'medications.alert_delivery.attended';
+
+    public const DELIVERY_ESCALATE_AFTER = 'medications.alert_delivery.escalate_after';
+
+    public const DELIVERY_ESCALATE_TO = 'medications.alert_delivery.escalate_to';
+
+    /** "Off" for the follow-up numbers: each alert is sent once, nobody else is told. */
+    public const FOLLOW_UP_OFF = 'off';
+
+    /** Who an escalation can add (v5 FOLLOW_TO; the on-call person arrives with B2 chunk 4). */
+    public const ESCALATE_TO_GROUPS = [
+        MedicationAlertCatalogue::HOUSE_LEAD,
+        MedicationAlertCatalogue::CLINICAL_LEAD,
+        MedicationAlertCatalogue::PROVIDER_MANAGER,
+    ];
+
     /** @var array<string, MedicationSettingGroup>|null */
     private ?array $groups = null;
 
@@ -168,9 +189,32 @@ class MedicationSettingsRegistry
      * house. B2 chunk 2: whether email and push leave out client names and
      * medicines — on by default, so a lock screen or an inbox never shows
      * them. Switching it off is a loosening.
+     *
+     * B2 chunk 3, follow-up for alerts with Follow up on: re-alert everyone
+     * told so far every N minutes up to M times, and escalate to more groups
+     * after N minutes, until someone attends. Both start off (today: each
+     * alert is sent once). What counts as attended runs dealt with >
+     * acknowledged > opened; moving towards "opened" is a loosening.
      */
     private function alertDelivery(): MedicationSettingGroup
     {
+        $off = self::FOLLOW_UP_OFF;
+        $number = fn (string $key, string $storageKey, string $label, string $unit, array $range, string $direction, string $offLabel, ?string $pairedWith = null): MedicationSettingDefinition => new MedicationSettingDefinition(
+            group: 'delivery',
+            key: $key,
+            storageKey: $storageKey,
+            scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+            section: 'delivery',
+            label: $label,
+            options: [],
+            default: $off,
+            numeric: ['direction' => $direction, 'off' => $off, 'off_is_loosest' => true],
+            range: $range,
+            unit: $unit,
+            pairedWith: $pairedWith,
+            offLabel: $offLabel,
+        );
+
         return new MedicationSettingGroup(
             key: 'delivery',
             view: self::VIEW_ALERTS,
@@ -187,6 +231,32 @@ class MedicationSettingsRegistry
                     options: ['no' => 'Off — email and push include client names and medicines', 'yes' => 'On'],
                     default: 'yes',
                     rank: ['no', 'yes'],
+                ),
+                // Checked every 15 minutes, so 15 is the shortest interval.
+                $number('realert_every', self::DELIVERY_REALERT_EVERY, 'Re-alert until someone attends', 'minutes between re-alerts', [15, 1440], MedicationSettingDefinition::HIGHER_IS_LOOSER, 'Off — each alert is sent once', 'realert_max'),
+                $number('realert_max', self::DELIVERY_REALERT_MAX, 'Most re-alerts', 'times', [1, 10], MedicationSettingDefinition::HIGHER_IS_STRICTER, 'Off', 'realert_every'),
+                new MedicationSettingDefinition(
+                    group: 'delivery',
+                    key: 'attended',
+                    storageKey: self::DELIVERY_ATTENDED,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'delivery',
+                    label: 'An alert counts as attended when',
+                    options: ['open' => 'Someone opens it', 'ack' => 'Someone acknowledges it', 'done' => 'It’s dealt with'],
+                    default: 'ack',
+                    rank: ['open', 'ack', 'done'],
+                ),
+                $number('escalate_after', self::DELIVERY_ESCALATE_AFTER, 'Escalate if still not attended', 'minutes', [15, 1440], MedicationSettingDefinition::HIGHER_IS_LOOSER, 'Off — nobody else is told'),
+                new MedicationSettingDefinition(
+                    group: 'delivery',
+                    key: 'escalate_to',
+                    storageKey: self::DELIVERY_ESCALATE_TO,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'delivery',
+                    label: 'Escalate to',
+                    options: [],
+                    default: '[]',
+                    codec: new GroupListCodec(self::ESCALATE_TO_GROUPS),
                 ),
             ],
         );

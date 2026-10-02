@@ -57,6 +57,34 @@ class MedicationAlertSettings
         return $definition->normalise(AppSetting::query()->where('key', $definition->storageKey)->value('value')) !== 'no';
     }
 
+    /**
+     * Follow-up for alerts with Follow up on (B2 chunk 3). Null numbers are
+     * off; a re-alert needs both its interval and its count.
+     *
+     * @return array{realert_every: int|null, realert_max: int|null, attended: string, escalate_after: int|null, escalate_to: list<string>}
+     */
+    public function followUp(): array
+    {
+        $value = function (string $key): string {
+            $definition = $this->registry->definition('delivery', $key);
+
+            return $definition === null
+                ? MedicationSettingsRegistry::FOLLOW_UP_OFF
+                : $definition->normalise(AppSetting::query()->where('key', $definition->storageKey)->value('value'));
+        };
+        $minutes = fn (string $v): ?int => $v === MedicationSettingsRegistry::FOLLOW_UP_OFF || ! ctype_digit($v) ? null : (int) $v;
+        $every = $minutes($value('realert_every'));
+        $max = $minutes($value('realert_max'));
+
+        return [
+            'realert_every' => $every !== null && $max !== null ? $every : null,
+            'realert_max' => $every !== null && $max !== null ? $max : null,
+            'attended' => $value('attended'),
+            'escalate_after' => $minutes($value('escalate_after')),
+            'escalate_to' => json_decode($value('escalate_to'), true) ?: [],
+        ];
+    }
+
     /** @return list<string> The channels this alert is sent on today. */
     public function channels(string $alert): array
     {

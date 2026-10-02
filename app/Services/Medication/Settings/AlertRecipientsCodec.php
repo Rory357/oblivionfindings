@@ -87,7 +87,8 @@ final class AlertRecipientsCodec implements MedicationSettingCodec
             ...array_map(fn (int $id): string => (string) ($names[$id] ?? 'A former staff member'), $setting['people']),
         ];
 
-        return implode(' · ', [...$channels, $who === [] ? 'nobody' : implode(', ', $who)]);
+        // v5: "In-app on · email off · push off · follow up on · House lead" (Follow up since B2 chunk 3).
+        return implode(' · ', [...$channels, 'follow up '.($setting['follow_up'] ? 'on' : 'off'), $who === [] ? 'nobody' : implode(', ', $who)]);
     }
 
     public function loosens(string $from, string $to): bool

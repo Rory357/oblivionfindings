@@ -114,6 +114,29 @@ const extraDef = (key: string, label: string): SettingDefinition => ({
     empty_label: 'Nobody extra',
 });
 
+const followNumber = (
+    key: string,
+    label: string,
+    unit: string,
+    range: [number, number],
+    direction: 'higher_is_looser' | 'higher_is_stricter',
+    pairedWith: string | null,
+): SettingDefinition => ({
+    group: 'delivery',
+    key,
+    scope: 'organisation',
+    section: 'delivery',
+    label,
+    options: [],
+    default: 'off',
+    range,
+    unit,
+    paired_with: pairedWith,
+    rank: null,
+    numeric: { direction, off: 'off', off_is_loosest: true },
+    off_label: 'Off',
+});
+
 const STOCK = meta('stock', 'Stock running low', [
     'houseLead',
     'stockStaff',
@@ -155,7 +178,14 @@ const settings: SettingsPayload = {
             view: 'alerts',
             effect: 'From the next alert sent, at every house',
             audit_event: 'medications.alert_delivery.updated',
-            keys: ['private'],
+            keys: [
+                'private',
+                'realert_every',
+                'realert_max',
+                'attended',
+                'escalate_after',
+                'escalate_to',
+            ],
         },
     },
     definitions: {
@@ -184,6 +214,68 @@ const settings: SettingsPayload = {
                 paired_with: null,
                 rank: ['no', 'yes'],
                 numeric: null,
+            },
+            realert_every: followNumber(
+                'realert_every',
+                'Re-alert until someone attends',
+                'minutes between re-alerts',
+                [15, 1440],
+                'higher_is_looser',
+                'realert_max',
+            ),
+            realert_max: followNumber(
+                'realert_max',
+                'Most re-alerts',
+                'times',
+                [1, 10],
+                'higher_is_stricter',
+                'realert_every',
+            ),
+            attended: {
+                group: 'delivery',
+                key: 'attended',
+                scope: 'organisation',
+                section: 'delivery',
+                label: 'An alert counts as attended when',
+                options: [
+                    { value: 'open', label: 'Someone opens it' },
+                    { value: 'ack', label: 'Someone acknowledges it' },
+                    { value: 'done', label: 'It’s dealt with' },
+                ],
+                default: 'ack',
+                range: null,
+                unit: null,
+                paired_with: null,
+                rank: ['open', 'ack', 'done'],
+                numeric: null,
+            },
+            escalate_after: followNumber(
+                'escalate_after',
+                'Escalate if still not attended',
+                'minutes',
+                [15, 1440],
+                'higher_is_looser',
+                null,
+            ),
+            escalate_to: {
+                group: 'delivery',
+                key: 'escalate_to',
+                scope: 'organisation',
+                section: 'delivery',
+                label: 'Escalate to',
+                options: [],
+                default: '[]',
+                range: null,
+                unit: null,
+                paired_with: null,
+                rank: null,
+                numeric: null,
+                kind: 'groups',
+                group_options: [
+                    { value: 'houseLead', label: 'House lead' },
+                    { value: 'clinicalLead', label: 'Clinical lead' },
+                    { value: 'providerManager', label: 'Provider manager' },
+                ],
             },
         },
         alertExtra: {
@@ -410,10 +502,10 @@ describe('Alerts & access › Alerts', () => {
         expect(
             within(followups).getByText('Default — not yet reviewed'),
         ).toBeInTheDocument();
-        // Email and push send since B2 C2; Follow up arrives with C3.
+        // Email and push send since B2 C2; Follow up since C3.
         expect(screen.getByText('Email')).toBeInTheDocument();
         expect(screen.getByText('Push')).toBeInTheDocument();
-        expect(screen.queryByText('Follow up')).toBeNull();
+        expect(screen.getByText('Follow up')).toBeInTheDocument();
     });
 
     it('edits who gets an alert into the draft: groups, named people and a house’s extras', () => {
@@ -490,9 +582,11 @@ describe('Who gets an alert, in the settings model', () => {
     it('reads in the server’s words, naming people', () => {
         expect(
             format(def, value(['houseLead'], [7]), settings.people_names),
-        ).toBe('In-app on · email off · push off · House lead, Rangi Parata');
+        ).toBe(
+            'In-app on · email off · push off · follow up off · House lead, Rangi Parata',
+        );
         expect(format(def, value([]), settings.people_names)).toBe(
-            'In-app on · email off · push off · nobody',
+            'In-app on · email off · push off · follow up off · nobody',
         );
         expect(format(settings.definitions.alertExtra.stock, '[]')).toBe(
             'Nobody extra',
@@ -535,7 +629,7 @@ describe('Who gets an alert, in the settings model', () => {
             [
                 'Who gets “Controlled-drug balance check overdue”',
                 null,
-                'In-app off · email off · push off · House lead',
+                'In-app off · email off · push off · follow up off · House lead',
             ],
             [
                 'Stock running low — extra people at Kōwhai House',
@@ -703,11 +797,10 @@ describe('Alerts & access › email, push and delivery (B2 C2)', () => {
         ).toBeInTheDocument();
         fireEvent.click(privacy);
         expect(last.delivery?.private).toBe('no');
-        // Hide-unbuilt: digest, personal copies and follow-up aren't shown yet.
+        // Hide-unbuilt: the digest and personal copies aren't shown yet.
         expect(
             screen.queryByText('Group emails into an hourly summary'),
         ).toBeNull();
-        expect(screen.queryByText('Re-alert until attended')).toBeNull();
     });
 
     it('previews a message from the server’s rendering, with the privacy switch from the draft', () => {
@@ -756,5 +849,115 @@ describe('Alerts & access › email, push and delivery (B2 C2)', () => {
         expect(
             within(open).getByText(/Client names and medicines are included/),
         ).toBeInTheDocument();
+    });
+});
+
+describe('Alerts & access › follow-up (B2 C3)', () => {
+    const followed = JSON.stringify({
+        inapp: true,
+        email: false,
+        push: false,
+        follow_up: true,
+        groups: ['rostered', 'houseLead'],
+        people: [],
+    });
+
+    it('turns Follow up on for an alert from its column', () => {
+        let last: Draft = {};
+        render(<Harness data={orgEditor} onDraft={(d) => (last = d)} />);
+        fireEvent.click(
+            screen.getByRole('switch', {
+                name: 'Stock running low: follow up until attended',
+            }),
+        );
+        expect(JSON.parse(last.alerts!.stock).follow_up).toBe(true);
+    });
+
+    it('re-alerts and escalates from Delivery, asking for the numbers and who it escalates to', () => {
+        let last: Draft = {};
+        render(
+            <Harness
+                data={orgEditor}
+                delivery
+                initialDraft={{ alerts: { followups: followed } }}
+                onDraft={(d) => (last = d)}
+            />,
+        );
+        // Follow up on, both off: still sent once.
+        expect(
+            screen.getByText(/re-alerting and escalation are both off/),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('switch', {
+                name: 'Re-alert until someone attends',
+            }),
+        );
+        // On asks for numbers: never invented.
+        expect(last.delivery).toMatchObject({
+            realert_every: '',
+            realert_max: '',
+        });
+        fireEvent.change(screen.getByLabelText('Minutes between re-alerts'), {
+            target: { value: '30' },
+        });
+        fireEvent.change(screen.getByLabelText('Most re-alerts'), {
+            target: { value: '2' },
+        });
+        fireEvent.click(
+            screen.getByRole('switch', {
+                name: 'Escalate if still not attended',
+            }),
+        );
+        fireEvent.change(screen.getByLabelText('Minutes before escalating'), {
+            target: { value: '30' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Clinical lead' }));
+        expect(last.delivery).toMatchObject({
+            realert_every: '30',
+            realert_max: '2',
+            escalate_after: '30',
+            escalate_to: '["clinicalLead"]',
+        });
+        // What happens if nobody attends, worked out from the draft.
+        const preview = screen
+            .getByText('What happens if nobody attends')
+            .closest('div.rounded-xl') as HTMLElement;
+        expect(
+            within(preview).getByText('Re-alert and escalate'),
+        ).toBeInTheDocument();
+        expect(
+            within(preview).getByText(
+                'The same people again, plus Clinical lead · in-app',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            within(preview).getByText(
+                'Everyone told so far, including Clinical lead · in-app',
+            ),
+        ).toBeInTheDocument();
+    });
+
+    it('stops a save that escalates to nobody', () => {
+        expect(
+            validateView(
+                settings,
+                { delivery: { escalate_after: '60', escalate_to: '[]' } },
+                'alerts',
+            ),
+        ).toMatchObject({
+            'delivery.escalate_to': 'Choose who it escalates to.',
+        });
+        expect(
+            loosens(settings.definitions.delivery.attended, 'done', 'open'),
+        ).toBe(true);
+        expect(
+            loosens(settings.definitions.delivery.attended, 'ack', 'done'),
+        ).toBe(false);
+        expect(
+            format(
+                settings.definitions.delivery.escalate_to,
+                '["houseLead","clinicalLead"]',
+            ),
+        ).toBe('House lead, Clinical lead');
     });
 });

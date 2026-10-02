@@ -7,6 +7,7 @@ use App\Models\MedicationAlertEvent;
 use App\Models\MedicationAlertRecipient;
 use App\Models\User;
 use App\Notifications\MedicationAlertNotification;
+use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -101,47 +102,20 @@ class MedicationAlerts
         ), $now);
 
         // No channel switched on means nobody is told, whoever the groups are
-        // (B2 C1 review): no recipient is recorded as told. Each person is
-        // told on the channels they can be reached on (B2 chunk 2): the bell
-        // here, in this transaction; email and push once it commits, so a
-        // slow mail server can't hold the record or undo it.
-        $private = $this->settings->privateDelivery();
-        $told = [];
-        $unreachable = [];
-        $afterCommit = [];
-        if ($channels !== []) {
-            foreach ($resolved['told'] as ['user' => $user, 'reason' => $reason]) {
-                $reach = $this->reachable($user, $channels);
-                if ($reach === []) {
-                    $unreachable[] = (int) $user->id;
-
-                    continue;
-                }
-                $notificationId = null;
-                if (in_array('inapp', $reach, true)) {
-                    $notification = new MedicationAlertNotification($alert, ['inapp'], $private);
-                    $notification->id = (string) Str::uuid();
-                    $user->notify($notification);
-                    $notificationId = $notification->id;
-                }
-                $outside = array_values(array_diff($reach, ['inapp']));
-                if ($outside !== []) {
-                    $afterCommit[] = [$user, $outside];
-                }
-                MedicationAlertRecipient::query()->create([
-                    'medication_alert_id' => $alert->id,
-                    'user_id' => $user->id,
-                    'reason' => $reason,
-                    'step' => 0,
-                    'channels' => $reach,
-                    'told_at' => $now,
-                    'notification_id' => $notificationId,
-                ]);
-                $told[] = ['user_id' => (int) $user->id, 'reason' => $reason, 'channels' => $reach];
-            }
-        }
-        if ($afterCommit !== []) {
-            DB::afterCommit(fn () => $this->sendOutside($alert, $afterCommit, $private));
+        // (B2 C1 review): no recipient is recorded as told.
+        $followUp = $this->settings->followUp();
+        ['told' => $told, 'unreachable' => $unreachable] = $this->deliver(
+            $alert,
+            $resolved['told'],
+            $channels,
+            0,
+            MedicationAlertNotification::FIRST,
+            $now,
+            $followUp,
+        );
+        // Follow up (B2 chunk 3): when the first re-alert or escalation is due.
+        if ($alert->follow_up && $told !== []) {
+            $alert->forceFill(['next_follow_up_at' => MedicationAlertFollowUps::nextDue($alert, $followUp)])->save();
         }
 
         $this->event($alert, MedicationAlertEvent::SENT, ['told' => $told, 'channels' => $channels]);
@@ -187,6 +161,65 @@ class MedicationAlerts
     }
 
     /**
+     * Tell these people about the alert, as one step of it (0: when raised;
+     * then each re-alert or escalation). Each person is told on the channels
+     * they can be reached on (B2 chunk 2): the bell here, in the caller's
+     * transaction; email and push once it commits, so a slow mail server
+     * can't hold the record or undo it. A Follow up alert waiting for an
+     * acknowledgement asks for one in the bell (B2 chunk 3).
+     *
+     * @param  iterable<array{user: User, reason: string}>  $people
+     * @param  list<string>  $channels
+     * @param  array{realert_every: int|null, realert_max: int|null, attended: string, escalate_after: int|null, escalate_to: list<string>}  $followUp
+     * @return array{told: list<array{user_id: int, reason: string, channels: list<string>}>, unreachable: list<int>}
+     */
+    public function deliver(MedicationAlert $alert, iterable $people, array $channels, int $step, string $kind, CarbonInterface $now, array $followUp): array
+    {
+        $private = $this->settings->privateDelivery();
+        $ack = $alert->follow_up && ($followUp['attended'] ?? 'ack') === 'ack';
+        $told = [];
+        $unreachable = [];
+        $afterCommit = [];
+        if ($channels === []) {
+            return ['told' => [], 'unreachable' => []];
+        }
+        foreach ($people as ['user' => $user, 'reason' => $reason]) {
+            $reach = $this->reachable($user, $channels);
+            if ($reach === []) {
+                $unreachable[] = (int) $user->id;
+
+                continue;
+            }
+            $notificationId = null;
+            if (in_array('inapp', $reach, true)) {
+                $notification = new MedicationAlertNotification($alert, ['inapp'], $private, $kind, $ack);
+                $notification->id = (string) Str::uuid();
+                $user->notify($notification);
+                $notificationId = $notification->id;
+            }
+            $outside = array_values(array_diff($reach, ['inapp']));
+            if ($outside !== []) {
+                $afterCommit[] = [$user, $outside];
+            }
+            MedicationAlertRecipient::query()->create([
+                'medication_alert_id' => $alert->id,
+                'user_id' => $user->id,
+                'reason' => $reason,
+                'step' => $step,
+                'channels' => $reach,
+                'told_at' => $now,
+                'notification_id' => $notificationId,
+            ]);
+            $told[] = ['user_id' => (int) $user->id, 'reason' => $reason, 'channels' => $reach];
+        }
+        if ($afterCommit !== []) {
+            DB::afterCommit(fn () => $this->sendOutside($alert, $afterCommit, $private, $kind));
+        }
+
+        return ['told' => $told, 'unreachable' => $unreachable];
+    }
+
+    /**
      * The alert's channels this person can be reached on: the bell always;
      * email only to a work email (never the sign-in address); push only to a
      * phone or browser they've allowed.
@@ -210,11 +243,11 @@ class MedicationAlerts
      *
      * @param  list<array{0: User, 1: list<string>}>  $people
      */
-    private function sendOutside(MedicationAlert $alert, array $people, bool $private): void
+    private function sendOutside(MedicationAlert $alert, array $people, bool $private, string $kind): void
     {
         foreach ($people as [$user, $channels]) {
             try {
-                $user->notify(new MedicationAlertNotification($alert, $channels, $private));
+                $user->notify(new MedicationAlertNotification($alert, $channels, $private, $kind));
             } catch (Throwable $exception) {
                 Log::error('Medication alert email or push could not be sent', [
                     'medication_alert_id' => $alert->id,
@@ -275,12 +308,16 @@ class MedicationAlerts
                 if ($locked === null) {
                     return 0;
                 }
+                // Dealt with is the strongest way to attend (B2 chunk 3): it
+                // stops any follow-up for everyone.
                 $locked->forceFill([
                     'open_key' => null,
                     'status' => MedicationAlert::STATUS_DEALT_WITH,
                     'dealt_with_at' => now(),
                     'outcome' => Str::limit($outcome, 188),
                     'next_follow_up_at' => null,
+                    'attended_at' => $locked->attended_at ?? now(),
+                    'attended_how' => $locked->attended_how ?? MedicationAlertAttendance::DEALT_WITH,
                 ])->save();
                 $this->event($locked, MedicationAlertEvent::DEALT_WITH, ['outcome' => $outcome]);
 
@@ -292,7 +329,7 @@ class MedicationAlerts
     }
 
     /** @param array<string, mixed> $detail */
-    private function event(MedicationAlert $alert, string $event, array $detail = [], ?int $userId = null): void
+    public function event(MedicationAlert $alert, string $event, array $detail = [], ?int $userId = null): void
     {
         MedicationAlertEvent::query()->create([
             'medication_alert_id' => $alert->id,

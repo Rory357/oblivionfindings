@@ -5,11 +5,11 @@
  * Everything here goes into the page draft and applies when the Alerts tab
  * is reviewed and saved.
  *
- * Built so far: the Alerts tab (in-app, email, push, who gets it), Delivery
- * (email, push, in-app and the privacy switch), the message preview and their
- * Overview cards. Follow up, quiet hours, On-call contacts and the Alert log
- * arrive with their chunks (P11 B2 C3–C6) — until then they aren't shown
- * (hide-unbuilt). */
+ * Built so far: the Alerts tab (in-app, email, push, Follow up, who gets
+ * it), Delivery (follow-up, email, push, in-app and the privacy switch), the
+ * message preview and their Overview cards. Quiet hours, On-call contacts
+ * and the Alert log arrive with their chunks (P11 B2 C4–C6) — until then
+ * they aren't shown (hide-unbuilt). */
 import { DiscardDraftDialog } from '@/components/governance/DiscardDraftDialog';
 import { EntityChip } from '@/components/lists/entity-cells';
 import {
@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
+    ChipMulti,
     InfoCard,
     SelectInput,
     StepHead,
@@ -39,6 +40,7 @@ import {
     AlertTriangle,
     ArrowUpRight,
     Bell,
+    BellRing,
     Building2,
     Check,
     ChevronLeft,
@@ -49,7 +51,9 @@ import {
     Mail,
     Plus,
     Shield,
+    Siren,
     Smartphone,
+    Timer,
     User,
     Users,
 } from 'lucide-react';
@@ -61,6 +65,7 @@ import {
     decisionReviewer,
     draftValue,
     encodeAlert,
+    encodeGroups,
     encodePeople,
     fallbackHouses,
     fallbackWarnings,
@@ -68,6 +73,7 @@ import {
     isDirty,
     isSiteDirty,
     parseAlert,
+    parseGroups,
     parsePeople,
     siteDraftValue,
     siteSlot,
@@ -79,9 +85,11 @@ import {
 import { NoMatches, useRow } from './_sections';
 import {
     Changed,
+    Choice,
     DefaultNotReviewed,
     GroupGrid,
     GroupRow,
+    NumberInput,
     OnOff,
     Overview,
     RecordPicker,
@@ -205,7 +213,16 @@ export function AlertsOverview({ q, data }: { q: string; data: AlertData }) {
         keys.filter((k) => parseAlert(draftValue(s, {}, G, k))?.[c]).length;
     const open = keys.filter((k) => !decisionReviewer(s, G, k)).length;
     const priv = draftValue(s, {}, D, 'private') !== 'no';
-    const deliveryOpen = decisionReviewer(s, D, 'private') ? 0 : 1;
+    const saved = (key: string) => draftValue(s, {}, D, key);
+    const off = s.definitions[D]?.realert_every?.numeric?.off ?? 'off';
+    const deliveryOpen = [
+        'realert_every',
+        'attended',
+        'escalate_after',
+        'private',
+    ]
+        .filter((k) => s.definitions[D]?.[k])
+        .filter((k) => !decisionReviewer(s, D, k)).length;
     return (
         <Overview
             q={q}
@@ -250,9 +267,13 @@ export function AlertsOverview({ q, data }: { q: string; data: AlertData }) {
                 },
                 {
                     icon: Mail,
-                    title: 'Delivery',
+                    title: 'Delivery & follow-up',
                     lines: [
-                        'Each alert is sent once, straight away.',
+                        saved('realert_every') !== off
+                            ? `Re-alerts every ${saved('realert_every')} minutes until attended${saved('escalate_after') !== off ? `; escalates after ${saved('escalate_after')} minutes` : ''}.`
+                            : saved('escalate_after') !== off
+                              ? `Escalates after ${saved('escalate_after')} minutes if nobody attends.`
+                              : 'Each alert is sent once — no re-alerts or escalation yet.',
                         priv
                             ? 'Email and push leave out client names and medicines.'
                             : 'Email and push include client names and medicines.',
@@ -266,7 +287,7 @@ export function AlertsOverview({ q, data }: { q: string; data: AlertData }) {
                             All reviewed
                         </StatusBadge>
                     ),
-                    cta: 'Review delivery',
+                    cta: 'Review delivery & follow-up',
                     onClick: () => go('alerts', 'delivery'),
                 },
             ]}
@@ -393,7 +414,7 @@ export function AlertsTable({
                     rowKey={(r) => r.key}
                     identityLabel="Alert"
                     identityWidth="1.9fr"
-                    minWidth={1000}
+                    minWidth={1080}
                     rowHeight="content"
                     identity={(r) => ({
                         icon: Bell,
@@ -449,14 +470,44 @@ export function AlertsTable({
                         {
                             key: 'email',
                             label: 'Email',
-                            width: '0.6fr',
+                            width: '0.55fr',
                             cell: (r) => channelCell(r, 'email'),
                         },
                         {
                             key: 'push',
                             label: 'Push',
-                            width: '0.6fr',
+                            width: '0.55fr',
                             cell: (r) => channelCell(r, 'push'),
+                        },
+                        {
+                            key: 'fu',
+                            label: 'Follow up',
+                            width: '0.7fr',
+                            cell: (r) => (
+                                <div onClick={(e) => e.stopPropagation()}>
+                                    <OnOff
+                                        id={`al-${r.key}-fu`}
+                                        checked={
+                                            valueOf(s, draft, r.key).follow_up
+                                        }
+                                        disabled={orgRo}
+                                        label={`${r.meta.label}: follow up until attended`}
+                                        onChange={(v) =>
+                                            setDraft((d) =>
+                                                withDraft(
+                                                    d,
+                                                    G,
+                                                    r.key,
+                                                    encodeAlert(r.meta, {
+                                                        ...valueOf(s, d, r.key),
+                                                        follow_up: v,
+                                                    }),
+                                                ),
+                                            )
+                                        }
+                                    />
+                                </div>
+                            ),
                         },
                         {
                             key: 'to',
@@ -542,7 +593,7 @@ export function AlertsTable({
                     size="sm"
                     onClick={() => go('alerts', 'delivery')}
                 >
-                    Review delivery
+                    Review delivery & follow-up
                     <ArrowUpRight className="size-3.5" />
                 </Button>
             </div>
@@ -567,7 +618,7 @@ export function AlertsDelivery({
     clear: () => void;
     data: AlertData;
 }) {
-    const { s, draft, go, open } = useSettings();
+    const { s, draft, go, open, errors, clearError } = useSettings();
     const { value, edit, state, disabled, shown } = useRow(D);
     const keys = alertKeys(s);
     const count = (c: Channel) =>
@@ -591,14 +642,294 @@ export function AlertsDelivery({
     const privLabel =
         s.definitions[D]?.private?.label ??
         'Keep client names and medicines out of email and push';
+    const def = (key: string) => s.definitions[D]?.[key];
+    const off = def('realert_every')?.numeric?.off ?? 'off';
+    const savedOf = (key: string) => s.values[D]?.[key] ?? off;
+    const reOn = value('realert_every') !== off;
+    const escOn = value('escalate_after') !== off;
+    const fu = keys.filter((k) => valueOf(s, draft, k).follow_up);
+    const fuLabels = fu.map((k) => metaOf(s, k)?.label ?? k);
+    const groups = def('escalate_to')?.group_options ?? [];
+    const escalateTo = parseGroups(value('escalate_to')) ?? [];
+    const err = (key: string) => errors[`${D}.${key}`];
+    const num = (
+        key: string,
+        label: string,
+        unit: string,
+        errorId?: string,
+    ) => (
+        <NumberInput
+            id={`dl-${key}`}
+            label={label}
+            value={value(key)}
+            unit={unit}
+            min={def(key)?.range?.[0]}
+            max={def(key)?.range?.[1]}
+            disabled={disabled}
+            error={err(key)}
+            errorId={errorId}
+            onChange={(v) => {
+                edit(key, v);
+                clearError(`${D}.${key}`);
+            }}
+        />
+    );
+    // On asks for numbers (v5): the saved ones, or empty boxes — never invented.
+    const switchOn = (key: string, on: boolean) => {
+        const was = savedOf(key);
+        edit(key, on ? (was !== off ? was : '') : off);
+        clearError(`${D}.${key}`);
+    };
+    const pairState =
+        state('realert_every') === 'changed' ||
+        state('realert_max') === 'changed'
+            ? 'changed'
+            : state('realert_every');
+    const reLabel =
+        def('realert_every')?.label ?? 'Re-alert until someone attends';
+    const escLabel =
+        def('escalate_after')?.label ?? 'Escalate if still not attended';
+    const attLabel =
+        def('attended')?.label ?? 'An alert counts as attended when';
     return (
         <Section
             id="sc-delivery"
-            title="Delivery"
-            caption="How alerts reach people"
+            title="Delivery & follow-up"
+            caption="How alerts reach people, and what happens if nobody attends"
             right={<EntityChip icon={Building2}>Every house</EntityChip>}
         >
+            {fu.length && !reOn && !escOn ? (
+                <InfoCard icon={AlertTriangle}>
+                    <b>
+                        Follow up is on for {fu.length} alert{' '}
+                        {fu.length === 1 ? 'type' : 'types'}, but re-alerting
+                        and escalation are both off.
+                    </b>{' '}
+                    Each alert is still sent once, as today.
+                </InfoCard>
+            ) : null}
             <GroupGrid empty={<NoMatches q={q} clear={clear} />}>
+                {def('realert_every') && def('realert_max') ? (
+                    <SettingGroup
+                        id="realert"
+                        icon={BellRing}
+                        title="Re-alert until attended"
+                        caption={`For the ${fu.length} alert ${fu.length === 1 ? 'type' : 'types'} with Follow up on`}
+                    >
+                        <GroupRow
+                            id="dl-reon"
+                            label={reLabel}
+                            hint={
+                                reOn
+                                    ? `Sent again to everyone told so far every ${value('realert_every') || '…'} minutes, up to ${value('realert_max') === off ? '…' : value('realert_max') || '…'} times, until someone attends.`
+                                    : 'Off — each alert is sent once (today).'
+                            }
+                            state={pairState}
+                            error={err('realert_every') || err('realert_max')}
+                            errorId="dl-realert-error"
+                            hidden={
+                                !shown(
+                                    show,
+                                    q,
+                                    'realert_every',
+                                    reLabel,
+                                    're-alert repeat',
+                                )
+                            }
+                            control={
+                                <OnOff
+                                    id="dl-reon"
+                                    checked={reOn}
+                                    disabled={disabled}
+                                    label={reLabel}
+                                    onChange={(v) => {
+                                        switchOn('realert_every', v);
+                                        switchOn('realert_max', v);
+                                    }}
+                                />
+                            }
+                        >
+                            {reOn ? (
+                                <span className="inline-flex flex-wrap items-center gap-2">
+                                    <span className="text-subtle">Every</span>
+                                    {num(
+                                        'realert_every',
+                                        'Minutes between re-alerts',
+                                        'minutes, up to',
+                                        'dl-realert-error',
+                                    )}
+                                    {num(
+                                        'realert_max',
+                                        'Most re-alerts',
+                                        'times',
+                                        'dl-realert-error',
+                                    )}
+                                </span>
+                            ) : null}
+                        </GroupRow>
+                        {def('attended') ? (
+                            <GroupRow
+                                id="dl-attended"
+                                label={attLabel}
+                                hint="Stops re-alerts and escalation. Recorded with the person’s name and the time."
+                                state={state('attended')}
+                                hidden={
+                                    !shown(
+                                        show,
+                                        q,
+                                        'attended',
+                                        attLabel,
+                                        'acknowledge opens dealt',
+                                    )
+                                }
+                            >
+                                <Choice
+                                    value={value('attended')}
+                                    disabled={disabled}
+                                    onChange={(v) => edit('attended', v)}
+                                    options={(
+                                        def('attended')?.options ?? []
+                                    ).map(
+                                        (o) =>
+                                            [o.value, o.label] as [
+                                                string,
+                                                string,
+                                            ],
+                                    )}
+                                />
+                            </GroupRow>
+                        ) : null}
+                        <GroupRow
+                            id="dl-fu"
+                            label="Alerts followed up"
+                            hint={
+                                fuLabels.length
+                                    ? fuLabels.join(', ')
+                                    : 'None — turn on Follow up in the Alerts table.'
+                            }
+                            hidden={!link('Alerts followed up', 'follow up')}
+                            control={toAlerts}
+                        />
+                    </SettingGroup>
+                ) : null}
+                {def('escalate_after') && def('escalate_to') ? (
+                    <SettingGroup
+                        id="escalate"
+                        icon={Siren}
+                        title="Escalate if still not attended"
+                        caption="Tells more people, as well as the first ones"
+                    >
+                        <GroupRow
+                            id="dl-escon"
+                            label={escLabel}
+                            hint={
+                                escOn
+                                    ? `After ${value('escalate_after') || '…'} minutes with nobody attending.`
+                                    : 'Off — nobody else is told (today).'
+                            }
+                            state={state('escalate_after')}
+                            error={err('escalate_after')}
+                            errorId="dl-escalate_after-error"
+                            hidden={
+                                !shown(
+                                    show,
+                                    q,
+                                    'escalate_after',
+                                    escLabel,
+                                    'escalate',
+                                )
+                            }
+                            control={
+                                <OnOff
+                                    id="dl-escon"
+                                    checked={escOn}
+                                    disabled={disabled}
+                                    label={escLabel}
+                                    onChange={(v) => {
+                                        switchOn('escalate_after', v);
+                                        if (!v)
+                                            edit(
+                                                'escalate_to',
+                                                s.values[D]?.escalate_to ??
+                                                    def('escalate_to')
+                                                        ?.default ??
+                                                    '[]',
+                                            );
+                                        clearError(`${D}.escalate_to`);
+                                    }}
+                                />
+                            }
+                        >
+                            {escOn
+                                ? num(
+                                      'escalate_after',
+                                      'Minutes before escalating',
+                                      'minutes',
+                                  )
+                                : null}
+                        </GroupRow>
+                        {escOn ? (
+                            <GroupRow
+                                id="dl-escalate_to"
+                                label={
+                                    def('escalate_to')?.label ?? 'Escalate to'
+                                }
+                                hint="The on-call person arrives with on-call contacts."
+                                state={state('escalate_to')}
+                                error={err('escalate_to')}
+                                errorId="dl-escalate_to-error"
+                                hidden={
+                                    !shown(
+                                        show,
+                                        q,
+                                        'escalate_to',
+                                        'Escalate to',
+                                        'escalate',
+                                    )
+                                }
+                            >
+                                {disabled ? (
+                                    <p className="text-[13px]">
+                                        {escalateTo
+                                            .map(
+                                                (g) =>
+                                                    groups.find(
+                                                        (o) => o.value === g,
+                                                    )?.label ?? g,
+                                            )
+                                            .join(', ') || 'Nobody chosen'}
+                                    </p>
+                                ) : (
+                                    <ChipMulti
+                                        values={escalateTo.map(
+                                            (g) =>
+                                                groups.find(
+                                                    (o) => o.value === g,
+                                                )?.label ?? g,
+                                        )}
+                                        options={groups.map((o) => o.label)}
+                                        onChange={(labels) => {
+                                            edit(
+                                                'escalate_to',
+                                                encodeGroups(
+                                                    def('escalate_to')!,
+                                                    groups
+                                                        .filter((o) =>
+                                                            labels.includes(
+                                                                o.label,
+                                                            ),
+                                                        )
+                                                        .map((o) => o.value),
+                                                ),
+                                            );
+                                            clearError(`${D}.escalate_to`);
+                                        }}
+                                    />
+                                )}
+                            </GroupRow>
+                        ) : null}
+                    </SettingGroup>
+                ) : null}
                 <SettingGroup
                     id="email"
                     icon={Mail}
@@ -703,8 +1034,148 @@ export function AlertsDelivery({
                         control={counted('inapp')}
                     />
                 </SettingGroup>
+                {show === 'all' ? <FollowUpPreview /> : null}
             </GroupGrid>
         </Section>
+    );
+}
+
+/** v5: whole hours as hours ("1 hour", "2 hours"), anything else in minutes ("90 minutes"). */
+const fmtMin = (m: number) =>
+    m >= 60 && m % 60 === 0
+        ? `${m / 60} ${m === 60 ? 'hour' : 'hours'}`
+        : `${m} minutes`;
+
+/* ── What happens if nobody attends (v5): worked out from the draft for one
+ * alert; a re-alert and an escalation at the same moment are one step, and
+ * after an escalation re-alerts go to everyone told so far. Nothing is sent. ── */
+function FollowUpPreview() {
+    const { s, draft } = useSettings();
+    const keys = alertKeys(s);
+    const [k, setK] = useState(keys.includes('overdue') ? 'overdue' : keys[0]);
+    const meta = metaOf(s, k);
+    if (!meta) return null;
+    const x = valueOf(s, draft, k);
+    const v = (key: string) => draftValue(s, draft, D, key);
+    const off = s.definitions[D]?.realert_every?.numeric?.off ?? 'off';
+    const num = (key: string) => (v(key) !== off ? Number(v(key)) || 0 : 0);
+    const every = num('realert_every');
+    const max = num('realert_max');
+    const after = num('escalate_after');
+    const groupOptions = s.definitions[D]?.escalate_to?.group_options ?? [];
+    const via =
+        (['inapp', 'email', 'push'] as const)
+            .filter((c) => x[c])
+            .map((c) => ({ inapp: 'in-app', email: 'email', push: 'push' })[c])
+            .join(', ')
+            .replace(/, ([^,]*)$/, ' and $1') || 'no channel';
+    const first =
+        [
+            ...x.groups.map((g) => meta.group_labels[g]?.label ?? g),
+            ...x.people.map((id) => nameOf(s, id)),
+        ].join(', ') || 'Nobody';
+    const esc =
+        x.follow_up && after
+            ? (parseGroups(v('escalate_to')) ?? [])
+                  .map(
+                      (g) =>
+                          groupOptions.find((o) => o.value === g)?.label ?? g,
+                  )
+                  .join(', ')
+            : '';
+    const reAt =
+        x.follow_up && every && max
+            ? Array.from({ length: max }, (_, i) => every * (i + 1))
+            : [];
+    const times = [...new Set([...reAt, ...(esc ? [after] : [])])].sort(
+        (p, q) => p - q,
+    );
+    const ev = times.map((t): [number, string, string] => {
+        const re = reAt.includes(t);
+        const up = !!esc && t === after;
+        const since = !!esc && t > after;
+        if (re && up)
+            return [
+                t,
+                'Re-alert and escalate',
+                `The same people again, plus ${esc} · ${via}`,
+            ];
+        if (up) return [t, 'Escalate', `${esc} · ${via}`];
+        return [
+            t,
+            'Re-alert',
+            since
+                ? `Everyone told so far, including ${esc} · ${via}`
+                : `The same people · ${via}`,
+        ];
+    });
+    const shownEv = ev.slice(0, 5);
+    const stop = (
+        s.definitions[D]?.attended?.options.find(
+            (o) => o.value === v('attended'),
+        )?.label ?? 'Someone acknowledges it'
+    ).toLowerCase();
+    return (
+        <ReviewCard icon={Timer} title="What happens if nobody attends" span>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-subtle">
+                    Worked out from your draft, for one alert. Nothing is sent.
+                </p>
+                <div className="w-72">
+                    <SelectInput
+                        value={k}
+                        onChange={setK}
+                        placeholder="Choose an alert"
+                        ariaLabel="Alert to preview"
+                        options={keys.map((y) => ({
+                            value: y,
+                            label: metaOf(s, y)?.label ?? y,
+                        }))}
+                    />
+                </div>
+            </div>
+            <ReviewRow
+                label="When it happens"
+                value={
+                    <span className="text-right">
+                        <b>{first}</b>
+                        <span className="text-caption block">
+                            {via === 'no channel'
+                                ? 'Nobody is told'
+                                : `By ${via}`}
+                        </span>
+                    </span>
+                }
+            />
+            {shownEv.map(([t, what, who]) => (
+                <ReviewRow
+                    key={`${t}-${what}`}
+                    label={`After ${fmtMin(t)}`}
+                    value={
+                        <span className="text-right">
+                            <b>{what}</b>
+                            <span className="text-caption block">{who}</span>
+                        </span>
+                    }
+                />
+            ))}
+            {ev.length > shownEv.length ? (
+                <ReviewRow
+                    label="Then"
+                    value={`${ev.length - shownEv.length} more re-alerts, up to ${max} in all`}
+                />
+            ) : null}
+            <ReviewRow
+                label="Stops"
+                value={
+                    !x.follow_up
+                        ? `Follow up is off for “${meta.label}” — it’s sent once.`
+                        : !ev.length
+                          ? 'Sent once — re-alerting and escalation are off.'
+                          : `When ${stop}. The alert itself stays ${meta.until.toLowerCase()}.`
+                }
+            />
+        </ReviewCard>
     );
 }
 
@@ -885,6 +1356,14 @@ export function MessagePreview({
                         <ReviewRow
                             label="Goes to"
                             value={names.join(', ') || 'Nobody'}
+                        />
+                        <ReviewRow
+                            label="Follow up"
+                            value={
+                                x.follow_up
+                                    ? 'On — re-alert and escalation follow the Delivery settings'
+                                    : 'Off — sent once'
+                            }
                         />
                         <ReviewRow
                             label="Email and push"
