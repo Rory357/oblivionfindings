@@ -1833,6 +1833,12 @@ class ClientController extends Controller
         $payload = $medication->toArray();
         $stock = $medication->stock;
 
+        // The profile records as-needed doses only: its endpoint carries no
+        // scheduled time, so the recording guard refuses a scheduled dose.
+        // Scheduled doses link to the MAR chart / Meds today (P02-6 moves
+        // profile recording onto the shared recorder).
+        $payload['record_on_profile'] = (bool) $medication->is_prn;
+
         $payload['stock'] = $stock ? [
             // The decimal:2 cast yields "24.00"; send a number like the eMAR
             // stock payloads so the profile reads "24 doses on hand".
