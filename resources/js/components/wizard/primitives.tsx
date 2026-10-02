@@ -32,9 +32,9 @@ export type IconType = ComponentType<{ className?: string }>;
 /*  Wizard chrome constants (Add Client reference contract)            */
 /* ------------------------------------------------------------------ */
 
-/** Stepper rail: fixed width sidebar with the app sidebar surface colour. */
+/** Stepper rail: fixed width light panel (not bg-sidebar, which is near-black). */
 export const WIZARD_RAIL_CLASS =
-    'hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 sm:flex';
+    'hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex';
 
 /** Thin progress strip under the wizard header. */
 export const WIZARD_PROGRESS_TRACK_CLASS = 'h-[3px] shrink-0 bg-muted';
