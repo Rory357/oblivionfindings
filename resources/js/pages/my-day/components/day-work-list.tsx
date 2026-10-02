@@ -1,3 +1,4 @@
+import { hiddenControlledCaption } from '@/components/meds/board-bits';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -33,10 +34,18 @@ interface Props {
     onAdd: (at?: number) => void;
     onOpenTask: (id: number) => void;
     onAddNote: (clientId: number) => void;
+    /** Controlled doses left off the list for this reader (EM-12). */
+    hiddenControlled?: number;
+    /** …and how many of those are overdue. */
+    hiddenControlledOverdue?: number;
 }
 
 export function DayWorkList(p: Props) {
     const groups = groupWork(p.items, p.now);
+    const hiddenNote = hiddenControlledCaption(
+        p.hiddenControlled ?? 0,
+        p.hiddenControlledOverdue ?? 0,
+    );
     const entry = (item: StreamItem): CalendarWorkEntry => {
         const done = workIsDone(item);
         const at = workDueAt(item);
@@ -45,8 +54,17 @@ export function DayWorkList(p: Props) {
         const status = done
             ? item.kind === 'task'
                 ? 'Done'
-                : { given: 'Given', refused: 'Refused', withheld: 'Withheld' }[
-                      item.data.status as 'given' | 'refused' | 'withheld'
+                : {
+                      given: 'Given',
+                      refused: 'Refused',
+                      withheld: 'Withheld',
+                      missed: 'Missed (recorded)',
+                  }[
+                      item.data.status as
+                          | 'given'
+                          | 'refused'
+                          | 'withheld'
+                          | 'missed'
                   ]
             : item.kind === 'med' && item.data.status === 'overdue'
               ? 'Overdue'
@@ -84,7 +102,13 @@ export function DayWorkList(p: Props) {
             status: (
                 <StatusBadge
                     variant={
-                        done ? 'success' : at <= p.now ? 'warning' : 'neutral'
+                        item.kind === 'med' && item.data.status === 'missed'
+                            ? 'critical'
+                            : done
+                              ? 'success'
+                              : at <= p.now
+                                ? 'warning'
+                                : 'neutral'
                     }
                 >
                     {status}
@@ -240,6 +264,9 @@ export function DayWorkList(p: Props) {
                         onAddAt={p.canAdd ? p.onAdd : undefined}
                         onAddAnytime={p.canAdd ? () => p.onAdd() : undefined}
                     />
+                    {hiddenNote ? (
+                        <p className="text-caption">{hiddenNote}</p>
+                    ) : null}
                     {groups.followedUp.length > 0 && (
                         <Card
                             unstyled

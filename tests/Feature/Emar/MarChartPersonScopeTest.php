@@ -220,10 +220,12 @@ class MarChartPersonScopeTest extends TestCase
             $this->actingAs($worker)->get('/meds/today')->assertOk()->inertiaProps('schedule'),
         )->where('client_id', $covered->id)->pluck('mar_url');
 
-        $this->assertNotEmpty($boardUrls());
-        $this->assertTrue($boardUrls()->every(fn ($url) => $url === null));
+        // Rostered but not clocked in (and not assigned): the board applies
+        // the person rule too (C6), so none of their medicines show yet.
+        $this->assertEmpty($boardUrls());
 
         $shift->forceFill(['status' => 'in_progress', 'actual_starts_at' => now()->subHour()])->save();
+        $this->assertNotEmpty($boardUrls());
         $this->assertTrue($boardUrls()->every(fn ($url) => is_string($url) && str_contains($url, 'client_id='.$covered->id)));
 
         // Site-scoped list rows: only the assigned resident's row links.

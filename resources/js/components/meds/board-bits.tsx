@@ -61,7 +61,7 @@ export const DOSE_STATUS_META: Record<
         tagColor: 'var(--muted-foreground)',
     },
     missed: {
-        label: 'Missed',
+        label: 'Missed (recorded)',
         pillClass:
             'border-status-critical/30 bg-status-critical-bg text-status-critical',
         tagBg: 'var(--status-critical-bg)',
@@ -74,6 +74,25 @@ export const DOSE_STATUS_META: Record<
         tagColor: 'var(--status-info)',
     },
 };
+
+/**
+ * EM-12: a dose list tells a reader without controlled-medicine access how
+ * many controlled doses it leaves out, and how many of those are overdue —
+ * naming none — so it reconciles with the overdue badge, which counts them.
+ * Null when nothing is left out.
+ */
+export function hiddenControlledCaption(
+    count: number,
+    overdue = 0,
+): string | null {
+    if (count <= 0) return null;
+    const lead =
+        count === 1
+            ? '1 more controlled-medicine dose isn’t shown'
+            : `${count} more controlled-medicine doses aren’t shown`;
+    const late = overdue > 0 ? ` (${overdue} overdue)` : '';
+    return `${lead}${late} — needs controlled-medicine access.`;
+}
 
 export function StatusPill({
     status,

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Services\Medication\DoseSlots\DoseSlotOrderSync;
+use App\Services\Medication\OverdueDoseAlerts;
 use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -189,6 +190,10 @@ class ClientMedication extends Model
 
         static::updated(function (self $medication): void {
             app(DoseSlotOrderSync::class)->updated($medication);
+            // C6f: an order change can mean a dose is no longer owed (ceased,
+            // waiting for the order check, a new version); once it commits,
+            // the person's overdue alerts for such doses resolve.
+            OverdueDoseAlerts::queueAfterCommit((int) $medication->client_id);
         });
 
         static::deleting(function (): never {

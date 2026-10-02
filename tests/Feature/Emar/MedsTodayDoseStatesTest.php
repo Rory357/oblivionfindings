@@ -57,8 +57,10 @@ class MedsTodayDoseStatesTest extends TestCase
         $this->aroha = Client::factory()->create(['first_name' => 'Aroha', 'last_name' => 'Ngata', 'site_id' => $this->site->id, 'service_context_id' => $context->id, 'status' => 'active']);
         $this->ben = Client::factory()->create(['first_name' => 'Ben', 'last_name' => 'Parata', 'site_id' => $this->site->id, 'service_context_id' => $context->id, 'status' => 'active']);
 
-        // A worker rostered with Aroha all day.
+        // A worker rostered with Aroha all day, who supports her (the person
+        // rule: before clock-in, only people they're assigned to show).
         $this->worker = $this->staff(['medications.administer.record', 'medications.view']);
+        $this->aroha->supportWorkers()->attach($this->worker->id);
         Shift::factory()->create([
             'client_id' => $this->aroha->id,
             'site_id' => $this->site->id,
@@ -197,6 +199,7 @@ class MedsTodayDoseStatesTest extends TestCase
 
         $controlled = $this->staff(['medications.administer.record', 'medications.view', 'medications.controlled.view']);
         Shift::query()->where('user_id', $this->worker->id)->update(['user_id' => $controlled->id]);
+        $this->aroha->supportWorkers()->attach($controlled->id);
         $rows = collect($this->medsToday('2026-06-15', $controlled))->sortBy('medication_name')->values();
         $this->assertSame(['Metformin', 'Morphine'], $rows->pluck('medication_name')->all());
         $this->assertSame(['due', 'due'], $rows->pluck('status')->all());

@@ -32,6 +32,9 @@ use Illuminate\Support\Collection;
  */
 final class ScheduledDoseStates
 {
+    /** Record outcomes a list shows as the dose's status (Missed is "Missed (recorded)"). */
+    public const RECORDED_STATUSES = ['given', 'refused', 'withheld', 'missed'];
+
     public function __construct(
         private readonly DoseSlotProjection $projection,
         private readonly DoseWindowResolver $windows,
@@ -137,6 +140,20 @@ final class ScheduledDoseStates
             DoseSlotProjection::STATE_NOT_DUE => $dose['due_soon'] ? 'due' : 'upcoming',
             default => 'upcoming',
         };
+    }
+
+    /**
+     * The list status of a dose with the record row matched to its slot, if
+     * any: the record's outcome (given, refused, withheld or missed), else
+     * listStatus(). The one mapping Meds today and My Day share.
+     *
+     * @param  array{state: string, outcome: string|null, due_soon: bool}  $dose
+     */
+    public static function statusFor(array $dose, ?string $recordedStatus): string
+    {
+        return in_array($recordedStatus, self::RECORDED_STATUSES, true)
+            ? $recordedStatus
+            : self::listStatus($dose);
     }
 
     /**
