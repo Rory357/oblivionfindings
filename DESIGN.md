@@ -688,9 +688,10 @@ before.
   user's own number and also copied it into the HR work phone, which the
   My HR directory shows to every staff member. Self-service contact fields
   say whose number they are ("Personal mobile"), state who can see them, and
-  never write HR's work contact fields (`work_phone`) or fall back to them on
-  read-back. Work contact details are edited only on HR's screens, with
-  HR's permissions.
+  never write HR's work contact fields (`work_phone`, `work_email`) or fall
+  back to them on read-back. The sign-in email can be personal too, so it is
+  not copied into `work_email` either. Work contact details are edited only
+  on HR's screens, with HR's permissions.
 
 ## File viewing and downloading (approved by Stephan 2026-09-27)
 

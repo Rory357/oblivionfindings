@@ -73,6 +73,7 @@ test('self service employment fields update only the current canonical HR profil
         'created_by' => $user->id,
         'updated_by' => $user->id,
     ]);
+    $originalEmail = $user->email;
     $compatibilityProfile = Staff::factory()->create([
         'user_id' => $user->id,
         'job_title' => 'Compatibility title',
@@ -92,7 +93,7 @@ test('self service employment fields update only the current canonical HR profil
     expect($profile->refresh())
         ->position_title->toBe('Senior Support Worker')
         ->work_phone->toBe('0800 OLD')
-        ->work_email->toBe('updated.worker@example.test')
+        ->work_email->toBe($originalEmail)
         ->updated_by->toBe($user->id);
     expect($user->refresh()->cellphone)->toBe('021 NEW');
     expect($compatibilityProfile->refresh())

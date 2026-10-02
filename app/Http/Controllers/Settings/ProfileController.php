@@ -161,23 +161,19 @@ class ProfileController extends Controller
 
             $user->save();
 
-            if (! $employeeProfile) {
+            // The phone here is the user's personal mobile (users.cellphone)
+            // and the email is their sign-in address, which can be personal.
+            // Work contact details (work_phone, work_email) are HR-managed and
+            // shown to every staff member in the directories, so this form
+            // never writes them.
+            if (! $employeeProfile || ! $request->jobTitleWasSubmitted()) {
                 return;
             }
 
-            // The phone here is the user's personal mobile (users.cellphone).
-            // work_phone is HR-managed and shown to every staff member in the
-            // directories, so this form never writes it.
-            $profileAttributes = [
-                'work_email' => $user->email,
+            $employeeProfile->forceFill([
+                'position_title' => $validated['job_title'],
                 'updated_by' => $user->id,
-            ];
-
-            if ($request->jobTitleWasSubmitted()) {
-                $profileAttributes['position_title'] = $validated['job_title'];
-            }
-
-            $employeeProfile->forceFill($profileAttributes)->save();
+            ])->save();
         });
 
         return to_route('profile.edit');

@@ -8,9 +8,10 @@ use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
 use Inertia\Testing\AssertableInertia as Assert;
 
-// Settings › Profile's phone is the user's personal mobile (users.cellphone).
-// The HR work phone is published to every staff member in the My HR
-// directory, so the personal number must never be copied into it.
+// Settings › Profile's phone is the user's personal mobile (users.cellphone)
+// and its email is the sign-in address, which can be personal. The HR work
+// phone and work email are published to every staff member in the My HR
+// directory, so Settings › Profile must never copy anything into them.
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -104,6 +105,48 @@ test('the My HR directory keeps showing the HR work phone after a Settings profi
 
     expect(collect($response->inertiaProps('people'))->firstWhere('id', $colleagueProfileId)['phone'] ?? null)
         ->toBe('0800 333 444');
+});
+
+test('Settings profile saves never replace the HR work email shown in the My HR directory', function () {
+    $colleague = ($this->makeStaff)(
+        ['email' => 'aroha.signin@example.test'],
+        ['work_email' => 'aroha@care.example.test'],
+    );
+    $viewer = ($this->makeStaff)();
+
+    // Personal information card: the sign-in email is changed.
+    $this->actingAs($colleague)
+        ->patch(route('profile.update'), [
+            'name' => $colleague->name,
+            'email' => 'aroha.home@example.test',
+            'phone' => null,
+        ])
+        ->assertSessionHasNoErrors();
+
+    // Preferences card: only the timezone and formats are sent.
+    $this->actingAs($colleague->refresh())
+        ->patch(route('profile.update'), [
+            'timezone' => 'Pacific/Chatham',
+            'locale' => 'en',
+            'date_format' => 'DD/MM/YYYY',
+            'time_format' => '24',
+        ])
+        ->assertSessionHasNoErrors();
+
+    $profile = HrEmployeeProfile::query()->where('user_id', $colleague->id)->sole();
+
+    expect($colleague->refresh())
+        ->email->toBe('aroha.home@example.test')
+        ->timezone->toBe('Pacific/Chatham');
+    expect($profile->work_email)->toBe('aroha@care.example.test');
+
+    $response = $this->actingAs($viewer)
+        ->get(route('hr.my.directory'))
+        ->assertOk()
+        ->assertDontSee('aroha.home@example.test');
+
+    expect(collect($response->inertiaProps('people'))->firstWhere('id', $profile->id)['email'] ?? null)
+        ->toBe('aroha@care.example.test');
 });
 
 test('the Settings profile page reads back the personal mobile, never the HR work phone', function () {
