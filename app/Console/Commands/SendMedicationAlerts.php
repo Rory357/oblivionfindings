@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\ClientMedication;
-use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationRound;
@@ -15,6 +14,7 @@ use App\Notifications\MedicationStockLowNotification;
 use App\Services\MarScheduleService;
 use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\OverdueDoseAlerts;
 use App\Services\Medication\RefusalEscalationPolicy;
 use App\Services\UserSiteAccessService;
 use App\Support\Medication\MedicationStockQuantity;
@@ -43,88 +43,62 @@ class SendMedicationAlerts extends Command
         return self::SUCCESS;
     }
 
+    /**
+     * The overdue job (C6f): the doses the dose-slot projection calls overdue
+     * — the window has ended with nothing recorded, yesterday and today —
+     * raised in the Control Room (one signal per dose) with alerts for doses
+     * no longer overdue resolved, and each dose's round assignee told once.
+     */
     protected function checkOverdueMedications(): void
     {
         $this->info('Checking for overdue medications...');
 
         $scheduleService = app(MarScheduleService::class);
         $now = Carbon::now($scheduleService->workerTimezone());
-        $lookbackStart = $now->copy()->subDay()->startOfDay();
-        $lookbackEnd = $now->copy()->startOfDay();
-
-        $medications = ClientMedication::query()
-            ->active()
-            ->where('is_prn', false)
-            ->whereHas('client', fn ($client) => $client->whereNotNull('site_id'))
-            ->where(function ($query) {
-                $query->whereNotNull('dose_times')
-                    ->orWhereNotNull('frequency');
-            })
-            ->with('client:id,first_name,last_name,site_id,service_context_id,suppress_med_admin_alerts')
-            ->get();
+        $overdue = app(OverdueDoseAlerts::class)->sweep($now);
 
         $count = 0;
-        foreach ($medications as $medication) {
+        foreach ($overdue as $dose) {
+            $medication = $dose['order'];
             $client = $medication->client;
-            if (! $client || $client->suppress_med_admin_alerts) {
+            $scheduledFor = Carbon::instance($dose['due_at']);
+
+            $round = $this->roundForSlot($medication, $scheduledFor, $scheduleService);
+            $staff = $round?->assignedTo;
+            if (! $staff || ! $this->canReceiveMedicationEvidence(
+                $staff,
+                (int) $client->site_id,
+                (bool) $medication->controlled_drug,
+            )) {
                 continue;
             }
 
-            $day = $lookbackStart->copy();
-
-            while ($day->lessThanOrEqualTo($lookbackEnd)) {
-                foreach ($scheduleService->scheduledTimesForDate($medication, $day) as $scheduledFor) {
-                    [, $slotWindowEnd] = $scheduleService->windowForScheduled($scheduledFor);
-                    if ($slotWindowEnd->greaterThanOrEqualTo($now)) {
-                        continue;
-                    }
-
-                    [$slotStartUtc, $slotEndUtc] = $scheduleService->utcSlotWindow($scheduledFor);
-                    $hasAdministration = ClientMedicationAdministration::query()
-                        ->effectiveClinicalEvidence()
-                        ->where('client_id', $client->id)
-                        ->where('client_medication_id', $medication->id)
-                        ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
-                        ->exists();
-
-                    if ($hasAdministration) {
-                        continue;
-                    }
-
-                    $round = $this->roundForSlot($medication, $scheduledFor, $scheduleService);
-                    $staff = $round?->assignedTo;
-                    if (! $staff || ! $this->canReceiveMedicationEvidence(
-                        $staff,
-                        (int) $client->site_id,
-                        (bool) $medication->controlled_drug,
-                    )) {
-                        continue;
-                    }
-
-                    $alertKey = sprintf(
-                        'emar:overdue-alert:user-%d.med-%d.%s',
-                        $staff->id,
-                        $medication->id,
-                        $scheduledFor->copy()->utc()->format('YmdHi'),
-                    );
-
-                    if (! Cache::add($alertKey, true, now()->addDay())) {
-                        continue;
-                    }
-
-                    $clientName = trim(($client->first_name ?? '').' '.($client->last_name ?? ''));
-
-                    $staff->notify(new MedicationOverdueNotification(
-                        medication: $medication->name ?? 'Unknown medication',
-                        clientName: $clientName !== '' ? $clientName : 'Unknown client',
-                        scheduledTime: $scheduledFor->format('H:i'),
-                        clientId: $client->id,
-                    ));
-                    $count++;
-                }
-
-                $day->addDay();
+            // Once per dose and person: the stored notification survives a
+            // deploy's cache clear; the cache key covers notifications sent
+            // before doses carried a key.
+            if ($this->alreadyNotified($staff, MedicationOverdueNotification::class, ['dose_key' => $dose['key']])) {
+                continue;
             }
+            $alertKey = sprintf(
+                'emar:overdue-alert:user-%d.med-%d.%s',
+                $staff->id,
+                $medication->id,
+                $scheduledFor->copy()->utc()->format('YmdHi'),
+            );
+            if (! Cache::add($alertKey, true, now()->addDay())) {
+                continue;
+            }
+
+            $clientName = trim(($client->first_name ?? '').' '.($client->last_name ?? ''));
+
+            $staff->notify(new MedicationOverdueNotification(
+                medication: $medication->name ?? 'Unknown medication',
+                clientName: $clientName !== '' ? $clientName : 'Unknown client',
+                scheduledTime: $scheduledFor->format('H:i'),
+                clientId: $client->id,
+                doseKey: $dose['key'],
+            ));
+            $count++;
         }
 
         $this->info("Sent {$count} overdue medication alerts.");

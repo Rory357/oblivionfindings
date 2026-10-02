@@ -1111,6 +1111,16 @@ class SignalProcessingService
             $query->where('site_id', $signal->site_id);
         }
 
+        // A signal about a person groups only into an alert about the same
+        // person (or none): assertAlertCanGroupSignal() refuses any other,
+        // which left the signal pending and retried forever (C6f: two
+        // people's overdue doses at one Site).
+        if ($this->canonicalPositiveId($signal->client_id) !== null) {
+            $query->where(fn ($alerts) => $alerts
+                ->whereNull('client_id')
+                ->orWhere('client_id', $this->canonicalPositiveId($signal->client_id)));
+        }
+
         if ($signal->signal_type_code === 'device_offline' && $monitorCorrelationKey === null) {
             $query->whereNull('context->normalized_data->monitor_correlation_key');
         }

@@ -165,10 +165,12 @@ class ControlledMedicineConcealmentTest extends TestCase
         $actor = User::factory()->create();
         $site = Site::factory()->create(['name' => 'Kōwhai House']);
         $client = Client::factory()->create(['site_id' => $site->id, 'suppress_med_admin_alerts' => false]);
-        // A dose an hour ago on the New Zealand clock. Dose times are NZ wall
-        // times; this fixture used the UTC wall time, which only raised the
-        // overdue alert while the check misread dose times as UTC (EM-02).
-        $overdueSlot = now(config('app.worker_timezone', 'Pacific/Auckland'))->subHour();
+        // A dose two and a half hours ago on the New Zealand clock, so its
+        // window (60 minutes after) has ended: overdue (C6f). Dose times are
+        // NZ wall times (EM-02). The order was entered before the dose was
+        // due — nothing is owed before an order exists.
+        $overdueSlot = now(config('app.worker_timezone', 'Pacific/Auckland'))->subMinutes(150);
+        $this->travel(-4)->hours();
         $controlled = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'name' => 'Morphine sulfate',
@@ -179,8 +181,10 @@ class ControlledMedicineConcealmentTest extends TestCase
             'active' => true,
             'state' => 'active',
             'approval_status' => 'verified',
+            'start_date' => now()->subMonth()->toDateString(),
             'end_date' => null,
         ]);
+        $this->travelBack();
         ClientMedicationStock::query()->create([
             'client_medication_id' => $controlled->id,
             'on_hand' => 0,
@@ -199,7 +203,7 @@ class ControlledMedicineConcealmentTest extends TestCase
             'client_medication_id' => $medication->id,
             'administered_by' => $actor->id,
             'status' => 'given',
-            // Clear of the controlled dose slot an hour ago, so it stays overdue.
+            // Clear of the controlled dose slot 2½ hours ago, so it stays overdue.
             'scheduled_for' => now()->subHours(2),
             'administered_at' => now(),
             ...$attributes,

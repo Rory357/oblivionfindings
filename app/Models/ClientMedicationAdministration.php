@@ -4,10 +4,12 @@ namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Services\Medication\DoseSlots\DoseSlotOutcomeWriter;
+use App\Services\Medication\OverdueDoseAlerts;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class ClientMedicationAdministration extends Model
 {
@@ -34,6 +36,16 @@ class ClientMedicationAdministration extends Model
         static::deleted($sync);
         static::restored($sync);
         static::forceDeleted($sync);
+
+        // C6f: once the change commits, the person's overdue alerts for doses
+        // no longer overdue resolve themselves.
+        $overdueAlerts = static fn (self $administration) => DB::afterCommit(
+            static fn () => app(OverdueDoseAlerts::class)->afterDoseChange((int) $administration->client_id),
+        );
+        static::saved($overdueAlerts);
+        static::deleted($overdueAlerts);
+        static::restored($overdueAlerts);
+        static::forceDeleted($overdueAlerts);
     }
 
     public const ADMINISTRATION_ONLY_EVIDENCE_FIELDS = [

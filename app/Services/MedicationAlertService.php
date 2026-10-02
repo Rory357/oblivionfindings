@@ -13,9 +13,9 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationSignalService;
+use App\Services\Medication\OverdueDoseAlerts;
 use App\Support\Medication\MedicationStockQuantity;
 use App\Support\WorkerClock;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -136,6 +136,9 @@ class MedicationAlertService
                 $alerts[] = $overdueAlert;
             }
         } else {
+            // Suppressed: none of their doses is overdue, so their open
+            // overdue alerts resolve (C6f).
+            $this->checkOverdueDoses($client);
             $alerts[] = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'med_admin_alerts_suppressed',
@@ -458,79 +461,15 @@ class MedicationAlertService
 
     /**
      * Check for overdue doses → always operational.
+     *
+     * C6f: the doses the overdue job, Meds today, My Day and the badge call
+     * overdue — the dose-slot projection's window has ended with nothing
+     * recorded (EM-02 (1): on the New Zealand clock) — raised as one signal
+     * per dose, and the person's alerts for doses no longer overdue resolved.
      */
     private function checkOverdueDoses(Client $client): ?array
     {
-        // EM-02 (1): dose times are New Zealand wall-clock times. Build each
-        // slot on the worker's calendar with the shared schedule rule and
-        // compare instants; reading "08:00" on a UTC date raised the alert at
-        // 21:00 NZDT and missed real morning doses. Which slots count as
-        // overdue (due in the last 3 hours, nothing recorded) is unchanged
-        // until the dose-slot projection replaces this check.
-        $schedule = app(MarScheduleService::class);
-        $now = Carbon::now($schedule->workerTimezone());
-        $cutoff = $now->copy()->subHours(3);
-
-        $medications = $client->medications()
-            ->active()
-            ->where('is_prn', false)
-            ->get();
-
-        $overdueCount = 0;
-        $overdueMeds = [];
-
-        foreach ($medications as $medication) {
-            // The 3-hour lookback can cross NZ midnight, so walk each NZ day it touches.
-            for ($day = $cutoff->copy()->startOfDay(); $day->lte($now); $day->addDay()) {
-                foreach ($schedule->scheduledTimesForDate($medication, $day) as $scheduledTime) {
-                    if (! $scheduledTime->lessThan($now) || ! $scheduledTime->greaterThan($cutoff)) {
-                        continue;
-                    }
-
-                    [$slotStartUtc, $slotEndUtc] = $schedule->utcSlotWindow($scheduledTime);
-                    $recorded = ClientMedicationAdministration::query()
-                        ->effectiveClinicalEvidence()
-                        ->where('client_medication_id', $medication->id)
-                        ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
-                        ->exists();
-
-                    if (! $recorded) {
-                        $overdueCount++;
-                        $overdueMeds[] = $medication->unrestrictedName();
-                    }
-                }
-            }
-        }
-
-        if ($overdueCount > 0) {
-            $message = "{$overdueCount} overdue dose(s): ".implode(', ', array_unique($overdueMeds));
-
-            // Dashboard alert (UI compat)
-            $alert = MedicationDashboardAlert::createOrUpdateAlert(
-                $client->id,
-                'overdue',
-                'critical',
-                $message,
-                null
-            );
-
-            // Operational signal → Control Room
-            $this->signalService->emit(
-                MedicationSignalService::TYPE_OVERDUE,
-                $client->id,
-                'high',
-                $message,
-                [
-                    'overdue_count' => $overdueCount,
-                    'medication_names' => array_unique($overdueMeds),
-                    'site_id' => $client->site_id,
-                ],
-            );
-
-            return $alert->toArray();
-        }
-
-        return null;
+        return app(OverdueDoseAlerts::class)->syncClient($client, now());
     }
 
     /**
