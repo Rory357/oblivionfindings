@@ -54,6 +54,9 @@ class MyTasksController extends Controller
 {
     private array $unavailableSections = [];
 
+    /** Controlled doses in My Day's window not listed for this reader (EM-12). */
+    private int $hiddenControlledDoses = 0;
+
     private const PRIORITY_ORDER = [
         'critical' => 0,
         'high' => 1,
@@ -132,8 +135,9 @@ class MyTasksController extends Controller
         $todayShifts = $shifts->filter(fn ($s) => $s['is_today']);
         $stats = [
             'shifts_today' => $todayShifts->count(),
-            // Doses waiting for the order check are listed but not counted.
-            'meds_due' => collect($medicationsDue)->where('status', '!=', 'pending_check')->count(),
+            // Doses waiting for the order check, and doses recorded as missed,
+            // are listed but not counted.
+            'meds_due' => collect($medicationsDue)->whereNotIn('status', ['pending_check', 'missed'])->count(),
             'meds_overdue' => collect($medicationsDue)->where('status', 'overdue')->count(),
             'tasks_open' => $todayShifts->sum(fn ($s) => collect($s['tasks'])->where('is_completed', false)->count()),
             'timesheets_pending' => collect($timesheets)->count(),
@@ -187,6 +191,9 @@ class MyTasksController extends Controller
             'today_iso' => $workerNow->toDateString(),
             'shifts' => $shifts->values()->all(),
             'medications_due' => $medicationsDue,
+            // Controlled doses in the same window left off the list for a
+            // reader without controlled-medicine access (EM-12).
+            'medications_hidden_controlled' => $this->hiddenControlledDoses,
             'timesheets' => $timesheets,
             'incidents' => $incidents,
             'tasks' => $tasks,
@@ -818,17 +825,30 @@ class MyTasksController extends Controller
 
             // Verified orders, and orders whose change waits for the order
             // check (shown, not recordable until checked).
-            $medications = ClientMedication::whereIn('client_id', $clientIds)
+            $scheduledOrders = fn () => ClientMedication::whereIn('client_id', $clientIds)
                 ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
                 ->where('is_prn', false)
-                ->when(! $canAccessControlled, fn ($query) => $query->where('controlled_drug', false))
                 ->where(function ($query) {
                     $query->whereNotNull('dose_times')
                         ->orWhereNotNull('frequency');
-                })
+                });
+            $medications = $scheduledOrders()
+                ->when(! $canAccessControlled, fn ($query) => $query->where('controlled_drug', false))
                 ->with('client:id,first_name,last_name')
                 ->get();
-            $doses = app(ScheduledDoseStates::class)->dosesBetween($medications, $windowStart, $windowEnd, $now);
+            $doseStates = app(ScheduledDoseStates::class);
+            $doses = $doseStates->dosesBetween($medications, $windowStart, $windowEnd, $now);
+
+            // EM-12: the controlled doses left off the list for this reader,
+            // counted (never named) so the list reconciles with the badge.
+            if (! $canAccessControlled) {
+                $this->hiddenControlledDoses = collect($doseStates->dosesBetween(
+                    $scheduledOrders()->where('controlled_drug', true)->get(),
+                    $windowStart,
+                    $windowEnd,
+                    $now,
+                ))->flatten(1)->filter(fn (array $dose): bool => $dose['due_at']->betweenIncluded($windowStart, $windowEnd))->count();
+            }
 
             // One administration query for the whole window, matched in memory
             // per slot — replaces the old per-dose-slot query (an N+1 that
@@ -861,14 +881,10 @@ class MyTasksController extends Controller
                         $scheduleService->slotKey((int) $med->client_id, (int) $med->id, $scheduled),
                     );
 
-                    // My Day has no "missed" status: a dose recorded as missed
-                    // still reads as overdue here, as before.
-                    $status = $administration && in_array($administration->status, ['given', 'refused', 'withheld'], true)
-                        ? $administration->status
-                        : ScheduledDoseStates::listStatus($dose);
-                    if ($status === 'missed') {
-                        $status = 'overdue';
-                    }
+                    // The shared mapping Meds today uses: a recorded outcome
+                    // (missed is Missed (recorded), never overdue), else the
+                    // dose's state.
+                    $status = ScheduledDoseStates::statusFor($dose, $administration?->status);
                     // Waiting for the order check: shown, never recordable here.
                     $awaitingCheck = $status === 'pending_check';
 
@@ -911,7 +927,7 @@ class MyTasksController extends Controller
 
             // Sort: overdue first, then due, then upcoming
             usort($result, function ($a, $b) {
-                $order = ['overdue' => 0, 'due' => 1, 'upcoming' => 2, 'pending_check' => 2, 'given' => 3, 'refused' => 4, 'withheld' => 5];
+                $order = ['overdue' => 0, 'due' => 1, 'upcoming' => 2, 'pending_check' => 2, 'given' => 3, 'refused' => 4, 'withheld' => 5, 'missed' => 6];
 
                 return ($order[$a['status']] ?? 3) <=> ($order[$b['status']] ?? 3);
             });

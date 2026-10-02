@@ -240,6 +240,10 @@ export interface MedsTodayProps {
         manage_stock: boolean;
     };
     has_shift_context: boolean;
+    /** People on the worker's shift whose medicines show once they're clocked in to it. */
+    people_after_clock_in?: number;
+    /** Controlled doses this day not listed for this reader (EM-12). */
+    hidden_controlled_doses?: number;
 }
 
 /** Stable per-client hue for avatar chips (golden-angle spread). */

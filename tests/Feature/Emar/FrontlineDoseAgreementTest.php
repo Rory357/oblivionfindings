@@ -101,6 +101,9 @@ class FrontlineDoseAgreementTest extends TestCase
         $this->assertSame($expected, $this->byDose($myDay->inertiaProps('medications_due'), 'medication_name', 'scheduled_for'));
         $this->assertSame(2, $myDay->inertiaProps('stats.meds_overdue'));
         $this->assertSame(5, $myDay->inertiaProps('stats.meds_due'));   // the dose waiting for the check isn't counted
+        // A controlled-medicine reader sees every dose: nothing is left out.
+        $this->assertSame(0, $myDay->inertiaProps('medications_hidden_controlled'));
+        $this->assertSame(0, $board->inertiaProps('hidden_controlled_doses'));
         $paracetamol = collect($myDay->inertiaProps('medications_due'))->firstWhere('medication_name', 'Paracetamol');
         $this->assertFalse($paracetamol['can_give']);
         $this->assertFalse($paracetamol['can_record']);
@@ -138,6 +141,47 @@ class FrontlineDoseAgreementTest extends TestCase
         // Metformin, Vitamin D (not recorded here) and Morphine.
         $this->assertSame(3, $myDay->inertiaProps('auth.can.medications.overdueTodayCount'));
         $this->assertSame(2, $myDay->inertiaProps('stats.meds_overdue'));
+        // …and the list says how many controlled doses it leaves out, so the
+        // two reconcile: 2 listed overdue + 1 not shown = the badge's 3.
+        $this->assertSame(1, $myDay->inertiaProps('medications_hidden_controlled'));
+
+        $board = $this->actingAs($worker)->get('/meds/today')->assertOk();
+        $rows = collect($board->inertiaProps('schedule'));
+        $this->assertNotContains('Morphine', $rows->pluck('medication_name')->all());
+        $this->assertSame(1, $board->inertiaProps('hidden_controlled_doses'));
+        $this->assertSame(3, $rows->where('status', 'overdue')->count() + $board->inertiaProps('hidden_controlled_doses'));
+    }
+
+    public function test_a_dose_recorded_as_missed_reads_missed_recorded_and_is_never_overdue(): void
+    {
+        $worker = $this->workerOnShift();
+        $this->at('2026-06-15 08:30');
+        ClientMedicationAdministration::query()->create([
+            'client_id' => $this->aroha->id,
+            'client_medication_id' => $this->orders['Metformin']->id,
+            'administered_by' => $worker->id,
+            'scheduled_for' => $this->nz('2026-06-15 07:00'),
+            'administered_at' => $this->nz('2026-06-15 08:30'),
+            'status' => 'missed',
+            'reason' => 'Asleep through the round',
+        ]);
+        $this->at('2026-06-15 09:30');
+
+        $board = $this->actingAs($worker)->get('/meds/today')->assertOk();
+        $this->assertSame('missed', $this->byDose($board->inertiaProps('schedule'), 'medication_name', 'scheduled_for')['Metformin 07:00']);
+
+        Cache::flush();
+        $myDay = $this->actingAs($worker)->get('/my-day')->assertOk();
+        $this->assertSame(
+            $this->byDose($board->inertiaProps('schedule'), 'medication_name', 'scheduled_for'),
+            $this->byDose($myDay->inertiaProps('medications_due'), 'medication_name', 'scheduled_for'),
+        );
+        // Not overdue, not due: Morphine and Vitamin D are the overdue doses
+        // now; due = every listed dose but the missed one and the one waiting
+        // for the check.
+        $this->assertSame(2, $myDay->inertiaProps('stats.meds_overdue'));
+        $this->assertSame(4, $myDay->inertiaProps('stats.meds_due'));
+        $this->assertSame(2, $myDay->inertiaProps('auth.can.medications.overdueTodayCount'));
     }
 
     public function test_my_day_and_the_badge_count_only_people_the_worker_may_open(): void
@@ -159,6 +203,13 @@ class FrontlineDoseAgreementTest extends TestCase
         $myDay = $this->actingAs($worker)->get('/my-day')->assertOk();
         $this->assertSame([], $myDay->inertiaProps('medications_due'));
         $this->assertSame(0, $myDay->inertiaProps('auth.can.medications.overdueTodayCount'));
+        // Meds today agrees: none of her medicines before clock-in, and it
+        // says why rather than claiming there's no shift.
+        $board = $this->actingAs($worker)->get('/meds/today')->assertOk();
+        $this->assertSame([], $board->inertiaProps('schedule'));
+        $this->assertSame([], $board->inertiaProps('prn_medications'));
+        $this->assertTrue($board->inertiaProps('has_shift_context'));
+        $this->assertSame(1, $board->inertiaProps('people_after_clock_in'));
 
         // Once she's someone they support, her doses count.
         $this->aroha->supportWorkers()->attach($worker->id);
@@ -166,6 +217,48 @@ class FrontlineDoseAgreementTest extends TestCase
         $myDay = $this->actingAs($worker->fresh())->get('/my-day')->assertOk();
         // By 12:30 the 07:00, 08:00 (both) and 09:00 windows have ended.
         $this->assertSame(4, $myDay->inertiaProps('auth.can.medications.overdueTodayCount'));
+        $board = $this->actingAs($worker->fresh())->get('/meds/today')->assertOk();
+        $this->assertSame(4, collect($board->inertiaProps('schedule'))->where('status', 'overdue')->count());
+        $this->assertSame(0, $board->inertiaProps('people_after_clock_in'));
+    }
+
+    public function test_meds_today_shows_the_person_a_worker_is_clocked_in_with_and_not_the_next_shifts_person(): void
+    {
+        // sw2's case: clocked in with Aroha (not assigned to her), and rostered
+        // later today with Ben, whom they don't support and haven't clocked in
+        // for. Aroha's medicines show (a clocked-in covering shift); Ben's
+        // don't, until they clock in to his shift.
+        $ben = Client::factory()->create(['first_name' => 'Ben', 'last_name' => 'Tane', 'site_id' => $this->site->id, 'service_context_id' => $this->context->id, 'status' => 'active']);
+        $this->at('2026-06-15 00:00');
+        ClientMedication::query()->create([
+            'client_id' => $ben->id, 'name' => 'Sertraline', 'dosage' => '1 tablet', 'frequency' => 'Daily',
+            'dose_times' => ['20:00'], 'is_prn' => false, 'active' => true, 'state' => 'active', 'start_date' => '2026-06-01',
+        ]);
+        $worker = $this->staff();
+        foreach ([[$this->aroha, '07:00', '15:00', 'in_progress', '07:00'], [$ben, '15:00', '23:00', 'scheduled', null]] as [$person, $from, $to, $status, $clockedIn]) {
+            Shift::factory()->create([
+                'client_id' => $person->id,
+                'site_id' => $this->site->id,
+                'service_context_id' => $this->context->id,
+                'user_id' => $worker->id,
+                'starts_at' => $this->nz("2026-06-15 {$from}"),
+                'ends_at' => $this->nz("2026-06-15 {$to}"),
+                'actual_starts_at' => $clockedIn ? $this->nz("2026-06-15 {$clockedIn}") : null,
+                'status' => $status,
+            ]);
+        }
+        $this->at('2026-06-15 09:30');
+
+        $board = $this->actingAs($worker)->get('/meds/today')->assertOk();
+        $people = collect($board->inertiaProps('schedule'))->pluck('client_name')->unique()->values()->all();
+        $this->assertSame(['Aroha Ngata'], $people);
+        $this->assertSame(1, $board->inertiaProps('people_after_clock_in'));
+        $this->assertSame([$this->aroha->id], collect($board->inertiaProps('clients'))->pluck('id')->all());
+
+        // My Day and the badge read the same people.
+        Cache::flush();
+        $myDay = $this->actingAs($worker)->get('/my-day')->assertOk();
+        $this->assertNotContains('Ben Tane', collect($myDay->inertiaProps('medications_due'))->pluck('client_name')->all());
     }
 
     public function test_an_overnight_handover_counts_the_doses_of_both_days_as_clock_out_does(): void

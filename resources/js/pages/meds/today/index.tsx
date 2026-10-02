@@ -51,6 +51,7 @@ import {
     CdBadge,
     ClientAvatar,
     DOSE_STATUS_META,
+    hiddenControlledCaption,
     StatusPill,
 } from '@/components/meds/board-bits';
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
@@ -93,8 +94,8 @@ import {
 } from '@/pages/emar/eligibility/_my-eligibility';
 
 import {
-    DayPickerChip,
     addDays,
+    DayPickerChip,
     parseYmd,
 } from '@/components/meds/day-picker-chip';
 import { PrnEffectDialog } from './components/prn-effect-dialog';
@@ -341,6 +342,7 @@ function ScheduleCard({
     canViewMar,
     onRecord,
     onCtx,
+    notes = [],
 }: {
     rows: ScheduleRow[];
     clientById: Map<number, ClientInfo>;
@@ -351,6 +353,8 @@ function ScheduleCard({
     canViewMar: boolean;
     onRecord: (row: ScheduleRow) => void;
     onCtx: (e: ReactMouseEvent, row: ScheduleRow) => void;
+    /** What the list leaves out and why (people before clock-in, EM-12). */
+    notes?: string[];
 }) {
     const [status, setStatus] = useState<'all' | 'due' | 'later' | 'given'>(
         'all',
@@ -450,6 +454,11 @@ function ScheduleCard({
                         </Button>
                     ) : null}
                 </div>
+                {notes.map((note) => (
+                    <p key={note} className="text-caption">
+                        {note}
+                    </p>
+                ))}
             </CardHeader>
 
             <div className="overflow-x-auto">
@@ -1240,6 +1249,16 @@ export default function MedsToday(props: MedsTodayProps) {
     const canRecordControlled = board_can.record_controlled;
     const canRecordMedication = (isControlled: boolean) =>
         canRecord && (!isControlled || canRecordControlled);
+    // What the schedule leaves out, so it reconciles with the badge and the
+    // roster: people on the shift before clock-in, and controlled doses for
+    // a reader without controlled-medicine access (EM-12, naming none).
+    const peopleAfterClockIn = props.people_after_clock_in ?? 0;
+    const scheduleNotes = [
+        peopleAfterClockIn > 0
+            ? `Medicines for ${peopleAfterClockIn} more ${peopleAfterClockIn === 1 ? 'person' : 'people'} on your shift show once you’re clocked in to it.`
+            : null,
+        hiddenControlledCaption(props.hidden_controlled_doses ?? 0),
+    ].filter((note): note is string => note !== null);
 
     const [tab, setTab] = useState('schedule');
     const [meOpen, setMeOpen] = useState(false);
@@ -1755,7 +1774,9 @@ export default function MedsToday(props: MedsTodayProps) {
                         ) : (
                             <span>
                                 {props.has_shift_context
-                                    ? 'No scheduled doses for the clients on your shift this day.'
+                                    ? peopleAfterClockIn > 0
+                                        ? 'Medicines for the people on your shift show once you’re clocked in to it.'
+                                        : 'No scheduled doses for the clients on your shift this day.'
                                     : 'You don’t have a shift this day — once one is rostered, meds for those clients show here.'}
                             </span>
                         )
@@ -1862,6 +1883,7 @@ export default function MedsToday(props: MedsTodayProps) {
                                     setWizard({ type: 'dose', row })
                                 }
                                 onCtx={openDoseCtx}
+                                notes={scheduleNotes}
                             />
                         </div>
                         <div className="space-y-4">

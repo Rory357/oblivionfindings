@@ -75,7 +75,10 @@ class WorkerMedsTodayPayloadTest extends TestCase
             'user_id' => $worker->id,
             'starts_at' => Carbon::parse('2026-04-30 09:00:00', config('app.worker_timezone'))->utc(),
             'ends_at' => Carbon::parse('2026-04-30 13:00:00', config('app.worker_timezone'))->utc(),
-            'status' => 'scheduled',
+            // Clocked in at 09:00: Meds today shows the people a worker is
+            // assigned to or clocked in with (the person rule, C6).
+            'actual_starts_at' => Carbon::parse('2026-04-30 09:00:00', config('app.worker_timezone'))->utc(),
+            'status' => 'in_progress',
         ]);
 
         // Entered at the start of the day: a dose due before an order's entry is not owed.

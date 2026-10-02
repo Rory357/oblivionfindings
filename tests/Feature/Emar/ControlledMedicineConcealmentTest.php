@@ -314,7 +314,10 @@ class ControlledMedicineConcealmentTest extends TestCase
             'user_id' => $worker->id,
             'starts_at' => now()->subHour(),
             'ends_at' => now()->addHours(3),
-            'status' => 'scheduled',
+            // Clocked in: Meds today shows a person's medicines to a worker
+            // assigned to them or clocked in to their shift (C6).
+            'actual_starts_at' => now()->subHour(),
+            'status' => 'in_progress',
         ]);
 
         return $worker->refresh();
