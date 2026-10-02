@@ -20,7 +20,6 @@ import {
     Activity,
     ClipboardCheck,
     Clock,
-    Eye,
     FileText,
     HelpCircle,
     History,
@@ -52,6 +51,8 @@ import {
     StillToDecide,
     type HistoryFilters,
 } from './settings/_history';
+import { HouseLens } from './settings/_house-lens';
+import { hasSettingsMeters, SettingsMeters } from './settings/_meters';
 import {
     changes,
     stillToDecide,
@@ -208,6 +209,7 @@ export default function EmarSettings(props: Props) {
     const { view, sec } = route;
     const [draft, setDraftState] = useState<Draft>({});
     const [dialog, setDialog] = useState<Dialog | null>(null);
+    const [lensOpen, setLensOpen] = useState(false);
     const status = useStatusMessage();
     const setMessage = status.show;
     const [query, setQuery] = useState('');
@@ -389,6 +391,8 @@ export default function EmarSettings(props: Props) {
         });
     const viewGroups = Object.values(s.groups).filter((g) => g.view === view);
     const editable = viewGroups.some((g) => canEdit(g.key));
+    // Part of the one-line subline, so it stays short: houses are counted
+    // past one ("At a house" names them).
     const accessText = readOnlyAudit
         ? 'Read-only for audit'
         : !settingsAccess
@@ -402,11 +406,10 @@ export default function EmarSettings(props: Props) {
             ]
                 .filter(Boolean)
                 .join(' and ')
-                .replace(/^./, (c) => c.toUpperCase()) +
-            ' for your houses · nothing else here'
+                .replace(/^./, (c) => c.toUpperCase()) + ' for your houses'
           : s.can_manage_organisation
-            ? 'All-sites authority · every setting'
-            : `House settings for ${props.sites.map((x) => x.name).join(' and ') || 'no houses'} · organisation rules read-only`;
+            ? 'All-sites authority'
+            : `${props.sites.length === 1 ? props.sites[0].name : `${props.sites.length || 'No'} houses`} · organisation rules read-only`;
     const select = (
         label: string,
         value: string,
@@ -546,6 +549,19 @@ export default function EmarSettings(props: Props) {
             )
         ) : null;
 
+    const meters = hasSettingsMeters(built) ? (
+        <SettingsMeters
+            built={built}
+            view={view}
+            sec={sec}
+            go={go}
+            pending={pending}
+            rules={props.rules}
+            templates={props.roundTemplates}
+            pins={witnessPin.staff}
+        />
+    ) : undefined;
+
     const header = (
         <PageHeader
             className="overflow-clip!"
@@ -556,7 +572,7 @@ export default function EmarSettings(props: Props) {
                     Organisation
                 </PageHeaderStatusChip>
             }
-            subline="Medication rules and house settings · times in NZDT (Pacific/Auckland)"
+            subline={`Medication rules and house settings · ${accessText} · times in NZDT (Pacific/Auckland)`}
             actions={
                 <>
                     <PageHeaderSearch
@@ -564,6 +580,14 @@ export default function EmarSettings(props: Props) {
                         onChange={setQuery}
                         placeholder={`Search ${(sec === 'overview' ? SET_VIEWS[view].label : sectionLabel(view, sec)).replace(/^[A-Z](?![A-Z])/, (c) => c.toLowerCase())}`}
                     />
+                    {settingsAccess && props.sites.length ? (
+                        <PageHeaderGlassButton
+                            icon={Home}
+                            onClick={() => setLensOpen(true)}
+                        >
+                            At a house
+                        </PageHeaderGlassButton>
+                    ) : null}
                     {settingsAccess ? (
                         <PageHeaderGlassButton
                             icon={History}
@@ -574,16 +598,9 @@ export default function EmarSettings(props: Props) {
                     ) : null}
                 </>
             }
+            meters={meters}
             filters={
                 <>
-                    <span className="mr-2 inline-flex items-center gap-1.5 text-[11px] text-primary-foreground/80">
-                        {editable ? (
-                            <Shield className="size-3" />
-                        ) : (
-                            <Eye className="size-3" />
-                        )}
-                        {accessText}
-                    </span>
                     {sectionFilters}
                     <PageHeaderFilterButton
                         icon={RefreshCw}
@@ -774,6 +791,20 @@ export default function EmarSettings(props: Props) {
                     ) : null}
                 </div>
                 <DialogHost dialog={dialog} />
+                {lensOpen ? (
+                    <HouseLens
+                        s={s}
+                        houses={props.sites}
+                        rules={props.rules}
+                        templates={props.roundTemplates}
+                        pins={witnessPin.staff}
+                        onOpen={(v) => {
+                            setLensOpen(false);
+                            go(v);
+                        }}
+                        onClose={() => setLensOpen(false)}
+                    />
+                ) : null}
                 <RuleDialogHost dialog={dialog} data={ruleData} />
                 <TemplateDialogHost dialog={dialog} data={templateData} />
             </SettingsCtx.Provider>

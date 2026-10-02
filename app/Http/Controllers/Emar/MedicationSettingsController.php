@@ -369,7 +369,7 @@ class MedicationSettingsController extends Controller
             ? $staff->filter(fn (User $user): bool => $this->canResetPinOf($actor, $user))->pluck('id')->flip()
             : collect();
 
-        $houses = $this->primaryHouseNames($staff->pluck('id')->all());
+        $houses = $this->primaryHouses($staff->pluck('id')->all());
         $timezone = config('app.worker_timezone', 'Pacific/Auckland');
         $reminders = WitnessPinReminder::query()
             ->with('remindedBy:id,name')
@@ -389,7 +389,8 @@ class MedicationSettingsController extends Controller
 
                 return $row + [
                     'can_reset' => $resettable->has($row['id']),
-                    'house' => $houses[$row['id']] ?? null,
+                    'house' => $houses[$row['id']]['name'] ?? null,
+                    'house_id' => $houses[$row['id']]['id'] ?? null,
                     'reminded_at' => $remindedAt?->toIso8601String(),
                     'reminded_by' => $reminder?->remindedBy?->name,
                     // One reminder per person per NZ day (Q-G).
@@ -401,12 +402,12 @@ class MedicationSettingsController extends Controller
 
     /**
      * Each person's own house (their HR profile's primary Site), for the PIN
-     * status list's house filter.
+     * status list's house filter and "At a house" (by id: names repeat).
      *
      * @param  list<int>  $userIds
-     * @return array<int, string>
+     * @return array<int, array{id: int, name: string}>
      */
-    private function primaryHouseNames(array $userIds): array
+    private function primaryHouses(array $userIds): array
     {
         if ($userIds === []) {
             return [];
@@ -418,9 +419,10 @@ class MedicationSettingsController extends Controller
         $names = Site::query()->whereIn('id', $profiles->filter()->unique()->values()->all())->pluck('name', 'id');
 
         return $profiles
-            ->map(fn (mixed $siteId): ?string => $siteId ? ($names[(int) $siteId] ?? null) : null)
-            ->filter()
-            ->mapWithKeys(fn (string $name, mixed $userId): array => [(int) $userId => $name])
+            ->filter(fn (mixed $siteId): bool => $siteId && isset($names[(int) $siteId]))
+            ->mapWithKeys(fn (mixed $siteId, mixed $userId): array => [
+                (int) $userId => ['id' => (int) $siteId, 'name' => $names[(int) $siteId]],
+            ])
             ->all();
     }
 

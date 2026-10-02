@@ -9,6 +9,7 @@ import {
     AcknowledgeAssessment,
     type PendingAssessment,
 } from '@/components/meds/pending-assessment';
+import { PageHeaderStatusChip } from '@/components/page/page-header';
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { Button } from '@/components/ui/button';
 import { InfoCard } from '@/components/wizard/primitives';
@@ -135,6 +136,20 @@ export function myMeter(d: MyEligibilityData): {
                 tone: 'success',
             };
     }
+}
+
+/**
+ * The meter's value on the Meds today hero, as a status chip. Its own
+ * background keeps the verified status pairs (≥ 5.7:1 in both modes); tinted
+ * text straight on the PageHero gradient can't reach 4.5:1 (P11 chunk 7).
+ */
+export function MyEligibilityChip({ data }: { data: MyEligibilityData }) {
+    const m = myMeter(data);
+    return (
+        <PageHeaderStatusChip variant={m.tone} className="text-sm">
+            {m.big}
+        </PageHeaderStatusChip>
+    );
 }
 
 /** The summary at the top of My eligibility. */
