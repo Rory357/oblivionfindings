@@ -103,15 +103,20 @@ export function pickForeground(hex: string): string {
 }
 
 /**
- * Text for `--primary-foreground`, which is also the text on the brand sky
- * (`.eh-header` and the hero kits). The sky's upper shades are fixed dark
- * (L 0.30–0.42) whatever the brand, so its text stays white unless the brand
- * itself is very light — the long-standing rule, kept so headers don't flip
- * to ink for mid-light brands. Solid fills that carry text use
- * `--primary-fill-foreground` instead, picked by contrast in app.css.
+ * Text for `--primary-foreground`: white unless the brand itself is very
+ * light, then ink. It is NOT the text on the floored bands — the `.eh-header`
+ * sky and the PageHero band use `--band-foreground`, which is always white
+ * (app.css; they redefine primary-foreground inside themselves), because
+ * they are dark whatever the brand. Solid fills that carry text use
+ * `--primary-fill-foreground`, picked by contrast in app.css.
  */
 export function skyForeground(hex: string): string {
     return relativeLuminance(hex) > 0.5 ? INK_FOREGROUND : WHITE_FOREGROUND;
+}
+
+/** A brand light enough that `--primary-foreground` turns ink. */
+export function isVeryLightBrand(hex: string): boolean {
+    return skyForeground(hex) === INK_FOREGROUND;
 }
 
 /* ------------------------------------------------------------------ */
@@ -229,19 +234,17 @@ export const BRAND_CONTRAST_TARGET = 4.5;
 
 /**
  * Contrast of the brand-dependent header text this colour produces, mirroring
- * app.css: the sky text (--primary-foreground, `skyForeground`) on the sky's
- * top stop `oklch(from brand 0.3 c*0.6 h)` (title, 65% subline), its mid stop
+ * app.css: the band text (--band-foreground, always white) on the sky's top
+ * stop `oklch(from brand 0.3 c*0.6 h)` (title, 65% subline), its mid stop
  * `oklch(from brand 0.42 c*0.8 h)` (meter figures) and its bottom floor (80%
  * rail tab labels — the corner blooms take the same floor colour), and the
- * hero white button's --primary-strong text (`min(l, 0.5)`) on
- * --primary-foreground.
+ * hero white button's --primary-strong text (`min(l, 0.5)`) on the white
+ * band-foreground pill. Since band text stopped following the brand
+ * (2026-10-03) these hold for very light brands too.
  */
 export function brandContrastChecks(hex: string): BrandContrastCheck[] {
     const [L, C, h] = hexToOklch(hex);
-    const skyText: Rgb =
-        skyForeground(hex) === WHITE_FOREGROUND
-            ? [1, 1, 1]
-            : oklchToRgb(0.15, 0.015, 277);
+    const skyText: Rgb = [1, 1, 1];
     const top = oklchToRgb(0.3, C * 0.6, h);
     const mid = oklchToRgb(0.42, C * 0.8, h);
     const bottom = oklchToRgb(Math.min(L, SKY_BOTTOM_MAX_L), C, h);

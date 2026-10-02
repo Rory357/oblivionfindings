@@ -9,6 +9,7 @@ import {
     derivePalette,
     hexToOklch,
     INK_FOREGROUND,
+    isVeryLightBrand,
     pickForeground,
     relativeLuminance,
     skyForeground,
@@ -84,8 +85,8 @@ describe('pickForeground — WCAG contrast, not a luminance cut-off', () => {
     });
 });
 
-describe('skyForeground — text on the brand sky', () => {
-    it('stays white for mid-light brands, whose sky top is still dark', () => {
+describe('skyForeground — --primary-foreground (not band text)', () => {
+    it('stays white for mid-light brands', () => {
         expect(skyForeground(BRAND_PRESETS.warm.hex)).toBe(WHITE_FOREGROUND);
         expect(skyForeground(BRAND_PRESETS.cool.hex)).toBe(WHITE_FOREGROUND);
         expect(skyForeground(BRAND_PRESETS.forest.hex)).toBe(WHITE_FOREGROUND);
@@ -118,14 +119,14 @@ describe('brandContrastReport — Settings → Branding guidance', () => {
         expect(report.suggestion).toBeNull();
     });
 
-    it('flags a very light brand on the sky title, description and white button', () => {
-        const byId = Object.fromEntries(
-            brandContrastChecks('#facc15').map((c) => [c.id, c.ratio]),
-        );
-        expect(byId.title).toBeLessThan(BRAND_CONTRAST_TARGET);
-        expect(byId.subline).toBeLessThan(BRAND_CONTRAST_TARGET);
-        expect(byId.heroButton).toBeLessThan(BRAND_CONTRAST_TARGET);
-    });
+    it.each(['#facc15', '#fde68a', '#e0f2fe', '#f5f5f4', '#ffffff'])(
+        'keeps every header check readable for very light brand %s (band text is always white)',
+        (hex) => {
+            expect(isVeryLightBrand(hex)).toBe(true);
+            expect(minRatio(hex)).toBeGreaterThanOrEqual(BRAND_CONTRAST_TARGET);
+            expect(brandContrastReport(hex).passes).toBe(true);
+        },
+    );
 
     it.each(['#facc15', '#ffffff', '#ea580c', '#0891b2', '#059669', '#0ea5e9'])(
         'suggests a darker shade of %s that passes every check',

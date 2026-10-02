@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import {
     BRAND_CONTRAST_TARGET,
     brandContrastReport,
+    isVeryLightBrand,
 } from '@/lib/derive-palette';
 import { AlertTriangle, Check, X } from 'lucide-react';
 import { useMemo } from 'react';
@@ -12,9 +13,11 @@ const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const formatRatio = (ratio: number) => `${ratio.toFixed(1)}:1`;
 
 /**
- * Guidance only — never blocks saving. Shown when a brand colour would leave
- * page-header text or the white header button below WCAG AA (4.5:1); lists the
- * measured contrast of each and offers the lightest darker shade that passes.
+ * Guidance only — never blocks saving. Page headers are floored dark with
+ * always-white text (--band-foreground), so a very light brand gets a short
+ * confirmation that headers stay readable. The warning remains for any
+ * check that still falls below WCAG AA (4.5:1), with the measured contrast
+ * of each and the lightest darker shade that passes.
  */
 export function BrandContrastNotice({
     hex,
@@ -28,7 +31,31 @@ export function BrandContrastNotice({
         [hex],
     );
 
-    if (!report || report.passes) return null;
+    if (!report) return null;
+
+    if (report.passes) {
+        if (!isVeryLightBrand(hex)) return null;
+        return (
+            <Alert
+                className="border-status-success/30 bg-status-success-bg text-status-success"
+                data-testid="brand-contrast-ok"
+            >
+                <Check />
+                <AlertTitle className="line-clamp-none">
+                    Headers stay readable
+                </AlertTitle>
+                <AlertDescription className="text-status-success">
+                    <p>
+                        Page headers and banners are always dark with white
+                        text, so this light colour keeps them readable. Buttons
+                        and badges filled with it switch to dark text
+                        automatically.
+                    </p>
+                </AlertDescription>
+            </Alert>
+        );
+    }
+
     const suggestion = report.suggestion;
     const worst = report.checks.reduce((a, b) => (b.ratio < a.ratio ? b : a));
 
