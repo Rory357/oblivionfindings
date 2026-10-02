@@ -9,6 +9,7 @@ it('keeps medication UI flags and authoring routes on their exact capabilities',
     $emarRoutes = (string) file_get_contents($root.'/routes/emar.php');
     $apiRoutes = (string) file_get_contents($root.'/routes/api_medications.php');
     $sidebar = (string) file_get_contents($root.'/resources/js/components/app-sidebar.tsx');
+    $navigation = (string) file_get_contents($root.'/resources/js/lib/emar-navigation.ts');
     $errorPage = (string) file_get_contents($root.'/resources/js/pages/emar/MedicationErrors.tsx');
     $errorDialogs = (string) file_get_contents($root.'/resources/js/pages/emar/_error-dialogs.tsx');
 
@@ -49,17 +50,19 @@ it('keeps medication UI flags and authoring routes on their exact capabilities',
         ->toContain("->middleware('permission:medications.settings.manage')\n        ->name('api.medications.interactions.store')")
         ->not->toContain("->middleware('permission:medications.administer.correct')\n        ->name('api.medications.interactions.store')")
         ->not->toContain('permission:medications.administer.correct|clients.update')
+        // NAV: the sidebar delegates to lib/emar-navigation.ts, whose view
+        // gates mirror the server's exact reader capabilities.
         ->and($sidebar)
+        ->toContain('const medication = emarSidebar(can);')
+        ->not->toContain('const canAdminEmar')
+        ->and($navigation)
         ->toContain(
-            'if (can?.reports?.viewAny || can?.medications?.reportsExport)',
-            "(can?.medications?.view &&\n            can?.medications?.controlledView &&\n            can?.medications?.controlledRecord)",
-            'if (can?.medications?.view && can?.medications?.controlledView)',
+            "label: 'Reports',\n                href: '/emar/reports',\n                icon: BarChart3,\n                visible: any(reportsExport, reportsViewAny),",
+            "label: 'Controlled register',\n                href: '/emar/controlled',\n                icon: Shield,\n                visible: all(view, controlledView),",
+            "label: 'Destructions & returns',\n                href: '/emar/destructions',\n                icon: Ban,\n                visible: all(view, controlledView),",
+            '(controlledView(can) && hasManagerCapability(can))',
         )
-        ->not->toContain(
-            "can?.medications?.view &&\n        (can?.reports?.viewAny || can?.medications?.reportsExport)",
-            '(can?.medications?.view && can?.medications?.controlledView) ||',
-            '(can?.medications?.view && can?.medications?.controlledRecord) ||',
-        )
+        ->not->toContain('controlledRecord(can)', 'controlledWitness(can)')
         ->and($errorPage)
         ->toContain(
             'can.record ? (',

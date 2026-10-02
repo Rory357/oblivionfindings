@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- the tab cards/tables are custom-layout
    bordered surfaces (not Card/Button), and the hero carries the white pill search
    on the dark band (native input/button); all colours are semantic tokens. */
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { OrderDetailDialog } from '@/components/emar/prescriptions/order-detail-dialog';
 import {
     countersignHoursLeft,
@@ -21,6 +22,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     CancelOrderDialog,
@@ -239,6 +241,7 @@ function EmptyState({
 }
 
 export default function Prescriptions(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         orders,
         covert,
@@ -644,15 +647,11 @@ export default function Prescriptions(props: Props) {
     const visibleAlerts = alerts.filter((a) => !dismissed.has(a.key));
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Prescriptions', href: '/emar/prescriptions' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Prescriptions & Orders" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

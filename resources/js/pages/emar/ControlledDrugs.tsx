@@ -14,6 +14,7 @@ import {
     type ClientOption,
     type StaffOption,
 } from '@/components/emar/controlled/types';
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     DayPickerChip,
     addDays,
@@ -30,6 +31,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import { useOfflineQueueState } from '@/hooks/use-offline-queue';
 import AppLayout from '@/layouts/app-layout';
 import {
@@ -153,6 +155,7 @@ function persistDismissedAlerts(kinds: string[]): string[] {
 }
 
 export default function ControlledDrugs(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         medications,
         recentEntries,
@@ -689,15 +692,11 @@ export default function ControlledDrugs(props: Props) {
     ) : null;
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Controlled Drugs', href: '/emar/controlled' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Controlled Drug Register" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

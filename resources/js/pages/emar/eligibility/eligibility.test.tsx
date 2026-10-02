@@ -26,7 +26,7 @@ vi.mock('@inertiajs/react', () => ({
     Link: ({ children, href }: { children: ReactNode; href: string }) => (
         <a href={href}>{children}</a>
     ),
-    usePage: () => ({ props: {} }),
+    usePage: () => ({ url: '/emar/safety/eligibility', props: {} }),
 }));
 vi.mock('@/layouts/app-layout', () => ({
     default: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -202,6 +202,12 @@ describe('Safety & oversight › Staff eligibility', () => {
     it('shows the meters, the sub-views as header chips, and no witness view', () => {
         render(<StaffEligibility {...pageProps} />);
         expect(screen.getByText('Safety & oversight')).toBeInTheDocument();
+        // The Safety & oversight hub rail, this page as the active tab.
+        expect(
+            screen
+                .getByRole('tab', { name: /^Staff eligibility/ })
+                .getAttribute('aria-selected'),
+        ).toBe('true');
         expect(screen.getByText('Competency register')).toBeInTheDocument();
         expect(screen.getByText(/2 of 3/)).toBeInTheDocument();
         expect(

@@ -14,6 +14,12 @@ import {
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useStableValue } from '@/hooks/use-stable-value';
 import {
+    EMAR_SEARCH_KEYWORDS,
+    emarHubLinkActive,
+    emarSearchEntries,
+    emarSidebar,
+} from '@/lib/emar-navigation';
+import {
     FINANCE_SECTIONS,
     financeHubContainsUrl,
     isFinanceHubHref,
@@ -91,7 +97,6 @@ import {
     Stethoscope,
     Target,
     Timer,
-    Trash2,
     Truck,
     UserCheck,
     Users,
@@ -339,6 +344,14 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
         normalizedItemPath,
     );
     if (fleetActive !== undefined) return fleetActive ? 2000 + item.length : -1;
+
+    // A Medication hub entry is lit on every page of its hub (its landing
+    // varies with permissions, and `/emar` prefixes every eMAR URL).
+    const emarActive = emarHubLinkActive(
+        normalizedCurrentPath,
+        normalizedItemPath,
+    );
+    if (emarActive !== undefined) return emarActive ? 2000 + item.length : -1;
 
     if (itemQuery.length > 0) {
         return normalizedCurrentPath === normalizedItemPath &&
@@ -655,36 +668,25 @@ function buildIconNavItems({
         });
     }
 
-    // Medications (PR 12 — worker / admin split).
-    //
-    // Frontline workers (administer-record, no orders-manage/audit) get a
-    // single top-level link straight to the operational worker view at
-    // `/meds/today`. They never land on the admin-heavy eMAR dashboard by
-    // default.
-    //
-    // Managers / medication leads (orders, stock, audit, or reports) keep the
-    // full eMAR sub-panel for oversight, now rooted on the worker view so the
-    // first click still matches the frontline experience, with Dashboard kept
-    // one level deeper for compliance / management work.
-    const canAdminEmar =
-        (can?.medications?.view && can?.medications?.ordersManage) ||
-        (can?.medications?.view && can?.medications?.stockUpdate) ||
-        (can?.medications?.view &&
-            can?.medications?.controlledView &&
-            can?.medications?.controlledRecord) ||
-        can?.medications?.auditView ||
-        can?.medications?.reportsExport ||
-        can?.reports?.viewAny;
-    const canWorkerMeds =
-        can?.medications?.administerRecord || can?.medications?.view;
-    if (canAdminEmar) {
-        items.push({ id: 'emar', icon: Pill, label: 'eMAR', subPanel: true });
-    } else if (canWorkerMeds) {
+    // Medication (eMAR second review §2–§3; lib/emar-navigation.ts owns the
+    // hubs). Frontline workers get one "Meds today" entry; everyone else gets
+    // the "Medication" module listing the hubs they may open, each at its
+    // first permitted view. reports.viewAny alone reveals Reports & audit
+    // only. Navigation only — every page is still guarded on the server.
+    const medication = emarSidebar(can);
+    if (medication.mode === 'module') {
+        items.push({
+            id: 'emar',
+            icon: Pill,
+            label: medication.label,
+            subPanel: true,
+        });
+    } else if (medication.mode === 'frontline') {
         items.push({
             id: 'meds-today',
             icon: Pill,
             label: 'Meds today',
-            href: '/meds/today',
+            href: medication.href,
             // Overdue doses for the worker's shift clients (shared by
             // HandleInertiaRequests, 60s cache) — the design's critical chip.
             badge: can?.medications?.overdueTodayCount,
@@ -1324,136 +1326,20 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         : [];
 }
 
+/** The Medication module's hubs (lib/emar-navigation.ts), each at its first permitted view. */
 function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
-    const groups: SubPanelGroup[] = [];
-
-    // Worker view (PR 12). Top of the panel so even admins can quickly drop
-    // into the operational frontline surface before diving into compliance.
-    const workerItems: NavItem[] = [];
-    if (can?.medications?.administerRecord || can?.medications?.view)
-        workerItems.push({
-            title: 'Meds today',
-            href: '/meds/today',
-            icon: Activity,
-        });
-    if (workerItems.length > 0)
-        groups.push({ label: 'Worker view', items: workerItems });
-
-    // Overview
-    if (can?.medications?.view)
-        groups.push({
-            label: 'Overview',
-            items: [{ title: 'Dashboard', href: '/emar', icon: LayoutGrid }],
-        });
-
-    // Administration
-    const admin: NavItem[] = [];
-    if (can?.medications?.view)
-        admin.push({
-            title: 'MAR Charts',
-            href: '/emar/mar',
-            icon: ClipboardCheck,
-        });
-    if (can?.medications?.view)
-        admin.push({
-            title: 'Medication Rounds',
-            href: '/emar/rounds',
-            icon: Clock,
-        });
-    if (can?.medications?.view)
-        admin.push({ title: 'PRN Records', href: '/emar/prn', icon: BookOpen });
-    if (can?.medications?.view && can?.medications?.controlledView)
-        admin.push({
-            title: 'Controlled Drugs',
-            href: '/emar/controlled',
-            icon: Shield,
-        });
-    if (can?.medications?.breakGlass)
-        admin.push({
-            title: 'Emergency Access',
-            href: '/emar/emergency-access',
-            icon: ShieldAlert,
-        });
-    if (admin.length > 0)
-        groups.push({ label: 'Administration', items: admin });
-
-    // Management
-    const mgmt: NavItem[] = [];
-    if (can?.medications?.view)
-        mgmt.push({
-            title: 'Medications',
-            href: '/emar/medications',
-            icon: Pill,
-        });
-    if (can?.medications?.view && can?.medications?.stockUpdate)
-        mgmt.push({
-            title: 'Stock Management',
-            href: '/emar/stock',
-            icon: Package,
-        });
-    if (can?.medications?.view)
-        mgmt.push({
-            title: 'Prescriptions',
-            href: '/emar/prescriptions',
-            icon: FileText,
-        });
-    if (can?.medications?.view)
-        mgmt.push({
-            title: 'Medication Reviews',
-            href: '/emar/reviews',
-            icon: CalendarDays,
-        });
-    if (can?.medications?.view)
-        mgmt.push({
-            title: 'Self-Administration',
-            href: '/emar/self-admin',
-            icon: Users,
-        });
-    if (mgmt.length > 0) groups.push({ label: 'Management', items: mgmt });
-
-    // Compliance
-    const compliance: NavItem[] = [];
-    if (can?.medications?.auditView)
-        compliance.push({
-            title: 'Audit Trail',
-            href: '/emar/audit',
-            icon: Shield,
-        });
-    if (can?.reports?.viewAny || can?.medications?.reportsExport)
-        compliance.push({
-            title: 'Reports',
-            href: '/emar/reports',
-            icon: PieChart,
-        });
-    if (can?.medications?.view)
-        compliance.push({
-            // P11: Safety & oversight › Staff eligibility replaced Competency.
-            title: 'Staff eligibility',
-            href: '/emar/safety/eligibility',
-            icon: ClipboardCheck,
-        });
-    if (can?.medications?.view && can?.medications?.controlledView)
-        compliance.push({
-            title: 'Destructions',
-            href: '/emar/destructions',
-            icon: Trash2,
-        });
-    if (can?.medications?.view)
-        compliance.push({
-            title: 'Handovers',
-            href: '/emar/handovers',
-            icon: GitBranch,
-        });
-    if (can?.medications?.view)
-        compliance.push({
-            title: 'Medication Errors',
-            href: '/emar/errors',
-            icon: AlertTriangle,
-        });
-    if (compliance.length > 0)
-        groups.push({ label: 'Compliance', items: compliance });
-
-    return groups;
+    const medication = emarSidebar(can);
+    if (medication.mode !== 'module') return [];
+    return [
+        {
+            label: medication.label,
+            items: medication.hubs.map((hub) => ({
+                title: hub.title,
+                href: hub.href,
+                icon: hub.icon,
+            })),
+        },
+    ];
 }
 
 function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
@@ -3097,6 +2983,8 @@ export type NavSearchItem = {
     section: string;
     group?: string;
     icon?: LucideIcon;
+    /** Extra search terms, e.g. a module's former name. */
+    keywords?: string[];
 };
 
 export function buildNavSearchCatalog(ctx: {
@@ -3165,6 +3053,21 @@ export function buildNavSearchCatalog(ctx: {
                 }
             }
         }
+        // Every Medication view the viewer may open is searchable, with
+        // "eMAR" kept as a synonym for the renamed module.
+        if (icon.id === 'emar' || icon.id === 'meds-today') {
+            for (const entry of emarSearchEntries(can)) {
+                push({
+                    id: entry.id,
+                    label: entry.label,
+                    href: entry.href,
+                    section: 'Medication',
+                    group: entry.group,
+                    icon: entry.icon,
+                    keywords: entry.keywords,
+                });
+            }
+        }
         if (icon.href && !icon.subPanel) {
             push({
                 id: icon.id,
@@ -3172,6 +3075,9 @@ export function buildNavSearchCatalog(ctx: {
                 href: resolveUrl(icon.href),
                 section: 'General',
                 icon: icon.icon,
+                ...(icon.id === 'meds-today'
+                    ? { keywords: EMAR_SEARCH_KEYWORDS }
+                    : {}),
             });
         }
 
@@ -3192,6 +3098,9 @@ export function buildNavSearchCatalog(ctx: {
                         section: icon.label,
                         group: group.label,
                         icon: sub.icon ?? icon.icon,
+                        ...(icon.id === 'emar'
+                            ? { keywords: EMAR_SEARCH_KEYWORDS }
+                            : {}),
                     });
                 }
             }

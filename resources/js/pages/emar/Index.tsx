@@ -13,6 +13,7 @@ import { EntityFilter } from '@/components/rostering/entity-filter';
 import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import type { SharedData } from '@/types';
@@ -56,6 +57,7 @@ import {
     YAxis,
 } from 'recharts';
 
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     addDays,
     DayPickerChip,
@@ -449,6 +451,7 @@ function KpiCard({
 }
 
 export default function EmarHome(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         date,
         isToday,
@@ -795,11 +798,12 @@ export default function EmarHome(props: Props) {
     );
 
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="eMAR" />
             <div className="flex flex-col gap-4 p-6">
                 {/* ── Hero ── */}
                 <PageHero
+                    rail={<EmarHubRail />}
                     category="ops"
                     icon={Pill}
                     title={

@@ -90,22 +90,24 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         }
 
         $sharedPermissions = file_get_contents(app_path('Http/Middleware/HandleInertiaRequests.php'));
-        $sidebar = file_get_contents(resource_path('js/components/app-sidebar.tsx'));
+        // NAV: hub rail views live in lib/emar-navigation.ts (the sidebar and
+        // hub rails both read it).
+        $navigation = file_get_contents(resource_path('js/lib/emar-navigation.ts'));
         $this->assertIsString($sharedPermissions);
-        $this->assertIsString($sidebar);
+        $this->assertIsString($navigation);
         $this->assertStringContainsString("'controlledView' => \$user->canDo('medications.controlled.view')", $sharedPermissions);
         $this->assertStringContainsString("'stockUpdate' => \$user->canDo('medications.stock.update')", $sharedPermissions);
         $this->assertMatchesRegularExpression(
-            "/if \(can\?\.medications\?\.view && can\?\.medications\?\.controlledView\)\s*admin\.push\(\{\s*title: 'Controlled Drugs'/s",
-            $sidebar,
+            "/label: 'Controlled register',\s*href: '\/emar\/controlled',\s*icon: \w+,\s*visible: all\(view, controlledView\)/s",
+            $navigation,
         );
         $this->assertMatchesRegularExpression(
-            "/if \(can\?\.medications\?\.view && can\?\.medications\?\.controlledView\)\s*compliance\.push\(\{\s*title: 'Destructions'/s",
-            $sidebar,
+            "/label: 'Destructions & returns',\s*href: '\/emar\/destructions',\s*icon: \w+,\s*visible: all\(view, controlledView\)/s",
+            $navigation,
         );
         $this->assertMatchesRegularExpression(
-            "/if \(can\?\.medications\?\.view && can\?\.medications\?\.stockUpdate\)\s*mgmt\.push\(\{\s*title: 'Stock Management'/s",
-            $sidebar,
+            "/label: 'Stock & pharmacy',\s*href: '\/emar\/stock',\s*icon: \w+,\s*visible: all\(view, stockUpdate\)/s",
+            $navigation,
         );
 
         foreach ([
@@ -305,7 +307,6 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             'emar.medications',
             'emar.stock',
             'emar.prescriptions',
-            'emar.competency',
             'emar.reviews',
             'emar.rounds',
             'emar.self_admin',
@@ -320,6 +321,20 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 ->get(route($routeName, ['site_id' => 999999]))
                 ->assertNotFound();
         }
+
+        // P11 chunk 6: /emar/competency only redirects to Staff eligibility,
+        // which reads no Site from the URL and lists the reader's own houses.
+        $foreignSiteId = (int) $context['foreign_site']->id;
+        $this->actingAs($actor)
+            ->get(route('emar.competency', ['site_id' => $foreignSiteId]))
+            ->assertRedirect(route('emar.safety.eligibility', ['house' => $foreignSiteId]));
+        $this->actingAs($actor)
+            ->get(route('emar.safety.eligibility', ['house' => $foreignSiteId]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('emar/StaffEligibility')
+                ->where('houses', fn ($houses): bool => collect($houses)->pluck('id')->doesntContain($foreignSiteId))
+                ->where('people', fn ($people): bool => collect($people)->pluck('house_id')->doesntContain($foreignSiteId)));
 
         foreach ([
             'emar.prn',

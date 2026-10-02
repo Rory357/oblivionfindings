@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- the break-glass grant cards, audit table, flagged/policy
    panels and countdown rings are custom-layout bordered surfaces (not Card/Button); the ring uses an
    inline conic-gradient of design tokens. All colours are semantic tokens. */
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     PageHero,
     type PageHeroBadge,
@@ -22,6 +23,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     RequestAccessDialog,
@@ -215,6 +217,7 @@ export default function EmergencyAccess({
     can_edit_policy: canEditPolicy,
     incidents_by_client: incidentsByClient,
 }: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const [tab, setTab] = useState('active');
     const [siteFilter, setSiteFilter] = useState<number | null>(
         activeSite?.id ?? null,
@@ -361,15 +364,11 @@ export default function EmergencyAccess({
     }, [stats.awaiting_review, stats.flagged, policy.auto_revoke]);
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Emergency Access', href: '/emar/emergency-access' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="eMAR - Emergency Access" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

@@ -138,11 +138,14 @@ class MedsBoardPayloadService
                 ->with('client:id,first_name,last_name,site_id')
                 ->get()
                 ->partition(fn (ClientMedication $order): bool => ! $includeControlled && (bool) $order->controlled_drug);
-            $doses = app(ScheduledDoseStates::class)->dosesOn($medications->concat($controlled), $date, $now);
+            $states = app(ScheduledDoseStates::class);
+            $doses = $states->dosesOn($medications->concat($controlled), $date, $now);
             // Counted only for a caller that asks (passes $hidden).
             if (func_num_args() >= 6) {
                 $hidden = $this->hiddenControlledDoses($controlled, $doses, $clientIds, $date);
             }
+            // The words for an Away dose, as this reader may read them (C7).
+            $doses = $states->withAwayReasons($doses, auth()->user());
 
             $rows = [];
 
@@ -177,6 +180,8 @@ class MedsBoardPayloadService
                         'time' => $scheduled->copy()->timezone($timezone)->format('H:i'),
                         'round_label' => $this->roundLabelFor($scheduled->copy()->timezone($timezone)),
                         'status' => $status,
+                        // Away (C7): why, shown as "Away · reason".
+                        'away_reason' => $status === 'away' ? $dose['away_reason'] : null,
                         'recorded' => $administration ? $this->recordedPayload($administration, $timezone) : null,
                         'mar_url' => EmarUrl::mar($med->client_id, $scheduled->toDateString()),
                     ];

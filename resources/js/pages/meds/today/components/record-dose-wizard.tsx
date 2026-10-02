@@ -453,7 +453,10 @@ export function RecordDoseWizard({
                                     </div>
                                 </div>
                             </div>
-                            <StatusPill status={row.status} />
+                            <StatusPill
+                                status={row.status}
+                                awayReason={row.away_reason}
+                            />
                         </div>
 
                         {row.status === 'overdue' || row.status === 'missed' ? (

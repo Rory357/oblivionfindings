@@ -51,6 +51,7 @@ import {
     CdBadge,
     ClientAvatar,
     DOSE_STATUS_META,
+    doseStatusLabel,
     hiddenControlledCaption,
     StatusPill,
 } from '@/components/meds/board-bits';
@@ -83,6 +84,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     OWN_WITNESS_PIN_PROMPT,
@@ -129,8 +131,11 @@ function computeBoard(schedule: ScheduleRow[]) {
     const later = schedule.filter((r) => r.status === 'upcoming').length;
     const done = schedule.filter((r) => r.recorded !== null).length;
     const given = schedule.filter((r) => r.status === 'given').length;
-    // Doses waiting for the order check are shown but not counted.
-    const total = schedule.filter((r) => !awaitsOrderCheck(r)).length;
+    // Doses waiting for the order check, and doses the person is away for,
+    // are shown but not counted.
+    const total = schedule.filter(
+        (r) => !awaitsOrderCheck(r) && r.status !== 'away',
+    ).length;
     return {
         overdue,
         due,
@@ -286,7 +291,7 @@ function DoseRow({
                 {row.route ?? '—'}
             </td>
             <td className="py-3 pr-3 align-middle">
-                <StatusPill status={row.status} />
+                <StatusPill status={row.status} awayReason={row.away_reason} />
             </td>
             <td className="py-3 pr-5 text-right align-middle whitespace-nowrap">
                 {actionable ? (
@@ -1044,7 +1049,10 @@ function RoundsTab({
                                                     ' ',
                                                 )[0]}{' '}
                                             · {d.time}
-                                            <StatusPill status={d.status} />
+                                            <StatusPill
+                                                status={d.status}
+                                                awayReason={d.away_reason}
+                                            />
                                         </span>
                                     ))}
                                 </div>
@@ -1229,6 +1237,7 @@ function ActivityTab({ activity }: { activity: ActivityItem[] }) {
 /* ------------------------------------------------------------------ */
 
 export default function MedsToday(props: MedsTodayProps) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         schedule,
         clients,
@@ -1462,7 +1471,7 @@ export default function MedsToday(props: MedsTodayProps) {
         setCtxMenu({
             x: e.clientX,
             y: e.clientY,
-            tag: meta.label,
+            tag: doseStatusLabel(row.status, row.away_reason),
             tagBg: meta.tagBg,
             tagColor: meta.tagColor,
             meta: `${row.client_name} · ${row.medication_name}${row.dose ? ` ${row.dose}` : ''}`,
@@ -1716,12 +1725,7 @@ export default function MedsToday(props: MedsTodayProps) {
     const firstOverdue = overdueRows[0];
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Medication' },
-                { title: 'Meds today', href: '/meds/today' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Meds today" />
             <div className="space-y-4 p-4 md:p-5">
                 <PageHero

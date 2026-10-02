@@ -124,11 +124,13 @@ class EnhancedMarService
         // state, from the dose-slot projection (C6b, ScheduledDoseStates).
         $scheduledRows = [];
         $prnRows = [];
-        $doses = app(ScheduledDoseStates::class)->dosesOn(
+        $states = app(ScheduledDoseStates::class);
+        // With the words for an Away dose, as this reader may read them (C7).
+        $doses = $states->withAwayReasons($states->dosesOn(
             $medications->reject(fn (ClientMedication $medication): bool => (bool) $medication->is_prn),
             $date,
             $now,
-        );
+        ), auth()->user());
 
         foreach ($medications as $medication) {
             // Build scheduled doses for non-PRN medications
@@ -346,7 +348,11 @@ class EnhancedMarService
             'scheduled_for' => $scheduledFor->toIso8601String(),
             'scheduled_time' => $scheduledFor->format('H:i'),
             'schedule_state' => $scheduleState,
-            'schedule_state_label' => $this->getScheduleStateLabel($scheduleState),
+            // Away (C7) always shows its reason: "Away · On leave (until …)".
+            'schedule_state_label' => $scheduleState === 'away'
+                ? ['label' => 'Away'.($dose['away_reason'] ? ' · '.$dose['away_reason'] : ''), 'color' => 'blue', 'icon' => 'plane']
+                : $this->getScheduleStateLabel($scheduleState),
+            'away_reason' => $scheduleState === 'away' ? $dose['away_reason'] : null,
             'window_start' => $windowStart->toIso8601String(),
             'window_end' => $windowEnd->toIso8601String(),
             'can_record' => $scheduleState !== 'completed' && $scheduleState !== 'future' && $medication->isAdministrable(),
@@ -500,6 +506,8 @@ class EnhancedMarService
         }
 
         return match ($dose['state']) {
+            // The person is away (C7): shown, never due or overdue.
+            DoseSlotProjection::STATE_AWAY => 'away',
             DoseSlotProjection::STATE_DUE => 'due',
             DoseSlotProjection::STATE_LATE => 'late',
             DoseSlotProjection::STATE_NOT_RECORDED => 'missed_auto',
@@ -613,8 +621,11 @@ class EnhancedMarService
      */
     private function calculateStats(array $scheduledRows, array $prnRows, array $history): array
     {
+        // A dose the person is away for (C7) is shown, not counted as owed.
+        $owedRows = array_filter($scheduledRows, fn ($r) => $r['schedule_state'] !== 'away');
         $scheduledStats = [
-            'total' => count($scheduledRows),
+            'total' => count($owedRows),
+            'away' => count($scheduledRows) - count($owedRows),
             'completed' => count(array_filter($scheduledRows, fn ($r) => $r['schedule_state'] === 'completed')),
             'due' => count(array_filter($scheduledRows, fn ($r) => $r['schedule_state'] === 'due')),
             'late' => count(array_filter($scheduledRows, fn ($r) => $r['schedule_state'] === 'late')),

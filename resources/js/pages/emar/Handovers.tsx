@@ -2,6 +2,7 @@
    bordered surfaces / chip buttons (not Card/Button); the cards/rail/detail/wizard are reused shared
    components. All colours are semantic tokens. */
 import { AddClientDialog } from '@/components/clients/add-client-dialog';
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { PageHero, type PageHeroStat } from '@/components/page';
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
@@ -10,6 +11,7 @@ import {
     type RosterTabItem,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { CardsView } from '@/pages/operations/handovers/components/cards-view';
 import { HandoverDetailDialog } from '@/pages/operations/handovers/components/handover-detail-dialog';
@@ -117,6 +119,7 @@ export default function Handovers({
     active_site: activeSite,
     site_brand_colour: brandColour,
 }: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const weekStartDate = useMemo(
         () => new Date(`${weekStart}T00:00:00`),
         [weekStart],
@@ -453,15 +456,11 @@ export default function Handovers({
     ];
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Handovers', href: '/emar/handovers' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="eMAR - Medication Handovers" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

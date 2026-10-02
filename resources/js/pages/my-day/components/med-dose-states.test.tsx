@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
     DOSE_STATUS_META,
+    doseStatusLabel,
     hiddenControlledCaption,
 } from '@/components/meds/board-bits';
 
@@ -56,6 +57,34 @@ describe('My Day medication states (C6)', () => {
         expect(workIsDone(med('missed'))).toBe(true);
         // The label Meds today uses for the same state.
         expect(DOSE_STATUS_META.missed.label).toBe('Missed (recorded)');
+    });
+
+    it('shows a dose the person is away for as "Away · reason", with nothing to do and never overdue', () => {
+        const item = med('away');
+        if (item.kind === 'med') {
+            item.data.away_reason = 'Respite at another house (since Mon 15 Jun, 7:00 am)';
+        }
+        render(
+            <StreamItemRow
+                item={item}
+                isNow={false}
+                showResident={false}
+                onToggleTask={vi.fn()}
+                onGiveMed={vi.fn()}
+                onOpenContextMenu={vi.fn()}
+            />,
+        );
+
+        expect(
+            screen.getAllByText('Away · Respite at another house (since Mon 15 Jun, 7:00 am)').length,
+        ).toBeGreaterThan(0);
+        expect(screen.queryByText('Overdue')).toBeNull();
+        expect(screen.queryByTitle('Mark as given')).toBeNull();
+        expect(workIsDone(item)).toBe(true);
+        // The label Meds today uses for the same state.
+        expect(
+            doseStatusLabel('away', 'Respite at another house (since Mon 15 Jun, 7:00 am)'),
+        ).toBe('Away · Respite at another house (since Mon 15 Jun, 7:00 am)');
     });
 
     it('says how many controlled doses a list leaves out, naming none', () => {

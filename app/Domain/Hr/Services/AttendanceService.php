@@ -2035,7 +2035,7 @@ class AttendanceService
                 $scheduled = $dose['due_at'];
                 if (! $scheduled->betweenIncluded($start, $end)
                     || $dose['outcome'] !== null
-                    || in_array($dose['state'], [DoseSlotProjection::STATE_PENDING_CHECK, DoseSlotProjection::STATE_SELF_MANAGED], true)) {
+                    || in_array($dose['state'], [DoseSlotProjection::STATE_PENDING_CHECK, DoseSlotProjection::STATE_SELF_MANAGED, DoseSlotProjection::STATE_AWAY], true)) {
                     continue;
                 }
 

@@ -54,18 +54,22 @@ export function DayWorkList(p: Props) {
         const status = done
             ? item.kind === 'task'
                 ? 'Done'
-                : {
-                      given: 'Given',
-                      refused: 'Refused',
-                      withheld: 'Withheld',
-                      missed: 'Missed (recorded)',
-                  }[
-                      item.data.status as
-                          | 'given'
-                          | 'refused'
-                          | 'withheld'
-                          | 'missed'
-                  ]
+                : item.data.status === 'away'
+                  ? item.data.away_reason
+                      ? `Away · ${item.data.away_reason}`
+                      : 'Away'
+                  : {
+                        given: 'Given',
+                        refused: 'Refused',
+                        withheld: 'Withheld',
+                        missed: 'Missed (recorded)',
+                    }[
+                        item.data.status as
+                            | 'given'
+                            | 'refused'
+                            | 'withheld'
+                            | 'missed'
+                    ]
             : item.kind === 'med' && item.data.status === 'overdue'
               ? 'Overdue'
               : item.kind === 'med' && item.data.status === 'pending_check'
@@ -104,11 +108,14 @@ export function DayWorkList(p: Props) {
                     variant={
                         item.kind === 'med' && item.data.status === 'missed'
                             ? 'critical'
-                            : done
-                              ? 'success'
-                              : at <= p.now
-                                ? 'warning'
-                                : 'neutral'
+                            : item.kind === 'med' &&
+                                item.data.status === 'away'
+                              ? 'info'
+                              : done
+                                ? 'success'
+                                : at <= p.now
+                                  ? 'warning'
+                                  : 'neutral'
                     }
                 >
                     {status}

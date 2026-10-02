@@ -17,6 +17,11 @@ use InvalidArgumentException;
  * Live state is worked out in SQL against a bound `now` — never the database
  * clock, never stored — so it can't go stale:
  * - recorded: the outcome (given, refused, withheld, missed, away);
+ * - away: due while the person is away by a record that says so — checked
+ *   in at respite at another Site, from the stay's actual start until its
+ *   discharge (DoseAwaySources; C7) — read live, so withdrawing the record
+ *   makes the dose owed again. A dose due before the person left is owed. A
+ *   recorded outcome always wins;
  * - self_managed: the person takes it themselves (not chased);
  * - pending_check: due while a change to the order waited for its check,
  *   with nothing recorded ("Waiting for the order check") — doses can't be
@@ -50,9 +55,12 @@ final class DoseSlotProjection
 
     public const STATE_PENDING_CHECK = 'pending_check';
 
+    /** Away: a recorded absence (withheld, away reason) or a live away period (C7). */
+    public const STATE_AWAY = 'away';
+
     /** Every state a slot can read as: its recorded outcome, else its live state. */
     public const STATES = [
-        'given', 'refused', 'withheld', 'missed', 'away',
+        'given', 'refused', 'withheld', 'missed', self::STATE_AWAY,
         self::STATE_NOT_DUE, self::STATE_DUE, self::STATE_LATE, self::STATE_NOT_RECORDED, self::STATE_SELF_MANAGED,
         self::STATE_PENDING_CHECK,
     ];
@@ -124,6 +132,10 @@ final class DoseSlotProjection
                     'last_day' => (bool) $row->last_day,
                     // Rebuilt from history by the backfill, not generated live.
                     'reconstructed' => (bool) $row->reconstructed,
+                    // The record the person is away by (C7), when that is the state.
+                    'away' => $row->outcome === null && $row->state === self::STATE_AWAY
+                        ? DoseAwaySources::refOf($row)
+                        : null,
                 ];
             });
     }
@@ -233,11 +245,19 @@ final class DoseSlotProjection
         $opens = "DATE_SUB(s.due_at, INTERVAL {$before} MINUTE)";
         $ends = "DATE_ADD(s.due_at, INTERVAL {$after} MINUTE)";
 
-        return $scoped->select([
+        // The slots, each with the record (if any) the person is away by
+        // (C7), read live; the window and state are worked out over them.
+        $slots = $scoped->select([
             's.id', 's.client_id', 's.client_medication_id', 's.schedule_version_id', 's.nz_date', 's.ordered_time',
             's.due_at', 's.controlled', 's.order_change_pending', 's.dst_adjustment', 's.self_managed', 's.last_day', 's.reconstructed',
             's.outcome', 's.outcome_administration_id', 's.outcome_at',
-        ])
+        ]);
+        foreach (DoseAwaySources::sql() as $column => $sql) {
+            $slots->selectRaw("({$sql}) as {$column}");
+        }
+
+        return DB::query()->fromSub($slots, 's')
+            ->select('s.*')
             ->selectRaw("{$opens} as window_opens_at")
             ->selectRaw("{$ends} as window_ends_at")
             ->selectRaw("CASE WHEN ? > {$ends} THEN 1 ELSE 0 END as window_ended", [$nowUtc])
@@ -245,6 +265,7 @@ final class DoseSlotProjection
             ->selectRaw(
                 "CASE
                     WHEN s.outcome IS NOT NULL THEN s.outcome
+                    WHEN ".DoseAwaySources::awaySql('s')." THEN '".self::STATE_AWAY."'
                     WHEN s.self_managed = 1 THEN '".self::STATE_SELF_MANAGED."'
                     WHEN s.order_change_pending = 1 THEN '".self::STATE_PENDING_CHECK."'
                     WHEN ? < {$opens} THEN '".self::STATE_NOT_DUE."'
@@ -296,10 +317,12 @@ final class DoseSlotProjection
     private function aggregateSql(): string
     {
         // Counted: the window has ended, and the dose is a staff dose (not
-        // self-managed) that was not away and isn't waiting for the order check.
+        // self-managed) that was not away — recorded as away, or due in an
+        // away period (C7) — and isn't waiting for the order check.
         $pendingCheck = "state = '".self::STATE_PENDING_CHECK."'";
-        $counted = "window_ended = 1 AND self_managed = 0 AND (outcome IS NULL OR outcome <> 'away') AND NOT ({$pendingCheck})";
-        $open = "window_ended = 0 AND self_managed = 0 AND outcome IS NULL AND NOT ({$pendingCheck})";
+        $away = "state = '".self::STATE_AWAY."'";
+        $counted = "window_ended = 1 AND self_managed = 0 AND NOT ({$away}) AND NOT ({$pendingCheck})";
+        $open = "window_ended = 0 AND self_managed = 0 AND outcome IS NULL AND NOT ({$away}) AND NOT ({$pendingCheck})";
 
         return implode(', ', [
             'COUNT(*) as slots',
@@ -310,7 +333,7 @@ final class DoseSlotProjection
             "SUM(CASE WHEN {$counted} AND outcome = 'missed' THEN 1 ELSE 0 END) as missed",
             "SUM(CASE WHEN {$counted} AND outcome IS NULL THEN 1 ELSE 0 END) as not_recorded",
             "SUM(CASE WHEN {$counted} AND recorded_late = 1 THEN 1 ELSE 0 END) as recorded_late",
-            "SUM(CASE WHEN outcome = 'away' THEN 1 ELSE 0 END) as away",
+            "SUM(CASE WHEN {$away} THEN 1 ELSE 0 END) as away",
             "SUM(CASE WHEN self_managed = 1 THEN 1 ELSE 0 END) as self_managed",
             "SUM(CASE WHEN {$open} AND state = '".self::STATE_DUE."' THEN 1 ELSE 0 END) as due_now",
             "SUM(CASE WHEN {$open} AND state = '".self::STATE_NOT_DUE."' THEN 1 ELSE 0 END) as not_yet_due",

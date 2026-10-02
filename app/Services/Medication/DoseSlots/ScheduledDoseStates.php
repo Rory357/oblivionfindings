@@ -4,6 +4,7 @@ namespace App\Services\Medication\DoseSlots;
 
 use App\Models\ClientMedication;
 use App\Models\MedicationDoseSlot;
+use App\Models\User;
 use App\Services\MarScheduleService;
 use App\Services\Medication\DoseTimingSettings;
 use Carbon\Carbon;
@@ -68,7 +69,7 @@ final class ScheduledDoseStates
      * The doses each order owes on the NZ day of $date, oldest due first.
      *
      * @param  iterable<ClientMedication>  $orders  scheduled (non-PRN) orders the caller may show
-     * @return array<int, list<array{due_at: Carbon, ordered_time: string, state: string, outcome: string|null, window_opens_at: Carbon, window_ends_at: Carbon, due_soon: bool, order_change_pending: bool}>>
+     * @return array<int, list<array{due_at: Carbon, ordered_time: string, state: string, outcome: string|null, window_opens_at: Carbon, window_ends_at: Carbon, due_soon: bool, order_change_pending: bool, away: array{source: string, id: int}|null, away_reason: string|null}>>
      *                                                                                                                                                                                                         keyed by order id
      */
     public function dosesOn(iterable $orders, Carbon $date, Carbon $now): array
@@ -100,6 +101,17 @@ final class ScheduledDoseStates
                 $nowUtc,
             )->groupBy('client_medication_id');
 
+        // Away periods for the orders the projection doesn't hold (C7): read
+        // from the same records, so such a day reads away like a held one.
+        $unheld = $orders->reject(fn (ClientMedication $order, int $orderId): bool => isset($known[$orderId]));
+        $periods = $unheld->isEmpty()
+            ? collect()
+            : app(DoseAwaySources::class)->periods(
+                $unheld->pluck('client_id')->map(fn ($id): int => (int) $id)->unique()->values()->all(),
+                $nzDate,
+                $nzDate,
+            );
+
         $doses = [];
         foreach ($orders as $orderId => $order) {
             if (isset($known[$orderId])) {
@@ -117,11 +129,54 @@ final class ScheduledDoseStates
 
                 continue;
             }
+            $clientPeriods = $periods->get((int) $order->client_id, []);
             $doses[$orderId] = array_map(
-                fn (Carbon $scheduled): array => $this->fromOrder($orderId, $scheduled, $nzDate, $nowUtc, $timezone),
+                fn (Carbon $scheduled): array => $this->fromOrder(
+                    $orderId,
+                    $scheduled,
+                    $nzDate,
+                    $nowUtc,
+                    $timezone,
+                    DoseAwaySources::refAt($clientPeriods, CarbonImmutable::instance($scheduled)->utc()),
+                ),
                 $this->schedule->scheduledTimesForDate($order, $day),
             );
             usort($doses[$orderId], fn (array $a, array $b): int => $a['due_at'] <=> $b['due_at']);
+        }
+
+        return $doses;
+    }
+
+    /**
+     * Each away dose's reason, after "Away · " (C7), as $viewer may read it
+     * (a respite house is named only to a reader who may access its Site).
+     * Opt-in: only the surfaces that show the words pay for them — the badge,
+     * clock-out and the overdue sweep never ask.
+     *
+     * @param  array<int, list<array<string, mixed>>>  $doses  dosesOn() / dosesBetween() output
+     * @return array<int, list<array<string, mixed>>>
+     */
+    public function withAwayReasons(array $doses, ?User $viewer): array
+    {
+        $refs = [];
+        foreach ($doses as $orderDoses) {
+            foreach ($orderDoses as $dose) {
+                if ($dose['away'] !== null) {
+                    $refs[] = $dose['away'];
+                }
+            }
+        }
+        if ($refs === []) {
+            return $doses;
+        }
+
+        $reasons = app(DoseAwaySources::class)->reasons($refs, $viewer);
+        foreach ($doses as $orderId => $orderDoses) {
+            foreach ($orderDoses as $i => $dose) {
+                if ($dose['away'] !== null) {
+                    $doses[$orderId][$i]['away_reason'] = $reasons[$dose['away']['source'].':'.$dose['away']['id']] ?? null;
+                }
+            }
         }
 
         return $doses;
@@ -144,8 +199,9 @@ final class ScheduledDoseStates
      * MAR schedule, My Day — when no record row is matched to it: overdue
      * once its window has ended; due from when it shows as due soon through
      * its window; pending_check while its order's change waits for the
-     * check; else upcoming. A recorded dose reads as its outcome (Away as
-     * withheld).
+     * check; away while the person is away (C7: shown as "Away · reason",
+     * never due or overdue); else upcoming. A recorded dose reads as its
+     * outcome (a recorded absence as withheld, its record).
      *
      * @param  array{state: string, outcome: string|null, due_soon: bool}  $dose
      */
@@ -156,6 +212,7 @@ final class ScheduledDoseStates
         }
 
         return match ($dose['state']) {
+            DoseSlotProjection::STATE_AWAY => DoseSlotProjection::STATE_AWAY,
             DoseSlotProjection::STATE_PENDING_CHECK => DoseSlotProjection::STATE_PENDING_CHECK,
             DoseSlotProjection::STATE_DUE => 'due',
             DoseSlotProjection::STATE_LATE, DoseSlotProjection::STATE_NOT_RECORDED => 'overdue',
@@ -183,7 +240,7 @@ final class ScheduledDoseStates
      * oldest due first.
      *
      * @param  iterable<ClientMedication>  $orders
-     * @return array<int, list<array{due_at: Carbon, ordered_time: string, state: string, outcome: string|null, window_opens_at: Carbon, window_ends_at: Carbon, due_soon: bool, order_change_pending: bool}>>
+     * @return array<int, list<array{due_at: Carbon, ordered_time: string, state: string, outcome: string|null, window_opens_at: Carbon, window_ends_at: Carbon, due_soon: bool, order_change_pending: bool, away: array{source: string, id: int}|null, away_reason: string|null}>>
      */
     public function dosesBetween(iterable $orders, Carbon $from, Carbon $to, Carbon $now): array
     {
@@ -228,13 +285,16 @@ final class ScheduledDoseStates
             'window_ends_at' => Carbon::parse($slot['window_ends_at'])->timezone($timezone),
             'due_soon' => $slot['state'] === DoseSlotProjection::STATE_NOT_DUE && $this->isDueSoon($dueAt, $now),
             'order_change_pending' => (bool) $slot['order_change_pending'],
+            'away' => $slot['away'] ?? null,
+            'away_reason' => null,
         ];
     }
 
     /**
-     * @return array{due_at: Carbon, ordered_time: string, state: string, outcome: string|null, window_opens_at: Carbon, window_ends_at: Carbon, due_soon: bool, order_change_pending: bool}
+     * @param  array{source: string, id: int}|null  $away  the away period the dose falls in, if any
+     * @return array{due_at: Carbon, ordered_time: string, state: string, outcome: string|null, window_opens_at: Carbon, window_ends_at: Carbon, due_soon: bool, order_change_pending: bool, away: array{source: string, id: int}|null, away_reason: string|null}
      */
-    private function fromOrder(int $orderId, Carbon $scheduled, string $nzDate, CarbonImmutable $now, string $timezone): array
+    private function fromOrder(int $orderId, Carbon $scheduled, string $nzDate, CarbonImmutable $now, string $timezone, ?array $away = null): array
     {
         $dueAt = CarbonImmutable::instance($scheduled)->utc();
         $window = $this->windows->forOrder($orderId);
@@ -242,6 +302,7 @@ final class ScheduledDoseStates
         $ends = $window->closesAt($dueAt);
         $today = $now->setTimezone($timezone)->toDateString();
         $state = match (true) {
+            $away !== null => DoseSlotProjection::STATE_AWAY,
             $now->lessThan($opens) => DoseSlotProjection::STATE_NOT_DUE,
             $now->lessThanOrEqualTo($ends) => DoseSlotProjection::STATE_DUE,
             $nzDate === $today => DoseSlotProjection::STATE_LATE,
@@ -257,6 +318,8 @@ final class ScheduledDoseStates
             'window_ends_at' => Carbon::instance($ends)->timezone($timezone),
             'due_soon' => $state === DoseSlotProjection::STATE_NOT_DUE && $this->isDueSoon($dueAt, $now),
             'order_change_pending' => false,
+            'away' => $away,
+            'away_reason' => null,
         ];
     }
 }

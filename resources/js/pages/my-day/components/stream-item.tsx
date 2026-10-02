@@ -176,6 +176,10 @@ function MedRow({
     // Recorded as missed: done, never overdue (the label Meds today uses).
     const missed = med.status === 'missed';
     const resolved = given || notGiven || missed;
+    // Away (approved leave, respite at another Site): shown with its reason,
+    // nothing to do here — never due or overdue.
+    const away = med.status === 'away';
+    const awayLabel = med.away_reason ? `Away · ${med.away_reason}` : 'Away';
     const resolvedLabel = given
         ? 'Given'
         : missed
@@ -208,16 +212,19 @@ function MedRow({
                 type="button"
                 onClick={() =>
                     !resolved &&
+                    !away &&
                     med.can_give &&
                     onGiveMed(med.medication_id, med.scheduled_for)
                 }
-                disabled={!resolved && !med.can_give}
+                disabled={away || (!resolved && !med.can_give)}
                 title={
                     resolved
                         ? resolvedLabel
-                        : med.can_give
-                          ? 'Mark as given'
-                          : 'Open eMAR to record this dose'
+                        : away
+                          ? awayLabel
+                          : med.can_give
+                            ? 'Mark as given'
+                            : 'Open eMAR to record this dose'
                 }
                 aria-pressed={resolved}
                 className={cn(
@@ -307,6 +314,14 @@ function MedRow({
                             Waiting for the order check
                         </Badge>
                     ) : null}
+                    {away ? (
+                        <Badge
+                            variant="outline"
+                            className="border-status-info/30 bg-status-info-bg text-[10px] text-status-info"
+                        >
+                            {awayLabel}
+                        </Badge>
+                    ) : null}
                     {resolved ? (
                         <Badge
                             variant="outline"
@@ -326,7 +341,7 @@ function MedRow({
             ) : null}
 
             {/* Hover actions (replace static badges except resolved states above) */}
-            {!resolved ? (
+            {!resolved && !away ? (
                 <div
                     className={cn(
                         'flex gap-1 transition-opacity',

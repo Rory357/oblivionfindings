@@ -8,6 +8,7 @@ import RoundBoard from '@/components/emar/rounds/round-board';
 import RoundChart from '@/components/emar/rounds/round-chart';
 import RoundTimeline from '@/components/emar/rounds/round-timeline';
 import {
+    notOwedCaption,
     roundCounts,
     roundStatusMeta,
     type ActivityItem,
@@ -39,6 +40,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering/shift-context-menu';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     OWN_WITNESS_PIN_PROMPT,
@@ -101,6 +103,7 @@ type Props = {
 type StatusChip = 'all' | 'due' | 'flagged';
 
 export default function Rounds(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         rounds,
         date,
@@ -264,7 +267,7 @@ export default function Rounds(props: Props) {
                               : inProgress
                                 ? 'Resume guided round'
                                 : 'Start guided round',
-                          sub: `${original.scheduled_time} · ${c.recorded}/${c.total} recorded`,
+                          sub: `${original.scheduled_time} · ${c.recorded}/${c.total} recorded${notOwedCaption(c.waiting, c.away) ? ` · ${notOwedCaption(c.waiting, c.away)}` : ''}`,
                           tone: 'primary',
                           onClick: () => openGuided(original.id),
                       } satisfies ShiftCtxItem,
@@ -497,12 +500,7 @@ export default function Rounds(props: Props) {
     );
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Medication Rounds', href: '/emar/rounds' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medication Rounds" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero

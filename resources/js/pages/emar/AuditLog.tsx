@@ -2,6 +2,7 @@
    custom-layout bordered rows / chip buttons (not Card/Button); all colours are semantic tokens. */
 /* DESIGN REVIEW: docs/emar-redesign/audit-design-review.md — design spec, intended look,
    deliberate deviations, and a fidelity checklist for reviewing this page's design. */
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     eventMeta,
     eventPrimaryLink,
@@ -38,6 +39,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -218,6 +220,7 @@ export default function AuditLog({
     user_first_name: userFirstName,
     omissions_notice: omissionsNotice = null,
 }: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const [view, setView] = useState('timeline');
     const [cat, setCat] = useState('all');
     const [search, setSearch] = useState('');
@@ -557,15 +560,11 @@ export default function AuditLog({
     });
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Audit Trail', href: '/emar/audit' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="eMAR - Audit Trail" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

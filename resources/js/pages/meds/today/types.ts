@@ -27,7 +27,9 @@ export type DoseStatus =
     | 'withheld'
     | 'missed'
     /** Waiting for the order check: the order's change awaits verification. */
-    | 'pending_check';
+    | 'pending_check'
+    /** Away (checked in at respite at another Site): shown with its reason, never due or overdue. */
+    | 'away';
 
 /**
  * A dose waiting for the order check is shown but never overdue, and can't
@@ -63,6 +65,8 @@ export interface ScheduleRow {
     time: string;
     round_label: string;
     status: DoseStatus;
+    /** Why the person is away, e.g. "Respite at another house (since Mon 15 Jun, 7:00 am)"; set when status is away. */
+    away_reason?: string | null;
     recorded: RecordedInfo | null;
     /** Null when this worker may not open the resident's MAR (not assigned, no clocked-in covering shift). */
     mar_url: string | null;

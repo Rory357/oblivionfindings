@@ -252,6 +252,7 @@ export default function GlobalNavSearch({
                                         item.section,
                                         item.group ?? '',
                                         item.label,
+                                        ...(item.keywords ?? []),
                                     ]
                                         .filter(Boolean)
                                         .join(' ');
