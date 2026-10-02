@@ -103,6 +103,11 @@
     --color-status-critical-bg: var(--status-critical-bg);
     --color-status-critical-foreground: var(--status-critical-foreground);
     --color-status-info: var(--status-info);
+    /* text-status-info reads the mode-aware brand text shade (like
+       text-primary) — the raw brand is too light for text on the info tint
+       in dark mode and too light on white for some brands. bg-status-info
+       fills keep --color-status-info. */
+    --text-color-status-info: var(--primary-text);
     --color-status-info-bg: var(--status-info-bg);
     --color-status-info-foreground: var(--status-info-foreground);
     --color-status-neutral: var(--status-neutral);
@@ -505,7 +510,10 @@
     --status-critical-bg: oklch(24% 0.1 25);
     --status-critical-foreground: oklch(92% 0.06 25);
     --status-info: var(--primary);
-    --status-info-bg: var(--accent);
+    /* A dark brand tint like the other status backgrounds (was --accent, a
+       solid L ~0.40 shade that held info text at 2.9:1). Info text on it is
+       --primary-text (L >= 0.70) via --text-color-status-info. */
+    --status-info-bg: oklch(from var(--primary) 0.24 calc(c * 0.4) h);
     --status-info-foreground: var(--accent-foreground);
     --status-neutral: var(--muted-foreground);
     --status-neutral-bg: var(--muted);

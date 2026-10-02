@@ -919,7 +919,7 @@ export function CreateShiftDialog({
                     </VisuallyHidden.Root>
 
                     {/* Stepper rail */}
-                    <aside className="hidden w-[248px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-4 md:flex">
+                    <aside className="hidden w-[248px] shrink-0 flex-col border-r border-border bg-muted/30 p-4 md:flex">
                         <div className="mb-4 flex items-center gap-2.5">
                             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
                                 <CalendarClock className="h-4.5 w-4.5" />
@@ -952,8 +952,8 @@ export function CreateShiftDialog({
                                         className={cn(
                                             'flex items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors',
                                             active
-                                                ? 'bg-primary/10'
-                                                : 'hover:bg-accent',
+                                                ? 'bg-primary-fill/10'
+                                                : 'hover:bg-muted',
                                         )}
                                     >
                                         <span

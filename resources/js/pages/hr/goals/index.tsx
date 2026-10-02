@@ -1197,7 +1197,7 @@ function ObjectivesTab(props: {
                 />
             ) : (
                 <div className="mt-3.5 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                    <div className="flex items-center gap-3 border-b border-border bg-sidebar px-4 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                    <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-4 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
                         {can.manage ? (
                             <button
                                 type="button"
@@ -1560,7 +1560,7 @@ function BoardView({
                 return (
                     <div
                         key={c.key}
-                        className="overflow-hidden rounded-xl border border-border bg-sidebar"
+                        className="overflow-hidden rounded-xl border border-border bg-muted/30"
                     >
                         <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
                             <span className="inline-flex items-center gap-2 text-[12.5px] font-bold">
@@ -1852,7 +1852,7 @@ function DevelopmentTab({
                 )}
             </div>
             <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                <div className="flex items-center gap-3 border-b border-border bg-sidebar px-4 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-4 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
                     <span className="flex-1">Person &amp; competency</span>
                     <span className="hidden w-[150px] lg:block">Level</span>
                     <span className="w-[120px]">Status</span>

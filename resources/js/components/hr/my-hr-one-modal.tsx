@@ -164,7 +164,7 @@ export function MyHrOneOnOneModal({
                                     key={n.key}
                                     type="button"
                                     onClick={() => scrollTo(n.key)}
-                                    className="flex w-full items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-sidebar-accent"
+                                    className="flex w-full items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-muted"
                                 >
                                     <span className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
                                         <Icon className="h-3.5 w-3.5" />
