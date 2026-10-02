@@ -67,7 +67,10 @@ import {
     type PageHeaderMeterTarget,
 } from '@/components/page';
 import { type DonutSegment } from '@/components/rostering/donut';
-import { DonutCard } from '@/components/rostering/donut-card';
+import {
+    DonutCard,
+    type DonutCardTarget,
+} from '@/components/rostering/donut-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -190,6 +193,7 @@ type FinanceAbilities = {
     finance?: {
         dashboard?: boolean;
         ap?: { view?: boolean };
+        ar?: { view?: boolean };
         bank?: { view?: boolean };
         ledger?: { view?: boolean };
         reports?: { view?: boolean };
@@ -300,7 +304,12 @@ export default function FinanceDashboard({
     const can = usePage<{ auth?: { can?: FinanceAbilities } }>().props.auth?.can;
     const canReports = Boolean(can?.finance?.reports?.view);
     const canBills = Boolean(can?.finance?.ap?.view);
+    const canReceivables = Boolean(can?.finance?.ar?.view);
     const canLedger = Boolean(can?.finance?.ledger?.view);
+    const scrollToSection = (sectionId: string) =>
+        document
+            .getElementById(sectionId)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     const meterTarget = (
         allowed: boolean,
         href: string,
@@ -311,12 +320,21 @@ export default function FinanceDashboard({
         allowed
             ? { href, ariaLabel: listLabel }
             : {
-                  onClick: () =>
-                      document
-                          .getElementById(sectionId)
-                          ?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+                  onClick: () => scrollToSection(sectionId),
                   ariaLabel: sectionLabel,
               };
+    // The donut cards follow the same rule: the report when the viewer can
+    // open it, else the dashboard section that breaks the figure down.
+    const donutTarget = (
+        allowed: boolean,
+        href: string,
+        cta: string,
+        sectionId: string,
+        sectionCta: string,
+    ): DonutCardTarget =>
+        allowed
+            ? { cta, onClick: () => router.visit(href) }
+            : { cta: sectionCta, onClick: () => scrollToSection(sectionId) };
 
     const billCtx = useEntityContextMenu<UpcomingBill>();
     const claimCtx = useEntityContextMenu<FundingClaim>();
@@ -1066,12 +1084,13 @@ export default function FinanceDashboard({
                             centerLabel="revenue"
                             accentKeys={[revenueStreamSegments[0]?.key ?? '']}
                             active={false}
-                            cta="View funding summary"
-                            onClick={() =>
-                                router.visit(
-                                    '/finance/reports/funding-stream-summary',
-                                )
-                            }
+                            {...donutTarget(
+                                canReports,
+                                '/finance/reports/funding-stream-summary',
+                                'View funding summary',
+                                'finance-trends',
+                                'Show revenue vs expenses',
+                            )}
                             formatValue={(v) => formatMoneyCompact(v)}
                             showPercent
                         />
@@ -1084,12 +1103,13 @@ export default function FinanceDashboard({
                             centerLabel="utilised"
                             accentKeys={['paid']}
                             active={false}
-                            cta="View funding summary"
-                            onClick={() =>
-                                router.visit(
-                                    '/finance/reports/funding-stream-summary',
-                                )
-                            }
+                            {...donutTarget(
+                                canReports,
+                                '/finance/reports/funding-stream-summary',
+                                'View funding summary',
+                                'finance-funding-claims',
+                                'Show funding claims',
+                            )}
                             formatValue={(v) => formatMoneyCompact(v)}
                             showPercent
                         />
@@ -1104,12 +1124,26 @@ export default function FinanceDashboard({
                             centerLabel="receivables"
                             accentKeys={['current']}
                             active={false}
-                            cta="View aged receivables"
-                            onClick={() =>
-                                router.visit(
-                                    '/finance/reports/aged-receivables',
-                                )
-                            }
+                            // No dashboard section breaks the ageing down, so
+                            // without the report this falls back to the unpaid
+                            // invoices list, else a static card.
+                            {...(canReports
+                                ? {
+                                      cta: 'View aged receivables',
+                                      onClick: () =>
+                                          router.visit(
+                                              '/finance/reports/aged-receivables',
+                                          ),
+                                  }
+                                : canReceivables
+                                  ? {
+                                        cta: 'View unpaid invoices',
+                                        onClick: () =>
+                                            router.visit(
+                                                '/finance/invoices?status=unpaid',
+                                            ),
+                                    }
+                                  : {})}
                             formatValue={(v) => formatMoneyCompact(v)}
                             showPercent
                         />
@@ -1379,7 +1413,10 @@ export default function FinanceDashboard({
                             )}
                         </div>
 
-                        <div className="flex flex-col gap-5">
+                        <div
+                            id="finance-funding-claims"
+                            className="flex flex-col gap-5"
+                        >
                             <ListCaption
                                 title="Funding claims"
                                 caption={`${claims.length} of ${fundingClaims.length} shown`}
