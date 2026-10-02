@@ -269,8 +269,9 @@ export default function HazardShow({
         <PageHeaderMeterBlock
             label="Assigned to"
             tone={hazard.status === 'closed' ? 'brand' : 'warning'}
-            href={canAssign ? undefined : hazardsHref}
-            onClick={canAssign ? () => setShowAssignDialog(true) : undefined}
+            {...(canAssign
+                ? { onClick: () => setShowAssignDialog(true) }
+                : { href: hazardsHref })}
             ariaLabel={
                 canAssign ? 'Assign this hazard' : 'View the hazard register'
             }

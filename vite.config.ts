@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
 import path from 'path';
 import { defineConfig } from 'vite';
+import { nodeModulesFsAllow } from './build/node-modules-fs-allow';
 import { pdfjsAssets } from './build/pdfjs-assets';
 
 const heavyVendorChunkGroups: Array<[string, string[]]> = [
@@ -55,6 +56,9 @@ export default defineConfig({
     },
     server: {
         cors: true,
+        // Worktrees only: also allow the parent checkout's node_modules
+        // (undefined — Vite's default — everywhere else).
+        fs: { allow: nodeModulesFsAllow(__dirname) },
     },
     build: {
         // NOTE: modulePreload must stay ON (the default). Disabling it made

@@ -20,6 +20,7 @@ import {
     PageHeaderPrimaryButton,
     PageHeaderStatusChip,
     PageLayout,
+    type PageHeaderMeterTarget,
     type PageHeaderMeterTone,
 } from '@/components/page';
 import {
@@ -320,23 +321,19 @@ function inPageTab(href: string, meetingId: number): MeetingTab | null {
 function Meter({
     label,
     reading,
-    onClick,
-    href,
     ariaLabel,
     bar,
-}: {
+    ...target
+}: PageHeaderMeterTarget & {
     label: string;
     reading: MeterReading;
-    onClick?: () => void;
-    href?: string;
     ariaLabel: string;
     bar?: number;
 }) {
     return (
         <PageHeaderMeterBlock
             label={label}
-            href={href}
-            onClick={onClick}
+            {...target}
             ariaLabel={ariaLabel}
             tone={reading.tone as PageHeaderMeterTone}
         >
@@ -638,8 +635,9 @@ export default function MeetingShow({
                 key="pack"
                 label="Board pack"
                 ariaLabel={meeting.board_pack ? 'Open the board pack' : 'Open the agenda'}
-                href={meeting.board_pack ? showPack.url({ pack: meeting.board_pack.id }) : undefined}
-                onClick={meeting.board_pack ? undefined : () => handleTabChange('agenda')}
+                {...(meeting.board_pack
+                    ? { href: showPack.url({ pack: meeting.board_pack.id }) }
+                    : { onClick: () => handleTabChange('agenda') })}
                 reading={packMeter(packReading)}
             />,
             <Meter

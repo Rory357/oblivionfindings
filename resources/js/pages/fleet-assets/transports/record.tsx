@@ -23,6 +23,7 @@ import {
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderMeterCaption,
+    type PageHeaderMeterTarget,
 } from '@/components/page/page-header';
 import { PageLayout } from '@/components/page/page-layout';
 import AppLayout from '@/layouts/app-layout';
@@ -46,6 +47,51 @@ export default function TransportRecordPage({
         router.visit(
             `/fleet-assets/transports/planner?from=${transportDay(row.booking?.start || row.start)}&to=${transportDay(row.booking?.start || row.start)}&selected=${row.id}&queue=${row.booking ? 'planned' : 'all'}`,
         );
+    const showSection = (id: string) => () =>
+        document
+            .getElementById(id)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Every meter goes to where its number lives: the stage and next step in
+    // the record body, the window on the transport calendar, and the
+    // allocation on the booking (or in the Planner while unallocated).
+    const meters: (PageHeaderMeterTarget & {
+        label: string;
+        value: string;
+        caption: string;
+        ariaLabel: string;
+    })[] = [
+        {
+            label: 'Current stage',
+            value: row.stage_label,
+            caption: row.reference,
+            ariaLabel: 'Show journey progress',
+            onClick: showSection('transport-progress'),
+        },
+        {
+            label: 'Transport window',
+            value: formatDateTime(row.booking?.start || row.start),
+            caption: row.end
+                ? `Return ${formatDateTime(row.booking?.end || row.end)}`
+                : 'Expected return needed',
+            ariaLabel: 'View this day on the transport calendar',
+            href: `/fleet-assets/transports/calendar?day=${transportDay(row.booking?.start || row.start)}&queue=day`,
+        },
+        {
+            label: 'Vehicle & driver',
+            value: row.booking?.vehicle.name || 'Unallocated',
+            caption: row.booking?.driver.name || 'Choose in Planner',
+            ...(row.links.booking
+                ? { ariaLabel: 'View the booking', href: row.links.booking }
+                : { ariaLabel: 'Open in the Planner', onClick: plan }),
+        },
+        {
+            label: 'Next person',
+            value: row.next_owner,
+            caption: row.next_action,
+            ariaLabel: 'Show the next step',
+            onClick: showSection('transport-next-step'),
+        },
+    ];
     const exportUrl = exportPath(
         {
             from: transportDay(row.start),
@@ -106,46 +152,27 @@ export default function TransportRecordPage({
                             }
                             meters={
                                 <div className="tr-meters">
-                                    {[
-                                        [
-                                            'Current stage',
-                                            row.stage_label,
-                                            row.reference,
-                                        ],
-                                        [
-                                            'Transport window',
-                                            formatDateTime(
-                                                row.booking?.start || row.start,
-                                            ),
-                                            row.end
-                                                ? `Return ${formatDateTime(row.booking?.end || row.end)}`
-                                                : 'Expected return needed',
-                                        ],
-                                        [
-                                            'Vehicle & driver',
-                                            row.booking?.vehicle.name ||
-                                                'Unallocated',
-                                            row.booking?.driver.name ||
-                                                'Choose in Planner',
-                                        ],
-                                        [
-                                            'Next person',
-                                            row.next_owner,
-                                            row.next_action,
-                                        ],
-                                    ].map(([label, value, caption]) => (
-                                        <PageHeaderMeterBlock
-                                            key={label}
-                                            label={label}
-                                        >
-                                            <PageHeaderMeterBig>
-                                                {value}
-                                            </PageHeaderMeterBig>
-                                            <PageHeaderMeterCaption>
-                                                {caption}
-                                            </PageHeaderMeterCaption>
-                                        </PageHeaderMeterBlock>
-                                    ))}
+                                    {meters.map(
+                                        ({
+                                            label,
+                                            value,
+                                            caption,
+                                            ...target
+                                        }) => (
+                                            <PageHeaderMeterBlock
+                                                key={label}
+                                                label={label}
+                                                {...target}
+                                            >
+                                                <PageHeaderMeterBig>
+                                                    {value}
+                                                </PageHeaderMeterBig>
+                                                <PageHeaderMeterCaption>
+                                                    {caption}
+                                                </PageHeaderMeterCaption>
+                                            </PageHeaderMeterBlock>
+                                        ),
+                                    )}
                                 </div>
                             }
                         />

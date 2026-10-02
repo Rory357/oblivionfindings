@@ -116,7 +116,7 @@ export function TransportRecordContent({
         <div className="transport-workspace tr-stack">
             {(!section || section === 'journey') && (
                 <>
-                    <div className="tr-record-next">
+                    <div id="transport-next-step" className="tr-record-next">
                         <ArrowRight className="size-6 text-primary" />
                         <div>
                             <small>NEXT STEP · {row.next_owner}</small>
@@ -135,7 +135,11 @@ export function TransportRecordContent({
                             </Button>
                         ) : null}
                     </div>
-                    <ol className="tr-steps" aria-label="Journey progress">
+                    <ol
+                        id="transport-progress"
+                        className="tr-steps"
+                        aria-label="Journey progress"
+                    >
                         {[
                             'Prepare',
                             'Ready to depart',

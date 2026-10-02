@@ -22,6 +22,7 @@ export {
     PageHeaderViewToggle,
     type PageHeaderMeterAvatar,
     type PageHeaderMeterContact,
+    type PageHeaderMeterTarget,
     type PageHeaderMeterTone,
     type PageHeaderProps,
     type PageHeaderRailItem,
