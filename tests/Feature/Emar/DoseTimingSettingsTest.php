@@ -16,7 +16,7 @@ use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
-use App\Notifications\MedicationRefusalClusterNotification;
+use App\Notifications\MedicationAlertNotification;
 use App\Services\MarScheduleService;
 use App\Services\Medication\DoseSlots\DoseWindowResolver;
 use App\Services\Medication\DoseTimingSettings;
@@ -262,7 +262,7 @@ class DoseTimingSettingsTest extends TestCase
 
         // Two of three: no alert yet.
         $this->artisan('emar:send-alerts')->assertExitCode(0);
-        Notification::assertNotSentTo($lead, MedicationRefusalClusterNotification::class);
+        Notification::assertNotSentTo($lead, MedicationAlertNotification::class);
 
         AppSetting::query()->create(['key' => DoseTimingSettings::REFUSAL_COUNT, 'value' => '2']);
         AppSetting::query()->create(['key' => DoseTimingSettings::REFUSAL_DAYS, 'value' => '5']);
@@ -270,14 +270,9 @@ class DoseTimingSettingsTest extends TestCase
 
         Notification::assertSentTo(
             $lead,
-            MedicationRefusalClusterNotification::class,
-            function (MedicationRefusalClusterNotification $notification) use ($lead): bool {
-                $message = $notification->toArray($lead)['message'];
-
-                return $notification->count === 2
-                    && $notification->days === 5
-                    && str_ends_with($message, 'refused or withheld 2 times in the last 5 days');
-            },
+            MedicationAlertNotification::class,
+            fn (MedicationAlertNotification $notification): bool => $notification->alert->type === 'refusals'
+                && str_contains($notification->toArray($lead)['message'], 'refused or withheld 2 times in 5 days'),
         );
     }
 

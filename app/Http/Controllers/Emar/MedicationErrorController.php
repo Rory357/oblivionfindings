@@ -12,6 +12,7 @@ use App\Models\MedicationMarAttachment;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
@@ -333,6 +334,10 @@ class MedicationErrorController extends Controller
                 $error = MedicationError::create($attributes);
 
                 app(MedicationSignalService::class)->emitError($error);
+                // Every reported error tells whoever Medication Settings ›
+                // Alerts & access chooses (P11 B2); Control Room still gets
+                // major and critical ones.
+                app(MedicationAlertSources::class)->error($error);
 
                 if ($incident !== null) {
                     app(TimelineEmitter::class)->project($incident->fresh());

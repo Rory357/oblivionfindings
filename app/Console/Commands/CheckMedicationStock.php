@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationDashboardAlert;
+use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\MedicationSignalService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
@@ -15,7 +16,7 @@ class CheckMedicationStock extends Command
 
     protected $description = 'Check medication stock levels and expiry dates, creating alerts as needed';
 
-    public function handle(MedicationSignalService $signalService): int
+    public function handle(MedicationSignalService $signalService, MedicationAlertSources $alerts): int
     {
         $this->info('Checking medication stock levels and expiry dates...');
 
@@ -143,6 +144,10 @@ class CheckMedicationStock extends Command
             $alertsCreated++;
             $this->info("  Low stock: {$medicationName} ({$stock->on_hand} {$stock->unit})");
         }
+
+        // Stock expiring, expired and run out: people are told as Medication
+        // Settings › Alerts & access says (P11 B2), once per open alert.
+        $alerts->stockCheck($expiringSoon, $expired, $lowStock);
 
         $this->info("Stock check complete. {$alertsCreated} new alerts created.");
 

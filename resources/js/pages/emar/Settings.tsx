@@ -18,6 +18,7 @@ import { Sections } from '@/pages/fleet-assets/settings/_ui';
 import { Head, router } from '@inertiajs/react';
 import {
     Activity,
+    Bell,
     ClipboardCheck,
     Clock,
     FileText,
@@ -40,6 +41,14 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+    AlertDialogHost,
+    AlertsOverview,
+    AlertsTable,
+    type AlertAccess,
+    type AlertData,
+    type AlertPerson,
+} from './settings/_alerts';
+import {
     SettingsCtx,
     type Dialog,
     type SettingsContext,
@@ -57,6 +66,7 @@ import {
     changes,
     stillToDecide,
     validateView,
+    type AlertReach,
     type Draft,
     type SettingsPayload,
     type ViewKey,
@@ -118,13 +128,23 @@ type Props = {
     /** Whether they manage templates (orders.manage at a house), and where. */
     templateAccess: TemplateAccess;
     templateStaff: TemplateStaff[];
+    /** Alerts & access (P11 B2): who sees it and what they change. */
+    alertAccess: AlertAccess;
+    /** People who can be named on an alert. */
+    alertPeople: AlertPerson[];
+    /** Names of everyone already named on an alert, by id. */
+    alertNames: Record<string, string>;
+    /** Who each alert group would tell at each house (the safety net's warning). */
+    alertReach: AlertReach;
+    /** Open alerts nobody could be told about. */
+    alertNobodyOpen: number;
 };
 
 const VIEW_ICON: Record<ViewKey, LucideIcon> = {
     rules: Pill,
     rounds: Repeat,
     staff: UserCheck,
-    alerts: Shield,
+    alerts: Bell,
     history: History,
 };
 const SEC_ICON: Record<string, LucideIcon> = {
@@ -141,11 +161,24 @@ const SEC_ICON: Record<string, LucideIcon> = {
     status: Users,
     decide: HelpCircle,
     changes: History,
+    alerts: Bell,
 };
 /** Tabs whose settings are saved through the save bar. */
-const SAVED_SECTIONS = ['safety', 'timing', 'competency', 'exemptions', 'pins'];
+const SAVED_SECTIONS = [
+    'safety',
+    'timing',
+    'competency',
+    'exemptions',
+    'pins',
+    'alerts',
+];
 const SHOW_OPTIONS = [
     { value: 'all', label: 'All settings' },
+    { value: 'open', label: 'Not yet reviewed' },
+    { value: 'changed', label: 'Unsaved changes' },
+];
+const ALERT_SHOW_OPTIONS = [
+    { value: 'all', label: 'All alerts' },
     { value: 'open', label: 'Not yet reviewed' },
     { value: 'changed', label: 'Unsaved changes' },
 ];
@@ -180,7 +213,46 @@ const DirtyDot = () => (
 );
 
 export default function EmarSettings(props: Props) {
-    const { settings: s, witnessPin, settingsAccess, readOnlyAudit } = props;
+    const { witnessPin, settingsAccess, readOnlyAudit, alertAccess } = props;
+    // The settings, with the names alert values list and house names, so
+    // every change reads in words (P11 B2).
+    const s = useMemo(
+        () => ({
+            ...props.settings,
+            people_names: {
+                ...props.alertNames,
+                ...Object.fromEntries(
+                    props.alertPeople.map((p) => [p.id, p.name]),
+                ),
+            },
+            site_names: Object.fromEntries(
+                props.sites.map((x) => [x.id, x.name]),
+            ),
+            alert_reach: {
+                houses: props.alertReach.houses,
+                people: {
+                    ...props.alertReach.people,
+                    ...Object.fromEntries(
+                        props.alertPeople.map((p) => [
+                            p.id,
+                            {
+                                ok: true,
+                                site_ids: p.site_ids,
+                                controlled: p.controlled,
+                            },
+                        ]),
+                    ),
+                },
+            },
+        }),
+        [
+            props.settings,
+            props.alertNames,
+            props.alertPeople,
+            props.alertReach,
+            props.sites,
+        ],
+    );
     // P11 F1 + Q2: people who manage or read a house's round templates
     // reach them here without other Settings access.
     const templatesOnly = !settingsAccess && props.templateAccess.read;
@@ -199,9 +271,11 @@ export default function EmarSettings(props: Props) {
                 : witnessPin.can_reset
                   ? ['pins', 'status']
                   : [],
+            // P11 B2: settings readers, and house managers for their houses' extras.
+            alerts: alertAccess.view ? ['overview', 'alerts'] : [],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
-        [settingsAccess, templatesOnly, witnessPin.can_reset],
+        [settingsAccess, templatesOnly, witnessPin.can_reset, alertAccess.view],
     );
     const [route, setRoute] = useState(() =>
         parseHash(window.location.hash, built),
@@ -343,8 +417,20 @@ export default function EmarSettings(props: Props) {
         can: props.can,
         readOnlyAudit,
     };
+    const alertData: AlertData = {
+        access: alertAccess,
+        people: props.alertPeople,
+        sites: props.sites,
+        readOnlyAudit,
+        nobodyOpen: props.alertNobodyOpen,
+    };
+    // House extras: their own houses' managers (B2 Q3); everything else
+    // needs all-sites authority.
     const canEdit = (group: string) =>
-        !!s.groups[group] && s.can_manage_organisation;
+        !!s.groups[group] &&
+        (group === 'alertExtra'
+            ? !readOnlyAudit && alertAccess.house_ids.length > 0
+            : s.can_manage_organisation);
     const ctx: SettingsContext = {
         s,
         draft,
@@ -386,7 +472,16 @@ export default function EmarSettings(props: Props) {
 
     const refresh = () =>
         router.reload({
-            only: ['settings', 'witnessPin', 'rules', 'roundTemplates'],
+            only: [
+                'settings',
+                'witnessPin',
+                'rules',
+                'roundTemplates',
+                'alertPeople',
+                'alertNames',
+                'alertReach',
+                'alertNobodyOpen',
+            ],
             onSuccess: () => setLoadedAt(new Date()),
         });
     const viewGroups = Object.values(s.groups).filter((g) => g.view === view);
@@ -397,7 +492,8 @@ export default function EmarSettings(props: Props) {
         ? 'Read-only for audit'
         : !settingsAccess
           ? [
-                witnessPin.can_reset ? 'Witness PIN resets' : null,
+                alertAccess.house_ids.length ? 'Alert extras' : null,
+                witnessPin.can_reset ? 'witness PIN resets' : null,
                 props.templateAccess.manage
                     ? 'round templates'
                     : props.templateAccess.read
@@ -543,6 +639,10 @@ export default function EmarSettings(props: Props) {
                     'current',
                 )}
             </>
+        ) : view === 'alerts' && sec === 'alerts' ? (
+            select('All alerts', f.show, ALERT_SHOW_OPTIONS, (v) =>
+                setF({ ...f, show: v }),
+            )
         ) : SAVED_SECTIONS.includes(sec) ? (
             select('All settings', f.show, SHOW_OPTIONS, (v) =>
                 setF({ ...f, show: v }),
@@ -741,6 +841,18 @@ export default function EmarSettings(props: Props) {
                     setF({ ...f, pinState: 'all', pinHouse: 'all' });
                 }}
             />
+        ) : view === 'alerts' && sec === 'overview' ? (
+            <AlertsOverview q={query} data={alertData} />
+        ) : view === 'alerts' && sec === 'alerts' ? (
+            <AlertsTable
+                q={query}
+                show={f.show}
+                data={alertData}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
         ) : view === 'history' && sec === 'decide' ? (
             <StillToDecide q={query} />
         ) : view === 'history' && sec === 'changes' ? (
@@ -806,6 +918,7 @@ export default function EmarSettings(props: Props) {
                     />
                 ) : null}
                 <RuleDialogHost dialog={dialog} data={ruleData} />
+                <AlertDialogHost dialog={dialog} data={alertData} />
                 <TemplateDialogHost dialog={dialog} data={templateData} />
             </SettingsCtx.Provider>
         </AppLayout>

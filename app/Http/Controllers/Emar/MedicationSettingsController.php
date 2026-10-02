@@ -7,11 +7,13 @@ use App\Domain\Hr\Services\PeopleMutationLockService;
 use App\Http\Controllers\Controller;
 use App\Models\ClientMedication;
 use App\Models\MedicationAdminRule;
+use App\Models\MedicationAlert;
 use App\Models\Site;
 use App\Models\User;
 use App\Models\WitnessPinReminder;
 use App\Notifications\WitnessPinReminderNotification;
 use App\Services\AuditLogger;
+use App\Services\Medication\Alerts\MedicationAlertRecipients;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\RoundTemplateCatalogue;
 use App\Services\Medication\Settings\MedicationSettingDefinition;
@@ -77,7 +79,7 @@ class MedicationSettingsController extends Controller
     public function saveChanges(Request $request)
     {
         $actor = $request->user();
-        abort_unless($this->canManageSettings($actor), 403);
+        abort_unless($this->canManageSettings($actor) || $this->canManageHouseAlerts($actor), 403);
 
         $validated = $request->validate([
             'view' => ['required', 'string', Rule::in($this->settingsRegistry->views())],
@@ -85,8 +87,9 @@ class MedicationSettingsController extends Controller
             'changes.*.group' => ['required', 'string', 'max:40'],
             'changes.*.key' => ['required', 'string', 'max:80'],
             'changes.*.site_id' => ['nullable', 'integer'],
-            'changes.*.value' => ['present', 'nullable', 'string', 'max:255'],
-            'changes.*.from' => ['present', 'nullable', 'string', 'max:255'],
+            // Who gets an alert is one JSON value (P11 B2); each definition checks its own length.
+            'changes.*.value' => ['present', 'nullable', 'string', 'max:4000'],
+            'changes.*.from' => ['present', 'nullable', 'string', 'max:4000'],
             'confirm_loosening' => ['sometimes', 'boolean'],
         ]);
 
@@ -97,11 +100,14 @@ class MedicationSettingsController extends Controller
                     "changes.{$index}.value" => $change['definition']->invalidMessage(),
                 ]);
             }
+            // Stored as the canonical value, so "nothing changed" is exact.
+            $changes[$index]['value'] = $change['definition']->normalise($change['value']);
         }
         $this->assertSettingsAuthority($actor, $changes);
+        $this->assertAlertPeople($changes);
 
         $result = DB::transaction(function () use ($actor, $changes, $validated): array {
-            $lockedActor = $this->lockCurrentRuleActor($actor);
+            $lockedActor = $this->lockCurrentRuleActor($actor, $this->onlyHouseManaged($changes));
             $this->assertCurrentSettingsAuthority($lockedActor, $changes);
 
             return $this->settingsStore->apply($lockedActor, $changes, (bool) ($validated['confirm_loosening'] ?? false));
@@ -198,12 +204,123 @@ class MedicationSettingsController extends Controller
         return $resolved;
     }
 
-    /** @param  list<array{definition: MedicationSettingDefinition, site_id: int|null}>  $items */
+    /**
+     * Organisation settings need settings management with all-sites
+     * authority. Without settings management, a house manager may change only
+     * house settings marked for them — their houses' alert extras (P11 B2 Q3);
+     * anything else is refused, never silently skipped.
+     *
+     * @param  list<array{definition: MedicationSettingDefinition, site_id: int|null}>  $items
+     */
     private function assertSettingsAuthority(User $actor, array $items): void
     {
+        if (! $this->canManageSettings($actor)) {
+            abort_unless($this->canManageHouseAlerts($actor) && $this->onlyHouseManaged($items), 403);
+        }
         if (collect($items)->contains(fn (array $item): bool => ! $item['definition']->isSiteScoped())) {
             abort_unless($this->canManageGlobalRules($actor), 403);
         }
+    }
+
+    /** @param  list<array{definition: MedicationSettingDefinition, site_id: int|null}>  $items */
+    private function onlyHouseManaged(array $items): bool
+    {
+        return $items !== [] && collect($items)->every(
+            fn (array $item): bool => $item['definition']->houseManaged && $item['definition']->isSiteScoped(),
+        );
+    }
+
+    private function canManageHouseAlerts(?User $user): bool
+    {
+        return (bool) $user && $user->canDo('medications.alerts.manage_house');
+    }
+
+    /**
+     * People newly named on an alert must be able to get it: an approved
+     * account with medication access — for a house's extras, access to that
+     * house (P11 v5 pickers). Someone already on the list who has since lost
+     * access can stay until they're removed.
+     *
+     * @param  list<array{definition: MedicationSettingDefinition, site_id: int|null, value: string, from: string}>  $changes
+     */
+    private function assertAlertPeople(array $changes): void
+    {
+        foreach ($changes as $index => $change) {
+            $kind = $change['definition']->codec?->kind();
+            if (! in_array($kind, ['alert', 'people'], true)) {
+                continue;
+            }
+            $ids = fn (string $value): array => $kind === 'alert'
+                ? (json_decode($value, true)['people'] ?? [])
+                : (json_decode($value, true) ?? []);
+            $added = array_values(array_diff($ids($change['value']), $ids($change['from'])));
+            if ($added === []) {
+                continue;
+            }
+            $eligible = collect($this->alertPeople($change['site_id'] !== null ? [$change['site_id']] : null))
+                ->pluck('id')
+                ->all();
+            if (array_diff($added, $eligible) !== []) {
+                throw ValidationException::withMessages([
+                    "changes.{$index}.value" => $change['site_id'] !== null
+                        ? 'Choose people with medication access at this house.'
+                        : 'Choose people with medication access.',
+                ]);
+            }
+        }
+    }
+
+    /**
+     * People who can be named on an alert (P11 v5 "Add a person"): approved
+     * accounts with medication access, with their role and houses. Null =
+     * anyone in the organisation; otherwise people with access to one of
+     * these houses.
+     *
+     * @param  list<int>|null  $siteIds
+     * @return list<array{id: int, name: string, role: string, houses: list<string>, site_ids: list<int>, all_houses: bool, controlled: bool}>
+     */
+    private function alertPeople(?array $siteIds): array
+    {
+        $allSites = Site::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id');
+
+        return User::query()
+            ->whereNotNull('approved_at')
+            ->where(fn ($holders) => $holders
+                ->whereHas('roles.permissions', fn ($p) => $p->where('key', 'medications.view'))
+                ->orWhereHas('permissionOverrides', fn ($p) => $p->where('permissions.key', 'medications.view')))
+            ->with(['roles:id,name,label', 'hrEmployeeProfile'])
+            ->orderBy('name')
+            ->limit(self::WITNESS_PIN_STAFF_LIMIT)
+            ->get()
+            ->filter(fn (User $user): bool => $user->canDo('medications.view'))
+            ->map(function (User $user) use ($allSites, $siteIds): ?array {
+                $everywhere = $this->siteAccess->canBypass($user, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS);
+                $sites = $everywhere
+                    ? $allSites->keys()->map(fn (mixed $id): int => (int) $id)->all()
+                    : collect([$user->hrEmployeeProfile?->primary_site_id, ...($user->hrEmployeeProfile?->secondary_site_ids ?? [])])
+                        ->filter()
+                        ->map(fn (mixed $id): int => (int) $id)
+                        ->filter(fn (int $id): bool => $allSites->has($id))
+                        ->unique()
+                        ->values()
+                        ->all();
+                if ($siteIds !== null && array_intersect($siteIds, $sites) === []) {
+                    return null;
+                }
+
+                return [
+                    'id' => (int) $user->id,
+                    'name' => (string) $user->name,
+                    'role' => (string) ($user->roles->first()?->label ?? $user->roles->first()?->name ?? 'Staff'),
+                    'houses' => $everywhere ? [] : array_map(fn (int $id): string => (string) $allSites[$id], $sites),
+                    'site_ids' => $sites,
+                    'all_houses' => $everywhere,
+                    'controlled' => $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     /**
@@ -471,10 +588,14 @@ class MedicationSettingsController extends Controller
         // still can, read-only.
         $canTemplates = $actor !== null && $this->roundTemplates->canManageAny($actor);
         $canReadTemplates = $canTemplates || (bool) $actor?->canDo('medications.view');
-        abort_unless($canView || $canResetPins || $canReadTemplates, 403);
+        // P11 B2 Q3: house managers reach Alerts & access for their own houses' extras.
+        $canHouseAlerts = $this->canManageHouseAlerts($actor);
+        abort_unless($canView || $canResetPins || $canReadTemplates || $canHouseAlerts, 403);
 
         $canManageGlobal = $this->canManageGlobalRules($actor);
-        $siteIds = $canView ? $this->accessibleSiteIds($actor) : [];
+        $houseSiteIds = $canManage || $canHouseAlerts ? $this->ownHouseSiteIds($actor) : [];
+        $siteIds = $canView ? $this->accessibleSiteIds($actor) : $houseSiteIds;
+        $alertPayload = $this->alertPayload($actor, $canView, $canManage, $canManageGlobal, $canHouseAlerts, $siteIds, $houseSiteIds);
         // Rules that name a controlled medicine are concealed from anyone
         // without controlled-medicine access, here and in the history (EM-12).
         $canSeeControlled = $this->ruleScope->canSeeControlled($actor);
@@ -510,11 +631,13 @@ class MedicationSettingsController extends Controller
                 'settings' => $settings,
                 'witnessPin' => $witnessPin,
                 ...$roundTemplates,
+                ...$alertPayload,
                 'settingsAccess' => false,
                 'readOnlyAudit' => false,
                 'rules' => [],
                 'ruleOptions' => ['names' => [], 'routes' => [], 'nzulm' => []],
-                'sites' => [],
+                // A house manager's own houses, for their alert extras.
+                'sites' => $canHouseAlerts ? $this->siteChoices($houseSiteIds) : [],
                 'observationOptions' => self::OBSERVATION_OPTIONS,
                 'matchTypes' => self::MATCH_TYPES,
                 'can' => ['manage' => false, 'manage_global' => false],
@@ -587,6 +710,7 @@ class MedicationSettingsController extends Controller
             'settings' => $settings,
             'witnessPin' => $witnessPin,
             ...$roundTemplates,
+            ...$alertPayload,
             'settingsAccess' => true,
             'readOnlyAudit' => $readOnlyAudit,
             'rules' => $rules,
@@ -608,6 +732,152 @@ class MedicationSettingsController extends Controller
                 'manage_global' => $canManage && $canManageGlobal,
             ],
         ]);
+    }
+
+    /**
+     * Alerts & access (P11 B2): whether this person sees it, whether they set
+     * who gets each alert organisation-wide, the houses whose extras they
+     * change, the people they can name, and the names of everyone already
+     * named on an alert they can see.
+     *
+     * @param  list<int>  $siteIds  Houses whose settings this person reads.
+     * @param  list<int>  $houseSiteIds  Their own houses (HR profile).
+     * @return array{alertAccess: array<string, mixed>, alertPeople: list<array<string, mixed>>, alertNames: array<int, string>, alertReach: array<string, mixed>, alertNobodyOpen: int}
+     */
+    private function alertPayload(User $actor, bool $canView, bool $canManage, bool $canManageGlobal, bool $canHouseAlerts, array $siteIds, array $houseSiteIds): array
+    {
+        $view = $canView || $canHouseAlerts;
+        $manageOrg = $canManage && $canManageGlobal;
+        $houseIds = $canManage
+            ? ($canManageGlobal ? $siteIds : $houseSiteIds)
+            : ($canHouseAlerts ? $houseSiteIds : []);
+        if (! $view) {
+            return [
+                'alertAccess' => ['view' => false, 'manage_org' => false, 'house_ids' => []],
+                'alertPeople' => [],
+                'alertNames' => [],
+                'alertReach' => ['houses' => [], 'people' => []],
+                'alertNobodyOpen' => 0,
+            ];
+        }
+
+        $named = [];
+        foreach ($this->settingsStore->organisationValues()['alerts'] ?? [] as $value) {
+            array_push($named, ...(json_decode($value, true)['people'] ?? []));
+        }
+        foreach ($this->settingsStore->siteValues($siteIds) as $groups) {
+            foreach ($groups['alertExtra'] ?? [] as $value) {
+                array_push($named, ...(json_decode($value, true) ?? []));
+            }
+        }
+
+        $recipients = app(MedicationAlertRecipients::class);
+        $readable = array_values(array_unique([...$named, ...collect($manageOrg ? [] : $this->alertPeopleIds($houseIds))->all()]));
+
+        return [
+            'alertAccess' => [
+                'view' => true,
+                'manage_org' => $manageOrg,
+                'house_ids' => array_values(array_map('intval', $houseIds)),
+            ],
+            // The safety net's warning (P11 B2): who each group would tell at
+            // each house, from the same resolution an alert uses.
+            'alertReach' => [
+                'houses' => $recipients->reach($this->alertHouseIds($siteIds), now()),
+                'people' => $recipients->peopleReach($readable),
+            ],
+            // Open alerts nobody could be told about — never only a log row.
+            'alertNobodyOpen' => MedicationAlert::query()
+                ->whereNotNull('open_key')
+                ->where('reached_nobody', true)
+                ->when(! $canManageGlobal, fn ($query) => $query->whereIn('site_id', $siteIds))
+                ->count(),
+            // Organisation editors name anyone; house managers people at their houses.
+            'alertPeople' => $manageOrg ? $this->alertPeople(null) : ($houseIds !== [] ? $this->alertPeople($houseIds) : []),
+            'alertNames' => $named === [] ? [] : User::query()
+                ->whereIn('id', array_values(array_unique($named)))
+                ->pluck('name', 'id')
+                ->mapWithKeys(fn (mixed $name, mixed $id): array => [(int) $id => (string) $name])
+                ->all(),
+        ];
+    }
+
+    /**
+     * Where people live and medicines are given (P11 B2 Q12): every Site that
+     * isn't head office, and head office too if it has active orders.
+     *
+     * @param  list<int>  $siteIds
+     * @return list<int>
+     */
+    private function alertHouseIds(array $siteIds): array
+    {
+        if ($siteIds === []) {
+            return [];
+        }
+
+        return Site::query()
+            ->whereIn('id', $siteIds)
+            ->where('is_active', true)
+            ->where(fn ($sites) => $sites
+                ->where('type', '!=', 'head_office')
+                ->orWhereNull('type')
+                ->orWhereHas('clients.medications', fn ($orders) => $orders->active()))
+            ->orderBy('name')
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+    }
+
+    /**
+     * @param  list<int>  $houseIds
+     * @return list<int>
+     */
+    private function alertPeopleIds(array $houseIds): array
+    {
+        return $houseIds === [] ? [] : array_column($this->alertPeople($houseIds), 'id');
+    }
+
+    /**
+     * A person's own houses: their current HR profile's primary and other
+     * houses, active only (where house settings can be changed).
+     *
+     * @return list<int>
+     */
+    private function ownHouseSiteIds(?User $actor): array
+    {
+        $profile = $actor?->hrEmployeeProfile;
+        if (! $profile instanceof HrEmployeeProfile || ! $profile->is_active) {
+            return [];
+        }
+        $ids = collect([$profile->primary_site_id, ...($profile->secondary_site_ids ?? [])])
+            ->filter()
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        return Site::query()
+            ->whereIn('id', $ids)
+            ->where('is_active', true)
+            ->where('archived', false)
+            ->orderBy('name')
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+    }
+
+    /**
+     * @param  list<int>  $siteIds
+     * @return list<array{id: int, name: string}>
+     */
+    private function siteChoices(array $siteIds): array
+    {
+        return Site::query()
+            ->whereIn('id', $siteIds)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Site $site): array => ['id' => (int) $site->id, 'name' => (string) $site->name])
+            ->all();
     }
 
     /**
@@ -999,7 +1269,8 @@ class MedicationSettingsController extends Controller
         return (bool) $user && $user->canDo('medications.settings.manage');
     }
 
-    private function lockCurrentRuleActor(User $actor): User
+    /** `$houseManagedOnly`: every change is a house setting house managers may make (P11 B2 Q3). */
+    private function lockCurrentRuleActor(User $actor, bool $houseManagedOnly = false): User
     {
         $locks = $this->peopleLocks->lock([(int) $actor->id]);
         /** @var User|null $lockedActor */
@@ -1007,7 +1278,8 @@ class MedicationSettingsController extends Controller
         abort_unless(
             $lockedActor instanceof User
                 && $lockedActor->approved_at !== null
-                && $lockedActor->canDo('medications.settings.manage'),
+                && ($lockedActor->canDo('medications.settings.manage')
+                    || ($houseManagedOnly && $lockedActor->canDo('medications.alerts.manage_house'))),
             403,
         );
         $profile = $lockedActor->hrEmployeeProfile;

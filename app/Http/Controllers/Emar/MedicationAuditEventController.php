@@ -16,6 +16,7 @@ use App\Models\MedicationPrescriberOrder;
 use App\Models\MedicationReview;
 use App\Models\User;
 use App\Services\Emar\MedicationAuditIntegrityService;
+use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
@@ -223,6 +224,7 @@ class MedicationAuditEventController extends Controller
                     'reported_at' => now(),
                     'status' => 'reported',
                 ]);
+                app(MedicationAlertSources::class)->error($error);
                 $this->medicationScope->recordBreakGlassUse(
                     $scope,
                     'flagged_medication_audit_event',

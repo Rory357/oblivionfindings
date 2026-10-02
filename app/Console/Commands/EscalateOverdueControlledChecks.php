@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\MedicationDashboardAlert;
+use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -34,7 +35,7 @@ class EscalateOverdueControlledChecks extends Command
         $medications = ClientMedication::query()
             ->active()
             ->controlled()
-            ->with('client:id,first_name,last_name')
+            ->with('client:id,first_name,last_name,site_id')
             ->get();
 
         // Last balance check per controlled drug (one grouped query).
@@ -50,6 +51,7 @@ class EscalateOverdueControlledChecks extends Command
             ->pluck('last_at', 'client_medication_id');
 
         $raised = 0;
+        $overdueOrders = collect();
 
         foreach ($medications as $med) {
             if (! $med->client_id) {
@@ -62,6 +64,7 @@ class EscalateOverdueControlledChecks extends Command
             if (! $overdue) {
                 continue;
             }
+            $overdueOrders->push($med);
 
             $clientName = $med->client ? trim($med->client->first_name.' '.$med->client->last_name) : 'Unknown';
             $when = $lastAt ? Carbon::parse($lastAt)->diffForHumans() : 'never';
@@ -77,6 +80,10 @@ class EscalateOverdueControlledChecks extends Command
 
             $raised++;
         }
+
+        // One alert per house, to whoever Medication Settings › Alerts &
+        // access chooses (P11 B2); a house with no overdue order is dealt with.
+        app(MedicationAlertSources::class)->controlledChecks($overdueOrders, $days);
 
         $this->info("Overdue CD balance-check escalation complete. {$raised} alert(s) raised/updated (threshold {$days}d).");
 

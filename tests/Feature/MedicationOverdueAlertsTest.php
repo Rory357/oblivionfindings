@@ -10,7 +10,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Notifications\MedicationOverdueNotification;
-use App\Notifications\MedicationStockLowNotification;
+use App\Notifications\MedicationAlertNotification;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -129,10 +129,10 @@ it('site-scopes low-stock alerts: explicit all-site recipients get all, site-res
 
     $this->artisan('emar:send-alerts')->assertExitCode(0);
 
-    // Org-wide admin hears about Site B's low stock…
-    Notification::assertSentTo($admin, MedicationStockLowNotification::class);
+    // Org-wide admin (who updates stock everywhere) hears about Site B's low stock…
+    Notification::assertSentTo($admin, MedicationAlertNotification::class, fn ($n) => $n->alert->type === 'stock');
     // …the Site-A-only worker does not.
-    Notification::assertNotSentTo($siteAWorker, MedicationStockLowNotification::class);
+    Notification::assertNotSentTo($siteAWorker, MedicationAlertNotification::class);
 });
 
 it('fails closed when a low-stock recipient has no accessible Site even with report permission', function () {
@@ -140,8 +140,9 @@ it('fails closed when a low-stock recipient has no accessible Site even with rep
 
     $site = Site::factory()->create();
     $recipient = User::factory()->create(['approved_at' => now()]);
+    // Someone who updates stock (a low-stock recipient group) but has no house.
     $permissionIds = Permission::query()
-        ->whereIn('key', ['medications.view', 'reports.viewAny'])
+        ->whereIn('key', ['medications.view', 'medications.stock.update', 'reports.viewAny'])
         ->pluck('id');
     $recipient->permissionOverrides()->sync(
         $permissionIds->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all(),
@@ -162,7 +163,7 @@ it('fails closed when a low-stock recipient has no accessible Site even with rep
 
     $this->artisan('emar:send-alerts')->assertExitCode(0);
 
-    Notification::assertNotSentTo($recipient, MedicationStockLowNotification::class);
+    Notification::assertNotSentTo($recipient, MedicationAlertNotification::class);
 });
 
 it('conceals controlled low-stock notifications without exact controlled-view permission', function () {
@@ -187,11 +188,17 @@ it('conceals controlled low-stock notifications without exact controlled-view pe
         ]);
     }
 
+    // Both update stock at the house (a low-stock recipient group).
     $viewPermission = Permission::where('key', 'medications.view')->firstOrFail();
+    $stockPermission = Permission::where('key', 'medications.stock.update')->firstOrFail();
     $controlledPermission = Permission::where('key', 'medications.controlled.view')->firstOrFail();
-    $ordinaryRecipient->permissionOverrides()->sync([$viewPermission->id => ['allowed' => true]]);
+    $ordinaryRecipient->permissionOverrides()->sync([
+        $viewPermission->id => ['allowed' => true],
+        $stockPermission->id => ['allowed' => true],
+    ]);
     $controlledRecipient->permissionOverrides()->sync([
         $viewPermission->id => ['allowed' => true],
+        $stockPermission->id => ['allowed' => true],
         $controlledPermission->id => ['allowed' => true],
     ]);
 
@@ -212,6 +219,6 @@ it('conceals controlled low-stock notifications without exact controlled-view pe
 
     $this->artisan('emar:send-alerts')->assertExitCode(0);
 
-    Notification::assertNotSentTo($ordinaryRecipient, MedicationStockLowNotification::class);
-    Notification::assertSentTo($controlledRecipient, MedicationStockLowNotification::class);
+    Notification::assertNotSentTo($ordinaryRecipient, MedicationAlertNotification::class);
+    Notification::assertSentTo($controlledRecipient, MedicationAlertNotification::class, fn ($n) => $n->alert->type === 'stock');
 });

@@ -36,6 +36,14 @@ final class MedicationSettingDefinition
      * whose off value means "Not configured" — screens give no value until the
      * organisation chooses one — and says what happens meanwhile.
      *
+     * A `$codec` makes the value something else written as one string — who
+     * gets an alert, a list of people (P11 B2) — and decides what it accepts,
+     * its words and its loosening. `$decideLabel` is the name "Still to
+     * decide" uses when it differs from the label ("Alert: Overdue doses").
+     * `$houseManaged` marks a house setting that house managers may change
+     * for their own houses without managing medication settings
+     * (`medications.alerts.manage_house`, P11 B2 Q3).
+     *
      * @param  array<string, string>  $options  Accepted value => the words for it.
      * @param  list<string>|null  $rank
      * @param  array{direction: string, off: string|null, off_is_loosest: bool}|null  $numeric
@@ -57,11 +65,14 @@ final class MedicationSettingDefinition
         public readonly ?string $pairedWith = null,
         public readonly ?string $offLabel = null,
         public readonly ?string $whenNotConfigured = null,
+        public readonly ?MedicationSettingCodec $codec = null,
+        public readonly ?string $decideLabel = null,
+        public readonly bool $houseManaged = false,
     ) {}
 
     public function isNumber(): bool
     {
-        return $this->options === [] && $this->range !== null;
+        return $this->codec === null && $this->options === [] && $this->range !== null;
     }
 
     /** The value meaning "switched off", for a number that can be off. */
@@ -85,6 +96,9 @@ final class MedicationSettingDefinition
         if (! is_string($value)) {
             return false;
         }
+        if ($this->codec !== null) {
+            return $this->codec->accepts($value);
+        }
         if ($this->isNumber()) {
             if ($this->offValue() !== null && $value === $this->offValue()) {
                 return true;
@@ -101,6 +115,10 @@ final class MedicationSettingDefinition
     /** What to say when a value isn't accepted. */
     public function invalidMessage(): string
     {
+        if ($this->codec !== null) {
+            return $this->codec->invalidMessage($this->label);
+        }
+
         return $this->isNumber()
             ? 'Enter a whole number from '.number_format($this->range[0]).' to '.number_format($this->range[1]).' for “'.$this->label.'”'.($this->offValue() !== null ? ', or switch it off.' : '.')
             : 'Choose one of the listed values for “'.$this->label.'”.';
@@ -112,6 +130,9 @@ final class MedicationSettingDefinition
      */
     public function normalise(mixed $value): string
     {
+        if ($this->codec !== null) {
+            return $this->codec->normalise($value, $this->default);
+        }
         if ($this->isNumber() && is_int($value)) {
             $value = (string) $value;
         }
@@ -121,6 +142,9 @@ final class MedicationSettingDefinition
 
     public function format(string $value): string
     {
+        if ($this->codec !== null) {
+            return $this->codec->format($value);
+        }
         if ($this->isNumber()) {
             if ($this->offValue() !== null && $value === $this->offValue()) {
                 return $this->offLabel ?? 'Off';
@@ -137,6 +161,9 @@ final class MedicationSettingDefinition
     {
         if ($from === $to) {
             return false;
+        }
+        if ($this->codec !== null) {
+            return $this->codec->loosens($from, $to);
         }
 
         if ($this->rank !== null) {
@@ -186,6 +213,10 @@ final class MedicationSettingDefinition
             'when_not_configured' => $this->whenNotConfigured,
             'rank' => $this->rank,
             'numeric' => $this->numeric,
+            'kind' => $this->codec?->kind(),
+            'decide_label' => $this->decideLabel,
+            'house_managed' => $this->houseManaged,
+            ...($this->codec?->toClient() ?? []),
         ];
     }
 }
