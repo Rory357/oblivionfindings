@@ -116,12 +116,20 @@ class MedicationGenericReportingSurfaceTest extends TestCase
         $this->assertSame(0, $dashboard->inertiaProps('emarWidgets.overdue'));
         $this->assertSame(1, $dashboard->inertiaProps('emarWidgets.lowStock'));
 
+        // The MAR numbers (C6h) count a scheduled dose once its window has
+        // ended — at 10:01 — and count controlled doses for every reader (P09
+        // Q6): missed 2 (the ordinary and the deleted controlled order's
+        // 09:00), not recorded 3 (the controlled stock, replacement and
+        // unverified orders' 09:00).
+        Carbon::setTestNow(Carbon::parse('2026-05-21 10:01:00', 'Pacific/Auckland')->utc());
         $compliance = $this->actingAs($ordinary)->get(route('compliance.index'))->assertOk();
         $ordinaryKpis = collect($compliance->inertiaProps('kpis'));
         $this->assertFalse($ordinaryKpis->contains('key', 'cd'));
-        $this->assertSame(1, $ordinaryKpis->firstWhere('key', 'mar')['value']);
+        $this->assertSame(5, $ordinaryKpis->firstWhere('key', 'mar')['value']);
         $this->assertSame([], $compliance->inertiaProps('charts.cdTrend'));
-        $this->assertSame(1, collect($compliance->inertiaProps('charts.marTrend'))->sum('missed'));
+        $this->assertSame(2, collect($compliance->inertiaProps('charts.marTrend'))->sum('missed'));
+        $this->assertSame(3, collect($compliance->inertiaProps('charts.marTrend'))->sum('not_recorded'));
+        Carbon::setTestNow(Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland')->utc());
 
         $generalAudit = AuditLog::query()->create([
             'user_id' => $ordinary->id,
@@ -208,12 +216,14 @@ class MedicationGenericReportingSurfaceTest extends TestCase
         $this->assertSame(3, $controlledDashboard->inertiaProps('emarWidgets.dueNow'));
         $this->assertSame(2, $controlledDashboard->inertiaProps('emarWidgets.lowStock'));
 
+        // The same MAR numbers as the ordinary reader (P09 Q6).
+        Carbon::setTestNow(Carbon::parse('2026-05-21 10:01:00', 'Pacific/Auckland')->utc());
         $controlledCompliance = $this->actingAs($controlledReader)
             ->get(route('compliance.index'))
             ->assertOk();
         $controlledKpis = collect($controlledCompliance->inertiaProps('kpis'));
         $this->assertSame(1, $controlledKpis->firstWhere('key', 'cd')['value']);
-        $this->assertSame(2, $controlledKpis->firstWhere('key', 'mar')['value']);
+        $this->assertSame(5, $controlledKpis->firstWhere('key', 'mar')['value']);
         $this->assertSame(1, collect($controlledCompliance->inertiaProps('charts.cdTrend'))->sum('total'));
         $this->assertSame(2, collect($controlledCompliance->inertiaProps('charts.marTrend'))->sum('missed'));
     }

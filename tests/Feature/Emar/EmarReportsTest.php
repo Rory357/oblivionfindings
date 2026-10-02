@@ -12,6 +12,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -26,6 +27,13 @@ use Tests\TestCase;
 class EmarReportsTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
 
     public function test_page_serves_brand_colour_reasons_and_cd_medications(): void
     {
@@ -86,6 +94,9 @@ class EmarReportsTest extends TestCase
 
     public function test_page_csv_and_api_reports_intersect_requested_site_with_canonical_access(): void
     {
+        // A fixed NZ day from the start, so the worker's HR profile is current
+        // on it (C6h: the report's doses are that day's scheduled doses).
+        Carbon::setTestNow(Carbon::parse('2026-06-15 00:00', 'Pacific/Auckland')->utc());
         $this->seed(RbacSeeder::class);
         $siteA = Site::factory()->create(['name' => 'Report Site A', 'is_active' => true]);
         $siteB = Site::factory()->create(['name' => 'Report Site B', 'is_active' => true]);
@@ -102,10 +113,16 @@ class EmarReportsTest extends TestCase
 
         $clientA = Client::factory()->create(['site_id' => $siteA->id, 'status' => 'active']);
         $clientB = Client::factory()->create(['site_id' => $siteB->id, 'status' => 'active']);
+        // One scheduled dose each (08:00), entered at the start of the day and
+        // given: the report's dose numbers are the scheduled doses due (C6h).
         foreach ([[$clientA, 'Site A medicine'], [$clientB, 'Site B medicine']] as [$client, $name]) {
             $medication = ClientMedication::create([
                 'client_id' => $client->id,
                 'name' => $name,
+                'dose_times' => ['08:00'],
+                'frequency' => 'Daily',
+                'is_prn' => false,
+                'start_date' => '2026-06-01',
                 'active' => true,
                 'state' => 'active',
                 'approval_status' => 'verified',
@@ -115,9 +132,11 @@ class EmarReportsTest extends TestCase
                 'client_medication_id' => $medication->id,
                 'status' => 'given',
                 'administered_by' => $user->id,
-                'administered_at' => now(),
+                'scheduled_for' => Carbon::parse('2026-06-15 08:00', 'Pacific/Auckland')->utc(),
+                'administered_at' => Carbon::parse('2026-06-15 08:05', 'Pacific/Auckland')->utc(),
             ]);
         }
+        Carbon::setTestNow(Carbon::parse('2026-06-15 10:00', 'Pacific/Auckland')->utc());
 
         $this->actingAs($user)
             ->get('/emar/reports')

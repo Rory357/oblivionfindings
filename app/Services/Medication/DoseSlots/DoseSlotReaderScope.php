@@ -97,6 +97,21 @@ final class DoseSlotReaderScope
     }
 
     /**
+     * People the caller has already authorised under its own capability —
+     * the audit's people at the Sites medications.audit.view gives — with
+     * controlled medicines named only for a controlled-medicine viewer.
+     *
+     * @param  array<int, int>  $clientIds
+     */
+    public static function forAuthorisedClients(User $viewer, array $clientIds): self
+    {
+        return new self(
+            array_values(array_unique(array_map('intval', $clientIds))),
+            $viewer->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
+        );
+    }
+
+    /**
      * Internal jobs (alerts, rounds, the event log): every person, or the
      * given ones, with controlled medicines named.
      *

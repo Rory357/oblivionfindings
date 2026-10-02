@@ -151,12 +151,14 @@ type Props = {
     };
     charts: {
         incidentBySeverity: Array<{ severity: string; total: number }>;
+        /** Scheduled doses due each NZ day (C6h), by what happened to them. */
         marTrend: Array<{
             date: string;
             given: number;
             missed: number;
             refused: number;
             withheld: number;
+            not_recorded?: number;
         }>;
         cdTrend: Array<{ date: string; total: number }>;
     };
@@ -1317,6 +1319,16 @@ export default function ComplianceIndex({
                                         dataKey="withheld"
                                         name="Withheld"
                                         stroke={TOKEN.info}
+                                        dot={false}
+                                        strokeWidth={2}
+                                        isAnimationActive={false}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="not_recorded"
+                                        name="Not recorded"
+                                        stroke={TOKEN.critical}
+                                        strokeDasharray="4 3"
                                         dot={false}
                                         strokeWidth={2}
                                         isAnimationActive={false}

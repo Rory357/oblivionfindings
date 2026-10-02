@@ -324,7 +324,9 @@ class AuditTrailTest extends TestCase
     public function test_unrecorded_scheduled_dose_becomes_an_omission(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedAudit();
-        // Scheduled (non-PRN) med, active for 3 days, due daily at 08:00.
+        // Scheduled (non-PRN) med, entered 3 days ago, due daily at 08:00 (an
+        // order owes nothing before it exists; omissions come from its slots).
+        $this->travel(-3)->days();
         ClientMedication::query()->create([
             'client_id' => $client->id, 'name' => 'Metformin', 'dosage' => '500mg', 'frequency' => 'Morning',
             'dose_times' => ['08:00'], 'is_prn' => false, 'active' => true, 'state' => 'active',
@@ -336,6 +338,7 @@ class AuditTrailTest extends TestCase
             'is_prn' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified',
             'start_date' => now()->subDays(3)->toDateString(),
         ]);
+        $this->travelBack();
 
         $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('events', function ($events) {
