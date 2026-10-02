@@ -79,7 +79,11 @@ class MyCalendarController extends Controller
                 ->get();
 
             foreach ($rounds as $round) {
-                $roundStart = Carbon::parse($round->round_date->format('Y-m-d').' '.$round->scheduled_time);
+                // The round's date and time are NZ wall-clock.
+                $roundStart = $round->scheduledAt();
+                if ($roundStart === null) {
+                    continue;
+                }
                 $roundEnd = $roundStart->copy()->addHour();
 
                 $events[] = [

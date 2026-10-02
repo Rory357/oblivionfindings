@@ -344,16 +344,31 @@ class EmarReportController extends Controller
         $roundTotals = (clone $roundQuery)->selectRaw("
             COUNT(*) as total,
             SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-            SUM(CASE WHEN status = 'completed' AND completed_at <= DATE_ADD(CONCAT(round_date, ' ', scheduled_time), INTERVAL window_minutes MINUTE) THEN 1 ELSE 0 END) as on_time,
-            SUM(CASE WHEN status = 'completed' AND completed_at > DATE_ADD(CONCAT(round_date, ' ', scheduled_time), INTERVAL window_minutes MINUTE) THEN 1 ELSE 0 END) as late,
             SUM(CASE WHEN status = 'missed' THEN 1 ELSE 0 END) as missed
         ")->first();
 
         $totalRounds = (int) ($roundTotals->total ?? 0);
         $completedRounds = (int) ($roundTotals->completed ?? 0);
-        $onTimeRounds = (int) ($roundTotals->on_time ?? 0);
-        $lateRounds = (int) ($roundTotals->late ?? 0);
         $missedRounds = (int) ($roundTotals->missed ?? 0);
+        // On time: completed by the end of the round's own window. The round's
+        // date and time are NZ wall-clock and completed_at is UTC, so compare
+        // instants (MedicationRound::windowEndsAt), not the columns in SQL.
+        $onTimeRounds = 0;
+        $lateRounds = 0;
+        (clone $roundQuery)
+            ->where('status', 'completed')
+            ->whereNotNull('completed_at')
+            ->select(['id', 'round_date', 'scheduled_time', 'window_minutes', 'completed_at'])
+            ->orderBy('id')
+            ->chunk(1000, function ($rounds) use (&$onTimeRounds, &$lateRounds): void {
+                foreach ($rounds as $round) {
+                    $endsAt = $round->windowEndsAt();
+                    if ($endsAt === null) {
+                        continue;
+                    }
+                    $round->completed_at->lessThanOrEqualTo($endsAt) ? $onTimeRounds++ : $lateRounds++;
+                }
+            });
 
         $roundSummary = [
             'total' => $totalRounds,
