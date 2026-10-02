@@ -5,11 +5,13 @@ namespace App\Services\Medication\Alerts;
 use App\Models\MedicationAlert;
 use App\Models\MedicationAlertEvent;
 use App\Models\MedicationAlertRecipient;
+use App\Models\User;
 use App\Notifications\MedicationAlertNotification;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * The one way a medication alert is raised (eMAR P11 B2).
@@ -99,27 +101,56 @@ class MedicationAlerts
         ), $now);
 
         // No channel switched on means nobody is told, whoever the groups are
-        // (B2 C1 review): no recipient is recorded as told.
+        // (B2 C1 review): no recipient is recorded as told. Each person is
+        // told on the channels they can be reached on (B2 chunk 2): the bell
+        // here, in this transaction; email and push once it commits, so a
+        // slow mail server can't hold the record or undo it.
+        $private = $this->settings->privateDelivery();
         $told = [];
+        $unreachable = [];
+        $afterCommit = [];
         if ($channels !== []) {
             foreach ($resolved['told'] as ['user' => $user, 'reason' => $reason]) {
-                $notification = new MedicationAlertNotification($alert, $channels);
-                $notification->id = (string) Str::uuid();
-                $user->notify($notification);
+                $reach = $this->reachable($user, $channels);
+                if ($reach === []) {
+                    $unreachable[] = (int) $user->id;
+
+                    continue;
+                }
+                $notificationId = null;
+                if (in_array('inapp', $reach, true)) {
+                    $notification = new MedicationAlertNotification($alert, ['inapp'], $private);
+                    $notification->id = (string) Str::uuid();
+                    $user->notify($notification);
+                    $notificationId = $notification->id;
+                }
+                $outside = array_values(array_diff($reach, ['inapp']));
+                if ($outside !== []) {
+                    $afterCommit[] = [$user, $outside];
+                }
                 MedicationAlertRecipient::query()->create([
                     'medication_alert_id' => $alert->id,
                     'user_id' => $user->id,
                     'reason' => $reason,
                     'step' => 0,
-                    'channels' => $channels,
+                    'channels' => $reach,
                     'told_at' => $now,
-                    'notification_id' => $notification->id,
+                    'notification_id' => $notificationId,
                 ]);
-                $told[] = ['user_id' => (int) $user->id, 'reason' => $reason];
+                $told[] = ['user_id' => (int) $user->id, 'reason' => $reason, 'channels' => $reach];
             }
+        }
+        if ($afterCommit !== []) {
+            DB::afterCommit(fn () => $this->sendOutside($alert, $afterCommit, $private));
         }
 
         $this->event($alert, MedicationAlertEvent::SENT, ['told' => $told, 'channels' => $channels]);
+        if ($unreachable !== []) {
+            $this->event($alert, MedicationAlertEvent::NOT_REACHABLE, [
+                'user_ids' => $unreachable,
+                'reason' => 'In-app is off for this alert, and they have no work email or push set up for its other channels.',
+            ]);
+        }
         if ($resolved['not_told_controlled'] !== []) {
             $this->event($alert, MedicationAlertEvent::NOT_TOLD_CONTROLLED, ['user_ids' => $resolved['not_told_controlled']]);
         }
@@ -130,9 +161,11 @@ class MedicationAlerts
             ]);
         }
         if ($told === []) {
-            $reason = $channels === []
-                ? 'No way to tell people is switched on for this alert.'
-                : $resolved['nobody_reason'];
+            $reason = match (true) {
+                $channels === [] => 'No way to tell people is switched on for this alert.',
+                $unreachable !== [] => 'Nobody it would go to can be reached: in-app is off, and they have no work email or push set up.',
+                default => $resolved['nobody_reason'],
+            };
             // Never a silent log row: Settings counts open alerts that reached nobody.
             $alert->forceFill(['reached_nobody' => true])->save();
             $this->event($alert, MedicationAlertEvent::NOBODY_TOLD, [
@@ -151,6 +184,47 @@ class MedicationAlerts
         }
 
         return $alert;
+    }
+
+    /**
+     * The alert's channels this person can be reached on: the bell always;
+     * email only to a work email (never the sign-in address); push only to a
+     * phone or browser they've allowed.
+     *
+     * @param  list<string>  $channels
+     * @return list<string>
+     */
+    private function reachable(User $user, array $channels): array
+    {
+        return array_values(array_filter($channels, fn (string $channel): bool => match ($channel) {
+            'inapp' => true,
+            'email' => $user->medicationAlertWorkEmail() !== null,
+            'push' => $user->pushSubscriptions()->where('enabled', true)->exists(),
+            default => false,
+        }));
+    }
+
+    /**
+     * Email and push, after the record commits. A failure is logged and
+     * reported; it never undoes the record or the bell.
+     *
+     * @param  list<array{0: User, 1: list<string>}>  $people
+     */
+    private function sendOutside(MedicationAlert $alert, array $people, bool $private): void
+    {
+        foreach ($people as [$user, $channels]) {
+            try {
+                $user->notify(new MedicationAlertNotification($alert, $channels, $private));
+            } catch (Throwable $exception) {
+                Log::error('Medication alert email or push could not be sent', [
+                    'medication_alert_id' => $alert->id,
+                    'user_id' => $user->id,
+                    'channels' => $channels,
+                    'exception' => $exception->getMessage(),
+                ]);
+                report($exception);
+            }
+        }
     }
 
     /** The open alert for this subject is dealt with: its source was put right. */

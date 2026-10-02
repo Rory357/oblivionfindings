@@ -28,6 +28,7 @@ import {
     KeyRound,
     Layers,
     LockKeyhole,
+    Mail,
     Pencil,
     Pill,
     RefreshCw,
@@ -42,11 +43,13 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     AlertDialogHost,
+    AlertsDelivery,
     AlertsOverview,
     AlertsTable,
     type AlertAccess,
     type AlertData,
     type AlertPerson,
+    type AlertPreview,
 } from './settings/_alerts';
 import {
     SettingsCtx,
@@ -138,6 +141,10 @@ type Props = {
     alertReach: AlertReach;
     /** Open alerts nobody could be told about. */
     alertNobodyOpen: number;
+    /** Message preview samples, rendered by the real notification (B2 C2). */
+    alertPreviews: Record<string, AlertPreview>;
+    /** Of the people who can get alerts, how many have push set up. */
+    alertDelivery: { push_ready: number; people: number };
 };
 
 const VIEW_ICON: Record<ViewKey, LucideIcon> = {
@@ -162,6 +169,7 @@ const SEC_ICON: Record<string, LucideIcon> = {
     decide: HelpCircle,
     changes: History,
     alerts: Bell,
+    delivery: Mail,
 };
 /** Tabs whose settings are saved through the save bar. */
 const SAVED_SECTIONS = [
@@ -171,6 +179,7 @@ const SAVED_SECTIONS = [
     'exemptions',
     'pins',
     'alerts',
+    'delivery',
 ];
 const SHOW_OPTIONS = [
     { value: 'all', label: 'All settings' },
@@ -181,6 +190,8 @@ const ALERT_SHOW_OPTIONS = [
     { value: 'all', label: 'All alerts' },
     { value: 'open', label: 'Not yet reviewed' },
     { value: 'changed', label: 'Unsaved changes' },
+    { value: 'email', label: 'Email on' },
+    { value: 'push', label: 'Push on' },
 ];
 
 export type Filters = {
@@ -272,7 +283,7 @@ export default function EmarSettings(props: Props) {
                   ? ['pins', 'status']
                   : [],
             // P11 B2: settings readers, and house managers for their houses' extras.
-            alerts: alertAccess.view ? ['overview', 'alerts'] : [],
+            alerts: alertAccess.view ? ['overview', 'alerts', 'delivery'] : [],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
         [settingsAccess, templatesOnly, witnessPin.can_reset, alertAccess.view],
@@ -423,6 +434,8 @@ export default function EmarSettings(props: Props) {
         sites: props.sites,
         readOnlyAudit,
         nobodyOpen: props.alertNobodyOpen,
+        previews: props.alertPreviews ?? {},
+        delivery: props.alertDelivery ?? { push_ready: 0, people: 0 },
     };
     // House extras: their own houses' managers (B2 Q3); everything else
     // needs all-sites authority.
@@ -481,6 +494,7 @@ export default function EmarSettings(props: Props) {
                 'alertNames',
                 'alertReach',
                 'alertNobodyOpen',
+                'alertDelivery',
             ],
             onSuccess: () => setLoadedAt(new Date()),
         });
@@ -836,6 +850,16 @@ export default function EmarSettings(props: Props) {
             <AlertsOverview q={query} data={alertData} />
         ) : view === 'alerts' && sec === 'alerts' ? (
             <AlertsTable
+                q={query}
+                show={f.show}
+                data={alertData}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'alerts' && sec === 'delivery' ? (
+            <AlertsDelivery
                 q={query}
                 show={f.show}
                 data={alertData}

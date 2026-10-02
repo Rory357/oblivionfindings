@@ -46,6 +46,17 @@ class MedicationAlertSettings
         return json_decode($definition->normalise($stored), true);
     }
 
+    /** Email and push leave out client names and medicines (default on). */
+    public function privateDelivery(): bool
+    {
+        $definition = $this->registry->definition('delivery', 'private');
+        if ($definition === null) {
+            return true;
+        }
+
+        return $definition->normalise(AppSetting::query()->where('key', $definition->storageKey)->value('value')) !== 'no';
+    }
+
     /** @return list<string> The channels this alert is sent on today. */
     public function channels(string $alert): array
     {

@@ -9,9 +9,11 @@ import { useState, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     AlertDialogHost,
+    AlertsDelivery,
     AlertsTable,
     type AlertData,
     type AlertPerson,
+    type AlertPreview,
 } from './_alerts';
 import { SettingsCtx, type Dialog, type SettingsContext } from './_context';
 import {
@@ -66,7 +68,7 @@ const meta = (
     group_labels: Object.fromEntries(groups.map((g) => [g, LABELS[g]])),
     controlled,
     until: 'Until done',
-    channels: ['inapp'],
+    channels: ['inapp', 'email', 'push'],
 });
 const value = (groups: string[], people: number[] = [], inapp = true) =>
     JSON.stringify({
@@ -148,12 +150,41 @@ const settings: SettingsPayload = {
             audit_event: 'medications.alert_recipients.updated',
             keys: ['followups', 'stock', 'cdCheck'],
         },
+        delivery: {
+            key: 'delivery',
+            view: 'alerts',
+            effect: 'From the next alert sent, at every house',
+            audit_event: 'medications.alert_delivery.updated',
+            keys: ['private'],
+        },
     },
     definitions: {
         alerts: {
             followups: alertDef(FOLLOWUPS, value(['rostered', 'houseLead'])),
             stock: alertDef(STOCK, value(['houseLead', 'stockStaff'])),
             cdCheck: alertDef(CD_CHECK, value(['houseLead'])),
+        },
+        delivery: {
+            private: {
+                group: 'delivery',
+                key: 'private',
+                scope: 'organisation',
+                section: 'delivery',
+                label: 'Keep client names and medicines out of email and push',
+                options: [
+                    {
+                        value: 'no',
+                        label: 'Off — email and push include client names and medicines',
+                    },
+                    { value: 'yes', label: 'On' },
+                ],
+                default: 'yes',
+                range: null,
+                unit: null,
+                paired_with: null,
+                rank: ['no', 'yes'],
+                numeric: null,
+            },
         },
         alertExtra: {
             followups: extraDef('followups', 'Follow-ups overdue'),
@@ -247,12 +278,18 @@ function Harness({
     data,
     initialDialog = null,
     onDraft,
+    show = 'all',
+    delivery = false,
+    initialDraft = {},
 }: {
     data: AlertData;
     initialDialog?: Dialog | null;
     onDraft?: (d: Draft) => void;
+    show?: string;
+    delivery?: boolean;
+    initialDraft?: Draft;
 }) {
-    const [draft, setDraftState] = useState<Draft>({});
+    const [draft, setDraftState] = useState<Draft>(initialDraft);
     const [dialog, setDialog] = useState<Dialog | null>(initialDialog);
     const ctx: SettingsContext = {
         s: settings,
@@ -275,18 +312,62 @@ function Harness({
     };
     return (
         <SettingsCtx.Provider value={ctx}>
-            <AlertsTable q="" show="all" clear={vi.fn()} data={data} />
+            {delivery ? (
+                <AlertsDelivery q="" show={show} clear={vi.fn()} data={data} />
+            ) : (
+                <AlertsTable q="" show={show} clear={vi.fn()} data={data} />
+            )}
             <AlertDialogHost dialog={dialog} data={data} />
         </SettingsCtx.Provider>
     );
 }
 
+// As the server renders them (MedicationAlertPreviews through the real notification).
+const STOCK_PREVIEW: AlertPreview = {
+    controlled: false,
+    inapp: {
+        title: 'Stock running low',
+        message:
+            'Salbutamol inhaler for Aroha N. is below its reorder level (2 left). Kōwhai House.',
+    },
+    private: {
+        email: {
+            subject: 'Stock running low',
+            lines: [
+                'A medicine at Kōwhai House is running low.',
+                'Open Oblivion Care to see the details and respond.',
+            ],
+            action: 'Open in Oblivion Care',
+        },
+        push: {
+            title: 'Stock running low',
+            body: 'A medicine at Kōwhai House is running low.',
+        },
+    },
+    open: {
+        email: {
+            subject:
+                'Stock running low — Salbutamol inhaler for Aroha N. is below its reorder level (2 left). Kōwhai House.',
+            lines: [
+                'Salbutamol inhaler for Aroha N. is below its reorder level (2 left). Kōwhai House.',
+                'Open Oblivion Care to see the details and respond.',
+            ],
+            action: 'Open in Oblivion Care',
+        },
+        push: {
+            title: 'Stock running low',
+            body: 'Salbutamol inhaler for Aroha N. is below its reorder level (2 left). Kōwhai House.',
+        },
+    },
+};
 const orgEditor: AlertData = {
     access: { view: true, manage_org: true, house_ids: [3, 4] },
     people,
     sites,
     readOnlyAudit: false,
     nobodyOpen: 0,
+    previews: { stock: STOCK_PREVIEW },
+    delivery: { push_ready: 2, people: 3 },
 };
 const houseLead: AlertData = {
     access: { view: true, manage_org: false, house_ids: [3] },
@@ -294,6 +375,8 @@ const houseLead: AlertData = {
     sites: [sites[0]],
     readOnlyAudit: false,
     nobodyOpen: 0,
+    previews: { stock: STOCK_PREVIEW },
+    delivery: { push_ready: 1, people: 2 },
 };
 
 afterEach(cleanup);
@@ -314,17 +397,22 @@ describe('Alerts & access › Alerts', () => {
             .getByText('Follow-ups overdue')
             .closest('[role="row"]') as HTMLElement;
         expect(within(followups).getByText('Always on')).toBeInTheDocument();
-        expect(within(followups).getByRole('switch')).toBeDisabled();
-        // B2 C1 review: in-app is the only channel that sends today, so it stays on.
+        expect(
+            within(followups).getByRole('switch', { name: /in-app/ }),
+        ).toBeDisabled();
+        // B2 C1 review: while in-app is the only channel on, it stays on.
         expect(
             within(stock).getByText('Only way it’s sent'),
         ).toBeInTheDocument();
-        expect(within(stock).getByRole('switch')).toBeDisabled();
+        expect(
+            within(stock).getByRole('switch', { name: /in-app/ }),
+        ).toBeDisabled();
         expect(
             within(followups).getByText('Default — not yet reviewed'),
         ).toBeInTheDocument();
-        // Email, push and Follow up arrive with their chunks; nothing fake now.
-        expect(screen.queryByText('Email')).toBeNull();
+        // Email and push send since B2 C2; Follow up arrives with C3.
+        expect(screen.getByText('Email')).toBeInTheDocument();
+        expect(screen.getByText('Push')).toBeInTheDocument();
         expect(screen.queryByText('Follow up')).toBeNull();
     });
 
@@ -402,9 +490,9 @@ describe('Who gets an alert, in the settings model', () => {
     it('reads in the server’s words, naming people', () => {
         expect(
             format(def, value(['houseLead'], [7]), settings.people_names),
-        ).toBe('In-app on · House lead, Rangi Parata');
+        ).toBe('In-app on · email off · push off · House lead, Rangi Parata');
         expect(format(def, value([]), settings.people_names)).toBe(
-            'In-app on · nobody',
+            'In-app on · email off · push off · nobody',
         );
         expect(format(settings.definitions.alertExtra.stock, '[]')).toBe(
             'Nobody extra',
@@ -447,7 +535,7 @@ describe('Who gets an alert, in the settings model', () => {
             [
                 'Who gets “Controlled-drug balance check overdue”',
                 null,
-                'In-app off · House lead',
+                'In-app off · email off · push off · House lead',
             ],
             [
                 'Stock running low — extra people at Kōwhai House',
@@ -457,7 +545,7 @@ describe('Who gets an alert, in the settings model', () => {
         ]);
         expect(validateView(settings, draft, 'alerts')).toEqual({
             'alerts.cdCheck':
-                '“Controlled-drug balance check overdue”: turn on in-app — otherwise nobody is told.',
+                '“Controlled-drug balance check overdue”: turn on in-app, email or push — otherwise nobody is told.',
         });
     });
 });
@@ -515,6 +603,158 @@ describe('The safety net (Main, 2 Oct)', () => {
             within(cd).getByText(
                 'Nobody at Rimu House in these groups or among medication settings managers — nobody would be told',
             ),
+        ).toBeInTheDocument();
+    });
+});
+
+describe('Alerts & access › email, push and delivery (B2 C2)', () => {
+    it('turns email on for an alert, after which in-app can be switched off but not the last channel', () => {
+        let last: Draft = {};
+        render(<Harness data={orgEditor} onDraft={(d) => (last = d)} />);
+        const stock = screen
+            .getByText('Stock running low')
+            .closest('[role="row"]') as HTMLElement;
+        fireEvent.click(
+            within(stock).getByRole('switch', {
+                name: 'Stock running low: email',
+            }),
+        );
+        expect(JSON.parse(last.alerts!.stock)).toMatchObject({
+            inapp: true,
+            email: true,
+            push: false,
+        });
+        const inapp = within(stock).getByRole('switch', { name: /in-app/ });
+        expect(inapp).toBeEnabled();
+        expect(within(stock).queryByText('Only way it’s sent')).toBeNull();
+        fireEvent.click(inapp);
+        expect(JSON.parse(last.alerts!.stock)).toMatchObject({
+            inapp: false,
+            email: true,
+        });
+        // Email off too: in-app comes back on — never no channel at all.
+        fireEvent.click(
+            within(stock).getByRole('switch', {
+                name: 'Stock running low: email',
+            }),
+        );
+        expect(JSON.parse(last.alerts!.stock)).toMatchObject({
+            inapp: true,
+            email: false,
+        });
+    });
+
+    it('filters to alerts sent by email or push, and offers the message preview on the row menu', () => {
+        const emailOn = JSON.stringify({
+            inapp: true,
+            email: true,
+            push: false,
+            follow_up: false,
+            groups: ['houseLead'],
+            people: [],
+        });
+        render(
+            <Harness
+                data={orgEditor}
+                show="email"
+                initialDraft={{ alerts: { cdCheck: emailOn } }}
+            />,
+        );
+        expect(
+            screen.getByText('Controlled-drug balance check overdue'),
+        ).toBeInTheDocument();
+        expect(screen.queryByText('Stock running low')).toBeNull();
+        cleanup();
+
+        render(<Harness data={orgEditor} />);
+        const stock = screen
+            .getByText('Stock running low')
+            .closest('[role="row"]') as HTMLElement;
+        fireEvent.contextMenu(stock);
+        expect(
+            screen.getByRole('menuitem', { name: 'Preview message' }),
+        ).toBeInTheDocument();
+    });
+
+    it('shows Delivery: channel counts, push set-up and the privacy switch, on by default', () => {
+        let last: Draft = {};
+        render(
+            <Harness data={orgEditor} delivery onDraft={(d) => (last = d)} />,
+        );
+        const row = (label: string) =>
+            screen.getByText(label).closest('[data-setting]') as HTMLElement;
+        expect(
+            within(row('Alert types sent by email')).getByText('0 of 3'),
+        ).toBeInTheDocument();
+        expect(
+            within(row('Alert types sent in-app')).getByText('3 of 3'),
+        ).toBeInTheDocument();
+        expect(
+            within(row('Staff with push set up')).getByText('2 of 3'),
+        ).toBeInTheDocument();
+        const privacy = screen.getByRole('switch', {
+            name: 'Keep client names and medicines out of email and push',
+        });
+        expect(privacy).toBeChecked();
+        expect(
+            within(
+                row('Keep client names and medicines out of email and push'),
+            ).getByText('Default — not yet reviewed'),
+        ).toBeInTheDocument();
+        fireEvent.click(privacy);
+        expect(last.delivery?.private).toBe('no');
+        // Hide-unbuilt: digest, personal copies and follow-up aren't shown yet.
+        expect(
+            screen.queryByText('Group emails into an hourly summary'),
+        ).toBeNull();
+        expect(screen.queryByText('Re-alert until attended')).toBeNull();
+    });
+
+    it('previews a message from the server’s rendering, with the privacy switch from the draft', () => {
+        render(
+            <Harness
+                data={orgEditor}
+                initialDialog={{ kind: 'msgpreview', key: 'stock' }}
+            />,
+        );
+        const dialog = screen.getByRole('dialog');
+        expect(
+            within(dialog).getByText(
+                'Salbutamol inhaler for Aroha N. is below its reorder level (2 left). Kōwhai House.',
+            ),
+        ).toBeInTheDocument();
+        fireEvent.click(within(dialog).getByRole('tab', { name: /Email/ }));
+        expect(
+            within(dialog).getByText('Stock running low', {
+                selector: 'p.font-semibold',
+            }),
+        ).toBeInTheDocument();
+        expect(
+            within(dialog).getByText(
+                'A medicine at Kōwhai House is running low.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            within(dialog).getByText(/Client names and medicines are left out/),
+        ).toBeInTheDocument();
+        cleanup();
+
+        render(
+            <Harness
+                data={orgEditor}
+                initialDialog={{ kind: 'msgpreview', key: 'stock' }}
+                initialDraft={{ delivery: { private: 'no' } }}
+            />,
+        );
+        const open = screen.getByRole('dialog');
+        fireEvent.click(within(open).getByRole('tab', { name: /Push/ }));
+        expect(
+            within(open).getByText(
+                'Salbutamol inhaler for Aroha N. is below its reorder level (2 left). Kōwhai House.',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            within(open).getByText(/Client names and medicines are included/),
         ).toBeInTheDocument();
     });
 });

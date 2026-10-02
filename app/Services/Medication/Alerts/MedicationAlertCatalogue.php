@@ -270,8 +270,8 @@ final class MedicationAlertCatalogue
         ],
     ];
 
-    /** Channels that send today; email and push arrive with P11 B2 chunk 2. */
-    public const CHANNELS_BUILT = ['inapp'];
+    /** Channels that send today (email and push since P11 B2 chunk 2). */
+    public const CHANNELS_BUILT = ['inapp', 'email', 'push'];
 
     /** @return array{label: string, subline: string, groups: list<string>, default: list<string>, locked: list<string>, controlled: bool, follow_up: bool, until: string, built: bool}|null */
     public static function get(string $key): ?array

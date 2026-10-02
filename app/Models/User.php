@@ -13,6 +13,7 @@ use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
+use App\Notifications\MedicationAlertNotification;
 use App\Services\CurrentAuthorizationReads;
 use Database\Factories\UserFactory;
 use Illuminate\Auth\Notifications\VerifyEmail;
@@ -274,6 +275,39 @@ class User extends Authenticatable implements MustVerifyEmail
     public function hrEmployeeProfile()
     {
         return $this->hasOne(HrEmployeeProfile::class);
+    }
+
+    /**
+     * Where email goes. A medication alert goes only to the person's work
+     * email — never their sign-in address (P11 B2 chunk 2); without one,
+     * nothing is emailed and they show as a gap. Everything else keeps
+     * Laravel's default, the account email.
+     */
+    public function routeNotificationForMail(mixed $notification = null): ?string
+    {
+        if ($notification instanceof MedicationAlertNotification) {
+            return $this->medicationAlertWorkEmail();
+        }
+
+        return $this->email;
+    }
+
+    /** The work email on their current HR profile, or null. */
+    public function medicationAlertWorkEmail(): ?string
+    {
+        $profile = $this->relationLoaded('hrEmployeeProfile')
+            ? $this->getRelation('hrEmployeeProfile')
+            : $this->hrEmployeeProfile()->first();
+        if (! $profile instanceof HrEmployeeProfile || ! $profile->is_active) {
+            return null;
+        }
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+        if ($profile->end_date !== null && $profile->end_date->toDateString() < $today) {
+            return null;
+        }
+        $email = trim((string) $profile->work_email);
+
+        return $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) !== false ? $email : null;
     }
 
     /** Personal witness PIN (hash only) — see WitnessPinService. */

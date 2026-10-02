@@ -23,7 +23,8 @@ export type Dialog =
     | { kind: 'tplretire'; id: number }
     | { kind: 'gen' }
     | { kind: 'alertwho'; key: string }
-    | { kind: 'alertperson'; key: string };
+    | { kind: 'alertperson'; key: string }
+    | { kind: 'msgpreview'; key: string };
 
 export type SettingsContext = {
     s: SettingsPayload;
