@@ -335,6 +335,19 @@ export default function FinanceDashboard({
         allowed
             ? { cta, onClick: () => router.visit(href) }
             : { cta: sectionCta, onClick: () => scrollToSection(sectionId) };
+    // No dashboard section breaks the receivables ageing down, so without
+    // the report it falls back to the unpaid invoices list, else a static card.
+    const receivablesDonutTarget: DonutCardTarget = canReports
+        ? {
+              cta: 'View aged receivables',
+              onClick: () => router.visit('/finance/reports/aged-receivables'),
+          }
+        : canReceivables
+          ? {
+                cta: 'View unpaid invoices',
+                onClick: () => router.visit('/finance/invoices?status=unpaid'),
+            }
+          : {};
 
     const billCtx = useEntityContextMenu<UpcomingBill>();
     const claimCtx = useEntityContextMenu<FundingClaim>();
@@ -1124,26 +1137,7 @@ export default function FinanceDashboard({
                             centerLabel="receivables"
                             accentKeys={['current']}
                             active={false}
-                            // No dashboard section breaks the ageing down, so
-                            // without the report this falls back to the unpaid
-                            // invoices list, else a static card.
-                            {...(canReports
-                                ? {
-                                      cta: 'View aged receivables',
-                                      onClick: () =>
-                                          router.visit(
-                                              '/finance/reports/aged-receivables',
-                                          ),
-                                  }
-                                : canReceivables
-                                  ? {
-                                        cta: 'View unpaid invoices',
-                                        onClick: () =>
-                                            router.visit(
-                                                '/finance/invoices?status=unpaid',
-                                            ),
-                                    }
-                                  : {})}
+                            {...receivablesDonutTarget}
                             formatValue={(v) => formatMoneyCompact(v)}
                             showPercent
                         />
