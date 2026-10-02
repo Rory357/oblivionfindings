@@ -493,7 +493,7 @@ export default function Profile({
                                                     <Label htmlFor="phone">
                                                         <span className="flex items-center gap-1.5">
                                                             <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                                                            Phone number
+                                                            Personal mobile
                                                         </span>
                                                     </Label>
                                                     <Input
@@ -506,7 +506,16 @@ export default function Profile({
                                                         }
                                                         autoComplete="tel"
                                                         placeholder="+64 21 234 5678"
+                                                        aria-describedby="phone-help"
                                                     />
+                                                    <p
+                                                        id="phone-help"
+                                                        className="text-caption"
+                                                    >
+                                                        Not shown in the staff
+                                                        directory. HR manages
+                                                        your work phone.
+                                                    </p>
                                                     <InputError
                                                         message={
                                                             (errors as any)

@@ -58,7 +58,8 @@ import {
 interface StaffRow {
     user_id: number;
     user_name: string;
-    user_email: string;
+    /** HR work email; null when HR hasn't recorded one. */
+    user_email: string | null;
     total_requirements: number;
     compliant_count: number;
     expired_count: number;
@@ -524,9 +525,11 @@ export default function ComplianceOverview({
                                                         >
                                                             {r.user_name}
                                                         </Link>
-                                                        <div className="truncate text-[11px] text-muted-foreground">
-                                                            {r.user_email}
-                                                        </div>
+                                                        {r.user_email && (
+                                                            <div className="truncate text-[11px] text-muted-foreground">
+                                                                {r.user_email}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>

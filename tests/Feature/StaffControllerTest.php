@@ -407,6 +407,42 @@ class StaffControllerTest extends TestCase
         ]);
     }
 
+    public function test_staff_update_leaves_the_hr_work_email_when_the_login_email_changes(): void
+    {
+        $staff = User::factory()->create([
+            'role' => 'support_worker',
+            'approved_at' => now(),
+            'email' => 'aroha.signin@example.test',
+        ]);
+        $staff->roles()->attach(Role::where('name', 'support_worker')->first());
+        $profile = HrEmployeeProfile::factory()->create([
+            'user_id' => $staff->id,
+            'primary_site_id' => Site::factory()->create()->id,
+            'work_email' => 'aroha@care.example.test',
+            'position_title' => 'Support Worker',
+            'is_active' => true,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+
+        // The staff form has no work-email field; its email is the sign-in.
+        $this->actingAs($this->admin)
+            ->put("/staff/{$staff->id}", [
+                'name' => $staff->name,
+                'email' => 'aroha.home@example.test',
+                'profile' => [
+                    'job_title' => 'Senior Support Worker',
+                ],
+            ])
+            ->assertRedirect("/staff/{$staff->id}");
+
+        $this->assertSame('aroha.home@example.test', $staff->refresh()->email);
+        $profile->refresh();
+        // The job title proves the HR profile was written in the same save.
+        $this->assertSame('Senior Support Worker', $profile->position_title);
+        $this->assertSame('aroha@care.example.test', $profile->work_email);
+    }
+
     public function test_staff_update_excludes_portal_users(): void
     {
         $clientUser = User::factory()->create(['role' => 'client', 'approved_at' => now()]);

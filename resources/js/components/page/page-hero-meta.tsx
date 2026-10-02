@@ -26,7 +26,7 @@ export function PageHeroMeta({
     return (
         <div
             className={cn(
-                'mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-primary-foreground/60',
+                'mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-primary-foreground/70',
                 alignResponsive
                     ? 'justify-center md:justify-start'
                     : 'justify-start',
