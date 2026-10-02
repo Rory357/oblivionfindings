@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
     EMAR_HUBS,
+    emarBreadcrumbs,
     emarHubForUrl,
     emarHubLinkActive,
     emarSearchEntries,
@@ -306,5 +307,54 @@ describe('emarSearchEntries', () => {
             ['Reports & audit', 'Reports', '/emar/reports'],
         ]);
         expect(entries.every((e) => e.keywords.includes('eMAR'))).toBe(true);
+    });
+});
+
+describe('emarBreadcrumbs', () => {
+    const trail = (url: string, can: EmarNavigationPermissions) =>
+        emarBreadcrumbs(url, can).map((c) => `${c.title} ${c.href}`);
+
+    it('roots every Medication page at Home, in the rail labels', () => {
+        expect(trail('/emar/stock', PERSONAS.coordinator)).toEqual([
+            'Home /dashboard',
+            'Medication /meds/today',
+            'Stock & controlled drugs /emar/stock',
+            'Stock & pharmacy /emar/stock',
+        ]);
+        expect(trail('/meds/today', PERSONAS.supportWorker)).toEqual([
+            'Home /dashboard',
+            'Medication /meds/today',
+            'Meds today /meds/today',
+            'Schedule /meds/today',
+        ]);
+    });
+
+    it('links the hub and module crumbs to pages this viewer can open', () => {
+        // Team lead: no stock.update, so the Stock hub lands on the register.
+        expect(trail('/emar/destructions', PERSONAS.teamLead)).toEqual([
+            'Home /dashboard',
+            'Medication /meds/today',
+            'Stock & controlled drugs /emar/controlled',
+            'Destructions & returns /emar/destructions',
+        ]);
+        // Auditor: no Meds today or Overview.
+        expect(trail('/emar/errors', PERSONAS.auditor)).toEqual([
+            'Home /dashboard',
+            'Medication /emar/mar',
+            'Safety & oversight /emar/errors',
+            'Medication errors /emar/errors',
+        ]);
+        expect(trail('/emar/reports', PERSONAS.reportsViewAnyOnly)).toEqual([
+            'Home /dashboard',
+            'Medication /emar/reports',
+            'Reports & audit /emar/reports',
+            'Reports /emar/reports',
+        ]);
+    });
+
+    it('keeps a deeper page under its view', () => {
+        expect(trail('/emar/controlled/12', PERSONAS.coordinator).at(-1)).toBe(
+            'Controlled register /emar/controlled',
+        );
     });
 });

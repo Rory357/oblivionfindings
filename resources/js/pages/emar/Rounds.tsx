@@ -40,6 +40,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering/shift-context-menu';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     OWN_WITNESS_PIN_PROMPT,
@@ -102,6 +103,7 @@ type Props = {
 type StatusChip = 'all' | 'due' | 'flagged';
 
 export default function Rounds(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         rounds,
         date,
@@ -498,12 +500,7 @@ export default function Rounds(props: Props) {
     );
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Medication Rounds', href: '/emar/rounds' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medication Rounds" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero

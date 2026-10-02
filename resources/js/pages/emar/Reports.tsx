@@ -20,6 +20,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { ReportLossDialog } from '@/pages/emar/_cd-dialogs';
 import { Head, router } from '@inertiajs/react';
@@ -224,6 +225,7 @@ const fmtDate = (iso: string | null) =>
         : '—';
 
 export default function Reports(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         filters,
         clients,
@@ -470,12 +472,7 @@ export default function Reports(props: Props) {
             : '0';
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Reports', href: '/emar/reports' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="eMAR - Reports" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero

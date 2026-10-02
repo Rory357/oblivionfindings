@@ -84,6 +84,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     OWN_WITNESS_PIN_PROMPT,
@@ -1236,6 +1237,7 @@ function ActivityTab({ activity }: { activity: ActivityItem[] }) {
 /* ------------------------------------------------------------------ */
 
 export default function MedsToday(props: MedsTodayProps) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         schedule,
         clients,
@@ -1723,12 +1725,7 @@ export default function MedsToday(props: MedsTodayProps) {
     const firstOverdue = overdueRows[0];
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Medication' },
-                { title: 'Meds today', href: '/meds/today' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Meds today" />
             <div className="space-y-4 p-4 md:p-5">
                 <PageHero

@@ -13,6 +13,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     AssessmentWizardDialog,
@@ -191,6 +192,7 @@ export default function SelfAdmin({
     active_site: activeSite,
     site_brand_colour: brandColour,
 }: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const [activeTab, setActiveTab] = useState('assessments');
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(
@@ -389,12 +391,7 @@ export default function SelfAdmin({
     );
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Self-Administration', href: '/emar/self-admin' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="eMAR - Self-Administration" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero

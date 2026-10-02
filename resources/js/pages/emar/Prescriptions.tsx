@@ -22,6 +22,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     CancelOrderDialog,
@@ -240,6 +241,7 @@ function EmptyState({
 }
 
 export default function Prescriptions(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         orders,
         covert,
@@ -645,12 +647,7 @@ export default function Prescriptions(props: Props) {
     const visibleAlerts = alerts.filter((a) => !dismissed.has(a.key));
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Prescriptions', href: '/emar/prescriptions' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Prescriptions & Orders" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero

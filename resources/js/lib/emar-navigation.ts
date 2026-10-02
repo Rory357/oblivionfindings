@@ -438,6 +438,41 @@ export function emarHubForUrl(
     ).sort((a, b) => b.view.href.length - a.view.href.length)[0];
 }
 
+/** The viewer's way into the module: their first hub's landing. */
+export function emarModuleLanding(can: Can): string | null {
+    const first = visibleEmarHubs(can)[0];
+    return first ? emarHubLanding(first, can) : null;
+}
+
+export interface EmarBreadcrumb {
+    title: string;
+    href: string;
+}
+
+/**
+ * Home › Medication › hub › view for a Medication page — the Home-rooted
+ * trail (DESIGN.md "Missing or non-Home-rooted breadcrumbs"), in the rail's
+ * own labels. The hub crumb opens this viewer's landing for that hub and
+ * Medication their first hub, so no crumb leads to a page they can't open.
+ */
+export function emarBreadcrumbs(url: string, can: Can): EmarBreadcrumb[] {
+    const match = emarHubForUrl(url);
+    const here = match?.view.href ?? emarNavigationPath(url);
+    const trail: EmarBreadcrumb[] = [
+        { title: 'Home', href: '/dashboard' },
+        { title: EMAR_MODULE_LABEL, href: emarModuleLanding(can) ?? here },
+    ];
+    if (!match) return trail;
+    return [
+        ...trail,
+        {
+            title: match.hub.label,
+            href: emarHubLanding(match.hub, can) ?? match.view.href,
+        },
+        { title: match.view.label, href: match.view.href },
+    ];
+}
+
 /**
  * Sidebar active state for a hub link: lit on every page of its hub.
  * Undefined leaves the generic matcher alone for every other link.

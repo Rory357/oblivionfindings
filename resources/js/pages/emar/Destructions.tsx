@@ -20,6 +20,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     CdPill,
@@ -191,6 +192,7 @@ export default function Destructions({
     active_site: activeSite,
     site_brand_colour: brandColour,
 }: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const [activeTab, setActiveTab] = useState('log');
     const [siteFilter, setSiteFilter] = useState<number | null>(
         activeSite?.id ?? null,
@@ -429,12 +431,7 @@ export default function Destructions({
     ];
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Destructions', href: '/emar/destructions' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medication Destruction Register" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero

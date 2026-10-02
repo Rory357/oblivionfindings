@@ -13,6 +13,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     CloseErrorDialog,
@@ -161,6 +162,7 @@ export default function MedicationErrors({
     site_brand_colour: brandColour,
     can,
 }: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const [activeTab, setActiveTab] = useState('all');
     const [search, setSearch] = useState('');
     const [clientFilter, setClientFilter] = useState<number | null>(null);
@@ -513,12 +515,7 @@ export default function MedicationErrors({
     );
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Medication Errors', href: '/emar/errors' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="eMAR - Medication Errors" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero

@@ -23,6 +23,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     RequestAccessDialog,
@@ -216,6 +217,7 @@ export default function EmergencyAccess({
     can_edit_policy: canEditPolicy,
     incidents_by_client: incidentsByClient,
 }: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const [tab, setTab] = useState('active');
     const [siteFilter, setSiteFilter] = useState<number | null>(
         activeSite?.id ?? null,
@@ -362,12 +364,7 @@ export default function EmergencyAccess({
     }, [stats.awaiting_review, stats.flagged, policy.auto_revoke]);
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Emergency Access', href: '/emar/emergency-access' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="eMAR - Emergency Access" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero

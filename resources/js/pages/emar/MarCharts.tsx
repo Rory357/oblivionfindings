@@ -26,6 +26,7 @@ import {
     type RosterTabItem,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import MarGovernanceDialogs, {
     type ChartMedicationOption,
@@ -173,6 +174,7 @@ function initials(name: string): string {
 }
 
 export default function MarCharts(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         clients,
         selected_client_info: info,
@@ -354,12 +356,7 @@ export default function MarCharts(props: Props) {
     // whenever one exists, so this is the genuinely-empty state (not a picker).
     if (!info) {
         return (
-            <AppLayout
-                breadcrumbs={[
-                    { title: 'eMAR', href: '/emar' },
-                    { title: 'MAR Charts', href: '/emar/mar' },
-                ]}
-            >
+            <AppLayout breadcrumbs={breadcrumbs}>
                 <Head title="MAR Charts" />
                 <div className="flex flex-col gap-6 p-6">
                     <PageHero
@@ -490,12 +487,7 @@ export default function MarCharts(props: Props) {
     );
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'MAR Charts', href: '/emar/mar' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`MAR · ${info.name}`} />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero

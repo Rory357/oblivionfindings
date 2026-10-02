@@ -27,6 +27,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { PrnWizard } from '@/pages/meds/today/components/prn-wizard';
 import type {
@@ -267,6 +268,7 @@ function TrendBars({
 }
 
 export default function PrnRecords(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         administrations,
         pending_reviews: reviews,
@@ -653,12 +655,7 @@ export default function PrnRecords(props: Props) {
     }, [administrations, prnMeds]);
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'PRN Records', href: '/emar/prn' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="PRN Records" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero

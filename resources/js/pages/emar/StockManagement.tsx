@@ -16,6 +16,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     createMedicationMutationReplayState,
@@ -177,6 +178,7 @@ export default function StockManagement({
     site_brand_colour: brandColour,
     client_id: activeClientId,
 }: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const [activeTab, setActiveTab] = useState('all');
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(
@@ -738,12 +740,7 @@ export default function StockManagement({
     const description = `${stockItems.length} item${stockItems.length === 1 ? '' : 's'} tracked${activeSite ? ` at ${activeSite.name}` : ' across your services'}. ${lowStockCount} below reorder level, ${expiringCount} expiring within 30 days${cdDiscrepancies > 0 ? `, and ${cdDiscrepancies} controlled-drug count${cdDiscrepancies === 1 ? '' : 's'} needs investigation` : ''}.`;
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Stock Management', href: '/emar/stock' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="eMAR - Stock Management" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
