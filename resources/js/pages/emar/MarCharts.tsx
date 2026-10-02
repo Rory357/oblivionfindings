@@ -1,3 +1,4 @@
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import AttentionBar from '@/components/emar/mar/attention-bar';
 import ClinicalRail, {
     type InrRecord,
@@ -359,6 +360,7 @@ export default function MarCharts(props: Props) {
                 <Head title="MAR Charts" />
                 <div className="flex flex-col gap-6 p-6">
                     <PageHero
+                        rail={<EmarHubRail />}
                         variant="hero"
                         category="ops"
                         icon={Pill}
@@ -494,6 +496,7 @@ export default function MarCharts(props: Props) {
             <Head title={`MAR · ${info.name}`} />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

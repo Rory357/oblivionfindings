@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- the tab cards/tables are custom-layout
    bordered surfaces (not Card/Button), and the hero carries the white pill search
    on the dark band (native input/button); all colours are semantic tokens. */
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { OrderDetailDialog } from '@/components/emar/prescriptions/order-detail-dialog';
 import {
     countersignHoursLeft,
@@ -653,6 +654,7 @@ export default function Prescriptions(props: Props) {
             <Head title="Prescriptions & Orders" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

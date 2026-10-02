@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- error table, summary/analytics cards, filter toolbar and
    hero month stepper are custom-layout bordered surfaces / chip buttons (not Card/Button); colours
    are semantic tokens. */
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { PageHero, type PageHeroStat } from '@/components/page';
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
@@ -521,6 +522,7 @@ export default function MedicationErrors({
             <Head title="eMAR - Medication Errors" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

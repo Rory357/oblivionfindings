@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- the break-glass grant cards, audit table, flagged/policy
    panels and countdown rings are custom-layout bordered surfaces (not Card/Button); the ring uses an
    inline conic-gradient of design tokens. All colours are semantic tokens. */
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     PageHero,
     type PageHeroBadge,
@@ -370,6 +371,7 @@ export default function EmergencyAccess({
             <Head title="eMAR - Emergency Access" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

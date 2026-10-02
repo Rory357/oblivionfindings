@@ -14,6 +14,7 @@ import {
     type ClientOption,
     type StaffOption,
 } from '@/components/emar/controlled/types';
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     DayPickerChip,
     addDays,
@@ -698,6 +699,7 @@ export default function ControlledDrugs(props: Props) {
             <Head title="Controlled Drug Register" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

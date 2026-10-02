@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax -- the directory card/table + clickable rows are
    custom-layout surfaces (not Card/Button); all colours are semantic tokens. */
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     MED_TABS,
     matchesTab,
@@ -434,6 +435,7 @@ export default function Medications(props: Props) {
             <Head title="Medications Database" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

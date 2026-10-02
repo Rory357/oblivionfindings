@@ -2,6 +2,7 @@
    custom-layout bordered rows / chip buttons (not Card/Button); all colours are semantic tokens. */
 /* DESIGN REVIEW: docs/emar-redesign/audit-design-review.md — design spec, intended look,
    deliberate deviations, and a fidelity checklist for reviewing this page's design. */
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     eventMeta,
     eventPrimaryLink,
@@ -566,6 +567,7 @@ export default function AuditLog({
             <Head title="eMAR - Audit Trail" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

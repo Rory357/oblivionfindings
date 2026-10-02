@@ -56,6 +56,7 @@ import {
     YAxis,
 } from 'recharts';
 
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     addDays,
     DayPickerChip,
@@ -800,6 +801,7 @@ export default function EmarHome(props: Props) {
             <div className="flex flex-col gap-4 p-6">
                 {/* ── Hero ── */}
                 <PageHero
+                    rail={<EmarHubRail />}
                     category="ops"
                     icon={Pill}
                     title={

@@ -117,6 +117,13 @@ export interface PageHeroProps {
      */
     footer?: ReactNode;
 
+    /**
+     * Connected view tabs (a `PageHeaderRail`) as the banner's last row,
+     * under the footer — PageHeader's `rail` row, active tab flush with the
+     * page ground. Hero variant only.
+     */
+    rail?: ReactNode;
+
     className?: string;
 }
 
@@ -152,6 +159,7 @@ function HeroVariant(props: PageHeroProps) {
         quickActionsHeading,
         children,
         footer,
+        rail,
         className,
     } = props;
     const supportingText = description ?? subtitle;
@@ -268,9 +276,19 @@ function HeroVariant(props: PageHeroProps) {
                 </div>
             </div>
 
-            {footer ? (
-                <div className="relative overflow-hidden rounded-b-2xl border-t border-band-foreground/20 px-4">
+            {footer || rail ? (
+                <div
+                    className={cn(
+                        'relative overflow-hidden rounded-b-2xl px-4',
+                        footer && 'border-t border-band-foreground/20',
+                    )}
+                >
                     {footer}
+                    {rail ? (
+                        <div className="flex min-h-[46px] items-end">
+                            {rail}
+                        </div>
+                    ) : null}
                 </div>
             ) : null}
         </div>

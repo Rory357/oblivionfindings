@@ -8,6 +8,7 @@ import {
     DestructionDetailDialog,
     type DestructionRow,
 } from '@/components/emar/destruction-detail-dialog';
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { PageHero, type PageHeroStat } from '@/components/page';
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
@@ -437,6 +438,7 @@ export default function Destructions({
             <Head title="Medication Destruction Register" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

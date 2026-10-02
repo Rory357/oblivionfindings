@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax -- the register/near-limit/trends surfaces are
    custom-layout bordered panels (not Card/Button); all colours are semantic tokens. */
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     PrnDetailDialog,
     type PrnAdministration,
@@ -661,6 +662,7 @@ export default function PrnRecords(props: Props) {
             <Head title="PRN Records" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

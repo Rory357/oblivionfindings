@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax -- stock list/order/reconciliation surfaces are custom-layout
    bordered tables and chip buttons (not Card/Button); all colours are semantic tokens. */
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     StockDetailDialog,
     type OpenOrderSummary,
@@ -746,6 +747,7 @@ export default function StockManagement({
             <Head title="eMAR - Stock Management" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

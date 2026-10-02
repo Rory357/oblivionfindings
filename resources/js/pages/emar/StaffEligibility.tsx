@@ -8,6 +8,7 @@
  * witness view or "Can witness" meter: that rule is enforced with P07b; the
  * register keeps the real witness PIN status. */
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { EntityChip, PersonDisc } from '@/components/lists/entity-cells';
 import {
     compactMenu,
@@ -25,7 +26,6 @@ import {
     PageHeaderMeterCaption,
     PageHeaderMeterDonut,
     PageHeaderPrimaryButton,
-    PageHeaderRail,
     PageHeaderSearch,
     PageHeaderStatusChip,
 } from '@/components/page/page-header';
@@ -495,24 +495,7 @@ export default function StaffEligibility(props: Props) {
                     </PageHeaderFilterButton>
                 </>
             }
-            rail={
-                <PageHeaderRail
-                    items={[
-                        {
-                            key: 'eligibility',
-                            label: 'Staff eligibility',
-                            icon: UserCheck,
-                            ...(cant.length
-                                ? { count: cant.length, alert: true }
-                                : {}),
-                        },
-                    ]}
-                    value="eligibility"
-                    onSelect={() => go('register')}
-                    showFind={false}
-                    ariaLabel="Safety & oversight views"
-                />
-            }
+            rail={<EmarHubRail alerts={{ eligibility: cant.length }} />}
         />
     );
 

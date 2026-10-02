@@ -2,6 +2,7 @@
    audit-pack cards are custom-layout bordered surfaces / chip buttons (not Card/Button); charts
    reuse OpsStatCard/DonutChart/recharts. All colours are semantic tokens. */
 import { type CdMedication } from '@/components/emar/controlled/types';
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
 import {
     DonutChart,
@@ -475,6 +476,7 @@ export default function Reports(props: Props) {
             <Head title="eMAR - Reports" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

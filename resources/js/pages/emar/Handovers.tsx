@@ -2,6 +2,7 @@
    bordered surfaces / chip buttons (not Card/Button); the cards/rail/detail/wizard are reused shared
    components. All colours are semantic tokens. */
 import { AddClientDialog } from '@/components/clients/add-client-dialog';
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { PageHero, type PageHeroStat } from '@/components/page';
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
@@ -462,6 +463,7 @@ export default function Handovers({
             <Head title="eMAR - Medication Handovers" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}
