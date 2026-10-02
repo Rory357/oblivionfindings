@@ -734,14 +734,11 @@ export default function BudgetShow({
                                     ? 'warning'
                                     : 'brand'
                         }
-                        href={
-                            approval.resolution
-                                ? `/governance/resolutions/${approval.resolution.id}`
-                                : undefined
-                        }
-                        onClick={
-                            approval.resolution ? undefined : scrollToApproval
-                        }
+                        {...(approval.resolution
+                            ? {
+                                  href: `/governance/resolutions/${approval.resolution.id}`,
+                              }
+                            : { onClick: scrollToApproval })}
                         ariaLabel={
                             approval.resolution
                                 ? `Open resolution: ${approval.resolution.title}`
