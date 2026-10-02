@@ -4,6 +4,7 @@ use App\Http\Controllers\BreakGlassController;
 use App\Http\Controllers\Emar\AuditLogController;
 use App\Http\Controllers\Emar\CDLossReportController;
 use App\Http\Controllers\Emar\CompetencyExemptionController;
+use App\Http\Controllers\Emar\DoseRequirementsController;
 use App\Http\Controllers\Emar\EmarController;
 use App\Http\Controllers\Emar\EmarPdfController;
 use App\Http\Controllers\Emar\EmarReportController;
@@ -55,6 +56,16 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/meds/today/prn/effect', [WorkerMedsController::class, 'recordPrnEffect'])
         ->middleware('permission:medications.administer.record')
         ->name('meds.today.prn_effect');
+
+    // eMAR P01 — what recording a dose needs and allows (the recording
+    // dialog's safety checks, blocks and second-person candidates).
+    Route::get('/meds/today/doses/requirements', [DoseRequirementsController::class, 'scheduled'])
+        ->middleware('permission:medications.administer.record')
+        ->name('meds.today.requirements');
+    Route::get('/meds/today/prn/{medication}/requirements', [DoseRequirementsController::class, 'asNeeded'])
+        ->whereNumber('medication')
+        ->middleware('permission:medications.administer.record')
+        ->name('meds.today.prn_requirements');
 });
 
 Route::middleware(['auth'])->prefix('emar')->group(function () {

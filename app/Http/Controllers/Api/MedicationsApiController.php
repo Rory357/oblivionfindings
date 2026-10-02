@@ -27,6 +27,7 @@ use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\Recording\RecordingContract;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationReportingService;
@@ -953,6 +954,9 @@ class MedicationsApiController extends Controller
             'safety_override.reason_code' => ['required_with:safety_override', new Enum(SafetyOverrideReason::class)],
             'safety_override.reason' => ['required_with:safety_override', 'string', 'min:10', 'max:1000'],
             'override_window' => ['nullable', 'boolean'],
+            // P01: the same recording contract as the web dialog. "missed"
+            // above stays a legacy value for API callers only.
+            ...RecordingContract::rules(),
             ...$this->medicationOfflineSubmissionRules($request),
             'scan_code' => ['nullable', 'string', 'max:255'],
             'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
@@ -1029,11 +1033,31 @@ class MedicationsApiController extends Controller
                             ->first();
 
                         if ($conflictingAdministration) {
+                            // P01: say who recorded it and when, so the worker
+                            // knows nothing new was saved and why.
+                            $recordedBy = User::query()
+                                ->whereKey((int) $conflictingAdministration->administered_by)
+                                ->value('name');
+                            $recordedAt = $conflictingAdministration->administered_at
+                                ?->copy()
+                                ->timezone($this->scheduleService->workerTimezone())
+                                ->format('g:i a');
+
                             return response()->json(
-                                $this->buildConflictPayload(
-                                    $data,
-                                    'Medication state changed before this offline administration could sync. Supervisor review is required.',
-                                ),
+                                [
+                                    ...$this->buildConflictPayload(
+                                        $data,
+                                        'Already recorded — nothing new was saved. '
+                                            .($recordedBy ?? 'Someone').' recorded this dose as '
+                                            .$conflictingAdministration->status
+                                            .($recordedAt ? ' at '.$recordedAt : '').'.',
+                                    ),
+                                    'duplicate_of' => [
+                                        'status' => (string) $conflictingAdministration->status,
+                                        'administered_at' => $conflictingAdministration->administered_at?->toIso8601String(),
+                                        'by' => $recordedBy,
+                                    ],
+                                ],
                                 409
                             );
                         }
@@ -1089,6 +1113,7 @@ class MedicationsApiController extends Controller
                             'administered_at' => $administration->administered_at?->toIso8601String(),
                         ],
                         'safety_check' => $result['safety_check'] ?? null,
+                        'duplicate_of' => ($result['replayed'] ?? false) ? null : ($result['duplicate_of'] ?? null),
                     ], $data, 'duplicate', true, 'This medication request was already processed.');
 
                     return response()->json(

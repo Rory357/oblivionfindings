@@ -24,6 +24,7 @@ use App\Services\Medication\StaffEligibilityRegister;
 use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\Recording\RecordingContract;
 use App\Services\Timeline\TimelineEmitter;
 use App\Services\UserSiteAccessService;
 use App\Support\Medication\MedicationStockQuantity;
@@ -31,6 +32,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -202,7 +204,7 @@ class WorkerMedsController extends Controller
      * required observations, witness + credential, time window) all run
      * exactly as they do everywhere else. No second administration path.
      */
-    public function recordDose(Request $request): RedirectResponse
+    public function recordDose(Request $request): RedirectResponse|JsonResponse
     {
         $user = $request->user();
         abort_unless($user, 403);
@@ -229,6 +231,7 @@ class WorkerMedsController extends Controller
             'blood_pressure_systolic' => ['nullable', 'integer', 'min:40', 'max:300'],
             'blood_pressure_diastolic' => ['nullable', 'integer', 'min:20', 'max:200'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            ...RecordingContract::rules(),
             ...$this->medicationOfflineSubmissionRules($request),
         ]);
 
@@ -248,7 +251,7 @@ class WorkerMedsController extends Controller
             $scheduledFor,
             null,
             null,
-            function (MedicationScopeDecision $scope) use ($user, $data, $submittedAdministrationAt) {
+            function (MedicationScopeDecision $scope) use ($request, $user, $data, $submittedAdministrationAt) {
                 $medication = $scope->medication;
                 $shiftId = $scope->shiftId();
 
@@ -282,6 +285,8 @@ class WorkerMedsController extends Controller
                         'origin_device_id' => $data['origin_device_id'] ?? null,
                         'queued_offline' => (bool) ($data['queued_offline'] ?? false),
                         'scope_authorized' => true,
+                        // P01 C1 recording contract (all optional).
+                        ...Arr::only($data, RecordingContract::fields()),
                     ],
                     $user->id,
                     $shiftId,
@@ -292,15 +297,56 @@ class WorkerMedsController extends Controller
 
                 if (! ($result['success'] ?? false)) {
                     $field = $result['error_field'] ?? 'status';
+                    $message = $result['error'] ?? 'Could not record this dose.';
 
-                    return back()->withErrors([
-                        $field => $result['error'] ?? 'Could not record this dose.',
-                    ]);
+                    if ($request->expectsJson()) {
+                        return response()->json(
+                            $this->withMedicationSync(
+                                array_filter([
+                                    'success' => false,
+                                    'message' => $message,
+                                    'error' => $message,
+                                    'error_field' => $field,
+                                    'errors' => [$field => [$message]],
+                                    'competency_state' => $result['competency_state'] ?? null,
+                                    'safety_check' => $result['safety_check'] ?? null,
+                                ], fn ($value) => $value !== null),
+                                $data,
+                                'rejected',
+                                false,
+                                $message,
+                            ),
+                            422,
+                        );
+                    }
+
+                    return back()->withErrors([$field => $message]);
                 }
 
                 $clientName = trim(($medication->client->first_name ?? '').' '.($medication->client->last_name ?? ''));
 
                 if ($result['duplicate'] ?? false) {
+                    // P01 (JSON): someone else's record for this dose is
+                    // "Already recorded"; a retry of this same request is the
+                    // worker's own record coming back, so it confirms it.
+                    if ($request->expectsJson()) {
+                        $replayed = (bool) ($result['replayed'] ?? false);
+
+                        return response()->json($this->withMedicationSync(
+                            [
+                                ...$this->doseAdministrationPayload($result),
+                                'replayed' => $replayed,
+                                'duplicate_of' => $replayed ? null : ($result['duplicate_of'] ?? null),
+                            ],
+                            $data,
+                            'duplicate',
+                            true,
+                            $replayed
+                                ? $medication->name.' is on '.$clientName.'’s chart.'
+                                : 'Already recorded — nothing new was saved.',
+                        ));
+                    }
+
                     return back()->with('warning', 'This dose was already recorded — no changes made.');
                 }
 
@@ -323,6 +369,16 @@ class WorkerMedsController extends Controller
                     'withheld' => 'recorded as withheld',
                     default => 'recorded to the MAR',
                 };
+
+                if ($request->expectsJson()) {
+                    return response()->json($this->withMedicationSync(
+                        $this->doseAdministrationPayload($result),
+                        $data,
+                        $this->medicationProcessedStatus($data),
+                        false,
+                        $medication->name.' '.$outcome.' for '.$clientName,
+                    ));
+                }
 
                 return back()->with('success', $medication->name.' '.$outcome.' for '.$clientName);
             }, authorizationUserIds: array_filter([
@@ -370,6 +426,7 @@ class WorkerMedsController extends Controller
             'blood_pressure_systolic' => ['nullable', 'integer', 'min:40', 'max:300'],
             'blood_pressure_diastolic' => ['nullable', 'integer', 'min:20', 'max:200'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            ...RecordingContract::rules(),
             ...$this->medicationOfflineSubmissionRules($request),
         ]);
 
@@ -413,6 +470,16 @@ class WorkerMedsController extends Controller
                         'queued_offline' => (bool) ($data['queued_offline'] ?? false),
                         'administered_at' => $submittedAdministrationAt,
                         'scope_authorized' => true,
+                        // P01 C1: amount, second person and the effect-check time.
+                        ...Arr::only($data, [
+                            'amount_mode',
+                            'amount_reason',
+                            'quantity_given',
+                            'more_severity',
+                            'more_immediate_action',
+                            'second_person_unavailable',
+                            'effect_check_due_at',
+                        ]),
                     ],
                     $user->id,
                     $shiftId,
@@ -489,6 +556,35 @@ class WorkerMedsController extends Controller
     }
 
     /**
+     * Confirmation of the worker's own recorded scheduled dose for JSON
+     * callers (the P01 dialog): the record, the warnings it carries, and the
+     * medication error "more than ordered" raised.
+     *
+     * @return array<string, mixed>
+     */
+    private function doseAdministrationPayload(array $result): array
+    {
+        $administration = $result['administration'] ?? null;
+
+        return [
+            'success' => true,
+            'administration' => $administration instanceof ClientMedicationAdministration ? [
+                'id' => $administration->id,
+                'status' => $administration->status,
+                'administered_at' => $administration->administered_at?->toIso8601String(),
+                'reoffer_of_id' => $administration->reoffer_of_id,
+                'amount_mode' => $administration->amount_mode,
+                'quantity_given' => $administration->quantity_given,
+                'second_person_kind' => $administration->second_person_kind,
+                'second_person_status' => $administration->second_person_status,
+                'late_reason' => $administration->late_reason,
+            ] : null,
+            'medication_error' => $result['medication_error'] ?? null,
+            'safety_check' => $result['safety_check'] ?? null,
+        ];
+    }
+
+    /**
      * Minimal confirmation of the worker's own recorded PRN administration for
      * JSON callers.
      *
@@ -504,7 +600,9 @@ class WorkerMedsController extends Controller
                 'id' => $administration->id,
                 'status' => $administration->status,
                 'administered_at' => $administration->administered_at?->toIso8601String(),
+                'effect_check_due_at' => $administration->effect_check_due_at?->toIso8601String(),
             ] : null,
+            'medication_error' => $result['medication_error'] ?? null,
             'safety_check' => $result['safety_check'] ?? null,
         ];
     }

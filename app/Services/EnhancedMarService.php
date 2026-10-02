@@ -15,11 +15,14 @@ use App\Models\MedicationRound;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Recording\RecordingContract;
+use App\Services\Medication\Recording\RecordingContractEnforcer;
 use App\Services\Medication\WitnessPinService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
@@ -52,6 +55,7 @@ class EnhancedMarService
         protected MedicationAdministratorCompetencyPolicy $medicationCompetencyPolicy,
         protected MedicationGovernanceScopeService $medicationGovernanceScope,
         protected MedicationCompetencyRestrictionRules $competencyRestrictions,
+        protected RecordingContractEnforcer $recordingContract,
     ) {
         $this->scheduleService = $scheduleService;
         $this->safetyService = $safetyService;
@@ -717,6 +721,18 @@ class EnhancedMarService
             }
         }
 
+        if (array_key_exists('quantity_given', $data) && $data['quantity_given'] !== null) {
+            try {
+                $data['quantity_given'] = MedicationStockQuantity::normalizeMovement($data['quantity_given']);
+            } catch (\InvalidArgumentException) {
+                return [
+                    'success' => false,
+                    'error' => 'The amount given must use no more than two decimal places.',
+                    'error_field' => 'quantity_given',
+                ];
+            }
+        }
+
         if (array_key_exists('cd_balance', $data) && $data['cd_balance'] !== null) {
             try {
                 $data['cd_balance'] = MedicationStockQuantity::normalize($data['cd_balance']);
@@ -783,14 +799,26 @@ class EnhancedMarService
                 $this->scheduleService->windowAfterMinutes()
             );
 
-            if (! $windowCheck['valid'] && empty($data['reason']) && ! ($data['override_window'] ?? false)) {
+            // P01: the approved "outside the window" reason answers this too.
+            // The window is about when a dose was given: a refusal, withhold
+            // or absence carries its own reason and always saves (NF-06).
+            if (! $windowCheck['valid']
+                && ($data['status'] ?? null) === 'given'
+                && empty($data['reason'])
+                && empty($data['late_reason'])
+                && ! ($data['override_window'] ?? false)) {
                 return [
                     'success' => false,
                     'error' => 'Outside time window: '.$windowCheck['message'].'. Please provide a reason.',
-                    'error_field' => 'reason',
+                    'error_field' => array_key_exists('late_reason', $data) ? 'late_reason' : 'reason',
                     'time_window' => $windowCheck,
                 ];
             }
+        }
+
+        $contractValidation = $this->recordingContract->validate($data, $medication, $adminAt);
+        if ($contractValidation !== null) {
+            return $contractValidation;
         }
 
         // NF-03: in co-signer mode a restricted administrator's "given" dose
@@ -906,8 +934,15 @@ class EnhancedMarService
                 if ($currentObservationValidation !== null) {
                     return $currentObservationValidation;
                 }
-                $requiresWitness = ($data['status'] ?? null) === 'given'
-                    && ($medication->requiresWitness() || ($currentAdminRules['requires_countersign'] ?? false) || $requiresCosigner);
+                // P01: what the second person is for — a witness, a restricted
+                // worker's co-signer, a medication rule, or a smaller amount.
+                $secondPersonKind = $this->recordingContract->secondPersonKind(
+                    $data,
+                    $medication,
+                    $currentAdminRules,
+                    $requiresCosigner,
+                );
+                $requiresWitness = $secondPersonKind !== null;
                 $authorizationUserIds = [$userId];
                 if ($requiresWitness && is_numeric($data['witnessed_by'] ?? null)) {
                     $authorizationUserIds[] = (int) $data['witnessed_by'];
@@ -982,11 +1017,38 @@ class EnhancedMarService
                     }
                 }
 
+                // P01 Q2: a medication rule's second person, or the colleague
+                // confirming a smaller amount, may be recorded "Not confirmed by
+                // a second person" — only when the server finds nobody else on
+                // shift who can confirm. A witness or co-signer never can.
+                $secondPersonUnconfirmed = false;
+                if ($secondPersonKind !== null
+                    && empty($data['witnessed_by'])
+                    && filter_var($data['second_person_unavailable'] ?? false, FILTER_VALIDATE_BOOL)) {
+                    if (! $this->recordingContract->mayGoUnconfirmed($secondPersonKind)) {
+                        return [
+                            'success' => false,
+                            'error' => $secondPersonKind === RecordingContract::SECOND_COSIGNER
+                                ? 'Your restricted competency needs a co-signer for every dose you sign as given. Choose a present, qualified co-signer.'
+                                : 'This medicine always needs a witness. Choose an eligible witness, or record it as not given.',
+                            'error_field' => 'witnessed_by',
+                        ];
+                    }
+                    if (! $this->recordingContract->nobodyCanConfirm($client, $userId, $adminAt)) {
+                        return [
+                            'success' => false,
+                            'error' => 'A colleague on shift can confirm this dose. Choose them and ask them to type their witness PIN.',
+                            'error_field' => 'witnessed_by',
+                        ];
+                    }
+                    $secondPersonUnconfirmed = true;
+                }
+
                 // Witness authority is evaluated only after the canonical
                 // medication row is locked. The shared governance service then
                 // locks the witness and their current Site staff profile in this
                 // same transaction before any administration or stock write.
-                $witnessValidation = $this->validateWitness(
+                $witnessValidation = $secondPersonUnconfirmed ? ['success' => true] : $this->validateWitness(
                     $client,
                     $medication,
                     $currentAdminRules,
@@ -996,6 +1058,7 @@ class EnhancedMarService
                     $lockedAuthorizationUsers,
                     $lockedPresenceShifts,
                     $requiresCosigner,
+                    $secondPersonKind === RecordingContract::SECOND_AMOUNT,
                 );
                 if (! ($witnessValidation['success'] ?? false)) {
                     return $witnessValidation;
@@ -1078,6 +1141,22 @@ class EnhancedMarService
                 );
                 $override = $data['safety_override'] ?? null;
 
+                // NF-06: a blocked safety check stops "given" only. A refusal,
+                // withhold or absence is documentation that the dose was NOT
+                // given, so it always saves (the check is still returned).
+                $recordingGiven = ($data['status'] ?? null) === 'given';
+                if (! $recordingGiven && is_array($override)) {
+                    return [
+                        'success' => false,
+                        'error' => 'A safety override only applies to a dose recorded as given.',
+                        'error_field' => 'safety_override',
+                    ];
+                }
+                if (! $recordingGiven && $safetyCheck['blocked']) {
+                    $safetyCheck['blocked_given_only'] = true;
+                }
+                $blockedForThisOutcome = $recordingGiven && $safetyCheck['blocked'];
+
                 if (! $safetyCheck['blocked'] && is_array($override)) {
                     return [
                         'success' => false,
@@ -1087,11 +1166,11 @@ class EnhancedMarService
                     ];
                 }
 
-                $prnOverLimitAttempt = $safetyCheck['blocked']
+                $prnOverLimitAttempt = $blockedForThisOutcome
                     && $medication->is_prn
                     && $medication->isPrnBlocked();
 
-                if ($safetyCheck['blocked'] && ! is_array($override)) {
+                if ($blockedForThisOutcome && ! is_array($override)) {
                     return [
                         'success' => false,
                         'error' => $safetyCheck['block_reason'],
@@ -1102,7 +1181,7 @@ class EnhancedMarService
                 }
 
                 $overrideAudit = null;
-                if ($safetyCheck['blocked']) {
+                if ($blockedForThisOutcome) {
                     $failedChecks = $this->failedSafetyChecks($safetyCheck);
                     $reason = SafetyOverrideReason::from($override['reason_code']);
                     $reasonDetail = trim($override['reason']);
@@ -1128,6 +1207,7 @@ class EnhancedMarService
                         : $data['notes']."\n".$overrideNote);
                 }
 
+                $reofferFollowUp = null;
                 if ($scheduledFor && ! $medication->is_prn) {
                     [$slotStartUtc, $slotEndUtc] = $this->scheduleService->utcSlotWindow($scheduledFor);
 
@@ -1139,6 +1219,31 @@ class EnhancedMarService
                         ->lockForUpdate()
                         ->latest('id')
                         ->first();
+
+                    // NF-11 / P01: a re-offer after a refusal is a new record
+                    // for the same dose, linked to the refusal — allowed on the
+                    // same NZ day while the refusal's follow-up is open. Any
+                    // other later record for the slot is still a duplicate.
+                    $reofferOfId = $this->nullablePositiveInt($data['reoffer_of_id'] ?? null);
+                    if ($reofferOfId !== null && $existing === null) {
+                        return [
+                            'success' => false,
+                            'error' => 'There’s no refusal to re-offer for this dose.',
+                            'error_field' => 'reoffer_of_id',
+                        ];
+                    }
+                    if ($reofferOfId !== null && $existing !== null) {
+                        $reofferFollowUp = $this->recordingContract->openReofferFollowUp($existing, $reofferOfId, $adminAt);
+                        if ($reofferFollowUp !== null) {
+                            $existing = null;
+                        } elseif ($existing->status === 'refused') {
+                            return [
+                                'success' => false,
+                                'error' => 'This refusal can’t be re-offered any more: its follow-up is closed, or it was on another day.',
+                                'error_field' => 'reoffer_of_id',
+                            ];
+                        }
+                    }
 
                     if ($existing) {
                         $this->adoptMedicationRoundForEffectiveAdministration(
@@ -1162,6 +1267,7 @@ class EnhancedMarService
                             'administration' => $existing,
                             'safety_check' => $safetyCheck,
                             'duplicate' => true,
+                            'duplicate_of' => $this->duplicateOf($existing),
                         ];
                     }
                 }
@@ -1173,8 +1279,6 @@ class EnhancedMarService
                     }]);
 
                     if (($data['status'] ?? null) === 'given') {
-                        $quantity = MedicationStockQuantity::normalizeMovement($data['quantity_administered'] ?? 1);
-                        $quantity = MedicationStockQuantity::greaterThan($quantity, 0) ? $quantity : '1.00';
                         $stock = $medication->stock;
 
                         if (! $stock || $stock->on_hand === null) {
@@ -1184,6 +1288,21 @@ class EnhancedMarService
                                 'error_field' => 'quantity_administered',
                             ];
                         }
+
+                        // NF-18: never assume one unit. The quantity is what the
+                        // worker entered, or the order's own amount when it is in
+                        // the stock's unit; otherwise it must be entered.
+                        $quantity = ($data['quantity_administered'] ?? null) !== null
+                            ? MedicationStockQuantity::normalizeMovement($data['quantity_administered'])
+                            : $this->recordingContract->stockQuantity($data, $medication, $stock->unit);
+                        if ($quantity === null || ! MedicationStockQuantity::greaterThan($quantity, 0)) {
+                            return [
+                                'success' => false,
+                                'error' => 'Enter how many were taken from the controlled-drug stock for this dose.',
+                                'error_field' => 'quantity_administered',
+                            ];
+                        }
+                        $data['quantity_administered'] = $quantity;
 
                         $before = MedicationStockQuantity::normalize($stock->on_hand);
                         if (MedicationStockQuantity::greaterThan($quantity, $before)) {
@@ -1235,6 +1354,35 @@ class EnhancedMarService
                 $admin->site = $data['site'] ?? null;
                 $admin->medication_round_id = $round?->id;
 
+                // P01 recording contract.
+                $recordedGiven = $admin->status === 'given';
+                $admin->late_reason = $recordedGiven
+                    && $windowCheck !== null
+                    && ! ($windowCheck['valid'] ?? true)
+                    && filled($data['late_reason'] ?? null)
+                        ? (string) $data['late_reason']
+                        : null;
+                $admin->amount_mode = $recordedGiven ? ($data['amount_mode'] ?? null) : null;
+                $admin->amount_reason = $recordedGiven && ($data['amount_mode'] ?? null) === RecordingContract::AMOUNT_LESS
+                    ? ($data['amount_reason'] ?? null)
+                    : null;
+                $admin->quantity_given = $this->recordingContract->quantityGiven($data, $medication);
+                $admin->second_person_kind = $secondPersonKind;
+                $admin->second_person_status = match (true) {
+                    $secondPersonKind === null => null,
+                    $secondPersonUnconfirmed => RecordingContract::SECOND_NOT_CONFIRMED,
+                    default => RecordingContract::SECOND_VERIFIED,
+                };
+                if ($secondPersonUnconfirmed) {
+                    $admin->forceFill($this->recordingContract->notConfirmedReviewAttributes($secondPersonKind, $userId));
+                }
+                $admin->reoffer_of_id = $reofferFollowUp !== null
+                    ? (int) $reofferFollowUp->client_medication_administration_id
+                    : null;
+                $admin->effect_check_due_at = $recordedGiven && $medication->is_prn && filled($data['effect_check_due_at'] ?? null)
+                    ? $this->scheduleService->parseWorkerDateTime((string) $data['effect_check_due_at'])->utc()
+                    : null;
+
                 if ($shift) {
                     $admin->service_context_id = $shift->service_context_id;
                 }
@@ -1283,12 +1431,30 @@ class EnhancedMarService
                         $admin,
                         $userId,
                         $admin->witnessed_by,
-                        $data['quantity_administered'] ?? 1,
+                        $data['quantity_administered'],
                         $clientRequestUuid,
                         $data['captured_offline_at'] ?? null,
                         $data['origin_device_id'] ?? null,
                         (bool) ($data['queued_offline'] ?? false),
                     );
+                }
+
+                // P01: the refusal follow-up a re-offer closes, the follow-up
+                // a new refusal opens, and the error "more than ordered" raises.
+                if ($reofferFollowUp !== null) {
+                    $this->recordingContract->completeReofferFollowUp($reofferFollowUp, $admin, $userId);
+                }
+                if ($admin->status === 'refused' && ! $medication->is_prn && filled($data['follow_up_due_at'] ?? null)) {
+                    $this->recordingContract->createRefusalFollowUp(
+                        $client,
+                        $medication,
+                        $admin,
+                        $userId,
+                        $this->scheduleService->parseWorkerDateTime((string) $data['follow_up_due_at']),
+                    );
+                }
+                if ($recordedGiven && ($data['amount_mode'] ?? null) === RecordingContract::AMOUNT_MORE) {
+                    $this->recordingContract->raiseMoreThanOrderedError($client, $medication, $admin, $lockedActor, $data);
                 }
 
                 AuditLogger::logOrFail('medications.administration.record', $admin, [
@@ -1301,6 +1467,10 @@ class EnhancedMarService
                     'queued_offline' => (bool) ($data['queued_offline'] ?? false),
                     'status' => $admin->status,
                     'witnessed_by' => $admin->witnessed_by,
+                    'second_person_kind' => $admin->second_person_kind,
+                    'second_person_status' => $admin->second_person_status,
+                    'reoffer_of_id' => $admin->reoffer_of_id,
+                    'amount_mode' => $admin->amount_mode,
                 ]);
 
                 $this->rememberAdministrationReplay(
@@ -1414,7 +1584,45 @@ class EnhancedMarService
             $this->fireIncidentHooks($administration, $medication, $reporterId);
         }
 
+        // P01: a retry of this same request (e.g. after "Not confirmed") is
+        // the worker's own record coming back — not "already recorded". A
+        // different record for the dose says who made it and when.
+        $result['replayed'] = $isExactDurableReplay;
+        if (! $isNewAdministration && ! $isExactDurableReplay && ! isset($result['duplicate_of'])) {
+            $result['duplicate_of'] = $this->duplicateOf($administration);
+        }
+
+        // P01: "More than ordered was given" answers with the error and the
+        // incident it raised — the same ones on a replay.
+        if (($isNewAdministration || $isExactDurableReplay) && $administration->amount_mode === RecordingContract::AMOUNT_MORE) {
+            $error = $this->recordingContract->errorFor($administration);
+            if ($error !== null) {
+                $result['medication_error'] = [
+                    'id' => (int) $error->id,
+                    'reference_number' => $error->reference_number,
+                    'client_incident_id' => $error->client_incident_id !== null ? (int) $error->client_incident_id : null,
+                ];
+            }
+        }
+
         return $result;
+    }
+
+    /**
+     * Who already recorded a dose, so a duplicate can say so ("Already
+     * recorded — nothing new was saved").
+     *
+     * @return array{status: string, administered_at: ?string, by: ?string}
+     */
+    private function duplicateOf(ClientMedicationAdministration $administration): array
+    {
+        $administeredAt = DoseOrderTimelineFactory::rawInstant($administration->getRawOriginal('administered_at'));
+
+        return [
+            'status' => (string) $administration->status,
+            'administered_at' => $administeredAt?->toIso8601String(),
+            'by' => User::query()->whereKey((int) $administration->administered_by)->value('name'),
+        ];
     }
 
     /** @param array<string, mixed> $binding */
@@ -1687,7 +1895,7 @@ class EnhancedMarService
             return null;
         }
 
-        if (in_array($key, ['scheduled_for', 'administered_at', 'captured_offline_at'], true)) {
+        if (in_array($key, ['scheduled_for', 'administered_at', 'captured_offline_at', 'follow_up_due_at', 'effect_check_due_at'], true)) {
             $text = trim((string) $value);
             if ($text === '') {
                 return null;
@@ -1703,7 +1911,7 @@ class EnhancedMarService
             }
         }
 
-        if ($key === 'quantity_administered' && is_numeric($value)) {
+        if (in_array($key, ['quantity_administered', 'quantity_given'], true) && is_numeric($value)) {
             try {
                 return MedicationStockQuantity::normalizeMovement($value);
             } catch (\InvalidArgumentException) {
@@ -1725,6 +1933,7 @@ class EnhancedMarService
             'blood_pressure_systolic',
             'blood_pressure_diastolic',
             'medication_round_id',
+            'reoffer_of_id',
         ], true) && is_numeric($value)) {
             return (int) $value;
         }
@@ -1733,6 +1942,7 @@ class EnhancedMarService
             'override_window',
             'queued_offline',
             'scan_verified',
+            'second_person_unavailable',
         ], true)) {
             return filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? (bool) $value;
         }
@@ -2050,9 +2260,10 @@ class EnhancedMarService
         Collection $lockedWitnessUsers,
         Collection $lockedPresenceShifts,
         bool $requireCosigner = false,
+        bool $requireAmountConfirmation = false,
     ): array {
         $medicationRequiresWitness = $medication->requiresWitness() || ($adminRules['requires_countersign'] ?? false);
-        $requiresWitness = $medicationRequiresWitness || $requireCosigner;
+        $requiresWitness = $medicationRequiresWitness || $requireCosigner || $requireAmountConfirmation;
 
         if (($data['status'] ?? null) !== 'given' || ! $requiresWitness) {
             return ['success' => true];
@@ -2061,9 +2272,11 @@ class EnhancedMarService
         if (empty($data['witnessed_by'])) {
             return [
                 'success' => false,
-                'error' => $medicationRequiresWitness
-                    ? 'Witness is required for this medication.'
-                    : 'A co-signer is required: your medication competency assessment is restricted. Choose a present, qualified co-signer and ask them to type their own witness PIN.',
+                'error' => match (true) {
+                    $medicationRequiresWitness => 'Witness is required for this medication.',
+                    $requireCosigner => 'A co-signer is required: your medication competency assessment is restricted. Choose a present, qualified co-signer and ask them to type their own witness PIN.',
+                    default => 'A colleague on shift confirms a smaller amount than ordered. Choose them and ask them to type their witness PIN.',
+                },
                 'error_field' => 'witnessed_by',
             ];
         }
@@ -2138,14 +2351,20 @@ class EnhancedMarService
         ClientMedicationAdministration $admin,
         int $recordedBy,
         ?int $witnessedBy,
-        int|float|string $quantity = 1,
+        int|float|string $quantity,
         ?string $clientRequestUuid = null,
         mixed $capturedOfflineAt = null,
         mixed $originDeviceId = null,
         bool $queuedOffline = false,
     ): void {
+        // NF-18: a register entry records exactly what was taken — never an
+        // assumed single unit.
         $quantity = MedicationStockQuantity::normalizeMovement($quantity);
-        $quantity = MedicationStockQuantity::greaterThan($quantity, 0) ? $quantity : '1.00';
+        if (! MedicationStockQuantity::greaterThan($quantity, 0)) {
+            throw ValidationException::withMessages([
+                'quantity_administered' => 'Enter how many were taken from the controlled-drug stock for this dose.',
+            ]);
+        }
         $stock = $medication->stock;
         if (! $stock || $stock->on_hand === null) {
             throw ValidationException::withMessages([

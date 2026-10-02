@@ -34,6 +34,9 @@ class MedicationRefusalFollowup extends Model
         'escalated_to_manager',
         'escalated_at',
         'created_by',
+        // P01 C1: the person who owns the follow-up (the recorder, until the
+        // P08a handover can hand it on).
+        'owner_id',
     ];
 
     protected $casts = [

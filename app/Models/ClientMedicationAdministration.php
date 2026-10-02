@@ -102,9 +102,22 @@ class ClientMedicationAdministration extends Model
         'correction_rejection_reason',
         'witnessed_at',
         'witness_method',
+        // P01 C1 recording contract.
+        'late_reason',
+        'amount_mode',
+        'amount_reason',
+        'quantity_given',
+        'second_person_kind',
+        'second_person_status',
+        'review_reason_key',
+        'reoffer_of_id',
+        'effect_check_due_at',
     ];
 
     protected $casts = [
+        'quantity_given' => 'decimal:2',
+        'reoffer_of_id' => 'integer',
+        'effect_check_due_at' => 'datetime',
         'scheduled_for' => 'datetime',
         'administered_at' => 'datetime',
         'is_correction' => 'boolean',
