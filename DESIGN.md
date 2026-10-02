@@ -423,7 +423,14 @@ before.
   a header block that doesn't navigate anywhere, or one whose trend/
   fraction data has no real backend source. Every block links to the
   view where its number lives; a block without live data is dropped,
-  not faked.
+  not faked. **Type-enforced (2026-10-02):** `PageHeaderMeterBlock`
+  takes `PageHeaderMeterTarget` — an `href` or an `onClick`, so a block
+  with neither fails `tsc`. Pass a target that can't be both missing as
+  ONE conditional spread (`{...(ok ? { href } : { onClick })}`), not
+  two parallel ternaries; a wrapper component takes the same type. When
+  the viewer can't open the list (permission), point the block at the
+  in-page section that breaks the number down — never leave it
+  un-linked (reference: the Finance dashboard).
 - **Numbers-only meter blocks** (corrected 2026-09-06; budget case
   corrected 2026-09-07) — a header meter block rendered as a bare big
   number when the metric has an honest visual form with a live source:

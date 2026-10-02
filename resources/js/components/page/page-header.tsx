@@ -430,6 +430,15 @@ export function PageHeaderPrimaryButton({
 export type PageHeaderMeterTone = 'brand' | 'success' | 'warning' | 'critical';
 
 /**
+ * Where a meter block goes. "Every block is a link — no exceptions"
+ * (PAGE_HEADER_STYLE_GUIDE §5), so the type demands a page `href` or an
+ * in-page `onClick`; a block with neither is a compile error.
+ */
+export type PageHeaderMeterTarget =
+    | { href: string; onClick?: () => void }
+    | { href?: string; onClick: () => void };
+
+/**
  * One instrument block on the meter row. Dark glass; toned blocks take
  * the fixed status hue on border, label and headline value. ALWAYS a
  * link to the view where the number lives — pass `href` (page nav) or
@@ -449,16 +458,14 @@ export function PageHeaderMeterBlock({
     ariaLabel,
     className,
     children,
-}: {
+}: PageHeaderMeterTarget & {
     label: string;
     /** Optional headline value on the head row (e.g. "0/41 beds"). */
     value?: ReactNode;
     tone?: PageHeaderMeterTone;
-    href?: string;
     /** Keep an in-page workspace and its unsent fields mounted when following a meter. */
     preserveState?: boolean;
     preserveScroll?: boolean;
-    onClick?: () => void;
     /** Mark a meter that selects the current in-page view. */
     pressed?: boolean;
     /** Accessible name; defaults to "View <label>". */

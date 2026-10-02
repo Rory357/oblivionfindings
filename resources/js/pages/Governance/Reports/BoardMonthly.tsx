@@ -24,7 +24,8 @@ import {
 
 interface Props extends PageProps {
     report: {
-        headline: ReportMetric[];
+        /** Header meters: ReportController::boardMonthlyHeadline always sends a link. */
+        headline: (ReportMetric & { href: string })[];
         sections: ReportSection[];
     };
     period: { start: string; end: string; label: string };
