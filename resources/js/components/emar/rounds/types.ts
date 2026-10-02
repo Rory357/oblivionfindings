@@ -25,7 +25,7 @@ export interface RoundCell {
     requires_blood_glucose: boolean;
     requires_pulse: boolean;
     scheduled_for: string;
-    status: string; // given | refused | withheld | missed | due
+    status: string; // given | refused | withheld | missed | due | overdue | pending_check
     witnessed_by: string | null;
     blood_glucose_level: number | null;
     pulse_bpm: number | null;
@@ -98,7 +98,24 @@ export interface RoundItem {
     requires_blood_glucose: boolean;
     requires_pulse: boolean;
     scheduled_for: string;
+    /** The record's outcome, else due | upcoming | overdue | pending_check (as Meds today). */
+    dose_state?: string;
     administration: RoundItemAdministration | null;
+}
+
+/** A cell or record status that is a recorded outcome (anything else is still to do). */
+export function isRecordedStatus(status: string): boolean {
+    return ['given', 'refused', 'withheld', 'held', 'missed'].includes(status);
+}
+
+/** Waiting for the order check: shown, but not recordable until the order is checked. */
+export function isWaitingForCheck(item: RoundItem): boolean {
+    return !item.administration && item.dose_state === 'pending_check';
+}
+
+/** A dose the worker can record next: not recorded, not waiting for the order check. */
+export function isRecordable(item: RoundItem): boolean {
+    return !item.administration && !isWaitingForCheck(item);
 }
 
 export interface RoundProgress {
@@ -253,7 +270,11 @@ export function doseStatusMeta(status: string): {
         case 'held':
             return { label: 'Held', tone: 'warning' };
         case 'missed':
-            return { label: 'Missed', tone: 'critical' };
+            return { label: 'Missed (recorded)', tone: 'critical' };
+        case 'overdue':
+            return { label: 'Overdue', tone: 'critical' };
+        case 'pending_check':
+            return { label: 'Waiting for the order check', tone: 'info' };
         default:
             return { label: 'Due', tone: 'muted' };
     }
