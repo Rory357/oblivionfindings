@@ -695,8 +695,11 @@ before.
   say whose number they are ("Personal mobile"), state who can see them, and
   never write HR's work contact fields (`work_phone`, `work_email`) or fall
   back to them on read-back. The sign-in email can be personal too, so it is
-  not copied into `work_email` either. Work contact details are edited only
-  on HR's screens, with HR's permissions.
+  not copied into `work_email` either — not by Settings, System › Users or
+  the staff edit form. Work contact details are edited only on HR's screens,
+  with HR's permissions. Staff-facing directories and contact cards show
+  `work_email` only: someone without one shows no email, never the sign-in
+  address as a fallback (2026-10-02).
 
 ## File viewing and downloading (approved by Stephan 2026-09-27)
 

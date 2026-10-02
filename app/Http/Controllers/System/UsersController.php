@@ -391,9 +391,12 @@ class UsersController extends Controller
             ->values();
         $emailChanged = DB::transaction(function () use ($actorId, $data, $profileId, $roleIds, $targetId): bool {
             [$lockedActor, $lockedTarget] = $this->lockSystemUserMutation($actorId, $targetId, $roleIds->all());
-            $lockedProfile = $profileId
-                ? $this->lockedAccessibleEmployeeProfileOrFail($lockedTarget, $lockedActor, (int) $profileId)
-                : null;
+            // Re-check Site access to the staff record under lock. This screen
+            // has no work-email field, and the sign-in email can be personal,
+            // so work_email is left for HR to set on the employee profile.
+            if ($profileId) {
+                $this->lockedAccessibleEmployeeProfileOrFail($lockedTarget, $lockedActor, (int) $profileId);
+            }
             $lockedTarget->fill([
                 'name' => $data['name'] ?? $lockedTarget->name,
                 'email' => $data['email'] ?? $lockedTarget->email,
@@ -403,13 +406,6 @@ class UsersController extends Controller
                 $lockedTarget->email_verified_at = null;
             }
             $lockedTarget->save();
-
-            if ($lockedProfile && array_key_exists('email', $data)) {
-                $lockedProfile->forceFill([
-                    'work_email' => $lockedTarget->email,
-                    'updated_by' => $lockedActor->id,
-                ])->save();
-            }
 
             if (isset($data['role_ids'])) {
                 $lockedTarget->roles()->sync($roleIds->all());
