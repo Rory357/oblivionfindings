@@ -733,39 +733,55 @@ class MedicationRbacAuthorizationTest extends TestCase
 
     public function test_sidebar_reachability_and_deep_links_match_the_exact_reader_capabilities(): void
     {
+        // NAV (eMAR second review §2–§3): the old 14-item eMAR panel is now
+        // the "Medication" module of seven hubs, owned by
+        // lib/emar-navigation.ts. Behaviour per role is covered by
+        // emar-navigation.test.ts; this locks the gates to the server's.
         $sidebar = file_get_contents(resource_path('js/components/app-sidebar.tsx'));
         $this->assertIsString($sidebar);
+        $navigation = file_get_contents(resource_path('js/lib/emar-navigation.ts'));
+        $this->assertIsString($navigation);
         $inertiaMiddleware = file_get_contents(app_path('Http/Middleware/HandleInertiaRequests.php'));
         $this->assertIsString($inertiaMiddleware);
 
+        // The sidebar no longer decides medication access itself.
+        $this->assertStringContainsString('const medication = emarSidebar(can);', $sidebar);
+        $this->assertStringNotContainsString('const canAdminEmar', $sidebar);
+        $this->assertStringNotContainsString("label: 'eMAR'", $sidebar);
+
+        // Frontline = no lead/manager capability. Controlled-drug record or
+        // witness never promote anyone into the module.
         $this->assertMatchesRegularExpression(
-            '/const canAdminEmar =(?:(?!;).)*can\\?\\.medications\\?\\.ordersManage(?:(?!;).)*can\\?\\.medications\\?\\.stockUpdate(?:(?!;).)*can\\?\\.medications\\?\\.controlledView(?:(?!;).)*can\\?\\.medications\\?\\.controlledRecord/s',
-            $sidebar,
+            '/export const isFrontlineMedication(?:(?!};).)*m\.ordersManage(?:(?!};).)*m\.ordersVerify(?:(?!};).)*m\.stockUpdate(?:(?!};).)*m\.auditView(?:(?!};).)*m\.reportsExport(?:(?!};).)*m\.settingsManage(?:(?!};).)*m\.breakGlass/s',
+            $navigation,
         );
-        $this->assertStringNotContainsString(
-            '(can?.medications?.view && can?.medications?.controlledView) ||',
-            $sidebar,
+        $this->assertDoesNotMatchRegularExpression(
+            '/export const isFrontlineMedication(?:(?!};).)*controlled(Record|Witness)/s',
+            $navigation,
         );
-        $this->assertStringNotContainsString(
-            '(can?.medications?.view && can?.medications?.controlledRecord) ||',
-            $sidebar,
-        );
+        $this->assertStringContainsString('(controlledView(can) && hasManagerCapability(can))', $navigation);
         $this->assertStringNotContainsString(
             "((\$can['medications']['view'] ?? false) && (\$can['medications']['controlledView'] ?? false))",
             $inertiaMiddleware,
         );
 
+        // Each view's gate mirrors its route's exact reader capabilities.
         $this->assertMatchesRegularExpression(
-            "/if \\(can\\?\\.medications\\?\\.view && can\\?\\.medications\\?\\.controlledView\\)\\s*admin\\.push\\(\\{\\s*title: 'Controlled Drugs'/s",
-            $sidebar,
+            "/label: 'Controlled register',\\s*href: '\\/emar\\/controlled',\\s*icon: \\w+,\\s*visible: all\\(view, controlledView\\)/s",
+            $navigation,
         );
         $this->assertMatchesRegularExpression(
-            "/if \\(can\\?\\.medications\\?\\.view && can\\?\\.medications\\?\\.controlledView\\)\\s*compliance\\.push\\(\\{\\s*title: 'Destructions'/s",
-            $sidebar,
+            "/label: 'Destructions & returns',\\s*href: '\\/emar\\/destructions',\\s*icon: \\w+,\\s*visible: all\\(view, controlledView\\)/s",
+            $navigation,
         );
         $this->assertMatchesRegularExpression(
-            "/if \\(can\\?\\.medications\\?\\.view && can\\?\\.medications\\?\\.stockUpdate\\)\\s*mgmt\\.push\\(\\{\\s*title: 'Stock Management'/s",
-            $sidebar,
+            "/label: 'Stock & pharmacy',\\s*href: '\\/emar\\/stock',\\s*icon: \\w+,\\s*visible: all\\(view, stockUpdate\\)/s",
+            $navigation,
+        );
+        // reports.viewAny reveals Reports & audit › Reports only (§3).
+        $this->assertMatchesRegularExpression(
+            "/label: 'Reports',\\s*href: '\\/emar\\/reports',\\s*icon: \\w+,\\s*visible: any\\(reportsExport, reportsViewAny\\)/s",
+            $navigation,
         );
     }
 

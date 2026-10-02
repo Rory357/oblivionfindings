@@ -8,6 +8,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Alerts\MedicationAlertSettings;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\DB;
 
@@ -85,8 +86,8 @@ it('saves who gets an alert in the change history, asking before it loosens', fu
 
     $row = MedicationSettingChange::query()->where('setting_group', 'alerts')->where('setting_key', 'stock')->firstOrFail();
     expect($row->loosens)->toBeTrue()
-        ->and($row->before_text)->toBe('In-app on · House lead, People who update stock here')
-        ->and($row->after_text)->toBe('In-app on · House lead')
+        ->and($row->before_text)->toBe('In-app on · email off · push off · House lead, People who update stock here')
+        ->and($row->after_text)->toBe('In-app on · email off · push off · House lead')
         ->and($row->actor_id)->toBe($manager->id)
         ->and($row->audit_event)->toBe('medications.alert_recipients.updated');
 });
@@ -150,6 +151,60 @@ it('refuses a change that switches off every way of telling people', function ()
     ]);
 
     expect(DB::table('app_settings')->where('key', 'medications.alerts.stock')->exists())->toBeFalse();
+});
+
+it('lets in-app be switched off once email or push is on (B2 C2: at least one channel)', function () {
+    $manager = b2SettingsActor('provider_manager', Site::factory()->create());
+    $emailOnly = json_encode(['inapp' => false, 'email' => true, 'push' => false, 'follow_up' => false, 'groups' => ['houseLead', 'stockStaff'], 'people' => []]);
+
+    b2Save($this, $manager, [
+        'group' => 'alerts', 'key' => 'stock', 'site_id' => null,
+        'value' => $emailOnly,
+        'from' => b2AlertValue(['houseLead', 'stockStaff']),
+    ], confirm: true)->assertSessionHasNoErrors();
+
+    expect(json_decode(DB::table('app_settings')->where('key', 'medications.alerts.stock')->value('value'), true))->toBe($emailOnly);
+    expect(MedicationSettingChange::query()->where('setting_key', 'stock')->value('after_text'))
+        ->toBe('In-app off · email on · push off · House lead, People who update stock here');
+});
+
+it('saves the privacy switch for email and push, asking before it is switched off', function () {
+    $manager = b2SettingsActor('provider_manager', Site::factory()->create());
+    $change = ['group' => 'delivery', 'key' => 'private', 'site_id' => null, 'value' => 'no', 'from' => 'yes'];
+    expect(app(MedicationAlertSettings::class)->privateDelivery())->toBeTrue();
+
+    b2Save($this, $manager, $change)->assertSessionHasErrors('confirm_loosening');
+    b2Save($this, $manager, $change, confirm: true)->assertSessionHasNoErrors();
+
+    $row = MedicationSettingChange::query()->where('setting_group', 'delivery')->where('setting_key', 'private')->firstOrFail();
+    expect($row->loosens)->toBeTrue()
+        ->and($row->before_text)->toBe('On')
+        ->and($row->after_text)->toBe('Off — email and push include client names and medicines')
+        ->and($row->audit_event)->toBe('medications.alert_delivery.updated')
+        ->and(app(MedicationAlertSettings::class)->privateDelivery())->toBeFalse();
+});
+
+it('previews each alert from the real notification, with the privacy switch on and off', function () {
+    $manager = b2SettingsActor('provider_manager', Site::factory()->create());
+
+    $response = $this->actingAs($manager)->get(route('emar.settings'))->assertOk();
+
+    $stock = $response->inertiaProps('alertPreviews.stock');
+    expect($stock['inapp']['message'])->toBe('Salbutamol inhaler for Aroha N. is below its reorder level (2 left). Kōwhai House.')
+        ->and($stock['private']['email'])->toBe([
+            'subject' => 'Stock running low',
+            'lines' => ['A medicine at Kōwhai House is running low.', 'Open Oblivion Care to see the details and respond.'],
+            'action' => 'Open in Oblivion Care',
+        ])
+        ->and($stock['private']['push'])->toBe(['title' => 'Stock running low', 'body' => 'A medicine at Kōwhai House is running low.'])
+        ->and($stock['open']['email']['subject'])->toBe('Stock running low — Salbutamol inhaler for Aroha N. is below its reorder level (2 left). Kōwhai House.')
+        ->and($stock['open']['push']['body'])->toBe('Salbutamol inhaler for Aroha N. is below its reorder level (2 left). Kōwhai House.')
+        // A message that starts with its title doesn't repeat it.
+        ->and($response->inertiaProps('alertPreviews.cdDiscrepancy.open.email.subject'))
+        ->toBe('Controlled-drug count doesn’t match — Methylphenidate at Kōwhai House: 1 short.')
+        ->and($response->inertiaProps('alertPreviews.cdDiscrepancy.controlled'))->toBeTrue()
+        ->and(array_keys($response->inertiaProps('alertPreviews')))->toBe(array_keys($response->inertiaProps('settings.definitions.alerts')))
+        ->and($response->inertiaProps('alertDelivery'))->toMatchArray(['push_ready' => 0]);
 });
 
 it('grants the house key to team leads and coordinators, and rolls back only it', function () {

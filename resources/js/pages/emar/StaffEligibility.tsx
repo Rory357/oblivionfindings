@@ -8,6 +8,7 @@
  * witness view or "Can witness" meter: that rule is enforced with P07b; the
  * register keeps the real witness PIN status. */
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { EntityChip, PersonDisc } from '@/components/lists/entity-cells';
 import {
     compactMenu,
@@ -25,13 +26,13 @@ import {
     PageHeaderMeterCaption,
     PageHeaderMeterDonut,
     PageHeaderPrimaryButton,
-    PageHeaderRail,
     PageHeaderSearch,
     PageHeaderStatusChip,
 } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatTime } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
@@ -131,6 +132,7 @@ const csvCell = (v: unknown) => {
 const readQuery = () => new URLSearchParams(window.location.search);
 
 export default function StaffEligibility(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const { people, exemptions, houses, policy, areas, can } = props;
     const [view, setView] = useState<View>(() => {
         const v = readQuery().get('view');
@@ -495,24 +497,7 @@ export default function StaffEligibility(props: Props) {
                     </PageHeaderFilterButton>
                 </>
             }
-            rail={
-                <PageHeaderRail
-                    items={[
-                        {
-                            key: 'eligibility',
-                            label: 'Staff eligibility',
-                            icon: UserCheck,
-                            ...(cant.length
-                                ? { count: cant.length, alert: true }
-                                : {}),
-                        },
-                    ]}
-                    value="eligibility"
-                    onSelect={() => go('register')}
-                    showFind={false}
-                    ariaLabel="Safety & oversight views"
-                />
-            }
+            rail={<EmarHubRail alerts={{ eligibility: cant.length }} />}
         />
     );
 
@@ -623,20 +608,7 @@ export default function StaffEligibility(props: Props) {
     }
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Medication', href: '/emar' },
-                {
-                    title: 'Safety & oversight',
-                    href: '/emar/safety/eligibility',
-                },
-                {
-                    title: 'Staff eligibility',
-                    href: '/emar/safety/eligibility',
-                },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Staff eligibility" />
             <div className="flex flex-col gap-5 p-6">
                 {header}

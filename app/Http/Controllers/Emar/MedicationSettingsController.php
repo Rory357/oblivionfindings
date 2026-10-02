@@ -10,9 +10,11 @@ use App\Models\MedicationAdminRule;
 use App\Models\MedicationAlert;
 use App\Models\Site;
 use App\Models\User;
+use App\Models\UserPushSubscription;
 use App\Models\WitnessPinReminder;
 use App\Notifications\WitnessPinReminderNotification;
 use App\Services\AuditLogger;
+use App\Services\Medication\Alerts\MedicationAlertPreviews;
 use App\Services\Medication\Alerts\MedicationAlertRecipients;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\RoundTemplateCatalogue;
@@ -747,7 +749,7 @@ class MedicationSettingsController extends Controller
      *
      * @param  list<int>  $siteIds  Houses whose settings this person reads.
      * @param  list<int>  $houseSiteIds  Their own houses (HR profile).
-     * @return array{alertAccess: array<string, mixed>, alertPeople: list<array<string, mixed>>, alertNames: array<int, string>, alertReach: array<string, mixed>, alertNobodyOpen: int}
+     * @return array{alertAccess: array<string, mixed>, alertPeople: list<array<string, mixed>>, alertNames: array<int, string>, alertReach: array<string, mixed>, alertNobodyOpen: int, alertPreviews: array<string, mixed>, alertDelivery: array{push_ready: int, people: int}}
      */
     private function alertPayload(User $actor, bool $canView, bool $canManage, bool $canManageGlobal, bool $canHouseAlerts, array $siteIds, array $houseSiteIds): array
     {
@@ -763,6 +765,8 @@ class MedicationSettingsController extends Controller
                 'alertNames' => [],
                 'alertReach' => ['houses' => [], 'people' => []],
                 'alertNobodyOpen' => 0,
+                'alertPreviews' => [],
+                'alertDelivery' => ['push_ready' => 0, 'people' => 0],
             ];
         }
 
@@ -780,6 +784,8 @@ class MedicationSettingsController extends Controller
         // Worked out once per page: the picker and the warning share it.
         $housePeople = $manageOrg ? [] : ($houseIds !== [] ? $this->alertPeople($houseIds) : []);
         $readable = array_values(array_unique([...$named, ...array_column($housePeople, 'id')]));
+        $people = $manageOrg ? $this->alertPeople(null) : $housePeople;
+        $peopleIds = array_column($people, 'id');
 
         return [
             'alertAccess' => [
@@ -800,7 +806,20 @@ class MedicationSettingsController extends Controller
                 ->when(! $canManageGlobal, fn ($query) => $query->whereIn('site_id', $siteIds))
                 ->count(),
             // Organisation editors name anyone; house managers people at their houses.
-            'alertPeople' => $manageOrg ? $this->alertPeople(null) : $housePeople,
+            'alertPeople' => $people,
+            // Message preview (B2 chunk 2): synthetic samples through the real
+            // notification, with the privacy switch on and off.
+            'alertPreviews' => app(MedicationAlertPreviews::class)->all(),
+            // Delivery › Push: of the people who can get alerts, how many have
+            // a phone or browser allowed.
+            'alertDelivery' => [
+                'push_ready' => $peopleIds === [] ? 0 : UserPushSubscription::query()
+                    ->whereIn('user_id', $peopleIds)
+                    ->where('enabled', true)
+                    ->distinct()
+                    ->count('user_id'),
+                'people' => count($peopleIds),
+            ],
             'alertNames' => $named === [] ? [] : User::query()
                 ->whereIn('id', array_values(array_unique($named)))
                 ->pluck('name', 'id')

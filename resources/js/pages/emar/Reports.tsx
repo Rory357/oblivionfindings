@@ -2,6 +2,7 @@
    audit-pack cards are custom-layout bordered surfaces / chip buttons (not Card/Button); charts
    reuse OpsStatCard/DonutChart/recharts. All colours are semantic tokens. */
 import { type CdMedication } from '@/components/emar/controlled/types';
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
 import {
     DonutChart,
@@ -19,6 +20,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { ReportLossDialog } from '@/pages/emar/_cd-dialogs';
 import { Head, router } from '@inertiajs/react';
@@ -223,6 +225,7 @@ const fmtDate = (iso: string | null) =>
         : '—';
 
 export default function Reports(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         filters,
         clients,
@@ -469,15 +472,11 @@ export default function Reports(props: Props) {
             : '0';
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Reports', href: '/emar/reports' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="eMAR - Reports" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

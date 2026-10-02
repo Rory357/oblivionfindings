@@ -602,13 +602,17 @@ class HandleInertiaRequests extends Middleware
             'medications' => [
                 'view' => $user->canDo('medications.view'),
                 'ordersManage' => $user->canDo('medications.orders.manage'),
+                // Navigation only (lib/emar-navigation.ts: lead hubs and the
+                // Settings entry). Not an authority — every medication route
+                // and action re-checks its own permission on the server.
+                'ordersVerify' => $user->canDo('medications.orders.verify'),
+                'settingsManage' => $user->canDo('medications.settings.manage'),
                 'administerRecord' => $user->canDo('medications.administer.record'),
                 'administerCorrect' => $user->canDo('medications.administer.correct'),
                 'auditView' => $user->canDo('medications.audit.view'),
                 'reportsExport' => $user->canDo('medications.reports.export'),
                 'stockUpdate' => $user->canDo('medications.stock.update'),
                 'controlledView' => $user->canDo('medications.controlled.view'),
-                'stockUpdate' => $user->canDo('medications.stock.update'),
                 'controlledRecord' => $user->canDo('medications.controlled.record'),
                 'controlledWitness' => $user->canDo('medications.controlled.witness'),
                 'controlledOverride' => $user->canDo('medications.controlled.override'),

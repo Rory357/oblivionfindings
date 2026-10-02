@@ -14,6 +14,9 @@ class MedicationAlertEvent extends Model
 
     public const NOT_TOLD_CONTROLLED = 'not_told_controlled';
 
+    /** In the alert's groups, but no channel reached them (in-app off; no work email or push). */
+    public const NOT_REACHABLE = 'not_reachable';
+
     /** Nobody in its groups at the house: medication settings managers were told instead. */
     public const FALLBACK = 'fallback_to_settings_managers';
 

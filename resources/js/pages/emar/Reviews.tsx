@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax -- review tables, KPI cards, kanban cards and the cycle
    stepper are custom-layout bordered surfaces / chip buttons (not Card/Button); colours are tokens. */
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { PageHero, type PageHeroStat } from '@/components/page';
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
@@ -11,6 +12,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     actionTone,
@@ -171,6 +173,7 @@ export default function Reviews({
     active_site: activeSite,
     site_brand_colour: brandColour,
 }: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const [activeTab, setActiveTab] = useState('overview');
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(
@@ -551,15 +554,11 @@ export default function Reviews({
     const description = `${kpis.overdue + kpis.due_30} review${kpis.overdue + kpis.due_30 === 1 ? '' : 's'} need attention — ${kpis.overdue} overdue against the 3-monthly chart cycle. Pharmacist-led, GP-signed, whānau-informed.`;
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Medication Reviews', href: '/emar/reviews' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="eMAR - Medication Reviews" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

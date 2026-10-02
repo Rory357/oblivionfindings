@@ -18,12 +18,15 @@ use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Models\UserPushSubscription;
 use App\Notifications\MedicationAlertNotification;
+use App\Notifications\Channels\PushChannel;
 use App\Services\Medication\Alerts\MedicationAlertRecipients;
 use App\Services\Medication\Alerts\MedicationAlerts;
 use App\Services\Medication\Alerts\MedicationAlertSettings;
 use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\Alerts\MedicationAlertSubject;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\Settings\MedicationSettingsRegistry;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
@@ -616,4 +619,139 @@ it('carries over at deploy what people were already told, so the first run tells
     expect(app(MedicationAlerts::class)->raise('overdue', b2Subject($site, $doseKey)))->toBeNull()
         ->and(app(MedicationAlerts::class)->raise('refusals', b2Subject($site, 'refusals:'.$refused->id)))->toBeNull();
     Notification::assertNothingSent();
+});
+
+/*
+ * B2 chunk 2: email to the work email, push to allowed phones and browsers,
+ * the privacy switch.
+ */
+
+/** The notifications this person was sent for an alert type. */
+function b2Sent(User $user, string $type): Illuminate\Support\Collection
+{
+    return Notification::sent($user, MedicationAlertNotification::class)
+        ->filter(fn (MedicationAlertNotification $n) => $n->alert->type === $type)
+        ->values();
+}
+
+function b2WorkEmail(User $user, ?string $email): void
+{
+    HrEmployeeProfile::query()->where('user_id', $user->id)->update(['work_email' => $email]);
+    $user->unsetRelation('hrEmployeeProfile');
+}
+
+function b2Push(User $user, bool $enabled = true): void
+{
+    UserPushSubscription::query()->create([
+        'user_id' => $user->id,
+        'provider' => 'webpush',
+        'token' => 'https://push.example.test/'.$user->id,
+        'keys' => ['p256dh' => 'key', 'auth' => 'auth'],
+        'enabled' => $enabled,
+    ]);
+}
+
+it('emails only the work email and pushes only to allowed devices, after the record commits', function () {
+    $site = Site::factory()->create();
+    $emailed = b2Staff($site, 'team_lead');
+    $pushed = b2Staff($site, 'team_lead');
+    $neither = b2Staff($site, 'team_lead');
+    b2WorkEmail($emailed, 'house.lead@work.example.test');
+    b2WorkEmail($pushed, null);
+    b2WorkEmail($neither, null);
+    b2Push($pushed);
+    b2Push($neither, enabled: false);
+    b2Setting('stock', ['inapp' => true, 'email' => true, 'push' => true, 'follow_up' => false, 'groups' => ['houseLead'], 'people' => []]);
+
+    $alert = app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:1'));
+
+    expect($alert->recipients()->orderBy('user_id')->pluck('channels', 'user_id')->all())->toBe([
+        $emailed->id => ['inapp', 'email'],
+        $pushed->id => ['inapp', 'push'],
+        $neither->id => ['inapp'],
+    ]);
+    $via = fn (User $user): array => b2Sent($user, 'stock')->flatMap(fn (MedicationAlertNotification $n) => $n->via($user))->values()->all();
+    expect($via($emailed))->toBe(['database', 'mail'])
+        ->and($via($pushed))->toBe(['database', PushChannel::class])
+        ->and($via($neither))->toBe(['database']);
+    // Never the sign-in address.
+    $mail = b2Sent($emailed, 'stock')->last();
+    expect($emailed->routeNotificationFor('mail', $mail))->toBe('house.lead@work.example.test')
+        ->and($pushed->routeNotificationFor('mail', $mail))->toBeNull()
+        ->and($emailed->routeNotificationFor('mail', null))->toBe($emailed->email);
+});
+
+it('keeps client names and medicines out of email and push by default, and puts them in when switched off', function () {
+    $site = Site::factory()->create(['name' => 'Kōwhai House']);
+    $lead = b2Staff($site, 'team_lead');
+    b2WorkEmail($lead, 'lead@work.example.test');
+    b2Push($lead);
+    b2Setting('overdue', ['inapp' => true, 'email' => true, 'push' => true, 'follow_up' => true, 'groups' => ['houseLead'], 'people' => []]);
+    $subject = fn (string $key) => new MedicationAlertSubject(
+        key: $key,
+        siteId: (int) $site->id,
+        title: 'Overdue dose',
+        message: 'Aroha N. — Metformin 500 mg, 8:00 am dose — has no outcome 60 minutes after it was due. Kōwhai House.',
+        shortMessage: 'A dose at Kōwhai House has no outcome yet.',
+    );
+
+    app(MedicationAlerts::class)->raise('overdue', $subject('1@2026-10-02T19:00Z~1'));
+    $private = b2Sent($lead, 'overdue')->last();
+    expect($private->private)->toBeTrue()
+        ->and($private->toMail($lead)->subject)->toBe('Overdue dose')
+        ->and($private->toMail($lead)->introLines)->toBe(['A dose at Kōwhai House has no outcome yet.'])
+        ->and($private->toPush($lead))->toMatchArray(['title' => 'Overdue dose', 'body' => 'A dose at Kōwhai House has no outcome yet.'])
+        // The bell is inside the app: always the full message.
+        ->and(b2Sent($lead, 'overdue')->first()->toArray($lead)['message'])->toContain('Metformin 500 mg');
+
+    // As the settings store saves an option (the value column is cast to JSON).
+    AppSetting::query()->updateOrCreate(['key' => 'medications.alert_delivery.private'], ['value' => 'no']);
+    app(MedicationAlerts::class)->raise('overdue', $subject('2@2026-10-02T19:00Z~1'));
+    $open = b2Sent($lead, 'overdue')->last();
+    expect($open->private)->toBeFalse()
+        ->and($open->toMail($lead)->subject)->toBe('Overdue dose — Aroha N.')
+        ->and($open->toPush($lead)['body'])->toContain('Metformin 500 mg');
+});
+
+it('tells people on email alone when in-app is off, and records those it can’t reach', function () {
+    $site = Site::factory()->create();
+    $emailed = b2Staff($site, 'team_lead');
+    $unreachable = b2Staff($site, 'team_lead');
+    b2WorkEmail($emailed, 'lead@work.example.test');
+    b2WorkEmail($unreachable, null);
+    b2Setting('stock', ['inapp' => false, 'email' => true, 'push' => false, 'follow_up' => false, 'groups' => ['houseLead'], 'people' => []]);
+
+    $alert = app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:1'));
+
+    $row = $alert->recipients()->sole();
+    expect($row->user_id)->toBe($emailed->id)
+        ->and($row->channels)->toBe(['email'])
+        ->and($row->notification_id)->toBeNull()
+        ->and($alert->reached_nobody)->toBeFalse()
+        ->and($alert->events()->where('event', MedicationAlertEvent::NOT_REACHABLE)->value('detail'))
+        ->toMatchArray(['user_ids' => [$unreachable->id]])
+        ->and(b2Sent($unreachable, 'stock'))->toHaveCount(0);
+
+    // Nobody reachable at all: reached nobody, never silently "told".
+    b2WorkEmail($emailed, null);
+    $none = app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:2'));
+    expect($none->reached_nobody)->toBeTrue()
+        ->and($none->recipients()->count())->toBe(0)
+        ->and($none->events()->where('event', MedicationAlertEvent::NOBODY_TOLD)->value('detail')['reason'])
+        ->toBe('Nobody it would go to can be reached: in-app is off, and they have no work email or push set up.');
+});
+
+it('keeps a controlled alert behind the controlled gate on email and push too', function () {
+    $site = Site::factory()->create();
+    $cleared = b2Staff($site, 'team_lead', [MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY]);
+    $notCleared = b2Staff($site, 'team_lead', [], [MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY]);
+    b2WorkEmail($cleared, 'a@work.example.test');
+    b2WorkEmail($notCleared, 'b@work.example.test');
+    b2Push($notCleared);
+    b2Setting('stock', ['inapp' => true, 'email' => true, 'push' => true, 'follow_up' => false, 'groups' => ['houseLead'], 'people' => []]);
+
+    app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:cd', true));
+
+    expect(b2Sent($cleared, 'stock'))->not->toBeEmpty()
+        ->and(b2Sent($notCleared, 'stock'))->toHaveCount(0);
 });

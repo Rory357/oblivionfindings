@@ -33,6 +33,9 @@ class MedicationSettingsRegistry
     /** A house's extra people for each alert: `medications.alert_extras.{alert}` per Site. */
     public const ALERT_EXTRAS_STORAGE_PREFIX = 'medications.alert_extras.';
 
+    /** Email and push leave out client names and medicines (P11 v5 Delivery › Email). */
+    public const DELIVERY_PRIVATE = 'medications.alert_delivery.private';
+
     /** @var array<string, MedicationSettingGroup>|null */
     private ?array $groups = null;
 
@@ -96,6 +99,7 @@ class MedicationSettingsRegistry
             $this->witnessPinRules(),
             $this->alertRecipients(),
             $this->alertExtras(),
+            $this->alertDelivery(),
         ];
     }
 
@@ -156,6 +160,35 @@ class MedicationSettingsRegistry
                 codec: new PeopleListCodec,
                 houseManaged: true,
             ), MedicationAlertCatalogue::built()),
+        );
+    }
+
+    /**
+     * How alerts reach people (P11 v5 Alerts & access › Delivery), for every
+     * house. B2 chunk 2: whether email and push leave out client names and
+     * medicines — on by default, so a lock screen or an inbox never shows
+     * them. Switching it off is a loosening.
+     */
+    private function alertDelivery(): MedicationSettingGroup
+    {
+        return new MedicationSettingGroup(
+            key: 'delivery',
+            view: self::VIEW_ALERTS,
+            effect: 'From the next alert sent, at every house',
+            auditEvent: 'medications.alert_delivery.updated',
+            definitions: [
+                new MedicationSettingDefinition(
+                    group: 'delivery',
+                    key: 'private',
+                    storageKey: self::DELIVERY_PRIVATE,
+                    scope: MedicationSettingDefinition::SCOPE_ORGANISATION,
+                    section: 'delivery',
+                    label: 'Keep client names and medicines out of email and push',
+                    options: ['no' => 'Off — email and push include client names and medicines', 'yes' => 'On'],
+                    default: 'yes',
+                    rank: ['no', 'yes'],
+                ),
+            ],
         );
     }
 

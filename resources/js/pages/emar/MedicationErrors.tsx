@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- error table, summary/analytics cards, filter toolbar and
    hero month stepper are custom-layout bordered surfaces / chip buttons (not Card/Button); colours
    are semantic tokens. */
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { PageHero, type PageHeroStat } from '@/components/page';
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
@@ -12,6 +13,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     CloseErrorDialog,
@@ -160,6 +162,7 @@ export default function MedicationErrors({
     site_brand_colour: brandColour,
     can,
 }: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const [activeTab, setActiveTab] = useState('all');
     const [search, setSearch] = useState('');
     const [clientFilter, setClientFilter] = useState<number | null>(null);
@@ -512,15 +515,11 @@ export default function MedicationErrors({
     );
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Medication Errors', href: '/emar/errors' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="eMAR - Medication Errors" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}

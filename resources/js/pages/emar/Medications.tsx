@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax -- the directory card/table + clickable rows are
    custom-layout surfaces (not Card/Button); all colours are semantic tokens. */
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import {
     MED_TABS,
     matchesTab,
@@ -30,6 +31,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     AddMedicationDialog,
@@ -187,6 +189,7 @@ function AlertStripRow({
 }
 
 export default function Medications(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         medications,
         clients,
@@ -425,15 +428,11 @@ export default function Medications(props: Props) {
     };
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Medications', href: '/emar/medications' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medications Database" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    rail={<EmarHubRail />}
                     variant="hero"
                     category="ops"
                     brandColour={brandColour}
