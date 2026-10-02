@@ -18,7 +18,9 @@ class EmployeeImportExportService
     use SanitizesCsvOutput;
 
     /**
-     * CSV headers used for export and import.
+     * CSV headers used for export and import. `email` is the sign-in address
+     * (it matches rows to people); `work_email` is the HR work email and is
+     * the only column that writes it.
      */
     private const HEADERS = [
         'employee_number',
@@ -32,6 +34,8 @@ class EmployeeImportExportService
         'start_date',
         'hours_per_week',
         'is_active',
+        // Last, so the earlier columns keep their positions for older sheets.
+        'work_email',
     ];
 
     public function __construct(
@@ -77,6 +81,7 @@ class EmployeeImportExportService
                 $profile->start_date?->format('Y-m-d') ?? '',
                 $profile->hours_per_week ?? '',
                 $profile->is_active ? '1' : '0',
+                $profile->work_email ?? '',
             ]);
         }
 
@@ -141,6 +146,7 @@ class EmployeeImportExportService
             $validator = Validator::make($data, [
                 'name' => 'required|string|max:255',
                 'email' => 'required|email|max:255',
+                'work_email' => 'nullable|email|max:255',
                 'employee_number' => 'nullable|string|max:100',
                 'position_title' => 'nullable|string|max:255',
                 'position_role' => 'required|string|max:100',
@@ -234,7 +240,6 @@ class EmployeeImportExportService
                     $profileData = array_filter([
                         'user_id' => $user->id,
                         'employee_number' => $validated['employee_number'] ?? null,
-                        'work_email' => $email,
                         'position_title' => $validated['position_title'] ?? null,
                         'position_role' => $validated['position_role'],
                         'department' => $validated['department'] ?? null,
@@ -245,6 +250,14 @@ class EmployeeImportExportService
                     ], fn (mixed $value): bool => $value !== null);
                     if (array_key_exists('is_active', $validated) && $validated['is_active'] !== null) {
                         $profileData['is_active'] = filter_var($validated['is_active'], FILTER_VALIDATE_BOOL);
+                    }
+                    // Only a work_email column writes the work email (an empty
+                    // cell means none). The sign-in `email` never does, and an
+                    // older CSV without the column leaves it untouched.
+                    if (array_key_exists('work_email', $validated)) {
+                        $profileData['work_email'] = filled($validated['work_email'])
+                            ? strtolower(trim((string) $validated['work_email']))
+                            : null;
                     }
 
                     if ($profile) {

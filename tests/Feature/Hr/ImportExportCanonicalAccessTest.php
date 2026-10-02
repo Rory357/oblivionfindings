@@ -201,3 +201,84 @@ test('employee import updates visible profiles and the template requires Site pr
     expect($result['created'])->toBe(0)
         ->and($result['errors'])->toBe(['CSV headers must be unique.']);
 });
+
+test('an export then re-import keeps an HR-set work email', function (): void {
+    $employee = User::factory()->create([
+        'name' => 'Round trip worker',
+        'email' => 'round-trip.signin@example.test',
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    $profile = importExportCanonicalProfile($employee, $this->site, [
+        'work_email' => 'round-trip@care.example.test',
+        'position_role' => 'support_worker',
+        'employment_type' => 'full_time',
+    ]);
+
+    $csv = $this->actingAs($this->manager)
+        ->post('/hr/import-export/export', ['ids' => [$employee->id]])
+        ->assertOk()
+        ->streamedContent();
+    $lines = array_map('str_getcsv', preg_split('/\R/', trim($csv)));
+    $row = array_combine($lines[0], $lines[1]);
+
+    // `email` stays the sign-in address; work_email is its own column.
+    expect($row['email'])->toBe('round-trip.signin@example.test')
+        ->and($row['work_email'])->toBe('round-trip@care.example.test');
+
+    $this->actingAs($this->manager)
+        ->post('/hr/import-export/import', [
+            'file' => UploadedFile::fake()->createWithContent('employees.csv', $csv),
+        ])
+        ->assertSessionHas('importResult', fn (array $result): bool => $result['updated'] === 1
+            && $result['errors'] === []);
+
+    expect($profile->fresh()->work_email)->toBe('round-trip@care.example.test');
+});
+
+test('an old-format CSV without a work_email column leaves work emails alone', function (): void {
+    $employee = User::factory()->create([
+        'name' => 'Old format worker',
+        'email' => 'old-format.signin@example.test',
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    $profile = importExportCanonicalProfile($employee, $this->site, [
+        'work_email' => 'old-format@care.example.test',
+    ]);
+    $csv = importExportCsv([
+        ['EMP-OLD-FORMAT', 'Old format worker', $employee->email, 'Support Worker', 'support_worker', '', $this->site->id, 'full_time', '2026-07-02', '30', '1'],
+        ['EMP-OLD-NEW-HIRE', 'Old format new hire', 'old-format.newhire@example.test', 'Support Worker', 'support_worker', '', $this->site->id, 'full_time', '2026-07-02', '30', '1'],
+    ]);
+
+    $result = app(EmployeeImportExportService::class)->importFromCsv($csv, $this->manager);
+
+    expect($result['errors'])->toBe([])
+        ->and($result['updated'])->toBe(1)
+        ->and($result['created'])->toBe(1);
+    // The sign-in email in `email` never becomes the work email.
+    expect($profile->fresh()->work_email)->toBe('old-format@care.example.test');
+    $newHire = User::query()->where('email', 'old-format.newhire@example.test')->firstOrFail();
+    expect($newHire->hrEmployeeProfile->work_email)->toBeNull();
+});
+
+test('an empty work_email cell clears the work email', function (): void {
+    $employee = User::factory()->create([
+        'name' => 'Cleared worker',
+        'email' => 'cleared.signin@example.test',
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    $profile = importExportCanonicalProfile($employee, $this->site, [
+        'work_email' => 'cleared@care.example.test',
+    ]);
+
+    $result = app(EmployeeImportExportService::class)->importFromCsv(
+        "name,email,work_email,position_role,primary_site_id\nCleared worker,{$employee->email},,support_worker,{$this->site->id}\n",
+        $this->manager,
+    );
+
+    expect($result['errors'])->toBe([])
+        ->and($result['updated'])->toBe(1);
+    expect($profile->fresh()->work_email)->toBeNull();
+});

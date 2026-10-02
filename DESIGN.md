@@ -696,8 +696,10 @@ before.
   never write HR's work contact fields (`work_phone`, `work_email`) or fall
   back to them on read-back. The sign-in email can be personal too, so it is
   not copied into `work_email` either — not by Settings, System › Users or
-  the staff edit form. Work contact details are edited only on HR's screens,
-  with HR's permissions. Staff-facing directories and contact cards show
+  the staff edit form. Work contact details are edited only on HR's screens
+  (HR People › Add employee and › Edit, which shows the sign-in email
+  read-only and labelled "Sign-in email"), with HR's permissions, and the HR
+  CSV import writes them only from its `work_email` column. Staff-facing directories and contact cards show
   `work_email` only: someone without one shows no email, never the sign-in
   address as a fallback (2026-10-02). "No work email" is a real state
   (`work_email` is nullable): a recruitment hire whose offer has no work
