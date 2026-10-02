@@ -89,6 +89,7 @@ import {
 } from '@/lib/witness-pin';
 import {
     MyEligibility,
+    MyEligibilityChip,
     myMeter,
 } from '@/pages/emar/eligibility/_my-eligibility';
 
@@ -1533,9 +1534,8 @@ export default function MedsToday(props: MedsTodayProps) {
             ? [
                   {
                       label: 'My eligibility',
-                      value: myMeter(props.my_eligibility).big,
+                      value: <MyEligibilityChip data={props.my_eligibility} />,
                       sub: myMeter(props.my_eligibility).cap,
-                      tone: myMeter(props.my_eligibility).tone,
                       onClick: () => setMeOpen(true),
                   },
               ]
