@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\DB;
 
 class ClientMedicationAdministration extends Model
 {
@@ -38,10 +37,8 @@ class ClientMedicationAdministration extends Model
         static::forceDeleted($sync);
 
         // C6f: once the change commits, the person's overdue alerts for doses
-        // no longer overdue resolve themselves.
-        $overdueAlerts = static fn (self $administration) => DB::afterCommit(
-            static fn () => app(OverdueDoseAlerts::class)->afterDoseChange((int) $administration->client_id),
-        );
+        // now settled resolve themselves (once per person per transaction).
+        $overdueAlerts = static fn (self $administration) => OverdueDoseAlerts::queueAfterCommit((int) $administration->client_id);
         static::saved($overdueAlerts);
         static::deleted($overdueAlerts);
         static::restored($overdueAlerts);

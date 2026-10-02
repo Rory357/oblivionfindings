@@ -77,14 +77,21 @@ export const DOSE_STATUS_META: Record<
 
 /**
  * EM-12: a dose list tells a reader without controlled-medicine access how
- * many controlled doses it leaves out — naming none — so it reconciles with
- * the overdue badge, which counts them. Null when nothing is left out.
+ * many controlled doses it leaves out, and how many of those are overdue —
+ * naming none — so it reconciles with the overdue badge, which counts them.
+ * Null when nothing is left out.
  */
-export function hiddenControlledCaption(count: number): string | null {
+export function hiddenControlledCaption(
+    count: number,
+    overdue = 0,
+): string | null {
     if (count <= 0) return null;
-    return count === 1
-        ? '1 more controlled-medicine dose isn’t shown — needs controlled-medicine access.'
-        : `${count} more controlled-medicine doses aren’t shown — needs controlled-medicine access.`;
+    const lead =
+        count === 1
+            ? '1 more controlled-medicine dose isn’t shown'
+            : `${count} more controlled-medicine doses aren’t shown`;
+    const late = overdue > 0 ? ` (${overdue} overdue)` : '';
+    return `${lead}${late} — needs controlled-medicine access.`;
 }
 
 export function StatusPill({

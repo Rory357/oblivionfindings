@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ControlRoom\MaintenanceWindow;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
 use App\Models\MedicationDashboardAlert;
@@ -16,12 +17,14 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Notifications\MedicationOverdueNotification;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\MedicationAlertService;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -133,6 +136,177 @@ class OverdueDoseAlertsTest extends TestCase
         // No signal left stuck: Ben's dose isn't grouped into Aroha's alert.
         $this->assertSame(0, Signal::query()->where('status', 'pending')->count());
         $this->assertSame(3, Signal::query()->where('signal_type_code', MedicationSignalService::TYPE_OVERDUE)->count());
+
+        // Concealment both ways: Ben's ordinary dose is open to a reader
+        // without controlled access; Aroha's alert holds Morphine (grouped
+        // after Metformin), so it stays controlled.
+        $access = app(ControlRoomAlertAccessService::class);
+        $this->assertFalse($access->requiresControlledMedicationPermission($alerts->firstWhere('client_id', $this->ben->id)->fresh()));
+        $this->assertTrue($access->requiresControlledMedicationPermission($alerts->firstWhere('client_id', $this->aroha->id)->fresh()));
+    }
+
+    public function test_a_dose_that_has_aged_out_of_the_lookback_keeps_its_alert_open(): void
+    {
+        // Monday 9:30: Metformin 07:00 and Morphine 08:00 overdue — one alert.
+        $this->at('2026-06-15 09:30');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $monday = $this->openAlerts()->sole();
+
+        // Wednesday 00:00: Monday is outside the yesterday-and-today lookback,
+        // but nothing was recorded — the alert stays open.
+        $this->at('2026-06-17 00:00');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->assertTrue($monday->fresh()->isActionable());
+        // Tuesday's doses are new spells, worded with their day.
+        $this->assertTrue(Signal::query()->get()->contains(
+            fn (Signal $signal): bool => data_get($signal->normalized_data, 'title') === 'Overdue dose: Metformin, due 07:00 yesterday',
+        ));
+    }
+
+    public function test_a_spell_suppressed_by_a_maintenance_window_raises_one_alert_after_it(): void
+    {
+        MaintenanceWindow::query()->create([
+            'name' => 'Network work',
+            'starts_at' => $this->nz('2026-06-15 08:00'),
+            'ends_at' => $this->nz('2026-06-15 08:45'),
+            'status' => 'active',
+        ]);
+
+        // In the window: suppressed, and held there while it lasts.
+        $this->at('2026-06-15 08:30');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->at('2026-06-15 08:40');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->assertSame(0, $this->overdueAlertCount());
+        $this->assertSame(['suppressed'], Signal::query()->pluck('status')->all());
+
+        // After it: the next run raises one alert, and no more.
+        $this->at('2026-06-15 08:50');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->at('2026-06-15 08:55');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->assertSame(1, $this->overdueAlertCount());
+        $this->assertSame(2, Signal::query()->count());
+    }
+
+    public function test_a_failed_spell_doesnt_block_the_next_run(): void
+    {
+        $window = MaintenanceWindow::query()->create([
+            'name' => 'Network work',
+            'starts_at' => $this->nz('2026-06-15 08:00'),
+            'ends_at' => $this->nz('2026-06-15 09:00'),
+            'status' => 'active',
+        ]);
+        $this->at('2026-06-15 08:30');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        Signal::query()->update(['status' => 'failed']);
+        $window->delete();
+
+        $this->at('2026-06-15 08:35');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->assertSame(1, $this->overdueAlertCount());
+    }
+
+    public function test_the_daylight_saving_day_dose_is_raised_once_and_resolved_by_its_record(): void
+    {
+        // Sunday 27 September 2026: the clocks go forward at 02:00, so a
+        // 02:30 dose is due at 03:00 NZDT (14:00 UTC); its window ends 04:00.
+        $order = $this->order($this->ben, 'Night dose', ['02:30'], enteredNz: '2026-09-26 12:00');
+        $this->at('2026-09-27 04:30');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->at('2026-09-27 04:45');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+
+        $signal = Signal::query()->sole();
+        $this->assertSame($order->id.'@2026-09-26T14:00Z', data_get($signal->normalized_data, 'dose_key'));
+        $this->assertSame('Overdue dose: Night dose, due 03:00', data_get($signal->normalized_data, 'title'));
+        $alert = $this->openAlerts()->sole();
+
+        $this->at('2026-09-27 05:00');
+        DB::transaction(fn () => ClientMedicationAdministration::query()->create([
+            'client_id' => $this->ben->id,
+            'client_medication_id' => $order->id,
+            'administered_by' => User::factory()->create(['approved_at' => now()])->id,
+            'scheduled_for' => Carbon::parse('2026-09-26 14:00:00', 'UTC'),
+            'administered_at' => now(),
+            'status' => 'given',
+        ]));
+        $this->assertSame(ControlRoomAlert::STATUS_RESOLVED, $alert->fresh()->status);
+    }
+
+    public function test_an_acknowledged_dashboard_row_doesnt_come_back_until_a_new_dose_is_overdue(): void
+    {
+        $this->at('2026-06-15 08:30');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $row = $this->dashboardRow($this->aroha);
+        $row->acknowledge(User::factory()->create(['approved_at' => now()])->id);
+
+        // The same dose still overdue: no new active row.
+        $this->at('2026-06-15 08:45');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->assertNull($this->dashboardRow($this->aroha));
+        $this->assertSame(1, MedicationDashboardAlert::query()->where('alert_type', 'overdue')->count());
+
+        // Morphine falls overdue (9:00): new information, a new row.
+        $this->at('2026-06-15 09:05');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->assertSame('2 overdue dose(s): Metformin, Controlled medicine', $this->dashboardRow($this->aroha)?->message);
+    }
+
+    public function test_pausing_the_order_resolves_its_overdue_alert(): void
+    {
+        $this->at('2026-06-15 08:30');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $alert = $this->openAlerts()->sole();
+
+        $this->at('2026-06-15 08:40');
+        $this->orders['Metformin']->pause('Held for blood tests.', User::factory()->create(['approved_at' => now()])->id);
+
+        $this->assertSame(ControlRoomAlert::STATUS_RESOLVED, $alert->fresh()->status);
+    }
+
+    public function test_a_dose_grouped_into_the_alert_while_its_other_dose_is_recorded_keeps_it_open(): void
+    {
+        // 8:45: Metformin overdue — alert A.
+        $this->at('2026-06-15 08:45');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $alert = $this->openAlerts()->sole();
+
+        // 9:05, in one transaction: Metformin is recorded, and a run of the
+        // job groups Morphine (overdue since 9:00) into A. When it commits,
+        // A's doses are re-read under its lock: Morphine keeps it open.
+        $this->at('2026-06-15 09:05');
+        DB::transaction(function (): void {
+            $this->record('Metformin', '07:00', 'given');
+            $this->artisan('emar:send-alerts')->assertSuccessful();
+        });
+
+        $this->assertTrue($alert->fresh()->isActionable());
+        $this->assertSame(1, $this->overdueAlertCount());
+        $this->assertSame(2, Signal::query()->where('correlated_alert_id', $alert->id)->orWhere('alert_id', $alert->id)->count());
+    }
+
+    public function test_a_rolled_back_record_resolves_nothing(): void
+    {
+        $this->at('2026-06-15 08:30');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $alert = $this->openAlerts()->sole();
+
+        $this->at('2026-06-15 08:35');
+        try {
+            DB::transaction(function (): void {
+                $this->record('Metformin', '07:00', 'given');
+                throw new \RuntimeException('The save failed after the record.');
+            });
+        } catch (\RuntimeException) {
+            // Rolled back.
+        }
+
+        $this->assertTrue($alert->fresh()->isActionable());
+        $this->assertNotNull($this->dashboardRow($this->aroha));
+        // …and a later record still resolves it (the queue was released).
+        $this->record('Metformin', '07:00', 'given');
+        $this->assertSame(ControlRoomAlert::STATUS_RESOLVED, $alert->fresh()->status);
     }
 
     public function test_an_alert_resolves_itself_once_its_doses_are_recorded(): void
@@ -302,17 +476,20 @@ class OverdueDoseAlertsTest extends TestCase
             ->first();
     }
 
+    /** Recorded as the app records: inside a transaction (the hook runs on commit). */
     private function record(string $order, string $dueNz, string $status): ClientMedicationAdministration
     {
-        return ClientMedicationAdministration::query()->create([
+        $recorder = User::factory()->create(['approved_at' => now()]);
+
+        return DB::transaction(fn (): ClientMedicationAdministration => ClientMedicationAdministration::query()->create([
             'client_id' => $this->orders[$order]->client_id,
             'client_medication_id' => $this->orders[$order]->id,
-            'administered_by' => User::factory()->create(['approved_at' => now()])->id,
+            'administered_by' => $recorder->id,
             'scheduled_for' => $this->nz("2026-06-15 {$dueNz}"),
             'administered_at' => now(),
             'status' => $status,
             'reason' => $status === 'given' ? null : 'Recorded for the test.',
-        ]);
+        ]));
     }
 
     private function person(string $first, string $last): Client

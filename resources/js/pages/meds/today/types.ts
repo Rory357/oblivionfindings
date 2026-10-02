@@ -244,6 +244,8 @@ export interface MedsTodayProps {
     people_after_clock_in?: number;
     /** Controlled doses this day not listed for this reader (EM-12). */
     hidden_controlled_doses?: number;
+    /** …and how many of those are overdue (counted by the badge). */
+    hidden_controlled_overdue?: number;
 }
 
 /** Stable per-client hue for avatar chips (golden-angle spread). */

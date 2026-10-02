@@ -66,5 +66,9 @@ describe('My Day medication states (C6)', () => {
         expect(hiddenControlledCaption(3)).toBe(
             '3 more controlled-medicine doses aren’t shown — needs controlled-medicine access.',
         );
+        // The overdue ones among them: what reconciles the list with the badge.
+        expect(hiddenControlledCaption(2, 1)).toBe(
+            '2 more controlled-medicine doses aren’t shown (1 overdue) — needs controlled-medicine access.',
+        );
     });
 });

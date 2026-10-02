@@ -1258,7 +1258,10 @@ export default function MedsToday(props: MedsTodayProps) {
         peopleAfterClockIn > 0
             ? `Medicines for ${peopleAfterClockIn} more ${peopleAfterClockIn === 1 ? 'person' : 'people'} on your shift show once you’re clocked in to it.`
             : null,
-        hiddenControlledCaption(props.hidden_controlled_doses ?? 0),
+        hiddenControlledCaption(
+            props.hidden_controlled_doses ?? 0,
+            props.hidden_controlled_overdue ?? 0,
+        ),
     ].filter((note): note is string => note !== null);
 
     const [tab, setTab] = useState('schedule');

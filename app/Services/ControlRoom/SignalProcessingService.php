@@ -1037,7 +1037,7 @@ class SignalProcessingService
     /**
      * Check if signal should be suppressed due to maintenance window.
      */
-    protected function isInMaintenanceWindow(Signal $signal): bool
+    public function isInMaintenanceWindow(Signal $signal): bool
     {
         return MaintenanceWindow::query()
             ->where('status', 'active')

@@ -797,6 +797,9 @@ export default function MyDay() {
                             hiddenControlled={
                                 props.medications_hidden_controlled ?? 0
                             }
+                            hiddenControlledOverdue={
+                                props.medications_hidden_controlled_overdue ?? 0
+                            }
                         />
                     )}
                     {view === 'handover' && (

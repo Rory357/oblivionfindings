@@ -119,10 +119,12 @@ class MedsBoardPayloadService
      *
      * @param  array<int, int>  $clientIds
      * @param  Collection<string, ClientMedicationAdministration>  $bySlot
+     * @param  array{total: int, overdue: int}|null  $hidden  filled, when passed, with the controlled doses left out for this reader and how many are overdue
      * @return array<int, array<string, mixed>>
      */
-    public function scheduleForDate(array $clientIds, Carbon $date, Carbon $now, Collection $bySlot, bool $includeControlled = false): array
+    public function scheduleForDate(array $clientIds, Carbon $date, Carbon $now, Collection $bySlot, bool $includeControlled = false, ?array &$hidden = null): array
     {
+        $hidden = ['total' => 0, 'overdue' => 0];
         if (empty($clientIds)) {
             return [];
         }
@@ -130,11 +132,17 @@ class MedsBoardPayloadService
         try {
             $timezone = $this->scheduleService->workerTimezone();
 
-            $medications = $this->scheduledOrders($clientIds)
-                ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
+            // One orders query; the controlled ones are counted, not listed,
+            // for a reader without controlled-medicine access (EM-12).
+            [$controlled, $medications] = $this->scheduledOrders($clientIds)
                 ->with('client:id,first_name,last_name,site_id')
-                ->get();
-            $doses = app(ScheduledDoseStates::class)->dosesOn($medications, $date, $now);
+                ->get()
+                ->partition(fn (ClientMedication $order): bool => ! $includeControlled && (bool) $order->controlled_drug);
+            $doses = app(ScheduledDoseStates::class)->dosesOn($medications->concat($controlled), $date, $now);
+            // Counted only for a caller that asks (passes $hidden).
+            if (func_num_args() >= 6) {
+                $hidden = $this->hiddenControlledDoses($controlled, $doses, $clientIds, $date);
+            }
 
             $rows = [];
 
@@ -200,22 +208,37 @@ class MedsBoardPayloadService
      *
      * @param  array<int, int>  $clientIds
      */
-    public function controlledDoseCount(array $clientIds, Carbon $date, Carbon $now): int
+    /**
+     * The day's doses of controlled medicines left off the list for a reader
+     * without controlled-medicine access, and how many of them are overdue —
+     * counted, never named (EM-12), so the list reconciles with the badge.
+     *
+     * @param  Collection<int, ClientMedication>  $controlled
+     * @param  array<int, list<array<string, mixed>>>  $doses
+     * @param  array<int, int>  $clientIds
+     * @return array{total: int, overdue: int}
+     */
+    private function hiddenControlledDoses(Collection $controlled, array $doses, array $clientIds, Carbon $date): array
     {
-        if (empty($clientIds)) {
-            return 0;
+        $hidden = ['total' => 0, 'overdue' => 0];
+        if ($controlled->isEmpty()) {
+            return $hidden;
         }
 
-        try {
-            $orders = $this->scheduledOrders($clientIds)->where('controlled_drug', true)->get();
-
-            return collect(app(ScheduledDoseStates::class)->dosesOn($orders, $date, $now))
-                ->sum(fn (array $doses): int => count($doses));
-        } catch (\Throwable $e) {
-            report($e);
-
-            return 0;
+        // Records of every medicine (the board's own query leaves controlled
+        // ones out for this reader), to tell which hidden doses are overdue.
+        $records = $this->scheduleService->administrationsForWindow($clientIds, $date, $date);
+        foreach ($controlled as $order) {
+            foreach ($doses[(int) $order->id] ?? [] as $dose) {
+                $record = $records->get($this->scheduleService->slotKey((int) $order->client_id, (int) $order->id, $dose['due_at']));
+                $hidden['total']++;
+                if (ScheduledDoseStates::statusFor($dose, $record?->status) === 'overdue') {
+                    $hidden['overdue']++;
+                }
+            }
         }
+
+        return $hidden;
     }
 
     /**

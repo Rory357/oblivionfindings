@@ -19,15 +19,24 @@ use App\Services\Medication\RefusalEscalationPolicy;
 use App\Services\UserSiteAccessService;
 use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Console\Command;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Ramsey\Uuid\Uuid;
 
 class SendMedicationAlerts extends Command
 {
     protected $signature = 'emar:send-alerts';
 
     protected $description = 'Check for overdue medications, low stock, expiring competencies, and refusal clusters and send notifications';
+
+    /** @var array<string, Collection<int, MedicationRound>> rounds per Site and day, for this run */
+    private array $rounds = [];
+
+    /** @var array<string, bool> whether a round assignee may be told about a Site's (controlled) dose, for this run */
+    private array $recipients = [];
 
     public function handle(): int
     {
@@ -66,19 +75,21 @@ class SendMedicationAlerts extends Command
 
             $round = $this->roundForSlot($medication, $scheduledFor, $scheduleService);
             $staff = $round?->assignedTo;
-            if (! $staff || ! $this->canReceiveMedicationEvidence(
+            if (! $staff || ! ($this->recipients[$staff->id.'|'.$client->site_id.'|'.(int) $medication->controlled_drug] ??= $this->canReceiveMedicationEvidence(
                 $staff,
                 (int) $client->site_id,
                 (bool) $medication->controlled_drug,
-            )) {
+            ))) {
                 continue;
             }
 
-            // Once per overdue spell of a dose and person: the stored
-            // notification survives a deploy's cache clear; the cache key
-            // covers notifications sent before doses carried a key (a first
-            // spell only — a dose overdue again is told again).
-            if ($this->alreadyNotified($staff, MedicationOverdueNotification::class, ['dose_key' => $dose['spell_key']])) {
+            // Once per overdue spell of a dose and person: the notification's
+            // id is derived from both, so a primary-key lookup finds it after
+            // a deploy's cache clear; the cache key covers notifications sent
+            // before doses carried a key (a first spell only — a dose overdue
+            // again is told again).
+            $notificationId = Uuid::uuid5(Uuid::NAMESPACE_URL, "emar-overdue:{$staff->id}:{$dose['spell_key']}")->toString();
+            if (DatabaseNotification::query()->whereKey($notificationId)->exists()) {
                 continue;
             }
             $alertKey = sprintf(
@@ -93,13 +104,15 @@ class SendMedicationAlerts extends Command
 
             $clientName = trim(($client->first_name ?? '').' '.($client->last_name ?? ''));
 
-            $staff->notify(new MedicationOverdueNotification(
+            $notification = new MedicationOverdueNotification(
                 medication: $medication->name ?? 'Unknown medication',
                 clientName: $clientName !== '' ? $clientName : 'Unknown client',
-                scheduledTime: $scheduledFor->format('H:i'),
+                scheduledTime: OverdueDoseAlerts::dueLabel($scheduledFor, $now),
                 clientId: $client->id,
                 doseKey: $dose['spell_key'],
-            ));
+            );
+            $notification->id = $notificationId;
+            $staff->notify($notification);
             $count++;
         }
 
@@ -113,16 +126,18 @@ class SendMedicationAlerts extends Command
             return null;
         }
 
-        return MedicationRound::query()
+        // One query per Site and day for the run.
+        $rounds = $this->rounds[$client->site_id.'|'.$scheduledFor->toDateString()] ??= MedicationRound::query()
             ->whereDate('round_date', $scheduledFor->toDateString())
             ->whereNotNull('assigned_to')
-            ->whereNotNull('site_id')
             ->where('site_id', $client->site_id)
             ->with('assignedTo')
-            ->when($client->service_context_id, fn ($query) => $query->where(function ($scope) use ($client) {
-                $scope->whereNull('service_context_id')->orWhere('service_context_id', $client->service_context_id);
-            }))
-            ->get()
+            ->get();
+
+        return $rounds
+            ->filter(fn (MedicationRound $round): bool => ! $client->service_context_id
+                || $round->service_context_id === null
+                || (int) $round->service_context_id === (int) $client->service_context_id)
             ->first(function (MedicationRound $round) use ($scheduledFor, $scheduleService) {
                 if (! $round->scheduled_time) {
                     return false;

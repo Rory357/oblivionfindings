@@ -54,8 +54,13 @@ class MyTasksController extends Controller
 {
     private array $unavailableSections = [];
 
-    /** Controlled doses in My Day's window not listed for this reader (EM-12). */
-    private int $hiddenControlledDoses = 0;
+    /**
+     * Controlled doses in My Day's window not listed for this reader, and how
+     * many of them are overdue (EM-12).
+     *
+     * @var array{total: int, overdue: int}
+     */
+    private array $hiddenControlledDoses = ['total' => 0, 'overdue' => 0];
 
     private const PRIORITY_ORDER = [
         'critical' => 0,
@@ -193,7 +198,8 @@ class MyTasksController extends Controller
             'medications_due' => $medicationsDue,
             // Controlled doses in the same window left off the list for a
             // reader without controlled-medicine access (EM-12).
-            'medications_hidden_controlled' => $this->hiddenControlledDoses,
+            'medications_hidden_controlled' => $this->hiddenControlledDoses['total'],
+            'medications_hidden_controlled_overdue' => $this->hiddenControlledDoses['overdue'],
             'timesheets' => $timesheets,
             'incidents' => $incidents,
             'tasks' => $tasks,
@@ -825,35 +831,40 @@ class MyTasksController extends Controller
 
             // Verified orders, and orders whose change waits for the order
             // check (shown, not recordable until checked).
-            $scheduledOrders = fn () => ClientMedication::whereIn('client_id', $clientIds)
+            // One orders query; the controlled ones are counted, not listed,
+            // for a reader without controlled-medicine access (EM-12).
+            [$controlled, $medications] = ClientMedication::whereIn('client_id', $clientIds)
                 ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
                 ->where('is_prn', false)
                 ->where(function ($query) {
                     $query->whereNotNull('dose_times')
                         ->orWhereNotNull('frequency');
-                });
-            $medications = $scheduledOrders()
-                ->when(! $canAccessControlled, fn ($query) => $query->where('controlled_drug', false))
+                })
                 ->with('client:id,first_name,last_name')
-                ->get();
-            $doseStates = app(ScheduledDoseStates::class);
-            $doses = $doseStates->dosesBetween($medications, $windowStart, $windowEnd, $now);
-
-            // EM-12: the controlled doses left off the list for this reader,
-            // counted (never named) so the list reconciles with the badge.
-            if (! $canAccessControlled) {
-                $this->hiddenControlledDoses = collect($doseStates->dosesBetween(
-                    $scheduledOrders()->where('controlled_drug', true)->get(),
-                    $windowStart,
-                    $windowEnd,
-                    $now,
-                ))->flatten(1)->filter(fn (array $dose): bool => $dose['due_at']->betweenIncluded($windowStart, $windowEnd))->count();
-            }
+                ->get()
+                ->partition(fn (ClientMedication $order): bool => ! $canAccessControlled && (bool) $order->controlled_drug);
+            $doses = app(ScheduledDoseStates::class)->dosesBetween($medications->concat($controlled), $windowStart, $windowEnd, $now);
 
             // One administration query for the whole window, matched in memory
             // per slot — replaces the old per-dose-slot query (an N+1 that
             // re-ran every 60s with the /my-day live refresh).
             $administrations = $scheduleService->administrationsForWindow($clientIds, $windowStart, $windowEnd);
+
+            // EM-12: the controlled doses in the window left off the list for
+            // this reader — counted, never named, with how many are overdue —
+            // so the list reconciles with the badge.
+            foreach ($controlled as $order) {
+                foreach ($doses[(int) $order->id] ?? [] as $dose) {
+                    if (! $dose['due_at']->betweenIncluded($windowStart, $windowEnd)) {
+                        continue;
+                    }
+                    $this->hiddenControlledDoses['total']++;
+                    $record = $administrations->get($scheduleService->slotKey((int) $order->client_id, (int) $order->id, $dose['due_at']));
+                    if (ScheduledDoseStates::statusFor($dose, $record?->status) === 'overdue') {
+                        $this->hiddenControlledDoses['overdue']++;
+                    }
+                }
+            }
 
             $result = [];
 

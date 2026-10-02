@@ -100,13 +100,11 @@ class WorkerMedsController extends Controller
         $dayAdministrations = $this->boardPayload->administrationsForDay($assignedClientIds, $date, $includeControlled);
         $bySlot = $this->boardPayload->slotIndex($dayAdministrations);
 
-        $schedule = $this->boardPayload->scheduleForDate($assignedClientIds, $date, $now, $bySlot, $includeControlled);
         // EM-12: controlled doses are left off the list for a reader without
-        // controlled-medicine access; the list says how many, naming none, so
-        // it reconciles with the badge (which counts them, P09 Q6).
-        $hiddenControlled = $includeControlled
-            ? 0
-            : $this->boardPayload->controlledDoseCount($assignedClientIds, $date, $now);
+        // controlled-medicine access; the list says how many (and how many of
+        // those are overdue), naming none, so it reconciles with the badge
+        // (which counts them, P09 Q6).
+        $schedule = $this->boardPayload->scheduleForDate($assignedClientIds, $date, $now, $bySlot, $includeControlled, $hiddenControlled);
         // The MAR link: only charts this worker may open (a lead's fallback
         // board can include people outside the frontline person rule).
         $marLinks = app(MarLinkService::class);
@@ -190,7 +188,8 @@ class WorkerMedsController extends Controller
             // People on their shift whose medicines show once they're clocked
             // in to it (the person rule), and controlled doses not shown.
             'people_after_clock_in' => $peopleAfterClockIn,
-            'hidden_controlled_doses' => $hiddenControlled,
+            'hidden_controlled_doses' => $hiddenControlled['total'],
+            'hidden_controlled_overdue' => $hiddenControlled['overdue'],
         ]);
     }
 

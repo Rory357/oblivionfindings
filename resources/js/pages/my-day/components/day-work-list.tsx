@@ -36,10 +36,16 @@ interface Props {
     onAddNote: (clientId: number) => void;
     /** Controlled doses left off the list for this reader (EM-12). */
     hiddenControlled?: number;
+    /** …and how many of those are overdue. */
+    hiddenControlledOverdue?: number;
 }
 
 export function DayWorkList(p: Props) {
     const groups = groupWork(p.items, p.now);
+    const hiddenNote = hiddenControlledCaption(
+        p.hiddenControlled ?? 0,
+        p.hiddenControlledOverdue ?? 0,
+    );
     const entry = (item: StreamItem): CalendarWorkEntry => {
         const done = workIsDone(item);
         const at = workDueAt(item);
@@ -258,10 +264,8 @@ export function DayWorkList(p: Props) {
                         onAddAt={p.canAdd ? p.onAdd : undefined}
                         onAddAnytime={p.canAdd ? () => p.onAdd() : undefined}
                     />
-                    {hiddenControlledCaption(p.hiddenControlled ?? 0) ? (
-                        <p className="text-caption">
-                            {hiddenControlledCaption(p.hiddenControlled ?? 0)}
-                        </p>
+                    {hiddenNote ? (
+                        <p className="text-caption">{hiddenNote}</p>
                     ) : null}
                     {groups.followedUp.length > 0 && (
                         <Card

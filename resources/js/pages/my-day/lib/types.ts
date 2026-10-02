@@ -506,6 +506,8 @@ export interface MyDayPageProps {
     medications_due: MyDayMedDue[];
     /** Controlled doses in the same window not listed for this reader. */
     medications_hidden_controlled?: number;
+    /** …and how many of those are overdue (counted by the badge). */
+    medications_hidden_controlled_overdue?: number;
     timesheets: MyDayTimesheet[];
     incidents: MyDayIncident[];
     tasks: MyDayTaskFollowup[];

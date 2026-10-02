@@ -3,9 +3,11 @@
 namespace App\Services\Medication\DoseSlots;
 
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Services\MarScheduleService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
@@ -19,9 +21,10 @@ use Illuminate\Support\Collection;
  * administration alerts are suppressed have none.
  *
  * Looks back over yesterday and today (NZ days), as the overdue job always
- * has: an omission from earlier than that is the audit's, not an alert's.
- * Only days the projection holds count (DoseSlotCoverage) — a day before it
- * began isn't guessed at from the order as it is now.
+ * has. Only days the projection holds count (DoseSlotCoverage) — a day
+ * before it began isn't guessed at from the order as it is now. A dose that
+ * has aged out of the lookback is not thereby settled: settled() needs
+ * positive evidence.
  */
 final class OverdueDoses
 {
@@ -41,65 +44,16 @@ final class OverdueDoses
             return collect();
         }
 
-        $now = $now->copy()->timezone($this->schedule->workerTimezone());
-
-        return $this->between($now->copy()->subDay()->startOfDay(), $now, $clientIds, null);
-    }
-
-    /**
-     * Of these doses (keys), the ones still overdue now, whatever their day —
-     * so an alert for a dose that has aged out of the lookback stays open
-     * until the dose is recorded or no longer owed.
-     *
-     * @param  list<string>  $keys
-     * @return list<string>
-     */
-    public function stillOverdue(array $keys, Carbon $now): array
-    {
-        $doses = collect($keys)
-            ->map(fn (string $key): ?array => preg_match('/^(\d+)@(.+)$/', $key, $parts) === 1
-                ? ['order_id' => (int) $parts[1], 'due_at' => Carbon::parse($parts[2])]
-                : null)
-            ->filter();
-        if ($doses->isEmpty()) {
-            return [];
-        }
-
         $timezone = $this->schedule->workerTimezone();
-        $from = $doses->min(fn (array $dose): Carbon => $dose['due_at'])->copy()->timezone($timezone)->startOfDay();
-        $overdue = $this->between($from, $now->copy()->timezone($timezone), null, $doses->pluck('order_id')->unique()->values()->all())
-            ->pluck('key')
-            ->all();
-
-        return array_values(array_intersect($keys, $overdue));
-    }
-
-    /**
-     * @param  list<int>|null  $clientIds
-     * @param  list<int>|null  $orderIds
-     * @return Collection<int, array{key: string, client_id: int, site_id: int|null, order: ClientMedication, due_at: Carbon, window_ends_at: Carbon, state: string}>
-     */
-    private function between(Carbon $from, Carbon $now, ?array $clientIds, ?array $orderIds): Collection
-    {
-        $timezone = $this->schedule->workerTimezone();
-        // Only days the projection holds.
+        $now = $now->copy()->timezone($timezone);
+        $from = $now->copy()->subDay()->startOfDay();
         $held = Carbon::parse($this->coverage->availableFrom(CarbonImmutable::instance($now)), $timezone)->startOfDay();
         if ($held->greaterThan($from)) {
             $from = $held;
         }
 
-        $orders = ClientMedication::query()
-            ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
-            ->where('is_prn', false)
-            ->where(function ($query) {
-                $query->whereNotNull('dose_times')
-                    ->orWhereNotNull('frequency');
-            })
+        $orders = $this->owedOrders()
             ->when($clientIds !== null, fn ($query) => $query->whereIn('client_id', $clientIds))
-            ->when($orderIds !== null, fn ($query) => $query->whereKey($orderIds))
-            ->whereHas('client', fn ($client) => $client
-                ->whereNotNull('site_id')
-                ->where(fn ($alerts) => $alerts->whereNull('suppress_med_admin_alerts')->orWhere('suppress_med_admin_alerts', false)))
             ->with('client:id,first_name,last_name,site_id,service_context_id,suppress_med_admin_alerts')
             ->get();
         if ($orders->isEmpty()) {
@@ -136,9 +90,95 @@ final class OverdueDoses
         return $overdue->sortBy(fn (array $dose): string => $dose['due_at']->toIso8601String())->values();
     }
 
+    /**
+     * Of these doses (keys), the ones with positive evidence that they are
+     * no longer overdue, whatever their day: a record (given, refused,
+     * withheld or missed), the order no longer owed (ceased, paused,
+     * superseded, alerts suppressed for the person), or the dose's own state
+     * no longer overdue (away, self-managed, waiting for the order check).
+     * A dose that has only aged out of the lookback, or that can no longer
+     * be found, is not settled.
+     *
+     * @param  list<string>  $keys
+     * @return list<string>
+     */
+    public function settled(array $keys, Carbon $now): array
+    {
+        $doses = collect($keys)
+            ->unique()
+            ->mapWithKeys(fn (string $key): array => preg_match('/^(\d+)@(.+)$/', $key, $parts) === 1
+                ? [$key => ['order_id' => (int) $parts[1], 'due_at' => Carbon::parse($parts[2])->utc()]]
+                : []);
+        if ($doses->isEmpty()) {
+            return [];
+        }
+
+        $timezone = $this->schedule->workerTimezone();
+        $orderIds = $doses->pluck('order_id')->unique()->values()->all();
+        $owed = $this->owedOrders()->whereKey($orderIds)->with('client:id,site_id')->get()->keyBy('id');
+
+        // Records at each dose's slot (the same UTC minute).
+        $recorded = ClientMedicationAdministration::query()
+            ->effectiveClinicalEvidence()
+            ->whereIn('client_medication_id', $orderIds)
+            ->whereIn('status', ScheduledDoseStates::RECORDED_STATUSES)
+            ->whereBetween('scheduled_for', [
+                $doses->min(fn (array $dose): Carbon => $dose['due_at'])->copy()->subMinute(),
+                $doses->max(fn (array $dose): Carbon => $dose['due_at'])->copy()->addMinute(),
+            ])
+            ->get(['client_medication_id', 'scheduled_for'])
+            ->map(fn (ClientMedicationAdministration $record): string => self::key(
+                (int) $record->client_medication_id,
+                Carbon::parse($record->getRawOriginal('scheduled_for'), 'UTC'),
+            ))
+            ->flip();
+
+        // Each owed dose's own state, on its NZ day.
+        $states = [];
+        foreach ($doses->groupBy(fn (array $dose): string => $dose['due_at']->copy()->timezone($timezone)->toDateString()) as $day => $onDay) {
+            $orders = $owed->only($onDay->pluck('order_id')->unique()->all());
+            if ($orders->isEmpty()) {
+                continue;
+            }
+            foreach ($this->states->dosesOn($orders, Carbon::parse($day, $timezone), $now) as $orderId => $orderDoses) {
+                foreach ($orderDoses as $dose) {
+                    $states[self::key((int) $orderId, $dose['due_at'])] = $dose;
+                }
+            }
+        }
+
+        return $doses
+            ->filter(fn (array $dose, string $key): bool => ! $owed->has($dose['order_id'])
+                || $recorded->has($key)
+                || (isset($states[$key]) && ScheduledDoseStates::statusFor($states[$key], null) !== 'overdue'))
+            ->keys()
+            ->values()
+            ->all();
+    }
+
     /** A dose's identity across runs: its order and due instant (UTC minute). */
     public static function key(int $orderId, Carbon $dueAt): string
     {
         return $orderId.'@'.$dueAt->copy()->utc()->format('Y-m-d\TH:i\Z');
+    }
+
+    /**
+     * Scheduled orders that owe doses: verified, or waiting for the order
+     * check; for people at a Site whose alerts aren't suppressed.
+     *
+     * @return Builder<ClientMedication>
+     */
+    private function owedOrders(): Builder
+    {
+        return ClientMedication::query()
+            ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
+            ->where('is_prn', false)
+            ->where(function ($query) {
+                $query->whereNotNull('dose_times')
+                    ->orWhereNotNull('frequency');
+            })
+            ->whereHas('client', fn ($client) => $client
+                ->whereNotNull('site_id')
+                ->where(fn ($alerts) => $alerts->whereNull('suppress_med_admin_alerts')->orWhere('suppress_med_admin_alerts', false)));
     }
 }

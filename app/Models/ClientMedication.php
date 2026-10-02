@@ -13,7 +13,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\DB;
 
 class ClientMedication extends Model
 {
@@ -194,7 +193,7 @@ class ClientMedication extends Model
             // C6f: an order change can mean a dose is no longer owed (ceased,
             // waiting for the order check, a new version); once it commits,
             // the person's overdue alerts for such doses resolve.
-            DB::afterCommit(static fn () => app(OverdueDoseAlerts::class)->afterDoseChange((int) $medication->client_id));
+            OverdueDoseAlerts::queueAfterCommit((int) $medication->client_id);
         });
 
         static::deleting(function (): never {

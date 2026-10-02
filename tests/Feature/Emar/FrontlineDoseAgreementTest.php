@@ -103,7 +103,9 @@ class FrontlineDoseAgreementTest extends TestCase
         $this->assertSame(5, $myDay->inertiaProps('stats.meds_due'));   // the dose waiting for the check isn't counted
         // A controlled-medicine reader sees every dose: nothing is left out.
         $this->assertSame(0, $myDay->inertiaProps('medications_hidden_controlled'));
+        $this->assertSame(0, $myDay->inertiaProps('medications_hidden_controlled_overdue'));
         $this->assertSame(0, $board->inertiaProps('hidden_controlled_doses'));
+        $this->assertSame(0, $board->inertiaProps('hidden_controlled_overdue'));
         $paracetamol = collect($myDay->inertiaProps('medications_due'))->firstWhere('medication_name', 'Paracetamol');
         $this->assertFalse($paracetamol['can_give']);
         $this->assertFalse($paracetamol['can_record']);
@@ -130,26 +132,37 @@ class FrontlineDoseAgreementTest extends TestCase
 
     public function test_my_day_names_controlled_doses_only_to_readers_who_may_see_them(): void
     {
+        // A second controlled medicine, due later in the shift (12:00): hidden,
+        // but not overdue — so the hidden total and the hidden overdue differ.
+        $this->at('2026-06-15 00:00');
+        $this->orders['Oxycodone'] = $this->order('Oxycodone', ['12:00'], ['controlled_drug' => true]);
         $worker = $this->workerOnShift(deny: ['medications.controlled.view', 'medications.controlled.record']);
         $this->at('2026-06-15 09:30');
 
         $myDay = $this->actingAs($worker)->get('/my-day')->assertOk();
         $names = collect($myDay->inertiaProps('medications_due'))->pluck('medication_name');
         $this->assertNotContains('Morphine', $names->all());
+        $this->assertNotContains('Oxycodone', $names->all());
         $this->assertContains('Metformin', $names->all());
         // Not named, but counted: the badge counts every overdue dose (P09 Q6) —
         // Metformin, Vitamin D (not recorded here) and Morphine.
-        $this->assertSame(3, $myDay->inertiaProps('auth.can.medications.overdueTodayCount'));
+        $badge = $myDay->inertiaProps('auth.can.medications.overdueTodayCount');
+        $this->assertSame(3, $badge);
         $this->assertSame(2, $myDay->inertiaProps('stats.meds_overdue'));
-        // …and the list says how many controlled doses it leaves out, so the
-        // two reconcile: 2 listed overdue + 1 not shown = the badge's 3.
-        $this->assertSame(1, $myDay->inertiaProps('medications_hidden_controlled'));
+        // The list says what it leaves out: 2 controlled doses (Morphine 08:00,
+        // Oxycodone 12:00), 1 of them overdue — 2 listed overdue + 1 hidden
+        // overdue = the badge.
+        $this->assertSame(2, $myDay->inertiaProps('medications_hidden_controlled'));
+        $this->assertSame(1, $myDay->inertiaProps('medications_hidden_controlled_overdue'));
+        $this->assertSame($badge, $myDay->inertiaProps('stats.meds_overdue') + $myDay->inertiaProps('medications_hidden_controlled_overdue'));
 
         $board = $this->actingAs($worker)->get('/meds/today')->assertOk();
         $rows = collect($board->inertiaProps('schedule'));
         $this->assertNotContains('Morphine', $rows->pluck('medication_name')->all());
-        $this->assertSame(1, $board->inertiaProps('hidden_controlled_doses'));
-        $this->assertSame(3, $rows->where('status', 'overdue')->count() + $board->inertiaProps('hidden_controlled_doses'));
+        $this->assertNotContains('Oxycodone', $rows->pluck('medication_name')->all());
+        $this->assertSame(2, $board->inertiaProps('hidden_controlled_doses'));
+        $this->assertSame(1, $board->inertiaProps('hidden_controlled_overdue'));
+        $this->assertSame($badge, $rows->where('status', 'overdue')->count() + $board->inertiaProps('hidden_controlled_overdue'));
     }
 
     public function test_a_dose_recorded_as_missed_reads_missed_recorded_and_is_never_overdue(): void
