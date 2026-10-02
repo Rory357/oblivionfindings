@@ -58,7 +58,9 @@ class ProfileController extends Controller
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
             'profile' => [
-                'phone' => $user->cellphone ?? $employeeProfile?->work_phone,
+                // Personal mobile only. Never fall back to the HR work phone,
+                // which would present a work number as the personal one.
+                'phone' => $user->cellphone,
                 'jobTitle' => $employeeProfile?->position_title,
                 'timezone' => $user->timezone ?? 'Pacific/Auckland',
                 'locale' => $user->locale ?? 'en',
@@ -163,14 +165,13 @@ class ProfileController extends Controller
                 return;
             }
 
+            // The phone here is the user's personal mobile (users.cellphone).
+            // work_phone is HR-managed and shown to every staff member in the
+            // directories, so this form never writes it.
             $profileAttributes = [
                 'work_email' => $user->email,
                 'updated_by' => $user->id,
             ];
-
-            if ($request->phoneWasSubmitted()) {
-                $profileAttributes['work_phone'] = $validated['phone'];
-            }
 
             if ($request->jobTitleWasSubmitted()) {
                 $profileAttributes['position_title'] = $validated['job_title'];

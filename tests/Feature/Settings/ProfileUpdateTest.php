@@ -91,9 +91,10 @@ test('self service employment fields update only the current canonical HR profil
 
     expect($profile->refresh())
         ->position_title->toBe('Senior Support Worker')
-        ->work_phone->toBe('021 NEW')
+        ->work_phone->toBe('0800 OLD')
         ->work_email->toBe('updated.worker@example.test')
         ->updated_by->toBe($user->id);
+    expect($user->refresh()->cellphone)->toBe('021 NEW');
     expect($compatibilityProfile->refresh())
         ->job_title->toBe('Compatibility title')
         ->work_phone->toBe('0800 COMPAT');
