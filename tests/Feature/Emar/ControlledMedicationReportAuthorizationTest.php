@@ -10,6 +10,7 @@ use App\Models\MedicationDashboardAlert;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
@@ -19,6 +20,13 @@ use Tests\TestCase;
 class ControlledMedicationReportAuthorizationTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
 
     protected function setUp(): void
     {
@@ -104,7 +112,12 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
             'site_id' => $site->id,
             'status' => 'active',
         ]);
+        // Scheduled 08:00 doses, entered at the start of a fixed NZ day and
+        // given: the report's dose numbers are the scheduled doses (C6h).
+        Carbon::setTestNow(Carbon::parse('2026-06-15 00:00', 'Pacific/Auckland')->utc());
+        $scheduled = ['dose_times' => ['08:00'], 'frequency' => 'Daily', 'is_prn' => false, 'start_date' => '2026-06-01'];
         $controlledMedication = ClientMedication::factory()->create([
+            ...$scheduled,
             'client_id' => $client->id,
             'name' => 'Controlled MAR fixture',
             'controlled_drug' => true,
@@ -114,6 +127,7 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
             'end_date' => null,
         ]);
         $ordinaryMedication = ClientMedication::factory()->create([
+            ...$scheduled,
             'client_id' => $client->id,
             'name' => 'Ordinary MAR fixture',
             'controlled_drug' => false,
@@ -126,8 +140,8 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
             'client_id' => $client->id,
             'client_medication_id' => $controlledMedication->id,
             'administered_by' => $actor->id,
-            'administered_at' => now(),
-            'scheduled_for' => now(),
+            'administered_at' => Carbon::parse('2026-06-15 08:05', 'Pacific/Auckland')->utc(),
+            'scheduled_for' => Carbon::parse('2026-06-15 08:00', 'Pacific/Auckland')->utc(),
             'status' => 'given',
             'dose_given' => '5 mg',
         ]);
@@ -135,8 +149,8 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
             'client_id' => $client->id,
             'client_medication_id' => $ordinaryMedication->id,
             'administered_by' => $actor->id,
-            'administered_at' => now(),
-            'scheduled_for' => now(),
+            'administered_at' => Carbon::parse('2026-06-15 08:05', 'Pacific/Auckland')->utc(),
+            'scheduled_for' => Carbon::parse('2026-06-15 08:00', 'Pacific/Auckland')->utc(),
             'status' => 'given',
             'dose_given' => '500 mg',
         ]);
@@ -166,6 +180,7 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
             'status' => 'active',
         ]);
 
+        Carbon::setTestNow(Carbon::parse('2026-06-15 10:00', 'Pacific/Auckland')->utc());
         $this->actingAs($actor)
             ->get(route('reports.medications'))
             ->assertOk()
@@ -184,8 +199,9 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
                 ->component('emar/Reports')
                 ->where('can_view_controlled', false)
                 ->where('can_record_controlled', false)
-                ->where('adminSummary.total', 1)
-                ->where('adminSummary.given', 1)
+                // P09 Q6: dose numbers count the controlled dose too; nothing names it.
+                ->where('adminSummary.total', 2)
+                ->where('adminSummary.given', 2)
                 ->has('cdMedications', 0)
                 ->where('controlledDrugs.administrations', 0)
                 ->where('controlledDrugs.destructions', 0)

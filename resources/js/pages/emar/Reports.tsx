@@ -56,19 +56,29 @@ import {
 } from 'recharts';
 
 type ClientOption = { id: number; name: string };
+/**
+ * Scheduled doses due in the period (C6h, the dose-slot projection's P09
+ * numbers): `total` is the doses due; each was given, refused, withheld,
+ * recorded missed or not recorded. A rate is null — "Not applicable" — when
+ * nothing was due.
+ */
 type AdminSummary = {
     total: number;
     given: number;
     refused: number;
     withheld: number;
     missed: number;
-    compliance_rate: number;
+    not_recorded: number;
+    away?: number;
+    recorded_late?: number;
+    compliance_rate: number | null;
 };
 type DailyAdmin = {
     date: string;
     given: number;
     refused: number;
     missed: number;
+    not_recorded: number;
     total: number;
 };
 type ClientBreakdownRow = {
@@ -79,8 +89,12 @@ type ClientBreakdownRow = {
     refused: number;
     withheld: number;
     missed: number;
-    compliance: number;
+    not_recorded: number;
+    compliance: number | null;
 };
+/** A rate, or "Not applicable" when nothing was due. */
+const rate = (value: number | null): string =>
+    value === null ? 'Not applicable' : `${value}%`;
 type ReasonBreakdown = {
     codes: { code: string; class: string; count: number }[];
     by_class: { refusal: number; clinical: number; omission: number };
@@ -176,6 +190,8 @@ type Props = {
     site_brand_colour: string | null;
     can_view_controlled: boolean;
     can_record_controlled: boolean;
+    /** "Not available before …" when the period starts before the dose record. */
+    dose_notice?: string | null;
 };
 
 type Modal =
@@ -225,6 +241,7 @@ export default function Reports(props: Props) {
         site_brand_colour: brandColour,
         can_view_controlled: canViewControlled,
         can_record_controlled: canRecordControlled,
+        dose_notice: doseNotice = null,
     } = props;
     const [tab, setTab] = useState('administration');
     const [modal, setModal] = useState<Modal>(null);
@@ -315,11 +332,13 @@ export default function Reports(props: Props) {
     const openRowCtx = (e: React.MouseEvent, r: ClientBreakdownRow) => {
         e.preventDefault();
         const band =
-            r.compliance >= 95
-                ? 'success'
-                : r.compliance >= 85
-                  ? 'warning'
-                  : 'critical';
+            r.compliance === null
+                ? 'neutral'
+                : r.compliance >= 95
+                  ? 'success'
+                  : r.compliance >= 85
+                    ? 'warning'
+                    : 'critical';
         const items: ShiftCtxItem[] = [
             {
                 icon: <Eye className="h-3.5 w-3.5" />,
@@ -352,10 +371,10 @@ export default function Reports(props: Props) {
         setCtx({
             x: e.clientX,
             y: e.clientY,
-            tag: `${r.compliance}%`,
+            tag: rate(r.compliance),
             tagBg: `var(--status-${band}-bg)`,
             tagColor: `var(--status-${band})`,
-            meta: `${r.client_name} · ${r.total} dose${r.total === 1 ? '' : 's'}`,
+            meta: `${r.client_name} · ${r.total} dose${r.total === 1 ? '' : 's'} due`,
             items,
         });
     };
@@ -420,8 +439,8 @@ export default function Reports(props: Props) {
     ];
 
     const heroStats: PageHeroStat[] = [
-        { label: 'Compliance', value: `${adminSummary.compliance_rate}%` },
-        { label: 'Doses recorded', value: adminSummary.given },
+        { label: 'Compliance', value: rate(adminSummary.compliance_rate) },
+        { label: 'Doses given', value: adminSummary.given },
         {
             label: 'Open errors',
             value: errorSummary.open,
@@ -481,7 +500,7 @@ export default function Reports(props: Props) {
                             </span>
                         </span>
                     }
-                    description={`${adminSummary.total} doses recorded · ${adminSummary.compliance_rate}% compliance · ${adminSummary.missed} missed / ${adminSummary.refused} refused · ${canViewControlled ? `${controlledDrugs.discrepancies} CD variance${controlledDrugs.discrepancies === 1 ? '' : 's'} and ` : ''}${errorSummary.open} open error${errorSummary.open === 1 ? '' : 's'}.`}
+                    description={`${adminSummary.total} doses due${adminSummary.compliance_rate === null ? '' : ` · ${adminSummary.compliance_rate}% given`} · ${adminSummary.not_recorded} not recorded / ${adminSummary.missed} missed / ${adminSummary.refused} refused · ${canViewControlled ? `${controlledDrugs.discrepancies} CD variance${controlledDrugs.discrepancies === 1 ? '' : 's'} and ` : ''}${errorSummary.open} open error${errorSummary.open === 1 ? '' : 's'}.`}
                     stats={heroStats}
                     actions={
                         <>
@@ -642,10 +661,18 @@ export default function Reports(props: Props) {
                 {tab === 'administration' && (
                     <Panel
                         title="Administration summary"
-                        subtitle="Doses recorded across the period"
+                        subtitle="Scheduled doses due across the period, by the NZ day each was due"
                         exportHref={exportUrl('administration')}
                     >
-                        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                        {doseNotice ? (
+                            <p className="text-caption">
+                                Dose numbers{' '}
+                                {doseNotice.charAt(0).toLowerCase() +
+                                    doseNotice.slice(1)}{' '}
+                                — the dose record starts then.
+                            </p>
+                        ) : null}
+                        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
                             <OpsStatCard
                                 label="Given"
                                 value={adminSummary.given}
@@ -671,8 +698,14 @@ export default function Reports(props: Props) {
                                 color="red"
                             />
                             <OpsStatCard
+                                label="Not recorded"
+                                value={adminSummary.not_recorded}
+                                icon={AlertOctagon}
+                                color="red"
+                            />
+                            <OpsStatCard
                                 label="Compliance"
-                                value={`${adminSummary.compliance_rate}%`}
+                                value={rate(adminSummary.compliance_rate)}
                                 icon={Award}
                                 color="indigo"
                             />
@@ -724,22 +757,32 @@ export default function Reports(props: Props) {
                                         fill="none"
                                         strokeWidth={2}
                                     />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="not_recorded"
+                                        name="not recorded"
+                                        stroke={OPS_COLORS.danger}
+                                        strokeDasharray="4 3"
+                                        fill="none"
+                                        strokeWidth={2}
+                                    />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </ChartCard>
                         <SimpleTable
                             head={[
                                 'Resident',
-                                'Total',
+                                'Due',
                                 'Given',
                                 'Refused',
                                 'Missed',
+                                'Not recorded',
                                 'Compliance',
                                 '',
                             ]}
                             empty={
                                 clientBreakdown.length === 0
-                                    ? 'No administrations in this period.'
+                                    ? 'No scheduled doses in this period.'
                                     : null
                             }
                         >
@@ -767,8 +810,11 @@ export default function Reports(props: Props) {
                                     <td className="px-4 py-2.5 text-status-critical tabular-nums">
                                         {r.missed}
                                     </td>
+                                    <td className="px-4 py-2.5 text-status-critical tabular-nums">
+                                        {r.not_recorded}
+                                    </td>
                                     <td className="px-4 py-2.5 tabular-nums">
-                                        {r.compliance}%
+                                        {rate(r.compliance)}
                                     </td>
                                     <td className="px-4 py-2.5 text-right text-xs text-primary">
                                         View ›
@@ -1579,12 +1625,13 @@ function DrillDialog({
             {/* TODO(G-reasons): enrich with top refusal/withhold reason codes once clientBreakdown carries
                 per-client reason data — see docs/REPORTS_GAP_ANALYSIS.md (front-end-only scope today). */}
             <div className="rounded-lg border px-4">
-                <SummaryRow label="Total doses" value={row.total} />
+                <SummaryRow label="Doses due" value={row.total} />
                 <SummaryRow label="Given" value={row.given} />
                 <SummaryRow label="Refused" value={row.refused} />
                 <SummaryRow label="Withheld" value={row.withheld} />
                 <SummaryRow label="Missed" value={row.missed} />
-                <SummaryRow label="Compliance" value={`${row.compliance}%`} />
+                <SummaryRow label="Not recorded" value={row.not_recorded} />
+                <SummaryRow label="Compliance" value={rate(row.compliance)} />
             </div>
         </MedsWizardDialog>
     );

@@ -9,13 +9,15 @@ use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientIncident;
-use App\Models\ClientMedicationAdministration;
 use App\Models\ClientSupportPlan;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\ControlRoom\ControlRoomAlertAccessService;
+use App\Services\Medication\DoseSlots\DoseSlotProjection;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
@@ -83,7 +85,6 @@ class ComplianceMetricsService
     public function exceptionKpis(User $viewer, string $period): array
     {
         $days = $this->days($period);
-        $today = Carbon::today();
         $from = Carbon::now()->subDays($days);
         $medicationSiteIds = $this->medicationSiteIds($viewer);
         $canViewControlled = $viewer->canDo(
@@ -94,12 +95,12 @@ class ComplianceMetricsService
         $this->siteAccess->applyClientIncidentScope($incidents, $viewer, self::INCIDENT_SITE_BYPASS_PERMISSIONS);
         $openIncidents = (clone $incidents)->whereIn('status', ['submitted', 'reviewed'])->count();
 
-        $mar = $this->medicationAdministrationQuery($viewer, $medicationSiteIds);
-        $marExceptions = (clone $mar)
-            ->whereDate('scheduled_for', $today)
-            ->whereIn('status', ['missed', 'refused', 'withheld'])
-            ->count();
-        $marExceptionSeries = (clone $mar)->whereIn('status', ['missed', 'refused', 'withheld']);
+        // MAR exceptions (C6h): scheduled doses due on the NZ day that weren't
+        // given — refused, withheld, recorded missed, or not recorded at all —
+        // from the dose-slot projection, per NZ day for the sparkline.
+        $marByDay = $this->doseTotalsByDay($viewer, $medicationSiteIds, $days);
+        $marExceptionSeries = array_map(fn (array $t): int => $this->doseExceptions($t), array_values($marByDay));
+        $marExceptions = (int) end($marExceptionSeries);
 
         $bg = $this->scopeClientOwnedForSiteIds(
             ClientBreakGlassAccess::query(),
@@ -121,9 +122,9 @@ class ComplianceMetricsService
             ],
             [
                 'key' => 'mar', 'label' => 'MAR exceptions', 'value' => $marExceptions,
-                'caption' => 'Missed / refused / withheld today', 'href' => '/medications?tab=mar',
+                'caption' => 'Not given or not recorded today', 'href' => '/medications?tab=mar',
                 'tone' => $marExceptions > 0 ? 'warning' : 'success',
-                'spark' => $this->dailyCounts($marExceptionSeries, 'scheduled_for', $days),
+                'spark' => $marExceptionSeries,
             ],
             [
                 'key' => 'break_glass', 'label' => 'Break-glass', 'value' => $breakGlass,
@@ -290,7 +291,6 @@ class ComplianceMetricsService
     {
         $days = $this->days($period);
         $from = Carbon::now()->subDays($days);
-        $fromMar = Carbon::now()->subDays(min($days, 30));
         $medicationSiteIds = $this->medicationSiteIds($viewer);
 
         $incidents = ClientIncident::query();
@@ -304,22 +304,16 @@ class ComplianceMetricsService
             ->values()
             ->all();
 
-        $marTrend = $this->medicationAdministrationQuery($viewer, $medicationSiteIds)
-            ->where('scheduled_for', '>=', $fromMar)
-            ->selectRaw("DATE(scheduled_for) as d,
-                SUM(CASE WHEN status = 'given' THEN 1 ELSE 0 END) as given_total,
-                SUM(CASE WHEN status = 'missed' THEN 1 ELSE 0 END) as missed_total,
-                SUM(CASE WHEN status = 'refused' THEN 1 ELSE 0 END) as refused_total,
-                SUM(CASE WHEN status = 'withheld' THEN 1 ELSE 0 END) as withheld_total")
-            ->groupBy('d')
-            ->orderBy('d')
-            ->get()
-            ->map(fn ($r) => [
-                'date' => (string) $r->d,
-                'given' => (int) $r->given_total,
-                'missed' => (int) $r->missed_total,
-                'refused' => (int) $r->refused_total,
-                'withheld' => (int) $r->withheld_total,
+        // MAR outcomes (C6h): the scheduled doses due each NZ day, from the
+        // dose-slot projection — not recorded included.
+        $marTrend = collect($this->doseTotalsByDay($viewer, $medicationSiteIds, min($days, 30)))
+            ->map(fn (array $t, string $day): array => [
+                'date' => $day,
+                'given' => $t['given'],
+                'missed' => $t['missed'],
+                'refused' => $t['refused'],
+                'withheld' => $t['withheld'],
+                'not_recorded' => $t['not_recorded'],
             ])
             ->values()
             ->all();
@@ -363,20 +357,47 @@ class ComplianceMetricsService
         );
     }
 
-    /** @param array<int, int> $siteIds */
-    private function medicationAdministrationQuery(User $viewer, array $siteIds): Builder
+    /**
+     * The dose-slot projection's numbers (P09) for each of the last $days NZ
+     * days up to today, for the people at these Sites — every day present,
+     * zeros where none was due. Controlled doses count for every reader (P09
+     * Q6); nothing here names one.
+     *
+     * @param  array<int, int>  $siteIds
+     * @return array<string, array<string, int|float|null>> keyed by NZ day (Y-m-d), oldest first
+     */
+    private function doseTotalsByDay(User $viewer, array $siteIds, int $days): array
     {
-        $query = ClientMedicationAdministration::query()->effectiveClinicalEvidence();
-        $this->medicationScope->scopeCanonicalClientMedicationRows(
-            $query,
-            $siteIds,
-            allowNullMedication: false,
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $today = Carbon::now($timezone)->startOfDay();
+        $from = $today->copy()->subDays(max(1, $days) - 1)->toDateString();
+        $clientIds = $siteIds === [] ? [] : Client::query()->whereIn('site_id', $siteIds)->pluck('id')->all();
+        $byDay = app(DoseSlotProjection::class)->totalsBy(
+            'nz_date',
+            DoseSlotReaderScope::forAuthorisedClients($viewer, $clientIds),
+            $from,
+            $today->toDateString(),
+            CarbonImmutable::now(),
         );
-        if (! $viewer->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
-            $this->medicationScope->scopeWithoutControlledMedicationRows($query);
+
+        $empty = ['given' => 0, 'refused' => 0, 'withheld' => 0, 'missed' => 0, 'not_recorded' => 0, 'due' => 0];
+        $series = [];
+        for ($day = Carbon::parse($from); $day->toDateString() <= $today->toDateString(); $day->addDay()) {
+            $series[$day->toDateString()] = $byDay[$day->toDateString()] ?? $empty;
         }
 
-        return $query;
+        return $series;
+    }
+
+    /**
+     * A day's MAR exceptions: doses due that weren't given — refused,
+     * withheld, recorded missed, or not recorded.
+     *
+     * @param  array<string, int|float|null>  $totals
+     */
+    private function doseExceptions(array $totals): int
+    {
+        return (int) $totals['refused'] + (int) $totals['withheld'] + (int) $totals['missed'] + (int) $totals['not_recorded'];
     }
 
     /** @param array<int, int> $siteIds */

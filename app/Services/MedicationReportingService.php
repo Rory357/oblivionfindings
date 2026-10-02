@@ -57,6 +57,38 @@ class MedicationReportingService
         return $siteIds ?? [];
     }
 
+    /**
+     * NZ days (C6h): the UTC instants bounding the NZ days the period's ends
+     * fall on — the record columns are UTC, the report's days are New
+     * Zealand's.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function nzDays(Carbon $from, Carbon $to): array
+    {
+        return [
+            $from->copy()->timezone($this->timezone())->startOfDay()->utc(),
+            $to->copy()->timezone($this->timezone())->endOfDay()->utc(),
+        ];
+    }
+
+    /** An instant's NZ calendar day (Y-m-d). */
+    private function nzDate(?Carbon $instant): ?string
+    {
+        return $instant?->copy()->timezone($this->timezone())->toDateString();
+    }
+
+    /** An instant's NZ wall time (H:i). */
+    private function nzTime(?Carbon $instant): ?string
+    {
+        return $instant?->copy()->timezone($this->timezone())->format('H:i');
+    }
+
+    private function timezone(): string
+    {
+        return (string) config('app.worker_timezone', 'Pacific/Auckland');
+    }
+
     /** @return Builder<ClientMedicationAdministration> */
     private function effectiveAdministrationRows(?array $siteIds, bool $includeControlled = false): Builder
     {
@@ -97,7 +129,7 @@ class MedicationReportingService
                 'serviceContext:id,name',
                 'shift:id,starts_at,ends_at',
             ])
-            ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()]);
+            ->whereBetween('administered_at', $this->nzDays($dateFrom, $dateTo));
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -120,14 +152,14 @@ class MedicationReportingService
         return [
             'meta' => [
                 'generated_at' => now()->toIso8601String(),
-                'date_from' => $dateFrom->toDateString(),
-                'date_to' => $dateTo->toDateString(),
+                'date_from' => $this->nzDate($dateFrom),
+                'date_to' => $this->nzDate($dateTo),
                 'total_records' => $administrations->count(),
             ],
             'records' => $administrations->map(fn ($a) => [
                 'id' => $a->id,
-                'date' => $a->administered_at?->toDateString(),
-                'time' => $a->administered_at?->format('H:i'),
+                'date' => $this->nzDate($a->administered_at),
+                'time' => $this->nzTime($a->administered_at),
                 'client' => $a->client ? trim("{$a->client->first_name} {$a->client->last_name}") : 'Unknown',
                 'client_id' => $a->client_id,
                 'care_level' => $a->client?->care_level,
@@ -152,7 +184,7 @@ class MedicationReportingService
                     ? "{$a->blood_pressure_systolic}/{$a->blood_pressure_diastolic}"
                     : null,
                 'scheduled_for' => $a->scheduled_for?->toDateTimeString(),
-                'shift_date' => $a->shift?->starts_at?->toDateString(),
+                'shift_date' => $this->nzDate($a->shift?->starts_at),
                 'service_context' => $a->serviceContext?->name ?? 'N/A',
                 'late_minutes' => $a->late_minutes,
                 'early_minutes' => $a->early_minutes,
@@ -179,7 +211,7 @@ class MedicationReportingService
         $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->where('status', 'given')
-            ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
+            ->whereBetween('administered_at', $this->nzDays($dateFrom, $dateTo))
             ->with(['medication:id,name,max_per_day,client_id,pharmac_therapeutic_group,deleted_at', 'client:id,first_name,last_name,care_level']);
 
         if ($clientId) {
@@ -197,7 +229,7 @@ class MedicationReportingService
 
         $daysInRange = max(
             1,
-            $dateFrom->copy()->startOfDay()->diffInDays($dateTo->copy()->startOfDay()) + 1
+            (int) Carbon::parse($this->nzDate($dateFrom))->diffInDays(Carbon::parse($this->nzDate($dateTo))) + 1
         );
 
         $summaries = $grouped->map(function ($group) use ($daysInRange) {
@@ -215,14 +247,14 @@ class MedicationReportingService
                 'max_per_day' => $maxPerDay ?: null,
                 'total_administrations' => $count,
                 'average_per_day' => round($count / $daysInRange, 2),
-                'first_administration' => $group->first()->administered_at?->toDateString(),
-                'last_administration' => $group->last()->administered_at?->toDateString(),
-                'limit_exceeded_count' => $maxPerDay > 0 ? $group->filter(function ($a) use ($maxPerDay) {
-                    // Count administrations where this was over the daily limit
-                    $dayCount = $group->whereBetween('administered_at', [
-                        $a->administered_at->copy()->startOfDay(),
-                        $a->administered_at->copy()->endOfDay(),
-                    ])->count();
+                'first_administration' => $this->nzDate($group->first()->administered_at),
+                'last_administration' => $this->nzDate($group->last()->administered_at),
+                'limit_exceeded_count' => $maxPerDay > 0 ? $group->filter(function ($a) use ($maxPerDay, $group) {
+                    // Administrations on an NZ day over the daily limit (the
+                    // closure didn't have $group, so this threw whenever a
+                    // medicine had a daily limit).
+                    $day = $this->nzDate($a->administered_at);
+                    $dayCount = $group->filter(fn ($other) => $this->nzDate($other->administered_at) === $day)->count();
 
                     return $dayCount > $maxPerDay;
                 })->count() : 0,
@@ -231,8 +263,8 @@ class MedicationReportingService
 
         return [
             'meta' => [
-                'date_from' => $dateFrom->toDateString(),
-                'date_to' => $dateTo->toDateString(),
+                'date_from' => $this->nzDate($dateFrom),
+                'date_to' => $this->nzDate($dateTo),
                 'total_prn_administrations' => $administrations->count(),
             ],
             'summaries' => $summaries->toArray(),
@@ -258,7 +290,7 @@ class MedicationReportingService
         $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,dosage,is_prn,end_date,pharmac_therapeutic_group,pharmac_subgroup,deleted_at', 'administeredBy:id,name'])
             ->where('status', 'given')
-            ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
+            ->whereBetween('administered_at', $this->nzDays($dateFrom, $dateTo))
             ->whereHas('medication', function ($q) use ($type) {
                 $q->where('is_prn', false);
                 if ($type === 'short_course') {
@@ -275,8 +307,8 @@ class MedicationReportingService
         return [
             'meta' => [
                 'type' => $type,
-                'date_from' => $dateFrom->toDateString(),
-                'date_to' => $dateTo->toDateString(),
+                'date_from' => $this->nzDate($dateFrom),
+                'date_to' => $this->nzDate($dateTo),
                 'total_records' => $records->count(),
             ],
             'records' => $records->map(fn ($a) => [
@@ -300,7 +332,7 @@ class MedicationReportingService
 
         $observations = $this->effectiveAdministrationRows($siteIds, $includeControlled)
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group,deleted_at'])
-            ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
+            ->whereBetween('administered_at', $this->nzDays($dateFrom, $dateTo))
             ->where(function ($query) {
                 $query->whereNotNull('blood_glucose_level')
                     ->orWhereNotNull('pulse_bpm')
@@ -338,7 +370,7 @@ class MedicationReportingService
         }
         $inrs = $inrQuery
             ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group'])
-            ->whereBetween('tested_on', [$dateFrom->toDateString(), $dateTo->toDateString()])
+            ->whereBetween('tested_on', [$this->nzDate($dateFrom), $this->nzDate($dateTo)])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
             ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
             ->orderBy('tested_on')
@@ -361,8 +393,8 @@ class MedicationReportingService
 
         return [
             'meta' => [
-                'date_from' => $dateFrom->toDateString(),
-                'date_to' => $dateTo->toDateString(),
+                'date_from' => $this->nzDate($dateFrom),
+                'date_to' => $this->nzDate($dateTo),
                 'total_records' => $records->count(),
             ],
             'records' => $records->toArray(),
@@ -384,7 +416,7 @@ class MedicationReportingService
         $drivers = MedicationSyringeDriver::query()
             ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))
             ->with(['client:id,first_name,last_name,care_level', 'commencedBy:id,name', 'completedBy:id,name'])
-            ->whereBetween('commenced_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
+            ->whereBetween('commenced_at', $this->nzDays($dateFrom, $dateTo))
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
             ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
             ->orderBy('commenced_at')
@@ -408,8 +440,8 @@ class MedicationReportingService
 
         return [
             'meta' => [
-                'date_from' => $dateFrom->toDateString(),
-                'date_to' => $dateTo->toDateString(),
+                'date_from' => $this->nzDate($dateFrom),
+                'date_to' => $this->nzDate($dateTo),
                 'total_records' => $drivers->count(),
             ],
             'records' => $drivers->map(fn ($driver) => [
@@ -439,9 +471,9 @@ class MedicationReportingService
             ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))
             ->with('client:id,first_name,last_name,care_level,next_chart_review_date')
             ->where(function ($query) use ($dateFrom, $dateTo) {
-                $query->whereBetween('scheduled_date', [$dateFrom->toDateString(), $dateTo->toDateString()])
-                    ->orWhereBetween('completed_date', [$dateFrom->toDateString(), $dateTo->toDateString()])
-                    ->orWhereBetween('next_review_date', [$dateFrom->toDateString(), $dateTo->toDateString()]);
+                $query->whereBetween('scheduled_date', [$this->nzDate($dateFrom), $this->nzDate($dateTo)])
+                    ->orWhereBetween('completed_date', [$this->nzDate($dateFrom), $this->nzDate($dateTo)])
+                    ->orWhereBetween('next_review_date', [$this->nzDate($dateFrom), $this->nzDate($dateTo)]);
             })
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
             ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
@@ -450,8 +482,8 @@ class MedicationReportingService
 
         return [
             'meta' => [
-                'date_from' => $dateFrom->toDateString(),
-                'date_to' => $dateTo->toDateString(),
+                'date_from' => $this->nzDate($dateFrom),
+                'date_to' => $this->nzDate($dateTo),
                 'total_records' => $reviews->count(),
             ],
             'records' => $reviews->map(fn ($review) => [
@@ -473,7 +505,7 @@ class MedicationReportingService
     private function getPrnDailyBreakdown(Collection $administrations): array
     {
         return $administrations
-            ->groupBy(fn ($a) => $a->administered_at?->toDateString() ?? 'unknown')
+            ->groupBy(fn ($a) => $this->nzDate($a->administered_at) ?? 'unknown')
             ->map(fn ($group, $date) => [
                 'date' => $date,
                 'count' => $group->count(),
@@ -503,7 +535,7 @@ class MedicationReportingService
 
         $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)
             ->where('status', 'missed')
-            ->whereBetween('scheduled_for', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
+            ->whereBetween('scheduled_for', $this->nzDays($dateFrom, $dateTo))
             ->with(['medication:id,name,dosage,controlled_drug,high_risk,deleted_at', 'client:id,first_name,last_name']);
 
         if ($clientId) {
@@ -514,14 +546,14 @@ class MedicationReportingService
 
         return [
             'meta' => [
-                'date_from' => $dateFrom->toDateString(),
-                'date_to' => $dateTo->toDateString(),
+                'date_from' => $this->nzDate($dateFrom),
+                'date_to' => $this->nzDate($dateTo),
                 'total_missed' => $missed->count(),
             ],
             'records' => $missed->map(fn ($m) => [
                 'id' => $m->id,
-                'date' => $m->scheduled_for?->toDateString(),
-                'time' => $m->scheduled_for?->format('H:i'),
+                'date' => $this->nzDate($m->scheduled_for),
+                'time' => $this->nzTime($m->scheduled_for),
                 'client' => $m->client ? trim("{$m->client->first_name} {$m->client->last_name}") : 'Unknown',
                 'client_id' => $m->client_id,
                 'medication' => $m->medication?->historicalDisplayName() ?? 'Unknown',
@@ -563,7 +595,7 @@ class MedicationReportingService
             ->where('status', 'given')
             ->whereNotNull('scheduled_for')
             ->whereNotNull('administered_at')
-            ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
+            ->whereBetween('administered_at', $this->nzDays($dateFrom, $dateTo))
             ->whereRaw("TIMESTAMPDIFF(MINUTE, scheduled_for, administered_at) > {$lateThresholdMinutes}")
             ->with(['medication:id,name,dosage,deleted_at', 'client:id,first_name,last_name']);
 
@@ -575,19 +607,19 @@ class MedicationReportingService
 
         return [
             'meta' => [
-                'date_from' => $dateFrom->toDateString(),
-                'date_to' => $dateTo->toDateString(),
+                'date_from' => $this->nzDate($dateFrom),
+                'date_to' => $this->nzDate($dateTo),
                 'late_threshold_minutes' => $lateThresholdMinutes,
                 'total_late' => $late->count(),
             ],
             'records' => $late->map(fn ($l) => [
                 'id' => $l->id,
-                'date' => $l->administered_at?->toDateString(),
+                'date' => $this->nzDate($l->administered_at),
                 'client' => $l->client ? trim("{$l->client->first_name} {$l->client->last_name}") : 'Unknown',
                 'client_id' => $l->client_id,
                 'medication' => $l->medication?->historicalDisplayName() ?? 'Unknown',
-                'scheduled_time' => $l->scheduled_for?->format('H:i'),
-                'administered_time' => $l->administered_at?->format('H:i'),
+                'scheduled_time' => $this->nzTime($l->scheduled_for),
+                'administered_time' => $this->nzTime($l->administered_at),
                 'late_minutes' => $l->scheduled_for->diffInMinutes($l->administered_at),
                 'reason' => $l->reason,
             ])->toArray(),
@@ -681,7 +713,7 @@ class MedicationReportingService
                 'reportedBy:id,name',
                 'resolvedBy:id,name',
             ])
-            ->whereBetween('reported_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()]);
+            ->whereBetween('reported_at', $this->nzDays($dateFrom, $dateTo));
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -695,8 +727,8 @@ class MedicationReportingService
 
         return [
             'meta' => [
-                'date_from' => $dateFrom->toDateString(),
-                'date_to' => $dateTo->toDateString(),
+                'date_from' => $this->nzDate($dateFrom),
+                'date_to' => $this->nzDate($dateTo),
                 'total_discrepancies' => $discrepancies->count(),
                 'open_count' => $discrepancies->where('status', 'open')->count(),
                 'under_review_count' => $discrepancies->where('status', 'under_review')->count(),
@@ -748,7 +780,7 @@ class MedicationReportingService
                 'medication:id,name',
                 'changedBy:id,name',
             ])
-            ->whereBetween('changed_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()]);
+            ->whereBetween('changed_at', $this->nzDays($dateFrom, $dateTo));
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -762,8 +794,8 @@ class MedicationReportingService
 
         return [
             'meta' => [
-                'date_from' => $dateFrom->toDateString(),
-                'date_to' => $dateTo->toDateString(),
+                'date_from' => $this->nzDate($dateFrom),
+                'date_to' => $this->nzDate($dateTo),
                 'total_changes' => $versions->count(),
             ],
             'records' => $versions->map(fn ($v) => [
@@ -796,7 +828,7 @@ class MedicationReportingService
 
         $query = ClientIncident::query()
             ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))
-            ->whereBetween('occurred_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
+            ->whereBetween('occurred_at', $this->nzDays($dateFrom, $dateTo))
             ->with(['client:id,first_name,last_name']);
 
         $hasMedicationMetadata = Schema::hasTable('client_incidents')
@@ -896,8 +928,8 @@ class MedicationReportingService
 
         return [
             'meta' => [
-                'date_from' => $dateFrom->toDateString(),
-                'date_to' => $dateTo->toDateString(),
+                'date_from' => $this->nzDate($dateFrom),
+                'date_to' => $this->nzDate($dateTo),
                 'total_incidents' => $incidents->count(),
             ],
             'summary_by_category' => $incidents->groupBy(fn (array $row) => $row['incident']->category)
@@ -948,8 +980,8 @@ class MedicationReportingService
         return [
             'meta' => [
                 'generated_at' => now()->toIso8601String(),
-                'date_from' => $dateFrom->toDateString(),
-                'date_to' => $dateTo->toDateString(),
+                'date_from' => $this->nzDate($dateFrom),
+                'date_to' => $this->nzDate($dateTo),
                 'client_id' => $clientId,
             ],
             'mar_summary' => $this->getMarSummary($clientId, $dateFrom, $dateTo, $siteIds, $includeControlled),
@@ -967,10 +999,7 @@ class MedicationReportingService
      */
     private function getMarSummary(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null, bool $includeControlled = false): array
     {
-        $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)->whereBetween('administered_at', [
-            $dateFrom->startOfDay(),
-            $dateTo->endOfDay(),
-        ]);
+        $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)->whereBetween('administered_at', $this->nzDays($dateFrom, $dateTo));
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -985,10 +1014,7 @@ class MedicationReportingService
         }
         $rawCorrections
             ->where('is_correction', true)
-            ->whereBetween('administered_at', [
-                $dateFrom->startOfDay(),
-                $dateTo->endOfDay(),
-            ])
+            ->whereBetween('administered_at', $this->nzDays($dateFrom, $dateTo))
             ->when($clientId, fn ($corrections) => $corrections->where('client_id', $clientId));
         $correctionsCount = $rawCorrections->count();
         $stats = (clone $query)->selectRaw('
@@ -1019,7 +1045,7 @@ class MedicationReportingService
         $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->where('status', 'given')
-            ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()]);
+            ->whereBetween('administered_at', $this->nzDays($dateFrom, $dateTo));
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -1043,10 +1069,7 @@ class MedicationReportingService
         $query = $this->canonicalMedicationRows(
             ClientControlledDrugEntry::query(),
             $siteIds,
-        )->whereBetween('recorded_at', [
-            $dateFrom->startOfDay(),
-            $dateTo->endOfDay(),
-        ]);
+        )->whereBetween('recorded_at', $this->nzDays($dateFrom, $dateTo));
 
         if ($clientId) {
             $query->where('client_id', $clientId);
@@ -1061,10 +1084,7 @@ class MedicationReportingService
             'discrepancies' => $this->canonicalMedicationRows(
                 ClientControlledDrugDiscrepancy::query(),
                 $siteIds,
-            )->whereBetween('reported_at', [
-                $dateFrom->startOfDay(),
-                $dateTo->endOfDay(),
-            ])
+            )->whereBetween('reported_at', $this->nzDays($dateFrom, $dateTo))
                 ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
                 ->count(),
         ];
@@ -1079,10 +1099,7 @@ class MedicationReportingService
             MedicationDashboardAlert::query(),
             $siteIds,
             true,
-        )->whereBetween('created_at', [
-            $dateFrom->startOfDay(),
-            $dateTo->endOfDay(),
-        ]);
+        )->whereBetween('created_at', $this->nzDays($dateFrom, $dateTo));
         if (! $includeControlled) {
             $query->whereNotIn('alert_type', [
                 'controlled_discrepancy',
@@ -1115,10 +1132,7 @@ class MedicationReportingService
      */
     private function getComplianceMetrics(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null, bool $includeControlled = false): array
     {
-        $adminQuery = $this->effectiveAdministrationRows($siteIds, $includeControlled)->whereBetween('administered_at', [
-            $dateFrom->startOfDay(),
-            $dateTo->endOfDay(),
-        ]);
+        $adminQuery = $this->effectiveAdministrationRows($siteIds, $includeControlled)->whereBetween('administered_at', $this->nzDays($dateFrom, $dateTo));
 
         if ($clientId) {
             $adminQuery->where('client_id', $clientId);
@@ -1144,10 +1158,7 @@ class MedicationReportingService
      */
     private function calculateDocumentationCompleteness(?int $clientId, Carbon $dateFrom, Carbon $dateTo, ?array $siteIds = null, bool $includeControlled = false): float
     {
-        $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)->whereBetween('administered_at', [
-            $dateFrom->startOfDay(),
-            $dateTo->endOfDay(),
-        ]);
+        $query = $this->effectiveAdministrationRows($siteIds, $includeControlled)->whereBetween('administered_at', $this->nzDays($dateFrom, $dateTo));
 
         if ($clientId) {
             $query->where('client_id', $clientId);
