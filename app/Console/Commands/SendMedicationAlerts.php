@@ -47,7 +47,8 @@ class SendMedicationAlerts extends Command
      * The overdue job (C6f): the doses the dose-slot projection calls overdue
      * — the window has ended with nothing recorded, yesterday and today —
      * raised in the Control Room (one signal per dose) with alerts for doses
-     * no longer overdue resolved, and each dose's round assignee told once.
+     * no longer overdue resolved, and each dose's round assignee told once
+     * per overdue spell.
      */
     protected function checkOverdueMedications(): void
     {
@@ -73,10 +74,11 @@ class SendMedicationAlerts extends Command
                 continue;
             }
 
-            // Once per dose and person: the stored notification survives a
-            // deploy's cache clear; the cache key covers notifications sent
-            // before doses carried a key.
-            if ($this->alreadyNotified($staff, MedicationOverdueNotification::class, ['dose_key' => $dose['key']])) {
+            // Once per overdue spell of a dose and person: the stored
+            // notification survives a deploy's cache clear; the cache key
+            // covers notifications sent before doses carried a key (a first
+            // spell only — a dose overdue again is told again).
+            if ($this->alreadyNotified($staff, MedicationOverdueNotification::class, ['dose_key' => $dose['spell_key']])) {
                 continue;
             }
             $alertKey = sprintf(
@@ -85,7 +87,7 @@ class SendMedicationAlerts extends Command
                 $medication->id,
                 $scheduledFor->copy()->utc()->format('YmdHi'),
             );
-            if (! Cache::add($alertKey, true, now()->addDay())) {
+            if (! Cache::add($alertKey, true, now()->addDay()) && str_ends_with($dose['spell_key'], '~1')) {
                 continue;
             }
 
@@ -96,7 +98,7 @@ class SendMedicationAlerts extends Command
                 clientName: $clientName !== '' ? $clientName : 'Unknown client',
                 scheduledTime: $scheduledFor->format('H:i'),
                 clientId: $client->id,
-                doseKey: $dose['key'],
+                doseKey: $dose['spell_key'],
             ));
             $count++;
         }

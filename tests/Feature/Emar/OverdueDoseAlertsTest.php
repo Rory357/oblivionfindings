@@ -141,10 +141,12 @@ class OverdueDoseAlertsTest extends TestCase
         $this->artisan('emar:send-alerts')->assertSuccessful();
         $alert = $this->openAlerts()->sole();
 
-        // Metformin given late: Morphine is still overdue, so it stays open.
+        // Metformin given late: Morphine is still overdue, so it stays open,
+        // and the dashboard row's count follows straight away.
         $this->at('2026-06-15 09:40');
         $this->record('Metformin', '07:00', 'given');
         $this->assertTrue($alert->fresh()->isActionable());
+        $this->assertSame('1 overdue dose(s): Controlled medicine', $this->dashboardRow($this->aroha)?->message);
 
         // Morphine recorded as missed: nothing of the alert's is overdue now.
         $this->at('2026-06-15 09:45');
@@ -154,6 +156,37 @@ class OverdueDoseAlertsTest extends TestCase
         $this->assertSame('medication_workflow', $alert->resolution_code);
         $this->assertSame('dose_slot_projection', data_get($alert->context, 'resolution.source'));
         $this->assertNull($this->dashboardRow($this->aroha));
+    }
+
+    public function test_a_dose_overdue_again_after_its_record_is_deleted_raises_one_new_alert(): void
+    {
+        // 8:30: Metformin's 7:00 dose is overdue — one alert.
+        $this->at('2026-06-15 08:30');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $first = $this->openAlerts()->sole();
+
+        // Recorded: the alert resolves and the dose is released.
+        $this->at('2026-06-15 08:35');
+        $record = $this->record('Metformin', '07:00', 'given');
+        $this->assertSame(ControlRoomAlert::STATUS_RESOLVED, $first->fresh()->status);
+
+        // The record is deleted: the dose is overdue again — a new spell,
+        // exactly one new alert.
+        $this->at('2026-06-15 08:40');
+        $record->delete();
+        $this->at('2026-06-15 08:45');
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $second = $this->openAlerts()->sole();
+        $this->assertNotSame($first->id, $second->id);
+        $this->assertSame(2, $this->overdueAlertCount());
+
+        // Each run after that raises nothing more.
+        $this->at('2026-06-15 08:55');
+        Cache::flush();
+        $this->artisan('emar:send-alerts')->assertSuccessful();
+        $this->assertSame(2, $this->overdueAlertCount());
+        $this->assertSame(2, Signal::query()->where('signal_type_code', MedicationSignalService::TYPE_OVERDUE)->count());
+        $this->assertTrue($second->fresh()->isActionable());
     }
 
     public function test_ceasing_the_order_resolves_its_overdue_alert(): void
@@ -252,6 +285,14 @@ class OverdueDoseAlertsTest extends TestCase
             ->get();
     }
 
+    private function overdueAlertCount(): int
+    {
+        return ControlRoomAlert::query()
+            ->where('source', 'medication')
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(context, '$.signal_type_code')) = ?", [MedicationSignalService::TYPE_OVERDUE])
+            ->count();
+    }
+
     private function dashboardRow(Client $client): ?MedicationDashboardAlert
     {
         return MedicationDashboardAlert::query()
@@ -261,9 +302,9 @@ class OverdueDoseAlertsTest extends TestCase
             ->first();
     }
 
-    private function record(string $order, string $dueNz, string $status): void
+    private function record(string $order, string $dueNz, string $status): ClientMedicationAdministration
     {
-        ClientMedicationAdministration::query()->create([
+        return ClientMedicationAdministration::query()->create([
             'client_id' => $this->orders[$order]->client_id,
             'client_medication_id' => $this->orders[$order]->id,
             'administered_by' => User::factory()->create(['approved_at' => now()])->id,

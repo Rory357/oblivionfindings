@@ -14,7 +14,7 @@ class MedicationOverdueNotification extends Notification
         public string $clientName,
         public string $scheduledTime,
         public ?int $clientId = null,
-        /** The dose (order @ due instant) — one notification per dose and person. */
+        /** The dose's overdue spell (order @ due instant ~ spell) — one notification per spell and person. */
         public ?string $doseKey = null,
     ) {}
 

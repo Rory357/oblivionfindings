@@ -41,9 +41,48 @@ final class OverdueDoses
             return collect();
         }
 
+        $now = $now->copy()->timezone($this->schedule->workerTimezone());
+
+        return $this->between($now->copy()->subDay()->startOfDay(), $now, $clientIds, null);
+    }
+
+    /**
+     * Of these doses (keys), the ones still overdue now, whatever their day —
+     * so an alert for a dose that has aged out of the lookback stays open
+     * until the dose is recorded or no longer owed.
+     *
+     * @param  list<string>  $keys
+     * @return list<string>
+     */
+    public function stillOverdue(array $keys, Carbon $now): array
+    {
+        $doses = collect($keys)
+            ->map(fn (string $key): ?array => preg_match('/^(\d+)@(.+)$/', $key, $parts) === 1
+                ? ['order_id' => (int) $parts[1], 'due_at' => Carbon::parse($parts[2])]
+                : null)
+            ->filter();
+        if ($doses->isEmpty()) {
+            return [];
+        }
+
         $timezone = $this->schedule->workerTimezone();
-        $now = $now->copy()->timezone($timezone);
-        $from = $now->copy()->subDay()->startOfDay();
+        $from = $doses->min(fn (array $dose): Carbon => $dose['due_at'])->copy()->timezone($timezone)->startOfDay();
+        $overdue = $this->between($from, $now->copy()->timezone($timezone), null, $doses->pluck('order_id')->unique()->values()->all())
+            ->pluck('key')
+            ->all();
+
+        return array_values(array_intersect($keys, $overdue));
+    }
+
+    /**
+     * @param  list<int>|null  $clientIds
+     * @param  list<int>|null  $orderIds
+     * @return Collection<int, array{key: string, client_id: int, site_id: int|null, order: ClientMedication, due_at: Carbon, window_ends_at: Carbon, state: string}>
+     */
+    private function between(Carbon $from, Carbon $now, ?array $clientIds, ?array $orderIds): Collection
+    {
+        $timezone = $this->schedule->workerTimezone();
+        // Only days the projection holds.
         $held = Carbon::parse($this->coverage->availableFrom(CarbonImmutable::instance($now)), $timezone)->startOfDay();
         if ($held->greaterThan($from)) {
             $from = $held;
@@ -57,6 +96,7 @@ final class OverdueDoses
                     ->orWhereNotNull('frequency');
             })
             ->when($clientIds !== null, fn ($query) => $query->whereIn('client_id', $clientIds))
+            ->when($orderIds !== null, fn ($query) => $query->whereKey($orderIds))
             ->whereHas('client', fn ($client) => $client
                 ->whereNotNull('site_id')
                 ->where(fn ($alerts) => $alerts->whereNull('suppress_med_admin_alerts')->orWhere('suppress_med_admin_alerts', false)))

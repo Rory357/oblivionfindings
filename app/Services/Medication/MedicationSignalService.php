@@ -373,9 +373,9 @@ class MedicationSignalService
             'transport_log_id' => 'transport_log',
             'prn_attempt_id' => 'prn_attempt',
             'incident_id' => 'client_incident',
-            // An overdue dose (C6f): one signal per dose, however often the
-            // overdue job finds it.
-            'dose_key' => 'dose',
+            // An overdue dose (C6f): one signal per overdue spell of a dose,
+            // however often the overdue job finds it.
+            'dose_spell_key' => 'dose_spell',
         ] as $key => $type) {
             if (filled($context[$key] ?? null)) {
                 return [$type, $context[$key]];
