@@ -18,6 +18,8 @@ export type PageHeroStat = {
     sub?: ReactNode;
     icon?: LucideIcon;
     href?: string;
+    /** Opens something in the page (e.g. a dialog) instead of following a link. */
+    onClick?: () => void;
     /** Hide this stat below md. Default true to match the Site Detail reference. */
     hideOnMobile?: boolean;
     tone?: PageHeroStatTone;
@@ -123,7 +125,16 @@ export function PageHeroStats({
                     </div>
                 );
 
-                return stat.href ? (
+                return stat.onClick ? (
+                    <button
+                        key={String(stat.label)}
+                        type="button"
+                        onClick={stat.onClick}
+                        className="rounded-md transition-opacity outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
+                    >
+                        {inner}
+                    </button>
+                ) : stat.href ? (
                     <Link
                         key={String(stat.label)}
                         href={stat.href}

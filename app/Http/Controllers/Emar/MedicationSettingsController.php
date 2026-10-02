@@ -19,6 +19,7 @@ use App\Services\Medication\Settings\MedicationSettingsRegistry;
 use App\Services\Medication\Settings\MedicationSettingsStore;
 use App\Services\Medication\Settings\MedicineRuleScope;
 use App\Services\Medication\Settings\MedicineRuleWording;
+use App\Services\Medication\WitnessPinResetAuthority;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationRuleService;
 use App\Services\UserSiteAccessService;
@@ -435,15 +436,7 @@ class MedicationSettingsController extends Controller
      */
     private function canResetPinOf(User $actor, User $target): bool
     {
-        if ($this->canManageGlobalRules($actor)) {
-            return true;
-        }
-
-        return ! collect([
-            'medications.witness_pin.reset',
-            'medications.settings.manage',
-            ...MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
-        ])->contains(fn (string $key): bool => $target->canDo($key));
+        return app(WitnessPinResetAuthority::class)->allows($actor, $target);
     }
 
     /**

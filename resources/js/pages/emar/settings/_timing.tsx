@@ -1,9 +1,9 @@
 /* Medication › Settings › Rounds & timing (eMAR P11 v5 `settings.tsx`
  * DoseTiming and RoundsOverview). Dose timing is saved through the save bar
  * like every other setting; the server reads it through DoseTimingSettings.
- * "Shows as due soon" waits for Meds today to read its dose states from the
- * dose window resolver (P01 C6), "Remind staff to offer again" for P08a
- * follow-ups, and time-critical medicines for P01 — no stubs. */
+ * Meds today and the MAR read "Can be given from" and "Shows as due soon"
+ * (P01 C6(b)). "Remind staff to offer again" waits for P08a follow-ups, and
+ * time-critical medicines for P01 — no stubs. */
 import { StatusBadge } from '@/components/ui/status-badge';
 import { AlarmClock, Clock, Repeat, RotateCcw } from 'lucide-react';
 import { useSettings } from './_context';
@@ -103,12 +103,17 @@ export function DoseTiming({
                     id="due"
                     icon={Clock}
                     title="When a dose is due"
-                    caption="The window for giving a scheduled dose"
+                    caption="What Meds today shows for a scheduled dose"
                 >
                     {number(
                         'early',
                         'Can be given from',
-                        'Before this, recording asks for a reason.',
+                        'Before this, the dose shows as not yet due.',
+                    )}
+                    {number(
+                        'due_soon',
+                        'Shows as due soon',
+                        'Only changes what Meds today highlights.',
                     )}
                     {number(
                         'late',
@@ -228,7 +233,7 @@ export function RoundsOverview({
                         `Can be given from ${v('early')} minutes before. Late after ${v('late')} minutes.`,
                         'Recording is never blocked by these times.',
                     ],
-                    badge: notReviewed(['early', 'late']),
+                    badge: notReviewed(['early', 'late', 'due_soon']),
                     cta: 'Review dose timing',
                     onClick: () => go('rounds', 'timing'),
                 },

@@ -321,3 +321,53 @@ describe('Rounds & timing › Overview', () => {
         expect(screen.getAllByText(/not yet reviewed/)).toHaveLength(2);
     });
 });
+
+describe('Shows as due soon (P01 C6(b) reads it)', () => {
+    const withDueSoon = () => {
+        const base = payload();
+        const dueSoon = minutes(
+            'due_soon',
+            'Doses show as due soon',
+            'minutes before the dose time',
+            '60',
+            { numeric: null },
+        );
+        return payload({
+            groups: {
+                timing: {
+                    ...base.groups.timing,
+                    keys: [
+                        'early',
+                        'due_soon',
+                        ...base.groups.timing.keys.slice(1),
+                    ],
+                },
+            },
+            definitions: { timing: { ...timing, due_soon: dueSoon } },
+            values: { timing: { ...base.values.timing, due_soon: '60' } },
+            reviewed: { timing: { ...base.reviewed.timing, due_soon: null } },
+        });
+    };
+
+    it('shows v5’s row and early hint', () => {
+        renderWith(
+            <DoseTiming q="" show="all" clear={vi.fn()} />,
+            {},
+            withDueSoon(),
+        );
+        expect(screen.getByLabelText('Shows as due soon')).toHaveValue(60);
+        expect(
+            screen.getByText('Only changes what Meds today highlights.'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Before this, the dose shows as not yet due.'),
+        ).toBeInTheDocument();
+    });
+
+    it('never counts as loosening a check — it only changes what is highlighted', () => {
+        const s = withDueSoon();
+        const def = s.definitions.timing.due_soon;
+        expect(loosens(def, '60', '120')).toBe(false);
+        expect(loosens(def, '60', '15')).toBe(false);
+    });
+});

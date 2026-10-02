@@ -166,9 +166,10 @@ class CompetencyPolicySettingsTest extends TestCase
             ->assertRedirect();
         $reader = $this->manager;
 
-        $this->actingAs($reader)->get('/emar/competency')
+        $statusOf = fn ($people) => collect($people)->firstWhere('id', $this->worker->id)['status'] ?? null;
+        $this->actingAs($reader)->get('/emar/safety/eligibility')
             ->assertInertia(fn (Assert $page) => $page
-                ->where('kpis.expiring', 0)
+                ->where('people', fn ($people) => $statusOf($people) === 'current')
                 ->where('policy.renewal_days', 30)
                 ->where('policy.core_must_pass', false)
                 ->where('policy.observed_minimum', null));
@@ -179,9 +180,9 @@ class CompetencyPolicySettingsTest extends TestCase
         $this->saveStaff([['elig', 'reminder', '45', '30']])->assertSessionHasNoErrors();
         app()->forgetScopedInstances();
 
-        $this->actingAs($reader)->get('/emar/competency')
+        $this->actingAs($reader)->get('/emar/safety/eligibility')
             ->assertInertia(fn (Assert $page) => $page
-                ->where('kpis.expiring', 1)
+                ->where('people', fn ($people) => $statusOf($people) === 'due')
                 ->where('policy.renewal_days', 45));
         $after = app(MedicationOverviewService::class)->payload(null, $reader);
         $this->assertSame(1, $after['stats']['expiringCompetencies']);

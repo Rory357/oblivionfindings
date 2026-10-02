@@ -27,7 +27,7 @@ class MedicationCompetencyExpiringNotification extends Notification
             'title' => 'Competency Expiring',
             'message' => "{$this->staffName}'s medication competency expires on {$this->expiryDate}",
             'severity' => 'info',
-            'action_url' => '/emar/competency',
+            'action_url' => '/emar/safety/eligibility?view=renewals',
             'staff_name' => $this->staffName,
             'expiry_date' => $this->expiryDate,
             'assessment_id' => $this->assessmentId,

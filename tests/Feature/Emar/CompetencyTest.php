@@ -119,8 +119,9 @@ class CompetencyTest extends TestCase
         $this->assertSame($exemption->id, $decision['exemption_id']);
     }
 
-    public function test_page_serves_brand_colour_and_kpis(): void
+    public function test_the_old_competency_link_opens_staff_eligibility_at_the_house(): void
     {
+        // P11 chunk 6: Safety & oversight › Staff eligibility replaced the page.
         ['user' => $user, 'staff' => $staff, 'site' => $site] = $this->seedCompetency();
         MedicationCompetencyAssessment::query()->create(array_merge($this->fullAreas(), [
             'user_id' => $staff->id, 'assessor_id' => $user->id, 'assessment_type' => 'annual', 'status' => 'passed',
@@ -131,22 +132,25 @@ class CompetencyTest extends TestCase
 
         $this->actingAs($user)
             ->get('/emar/competency?site_id='.$site->id)
+            ->assertRedirect('/emar/safety/eligibility?house='.$site->id);
+
+        $this->actingAs($user)
+            ->get('/emar/safety/eligibility')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('emar/Competency')
-                ->where('site_brand_colour', '#5E35B1')
-                ->has('assessments', 1)
-                ->where('kpis.cd_witnesses', 1)
-                ->has('kpis')
-                ->has('staffWithoutAssessment')
+                ->component('emar/StaffEligibility')
+                ->where('people', fn ($people) => collect($people)->contains(fn (array $row) => $row['id'] === $staff->id
+                    && $row['status'] === 'current'
+                    && $row['assessment']['can_witness'] === true
+                    && $row['assessment']['passed'] === 12))
+                ->where('can.assess', true)
             );
     }
 
-    public function test_assessment_payload_carries_detail_and_staff_jump_fields(): void
+    public function test_the_register_carries_the_assessment_detail_even_before_it_is_declared(): void
     {
-        // Guards the cross-module parity contract the redesigned page relies on:
-        // user_id drives the "View staff member" jump (/staff/{id}); observed_rounds
-        // + assessor_comments + the 12 area booleans drive the enriched detail modal.
+        // Observed administrations, notes and each area result drive the
+        // assessment view; one the assessor never declared is still shown.
         ['user' => $user, 'staff' => $staff] = $this->seedCompetency();
         MedicationCompetencyAssessment::query()->create(array_merge($this->fullAreas(), [
             'user_id' => $staff->id, 'assessor_id' => $user->id, 'assessment_type' => 'annual', 'status' => 'passed',
@@ -157,18 +161,15 @@ class CompetencyTest extends TestCase
         ]));
 
         $this->actingAs($user)
-            ->get('/emar/competency')
+            ->get('/emar/safety/eligibility')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('emar/Competency')
-                ->has('assessments.0', fn (Assert $row) => $row
-                    ->where('user_id', $staff->id)
-                    ->where('user_name', $staff->name)
-                    ->where('assessor_comments', 'Confident and methodical.')
-                    ->has('observed_rounds', 1)
-                    ->where('medication_knowledge', true)
-                    ->etc()
-                )
+                ->where('people', fn ($people) => collect($people)->contains(fn (array $row) => $row['id'] === $staff->id
+                    && $row['status'] === 'none'
+                    && $row['assessment']['comments'] === 'Confident and methodical.'
+                    && count($row['assessment']['observed']) === 1
+                    && $row['assessment']['res']['medication_knowledge'] === 'yes'
+                    && $row['assessment']['declared_at'] === null))
             );
     }
 
@@ -230,15 +231,14 @@ class CompetencyTest extends TestCase
         $this->assertNotNull($a->staff_acknowledged_at);
         $this->assertTrue($a->isPassed());
 
-        // Serialized payload surfaces the declarations for the detail modal.
+        // The register surfaces both for the assessment view.
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
         $this->actingAs($user)
-            ->get('/emar/competency')
+            ->get('/emar/safety/eligibility')
             ->assertInertia(fn (Assert $page) => $page
-                ->has('assessments.0', fn (Assert $row) => $row
-                    ->where('assessor_declared_at', now()->toDateString())
-                    ->where('staff_acknowledged_at', now()->toDateString())
-                    ->etc()
-                )
+                ->where('people', fn ($people) => collect($people)->contains(fn (array $row) => $row['id'] === $staff->id
+                    && $row['assessment']['declared_at'] === $today
+                    && $row['assessment']['acknowledged_at'] === $today))
             );
     }
 

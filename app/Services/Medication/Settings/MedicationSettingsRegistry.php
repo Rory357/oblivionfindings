@@ -168,9 +168,10 @@ class MedicationSettingsRegistry
             effect: 'From the next dose shown on Meds today, at every house — recording is never blocked',
             auditEvent: 'medications.mar_timing.updated',
             definitions: [
-                // "Doses show as due soon" (v5) waits until Meds today reads its
-                // dose states from DoseWindowResolver (P01): nothing shows it yet.
                 $number('early', $timing::EARLY_MINUTES, 'Doses can be given from', 'minutes before the dose time', $looser),
+                // Meds today, the MAR schedule and MAR rows read it (P01 C6(b)).
+                // It only changes what's highlighted, so no change loosens a check.
+                $number('due_soon', $timing::DUE_SOON_MINUTES, 'Doses show as due soon', 'minutes before the dose time', null),
                 $number('late', $timing::LATE_MINUTES, 'Doses count as late', 'minutes after the dose time', $looser),
                 $number('late_incident', $timing::LATE_INCIDENT_MINUTES, 'A late dose raises an incident', 'minutes after the dose time', $looser),
                 $number('refusal_count', $timing::REFUSAL_COUNT, 'Repeated refusals escalate', 'refusals or withholds', $looser, 'refusal_days'),

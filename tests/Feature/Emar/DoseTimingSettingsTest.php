@@ -99,6 +99,29 @@ class DoseTimingSettingsTest extends TestCase
                 ->where('settings.reviewed.timing.late', null));
     }
 
+    public function test_shows_as_due_soon_is_a_setting_again_and_never_loosens_a_check(): void
+    {
+        // Meds today and the MAR read it since P01 C6(b): v5's row is back.
+        $manager = $this->staff(['medications.settings.manage', 'sites.viewAll']);
+        $this->actingAs($manager)->get('/emar/settings')
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('settings.values.timing.due_soon', '60')
+                ->where('settings.definitions.timing.due_soon.label', 'Doses show as due soon')
+                ->where('settings.definitions.timing.due_soon.numeric', null));
+
+        // Either way, no confirmation: it only changes what's highlighted.
+        $this->actingAs($manager)
+            ->from('/emar/settings')
+            ->put('/emar/settings/changes', $this->save([['due_soon', '90', '60']]))
+            ->assertSessionHasNoErrors();
+        $this->assertSame(90, app(DoseTimingSettings::class)->dueSoonMinutes());
+        $this->actingAs($manager)
+            ->from('/emar/settings')
+            ->put('/emar/settings/changes', $this->save([['due_soon', '15', '90']]))
+            ->assertSessionHasNoErrors();
+        $this->assertSame(15, app(DoseTimingSettings::class)->dueSoonMinutes());
+    }
+
     public function test_a_number_outside_its_range_is_refused_with_the_range(): void
     {
         $manager = $this->staff(['medications.settings.manage', 'sites.viewAll']);

@@ -1,15 +1,13 @@
-/* The worker's own medication competency assessment, waiting for their
- * acknowledgement (eMAR P11 v5 `dialogs-elig.tsx` Acknowledge). An assessment
- * counts only once the assessed person acknowledges it from their own login.
- * Shown on Meds today for now; Staff eligibility › My eligibility (P11
- * chunk 6) becomes its permanent home. */
+/* Acknowledge your assessment (eMAR P11 v5 `dialogs-elig.tsx` Acknowledge).
+ * An assessment counts only once the assessed person acknowledges it from
+ * their own login. Opened from Meds today › My eligibility. */
 import { SettingsModal } from '@/components/settings/settings-modal';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import { formatDateOnly } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
-import { AlertTriangle, ClipboardCheck } from 'lucide-react';
+import { ClipboardCheck } from 'lucide-react';
 import { useState } from 'react';
 
 export type PendingAssessment = {
@@ -27,51 +25,6 @@ export type PendingAssessment = {
 };
 
 const day = (d: string | null) => (d ? formatDateOnly(d) : '—');
-
-export function PendingAssessmentNotice({
-    assessment,
-}: {
-    assessment: PendingAssessment | null | undefined;
-}) {
-    const [open, setOpen] = useState(false);
-    if (!assessment) return null;
-    return (
-        <>
-            <div
-                role="status"
-                className="flex flex-wrap items-start gap-3 rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm"
-            >
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
-                <div className="min-w-0 flex-1">
-                    <p className="font-medium text-status-warning">
-                        Your new medication assessment is waiting for you
-                    </p>
-                    <p className="mt-0.5 text-xs text-foreground/80">
-                        {assessment.assessor ?? 'Your assessor'} recorded it on{' '}
-                        {day(assessment.assessed_on)}. It counts once you
-                        acknowledge it
-                        {assessment.can_give_now
-                            ? '.'
-                            : ' — until then you can’t record doses as given.'}
-                    </p>
-                </div>
-                <Button
-                    size="sm"
-                    className="ml-auto shrink-0"
-                    onClick={() => setOpen(true)}
-                >
-                    Read and acknowledge
-                </Button>
-            </div>
-            {open ? (
-                <AcknowledgeAssessment
-                    assessment={assessment}
-                    onClose={() => setOpen(false)}
-                />
-            ) : null}
-        </>
-    );
-}
 
 export function AcknowledgeAssessment({
     assessment,
@@ -112,10 +65,19 @@ export function AcknowledgeAssessment({
             onClose={onClose}
             footer={
                 <>
-                    <Button variant="outline" onClick={onClose}>
+                    {/* Support workers tap these on shift: 44 px targets (Rory, P11). */}
+                    <Button
+                        variant="outline"
+                        className="frontline-tap"
+                        onClick={onClose}
+                    >
                         Cancel
                     </Button>
-                    <Button onClick={acknowledge} disabled={saving}>
+                    <Button
+                        className="frontline-tap"
+                        onClick={acknowledge}
+                        disabled={saving}
+                    >
                         Acknowledge
                     </Button>
                 </>
@@ -169,6 +131,7 @@ export function AcknowledgeAssessment({
                 <span className="inline-flex items-center gap-3">
                     <Switch
                         id="ack-tick"
+                        className="frontline-hit"
                         checked={on}
                         aria-invalid={err || undefined}
                         onCheckedChange={(v) => {

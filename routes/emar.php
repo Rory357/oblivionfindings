@@ -12,12 +12,14 @@ use App\Http\Controllers\Emar\MedicationAuditEventController;
 use App\Http\Controllers\Emar\MedicationErrorController;
 use App\Http\Controllers\Emar\MedicationSettingsController;
 use App\Http\Controllers\Emar\RefusalFollowUpController;
+use App\Http\Controllers\Emar\StaffEligibilityController;
 use App\Http\Controllers\Emar\WorkerMedsController;
 use App\Http\Controllers\EmergencyAccessController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\MedicationsController;
 use App\Http\Controllers\MedicationsReportController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -108,8 +110,15 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->middleware('permission:medications.view')
         ->name('emar.prescriptions');
 
-    // Competency Assessments
-    Route::get('/competency', [EmarController::class, 'competency'])
+    // P11 chunk 6: Safety & oversight › Staff eligibility replaces
+    // Medication › Competency; old links (and ?site_id) land on it.
+    Route::get('/safety/eligibility', [StaffEligibilityController::class, 'index'])
+        ->middleware('permission:medications.view')
+        ->name('emar.safety.eligibility');
+    Route::get('/competency', fn (Request $request) => redirect()->route(
+        'emar.safety.eligibility',
+        array_filter(['house' => $request->integer('site_id') ?: null]),
+    ))
         ->middleware('permission:medications.view')
         ->name('emar.competency');
 

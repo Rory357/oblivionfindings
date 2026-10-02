@@ -16,16 +16,17 @@ use App\Models\User;
 class CompetencyAcknowledgement
 {
     /** The 12 areas, in the order and words the assessment form uses. */
+    /** The 12 areas, worded as the register words them (StaffEligibilityRegister::AREAS). */
     public const AREAS = [
         'medication_knowledge' => 'Medication knowledge',
-        'five_rights' => 'Five rights',
+        'five_rights' => 'The five rights',
         'safety_checks' => 'Safety checks',
         'documentation' => 'Documentation',
         'controlled_drugs' => 'Controlled drugs',
-        'prn_assessment' => 'PRN assessment',
-        'insulin_competent' => 'Insulin administration',
+        'prn_assessment' => 'As-needed (PRN) assessment',
+        'insulin_competent' => 'Insulin',
         'inhaler_competent' => 'Inhaler technique',
-        'topical_competent' => 'Topical application',
+        'topical_competent' => 'Topical medicines',
         'covert_admin_knowledge' => 'Covert administration',
         'error_reporting' => 'Error reporting',
         'allergy_awareness' => 'Allergy awareness',
