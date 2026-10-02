@@ -237,7 +237,7 @@ final class MedicationAlertCatalogue
             // B2 C1 review: run-out stock alerts whenever it reaches 0; expired
             // stock still also notifies through Control Room (its signal carries
             // order end dates too), so the row says so.
-            'subline' => 'Stock reaches 0, or expires — Control Room still sends expired-stock notices',
+            'subline' => 'Stock at 0, or expired (Control Room still notifies on expiry)',
             'groups' => [self::STOCK_STAFF, self::HOUSE_LEAD, self::CLINICAL_LEAD],
             'default' => [self::STOCK_STAFF, self::HOUSE_LEAD],
             'locked' => [],
