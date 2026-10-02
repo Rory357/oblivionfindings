@@ -116,7 +116,15 @@ export interface MyDayMedDue {
     can_record: boolean;
     can_give: boolean;
     scheduled_for: string;
-    status: 'overdue' | 'due' | 'upcoming' | 'given' | 'refused' | 'withheld';
+    /** pending_check: waiting for the order check — shown, not recordable. */
+    status:
+        | 'overdue'
+        | 'due'
+        | 'upcoming'
+        | 'given'
+        | 'refused'
+        | 'withheld'
+        | 'pending_check';
     flag?: string | null;
     /** Admin eMAR deep-link; null for record-only frontline workers. */
     emar_url: string | null;

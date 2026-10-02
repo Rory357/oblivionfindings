@@ -17,6 +17,8 @@ use App\Models\User;
 use App\Services\Assurance\NzsAssuranceResolver;
 use App\Services\Fleet\FleetMapSettings;
 use App\Services\MarScheduleService;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
+use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Operations\OpsMessageVisibilityService;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\UserSiteAccessService;
@@ -1287,10 +1289,11 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Today's overdue (scheduled-before-now, unrecorded) doses for the
-     * worker's shift clients — the sidebar "Meds today" badge. Same overdue
-     * semantics as the /meds/today board hero. Cached for 60s per user/day;
-     * WorkerMedsController busts the cache when a dose is recorded.
+     * Today's overdue doses (window ended, nothing recorded) for the worker's
+     * shift clients they may open — the sidebar "Meds today" badge. Same
+     * overdue semantics as the /meds/today board hero (dose-slot projection,
+     * C6d). Cached for 60s per user/day; WorkerMedsController busts the cache
+     * when a dose is recorded.
      */
     public static function medsOverdueBadgeCacheKey(int $userId, string $localDate): string
     {
@@ -1332,12 +1335,16 @@ class HandleInertiaRequests extends Middleware
                         ->values()
                         ->all();
 
+                    // The people the worker may open (the P02 person rule, C6d).
+                    $clientIds = DoseSlotReaderScope::forViewerClients($user, $clientIds)->clientIds ?? [];
                     if (empty($clientIds)) {
                         return 0;
                     }
 
+                    // A count: controlled doses are included for every reader
+                    // (P09 Q6); a dose waiting for the order check never is.
                     $medications = ClientMedication::whereIn('client_id', $clientIds)
-                        ->active()
+                        ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
                         ->where('is_prn', false)
                         ->where(function ($query) {
                             $query->whereNotNull('dose_times')
@@ -1352,17 +1359,20 @@ class HandleInertiaRequests extends Middleware
                     $dayStart = $now->copy()->startOfDay();
                     $administrations = $schedule->administrationsForWindow($clientIds, $dayStart, $now);
 
+                    // Overdue as Meds today, My Day and the MAR read it: the
+                    // dose window has ended with nothing recorded (C6d).
                     $count = 0;
-                    foreach ($medications as $medication) {
-                        foreach ($schedule->scheduledTimesForDate($medication, $dayStart) as $scheduled) {
-                            if ($scheduled->gte($now)) {
+                    foreach (app(ScheduledDoseStates::class)->dosesOn($medications, $dayStart, $now) as $orderId => $doses) {
+                        $medication = $medications->firstWhere('id', $orderId);
+                        foreach ($doses as $dose) {
+                            if (ScheduledDoseStates::listStatus($dose) !== 'overdue') {
                                 continue;
                             }
 
                             $administration = $administrations->get($schedule->slotKey(
                                 (int) $medication->client_id,
                                 (int) $medication->id,
-                                $scheduled,
+                                $dose['due_at'],
                             ));
 
                             if ($administration && in_array($administration->status, ['given', 'refused', 'withheld', 'missed'], true)) {

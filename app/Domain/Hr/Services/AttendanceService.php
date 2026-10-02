@@ -25,6 +25,8 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\DoseSlots\DoseSlotProjection;
+use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\MyDay\ShiftTaskHelpService;
 use App\Services\ShiftHandoverService;
@@ -1987,7 +1989,7 @@ class AttendanceService
                 $query->whereNotNull('dose_times')
                     ->orWhereNotNull('frequency');
             })
-            ->get(['id', 'dose_times', 'frequency', 'active', 'is_prn', 'start_date', 'end_date']);
+            ->get();
 
         if ($medications->isEmpty()) {
             return 0;
@@ -2016,25 +2018,31 @@ class AttendanceService
                 return [$administration->client_medication_id.'|'.$scheduledKey => true];
             });
 
+        // The shift's doses as Meds today, My Day and the handover read them
+        // (dose-slot projection, C6e): the slot's due time, nothing before the
+        // order's entry. A dose waiting for the order check can't be signed,
+        // so it isn't counted; a self-managed dose isn't staff's to sign.
+        $doses = app(ScheduledDoseStates::class)->dosesBetween(
+            $medications,
+            $start,
+            $end,
+            Carbon::now($scheduleService->workerTimezone()),
+        );
         $unsigned = 0;
 
         foreach ($medications as $medication) {
-            $day = $start->copy()->startOfDay();
-            $lastDay = $end->copy()->startOfDay();
-
-            while ($day->lessThanOrEqualTo($lastDay)) {
-                foreach ($scheduleService->scheduledTimesForDate($medication, $day) as $scheduled) {
-                    if (! $scheduled->betweenIncluded($start, $end)) {
-                        continue;
-                    }
-
-                    $key = $medication->id.'|'.$scheduled->copy()->utc()->format('Y-m-d H:i');
-                    if (! $signedKeys->has($key)) {
-                        $unsigned++;
-                    }
+            foreach ($doses[(int) $medication->id] ?? [] as $dose) {
+                $scheduled = $dose['due_at'];
+                if (! $scheduled->betweenIncluded($start, $end)
+                    || $dose['outcome'] !== null
+                    || in_array($dose['state'], [DoseSlotProjection::STATE_PENDING_CHECK, DoseSlotProjection::STATE_SELF_MANAGED], true)) {
+                    continue;
                 }
 
-                $day->addDay();
+                $key = $medication->id.'|'.$scheduled->copy()->utc()->format('Y-m-d H:i');
+                if (! $signedKeys->has($key)) {
+                    $unsigned++;
+                }
             }
         }
 

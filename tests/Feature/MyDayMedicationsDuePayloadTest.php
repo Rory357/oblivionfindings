@@ -32,7 +32,7 @@ afterEach(function () {
 it('emits a distinct medications_due row per in-window dose slot', function () {
     [$worker, $client] = makeWorkerWithMyDayMedicationClient();
 
-    $med = ClientMedication::factory()->create([
+    $med = myDayEnteredOrder([
         'client_id' => $client->id,
         'name' => 'Paracetamol',
         'dosage' => '500 mg',
@@ -59,7 +59,7 @@ it('emits a distinct medications_due row per in-window dose slot', function () {
             ->component('my-day/index')
             // Two in-window slots for one medication => two rows (no collapse).
             ->has('medications_due', 2)
-            // Sorted overdue-first: 09:00 (overdue at 10:00) then 13:00 (upcoming).
+            // Sorted by urgency: 09:00 (due) then 13:00 (upcoming).
             ->where('medications_due.0.medication_id', $med->id)
             ->where('medications_due.1.medication_id', $med->id)
             ->where('medications_due.0.scheduled_for', $iso0900)
@@ -68,7 +68,9 @@ it('emits a distinct medications_due row per in-window dose slot', function () {
             // so React keys never collide and mutations target one dose.
             ->where('medications_due.0.id', $med->id.':'.$iso0900)
             ->where('medications_due.1.id', $med->id.':'.$iso1300)
-            ->where('medications_due.0.status', 'overdue')
+            // 09:00's window runs to 10:00, both ends included: due, not yet
+            // overdue (the dose-slot projection's states, C6d).
+            ->where('medications_due.0.status', 'due')
             ->where('medications_due.1.status', 'upcoming')
             ->where('can_open_emar', true)
             ->where('medications_due.0.emar_url', $emarUrl)
@@ -81,7 +83,7 @@ it('keeps record-only workers on Meds Today without exposing a dead admin eMAR l
     Shift::factory()->assignedToday($worker)->published()->create([
         'client_id' => $client->id,
     ]);
-    ClientMedication::factory()->create([
+    myDayEnteredOrder([
         'client_id' => $client->id,
         'name' => 'Paracetamol',
         'dosage' => '500 mg',
@@ -92,7 +94,7 @@ it('keeps record-only workers on Meds Today without exposing a dead admin eMAR l
         'end_date' => null,
         'dose_times' => ['09:00'],
     ]);
-    ClientMedication::factory()->create([
+    myDayEnteredOrder([
         'client_id' => $client->id,
         'name' => 'PRIVATE CONTROLLED MY DAY MEDICATION',
         'dosage' => '5 mg',
@@ -122,7 +124,7 @@ it('keeps record-only workers on Meds Today without exposing a dead admin eMAR l
 
 it('marks a My Day medication slot as given when an administration exists for that slot', function () {
     [$worker, $client] = makeWorkerWithMyDayMedicationClient();
-    $med = ClientMedication::factory()->create([
+    $med = myDayEnteredOrder([
         'client_id' => $client->id,
         'name' => 'Paracetamol',
         'dosage' => '500 mg',
@@ -162,7 +164,7 @@ it('marks a My Day medication slot as given when an administration exists for th
 it('hides a My Day medication slot while the worker snooze cache key is active', function () {
     Cache::flush();
     [$worker, $client] = makeWorkerWithMyDayMedicationClient();
-    $med = ClientMedication::factory()->create([
+    $med = myDayEnteredOrder([
         'client_id' => $client->id,
         'name' => 'Paracetamol',
         'dosage' => '500 mg',
@@ -203,7 +205,7 @@ it('matches every dose slot with a single administration query (no N+1)', functi
     // rail issued one ClientMedicationAdministration query per slot, re-run on
     // every 60s live refresh; now it must be a single query for the window.
     foreach (['Paracetamol', 'Metformin', 'Aspirin'] as $name) {
-        ClientMedication::factory()->create([
+        myDayEnteredOrder([
             'client_id' => $client->id,
             'name' => $name,
             'is_prn' => false,
@@ -255,7 +257,7 @@ it('does not disclose shift medications without an exact medication capability',
     Shift::factory()->assignedToday($worker)->published()->create([
         'client_id' => $client->id,
     ]);
-    ClientMedication::factory()->create([
+    myDayEnteredOrder([
         'client_id' => $client->id,
         'name' => 'Private shift medication',
         'is_prn' => false,
@@ -307,7 +309,7 @@ it('only serializes an active medication round with canonical accessible Site pr
 
     foreach ([$localSite, $foreignSite] as $site) {
         $client = Client::factory()->create(['site_id' => $site->id]);
-        ClientMedication::factory()->create([
+        myDayEnteredOrder([
             'client_id' => $client->id,
             'name' => 'Scheduled medicine for '.$site->name,
             'is_prn' => false,
@@ -421,4 +423,21 @@ function assignMyDayMedicationWorkerToClientSite(User $worker, array $extraPermi
     $client->supportWorkers()->attach($worker->id);
 
     return $client;
+}
+
+/**
+ * An order entered at the start of today (NZ): a dose due before an order's
+ * entry is not owed (P01 C6a), so the fixtures' morning doses need an order
+ * entered before them.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function myDayEnteredOrder(array $attributes): ClientMedication
+{
+    $now = Carbon::getTestNow();
+    Carbon::setTestNow(Carbon::now('Pacific/Auckland')->startOfDay()->utc());
+    $order = ClientMedication::factory()->create($attributes);
+    Carbon::setTestNow($now);
+
+    return $order;
 }
