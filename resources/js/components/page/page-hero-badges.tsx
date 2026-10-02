@@ -65,17 +65,22 @@ const TONE_CLASSES: Record<PageHeroBadgeTone, string> = {
         'border-status-success/30 bg-status-success-bg text-status-success',
     warning:
         'border-status-warning/30 bg-status-warning-bg text-status-warning',
+    // A white pill: its red stays dark in both modes (app.css).
     critical:
-        'border-status-critical/30 bg-primary-foreground text-status-critical',
-    info: 'border-status-info/30 bg-status-info-bg text-status-info',
+        'border-status-critical/30 bg-primary-foreground page-hero-on-white-critical',
+    // An opaque card pill with brand text, like the success/warning pairs.
+    // (bg-status-info-bg is --accent: a 15% brand tint under an org brand,
+    // so brand text on it sat on the brand band at 1:1.)
+    info: 'border-status-info/30 bg-card text-primary',
 };
 
+// Dots sit straight on the dark band, so they take the lifted tones too.
 const DOT_CLASSES: Record<PageHeroBadgeTone, string> = {
     default: 'bg-primary-foreground/80',
-    success: 'bg-status-success',
-    warning: 'bg-status-warning',
-    critical: 'bg-status-critical',
-    info: 'bg-status-info',
+    success: 'page-hero-dot-success',
+    warning: 'page-hero-dot-warning',
+    critical: 'page-hero-dot-critical',
+    info: 'page-hero-dot-info',
 };
 
 const ITEM_TONE_CLASSES: Record<PageHeroBadgePopoverItemTone, string> = {

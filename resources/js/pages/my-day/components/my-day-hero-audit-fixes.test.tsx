@@ -115,15 +115,17 @@ describe('MyDayHero audit fixes', () => {
             />,
         );
 
+        // PageHero stats take the band-safe tones (app.css page-hero-tone-*):
+        // the plain status tokens are tuned for cards, not the dark band.
         expect(screen.getByText('Clocked in')).toHaveClass(
-            'text-status-success',
+            'page-hero-tone-success',
         );
-        expect(screen.getByText('1/3')).toHaveClass('text-status-critical');
+        expect(screen.getByText('1/3')).toHaveClass('page-hero-tone-critical');
         expect(
             screen
                 .getAllByText('2')
                 .some((element) =>
-                    element.classList.contains('text-status-warning'),
+                    element.classList.contains('page-hero-tone-warning'),
                 ),
         ).toBe(true);
     });

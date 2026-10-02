@@ -25,18 +25,17 @@ export type PageHeroStat = {
     tone?: PageHeroStatTone;
 };
 
-// Heroes use a brand-tinted (purple) gradient background, so the dark
-// `*-foreground` variants of the status tokens (designed for on-light
-// backgrounds in light mode) read as black-on-purple. Use the base
-// `text-status-*` tokens instead — they sit at ~45% L in light mode and
-// ~70% L in dark mode, which gives a saturated tinted-white that's
-// visible on the brand gradient without needing a tile background.
+// The hero band is a dark brand shade, and the plain status tokens are tuned
+// for cards: light mode's are dark (~L 0.45) and info IS the brand, so on the
+// band they measured 1.0–2.4:1. The page-hero-tone-* classes (app.css) keep
+// each tone's hue but lift it to L ≥ 0.84 (info 0.86): ≥ 4.7:1 on every
+// brand and Site colour.
 const TONE_VALUE_CLASS: Record<PageHeroStatTone, string> = {
     neutral: '',
-    success: 'text-status-success',
-    warning: 'text-status-warning',
-    critical: 'text-status-critical',
-    info: 'text-status-info',
+    success: 'page-hero-tone-success',
+    warning: 'page-hero-tone-warning',
+    critical: 'page-hero-tone-critical',
+    info: 'page-hero-tone-info',
 };
 
 interface PageHeroStatsProps {
@@ -69,7 +68,7 @@ export function PageHeroStats({
                                     {stat.value}
                                 </div>
                             </div>
-                            <div className="mt-0.5 text-[10px] font-medium tracking-wider text-primary-foreground/60 uppercase">
+                            <div className="mt-0.5 text-[10px] font-medium tracking-wider text-primary-foreground/90 uppercase">
                                 {stat.label}
                             </div>
                         </div>
