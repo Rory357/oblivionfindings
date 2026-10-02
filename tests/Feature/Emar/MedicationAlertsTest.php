@@ -380,8 +380,8 @@ it('never raises an alert that isn’t offered yet', function () {
     $site = Site::factory()->create();
     b2Staff($site, 'team_lead');
 
-    // Overdue doses waits for P01 C6(f); witness overrides for PIN-2.
-    expect(app(MedicationAlerts::class)->raise('overdue', b2Subject($site, 'dose:1')))->toBeNull()
-        ->and(app(MedicationAlerts::class)->raise('override', b2Subject($site, 'override:1')))->toBeNull();
+    // Witness overrides arrive with PIN-2; the emergency-access report keeps its routing until B3.
+    expect(app(MedicationAlerts::class)->raise('override', b2Subject($site, 'override:1')))->toBeNull()
+        ->and(app(MedicationAlerts::class)->raise('breakglass', b2Subject($site, 'report:1')))->toBeNull();
     expect(MedicationAlert::query()->count())->toBe(0);
 });
