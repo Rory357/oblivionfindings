@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\Medication\OverdueDoseAlerts;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -93,6 +94,20 @@ class RespiteBooking extends Model
         'medications_reconciled' => 'boolean',
         'medications_reconciled_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        // A dose due during respite at another Site reads as Away (P01 C7):
+        // when the stay's times, place or status change, the person's
+        // overdue alerts follow.
+        $resync = static fn (self $booking) => OverdueDoseAlerts::queueAfterCommit((int) $booking->client_id);
+        static::saved(function (self $booking) use ($resync): void {
+            if ($booking->wasRecentlyCreated || $booking->wasChanged(['status', 'start_at', 'end_at', 'location_id', 'client_id', 'deleted_at'])) {
+                $resync($booking);
+            }
+        });
+        static::deleted($resync);
+    }
 
     public function request(): BelongsTo
     {

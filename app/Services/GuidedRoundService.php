@@ -170,12 +170,20 @@ class GuidedRoundService
 
                 $admin = $administrations->get($med->id.':'.$scheduled->copy()->utc()->format('Y-m-d H:i'));
                 // An order waiting for its check can't be recorded against
-                // until it is checked, whatever its dose's own state.
-                $doseState = $med->isAdministrable()
-                    ? ScheduledDoseStates::listStatus($dose)
-                    : DoseSlotProjection::STATE_PENDING_CHECK;
+                // until it is checked, whatever its dose's own state; a dose
+                // due while the person is away (C7) is away either way.
+                $doseState = ScheduledDoseStates::listStatus($dose);
+                if (! $med->isAdministrable() && $doseState !== DoseSlotProjection::STATE_AWAY) {
+                    $doseState = DoseSlotProjection::STATE_PENDING_CHECK;
+                }
 
-                $items->push($this->formatItem($med, $scheduled, $admin, $doseState));
+                $items->push($this->formatItem(
+                    $med,
+                    $scheduled,
+                    $admin,
+                    $doseState,
+                    $doseState === DoseSlotProjection::STATE_AWAY ? $dose['away_reason'] : null,
+                ));
             }
         }
 
@@ -248,11 +256,12 @@ class GuidedRoundService
      */
     public function summarise(array $items): array
     {
-        $total = count($items);
         $given = 0;
         $refused = 0;
         $held = 0;
         $pending = 0;
+        $waiting = 0;
+        $away = 0;
         $nextIndex = null;
 
         foreach ($items as $idx => $item) {
@@ -265,9 +274,12 @@ class GuidedRoundService
                 $held++;
             } elseif (($item['dose_state'] ?? null) === DoseSlotProjection::STATE_PENDING_CHECK) {
                 // Waiting for the order check: shown, not recordable until
-                // the order is checked, so it doesn't hold the round open —
-                // Meds today and the overdue alerts chase it once checked.
-                continue;
+                // the order is checked — Meds today and the overdue alerts
+                // chase it once checked.
+                $waiting++;
+            } elseif (($item['dose_state'] ?? null) === DoseSlotProjection::STATE_AWAY) {
+                // Away (C7): not owed here while the person is away.
+                $away++;
             } else {
                 $pending++;
                 if ($nextIndex === null) {
@@ -276,8 +288,12 @@ class GuidedRoundService
             }
         }
 
-        // Recorded doses (a dose waiting for the order check is neither
-        // recorded nor still to do in the round).
+        // The doses owed in the round (Main, 3 Oct): one waiting for the
+        // order check, or due while the person is away, isn't — it is left out
+        // of the total and the percent and counted on its own, so a round
+        // with only those left is 100% recorded. The rounds board's
+        // roundCounts() uses the same rule.
+        $total = count($items) - $waiting - $away;
         $completed = $given + $refused + $held;
 
         return [
@@ -288,7 +304,9 @@ class GuidedRoundService
             'refused' => $refused,
             'held' => $held,
             'next_index' => $nextIndex,
-            'percent' => $total > 0 ? (int) round(($completed / $total) * 100) : 0,
+            'percent' => $total > 0 ? (int) round(($completed / $total) * 100) : ($waiting + $away > 0 ? 100 : 0),
+            'waiting' => $waiting,
+            'away' => $away,
         ];
     }
 
@@ -325,9 +343,10 @@ class GuidedRoundService
                 'requires_pulse' => $it['requires_pulse'],
                 'scheduled_for' => $it['scheduled_for'],
                 'status' => $admin['status'] ?? match ($it['dose_state'] ?? null) {
-                    'overdue', DoseSlotProjection::STATE_PENDING_CHECK => $it['dose_state'],
+                    'overdue', DoseSlotProjection::STATE_PENDING_CHECK, DoseSlotProjection::STATE_AWAY => $it['dose_state'],
                     default => 'due',
                 },
+                'away_reason' => $admin === null ? ($it['away_reason'] ?? null) : null,
                 'witnessed_by' => $admin['witnessed_by'] ?? null,
                 'blood_glucose_level' => $admin['blood_glucose_level'] ?? null,
                 'pulse_bpm' => $admin['pulse_bpm'] ?? null,
@@ -471,6 +490,7 @@ class GuidedRoundService
 
     /**
      * @param  string|null  $doseState  the dose's list status (ScheduledDoseStates::listStatus) when it has no record
+     * @param  string|null  $awayReason  why the person is away, when the dose is away (C7)
      * @return array<string, mixed>
      */
     private function formatItem(
@@ -478,6 +498,7 @@ class GuidedRoundService
         Carbon $scheduled,
         ?ClientMedicationAdministration $administration,
         ?string $doseState = null,
+        ?string $awayReason = null,
     ): array {
         $client = $medication->client;
         $clientName = $client
@@ -505,8 +526,9 @@ class GuidedRoundService
             'requires_pulse' => $this->requiresPulse($medication),
             'scheduled_for' => $scheduled->toIso8601String(),
             // given/refused/withheld/missed once recorded; else due, upcoming,
-            // overdue or pending_check (Waiting for the order check).
+            // overdue, pending_check (Waiting for the order check) or away.
             'dose_state' => $administration?->status ?? $doseState ?? 'due',
+            'away_reason' => $administration === null ? $awayReason : null,
             'administration' => $administration ? [
                 'id' => $administration->id,
                 'status' => $administration->status,

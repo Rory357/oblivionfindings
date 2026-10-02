@@ -35,6 +35,7 @@ import {
     Lock,
     Package,
     Pill,
+    Plane,
     Printer,
     Search,
     Shield,
@@ -90,6 +91,8 @@ type ClientBreakdownRow = {
     withheld: number;
     missed: number;
     not_recorded: number;
+    /** Doses due while the person was away — its own number, not due. */
+    away?: number;
     compliance: number | null;
 };
 /** A rate, or "Not applicable" when nothing was due. */
@@ -672,7 +675,7 @@ export default function Reports(props: Props) {
                                 — the dose record starts then.
                             </p>
                         ) : null}
-                        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                        <div className="grid gap-3 sm:grid-cols-4 lg:grid-cols-7">
                             <OpsStatCard
                                 label="Given"
                                 value={adminSummary.given}
@@ -702,6 +705,12 @@ export default function Reports(props: Props) {
                                 value={adminSummary.not_recorded}
                                 icon={AlertOctagon}
                                 color="red"
+                            />
+                            <OpsStatCard
+                                label="Away"
+                                value={adminSummary.away ?? 0}
+                                icon={Plane}
+                                color="indigo"
                             />
                             <OpsStatCard
                                 label="Compliance"
@@ -1631,6 +1640,7 @@ function DrillDialog({
                 <SummaryRow label="Withheld" value={row.withheld} />
                 <SummaryRow label="Missed" value={row.missed} />
                 <SummaryRow label="Not recorded" value={row.not_recorded} />
+                <SummaryRow label="Away" value={row.away ?? 0} />
                 <SummaryRow label="Compliance" value={rate(row.compliance)} />
             </div>
         </MedsWizardDialog>

@@ -177,6 +177,8 @@ class MedsBoardPayloadService
                         'time' => $scheduled->copy()->timezone($timezone)->format('H:i'),
                         'round_label' => $this->roundLabelFor($scheduled->copy()->timezone($timezone)),
                         'status' => $status,
+                        // Away (C7): why, shown as "Away · reason".
+                        'away_reason' => $status === 'away' ? $dose['away_reason'] : null,
                         'recorded' => $administration ? $this->recordedPayload($administration, $timezone) : null,
                         'mar_url' => EmarUrl::mar($med->client_id, $scheduled->toDateString()),
                     ];

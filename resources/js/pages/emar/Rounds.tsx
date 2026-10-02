@@ -8,6 +8,7 @@ import RoundBoard from '@/components/emar/rounds/round-board';
 import RoundChart from '@/components/emar/rounds/round-chart';
 import RoundTimeline from '@/components/emar/rounds/round-timeline';
 import {
+    notOwedCaption,
     roundCounts,
     roundStatusMeta,
     type ActivityItem,
@@ -264,7 +265,7 @@ export default function Rounds(props: Props) {
                               : inProgress
                                 ? 'Resume guided round'
                                 : 'Start guided round',
-                          sub: `${original.scheduled_time} · ${c.recorded}/${c.total} recorded`,
+                          sub: `${original.scheduled_time} · ${c.recorded}/${c.total} recorded${notOwedCaption(c.waiting, c.away) ? ` · ${notOwedCaption(c.waiting, c.away)}` : ''}`,
                           tone: 'primary',
                           onClick: () => openGuided(original.id),
                       } satisfies ShiftCtxItem,

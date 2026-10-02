@@ -140,9 +140,9 @@ class MyTasksController extends Controller
         $todayShifts = $shifts->filter(fn ($s) => $s['is_today']);
         $stats = [
             'shifts_today' => $todayShifts->count(),
-            // Doses waiting for the order check, and doses recorded as missed,
-            // are listed but not counted.
-            'meds_due' => collect($medicationsDue)->whereNotIn('status', ['pending_check', 'missed'])->count(),
+            // Doses waiting for the order check, doses recorded as missed, and
+            // doses the person is away for (C7), are listed but not counted.
+            'meds_due' => collect($medicationsDue)->whereNotIn('status', ['pending_check', 'missed', 'away'])->count(),
             'meds_overdue' => collect($medicationsDue)->where('status', 'overdue')->count(),
             'tasks_open' => $todayShifts->sum(fn ($s) => collect($s['tasks'])->where('is_completed', false)->count()),
             'timesheets_pending' => collect($timesheets)->count(),
@@ -929,6 +929,8 @@ class MyTasksController extends Controller
                         'can_give' => ! $awaitingCheck && $canRecord && ! $med->controlled_drug,
                         'scheduled_for' => $scheduledIso,
                         'status' => $status,
+                        // Away (C7): why, shown as "Away · reason".
+                        'away_reason' => $status === 'away' ? $dose['away_reason'] : null,
                         'emar_url' => $canOpenEmar
                             ? $this->marUrlFor($med->client_id, $scheduled->toDateString())
                             : null,
@@ -938,7 +940,7 @@ class MyTasksController extends Controller
 
             // Sort: overdue first, then due, then upcoming
             usort($result, function ($a, $b) {
-                $order = ['overdue' => 0, 'due' => 1, 'upcoming' => 2, 'pending_check' => 2, 'given' => 3, 'refused' => 4, 'withheld' => 5, 'missed' => 6];
+                $order = ['overdue' => 0, 'due' => 1, 'upcoming' => 2, 'pending_check' => 2, 'given' => 3, 'refused' => 4, 'withheld' => 5, 'missed' => 6, 'away' => 7];
 
                 return ($order[$a['status']] ?? 3) <=> ($order[$b['status']] ?? 3);
             });

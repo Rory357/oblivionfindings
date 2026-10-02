@@ -125,7 +125,7 @@ export default function RoundChart({
                                                 <DoseDot
                                                     key={`${c.medication_id}-${c.scheduled_for}`}
                                                     status={c.status}
-                                                    title={`${c.medication_name} — ${doseStatusMeta(c.status).label}`}
+                                                    title={`${c.medication_name} — ${doseStatusMeta(c.status).label}${c.status === 'away' && c.away_reason ? ` · ${c.away_reason}` : ''}`}
                                                 />
                                             ))}
                                         </div>

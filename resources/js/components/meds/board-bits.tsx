@@ -73,7 +73,26 @@ export const DOSE_STATUS_META: Record<
         tagBg: 'var(--status-info-bg)',
         tagColor: 'var(--status-info)',
     },
+    away: {
+        label: 'Away',
+        pillClass: 'border-status-info/30 bg-status-info-bg text-status-info',
+        tagBg: 'var(--status-info-bg)',
+        tagColor: 'var(--status-info)',
+    },
 };
+
+/**
+ * A dose status as words: "Away · On leave (until Tue 16 Jun)" when the
+ * person is away (the reason is always shown), else the status label.
+ */
+export function doseStatusLabel(
+    status: DoseStatus,
+    awayReason?: string | null,
+): string {
+    const label = (DOSE_STATUS_META[status] ?? DOSE_STATUS_META.upcoming)
+        .label;
+    return status === 'away' && awayReason ? `${label} · ${awayReason}` : label;
+}
 
 /**
  * EM-12: a dose list tells a reader without controlled-medicine access how
@@ -96,9 +115,12 @@ export function hiddenControlledCaption(
 
 export function StatusPill({
     status,
+    awayReason,
     className,
 }: {
     status: DoseStatus;
+    /** Shown after "Away · " when the person is away. */
+    awayReason?: string | null;
     className?: string;
 }) {
     const meta = DOSE_STATUS_META[status] ?? DOSE_STATUS_META.upcoming;
@@ -110,7 +132,7 @@ export function StatusPill({
                 className,
             )}
         >
-            {meta.label}
+            {doseStatusLabel(status, awayReason)}
         </span>
     );
 }

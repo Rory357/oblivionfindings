@@ -314,8 +314,11 @@ export default function MarCharts(props: Props) {
             )
                 cdDue += 1;
         }
-        // Doses waiting for the order check are shown but not counted.
-        const total = schedule.filter((row) => !awaitsOrderCheck(row)).length;
+        // Doses waiting for the order check, and doses the person is away
+        // for, are shown but not counted.
+        const total = schedule.filter(
+            (row) => !awaitsOrderCheck(row) && row.status !== 'away',
+        ).length;
         return {
             recorded,
             total,

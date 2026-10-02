@@ -335,6 +335,8 @@ class MedicationRoundLifecycleRetirementTest extends TestCase
             'held' => 0,
             'next_index' => null,
             'percent' => 100,
+            'waiting' => 0,
+            'away' => 0,
         ], app(GuidedRoundService::class)->summarise($items));
     }
 

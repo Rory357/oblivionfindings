@@ -8,8 +8,10 @@ import RoundAuditTimeline, {
 import { DoseStatusBadge } from '@/components/emar/rounds/round-bits';
 import {
     doseStatusMeta,
+    isAway,
     isRecordable,
     isWaitingForCheck,
+    notOwedCaption,
     type GuidedRound,
     type RoundItem,
     type StaffOption,
@@ -42,6 +44,7 @@ import {
     Heart,
     Pencil,
     Pill,
+    Plane,
     Printer,
     ShieldAlert,
     Users,
@@ -168,7 +171,9 @@ export default function GuidedRoundDialog({
                           ? Ban
                           : isWaitingForCheck(it)
                             ? Clock
-                            : Pill;
+                            : isAway(it)
+                              ? Plane
+                              : Pill;
                 return {
                     key: `${it.medication_id}-${it.scheduled_for}`,
                     label: `${firstName(it.client_name)} · ${shortMed(it.medication_name)}`,
@@ -407,6 +412,9 @@ export default function GuidedRoundDialog({
             railFooter={
                 <span className="text-xs text-muted-foreground">
                     Round progress {progress.percent}%
+                    {notOwedCaption(progress.waiting, progress.away)
+                        ? ` · ${notOwedCaption(progress.waiting, progress.away)}`
+                        : ''}
                 </span>
             }
             steps={steps}
@@ -441,6 +449,8 @@ export default function GuidedRoundDialog({
             ) : item ? (
                 isWaitingForCheck(item) ? (
                     <WaitingForCheckPane item={item} />
+                ) : isAway(item) ? (
+                    <AwayPane item={item} />
                 ) : showRecorded ? (
                     <RecordedPane
                         item={item}
@@ -619,6 +629,22 @@ function WaitingForCheckPane({ item }: { item: RoundItem }) {
                 </span>{' '}
                 A change to this order is waiting for its check. This dose can
                 be recorded once the order has been checked.
+            </InfoCard>
+        </div>
+    );
+}
+
+/** A dose due while the person is away: shown with its reason, nothing to do in the round. */
+function AwayPane({ item }: { item: RoundItem }) {
+    return (
+        <div className="flex flex-col gap-4">
+            <DoseCard item={item} />
+            <InfoCard icon={Plane}>
+                <span className="font-semibold">
+                    {item.away_reason ? `Away · ${item.away_reason}.` : 'Away.'}
+                </span>{' '}
+                This dose isn’t owed here while they’re away. If they’re back,
+                update the leave or respite record and the dose is owed again.
             </InfoCard>
         </div>
     );

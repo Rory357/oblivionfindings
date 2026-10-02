@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Contracts\Timeline\EmitsToTimeline;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
+use App\Services\Medication\OverdueDoseAlerts;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -33,6 +34,15 @@ class ClientLeaveRequest extends Model implements EmitsToTimeline
         'ends_on' => 'date',
         'approved_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        // A dose due on approved leave reads as Away (P01 C7): when leave is
+        // approved, changed or withdrawn, the person's overdue alerts follow.
+        $resync = static fn (self $leave) => OverdueDoseAlerts::queueAfterCommit((int) $leave->client_id);
+        static::saved($resync);
+        static::deleted($resync);
+    }
 
     public function client(): BelongsTo
     {

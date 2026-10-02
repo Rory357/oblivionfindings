@@ -307,6 +307,8 @@ const OUTCOME_COLOR: Record<string, string> = {
     warning: OPS_COLORS.warning,
     critical: OPS_COLORS.danger,
     slate: OPS_COLORS.neutral,
+    // Away (approved leave, respite at another Site): its own segment.
+    info: OPS_COLORS.secondary,
 };
 
 function localYmdToday(): string {
