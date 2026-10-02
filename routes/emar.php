@@ -19,7 +19,6 @@ use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\MedicationsController;
 use App\Http\Controllers\MedicationsReportController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -111,14 +110,12 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->name('emar.prescriptions');
 
     // P11 chunk 6: Safety & oversight › Staff eligibility replaces
-    // Medication › Competency; old links (and ?site_id) land on it.
+    // Medication › Competency; old links land on it — a ?site_id only after
+    // the same reader check as before (a foreign house is 404).
     Route::get('/safety/eligibility', [StaffEligibilityController::class, 'index'])
         ->middleware('permission:medications.view')
         ->name('emar.safety.eligibility');
-    Route::get('/competency', fn (Request $request) => redirect()->route(
-        'emar.safety.eligibility',
-        array_filter(['house' => $request->integer('site_id') ?: null]),
-    ))
+    Route::get('/competency', [StaffEligibilityController::class, 'legacyCompetency'])
         ->middleware('permission:medications.view')
         ->name('emar.competency');
 
