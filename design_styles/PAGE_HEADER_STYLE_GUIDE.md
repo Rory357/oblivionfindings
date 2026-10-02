@@ -404,7 +404,9 @@ No full-capsule (`999px`) pills anywhere in the header or sub nav.
 2. Tokens only: express the sky, glows, ring, borders and tints via
    `--primary` + `color-mix`; safety accents via fixed status tokens.
    Verify AA for white-on-glow text at extreme brand hues (amber is
-   the harshest test).
+   the harshest test). Band text is `--band-foreground` — always white,
+   never derived from the brand, so a very light brand reads like any
+   other (amended 2026-10-03; ESLint `design/band-text-token`).
 3. The sub-nav strip is the existing `TierTwoTabs`
    (`components/page/grouped-profile-nav.tsx`) restyled to §8 — one
    enforcement point, not a new component.
