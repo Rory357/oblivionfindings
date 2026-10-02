@@ -59,6 +59,7 @@ class MedicationAlerts
                 'severity' => $subject->severity,
                 'subject' => $subject->context,
                 'follow_up' => (bool) ($setting['follow_up'] ?? false),
+                'reached_nobody' => false,
                 'status' => MedicationAlert::STATUS_OPEN,
                 'raised_at' => $now,
             ]);

@@ -12,10 +12,10 @@ use Illuminate\Support\Facades\Schema;
  * is told twice.
  *
  * Cleared one type at a time, in the chunk that wires it (B2 Q4). Not here:
- * overdue doses (wired after P01 C6(f)), expired stock (its signal also
- * carries orders reaching their end date, which no alert covers yet), and
- * the refusal-escalation, unsafe-correction and transit rules (no catalogue
- * alert). down() restores the exact seeded values.
+ * expired stock (its signal also carries orders reaching their end date,
+ * which no alert covers yet), and the refusal-escalation, unsafe-correction
+ * and transit rules (no catalogue alert). down() restores the exact seeded
+ * values.
  */
 return new class extends Migration
 {
@@ -26,6 +26,7 @@ return new class extends Migration
         'medication_prn_over_limit' => ['Medication: PRN Over Limit', ['managers_core']],
         'medication_stock_out' => ['Medication: Out of Stock', ['managers_core']],
         'medication_error' => ['Medication: Error Reported', ['managers_core']],
+        'medication_overdue' => ['Medication: Overdue Doses', ['managers_core']],
     ];
 
     public function up(): void

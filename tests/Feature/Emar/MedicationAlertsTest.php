@@ -191,7 +191,7 @@ it('tells everyone rostered on a shift covering the alert time', function () {
     $offShift = b2Staff($site, 'support_worker');
     $client = Client::factory()->create(['site_id' => $site->id]);
     Shift::factory()->create(['client_id' => $client->id, 'site_id' => $site->id, 'user_id' => $onShift->id, 'starts_at' => now()->subHours(2), 'ends_at' => now()->addHours(4), 'status' => 'in_progress']);
-    Shift::factory()->create(['client_id' => $client->id, 'site_id' => $site->id, 'user_id' => $offShift->id, 'starts_at' => now()->subHours(9), 'ends_at' => now()->subHour(), 'status' => 'completed']);
+    Shift::factory()->create(['client_id' => $client->id, 'site_id' => $site->id, 'user_id' => $offShift->id, 'starts_at' => now()->subHours(9), 'ends_at' => now()->subHour(), 'status' => 'scheduled']);
 
     // "Follow-ups overdue" is decided: everyone rostered and the house lead, always.
     app(MedicationAlerts::class)->raise('followups', b2Subject($site, 'refusal-followup:1'));
@@ -248,13 +248,14 @@ it('raises low stock, expiring, expired and out-of-stock alerts from the stock c
     $out = b2Order($site, ['name' => 'Levetiracetam']);
     ClientMedicationStock::query()->create(['client_medication_id' => $out->id, 'on_hand' => 0, 'reorder_level' => 5, 'unit' => 'tablets']);
     $expiring = b2Order($site, ['name' => 'Enoxaparin 40 mg']);
-    ClientMedicationStock::query()->create(['client_medication_id' => $expiring->id, 'on_hand' => 20, 'reorder_level' => 2, 'unit' => 'syringes', 'expiry_date' => now()->addDays(4)->toDateString()]);
+    ClientMedicationStock::query()->create(['client_medication_id' => $expiring->id, 'on_hand' => 20, 'reorder_level' => 2, 'unit' => 'syringes', 'expiry_date' => '2026-10-06']);
 
     $this->artisan('emar:send-alerts')->assertExitCode(0);
     $this->artisan('emar:check-medication-stock')->assertExitCode(0);
 
     $messages = MedicationAlert::query()->pluck('message', 'type');
-    expect($messages['stock'] ?? null)->toContain('Salbutamol inhaler for Aroha N. is below its reorder level')
+    expect(MedicationAlert::query()->where('type', 'stock')->pluck('message')->all())
+        ->toContain('Salbutamol inhaler for Aroha N. is below its reorder level (2 left). Kōwhai House.')
         ->and($messages['expiry'])->toBe('Enoxaparin 40 mg for Aroha N. expires on 6 Oct 2026. Kōwhai House.')
         ->and($messages['outOfStock'])->toBe('Levetiracetam for Aroha N. is out of stock. Kōwhai House.');
     // v5 defaults: low stock to the house lead and stock staff; expiring to stock staff.
@@ -297,7 +298,7 @@ it('raises as-needed limit and review alerts when a person’s alerts are refres
         ]);
     }
     $client = $prn->client;
-    $client->forceFill(['next_chart_review_date' => now()->addDays(3)->toDateString()])->save();
+    $client->forceFill(['next_chart_review_date' => '2026-10-05'])->save();
 
     app(MedicationAlertService::class)->generateClientAlerts($client->fresh());
 

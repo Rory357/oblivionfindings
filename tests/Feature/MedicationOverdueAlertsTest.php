@@ -4,12 +4,11 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationStock;
-use App\Models\MedicationRound;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
-use App\Notifications\MedicationOverdueNotification;
 use App\Notifications\MedicationAlertNotification;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
@@ -66,26 +65,25 @@ it('sends overdue medication alerts from missed scheduled slots without pending 
     ]);
     Carbon::setTestNow(Carbon::parse('2026-06-08 11:15:00', 'Pacific/Auckland')->utc());
 
-    MedicationRound::query()->create([
+    // P11 B2: overdue doses go to everyone rostered on a covering shift and
+    // the house lead (Stephan's decision, locked on).
+    Shift::factory()->create([
+        'client_id' => $client->id,
         'site_id' => $site->id,
-        'name' => 'Morning round',
-        'round_type' => 'morning',
-        'scheduled_time' => '09:00',
-        'window_minutes' => 60,
-        'round_date' => '2026-06-08',
-        'status' => 'pending',
-        'assigned_to' => $worker->id,
+        'user_id' => $worker->id,
+        'starts_at' => now()->subHours(3),
+        'ends_at' => now()->addHours(5),
+        'status' => 'in_progress',
     ]);
 
     $this->artisan('emar:send-alerts')->assertExitCode(0);
 
     Notification::assertSentTo(
         $worker,
-        MedicationOverdueNotification::class,
-        fn (MedicationOverdueNotification $notification) => $notification->medication === $medication->name
-            && $notification->clientName === 'Mere Wilson'
-            && $notification->scheduledTime === '09:00'
-            && $notification->clientId === $client->id,
+        MedicationAlertNotification::class,
+        fn (MedicationAlertNotification $notification) => $notification->alert->type === 'overdue'
+            && $notification->alert->client_id === $client->id
+            && str_starts_with($notification->alert->message, 'Mere W. — Morning tablets, 9:00 am dose — has no outcome 2 h 15 min after it was due.'),
     );
 });
 

@@ -98,10 +98,9 @@ final class MedicationAlertCatalogue
      * other alerts are controlled when their medicine is. `follow_up`: Follow
      * up is proposed on by default (v5 FOLLOW_UP_DEFAULT).
      *
-     * Not built (hidden): overdue doses waits for the dose-slot overdue
-     * alerts (P01 C6(f)) to own when it fires; witness override requests
-     * arrive with PIN-2; the emergency-access daily report keeps today's
-     * routing until B3 / P10 define who reviews emergency access (P11 B2 Q5).
+     * Not built (hidden): witness override requests arrive with PIN-2; the
+     * emergency-access daily report keeps today's routing until B3 / P10
+     * define who reviews emergency access (P11 B2 Q5).
      *
      * @var array<string, array{label: string, subline: string, groups: list<string>, default: list<string>, locked: list<string>, controlled: bool, follow_up: bool, until: string, built: bool}>
      */
@@ -115,7 +114,8 @@ final class MedicationAlertCatalogue
             'controlled' => false,
             'follow_up' => true,
             'until' => 'Until every dose has an outcome',
-            'built' => false,
+            // P01 C6(f) finds the overdue doses and owns when they're dealt with.
+            'built' => true,
         ],
         // P11 B2 Q6: only refusal follow-ups have a due time today; effect
         // checks, second-person confirmations and phone instructions join with

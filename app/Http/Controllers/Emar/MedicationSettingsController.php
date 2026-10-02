@@ -104,11 +104,13 @@ class MedicationSettingsController extends Controller
             $changes[$index]['value'] = $change['definition']->normalise($change['value']);
         }
         $this->assertSettingsAuthority($actor, $changes);
-        $this->assertAlertPeople($changes);
 
         $result = DB::transaction(function () use ($actor, $changes, $validated): array {
             $lockedActor = $this->lockCurrentRuleActor($actor, $this->onlyHouseManaged($changes));
             $this->assertCurrentSettingsAuthority($lockedActor, $changes);
+            // Who may be named is checked once authority over each house is
+            // (another house's extras: 403, never a validation message).
+            $this->assertAlertPeople($changes);
 
             return $this->settingsStore->apply($lockedActor, $changes, (bool) ($validated['confirm_loosening'] ?? false));
         }, 3);

@@ -161,12 +161,11 @@ it('stops Control Room rules notifying for alerts the catalogue now owns, and re
     $roles = fn (string $code) => SignalRule::query()->where('signal_type_code', $code)->value('notify_roles');
 
     $migration->up();
-    foreach (['medication_controlled_discrepancy', 'medication_controlled_loss', 'medication_prn_over_limit', 'medication_stock_out', 'medication_error'] as $code) {
+    foreach (['medication_controlled_discrepancy', 'medication_controlled_loss', 'medication_prn_over_limit', 'medication_stock_out', 'medication_error', 'medication_overdue'] as $code) {
         expect($roles($code))->toBe([]);
     }
     // Not wired yet: unchanged.
-    expect($roles('medication_overdue'))->toBe(['managers_core'])
-        ->and($roles('medication_expired'))->toBe(['managers_core'])
+    expect($roles('medication_expired'))->toBe(['managers_core'])
         ->and($roles('medication_refusal_escalation'))->toBe(['managers_core', 'coordinators']);
 
     $migration->down();
@@ -174,5 +173,6 @@ it('stops Control Room rules notifying for alerts the catalogue now owns, and re
         ->and($roles('medication_controlled_loss'))->toBe(['managers_core', 'coordinators'])
         ->and($roles('medication_prn_over_limit'))->toBe(['managers_core'])
         ->and($roles('medication_stock_out'))->toBe(['managers_core'])
-        ->and($roles('medication_error'))->toBe(['managers_core']);
+        ->and($roles('medication_error'))->toBe(['managers_core'])
+        ->and($roles('medication_overdue'))->toBe(['managers_core']);
 });

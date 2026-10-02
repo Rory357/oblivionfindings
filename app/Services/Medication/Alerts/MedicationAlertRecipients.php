@@ -186,20 +186,24 @@ class MedicationAlertRecipients
 
     /**
      * Medication access at the alert's house, and controlled-medicine access
-     * for a controlled alert. "controlled" means only that was missing.
+     * for a controlled alert. "controlled" means only that was missing. The
+     * staff member is told about their own renewal wherever they work — it
+     * names nobody else and no medicine (as today).
      *
      * @return 'yes'|'no'|'controlled'
      */
     private function gate(User $user, MedicationAlertSubject $subject, string $reason): string
     {
-        if ($user->approved_at === null || ! $this->can($user, 'medications.view')) {
+        if ($user->approved_at === null) {
             return 'no';
         }
-        // The staff member is told about their own renewal wherever they work.
-        if ($reason !== MedicationAlertCatalogue::STAFF_MEMBER) {
-            if ($subject->siteId === null || ! in_array($subject->siteId, $this->sitesOf($user), true)) {
-                return 'no';
-            }
+        if ($reason === MedicationAlertCatalogue::STAFF_MEMBER) {
+            return 'yes';
+        }
+        if (! $this->can($user, 'medications.view')
+            || $subject->siteId === null
+            || ! in_array($subject->siteId, $this->sitesOf($user), true)) {
+            return 'no';
         }
         if ($subject->controlled && ! $this->can($user, MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
             return 'controlled';

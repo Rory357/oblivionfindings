@@ -41,6 +41,94 @@ class MedicationAlertSources
 {
     public function __construct(private readonly MedicationAlerts $alerts) {}
 
+    /**
+     * Overdue doses (P01 C6f finds them, every 15 minutes): one alert per
+     * overdue spell of a dose, keyed by the same spell as its Control Room
+     * signal, so the two can't disagree; dealt with when the dose is settled
+     * (OverdueDoseAlerts). Returns how many alerts were raised.
+     *
+     * @param  Collection<int, array{key: string, spell_key: string, client_id: int, site_id: int|null, order: ClientMedication, due_at: CarbonInterface}>  $doses
+     */
+    public function overdueDoses(Collection $doses, CarbonInterface $now): int
+    {
+        $raised = 0;
+        $this->safely('overdue', function () use ($doses, $now, &$raised): void {
+            foreach ($doses as $dose) {
+                if ($dose['site_id'] === null) {
+                    continue;
+                }
+                $order = $dose['order'];
+                $order->loadMissing('client.site:id,name');
+                $client = $order->client;
+                $house = $this->house($client);
+                $due = $dose['due_at']->copy()->timezone(config('app.worker_timezone', 'Pacific/Auckland'));
+                $alert = $this->alerts->raise(MedicationAlertCatalogue::OVERDUE, new MedicationAlertSubject(
+                    key: $dose['spell_key'],
+                    siteId: (int) $dose['site_id'],
+                    title: 'Overdue dose',
+                    message: sprintf(
+                        '%s — %s, %s dose — has no outcome %s after it was due. %s.',
+                        $this->person($client),
+                        $order->name,
+                        $due->format('g:i a').($due->isSameDay($now->copy()->timezone($due->getTimezone())) ? '' : ' '.$due->format('D j M')),
+                        $this->elapsed($due, $now),
+                        $house,
+                    ),
+                    shortMessage: "A dose at {$house} has no outcome yet.",
+                    actionUrl: '/emar/mar?client_id='.$order->client_id,
+                    severity: 'critical',
+                    clientId: (int) $order->client_id,
+                    controlled: (bool) $order->controlled_drug,
+                    context: ['client_id' => (int) $order->client_id, 'client_medication_id' => (int) $order->id, 'dose_key' => $dose['spell_key']],
+                ));
+                $raised += $alert !== null ? 1 : 0;
+            }
+        });
+
+        return $raised;
+    }
+
+    /**
+     * Overdue doses now settled (recorded, or no longer owed): their alerts
+     * are dealt with. Called with OverdueDoseAlerts' own settled check.
+     *
+     * @param  callable(list<string>): list<string>  $settled  dose keys → those settled
+     * @param  list<int>|null  $clientIds  null: everyone
+     */
+    public function overdueSettled(callable $settled, ?array $clientIds): void
+    {
+        $this->safely('overdue', function () use ($settled, $clientIds): void {
+            $prefix = MedicationAlertCatalogue::OVERDUE.':';
+            $open = MedicationAlert::query()
+                ->where('type', MedicationAlertCatalogue::OVERDUE)
+                ->whereNotNull('open_key')
+                ->when($clientIds !== null, fn ($query) => $query->whereIn('client_id', $clientIds))
+                ->pluck('open_key')
+                ->map(fn (string $key): string => substr($key, strlen($prefix)));
+            if ($open->isEmpty()) {
+                return;
+            }
+            // "dose-key~spell" → the dose key.
+            $byDose = $open->groupBy(fn (string $spellKey): string => (string) preg_replace('/~\d+$/', '', $spellKey));
+            foreach ($settled($byDose->keys()->all()) as $doseKey) {
+                foreach ($byDose->get($doseKey, collect()) as $spellKey) {
+                    $this->alerts->resolve(MedicationAlertCatalogue::OVERDUE, $spellKey, 'The dose has been recorded, or is no longer owed');
+                }
+            }
+        });
+    }
+
+    /** "60 minutes", "2 h 15 min". */
+    private function elapsed(CarbonInterface $since, CarbonInterface $now): string
+    {
+        $minutes = max(0, (int) floor($since->diffInMinutes($now, true)));
+        if ($minutes < 120) {
+            return $minutes.' '.($minutes === 1 ? 'minute' : 'minutes');
+        }
+
+        return intdiv($minutes, 60).' h'.($minutes % 60 ? ' '.($minutes % 60).' min' : '');
+    }
+
     /** Stock running low: on hand at or below its reorder level (every 15 minutes). */
     public function lowStock(): void
     {
