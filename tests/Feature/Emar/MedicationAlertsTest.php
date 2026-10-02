@@ -559,3 +559,61 @@ it('closes a renewal reminder as renewed only when there is a renewal', function
     expect(MedicationAlert::query()->where('dedupe_key', 'renewals:renewal:'.$old->id.':2026-10-20')->value('outcome'))->toBe('Renewed')
         ->and(MedicationAlert::query()->where('dedupe_key', 'renewals:renewal:'.$lapsed->id.':2026-10-20')->value('outcome'))->toBe('No longer due');
 });
+
+it('carries over at deploy what people were already told, so the first run tells nobody again', function () {
+    $site = Site::factory()->create(['name' => 'Kōwhai House']);
+    $assessor = b2Staff($site, 'clinical_lead');
+    $lead = b2Staff($site, 'team_lead');
+    $staff = b2Staff($site, 'support_worker', ['medications.view']);
+    $low = b2Order($site);
+    $stock = ClientMedicationStock::query()->create(['client_medication_id' => $low->id, 'on_hand' => 2, 'reorder_level' => 10, 'unit' => 'doses', 'last_reorder_alert_at' => now()->subHours(5)]);
+    $refused = b2Order($site, ['name' => 'Risperidone']);
+    $longAgo = b2Order($site, ['name' => 'Quetiapine']);
+    $overdue = b2Order($site, ['name' => 'Levetiracetam']);
+    $doseKey = $overdue->id.'@2026-10-01T19:00Z~1';
+    $competency = MedicationCompetencyAssessment::query()->create([
+        'user_id' => $staff->id,
+        'assessor_id' => $assessor->id,
+        'assessment_type' => 'annual',
+        'status' => 'passed',
+        'assessment_date' => '2025-10-20',
+        'expiry_date' => '2026-10-20',
+        'assessor_declared_at' => now()->subYear(),
+        'staff_acknowledged_at' => now()->subYear(),
+        'restricted' => false,
+    ]);
+    $told = fn (User $user, string $class, array $data, int $hoursAgo = 3) => DB::table('notifications')->insert([
+        'id' => (string) Str::uuid(),
+        'type' => 'App\\Notifications\\'.$class,
+        'notifiable_type' => User::class,
+        'notifiable_id' => $user->id,
+        'data' => json_encode($data),
+        'created_at' => now()->subHours($hoursAgo),
+        'updated_at' => now()->subHours($hoursAgo),
+    ]);
+    $told($lead, 'MedicationOverdueNotification', ['client_id' => $overdue->client_id, 'dose_key' => $doseKey]);
+    $told($lead, 'MedicationRefusalClusterNotification', ['client_id' => $refused->client_id, 'client_medication_id' => $refused->id]);
+    $told($staff, 'MedicationCompetencyExpiringNotification', ['assessment_id' => $competency->id, 'expiry_date' => '20/10/2026']);
+    // Told days ago: an open cluster was re-told daily, so this one isn't open.
+    $told($lead, 'MedicationRefusalClusterNotification', ['client_id' => $longAgo->client_id, 'client_medication_id' => $longAgo->id], 72);
+
+    (require database_path('migrations/2026_10_02_100300_carry_over_notified_medication_alerts.php'))->up();
+
+    expect(MedicationAlert::query()->whereNotNull('open_key')->pluck('open_key')->sort()->values()->all())->toBe([
+        'overdue:'.$doseKey,
+        'refusals:refusals:'.$refused->id,
+        'renewals:renewal:'.$competency->id.':2026-10-20',
+        'stock:stock:'.$stock->id,
+    ])
+        ->and(MedicationAlertEvent::query()->where('event', MedicationAlertEvent::CARRIED_OVER)->count())->toBe(4)
+        ->and(MedicationAlert::query()->where('type', 'stock')->first()->only(['site_id', 'client_id', 'reached_nobody']))
+        ->toBe(['site_id' => $site->id, 'client_id' => $low->client_id, 'reached_nobody' => false])
+        ->and(MedicationAlert::query()->where('type', 'renewals')->value('staff_user_id'))->toBe($staff->id);
+
+    // The first runs find them open: nobody is told again.
+    app(MedicationAlertSources::class)->lowStock();
+    app(MedicationAlertSources::class)->renewals();
+    expect(app(MedicationAlerts::class)->raise('overdue', b2Subject($site, $doseKey)))->toBeNull()
+        ->and(app(MedicationAlerts::class)->raise('refusals', b2Subject($site, 'refusals:'.$refused->id)))->toBeNull();
+    Notification::assertNothingSent();
+});

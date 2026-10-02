@@ -10,9 +10,12 @@ use Illuminate\Support\Facades\Schema;
  * — without managing the rest of Medication Settings. Granted to team_lead
  * and coordinator, plus admin.
  *
- * `medications.settings.manage` predates the grant-migration rule and was
- * only ever seeded; this also grants it to the roles RbacSeeder gives it, so
- * a fresh deploy doesn't 403 every settings manager.
+ * `medications.settings.manage` predates the grant-migration rule: RbacSeeder
+ * has seeded it since 2 June 2026 (79aac1a55) and no migration has granted it
+ * before (B1 shipped none). So this is its first grant ever, and only where
+ * the key doesn't exist yet — where the seeder already made it, its role
+ * grants are left exactly as they are, so a revoked grant stays revoked
+ * (B2 C1 review).
  *
  * Deploys don't run seeders, so this grants what RbacSeeder seeds.
  */
@@ -34,7 +37,7 @@ return new class extends Migration
 
         DB::transaction(function (): void {
             $this->grant(self::HOUSE_KEY, self::HOUSE_DESCRIPTION, ['admin', 'team_lead', 'coordinator']);
-            $this->grant(self::SETTINGS_KEY, self::SETTINGS_DESCRIPTION, ['admin', 'provider_manager', 'coordinator', 'clinical_lead']);
+            $this->grant(self::SETTINGS_KEY, self::SETTINGS_DESCRIPTION, ['admin', 'provider_manager', 'coordinator', 'clinical_lead'], onlyIfNew: true);
         });
     }
 
@@ -61,11 +64,14 @@ return new class extends Migration
         });
     }
 
-    /** @param list<string> $roles */
-    private function grant(string $key, string $description, array $roles): void
+    /**
+     * @param  list<string>  $roles
+     * @param  bool  $onlyIfNew  Grant to the roles only when this creates the key.
+     */
+    private function grant(string $key, string $description, array $roles, bool $onlyIfNew = false): void
     {
         $now = now();
-        DB::table('permissions')->insertOrIgnore([
+        $created = DB::table('permissions')->insertOrIgnore([
             'key' => $key,
             'description' => $description,
             'group' => 'medications',
@@ -73,6 +79,9 @@ return new class extends Migration
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+        if ($onlyIfNew && $created === 0) {
+            return;
+        }
         $permissionId = DB::table('permissions')->where('key', $key)->value('id');
 
         foreach (DB::table('roles')->whereIn('name', $roles)->pluck('id') as $roleId) {

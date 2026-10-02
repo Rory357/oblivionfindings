@@ -168,25 +168,58 @@ it('grants the house key to team leads and coordinators, and rolls back only it'
         ->and(Permission::query()->where('key', 'medications.settings.manage')->exists())->toBeTrue();
 });
 
-it('stops Control Room rules notifying for alerts the catalogue now owns, and restores them on rollback', function () {
+it('grants the settings key only where it is new, so a revoked grant stays revoked', function () {
+    $migration = require database_path('migrations/2026_10_02_100000_grant_medication_alert_and_settings_keys.php');
+    $settings = Permission::query()->where('key', 'medications.settings.manage')->firstOrFail();
+    $coordinator = Role::query()->where('name', 'coordinator')->firstOrFail();
+    DB::table('role_permission')->where('permission_id', $settings->id)->where('role_id', $coordinator->id)->delete();
+
+    // Seeded already (RbacSeeder since 2 June): its grants are left as they are.
+    $migration->up();
+    expect(DB::table('role_permission')->where('permission_id', $settings->id)->where('role_id', $coordinator->id)->exists())->toBeFalse();
+
+    // Never seeded: this is its first grant.
+    DB::table('role_permission')->where('permission_id', $settings->id)->delete();
+    DB::table('permissions')->where('id', $settings->id)->delete();
+    $migration->up();
+    $created = Permission::query()->where('key', 'medications.settings.manage')->firstOrFail();
+    expect(Role::query()->whereHas('permissions', fn ($p) => $p->whereKey($created->id))->pluck('name')->sort()->values()->all())
+        ->toBe(['admin', 'clinical_lead', 'coordinator', 'provider_manager']);
+});
+
+it('stops Control Room rules notifying only where they still hold their seeded recipients, and restores them exactly', function () {
     (require database_path('migrations/2026_04_10_240000_seed_medication_signal_types_and_rules.php'))->up();
     (require database_path('migrations/2026_04_12_150000_expand_medication_signal_types_for_exceptions.php'))->up();
     $migration = require database_path('migrations/2026_10_02_100200_medication_settings_own_who_is_told_c1.php');
+    DB::table('medication_alert_cr_rule_snapshots')->delete();
     $roles = fn (string $code) => SignalRule::query()->where('signal_type_code', $code)->value('notify_roles');
+    $stored = fn (string $code) => DB::table('control_room_signal_rules')->where('signal_type_code', $code)->value('notify_roles');
+    $set = fn (string $code, array $to) => DB::table('control_room_signal_rules')->where('signal_type_code', $code)->update(['notify_roles' => json_encode($to)]);
+    // Someone already chose the as-needed rule's recipients: theirs stay.
+    $set('medication_prn_over_limit', ['managers_core', 'site_managers']);
+    $stockOutBefore = $stored('medication_stock_out');
 
     $migration->up();
-    foreach (['medication_controlled_discrepancy', 'medication_controlled_loss', 'medication_prn_over_limit', 'medication_stock_out', 'medication_error', 'medication_overdue'] as $code) {
+
+    $cleared = ['medication_controlled_discrepancy', 'medication_controlled_loss', 'medication_error', 'medication_overdue', 'medication_refusal_escalation', 'medication_stock_out'];
+    foreach ($cleared as $code) {
         expect($roles($code))->toBe([]);
     }
-    // Not wired yet: unchanged.
-    expect($roles('medication_expired'))->toBe(['managers_core'])
-        ->and($roles('medication_refusal_escalation'))->toBe(['managers_core', 'coordinators']);
+    expect($roles('medication_prn_over_limit'))->toBe(['managers_core', 'site_managers'])
+        // Expired stock still notifies (order end dates); the alert row says so.
+        ->and($roles('medication_expired'))->toBe(['managers_core'])
+        ->and(DB::table('medication_alert_cr_rule_snapshots')->orderBy('signal_type_code')->pluck('signal_type_code')->all())->toBe($cleared);
 
-    $migration->down();
-    expect($roles('medication_controlled_discrepancy'))->toBe(['managers_core', 'coordinators'])
+    // After the clear, someone chose new recipients for errors: a rollback keeps them.
+    $set('medication_error', ['coordinators']);
+    // down() also drops the snapshot table — DDL, never run inside a test transaction.
+    (new ReflectionMethod($migration, 'restoreSnapshots'))->invoke($migration);
+
+    expect($stored('medication_stock_out'))->toBe($stockOutBefore)
+        ->and($roles('medication_controlled_discrepancy'))->toBe(['managers_core', 'coordinators'])
         ->and($roles('medication_controlled_loss'))->toBe(['managers_core', 'coordinators'])
-        ->and($roles('medication_prn_over_limit'))->toBe(['managers_core'])
-        ->and($roles('medication_stock_out'))->toBe(['managers_core'])
-        ->and($roles('medication_error'))->toBe(['managers_core'])
-        ->and($roles('medication_overdue'))->toBe(['managers_core']);
+        ->and($roles('medication_overdue'))->toBe(['managers_core'])
+        ->and($roles('medication_refusal_escalation'))->toBe(['managers_core', 'coordinators'])
+        ->and($roles('medication_error'))->toBe(['coordinators'])
+        ->and($roles('medication_prn_over_limit'))->toBe(['managers_core', 'site_managers']);
 });
