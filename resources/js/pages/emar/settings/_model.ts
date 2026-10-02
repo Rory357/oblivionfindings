@@ -188,11 +188,19 @@ export function parseAlert(value: string): AlertSetting | null {
     }
 }
 
+/** In-app can't be switched off: a decided alert, or no other channel that sends today is on (B2 C1 review). */
+export function inAppLocked(meta: AlertMeta, a: AlertSetting): boolean {
+    return (
+        meta.locked.length > 0 ||
+        !meta.channels.some((c) => c !== 'inapp' && a[c as 'email' | 'push'])
+    );
+}
+
 /** The server's canonical form: groups in catalogue order with decided ones on, people unique and in order. */
 export function encodeAlert(meta: AlertMeta, a: AlertSetting): string {
     const chosen = new Set([...a.groups, ...meta.locked]);
     return JSON.stringify({
-        inapp: meta.locked.length ? true : a.inapp,
+        inapp: inAppLocked(meta, a) ? true : a.inapp,
         email: a.email,
         push: a.push,
         follow_up: a.follow_up,

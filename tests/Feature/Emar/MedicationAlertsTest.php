@@ -9,6 +9,7 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationAlert;
 use App\Models\MedicationAlertEvent;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationError;
 use App\Models\MedicationRefusalFollowup;
 use App\Models\MedicationSiteSetting;
@@ -18,14 +19,20 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Notifications\MedicationAlertNotification;
+use App\Services\Medication\Alerts\MedicationAlertRecipients;
 use App\Services\Medication\Alerts\MedicationAlerts;
+use App\Services\Medication\Alerts\MedicationAlertSettings;
 use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\Alerts\MedicationAlertSubject;
+use App\Services\Medication\Settings\MedicationSettingsRegistry;
 use App\Services\MedicationAlertService;
+use App\Services\MedicationIncidentIntegrationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 
 /*
  * P11 B2 chunk 1: medication alerts are raised once per open subject, to the
@@ -384,4 +391,171 @@ it('never raises an alert that isn’t offered yet', function () {
     expect(app(MedicationAlerts::class)->raise('override', b2Subject($site, 'override:1')))->toBeNull()
         ->and(app(MedicationAlerts::class)->raise('breakglass', b2Subject($site, 'report:1')))->toBeNull();
     expect(MedicationAlert::query()->count())->toBe(0);
+});
+
+/** How many of this alert type the person was sent. */
+function b2SentCount(User $user, string $type): int
+{
+    return Notification::sent($user, MedicationAlertNotification::class)
+        ->filter(fn (MedicationAlertNotification $n) => $n->alert->type === $type)
+        ->count();
+}
+
+/*
+ * B2 C1 review fixes (Main, under Stephan's delegation).
+ */
+
+it('raises out of stock at 0 from the 6:00 am check when the stock has no reorder level', function () {
+    $site = Site::factory()->create(['name' => 'Kōwhai House']);
+    $lead = b2Staff($site, 'team_lead');
+    $order = b2Order($site, ['name' => 'Levetiracetam']);
+    ClientMedicationStock::query()->create(['client_medication_id' => $order->id, 'on_hand' => 0, 'reorder_level' => null, 'unit' => 'tablets']);
+    // Run out on an order that has ended: nothing to give, so no alert.
+    $ended = b2Order($site, ['name' => 'Amoxicillin', 'active' => false, 'state' => 'discontinued']);
+    ClientMedicationStock::query()->create(['client_medication_id' => $ended->id, 'on_hand' => 0, 'reorder_level' => null, 'unit' => 'capsules']);
+
+    $this->artisan('emar:check-medication-stock')->assertExitCode(0);
+
+    expect(MedicationAlert::query()->where('type', 'outOfStock')->pluck('message')->all())
+        ->toBe(['Levetiracetam for Aroha N. is out of stock. Kōwhai House.'])
+        ->and(b2SentCount($lead, 'outOfStock'))->toBe(1);
+});
+
+it('raises out of stock when a person’s alerts refresh after a change, and deals with it once restocked', function () {
+    $site = Site::factory()->create(['name' => 'Kōwhai House']);
+    $lead = b2Staff($site, 'team_lead');
+    $order = b2Order($site, ['name' => 'Levetiracetam']);
+    $stock = ClientMedicationStock::query()->create(['client_medication_id' => $order->id, 'on_hand' => 0, 'reorder_level' => null, 'unit' => 'tablets']);
+    $insulin = ClientMedication::factory()->create([
+        'client_id' => $order->client_id,
+        'name' => 'Insulin glargine',
+        'active' => true,
+        'state' => 'active',
+        'is_prn' => false,
+        'controlled_drug' => false,
+        'start_date' => '2026-09-01',
+        'end_date' => null,
+    ]);
+    $expired = ClientMedicationStock::query()->create(['client_medication_id' => $insulin->id, 'on_hand' => 5, 'reorder_level' => null, 'unit' => 'pens', 'expiry_date' => '2026-09-30']);
+
+    // Every dose recorded and every order setting change runs this refresh.
+    app(MedicationAlertService::class)->generateClientAlerts($order->client->fresh());
+    expect(MedicationAlert::query()->where('type', 'outOfStock')->whereNotNull('open_key')->pluck('open_key')->all())
+        ->toBe(['outOfStock:out:'.$stock->id])
+        ->and(b2SentCount($lead, 'outOfStock'))->toBe(1);
+
+    // The 6:00 am check finds the expired pen; the run-out alert is already open.
+    $this->artisan('emar:check-medication-stock')->assertExitCode(0);
+    expect(MedicationAlert::query()->where('type', 'outOfStock')->whereNotNull('open_key')->pluck('open_key')->sort()->values()->all())
+        ->toBe(['outOfStock:expired:'.$expired->id.':2026-09-30', 'outOfStock:out:'.$stock->id])
+        ->and(b2SentCount($lead, 'outOfStock'))->toBe(2);
+
+    // Restocked: the next refresh deals with the run-out alert, and leaves
+    // expired stock to the stock check.
+    $stock->update(['on_hand' => 30]);
+    app(MedicationAlertService::class)->generateClientAlerts($order->client->fresh());
+
+    $out = MedicationAlert::query()->where('dedupe_key', 'outOfStock:out:'.$stock->id)->firstOrFail();
+    expect($out->status)->toBe('dealt_with')
+        ->and($out->outcome)->toBe('Restocked or removed')
+        ->and(app(MedicationAlerts::class)->isOpen('outOfStock', 'expired:'.$expired->id.':2026-09-30'))->toBeTrue();
+});
+
+it('keeps in-app on for a stored choice with every channel off, so the alert still tells people', function () {
+    $site = Site::factory()->create();
+    $lead = b2Staff($site, 'team_lead');
+    b2Setting('stock', ['inapp' => false, 'email' => false, 'push' => false, 'follow_up' => false, 'groups' => ['houseLead'], 'people' => []]);
+
+    $alert = app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:1'));
+
+    expect($alert->reached_nobody)->toBeFalse()
+        ->and(b2Told($lead, 'stock'))->toBeTrue()
+        ->and($alert->recipients()->value('channels'))->toBe(['inapp']);
+});
+
+it('records an alert with no channel to send on as reaching nobody, not as told', function () {
+    $site = Site::factory()->create();
+    $lead = b2Staff($site, 'team_lead');
+    $settings = Mockery::mock(MedicationAlertSettings::class, [app(MedicationSettingsRegistry::class)])->makePartial();
+    $settings->shouldReceive('channels')->andReturn([]);
+    $this->instance(MedicationAlertSettings::class, $settings);
+
+    $alert = app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:1'));
+
+    expect($alert->reached_nobody)->toBeTrue()
+        ->and($alert->recipients()->count())->toBe(0)
+        ->and(b2Told($lead, 'stock'))->toBeFalse()
+        ->and($alert->events()->where('event', MedicationAlertEvent::NOBODY_TOLD)->value('detail'))
+        ->toMatchArray(['reason' => 'No way to tell people is switched on for this alert.', 'would_have_told' => [$lead->id]]);
+});
+
+it('keeps nothing when raising fails part-way, so the next check raises it again', function () {
+    $site = Site::factory()->create();
+    $lead = b2Staff($site, 'team_lead');
+    $this->partialMock(MedicationAlertRecipients::class, fn ($mock) => $mock->shouldReceive('resolve')->once()->andThrow(new RuntimeException('Recipient lookup failed')));
+
+    expect(fn () => app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:1')))
+        ->toThrow(RuntimeException::class, 'Recipient lookup failed');
+    expect(MedicationAlert::query()->count())->toBe(0)
+        ->and(MedicationAlertEvent::query()->count())->toBe(0);
+
+    $this->app->forgetInstance(MedicationAlertRecipients::class);
+    $alert = app(MedicationAlerts::class)->raise('stock', b2Subject($site, 'stock:1'));
+
+    expect($alert)->not->toBeNull()
+        ->and(b2Told($lead, 'stock'))->toBeTrue();
+});
+
+it('deals with a medication error’s alert when the error is resolved', function () {
+    $site = Site::factory()->create(['name' => 'Rimu House']);
+    $lead = b2Staff($site, 'team_lead');
+    $order = b2Order($site);
+    $error = MedicationError::query()->create([
+        'client_id' => $order->client_id,
+        'client_medication_id' => $order->id,
+        'error_type' => 'omission',
+        'severity' => 'minor',
+        'description' => 'Missed.',
+        'reported_by' => $lead->id,
+        'reported_at' => now(),
+        'status' => 'reported',
+    ]);
+    app(MedicationAlertSources::class)->error($error);
+    expect(app(MedicationAlerts::class)->isOpen('errors', 'error:'.$error->id))->toBeTrue();
+
+    app(MedicationIncidentIntegrationService::class)->resolveMedicationError($error, 'Medication error resolved.', $lead->id);
+
+    $alert = MedicationAlert::query()->where('type', 'errors')->firstOrFail();
+    expect($alert->status)->toBe('dealt_with')
+        ->and($alert->outcome)->toBe('The error was resolved');
+});
+
+it('closes a renewal reminder as renewed only when there is a renewal', function () {
+    $site = Site::factory()->create();
+    $assessor = b2Staff($site, 'clinical_lead');
+    $renewing = b2Staff($site, 'support_worker', ['medications.view']);
+    $lapsing = b2Staff($site, 'support_worker', ['medications.view']);
+    $competency = fn (User $staff, string $expiry, array $extra = []) => MedicationCompetencyAssessment::query()->create(array_merge([
+        'user_id' => $staff->id,
+        'assessor_id' => $assessor->id,
+        'assessment_type' => 'annual',
+        'status' => 'passed',
+        'assessment_date' => '2025-10-20',
+        'expiry_date' => $expiry,
+        'assessor_declared_at' => now()->subYear(),
+        'staff_acknowledged_at' => now()->subYear(),
+        'restricted' => false,
+    ], $extra));
+    $old = $competency($renewing, '2026-10-20');
+    $lapsed = $competency($lapsing, '2026-10-20');
+    app(MedicationAlertSources::class)->renewals();
+    expect(MedicationAlert::query()->where('type', 'renewals')->whereNotNull('open_key')->count())->toBe(2);
+
+    // One renews; the other lapses without a renewal.
+    $competency($renewing, '2027-10-20', ['assessment_date' => '2026-10-02']);
+    $lapsed->update(['status' => 'expired']);
+    app(MedicationAlertSources::class)->renewals();
+
+    expect(MedicationAlert::query()->where('dedupe_key', 'renewals:renewal:'.$old->id.':2026-10-20')->value('outcome'))->toBe('Renewed')
+        ->and(MedicationAlert::query()->where('dedupe_key', 'renewals:renewal:'.$lapsed->id.':2026-10-20')->value('outcome'))->toBe('No longer due');
 });

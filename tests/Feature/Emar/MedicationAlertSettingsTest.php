@@ -138,6 +138,20 @@ it('only lets people who can get the alert be named on it', function () {
     ])->assertSessionHasErrors('changes.0.value');
 });
 
+it('refuses a change that switches off every way of telling people', function () {
+    $manager = b2SettingsActor('provider_manager', Site::factory()->create());
+
+    b2Save($this, $manager, [
+        'group' => 'alerts', 'key' => 'stock', 'site_id' => null,
+        'value' => json_encode(['inapp' => false, 'email' => false, 'push' => false, 'follow_up' => false, 'groups' => ['houseLead', 'stockStaff'], 'people' => []]),
+        'from' => b2AlertValue(['houseLead', 'stockStaff']),
+    ], confirm: true)->assertSessionHasErrors([
+        'changes.0.value' => 'Choose who gets “Stock running low” from the listed groups and people, with at least one way to tell them switched on.',
+    ]);
+
+    expect(DB::table('app_settings')->where('key', 'medications.alerts.stock')->exists())->toBeFalse();
+});
+
 it('grants the house key to team leads and coordinators, and rolls back only it', function () {
     $migration = require database_path('migrations/2026_10_02_100000_grant_medication_alert_and_settings_keys.php');
     $key = Permission::query()->where('key', 'medications.alerts.manage_house')->firstOrFail();

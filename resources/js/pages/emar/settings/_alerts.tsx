@@ -53,6 +53,7 @@ import {
     encodePeople,
     fallbackHouses,
     fallbackWarnings,
+    inAppLocked,
     isDirty,
     isSiteDirty,
     parseAlert,
@@ -326,6 +327,12 @@ export function AlertsTable({
                             width: '0.7fr',
                             cell: (r) => {
                                 const locked = r.meta.locked.length > 0;
+                                const only =
+                                    !locked &&
+                                    inAppLocked(
+                                        r.meta,
+                                        valueOf(s, draft, r.key),
+                                    );
                                 return (
                                     <div
                                         onClick={(e) => e.stopPropagation()}
@@ -336,7 +343,7 @@ export function AlertsTable({
                                             checked={
                                                 valueOf(s, draft, r.key).inapp
                                             }
-                                            disabled={orgRo || locked}
+                                            disabled={orgRo || locked || only}
                                             label={`${r.meta.label}: in-app`}
                                             invalid={!!errors[`${G}.${r.key}`]}
                                             onChange={(v) => setInApp(r.key, v)}
@@ -345,6 +352,11 @@ export function AlertsTable({
                                             <p className="text-caption mt-1 flex items-center gap-1">
                                                 <LockKeyhole className="size-3" />
                                                 Always on
+                                            </p>
+                                        ) : only ? (
+                                            <p className="text-caption mt-1 flex items-center gap-1">
+                                                <LockKeyhole className="size-3" />
+                                                Only way it’s sent
                                             </p>
                                         ) : null}
                                     </div>

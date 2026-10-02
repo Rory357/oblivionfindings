@@ -15,6 +15,10 @@ use App\Services\Medication\Alerts\MedicationAlertCatalogue;
  * Groups keep the catalogue's order, decided groups are always on (and so is
  * in-app for a decided alert), and people are unique ids in order.
  *
+ * At least one channel that sends today is always on (B2 C1 review): a change
+ * that switches every one off is refused, and a stored value with none reads
+ * with in-app on — in-app stays on until email or push is.
+ *
  * Loosening (v5 `loosens`): a channel or Follow up switched off, or any group
  * or named person dropped.
  */
@@ -46,7 +50,12 @@ final class AlertRecipientsCodec implements MedicationSettingCodec
 
     public function accepts(string $value): bool
     {
-        return strlen($value) <= 4000 && $this->decode($value, strict: true) !== null;
+        if (strlen($value) > 4000) {
+            return false;
+        }
+        $setting = $this->decode($value, strict: true);
+
+        return $setting !== null && ($this->hasLocked() || $this->sendsToday($setting));
     }
 
     public function normalise(mixed $value, string $default): string
@@ -98,9 +107,12 @@ final class AlertRecipientsCodec implements MedicationSettingCodec
             || array_diff($before['people'], $after['people']) !== [];
     }
 
+    /** $label is the setting's ("Who gets …"); the message names the alert itself. */
     public function invalidMessage(string $label): string
     {
-        return 'Choose who gets “'.$label.'” from the listed groups and people.';
+        $alert = MedicationAlertCatalogue::get($this->alertKey)['label'] ?? $label;
+
+        return 'Choose who gets “'.$alert.'” from the listed groups and people, with at least one way to tell them switched on.';
     }
 
     public function toClient(): array
@@ -174,6 +186,25 @@ final class AlertRecipientsCodec implements MedicationSettingCodec
     }
 
     /** @param array{inapp: bool, email: bool, push: bool, follow_up: bool, groups: list<string>, people: list<int>} $setting */
+    private function sendsToday(array $setting): bool
+    {
+        foreach (MedicationAlertCatalogue::CHANNELS_BUILT as $channel) {
+            if ($setting[$channel] ?? false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function hasLocked(): bool
+    {
+        $alert = MedicationAlertCatalogue::get($this->alertKey) ?? [];
+
+        return array_intersect($alert['locked'] ?? [], MedicationAlertCatalogue::offeredGroups($this->alertKey)) !== [];
+    }
+
+    /** @param array{inapp: bool, email: bool, push: bool, follow_up: bool, groups: list<string>, people: list<int>} $setting */
     private function encode(array $setting): string
     {
         $alert = MedicationAlertCatalogue::get($this->alertKey) ?? [];
@@ -184,8 +215,9 @@ final class AlertRecipientsCodec implements MedicationSettingCodec
         sort($people);
 
         return json_encode([
-            // A decided alert is always in the bell (v5 "Always on").
-            'inapp' => $locked !== [] ? true : $setting['inapp'],
+            // A decided alert is always in the bell (v5 "Always on"), and so
+            // is any alert with no other channel that sends today.
+            'inapp' => $locked !== [] || ! $this->sendsToday([...$setting, 'inapp' => false]) ? true : $setting['inapp'],
             'email' => $setting['email'],
             'push' => $setting['push'],
             'follow_up' => $setting['follow_up'],

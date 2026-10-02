@@ -927,6 +927,8 @@ class MedicationIncidentIntegrationService
                 'resolved_by_user_id' => $resolvedBy,
             ], fn ($value) => $value !== null)
         );
+
+        app(MedicationAlertSources::class)->errorResolved($error, 'The error was resolved');
     }
 
     /**

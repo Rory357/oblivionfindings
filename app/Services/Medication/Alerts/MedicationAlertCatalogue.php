@@ -234,7 +234,10 @@ final class MedicationAlertCatalogue
         ],
         self::OUT_OF_STOCK => [
             'label' => 'Out of stock or expired stock',
-            'subline' => 'From the 6:00 am stock check',
+            // B2 C1 review: run-out stock alerts whenever it reaches 0; expired
+            // stock still also notifies through Control Room (its signal carries
+            // order end dates too), so the row says so.
+            'subline' => 'Stock reaches 0, or expires — Control Room still sends expired-stock notices',
             'groups' => [self::STOCK_STAFF, self::HOUSE_LEAD, self::CLINICAL_LEAD],
             'default' => [self::STOCK_STAFF, self::HOUSE_LEAD],
             'locked' => [],

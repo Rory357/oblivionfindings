@@ -147,7 +147,7 @@ class CheckMedicationStock extends Command
 
         // Stock expiring, expired and run out: people are told as Medication
         // Settings › Alerts & access says (P11 B2), once per open alert.
-        $alerts->stockCheck($expiringSoon, $expired, $lowStock);
+        $alerts->stockCheck($expiringSoon, $expired);
 
         $this->info("Stock check complete. {$alertsCreated} new alerts created.");
 

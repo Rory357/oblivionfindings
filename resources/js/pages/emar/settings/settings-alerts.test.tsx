@@ -315,6 +315,11 @@ describe('Alerts & access › Alerts', () => {
             .closest('[role="row"]') as HTMLElement;
         expect(within(followups).getByText('Always on')).toBeInTheDocument();
         expect(within(followups).getByRole('switch')).toBeDisabled();
+        // B2 C1 review: in-app is the only channel that sends today, so it stays on.
+        expect(
+            within(stock).getByText('Only way it’s sent'),
+        ).toBeInTheDocument();
+        expect(within(stock).getByRole('switch')).toBeDisabled();
         expect(
             within(followups).getByText('Default — not yet reviewed'),
         ).toBeInTheDocument();

@@ -165,13 +165,13 @@ class MedicationAlertSources
 
     /**
      * The 6:00 am stock check: stock expiring within 30 days, expired stock,
-     * and stock that has run out.
+     * and stock that has run out — on hand at 0 for an active order, whether
+     * or not it has a reorder level (the same test as forClient()).
      *
      * @param  Collection<int, ClientMedicationStock>  $expiringSoon
      * @param  Collection<int, ClientMedicationStock>  $expired
-     * @param  Collection<int, ClientMedicationStock>  $lowStock
      */
-    public function stockCheck(Collection $expiringSoon, Collection $expired, Collection $lowStock): void
+    public function stockCheck(Collection $expiringSoon, Collection $expired): void
     {
         $this->safely('expiry', function () use ($expiringSoon): void {
             $keys = [];
@@ -200,7 +200,7 @@ class MedicationAlertSources
             $this->alerts->reconcile(MedicationAlertCatalogue::EXPIRY, $keys, 'Removed or replaced');
         });
 
-        $this->safely('outOfStock', function () use ($expired, $lowStock): void {
+        $this->safely('outOfStock', function () use ($expired): void {
             $keys = [];
             foreach ($expired as $stock) {
                 if ($stock->expiry_date === null || $stock->medication?->client?->site_id === null) {
@@ -223,19 +223,15 @@ class MedicationAlertSources
                     'critical',
                 ));
             }
-            $out = $lowStock->filter(fn (ClientMedicationStock $stock): bool => MedicationStockQuantity::lessThanOrEqual($stock->on_hand ?? 0, 0)
-                && $stock->medication?->client?->site_id !== null);
+            $out = ClientMedicationStock::query()
+                ->whereNotNull('on_hand')
+                ->where('on_hand', '<=', 0)
+                ->whereHas('medication', fn ($orders) => $orders->active())
+                ->with('medication.client.site:id,name')
+                ->get()
+                ->filter(fn (ClientMedicationStock $stock): bool => $stock->medication?->client?->site_id !== null);
             foreach ($out as $stock) {
-                $key = 'out:'.$stock->id;
-                $keys[] = $key;
-                $this->alerts->raise(MedicationAlertCatalogue::OUT_OF_STOCK, $this->stockSubject(
-                    $stock,
-                    $key,
-                    'Out of stock',
-                    fn (string $medicine, string $person, string $house): string => "{$medicine} for {$person} is out of stock. {$house}.",
-                    fn (string $house): string => "A medicine at {$house} is out of stock.",
-                    'critical',
-                ));
+                $keys[] = $this->raiseOutOfStock($stock);
             }
             $this->alerts->reconcile(MedicationAlertCatalogue::OUT_OF_STOCK, $keys, 'Restocked or removed');
         });
@@ -276,8 +272,39 @@ class MedicationAlertSources
                     context: ['assessment_id' => (int) $assessment->id],
                 ));
             }
-            $this->alerts->reconcile(MedicationAlertCatalogue::RENEWALS, $keys, 'Renewed');
+            // No longer due: "Renewed" only when a renewal exists (B2 C1
+            // review) — a competency that lapsed, or an assessment withdrawn,
+            // is closed as no longer due, never logged as renewed.
+            $stale = MedicationAlert::query()
+                ->where('type', MedicationAlertCatalogue::RENEWALS)
+                ->whereNotNull('open_key')
+                ->when($keys !== [], fn ($query) => $query->whereNotIn('open_key', array_map(
+                    fn (string $key): string => MedicationAlertCatalogue::RENEWALS.':'.$key,
+                    $keys,
+                )))
+                ->get(['id', 'open_key', 'staff_user_id']);
+            foreach ($stale as $alert) {
+                $subjectKey = substr((string) $alert->open_key, strlen(MedicationAlertCatalogue::RENEWALS) + 1);
+                $this->alerts->resolve(
+                    MedicationAlertCatalogue::RENEWALS,
+                    $subjectKey,
+                    $this->renewed($subjectKey, $alert->staff_user_id) ? 'Renewed' : 'No longer due',
+                );
+            }
         });
+    }
+
+    /** "renewal:{assessment}:{expiry}": has that person a current assessment ending later? */
+    private function renewed(string $subjectKey, mixed $staffUserId): bool
+    {
+        if (preg_match('/^renewal:\d+:(\d{4}-\d{2}-\d{2})$/', $subjectKey, $match) !== 1 || $staffUserId === null) {
+            return false;
+        }
+
+        return MedicationCompetencyAssessment::active()
+            ->where('user_id', (int) $staffUserId)
+            ->where('expiry_date', '>', $match[1])
+            ->exists();
     }
 
     /** Repeated refusals: refusals or withholds of one medicine, as Rounds & timing defines them. */
@@ -505,6 +532,24 @@ class MedicationAlertSources
             $this->alerts->reconcile(MedicationAlertCatalogue::REVIEW_DUE, $keys, 'Reviewed', $scope);
         });
 
+        // Run out (B2 C1 review P0): on hand at 0 tells people whether or not
+        // the stock has a reorder level — after any order or stock change, and
+        // the 7:05 am refresh. Expired stock closes through the stock check.
+        $this->safely('outOfStock', function () use ($client, $orders, $scope): void {
+            $keys = [];
+            foreach ($orders as $order) {
+                $stock = $order->stock;
+                if (! $stock instanceof ClientMedicationStock || $stock->on_hand === null
+                    || ! MedicationStockQuantity::lessThanOrEqual($stock->on_hand, 0)) {
+                    continue;
+                }
+                $order->setRelation('client', $client);
+                $stock->setRelation('medication', $order);
+                $keys[] = $this->raiseOutOfStock($stock);
+            }
+            $this->alerts->reconcile(MedicationAlertCatalogue::OUT_OF_STOCK, $keys, 'Restocked or removed', [...$scope, 'key_prefix' => 'out:']);
+        });
+
         $this->safely('cdDiscrepancy', function () use ($client, $scope): void {
             $open = app(MedicationGovernanceScopeService::class)->scopeCanonicalClientMedicationRows(
                 ClientControlledDrugDiscrepancy::query(),
@@ -593,6 +638,12 @@ class MedicationAlertSources
         }));
     }
 
+    /** The error was resolved: the people told see it dealt with (B2 C1 review). */
+    public function errorResolved(MedicationError $error, string $outcome): void
+    {
+        $this->safely('errors', fn () => $this->alerts->resolve(MedicationAlertCatalogue::ERRORS, 'error:'.$error->id, $outcome));
+    }
+
     /** Someone recorded a medication error (after the record commits). */
     public function error(MedicationError $error): void
     {
@@ -666,6 +717,22 @@ class MedicationAlertSources
             controlled: (bool) $order->controlled_drug,
             context: ['client_id' => (int) $client->id, 'client_medication_id' => (int) $order->id],
         );
+    }
+
+    /** Stock at 0 for an active order: "Out of stock". Returns its subject key. */
+    private function raiseOutOfStock(ClientMedicationStock $stock): string
+    {
+        $key = 'out:'.$stock->id;
+        $this->alerts->raise(MedicationAlertCatalogue::OUT_OF_STOCK, $this->stockSubject(
+            $stock,
+            $key,
+            'Out of stock',
+            fn (string $medicine, string $person, string $house): string => "{$medicine} for {$person} is out of stock. {$house}.",
+            fn (string $house): string => "A medicine at {$house} is out of stock.",
+            'critical',
+        ));
+
+        return $key;
     }
 
     /**
