@@ -550,7 +550,7 @@ function WizardBody({
     return (
         <div className="flex h-[min(92vh,820px)] min-h-0 overflow-hidden">
             {/* Stepper rail */}
-            <aside className="hidden w-[248px] shrink-0 flex-col gap-1 border-r border-sidebar-border bg-sidebar p-4 sm:flex">
+            <aside className="hidden w-[248px] shrink-0 flex-col gap-1 border-r border-border bg-muted/30 p-4 sm:flex">
                 <div className="mb-3 flex items-center gap-2.5">
                     <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary-fill text-primary-fill-foreground">
                         <LayoutTemplate className="h-5 w-5" />
@@ -575,7 +575,9 @@ function WizardBody({
                             onClick={() => setStepIndex(i)}
                             className={cn(
                                 'flex items-center gap-2.5 rounded-md p-2 text-left transition-colors',
-                                active ? 'bg-primary/10' : 'hover:bg-accent',
+                                active
+                                    ? 'bg-primary-fill/10'
+                                    : 'hover:bg-muted',
                             )}
                         >
                             <span

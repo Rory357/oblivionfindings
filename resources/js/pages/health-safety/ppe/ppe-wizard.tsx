@@ -209,7 +209,7 @@ function WizardBody<D extends FormDataType<D>>({
     return (
         <div className="flex h-[min(88vh,820px)]">
             {/* ── Stepper rail ── */}
-            <aside className="hidden w-[248px] shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 sm:flex">
+            <aside className="hidden w-[248px] shrink-0 flex-col overflow-y-auto border-r border-border bg-muted/30 p-4 sm:flex">
                 <div className="mb-4 flex items-center gap-2.5">
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-primary-fill text-primary-fill-foreground">
                         <Icon className="h-[18px] w-[18px]" />

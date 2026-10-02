@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax -- Shared medication wizard chrome,
  * ported 1:1 from the Add Client dialog (components/clients/add-client-dialog.tsx),
  * the reference implementation for every multi-step popup workflow: 248px
- * stepper rail on bg-sidebar, header strip, 3px progress bar, scroll-contained
+ * stepper rail on bg-muted/30, header strip, 3px progress bar, scroll-contained
  * body, muted footer band. Every colour comes from semantic design tokens. */
 import {
     Dialog,
@@ -103,8 +103,8 @@ export function MedsWizardDialog({
                                     className={cn(
                                         'flex items-center gap-2.5 rounded-md p-2 text-left transition-colors',
                                         active
-                                            ? 'bg-primary/10'
-                                            : 'hover:bg-sidebar-accent',
+                                            ? 'bg-primary-fill/10'
+                                            : 'hover:bg-muted',
                                     )}
                                 >
                                     <span

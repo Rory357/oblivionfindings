@@ -215,7 +215,7 @@ export function CheckinWizard({
                                 return (
                                     <div
                                         key={k.id}
-                                        className="rounded-xl border border-border bg-sidebar p-3.5"
+                                        className="rounded-xl border border-border bg-muted/30 p-3.5"
                                     >
                                         <div className="mb-2.5 flex items-center justify-between gap-2.5">
                                             <span className="text-[13px] font-semibold">
@@ -275,7 +275,7 @@ export function CheckinWizard({
                             })}
                         </div>
                     ) : (
-                        <div className="max-w-md rounded-xl border border-border bg-sidebar p-4">
+                        <div className="max-w-md rounded-xl border border-border bg-muted/30 p-4">
                             <Field label="Overall progress (manual)">
                                 <div className="flex items-center gap-3">
                                     <Input
@@ -312,7 +312,7 @@ export function CheckinWizard({
                     />
                     <div className="flex flex-wrap gap-5">
                         <div className="min-w-[300px] flex-1">
-                            <div className="mb-3.5 rounded-xl border border-border bg-sidebar p-4">
+                            <div className="mb-3.5 rounded-xl border border-border bg-muted/30 p-4">
                                 <div className="mb-2.5 flex items-center justify-between">
                                     <span className="text-xs text-muted-foreground">
                                         Previous

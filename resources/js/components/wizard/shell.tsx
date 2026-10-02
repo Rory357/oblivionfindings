@@ -228,8 +228,8 @@ export function WizardShell({
                                                 ? 'gap-2.5 p-2'
                                                 : 'frontline-tap relative shrink-0 justify-center gap-2 px-2',
                                             active
-                                                ? 'bg-primary/10'
-                                                : 'hover:bg-accent',
+                                                ? 'bg-primary-fill/10'
+                                                : 'hover:bg-muted',
                                         )}
                                     >
                                         <span

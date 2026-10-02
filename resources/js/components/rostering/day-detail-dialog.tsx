@@ -521,7 +521,7 @@ export function DayDetailDialog({
                 </VisuallyHidden.Root>
 
                 {/* ── rail: date nav + status filters ── */}
-                <aside className="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 md:flex">
+                <aside className="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 md:flex">
                     <div className="mb-2 flex items-center gap-2.5">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
                             <CalendarClock className="h-4.5 w-4.5" />
@@ -581,8 +581,8 @@ export function DayDetailDialog({
                                 className={cn(
                                     'flex w-full items-start gap-2.5 rounded-[10px] px-2.5 py-2 text-left transition-colors',
                                     isActive
-                                        ? 'bg-primary/10'
-                                        : 'hover:bg-sidebar-accent',
+                                        ? 'bg-primary-fill/10'
+                                        : 'hover:bg-muted',
                                 )}
                             >
                                 <span

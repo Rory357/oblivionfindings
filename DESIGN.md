@@ -370,6 +370,17 @@ before.
   (`design/no-primary-foreground-on-fill`) blocks the pairing in one class
   string; 311 pairs in 185 files were migrated. A fill whose text colour is
   set on a child element isn't caught — pair those by hand.
+- **A light panel painted bg-sidebar** (fixed 2026-10-03) — the app
+  sidebar has been near-black since 7 Sep, so `bg-sidebar` is a dark
+  surface. Wizard rails, cards and table headers that used it as a light
+  panel (the shared `WIZARD_RAIL_CLASS` and 13 other places) turned dark
+  with dark labels (1.0:1). A light panel uses `bg-muted/30` with
+  `border-border`, like the WizardShell rail; rail steps hover
+  `bg-muted` and mark the active step `bg-primary-fill/10` (`bg-accent`
+  is purple in dark mode and `bg-primary/10` follows a light brand, both
+  under 4.5:1 for the step text). `bg-sidebar` is only for real sidebar
+  surfaces, paired with `text-sidebar-foreground` in the same class
+  string (ESLint `design/no-sidebar-bg-without-foreground`).
 - **Band text from the brand** (fixed 2026-10-03) — text on the floored
   dark bands (the `.eh-header` sky and the PageHero band) is
   `--band-foreground`, always white, never `--primary-foreground`, which

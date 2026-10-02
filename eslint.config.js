@@ -146,6 +146,9 @@ export default [
                         'no-restricted-syntax',
                     ),
                     'band-text-token': builtinRules.get('no-restricted-syntax'),
+                    'no-sidebar-bg-without-foreground': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
                 },
             },
         },
@@ -172,6 +175,27 @@ export default [
                         "JSXOpeningElement[name.name=/^(Button|AlertDialogAction)$/]:not(:has(> JSXAttribute[name.name='unstyled'])):not(:has(> JSXAttribute[name.name='variant']:not([value.value='default']))) > JSXAttribute[name.name='className'] :matches(Literal[value=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/], TemplateElement[value.raw=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/])",
                     message:
                         'The default Button variant (.btn-soft-primary gradient) paints over bg-destructive / bg-status-* / bg-white / bg-primary-foreground, so this renders purple. Use variant="destructive" for destructive actions; otherwise keep the default primary, or variant="outline" inside a status banner. On a hero, use PageHeaderPrimaryButton (white primary) or PageHeaderGlassButton (glass secondary). See DESIGN.md "Recolouring a primary button with bg-* classes".',
+                },
+            ],
+        },
+    },
+    {
+        // DESIGN.md "A light panel painted bg-sidebar": the app sidebar has
+        // been near-black since 7 Sep, so bg-sidebar is a dark surface. A
+        // class string that paints it must also set the sidebar foreground;
+        // a light panel (wizard rail, card, table header) uses bg-muted/30
+        // like the WizardShell rail. ui/sidebar.tsx is the shadcn primitive,
+        // whose text colour is set on its wrapper.
+        files: ['resources/js/**/*.{ts,tsx}'],
+        ignores: ['resources/js/components/ui/sidebar.tsx'],
+        rules: {
+            'design/no-sidebar-bg-without-foreground': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/^(?![\\s\\S]*(?:^|\\s)text-sidebar-(?:accent-)?foreground(?:\\x2f\\d+)?(?:\\s|$))[\\s\\S]*(?:^|\\s)bg-sidebar(?:\\s|$)/], TemplateElement[value.raw=/^(?![\\s\\S]*(?:^|\\s)text-sidebar-(?:accent-)?foreground(?:\\x2f\\d+)?(?:\\s|$))[\\s\\S]*(?:^|\\s)bg-sidebar(?:\\s|$)/])',
+                    message:
+                        'bg-sidebar is the near-black app sidebar: pair it with text-sidebar-foreground in the same class string. A light panel (wizard rail, card, table header) uses bg-muted/30 like the WizardShell rail. See DESIGN.md "A light panel painted bg-sidebar".',
                 },
             ],
         },

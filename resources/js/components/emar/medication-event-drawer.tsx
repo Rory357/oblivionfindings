@@ -408,8 +408,8 @@ export function MedicationEventDrawer({
                                     className={cn(
                                         'flex items-center gap-2.5 rounded-md p-2 text-left text-[13px] font-semibold transition-colors',
                                         isActive
-                                            ? 'bg-primary/10 text-primary'
-                                            : 'text-muted-foreground hover:bg-sidebar-accent',
+                                            ? 'bg-primary-fill/10 text-primary'
+                                            : 'text-muted-foreground hover:bg-muted',
                                     )}
                                 >
                                     <SIcon className="h-4 w-4 shrink-0" />
