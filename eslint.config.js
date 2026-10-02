@@ -105,13 +105,13 @@ export default [
                     selector:
                         "JSXAttribute[name.name='className'] Literal[value=/\\b(text|bg|border|ring|from|to|via)-(white|black)(\\/\\d+)?\\b/]",
                     message:
-                        'Hero components must use --primary-foreground tokens (text-primary-foreground, bg-primary-foreground/10). text-white / bg-white/* bypass the theme system.',
+                        'Hero components must use --band-foreground tokens (text-band-foreground, bg-band-foreground/10). text-white / bg-white/* bypass the theme system.',
                 },
                 {
                     selector:
                         'TemplateElement[value.raw=/\\b(text|bg|border|ring|from|to|via)-(white|black)(\\/\\d+)?\\b/]',
                     message:
-                        'Hero components must use --primary-foreground tokens, not text-white / bg-white/*.',
+                        'Hero components must use --band-foreground tokens, not text-white / bg-white/*.',
                 },
                 {
                     selector:
@@ -145,6 +145,7 @@ export default [
                     'no-primary-foreground-on-fill': builtinRules.get(
                         'no-restricted-syntax',
                     ),
+                    'band-text-token': builtinRules.get('no-restricted-syntax'),
                 },
             },
         },
@@ -168,9 +169,34 @@ export default [
                 'error',
                 {
                     selector:
-                        "JSXOpeningElement[name.name=/^(Button|AlertDialogAction)$/]:not(:has(> JSXAttribute[name.name='unstyled'])):not(:has(> JSXAttribute[name.name='variant']:not([value.value='default']))) > JSXAttribute[name.name='className'] :matches(Literal[value=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground)/], TemplateElement[value.raw=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground)/])",
+                        "JSXOpeningElement[name.name=/^(Button|AlertDialogAction)$/]:not(:has(> JSXAttribute[name.name='unstyled'])):not(:has(> JSXAttribute[name.name='variant']:not([value.value='default']))) > JSXAttribute[name.name='className'] :matches(Literal[value=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/], TemplateElement[value.raw=/\\bbg-(destructive|status-(critical|success|warning|info)|white|primary-foreground|band-foreground)/])",
                     message:
                         'The default Button variant (.btn-soft-primary gradient) paints over bg-destructive / bg-status-* / bg-white / bg-primary-foreground, so this renders purple. Use variant="destructive" for destructive actions; otherwise keep the default primary, or variant="outline" inside a status banner. On a hero, use PageHeaderPrimaryButton (white primary) or PageHeaderGlassButton (glass secondary). See DESIGN.md "Recolouring a primary button with bg-* classes".',
+                },
+            ],
+        },
+    },
+    {
+        // DESIGN.md "Band text": the floored dark bands (the .eh-header sky
+        // and the PageHero band) carry --band-foreground, which is always
+        // white. --primary-foreground follows the brand and turns ink for a
+        // very light brand, unreadable on a dark band, so the band
+        // components never use it (class or var()). Page content passed
+        // into band slots is covered by app.css, which redefines
+        // primary-foreground inside both bands.
+        files: [
+            'resources/js/components/page/page-header*.tsx',
+            'resources/js/components/page/page-hero*.tsx',
+        ],
+        ignores: ['**/*.test.tsx'],
+        rules: {
+            'design/band-text-token': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/primary-foreground/], TemplateElement[value.raw=/primary-foreground/])',
+                    message:
+                        'Band components use --band-foreground (text-band-foreground, bg-band-foreground/10, var(--band-foreground)): the bands are floored dark, and --primary-foreground turns ink for a very light brand. See DESIGN.md "Band text".',
                 },
             ],
         },

@@ -127,8 +127,9 @@ describe('CategoryWorkspaceHero', () => {
             level: 1,
         });
 
+        // The PageHero band's text is the always-white band token.
         expect(heading.closest('.rounded-2xl')).toHaveClass(
-            'text-primary-foreground',
+            'text-band-foreground',
         );
         expect(screen.getByText('12')).toBeInTheDocument();
         expect(screen.getByText('Need attention')).toBeInTheDocument();

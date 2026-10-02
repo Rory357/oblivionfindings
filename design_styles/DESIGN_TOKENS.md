@@ -58,10 +58,11 @@ whichever has the higher WCAG contrast — never a fixed luminance cut-off (the
 old `> 0.5` gave white text at 3.6:1 on orange, teal and green brands).
 `pickForeground()` in `lib/derive-palette.ts` applies it in JS (the sidebar
 logo tile); `--primary-fill-foreground` applies the same crossover in CSS.
-`--primary-foreground` is **not** a fill foreground: it is also the text on
-the brand sky, whose upper shades are fixed dark (L 0.30–0.42), so it stays
-white unless the brand itself is very light. New text-bearing fills use the
-fill pair, never `bg-primary text-primary-foreground`.
+`--primary-foreground` is **not** a fill foreground: it stays white unless
+the brand itself is very light. It is not the band text either — the sky and
+the PageHero band use `--band-foreground`, always white (amended
+2026-10-03). New text-bearing fills use the fill pair, never
+`bg-primary text-primary-foreground`.
 
 ## Status tokens — for badges and severity states
 

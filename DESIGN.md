@@ -370,6 +370,14 @@ before.
   (`design/no-primary-foreground-on-fill`) blocks the pairing in one class
   string; 311 pairs in 185 files were migrated. A fill whose text colour is
   set on a child element isn't caught — pair those by hand.
+- **Band text from the brand** (fixed 2026-10-03) — text on the floored
+  dark bands (the `.eh-header` sky and the PageHero band) is
+  `--band-foreground`, always white, never `--primary-foreground`, which
+  turns ink for a very light brand (1.3:1 on the band). The band
+  components use `text-band-foreground` / `bg-band-foreground/10` (ESLint
+  `design/band-text-token`); both bands also redefine
+  `primary-foreground` inside themselves, so page content in their slots
+  reads white too. Brands are never blocked for this.
 - **Ad-hoc `text-2xl`/`text-xl` headings** — use the typography helpers.
 - **`dark:` colour pairs on token-styled elements** — redundant and drifts.
 - **Pinning a fixed hue to a module** (e.g. `bg-purple-500` for HR) — use

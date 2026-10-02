@@ -26,7 +26,7 @@ export function PageHeroMeta({
     return (
         <div
             className={cn(
-                'mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-primary-foreground/70',
+                'mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-band-foreground/70',
                 alignResponsive
                     ? 'justify-center md:justify-start'
                     : 'justify-start',
@@ -46,7 +46,7 @@ export function PageHeroMeta({
                         <Link
                             key={idx}
                             href={item.href}
-                            className="inline-flex items-center transition-colors hover:text-primary-foreground/90"
+                            className="inline-flex items-center transition-colors hover:text-band-foreground/90"
                         >
                             {inner}
                         </Link>
