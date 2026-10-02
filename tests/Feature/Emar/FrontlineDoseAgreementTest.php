@@ -168,6 +168,41 @@ class FrontlineDoseAgreementTest extends TestCase
         $this->assertSame(4, $myDay->inertiaProps('auth.can.medications.overdueTodayCount'));
     }
 
+    public function test_an_overnight_handover_counts_the_doses_of_both_days_as_clock_out_does(): void
+    {
+        // Entered the evening before; Thyroxine is first owed on the 15th.
+        $this->at('2026-06-14 18:00');
+        $this->orders['Melatonin'] = $this->order('Melatonin', ['21:00']);
+        $this->orders['Thyroxine'] = $this->order('Thyroxine', ['06:00']);
+        $worker = $this->staff();
+        $this->aroha->supportWorkers()->attach($worker->id);
+        $this->shift = Shift::factory()->create([
+            'client_id' => $this->aroha->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->context->id,
+            'user_id' => $worker->id,
+            'starts_at' => $this->nz('2026-06-14 20:00'),
+            'ends_at' => $this->nz('2026-06-15 08:00'),
+            'actual_starts_at' => $this->nz('2026-06-14 20:00'),
+            'actual_ends_at' => null,
+            'status' => 'in_progress',
+        ]);
+        $this->at('2026-06-14 21:05');
+        $this->recordGiven('Melatonin', '2026-06-14 21:00', '2026-06-14 21:05', $worker);
+        $this->at('2026-06-15 09:30');
+
+        // In the shift: Melatonin 21:00 (given) on the 14th; Thyroxine 06:00,
+        // Metformin 07:00, Vitamin D and Morphine 08:00 on the 15th, all with
+        // their windows ended (still to do, and omissions). Paracetamol 08:30
+        // is after the shift.
+        $snapshot = app(ShiftMedicationSnapshotService::class)->forShift($this->shift->fresh(), true);
+        $this->assertSame(
+            ['due' => 4, 'given' => 1, 'missed' => 0, 'omissions' => 4],
+            array_intersect_key($snapshot['counts'], array_flip(['due', 'given', 'missed', 'omissions'])),
+        );
+        $this->assertSame(4, $this->unsignedDoses());
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     private function at(string $nz): void

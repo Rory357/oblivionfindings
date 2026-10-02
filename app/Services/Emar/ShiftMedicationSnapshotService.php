@@ -52,9 +52,20 @@ class ShiftMedicationSnapshotService
         $windowEnd = ($shift->ends_at ?? $shift->starts_at->copy()->addHours(8))->copy()->timezone($tz);
         $date = $windowStart->copy()->startOfDay();
 
-        // One full-day MAR build for this client, then narrow to the shift window.
+        // One full-day MAR build per NZ day the shift touches (an overnight
+        // shift owes doses on both days, as clock-out counts them), then
+        // narrow to the shift window. PRN and attention alerts come from the
+        // start day's build.
         $mar = $this->marService->build($client, $date, null, $shift->id, $includeControlled);
-        $scheduled = collect(Arr::get($mar, 'scheduled', []))
+        $rows = Arr::get($mar, 'scheduled', []);
+        for ($day = $date->copy()->addDay(); $day->lte($windowEnd); $day->addDay()) {
+            $rows = array_merge($rows, Arr::get(
+                $this->marService->build($client, $day->copy(), null, $shift->id, $includeControlled),
+                'scheduled',
+                [],
+            ));
+        }
+        $scheduled = collect($rows)
             ->filter(function (array $row) use ($windowStart, $windowEnd): bool {
                 $sf = Arr::get($row, 'scheduled_for');
 
