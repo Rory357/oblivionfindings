@@ -1026,6 +1026,75 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+ * Legacy PageHero band (components/page/page-hero.tsx) — superseded by the
+ * Event Horizon header, kept until each page migrates.
+ *
+ * Its base is --hero-base: the brand by default, a category hue, or an
+ * admin-chosen Site colour. It used to paint that colour raw at 80–100%
+ * alpha, so white text fell to 2.1–4.4:1 on most brands (3.2:1 on the dark
+ * default, 1.6:1 on a light Site colour). Like the sky, the band is now the
+ * colour floored dark and opaque — no lighter than L 0.36 → 0.32 — so 70%
+ * white text holds ≥ 4.84:1 for every brand and Site colour, over the 5% orbs
+ * too (measured in Chrome, which clips out-of-gamut bands brighter; the
+ * worst is a saturated green Site colour). Faint text on it
+ * is therefore never below 70% (80% on a 10% panel, 90% on a 15% tile).
+ * A very light brand, whose sky text turns ink, fails here as it does on
+ * the sky; the Branding page already warns about it.
+ * ────────────────────────────────────────────────────────────────────────── */
+.page-hero {
+    --hero-base: var(--primary);
+    --hero-tone-success: oklch(
+        from var(--status-success) max(l, 0.84) min(c, 0.12) h
+    );
+    --hero-tone-warning: oklch(
+        from var(--status-warning) max(l, 0.84) min(c, 0.12) h
+    );
+    --hero-tone-critical: oklch(
+        from var(--status-critical) max(l, 0.84) min(c, 0.1) h
+    );
+    --hero-tone-info: oklch(from var(--status-info) max(l, 0.86) min(c, 0.1) h);
+    background: linear-gradient(
+        to bottom right,
+        oklch(from var(--hero-base) min(l, 0.36) c h),
+        oklch(from var(--hero-base) min(l, 0.34) c h),
+        oklch(from var(--hero-base) min(l, 0.32) c h)
+    );
+}
+/* Status tones on the band keep their hue but are lifted like the meter
+   tones — never darker than L 0.84 (info, the brand itself, 0.86) — with
+   chroma capped so Chrome needn't clip them out of gamut, which otherwise
+   costs up to a whole contrast point. The critical badge is a white pill,
+   so its red is instead held DARK (≤ 0.45), which dark mode's light status
+   red otherwise breaks (2.98:1). */
+.page-hero-tone-success {
+    color: var(--hero-tone-success);
+}
+.page-hero-tone-warning {
+    color: var(--hero-tone-warning);
+}
+.page-hero-tone-critical {
+    color: var(--hero-tone-critical);
+}
+.page-hero-tone-info {
+    color: var(--hero-tone-info);
+}
+.page-hero-dot-success {
+    background-color: var(--hero-tone-success);
+}
+.page-hero-dot-warning {
+    background-color: var(--hero-tone-warning);
+}
+.page-hero-dot-critical {
+    background-color: var(--hero-tone-critical);
+}
+.page-hero-dot-info {
+    background-color: var(--hero-tone-info);
+}
+.page-hero-on-white-critical {
+    color: oklch(from var(--status-critical) min(l, 0.45) c h);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
  * Frontline / staff shell support (PR 24)
  *
  * Shared safe-area primitives used by StaffPageShell, StaffBottomNav, and any

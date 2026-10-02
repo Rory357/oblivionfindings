@@ -18,7 +18,9 @@ ring mark, palette-backed `PageHeaderSearchTrigger`, group rail +
 tier-2 strip). Visual reference: `public/eh-hero-variants.html`.
 
 **Supersedes** (2026-09-05): the `PageHero` banner system
-(`components/page/page-hero.tsx` and its ~559-page rollout), the
+(`components/page/page-hero.tsx` and its ~559-page rollout; until each
+page migrates, its band is floored like the sky — brand/category/Site
+colour at L ≤ 0.36, lifted status tones — amended 2026-10-02), the
 Governance Hero Guide (deleted), `docs/hero-unification-v2-plan.md`
 (deleted), `docs/hero-unification-v3-handoff.md` (kept for a security
 runbook reference only), and the client/site profile heroes — both

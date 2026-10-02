@@ -129,6 +129,11 @@ This supersedes the `PageHero` banner system
 hero-unification plans, and the client/site profile heroes as
 references — all of those are migration targets (conformance probe
 12), not precedents. Do not consult or extend them for new work.
+Until a page migrates, its `PageHero` band follows the sky's contrast
+rules (amended 2026-10-02): `.page-hero` in `app.css` paints the brand,
+category or Site colour (`--hero-base`) floored to L ≤ 0.36 and
+opaque; faint text on it is never below 70%; status tones on it use
+the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
 Both profile heroes are now migrated and deleted (sites 2026-09-06,
 clients 2026-09-07 — `pages/operations/clients/show.tsx` is on the
 `PageHeader` profile variant with its alert ribbon folded into the
