@@ -278,6 +278,8 @@ class WorkerMedsTodayPayloadTest extends TestCase
             'ends_at' => Carbon::parse('2026-04-30 13:00:00', config('app.worker_timezone'))->utc(),
             'status' => 'scheduled',
         ]);
+        // The badge counts the people the worker supports or may open (C6d).
+        $client->supportWorkers()->attach($worker->id);
 
         // 3 scheduled meds × 3 in-window dose times = 9 slots, no PRN meds (PRN
         // 24h counts hit the administrations table through a separate accessor).
@@ -353,7 +355,11 @@ class WorkerMedsTodayPayloadTest extends TestCase
             'ends_at' => Carbon::parse('2026-05-01 05:00:00', $timezone)->utc(),
             'status' => 'in_progress',
         ]);
+        // The badge counts the people the worker supports or may open (C6d).
+        $client->supportWorkers()->attach($worker->id);
 
+        // Entered before its 00:05 dose (a dose due before an order's entry is not owed).
+        Carbon::setTestNow(Carbon::parse('2026-04-30 22:00:00', $timezone)->utc());
         ClientMedication::query()->create([
             'client_id' => $client->id,
             'name' => 'Overnight tablets',
@@ -364,6 +370,8 @@ class WorkerMedsTodayPayloadTest extends TestCase
             'active' => true,
             'state' => 'active',
         ]);
+        // 01:20: the 00:05 dose's window (to 01:05) has ended — overdue (C6d).
+        Carbon::setTestNow(Carbon::parse('2026-05-01 01:20:00', $timezone)->utc());
 
         $this->actingAs($worker)
             ->get('/meds/today')
