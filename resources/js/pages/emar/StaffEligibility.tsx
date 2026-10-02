@@ -625,6 +625,7 @@ export default function StaffEligibility(props: Props) {
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Medication', href: '/emar' },
                 {
                     title: 'Safety & oversight',
