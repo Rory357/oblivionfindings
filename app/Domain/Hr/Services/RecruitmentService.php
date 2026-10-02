@@ -292,10 +292,14 @@ class RecruitmentService
 
         return DB::transaction(function () use ($candidate, $offer, $convertedBy) {
             $candidate->loadMissing('documents');
-            $workEmail = $offer->work_email ?: $candidate->personal_email;
+            // Only the offer's work email is a work address. Without one the
+            // hire signs in with their personal email, which must not become
+            // their published work email; HR sets that later.
+            $workEmail = filled($offer->work_email) ? $offer->work_email : null;
+            $loginEmail = $workEmail ?? $candidate->personal_email;
             $roleName = $offer->position_role ?: 'support_worker';
             $intake = app(EmployeeIntakeService::class);
-            $existingUserId = $intake->existingUserIdForEmail($workEmail);
+            $existingUserId = $intake->existingUserIdForEmail($loginEmail);
 
             // Guard: never attach this candidate/offer lineage to an existing
             // profile unless that profile already owns the exact pair.
@@ -316,7 +320,7 @@ class RecruitmentService
             // onboarding, invite, event). Recruitment is just one door into it.
             $profile = $intake->intake(
                 name: $candidate->full_name,
-                email: $workEmail,
+                email: $loginEmail,
                 roleName: $roleName,
                 profileAttributes: [
                     'position_id' => $offer->position_id,
@@ -348,12 +352,13 @@ class RecruitmentService
             $this->maybeCloseFilledRequisition($offer, $convertedBy);
             $this->transferCandidateDocuments($candidate, $profile, $convertedBy);
 
-            // The work email/login is now provisioned — record it on the offer so
-            // the stubbed flag carries a real signal (idempotent on re-convert).
-            $offer->update([
-                'work_email' => $workEmail,
-                'work_email_provisioned' => true,
-            ]);
+            // A work email on the offer is now provisioned as the login. Without
+            // one nothing was provisioned (the login is the personal email), so
+            // the offer is not marked and no personal address is recorded as a
+            // work email (idempotent on re-convert).
+            if ($workEmail !== null) {
+                $offer->update(['work_email_provisioned' => true]);
+            }
 
             return $profile->fresh();
         });

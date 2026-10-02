@@ -56,6 +56,32 @@ test('the My HR directory never shows the sign-in email when the HR work email i
     $response->assertDontSee('aroha.signin@example.test');
 });
 
+test('HR can clear a work email, which then shows as none in the My HR directory', function () {
+    $colleague = ($this->makeStaff)(
+        ['email' => 'aroha.signin@example.test'],
+        ['work_email' => 'aroha@care.example.test'],
+    );
+    $hrManager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    $hrManager->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->firstOrFail()->id]);
+    ensureCanonicalHrStaffProfile($hrManager, $this->site);
+    $profile = HrEmployeeProfile::query()->where('user_id', $colleague->id)->sole();
+
+    // An empty field arrives as null (ConvertEmptyStringsToNull). The column
+    // used to be NOT NULL, so this save failed with a 500.
+    $this->actingAs($hrManager)
+        ->put(route('hr.people.update', $profile), ['work_email' => ''])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    expect($profile->refresh()->work_email)->toBeNull();
+
+    [$response, $entry] = ($this->directoryEntryFor)($hrManager, $colleague);
+
+    expect($entry['email'])->toBeNull();
+    $response->assertDontSee('aroha@care.example.test')
+        ->assertDontSee('aroha.signin@example.test');
+});
+
 test('an HR-entered work email still shows in the My HR directory', function () {
     $colleague = ($this->makeStaff)(
         ['email' => 'aroha.signin@example.test'],

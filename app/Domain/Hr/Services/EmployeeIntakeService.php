@@ -198,8 +198,19 @@ class EmployeeIntakeService
 
             // 2. Upsert the single profile per user (user_id is UNIQUE). Only
             //    stamp employee_number / created_by on first creation.
+            //    The intake email is the work address unless the caller says
+            //    otherwise: HR People and the onboarding wizard collect it as
+            //    "Work email". A caller passing work_email => null (recruitment
+            //    with no offer work email, where the login is the candidate's
+            //    personal address) leaves it for HR, keeping any existing one.
+            $workEmail = array_key_exists('work_email', $profileAttributes)
+                ? (filled($profileAttributes['work_email']) ? $profileAttributes['work_email'] : null)
+                : $email;
+            if ($workEmail === null && $existing) {
+                $workEmail = $existing->work_email;
+            }
             $values = array_merge($profileAttributes, [
-                'work_email' => $profileAttributes['work_email'] ?? $email,
+                'work_email' => $workEmail,
                 'is_active' => true,
                 'updated_by' => $actorId,
             ]);

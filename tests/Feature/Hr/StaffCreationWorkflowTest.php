@@ -37,6 +37,9 @@ function staffCreationActor(string $roleName, Site $site, bool $siteBound = fals
         'role' => $roleName,
         'approved_at' => now(),
     ]);
+    // A verified operator: System Users sits behind the `verified` middleware,
+    // and these tests exercise staff creation, not the verification lifecycle.
+    $actor->markEmailAsVerified();
     $actor->roles()->sync([$role->id]);
     HrEmployeeProfile::query()->create([
         'user_id' => $actor->id,
