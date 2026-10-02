@@ -26,6 +26,7 @@ use App\Models\User;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -39,6 +40,13 @@ use Tests\TestCase;
 class ControlledMedicineConcealmentTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
 
     public function test_meds_today_hides_controlled_rows_from_a_worker_with_record_but_not_view(): void
     {
@@ -54,6 +62,10 @@ class ControlledMedicineConcealmentTest extends TestCase
             'service_context_id' => $serviceContext->id,
             'status' => 'active',
         ]);
+        // A fixed NZ morning, with the orders entered at the start of the day:
+        // on the real clock an evening run found no dose owed after the
+        // orders' entry, so the schedule was empty.
+        Carbon::setTestNow(Carbon::parse('2026-06-15 00:00', 'Pacific/Auckland')->utc());
         foreach ([['Everyday tablets', false], ['PRIVATE CONTROLLED TODAY', true]] as [$name, $controlled]) {
             ClientMedication::query()->create([
                 'client_id' => $client->id,
@@ -67,6 +79,9 @@ class ControlledMedicineConcealmentTest extends TestCase
                 'state' => 'active',
             ]);
         }
+        // 8:30: the worker's covering shift (an hour ago … three hours on) is
+        // under way; the 08:00 and 20:00 doses are both on today's board.
+        Carbon::setTestNow(Carbon::parse('2026-06-15 08:30', 'Pacific/Auckland')->utc());
 
         $recordOnly = $this->coveringWorker($site, $serviceContext, $client, deny: ['medications.controlled.view']);
         $this->assertTrue($recordOnly->canDo('medications.controlled.record'));
@@ -165,10 +180,12 @@ class ControlledMedicineConcealmentTest extends TestCase
         $actor = User::factory()->create();
         $site = Site::factory()->create(['name' => 'Kōwhai House']);
         $client = Client::factory()->create(['site_id' => $site->id, 'suppress_med_admin_alerts' => false]);
-        // A dose an hour ago on the New Zealand clock. Dose times are NZ wall
-        // times; this fixture used the UTC wall time, which only raised the
-        // overdue alert while the check misread dose times as UTC (EM-02).
-        $overdueSlot = now(config('app.worker_timezone', 'Pacific/Auckland'))->subHour();
+        // A dose two and a half hours ago on the New Zealand clock, so its
+        // window (60 minutes after) has ended: overdue (C6f). Dose times are
+        // NZ wall times (EM-02). The order was entered before the dose was
+        // due — nothing is owed before an order exists.
+        $overdueSlot = now(config('app.worker_timezone', 'Pacific/Auckland'))->subMinutes(150);
+        $this->travel(-4)->hours();
         $controlled = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'name' => 'Morphine sulfate',
@@ -179,8 +196,10 @@ class ControlledMedicineConcealmentTest extends TestCase
             'active' => true,
             'state' => 'active',
             'approval_status' => 'verified',
+            'start_date' => now()->subMonth()->toDateString(),
             'end_date' => null,
         ]);
+        $this->travelBack();
         ClientMedicationStock::query()->create([
             'client_medication_id' => $controlled->id,
             'on_hand' => 0,
@@ -199,7 +218,7 @@ class ControlledMedicineConcealmentTest extends TestCase
             'client_medication_id' => $medication->id,
             'administered_by' => $actor->id,
             'status' => 'given',
-            // Clear of the controlled dose slot an hour ago, so it stays overdue.
+            // Clear of the controlled dose slot 2½ hours ago, so it stays overdue.
             'scheduled_for' => now()->subHours(2),
             'administered_at' => now(),
             ...$attributes,
@@ -314,7 +333,10 @@ class ControlledMedicineConcealmentTest extends TestCase
             'user_id' => $worker->id,
             'starts_at' => now()->subHour(),
             'ends_at' => now()->addHours(3),
-            'status' => 'scheduled',
+            // Clocked in: Meds today shows a person's medicines to a worker
+            // assigned to them or clocked in to their shift (C6).
+            'actual_starts_at' => now()->subHour(),
+            'status' => 'in_progress',
         ]);
 
         return $worker->refresh();

@@ -1365,21 +1365,16 @@ class HandleInertiaRequests extends Middleware
                     foreach (app(ScheduledDoseStates::class)->dosesOn($medications, $dayStart, $now) as $orderId => $doses) {
                         $medication = $medications->firstWhere('id', $orderId);
                         foreach ($doses as $dose) {
-                            if (ScheduledDoseStates::listStatus($dose) !== 'overdue') {
-                                continue;
-                            }
-
                             $administration = $administrations->get($schedule->slotKey(
                                 (int) $medication->client_id,
                                 (int) $medication->id,
                                 $dose['due_at'],
                             ));
 
-                            if ($administration && in_array($administration->status, ['given', 'refused', 'withheld', 'missed'], true)) {
-                                continue;
+                            // The shared mapping: Missed (recorded) is never overdue.
+                            if (ScheduledDoseStates::statusFor($dose, $administration?->status) === 'overdue') {
+                                $count++;
                             }
-
-                            $count++;
                         }
                     }
 

@@ -46,7 +46,7 @@ export function PageHeroQuickActions({
                 className,
             )}
         >
-            <div className="w-full px-1 pt-0.5 pb-1 text-[10px] font-bold tracking-[0.10em] text-primary-foreground/70 uppercase">
+            <div className="w-full px-1 pt-0.5 pb-1 text-[10px] font-bold tracking-[0.10em] text-primary-foreground/80 uppercase">
                 {heading}
             </div>
             <TooltipProvider delayDuration={200}>

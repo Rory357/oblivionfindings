@@ -3,7 +3,7 @@ import type { StreamItem } from './stream-grouping';
 export function workIsDone(item: StreamItem): boolean {
     return item.kind === 'task'
         ? item.data.is_completed
-        : ['given', 'refused', 'withheld'].includes(item.data.status);
+        : ['given', 'refused', 'withheld', 'missed'].includes(item.data.status);
 }
 
 export function workDueAt(item: StreamItem): number {

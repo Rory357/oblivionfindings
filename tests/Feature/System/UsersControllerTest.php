@@ -247,29 +247,33 @@ class UsersControllerTest extends TestCase
         $this->assertDatabaseHas('hr_employee_profiles', ['id' => $profile->id]);
     }
 
-    public function test_update_keeps_canonical_work_email_atomic_with_login_email(): void
+    public function test_update_of_the_login_email_leaves_the_hr_work_email(): void
     {
         Notification::fake();
         $target = $this->userWithRole('support_worker');
+        $hrEditor = $this->userWithRole('hr');
         $profile = HrEmployeeProfile::factory()->create([
             'user_id' => $target->id,
             'primary_site_id' => Site::factory()->create()->id,
-            'work_email' => $target->email,
+            'work_email' => 'aroha@care.example.test',
             'is_active' => true,
-            'created_by' => $this->admin->id,
-            'updated_by' => $this->admin->id,
+            'created_by' => $hrEditor->id,
+            'updated_by' => $hrEditor->id,
         ]);
 
+        // This screen has no work-email field; its email is the sign-in,
+        // which can be personal, so the HR work email must not follow it.
         $this->actingAs($this->admin)
             ->put("/system/users/{$target->id}", [
-                'email' => 'canonical.worker@example.test',
+                'email' => 'aroha.home@example.test',
             ])
             ->assertRedirect();
 
-        $this->assertSame('canonical.worker@example.test', $target->refresh()->email);
+        $this->assertSame('aroha.home@example.test', $target->refresh()->email);
         $this->assertNull($target->email_verified_at);
-        $this->assertSame('canonical.worker@example.test', $profile->refresh()->work_email);
-        $this->assertSame($this->admin->id, $profile->updated_by);
+        $profile->refresh();
+        $this->assertSame('aroha@care.example.test', $profile->work_email);
+        $this->assertSame($hrEditor->id, $profile->updated_by);
         Notification::assertSentToTimes($target, VerifyEmail::class, 1);
     }
 

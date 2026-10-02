@@ -36,9 +36,6 @@ use Illuminate\Support\Str;
  */
 class MedsBoardPayloadService
 {
-    /** Statuses that mean a dose slot has been actioned and needs no chasing. */
-    private const RECORDED_STATUSES = ['given', 'refused', 'withheld', 'missed'];
-
     /** @var array<int, bool> the competency decision per viewer, for this request */
     private array $medCompetent = [];
 
@@ -116,14 +113,18 @@ class MedsBoardPayloadService
      * (DoseWindowResolver); "overdue" once the window has ended with nothing
      * recorded; "pending_check" — Waiting for the order check — for a dose of
      * an order whose change waits for its check: shown, never overdue, and
-     * not recordable until the order is checked.
+     * not recordable until the order is checked. A recorded dose reads as its
+     * record's outcome — "missed" is Missed (recorded), never overdue
+     * (ScheduledDoseStates::statusFor, shared with My Day).
      *
      * @param  array<int, int>  $clientIds
      * @param  Collection<string, ClientMedicationAdministration>  $bySlot
+     * @param  array{total: int, overdue: int}|null  $hidden  filled, when passed, with the controlled doses left out for this reader and how many are overdue
      * @return array<int, array<string, mixed>>
      */
-    public function scheduleForDate(array $clientIds, Carbon $date, Carbon $now, Collection $bySlot, bool $includeControlled = false): array
+    public function scheduleForDate(array $clientIds, Carbon $date, Carbon $now, Collection $bySlot, bool $includeControlled = false, ?array &$hidden = null): array
     {
+        $hidden = ['total' => 0, 'overdue' => 0];
         if (empty($clientIds)) {
             return [];
         }
@@ -131,19 +132,17 @@ class MedsBoardPayloadService
         try {
             $timezone = $this->scheduleService->workerTimezone();
 
-            // Verified orders, and orders whose change waits for the order
-            // check (their verified version's doses are still owed).
-            $medications = ClientMedication::whereIn('client_id', $clientIds)
-                ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
-                ->where('is_prn', false)
-                ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
-                ->where(function ($query) {
-                    $query->whereNotNull('dose_times')
-                        ->orWhereNotNull('frequency');
-                })
+            // One orders query; the controlled ones are counted, not listed,
+            // for a reader without controlled-medicine access (EM-12).
+            [$controlled, $medications] = $this->scheduledOrders($clientIds)
                 ->with('client:id,first_name,last_name,site_id')
-                ->get();
-            $doses = app(ScheduledDoseStates::class)->dosesOn($medications, $date, $now);
+                ->get()
+                ->partition(fn (ClientMedication $order): bool => ! $includeControlled && (bool) $order->controlled_drug);
+            $doses = app(ScheduledDoseStates::class)->dosesOn($medications->concat($controlled), $date, $now);
+            // Counted only for a caller that asks (passes $hidden).
+            if (func_num_args() >= 6) {
+                $hidden = $this->hiddenControlledDoses($controlled, $doses, $clientIds, $date);
+            }
 
             $rows = [];
 
@@ -154,11 +153,11 @@ class MedsBoardPayloadService
                         $this->scheduleService->slotKey((int) $med->client_id, (int) $med->id, $scheduled),
                     );
 
-                    if ($administration && ! in_array($administration->status, self::RECORDED_STATUSES, true)) {
+                    if ($administration && ! in_array($administration->status, ScheduledDoseStates::RECORDED_STATUSES, true)) {
                         $administration = null;
                     }
 
-                    $status = $administration ? $administration->status : ScheduledDoseStates::listStatus($dose);
+                    $status = ScheduledDoseStates::statusFor($dose, $administration?->status);
 
                     $clientName = $med->client
                         ? trim($med->client->first_name.' '.$med->client->last_name)
@@ -199,6 +198,67 @@ class MedsBoardPayloadService
 
             return [];
         }
+    }
+
+    /**
+     * How many of the day's scheduled doses for these people are of a
+     * controlled medicine — the doses left off the list for a reader without
+     * controlled-medicine access (EM-12), so the list can say how many it
+     * doesn't show without naming any.
+     *
+     * @param  array<int, int>  $clientIds
+     */
+    /**
+     * The day's doses of controlled medicines left off the list for a reader
+     * without controlled-medicine access, and how many of them are overdue —
+     * counted, never named (EM-12), so the list reconciles with the badge.
+     *
+     * @param  Collection<int, ClientMedication>  $controlled
+     * @param  array<int, list<array<string, mixed>>>  $doses
+     * @param  array<int, int>  $clientIds
+     * @return array{total: int, overdue: int}
+     */
+    private function hiddenControlledDoses(Collection $controlled, array $doses, array $clientIds, Carbon $date): array
+    {
+        $hidden = ['total' => 0, 'overdue' => 0];
+        if ($controlled->isEmpty()) {
+            return $hidden;
+        }
+
+        // Records of every medicine (the board's own query leaves controlled
+        // ones out for this reader), to tell which hidden doses are overdue.
+        $records = $this->scheduleService->administrationsForWindow($clientIds, $date, $date);
+        foreach ($controlled as $order) {
+            foreach ($doses[(int) $order->id] ?? [] as $dose) {
+                $record = $records->get($this->scheduleService->slotKey((int) $order->client_id, (int) $order->id, $dose['due_at']));
+                $hidden['total']++;
+                if (ScheduledDoseStates::statusFor($dose, $record?->status) === 'overdue') {
+                    $hidden['overdue']++;
+                }
+            }
+        }
+
+        return $hidden;
+    }
+
+    /**
+     * The scheduled (non-PRN) orders whose doses a board lists: verified
+     * orders, and orders whose change waits for the order check (their
+     * verified version's doses are still owed).
+     *
+     * @param  array<int, int>  $clientIds
+     * @return Builder<ClientMedication>
+     */
+    private function scheduledOrders(array $clientIds): Builder
+    {
+        return ClientMedication::query()
+            ->whereIn('client_id', $clientIds)
+            ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
+            ->where('is_prn', false)
+            ->where(function ($query) {
+                $query->whereNotNull('dose_times')
+                    ->orWhereNotNull('frequency');
+            });
     }
 
     /** @return array<string, mixed> */

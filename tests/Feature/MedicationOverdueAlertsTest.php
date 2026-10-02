@@ -50,6 +50,8 @@ it('sends overdue medication alerts from missed scheduled slots without pending 
         'last_name' => 'Wilson',
         'suppress_med_admin_alerts' => false,
     ]);
+    // Entered before the day began: a dose due before an order exists is not owed.
+    Carbon::setTestNow(Carbon::parse('2026-06-08 00:00:00', 'Pacific/Auckland')->utc());
     $medication = ClientMedication::factory()->create([
         'client_id' => $client->id,
         'name' => 'Morning tablets',
@@ -62,6 +64,7 @@ it('sends overdue medication alerts from missed scheduled slots without pending 
         'end_date' => null,
         'approval_status' => 'verified',
     ]);
+    Carbon::setTestNow(Carbon::parse('2026-06-08 11:15:00', 'Pacific/Auckland')->utc());
 
     MedicationRound::query()->create([
         'site_id' => $site->id,

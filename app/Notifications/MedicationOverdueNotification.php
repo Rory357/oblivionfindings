@@ -14,6 +14,8 @@ class MedicationOverdueNotification extends Notification
         public string $clientName,
         public string $scheduledTime,
         public ?int $clientId = null,
+        /** The dose's overdue spell (order @ due instant ~ spell) — one notification per spell and person. */
+        public ?string $doseKey = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -33,6 +35,7 @@ class MedicationOverdueNotification extends Notification
             'client_name' => $this->clientName,
             'scheduled_time' => $this->scheduledTime,
             'client_id' => $this->clientId,
+            'dose_key' => $this->doseKey,
         ];
     }
 }
