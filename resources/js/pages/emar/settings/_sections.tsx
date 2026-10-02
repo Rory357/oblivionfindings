@@ -428,6 +428,7 @@ export type WitnessPinStaffRow = {
     can_reset: boolean;
     /** Their own house (HR profile), for the house filter. */
     house?: string | null;
+    house_id?: number | null;
     reminded_at?: string | null;
     reminded_by?: string | null;
     /** Already reminded today (NZ): no second reminder until tomorrow. */

@@ -91,6 +91,8 @@ class WitnessPinReminderTest extends TestCase
                 ->where('witnessPin.can_reset', true)
                 ->where('witnessPin.staff', fn ($staff) => collect($staff)->contains(fn (array $row) => $row['id'] === $this->noPin->id
                     && $row['house'] === 'Kōwhai House'
+                    // "At a house" counts PINs by id: house names can repeat.
+                    && $row['house_id'] === $this->site->id
                     && $row['reminded_by'] === 'Hana Kereama'
                     && $row['reminded_today'] === true
                     && str_starts_with((string) $row['reminded_at'], '2026-10-02T09:12'))));

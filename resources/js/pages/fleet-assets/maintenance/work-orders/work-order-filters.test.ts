@@ -14,8 +14,9 @@ describe('work order filters', () => {
             'utf8',
         );
 
+        // The header meter (cbd9b3ccf): "Overdue orders", href as an expression.
         expect(dashboard).toMatch(
-            /href="\/fleet-assets\/maintenance\/work-orders\?overdue=1"\s+label="Overdue"/,
+            /label="Overdue orders"\s+href=\{\s*'\/fleet-assets\/maintenance\/work-orders\?overdue=1'\s*\}/,
         );
     });
 
