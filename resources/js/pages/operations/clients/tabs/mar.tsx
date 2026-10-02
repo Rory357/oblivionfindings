@@ -2,10 +2,12 @@
  * keep the page below the Babel deopt threshold). Same surface: header with
  * the record-dose workflow, allergy/alert banners, eMAR summary stats, links
  * into the eMAR module, and the scheduled / PRN / ceased medication lists. */
+import { scheduledDoseRecordLink } from '@/components/clients/profile/emar-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Link } from '@inertiajs/react';
+import type { EmarNavigationPermissions } from '@/lib/emar-navigation';
+import { Link, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     BookOpen,
@@ -53,6 +55,9 @@ export function MarTab({
     const controlledMeds = activeMeds.filter((m: any) => m.controlled_drug);
     const stockedMeds = activeMeds.filter((m: any) => m.stock);
     const hasAllergies = allergies.length > 0;
+    const can = usePage<{ auth?: { can?: EmarNavigationPermissions } }>().props
+        .auth?.can;
+    const scheduledLink = scheduledDoseRecordLink(clientId, can);
 
     return (
         <div className="space-y-4">
@@ -361,13 +366,17 @@ export function MarTab({
                                     {canRecord &&
                                     (!m.controlled_drug ||
                                         canRecordControlled) ? (
+                                        // Scheduled doses are recorded where
+                                        // each dose is matched to its time.
                                         <Button
                                             size="sm"
                                             variant="outline"
                                             className="shrink-0"
-                                            onClick={() => onRecordDose(m.id)}
+                                            asChild
                                         >
-                                            Sign
+                                            <Link href={scheduledLink.href}>
+                                                Record on {scheduledLink.place}
+                                            </Link>
                                         </Button>
                                     ) : null}
                                 </div>

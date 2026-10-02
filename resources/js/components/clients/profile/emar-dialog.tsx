@@ -26,6 +26,10 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
+    isFrontlineMedication,
+    type EmarNavigationPermissions,
+} from '@/lib/emar-navigation';
+import {
     createMedicationMutationReplayState,
     prepareMedicationMutationReplayState,
 } from '@/lib/emar-offline';
@@ -36,8 +40,9 @@ import {
     witnessOptionLabel,
     type WitnessPickerOption,
 } from '@/lib/witness-pin';
-import { router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
+    ArrowUpRight,
     Check,
     Loader2,
     Lock,
@@ -60,7 +65,38 @@ export type EmarMedication = {
     is_prn?: boolean;
     controlled_drug?: boolean;
     witness_required?: boolean;
+    /** Server: the profile can record this one (as-needed only). */
+    record_on_profile?: boolean;
 };
+
+/**
+ * Where a scheduled dose is recorded instead of the profile: the MAR chart,
+ * or Meds today for frontline staff. The profile's endpoint carries no
+ * scheduled time, so it records as-needed doses only.
+ */
+export function scheduledDoseRecordLink(
+    clientId: number,
+    can: EmarNavigationPermissions | undefined,
+): { href: string; place: string } {
+    return isFrontlineMedication(can)
+        ? { href: '/meds/today', place: 'Meds today' }
+        : { href: `/emar/mar?client_id=${clientId}`, place: 'the MAR chart' };
+}
+
+function ScheduledDosesLink({
+    link,
+}: {
+    link: { href: string; place: string };
+}) {
+    return (
+        <Button variant="link" asChild className="h-auto p-0">
+            <Link href={link.href}>
+                Record scheduled doses on {link.place}
+                <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+        </Button>
+    );
+}
 
 const OUTCOMES = [
     {
@@ -168,10 +204,22 @@ export function EmarRecordDialog({
         () =>
             medications.filter(
                 (candidate) =>
-                    !candidate.controlled_drug || canRecordControlled,
+                    Boolean(candidate.record_on_profile) &&
+                    (!candidate.controlled_drug || canRecordControlled),
             ),
         [canRecordControlled, medications],
     );
+    const can = usePage<{ auth?: { can?: EmarNavigationPermissions } }>().props
+        .auth?.can;
+    const scheduledLink = scheduledDoseRecordLink(clientId, can);
+    const hasScheduled = medications.some((m) => !m.record_on_profile);
+    // Asked for a scheduled dose, or no as-needed medicine to record here:
+    // the dialog offers only the link, never a form that would be refused.
+    const linkOnly =
+        recordableMedications.length === 0 ||
+        medications.some(
+            (m) => m.id === initialMedicationId && !m.record_on_profile,
+        );
     const medication = useMemo(
         () =>
             recordableMedications.find(
@@ -300,6 +348,37 @@ export function EmarRecordDialog({
         );
     };
 
+    if (linkOnly) {
+        return (
+            <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+                <DialogContent className="sm:max-w-[480px]">
+                    <DialogHeader>
+                        <DialogTitle>Record administration</DialogTitle>
+                        <DialogDescription>
+                            eMAR sign-off · {clientLabel}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                        <p className="font-medium">
+                            Scheduled doses are recorded on{' '}
+                            {scheduledLink.place}
+                        </p>
+                        <p className="text-muted-foreground">
+                            There each dose is matched to its time. Here you can
+                            record as-needed medicines only.
+                        </p>
+                        <ScheduledDosesLink link={scheduledLink} />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={onClose}>
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
+
     return (
         <Dialog open={open} onOpenChange={(o) => !o && !busy && onClose()}>
             <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-[640px]">
@@ -319,7 +398,7 @@ export function EmarRecordDialog({
                     {!initialMedicationId ? (
                         <div>
                             <Label className="mb-1.5 block">
-                                Medication{' '}
+                                As-needed medicine{' '}
                                 <span className="text-status-critical">*</span>
                             </Label>
                             <Select
@@ -342,6 +421,11 @@ export function EmarRecordDialog({
                                     ))}
                                 </SelectContent>
                             </Select>
+                            {hasScheduled ? (
+                                <div className="mt-1.5">
+                                    <ScheduledDosesLink link={scheduledLink} />
+                                </div>
+                            ) : null}
                         </div>
                     ) : null}
 
