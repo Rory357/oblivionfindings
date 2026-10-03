@@ -12,6 +12,7 @@ import {
     WIZARD_FOOTER_CLASS,
     WIZARD_RAIL_CLASS,
 } from '@/components/wizard/primitives';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import {
@@ -175,14 +176,6 @@ export const FLAG_META: Record<string, { label: string; cls: string }> = {
     },
 };
 
-const fmtDateTime = (iso: string) =>
-    new Date(iso).toLocaleString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
 type EventLink = { href: string; label: string; clientFilter?: boolean };
 const MAR_LINK: EventLink = {
     href: '/emar/mar',
@@ -525,7 +518,7 @@ export function MedicationEventDrawer({
                                         {meta.label}
                                     </span>
                                     <span className="text-muted-foreground text-xs">
-                                        {fmtDateTime(event.timestamp)}
+                                        {formatDateTimeLong(event.timestamp)}
                                     </span>
                                     {event.flags.map((f) => (
                                         <span

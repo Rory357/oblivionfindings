@@ -34,6 +34,7 @@ const event = (overrides: Partial<AuditEvent> = {}): AuditEvent => ({
 afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
 });
 
@@ -215,4 +216,27 @@ describe('history event destinations', () => {
             expect(visit).toHaveBeenCalledWith(href);
         },
     );
+});
+
+describe('history drawer New Zealand timestamp', () => {
+    it('shows the NZ date and year when a scheduled UTC instant crosses NZ midnight', () => {
+        vi.stubEnv('TZ', 'UTC');
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(() => new Promise(() => {})),
+        );
+        render(
+            <MedicationEventDrawer
+                event={event({
+                    event_type: 'dose_pending',
+                    category: 'doses',
+                    timestamp: '2026-10-02T11:30:00Z',
+                })}
+                onClose={vi.fn()}
+            />,
+        );
+        expect(
+            screen.getByText('3 October 2026, 12:30 am'),
+        ).toBeInTheDocument();
+    });
 });
