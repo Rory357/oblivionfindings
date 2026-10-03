@@ -232,9 +232,14 @@ class ClientMedicationDayTest extends TestCase
 
     public function test_a_past_day_keeps_stopped_and_superseded_orders_and_their_doses(): void
     {
-        $scheduled = $this->order('Old scheduled', ['08:00'], overrides: ['dosage' => '5 mg']);
-        $prn = $this->order('Old PRN', [], overrides: ['is_prn' => true]);
-        $replaced = $this->order('Replacement history', ['10:00'], overrides: ['dosage' => '2 tablets']);
+        $checked = [
+            'approval_status' => 'verified',
+            'verified_by' => $this->reader->id,
+            'verified_at' => Carbon::parse('2026-06-12 00:00', 'Pacific/Auckland')->utc(),
+        ];
+        $scheduled = $this->order('Old scheduled', ['08:00'], overrides: [...$checked, 'dosage' => '5 mg']);
+        $prn = $this->order('Old PRN', [], overrides: [...$checked, 'is_prn' => true]);
+        $replaced = $this->order('Replacement history', ['10:00'], overrides: [...$checked, 'dosage' => '2 tablets']);
         $this->at('2026-06-14 00:00');
         $this->artisan('emar:generate-dose-slots')->assertSuccessful();
         $this->record($scheduled, '2026-06-14 08:00', 'given');
@@ -244,9 +249,13 @@ class ClientMedicationDayTest extends TestCase
             $order->update(['active' => false, 'state' => 'ceased', 'ceased_at' => now(), 'ceased_reason' => 'Written stop', 'ceased_by' => $this->reader->id]);
         }
         $replacement = $replaced->createVersion($this->reader->id, 'Written change');
+        $snapshot = $replaced->versions()->where('version_number', 1)->firstOrFail();
+        $this->assertFalse($snapshot->controlled_drug);
+        $this->assertFalse($snapshot->high_risk);
+        $this->assertFalse($snapshot->witness_required);
         $replacement->update(['dosage' => '3 tablets']);
         foreach ([$scheduled, $prn, $replaced] as $order) {
-            $this->historicalVersion($order, 1, [], '2026-06-12 00:00');
+            $this->historicalVersion($order, 1, [], $order->verified_at->copy()->timezone('Pacific/Auckland')->format('Y-m-d H:i'));
         }
         $this->artisan('emar:generate-dose-slots')->assertSuccessful();
         $day = $this->day('2026-06-14');
@@ -411,7 +420,8 @@ class ClientMedicationDayTest extends TestCase
         return ClientMedication::withoutEvents(fn () => ClientMedication::query()->create(array_merge([
             'client_id' => $this->aroha->id, 'created_by' => $this->reader->id,
             'name' => $name, 'dosage' => '5 mg', 'route' => 'oral', 'dose_times' => $times,
-            'is_prn' => false, 'controlled_drug' => false, 'active' => true, 'state' => 'active',
+            'is_prn' => false, 'controlled_drug' => false, 'high_risk' => false, 'witness_required' => false,
+            'active' => true, 'state' => 'active',
             'version' => 1, 'approval_status' => 'verified', 'verified_by' => $this->reader->id,
             'verified_at' => Carbon::parse('2026-06-12 00:00', 'Pacific/Auckland')->utc(),
             'start_date' => '2026-06-01', 'created_at' => Carbon::parse('2026-06-12 00:00', 'Pacific/Auckland')->utc(),
@@ -520,6 +530,11 @@ class ClientMedicationDayTest extends TestCase
             'frequency' => 'Daily',
             'dose_times' => $doseTimes,
             'is_prn' => false,
+            'controlled_drug' => false,
+            'high_risk' => false,
+            'witness_required' => false,
+            'version' => 1,
+            'route' => 'oral',
             'active' => true,
             'state' => 'active',
             'start_date' => '2026-06-01',
