@@ -458,7 +458,11 @@ class EnhancedMarReplayBindingTest extends TestCase
             $controlledRecord->id => ['allowed' => true],
         ]);
         $this->actor->unsetRelation('permissionOverrides')->unsetRelation('roles');
-        $this->medication->forceFill(['controlled_drug' => true])->saveQuietly();
+        $this->medication->forceFill([
+            'controlled_drug' => true,
+            'nz_controlled_class' => 'B',
+            'controlled_class_source' => 'Synthetic reviewed test configuration',
+        ])->saveQuietly();
         $stock = ClientMedicationStock::query()->create([
             'client_medication_id' => $this->medication->id,
             'on_hand' => 10,

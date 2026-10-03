@@ -441,6 +441,8 @@ class OneChartAdministrationSafetyTest extends TestCase
                 'frequency' => 'Once daily',
                 'dose_times' => [$doseTime],
                 'controlled_drug' => false,
+                'nz_controlled_class' => ($overrides['controlled_drug'] ?? false) ? 'B' : null,
+                'controlled_class_source' => ($overrides['controlled_drug'] ?? false) ? 'Synthetic reviewed test configuration' : null,
                 'witness_required' => false,
                 'active' => true,
                 'state' => 'active',

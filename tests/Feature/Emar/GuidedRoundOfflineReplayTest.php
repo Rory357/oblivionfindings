@@ -541,6 +541,8 @@ class GuidedRoundOfflineReplayTest extends TestCase
         ]);
         $this->medication->forceFill([
             'controlled_drug' => true,
+            'nz_controlled_class' => 'B',
+            'controlled_class_source' => 'Synthetic reviewed test configuration',
             'witness_required' => true,
             'approval_status' => 'verified',
         ])->saveQuietly();

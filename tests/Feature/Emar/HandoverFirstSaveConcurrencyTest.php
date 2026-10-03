@@ -101,6 +101,8 @@ class HandoverFirstSaveConcurrencyTest extends TestCase
         $medication = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'controlled_drug' => true,
+            'nz_controlled_class' => 'B',
+            'controlled_class_source' => 'Synthetic reviewed test configuration',
             'active' => true,
             'state' => 'active',
             'approval_status' => 'verified',

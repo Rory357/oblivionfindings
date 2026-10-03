@@ -304,7 +304,7 @@ class WorkerMedsRecordDoseTest extends TestCase
         [$stock] = $this->trackedStock($medication);
         $this->actingAs($this->worker)->postJson('/meds/today/record', [
             'client_medication_id' => $medication->id, 'scheduled_for' => now()->toIso8601String(),
-            'administered_at' => now()->toIso8601String(), 'status' => 'refused', 'reason' => 'Person declined.',
+            'administered_at' => now()->toIso8601String(), 'status' => 'refused', 'reason_code' => 'refused', 'reason' => 'Person declined.',
         ])->assertOk();
         $this->assertDatabaseCount('medication_stock_movements', 0);
         $this->assertSame('25.00', $stock->fresh()->on_hand);
@@ -1638,6 +1638,10 @@ class WorkerMedsRecordDoseTest extends TestCase
             'frequency' => 'Daily',
             'dose_times' => $doseTimes,
             'is_prn' => false,
+            'controlled_drug' => false,
+            'nz_controlled_class' => ($overrides['controlled_drug'] ?? false) ? 'B' : null,
+            'controlled_class_source' => ($overrides['controlled_drug'] ?? false) ? 'Synthetic reviewed test configuration' : null,
+            'approval_status' => 'verified',
             'active' => true,
             'state' => 'active',
         ], $overrides));
