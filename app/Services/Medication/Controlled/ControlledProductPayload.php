@@ -22,6 +22,7 @@ use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\WitnessPinService;
 use App\Support\Medication\MedicationStockQuantity as Quantity;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 final class ControlledProductPayload
 {
@@ -47,22 +48,29 @@ final class ControlledProductPayload
             ->with(['client.site', 'stock'])->orderBy('name')->get();
         abort_if($medicationId !== null && $meds->isEmpty(), 404);
         $ids = $meds->pluck('id');
-        $entriesQuery = ClientControlledDrugEntry::query()->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds);
+        $entriesQuery = $this->scope->scopeCanonicalClientMedicationRows(ClientControlledDrugEntry::query(), $siteIds, false)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds);
         $entries = (clone $entriesQuery)->with(['recordedBy:id,name', 'witnessedBy:id,name'])->latest('id')->limit(self::HISTORY_LIMIT)->get();
         $latest = (clone $entriesQuery)->selectRaw('client_medication_id, MAX(id) AS latest_id')->groupBy('client_medication_id')->pluck('latest_id', 'client_medication_id');
         $lastCounts = (clone $entriesQuery)->where('entry_type', 'balance_check')->whereNotNull('witnessed_by')->selectRaw('client_medication_id, MAX(id) AS latest_id')->groupBy('client_medication_id')->pluck('latest_id', 'client_medication_id');
         $counts = ClientControlledDrugEntry::query()->whereIn('id', $lastCounts)->get()->keyBy('client_medication_id');
-        $reversals = ClientControlledDrugEntry::query()->whereIn('reverses_entry_id', $entries->pluck('id'))->with(['recordedBy:id,name', 'witnessedBy:id,name'])->get()->keyBy('reverses_entry_id');
-        $discrepancyQuery = ClientControlledDrugDiscrepancy::query()->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds);
+        $reversals = $this->scope->scopeCanonicalClientMedicationRows(ClientControlledDrugEntry::query(), $siteIds, false)
+            ->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds)
+            ->whereIn('reverses_entry_id', $entries->pluck('id'))
+            ->whereExists(fn ($q) => $q->selectRaw('1')->from('client_controlled_drug_entries as original')
+                ->whereColumn('original.id', 'client_controlled_drug_entries.reverses_entry_id')
+                ->whereColumn('original.client_id', 'client_controlled_drug_entries.client_id')
+                ->whereColumn('original.client_medication_id', 'client_controlled_drug_entries.client_medication_id'))
+            ->with(['recordedBy:id,name', 'witnessedBy:id,name'])->get()->keyBy('reverses_entry_id');
+        $discrepancyQuery = $this->scope->scopeCanonicalClientMedicationRows(ClientControlledDrugDiscrepancy::query(), $siteIds, false)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds);
         $discrepancies = $this->retainOutstanding($discrepancyQuery, fn ($q) => $q->whereIn('status', ['open', 'under_review']), ['reportedBy:id,name', 'witnessedBy:id,name', 'resolvedBy:id,name']);
-        $lossQuery = ControlledDrugLossReport::query()->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds);
+        $lossQuery = $this->scope->scopeCanonicalClientMedicationRows(ControlledDrugLossReport::query(), $siteIds, false)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds);
         $losses = $this->retainOutstanding($lossQuery, fn ($q) => $q->whereIn('investigation_status', ['reported', 'investigating']), ['discoveredBy:id,name', 'resolvedBy:id,name']);
-        $destructionQuery = MedicationDestruction::query()->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds)->where('is_controlled_drug', true);
+        $destructionQuery = $this->scope->scopeCanonicalClientMedicationRows(MedicationDestruction::query(), $siteIds, false)->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds)->where('is_controlled_drug', true);
         $destructions = $this->retainOutstanding($destructionQuery, fn ($q) => $q->whereNull('voided_at')->where('disposal_method', 'pharmacy_return')->whereNull('pharmacy_received_at'), ['destroyedByUser:id,name', 'witness1:id,name', 'witness2:id,name']);
         $overrideQuery = ControlledWitnessOverride::query()->whereIn('site_id', $siteIds)->whereIn('client_medication_id', $ids);
         $overrides = $this->retainOutstanding($overrideQuery, fn ($q) => $q->whereIn('status', ['waiting', 'approved'])->whereNull('signed_off_at'));
-        $overrideDoses = ClientMedicationAdministration::query()->whereIn('witness_override_id', $overrides->pluck('id'))
-            ->whereIn('client_medication_id', $ids)->whereIn('client_id', $clientIds)->with('administeredBy:id,name')->get();
+        $overrideDoses = $this->scopeOverrideDoses(ClientMedicationAdministration::query(), $siteIds, $ids, $clientIds)
+            ->whereIn('witness_override_id', $overrides->pluck('id'))->with('administeredBy:id,name')->get();
         // Fetch the complete evidence for displayed records; an unrelated event cap must never hide sign-off.
         $events = ControlledWorkflowEvent::query()->whereIn('client_medication_id', $ids)
             ->where(fn ($q) => $q->where(fn ($loss) => $loss->where('subject_type', 'loss')->whereIn('subject_id', $losses->pluck('id')))
@@ -180,6 +188,18 @@ final class ControlledProductPayload
         ];
     }
 
+    /** A dose belongs to its canonical owner and to the override's listed medicines at that house. */
+    private function scopeOverrideDoses($query, ?array $siteIds, Collection $medicationIds, array $clientIds)
+    {
+        return $this->scope->scopeCanonicalClientMedicationRows($query, $siteIds, false)
+            ->whereIn('client_medication_id', $medicationIds)->whereIn('client_id', $clientIds)
+            ->whereExists(fn ($parent) => $parent->selectRaw('1')->from('controlled_witness_overrides')
+                ->join('clients as dose_owner', 'dose_owner.site_id', '=', 'controlled_witness_overrides.site_id')
+                ->whereColumn('dose_owner.id', 'client_medication_administrations.client_id')
+                ->whereColumn('controlled_witness_overrides.id', 'client_medication_administrations.witness_override_id')
+                ->whereJsonContains('controlled_witness_overrides.medicine_ids', DB::raw('client_medication_administrations.client_medication_id')));
+    }
+
     /** Outstanding records remain actionable even when completed history exceeds the display limit. */
     private function retainOutstanding($query, \Closure $outstanding, array $relations = []): Collection
     {
@@ -193,8 +213,8 @@ final class ControlledProductPayload
         $openDiscrepancies = (clone $discrepancies)->whereIn('status', ['open', 'under_review'])->count();
         $openLosses = (clone $losses)->whereIn('investigation_status', ['reported', 'investigating'])->count();
         $receipts = (clone $destructions)->whereNull('voided_at')->where('disposal_method', 'pharmacy_return')->whereNull('pharmacy_received_at')->count();
-        $pending = (clone $overrides)->where('status', 'approved')->whereNull('signed_off_at')->whereHas('administrations', fn ($q) => $q->whereIn('client_medication_id', $medicationIds)->whereIn('client_id', $clientIds))->count();
-        $overdueFollowups = (clone $overrides)->where('status', 'approved')->whereNull('signed_off_at')->where('followup_due_at', '<', now())->whereHas('administrations', fn ($q) => $q->whereIn('client_medication_id', $medicationIds)->whereIn('client_id', $clientIds))->count();
+        $pending = (clone $overrides)->where('status', 'approved')->whereNull('signed_off_at')->whereHas('administrations', fn ($q) => $this->scopeOverrideDoses($q, null, $medicationIds, $clientIds))->count();
+        $overdueFollowups = (clone $overrides)->where('status', 'approved')->whereNull('signed_off_at')->where('followup_due_at', '<', now())->whereHas('administrations', fn ($q) => $this->scopeOverrideDoses($q, null, $medicationIds, $clientIds))->count();
         $waiting = (clone $overrides)->where('status', 'waiting')->count();
         $due = $medicines->filter(fn ($m) => in_array($m['count']['state'], ['due', 'overdue'], true))->count();
         $overdue = $medicines->where('count.state', 'overdue')->count();

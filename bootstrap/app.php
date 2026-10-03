@@ -113,6 +113,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'read_back_witness_credential',
             'cd_witness_credential',
             'witness_credential',
+            'second_witness_credential',
             'witness_1_credential',
             'witness_2_credential',
             'waiver_approver_credential',
