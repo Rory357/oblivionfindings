@@ -284,11 +284,11 @@ export function MarTab({
     ).size;
 
     return (
-        <div className="space-y-5">
+        <div className="min-w-0 max-w-full space-y-5">
             {/* Profile launch point and allergy warnings */}
             {!embedded || day ? (
-                <Card>
-                    <CardContent className="space-y-3 p-5">
+                <Card className="min-w-0 max-w-full">
+                    <CardContent className="min-w-0 max-w-full space-y-3 p-5">
                         {!embedded ? (
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="flex items-center gap-3">
@@ -418,13 +418,14 @@ export function MarTab({
             ) : null}
 
             {/* The day */}
-            <Card>
-                <CardContent className="space-y-3 p-5">
+            <Card className="min-w-0 max-w-full">
+                <CardContent className="min-w-0 max-w-full space-y-3 p-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
                             <Button
                                 variant="outline"
                                 size="icon"
+                                className="frontline-tap"
                                 aria-label="Earlier day"
                                 disabled={!day || !canGoBack}
                                 onClick={() =>
@@ -434,7 +435,7 @@ export function MarTab({
                                 <ChevronLeft className="size-4" />
                             </Button>
                             <h3
-                                className="text-section-title min-w-[12rem] text-center"
+                                className="text-section-title min-w-0 flex-1 text-center sm:min-w-[12rem]"
                                 aria-live="polite"
                             >
                                 {label}
@@ -442,6 +443,7 @@ export function MarTab({
                             <Button
                                 variant="outline"
                                 size="icon"
+                                className="frontline-tap"
                                 aria-label="Later day"
                                 disabled={!day || !canGoForward}
                                 onClick={() =>
@@ -510,7 +512,7 @@ export function MarTab({
                     ) : (
                         <div
                             className={cn(
-                                'space-y-2 transition-opacity',
+                                'min-w-0 max-w-full space-y-2 transition-opacity',
                                 load.status === 'loading' && 'opacity-60',
                             )}
                             aria-busy={load.status === 'loading'}
@@ -559,8 +561,8 @@ export function MarTab({
             </Card>
 
             {view !== 'scheduled' && day && day.coverage.complete ? (
-                <Card>
-                    <CardContent className="p-5">
+                <Card className="min-w-0 max-w-full">
+                    <CardContent className="min-w-0 max-w-full p-5">
                         <PrnStrip
                             rows={day.prn.rows}
                             hidden={day.prn.hidden}

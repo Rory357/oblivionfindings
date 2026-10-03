@@ -49,7 +49,7 @@ export function ChartSection({
     onChange: (date: string | null, week: boolean) => void;
 }) {
     return (
-        <div className="space-y-5">
+        <div className="min-w-0 max-w-full space-y-5">
             {view !== 'asneeded' && (
                 <div className="flex gap-2">
                     <Button
@@ -149,6 +149,7 @@ function WeekChart({
     return (
         <SectionCard
             title="Seven-day chart"
+            className="min-w-0 max-w-full"
             right={
                 <>
                     <Button
@@ -196,88 +197,126 @@ function WeekChart({
                 </p>
             )}
             {orders.length ? (
-                <EntityTable
-                    rows={orders}
-                    rowKey={clinicalKey}
-                    identityLabel="Medicine"
-                    identity={(medicine) => ({
-                        icon: Pill,
-                        name: medicine.name,
-                        subline: `${medicine.dose ?? ''} · ${medicine.route ?? ''}`,
-                    })}
-                    minWidth={1200}
-                    rowHeight="content"
-                    actionsFor={() => []}
-                    columns={data.days.map((day) => ({
-                        key: day.date,
-                        label: dayLabel(day.date, day.today, day.tomorrow),
-                        width: '1fr',
-                        cell: (medicine: DayMedicine) => {
-                            const current = day.medicines.find(
-                                (row) =>
-                                    clinicalKey(row) === clinicalKey(medicine),
+                <div
+                    role="region"
+                    aria-label={`Seven-day medication chart for ${personName}. Scroll horizontally to see all days.`}
+                    tabIndex={0}
+                    className="min-w-0 max-w-full rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                    onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
+                        const scroller =
+                            event.currentTarget.querySelector<HTMLElement>(
+                                '.overflow-x-auto',
                             );
-                            const doses = current
-                                ? Object.values(current.cells).flat()
-                                : [];
-                            return (
-                                <div className="space-y-1">
-                                    {doses.map((dose) => {
-                                        const kind = cellKind(
-                                            dose,
-                                            day.date === day.today,
-                                        );
-                                        return (
-                                            <Button
-                                                key={dose.key}
-                                                variant="outline"
-                                                className="min-h-11 w-full flex-col items-start px-2 py-2 whitespace-normal"
-                                                onClick={() => {
-                                                    if (
-                                                        day.date ===
-                                                            day.today &&
-                                                        day.can.record &&
-                                                        [
-                                                            'due_now',
-                                                            'overdue',
-                                                        ].includes(kind)
-                                                    )
-                                                        recorder.recordScheduled(
-                                                            dose,
-                                                        );
-                                                    else if (current)
-                                                        setDetail({
-                                                            day,
-                                                            dose,
-                                                            medicine: current,
-                                                        });
-                                                }}
-                                            >
-                                                <span className="text-caption">
-                                                    {clockLabel(dose.time)}
-                                                </span>
-                                                <StatusBadge
-                                                    variant={
-                                                        CELL_META[kind].tone
-                                                    }
+                        if (!scroller) return;
+                        if (
+                            event.key === 'ArrowLeft' ||
+                            event.key === 'ArrowRight'
+                        ) {
+                            event.preventDefault();
+                            scroller.scrollBy({
+                                left:
+                                    scroller.clientWidth *
+                                    (event.key === 'ArrowRight' ? 0.8 : -0.8),
+                            });
+                        } else if (
+                            event.key === 'Home' ||
+                            event.key === 'End'
+                        ) {
+                            event.preventDefault();
+                            scroller.scrollTo({
+                                left:
+                                    event.key === 'Home'
+                                        ? 0
+                                        : scroller.scrollWidth,
+                            });
+                        }
+                    }}
+                >
+                    <EntityTable
+                        className="min-w-0 max-w-full"
+                        rows={orders}
+                        rowKey={clinicalKey}
+                        identityLabel="Medicine"
+                        identity={(medicine) => ({
+                            icon: Pill,
+                            name: medicine.name,
+                            subline: `${medicine.dose ?? ''} · ${medicine.route ?? ''}`,
+                        })}
+                        minWidth={1200}
+                        rowHeight="content"
+                        actionsFor={() => []}
+                        columns={data.days.map((day) => ({
+                            key: day.date,
+                            label: dayLabel(day.date, day.today, day.tomorrow),
+                            width: '1fr',
+                            cell: (medicine: DayMedicine) => {
+                                const current = day.medicines.find(
+                                    (row) =>
+                                        clinicalKey(row) === clinicalKey(medicine),
+                                );
+                                const doses = current
+                                    ? Object.values(current.cells).flat()
+                                    : [];
+                                return (
+                                    <div className="space-y-1">
+                                        {doses.map((dose) => {
+                                            const kind = cellKind(
+                                                dose,
+                                                day.date === day.today,
+                                            );
+                                            return (
+                                                <Button
+                                                    key={dose.key}
+                                                    variant="outline"
+                                                    className="min-h-11 w-full flex-col items-start px-2 py-2 whitespace-normal"
+                                                    onClick={() => {
+                                                        if (
+                                                            day.date ===
+                                                                day.today &&
+                                                            day.can.record &&
+                                                            [
+                                                                'due_now',
+                                                                'overdue',
+                                                            ].includes(kind)
+                                                        )
+                                                            recorder.recordScheduled(
+                                                                dose,
+                                                            );
+                                                        else if (current)
+                                                            setDetail({
+                                                                day,
+                                                                dose,
+                                                                medicine: current,
+                                                            });
+                                                    }}
                                                 >
-                                                    {CELL_META[kind].label}
-                                                </StatusBadge>
-                                            </Button>
-                                        );
-                                    })}
-                                    {!doses.length && (
-                                        <span className="text-muted-foreground">
-                                            {day.coverage.complete
-                                                ? '—'
-                                                : 'Not available'}
-                                        </span>
-                                    )}
-                                </div>
-                            );
-                        },
-                    }))}
-                />
+                                                    <span className="text-caption">
+                                                        {clockLabel(dose.time)}
+                                                    </span>
+                                                    <StatusBadge
+                                                        variant={
+                                                            CELL_META[kind].tone
+                                                        }
+                                                    >
+                                                        {CELL_META[kind].label}
+                                                    </StatusBadge>
+                                                </Button>
+                                            );
+                                        })}
+                                        {!doses.length && (
+                                            <span className="text-muted-foreground">
+                                                {day.coverage.complete
+                                                    ? '—'
+                                                    : 'Not available'}
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            },
+                        }))}
+                    />
+                </div>
             ) : (
                 <p className="text-sm">
                     {hidden

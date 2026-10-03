@@ -151,7 +151,7 @@ function AvailableRecord({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${person.preferred} · Medication record`} />
-            <div className="flex min-w-0 flex-col gap-5">
+            <div className="flex min-w-0 max-w-full flex-col gap-5">
                 <PageHeader
                     variant="profile"
                     wrapTitle
@@ -323,7 +323,7 @@ function AvailableRecord({
                     id="medication-record-panel"
                     role="tabpanel"
                     aria-labelledby={`medication-record-tab-${activeView}`}
-                    className="min-w-0"
+                    className="min-w-0 max-w-full"
                 >
                     {location.tab === 'medicines' ? (
                         <MedicinesSection

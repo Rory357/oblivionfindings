@@ -129,7 +129,12 @@ export function MarDayGrid({
 
     return (
         <TooltipProvider delayDuration={150}>
-            <div className="overflow-x-auto rounded-lg border border-border">
+            <div
+                role="region"
+                aria-label={`Scheduled medication chart for ${personName}. Scroll horizontally to see all dose times.`}
+                tabIndex={0}
+                className="min-w-0 max-w-full overflow-x-auto rounded-lg border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+            >
                 <table
                     role="grid"
                     aria-label={`Scheduled doses for ${personName}`}
@@ -139,7 +144,7 @@ export function MarDayGrid({
                         <tr>
                             <th
                                 scope="col"
-                                className="sticky left-0 z-20 min-w-[220px] border-b border-border bg-muted/40 px-3 py-2 text-left text-xs font-semibold text-muted-foreground"
+                                className="sticky left-0 z-20 min-w-28 max-w-28 border-b border-border bg-muted/40 px-3 py-2 text-left text-xs font-semibold text-muted-foreground sm:min-w-[220px] sm:max-w-none"
                             >
                                 Medicine
                             </th>
@@ -183,15 +188,15 @@ export function MarDayGrid({
                             >
                                 <th
                                     scope="row"
-                                    className="sticky left-0 z-10 max-w-[280px] border-b border-border bg-card px-3 py-2 text-left align-middle font-normal group-hover:bg-muted"
+                                    className="sticky left-0 z-10 max-w-28 border-b border-border bg-card px-3 py-2 text-left align-middle font-normal group-hover:bg-muted sm:max-w-[280px]"
                                 >
                                     <div
-                                        className="line-clamp-2 font-medium break-words"
+                                        className="font-medium break-words sm:line-clamp-2"
                                         title={medicine.name}
                                     >
                                         {medicine.name}
                                     </div>
-                                    <div className="text-caption line-clamp-1 text-muted-foreground">
+                                    <div className="text-caption break-words text-muted-foreground sm:line-clamp-1">
                                         {[medicine.dose, medicine.route]
                                             .filter(Boolean)
                                             .join(' · ') || '—'}
