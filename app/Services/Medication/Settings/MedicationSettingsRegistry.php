@@ -5,6 +5,7 @@ namespace App\Services\Medication\Settings;
 use App\Services\Medication\Alerts\MedicationAlertCatalogue;
 use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\DoseTimingSettings;
+use App\Services\Medication\MedicationErrorWorkflow;
 use App\Services\Medication\MedicationSafetyPolicySettings;
 use App\Services\Medication\WitnessPinSettings;
 
@@ -135,6 +136,7 @@ class MedicationSettingsRegistry
             $this->alertExtras(),
             $this->alertDelivery(),
             $this->quietHouses(),
+            $this->errorTriage(),
         ];
     }
 
@@ -540,5 +542,21 @@ class MedicationSettingsRegistry
         return collect($accepted)
             ->mapWithKeys(fn (string $value): array => [$value => $words[$value] ?? $value])
             ->all();
+    }
+
+    private function errorTriage(): MedicationSettingGroup
+    {
+        return new MedicationSettingGroup(
+            key: 'errorTriage', view: self::VIEW_ALERTS,
+            effect: 'From the next medication error reported, at every house — existing reports keep their due time',
+            auditEvent: 'medications.error_triage.updated',
+            definitions: [new MedicationSettingDefinition(
+                group: 'errorTriage', key: 'due', storageKey: MedicationErrorWorkflow::TRIAGE_DUE,
+                scope: MedicationSettingDefinition::SCOPE_ORGANISATION, section: 'triage',
+                label: 'Medication errors must be triaged', options: [
+                    'fourHours' => 'Within 4 hours', 'endOfDay' => 'By the end of the day', 'nextDay' => 'By the end of the next day',
+                ], default: 'nextDay', rank: ['nextDay', 'endOfDay', 'fourHours'],
+            )],
+        );
     }
 }

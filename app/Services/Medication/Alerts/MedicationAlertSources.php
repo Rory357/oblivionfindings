@@ -16,6 +16,7 @@ use App\Models\MedicationReview;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\CompetencyPolicySettings;
+use App\Services\Medication\MedicationErrorSummary;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\RefusalEscalationPolicy;
 use App\Support\Medication\MedicationStockQuantity;
@@ -660,18 +661,13 @@ class MedicationAlertSources
                 key: 'error:'.$fresh->id,
                 siteId: (int) $client->site_id,
                 title: 'Medication error reported',
-                message: sprintf(
-                    'A medication error was reported at %s: %s%s — %s.',
-                    $house,
-                    $this->person($client),
-                    $fresh->medication ? ', '.$fresh->medication->name : '',
-                    $what,
-                ),
+                message: MedicationErrorSummary::for($fresh),
                 shortMessage: "A medication error was reported at {$house}.",
                 actionUrl: '/emar/errors',
                 severity: in_array($fresh->severity, ['major', 'critical'], true) ? 'critical' : 'warning',
                 clientId: (int) $client->id,
-                controlled: (bool) $fresh->medication?->controlled_drug,
+                // P08b D3: every configured recipient receives this neutral summary, including clinical leads.
+                controlled: false,
                 context: ['client_id' => (int) $client->id, 'medication_error_id' => (int) $fresh->id],
             ));
         }));

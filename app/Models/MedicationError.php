@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -40,6 +41,14 @@ class MedicationError extends Model
         'closed_at',
         'closed_by',
         'status',
+        'workflow_stage',
+        'report_source',
+        'report_token',
+        'report_fingerprint',
+        'occurred_at',
+        'triage_due_at',
+        'owner_id',
+        'investigation_due_at',
         // P01 C1: the dose whose "more than ordered" record raised this error.
         'client_medication_administration_id',
     ];
@@ -48,6 +57,9 @@ class MedicationError extends Model
         'reported_at' => 'datetime',
         'reviewed_at' => 'datetime',
         'closed_at' => 'datetime',
+        'occurred_at' => 'datetime',
+        'triage_due_at' => 'datetime',
+        'investigation_due_at' => 'datetime',
     ];
 
     // ─── Relationships ────────────────────────────────────
@@ -88,11 +100,33 @@ class MedicationError extends Model
             ->latest('id');
     }
 
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    public function entries(): HasMany
+    {
+        return $this->hasMany(MedicationErrorEntry::class)->orderBy('id');
+    }
+
+    public function actions(): HasMany
+    {
+        return $this->hasMany(MedicationErrorAction::class)->orderBy('due_at')->orderBy('id');
+    }
+
+    public function stage(): string
+    {
+        return $this->workflow_stage ?? match ($this->status) {
+            'resolved' => 'actions', 'closed' => 'closed', 'investigating' => 'investigating', default => 'triage',
+        };
+    }
+
     // ─── Scopes ───────────────────────────────────────────
 
     public function scopeOpen($query)
     {
-        return $query->whereIn('status', ['reported', 'investigating']);
+        return $query->whereIn('status', ['reported', 'investigating', 'resolved']);
     }
 
     public function scopeCritical($query)

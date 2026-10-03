@@ -41,6 +41,7 @@ export const SET_VIEWS: Record<
             ['overview', 'Overview'],
             ['alerts', 'Alerts'],
             ['delivery', 'Delivery'],
+            ['triage', 'Error triage'],
             ['oncall', 'On-call contacts'],
             ['emergency', 'Emergency access'],
             ['log', 'Alert log'],

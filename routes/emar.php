@@ -510,6 +510,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->name('emar.cd_loss.resolve');
 
     // ─── Medication Errors ──────────────────────────────────
+    Route::get('/errors/export', [MedicationErrorController::class, 'export'])->middleware('permission:medications.view')->name('emar.errors.export');
     Route::get('/errors', [MedicationErrorController::class, 'index'])
         ->middleware('permission:medications.view')
         ->name('emar.errors');
@@ -517,23 +518,31 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->middleware('permission:medications.administer.record')
         ->name('emar.errors.store');
     Route::put('/errors/{error}', [MedicationErrorController::class, 'update'])
-        ->middleware('permission:medications.administer.correct')
+        ->middleware('permission:medications.errors.manage')
         ->name('emar.errors.update');
     Route::post('/errors/{error}/review', [MedicationErrorController::class, 'review'])
-        ->middleware('permission:medications.administer.correct')
+        ->middleware('permission:medications.errors.manage')
         ->name('emar.errors.review');
     Route::post('/errors/{error}/resolve', [MedicationErrorController::class, 'resolve'])
-        ->middleware('permission:medications.administer.correct')
+        ->middleware('permission:medications.errors.manage')
         ->name('emar.errors.resolve');
     Route::post('/errors/{error}/close', [MedicationErrorController::class, 'close'])
-        ->middleware('permission:medications.administer.correct')
+        ->middleware('permission:medications.errors.manage')
         ->name('emar.errors.close');
     // Post-report "create & link incident" — the report-time create_incident path
     // only runs at store(). Reuses that incident-creation shape, links it, then
     // jumps to the incidents module. See docs/ERRORS_GAP_ANALYSIS.md (C1).
     Route::post('/errors/{error}/link-incident', [MedicationErrorController::class, 'linkIncident'])
-        ->middleware('permission:medications.administer.correct')
+        ->middleware('permission:medications.errors.manage')
         ->name('emar.errors.link_incident');
+
+    Route::get('/errors/medicines/{client}', [MedicationErrorController::class, 'medicines'])->middleware('permission:medications.administer.record')->name('emar.errors.medicines');
+    Route::post('/errors/{error}/accounts', [MedicationErrorController::class, 'account'])->middleware('permission:medications.administer.record')->name('emar.errors.account');
+    Route::post('/errors/{error}/notes', [MedicationErrorController::class, 'note'])->middleware('permission:medications.errors.manage')->name('emar.errors.note');
+    Route::post('/errors/{error}/actions', [MedicationErrorController::class, 'action'])->middleware('permission:medications.errors.manage')->name('emar.errors.action');
+    Route::post('/errors/{error}/actions/{action}/complete', [MedicationErrorController::class, 'completeAction'])->middleware('permission:medications.errors.manage')->name('emar.errors.action.complete');
+    Route::post('/errors/{error}/disclosure', [MedicationErrorController::class, 'disclosure'])->middleware('permission:medications.errors.manage')->name('emar.errors.disclosure');
+    Route::post('/errors/{error}/reopen', [MedicationErrorController::class, 'reopen'])->middleware('permission:medications.errors.manage')->name('emar.errors.reopen');
 
     // ─── PDF Exports ─────────────────────────────────────────
     Route::middleware('permission:medications.reports.export|reports.viewAny')->group(function () {

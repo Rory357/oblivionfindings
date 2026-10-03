@@ -1,3 +1,4 @@
+import { ErrorTriageSettings } from './settings/_error-triage';
 /* Medication › Settings (eMAR P11 v5). The Fleet Settings workspace pattern:
  * one PageHeader page with a rail of views, Sections (TierTwoTabs) inside each
  * view, titled groups of Switch rows, drafts that survive moving between tabs
@@ -305,7 +306,7 @@ export default function EmarSettings(props: Props) {
                   : [],
             // P11 B2: settings readers, and house managers for their houses' extras.
             alerts: alertAccess.view
-                ? ['overview', 'alerts', 'delivery', 'oncall']
+                ? ['overview', 'alerts', 'delivery', 'triage', 'oncall']
                 : [],
             history: settingsAccess ? ['decide', 'changes'] : [],
         }),
@@ -900,6 +901,8 @@ export default function EmarSettings(props: Props) {
                     setF({ ...f, show: 'all' });
                 }}
             />
+        ) : view === 'alerts' && sec === 'triage' ? (
+            <ErrorTriageSettings q={query} show={f.show} clear={clearQ} />
         ) : view === 'alerts' && sec === 'oncall' ? (
             <OnCallContacts
                 q={query}

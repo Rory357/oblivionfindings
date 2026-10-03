@@ -297,6 +297,7 @@ class RbacSeeder extends Seeder
             ['key' => 'medications.administer.record', 'description' => 'Record medication administrations (MAR)', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.administer.override_safety', 'description' => 'Authorise a blocked medication safety-check override', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.competency.exempt', 'description' => 'Approve a finite site-scoped medication competency exemption', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.errors.manage', 'description' => 'Triage, investigate and close medication errors', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.administer.correct', 'description' => 'Correct medication administrations', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.stock.update', 'description' => 'Update medication stock counts', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.controlled.view', 'description' => 'View controlled drug register entries', 'group' => 'medications', 'module' => 'Clinical'],
@@ -644,6 +645,7 @@ class RbacSeeder extends Seeder
 
         // Provider Manager
         $syncPermissions($providerManager, [
+            'medications.errors.manage',
             'sites.viewAny', 'sites.viewAll', 'sites.create', 'sites.update',
             'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'staff.viewAny', 'staff.create', 'staff.update', 'staff.invite', 'staff.assignments.update',
@@ -716,6 +718,7 @@ class RbacSeeder extends Seeder
 
         // Coordinator
         $syncPermissions($coordinator, [
+            'medications.errors.manage',
             'sites.viewAny', 'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'staff.viewAny', 'staff.credentials.viewAny', 'staff.credentials.updateAny',
             'staff.availability.updateAny', 'clients.viewAny', 'clients.assignments.update',
@@ -892,6 +895,7 @@ class RbacSeeder extends Seeder
 
         // Team Lead
         $syncPermissions($teamLead, [
+            'medications.errors.manage',
             'sites.viewAny', 'sites.update',
             'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'calendar.view', 'calendar.create', 'calendar.manage', 'calendar.approve',
@@ -994,6 +998,7 @@ class RbacSeeder extends Seeder
 
         // Clinical Lead: full clinical module access + medications view
         $syncPermissions($clinicalLead, [
+            'medications.errors.manage',
             'clinical.observations.view', 'clinical.observations.record',
             'clinical.observations.viewAny', 'clinical.observations.recordClinical', 'clinical.observations.correct',
             'clinical.events.view', 'clinical.events.record',
