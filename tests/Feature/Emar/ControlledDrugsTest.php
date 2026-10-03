@@ -1321,13 +1321,12 @@ class ControlledDrugsTest extends TestCase
                 'immediate_action_taken' => 'Remaining stock was secured and the client was checked while a recount began.',
             ]);
 
-        $response
-            ->assertRedirect('/emar/controlled')
-            ->assertSessionHasNoErrors()
-            ->assertSessionHas('success');
+        $response->assertOk()->assertJsonStructure(['entry_id', 'counted_entry_id', 'discrepancy_id']);
 
         $discrepancy = ClientControlledDrugDiscrepancy::first();
         $this->assertNotNull($discrepancy);
+        $response->assertJsonPath('discrepancy_id', $discrepancy->id);
+        $this->assertSame($response->json('entry_id'), $response->json('counted_entry_id'));
         $this->assertNotNull($discrepancy->incident_id, 'Balance-check discrepancy should link the auto-created incident.');
         $this->assertDatabaseHas('client_incidents', [
             'id' => $discrepancy->incident_id,
