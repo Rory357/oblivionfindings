@@ -13,12 +13,13 @@ use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\ReadsRetainedMedicationAuditEvidence;
 use Tests\TestCase;
 
 class MedicationPrescriberOrderAuditVisibilityTest extends TestCase
 {
+    use ReadsRetainedMedicationAuditEvidence;
     use RefreshDatabase;
-    use \Tests\Support\ReadsRetainedMedicationAuditEvidence;
 
     public function test_prescriber_order_snapshot_controls_audit_feed_and_direct_actions(): void
     {

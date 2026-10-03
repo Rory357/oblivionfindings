@@ -19,10 +19,8 @@ use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 /**
- * The redesigned Reports page resolves the active site's brand colour, adds a
- * coded-reason breakdown (refusal / clinical / omission classes) for not-given
- * doses, and exposes controlled medications in the CdMedication shape so the
- * Controlled-drugs tab can reuse the shared Report-CD-loss modal.
+ * Canonical reports retain scheduled-dose outcomes, current factual error
+ * stages, stock evidence, exact report grants and approved Site scope.
  */
 class EmarReportsTest extends TestCase
 {
@@ -35,17 +33,19 @@ class EmarReportsTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_page_serves_brand_colour_reasons_and_cd_medications(): void
+    public function test_hub_reports_refusal_error_stages_stock_and_controlled_medicine_picker(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-06-15 00:00', 'Pacific/Auckland')->utc());
         $this->seed(RbacSeeder::class);
         $user = $this->makeRoleUser('admin');
-        $this->grantPermissions($user, ['medications.view', 'medications.reports.export']);
+        $this->grantPermissions($user, ['medications.view', 'medications.reports.view', 'medications.reports.export']);
 
         $site = Site::factory()->create(['type' => 'house', 'is_active' => true, 'brand_colour' => '#5E35B1']);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $med = ClientMedication::query()->create([
             'client_id' => $client->id, 'name' => 'Paracetamol', 'dosage' => '500mg', 'frequency' => 'TDS',
             'active' => true, 'state' => 'active', 'approval_status' => 'verified',
+            'controlled_drug' => false, 'is_prn' => false, 'dose_times' => ['08:00'], 'start_date' => '2026-06-01',
         ]);
         ClientMedication::query()->create([
             'client_id' => $client->id, 'name' => 'Oxycodone', 'dosage' => '5mg', 'frequency' => 'PRN',
@@ -60,7 +60,9 @@ class EmarReportsTest extends TestCase
         // A refused dose with a coded reason → one "refusal" class in the breakdown.
         ClientMedicationAdministration::query()->create([
             'client_id' => $client->id, 'client_medication_id' => $med->id, 'status' => 'refused',
-            'reason_code' => 'R1', 'administered_by' => $user->id, 'administered_at' => now(),
+            'reason_code' => 'R1', 'administered_by' => $user->id,
+            'scheduled_for' => Carbon::parse('2026-06-15 08:00', 'Pacific/Auckland')->utc(),
+            'administered_at' => Carbon::parse('2026-06-15 08:05', 'Pacific/Auckland')->utc(),
         ]);
         foreach (['reported', 'investigating', 'resolved'] as $status) {
             MedicationError::query()->create([
@@ -74,22 +76,26 @@ class EmarReportsTest extends TestCase
             ]);
         }
 
+        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00', 'Pacific/Auckland')->utc());
         $this->actingAs($user)
-            ->get('/emar/reports?site_id='.$site->id)
+            ->get(route('emar.reports', ['site_id' => $site->id, 'report' => 'doses', 'period' => 'today']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('emar/Reports')
-                ->where('site_brand_colour', '#5E35B1')
-                ->where('reasonBreakdown.by_class.refusal', 1)
-                ->where('errorSummary.total', 3)
-                ->where('errorSummary.open', 2)
-                ->where('errorSummary.resolved', 1)
-                ->has('cdMedications', 1)
-                ->where('cdMedications.0.name', 'Oxycodone')
-                ->where('stockStatus.list.0.on_hand', 9.5)
-                ->has('adminSummary')
+                ->component('emar/reports/hub')
+                ->where('data.totals.refused', 1)
                 ->has('sites')
             );
+        $this->actingAs($user)
+            ->get(route('emar.reports', ['site_id' => $site->id, 'report' => 'errors', 'period' => 'today']))
+            ->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->has('page.data', 3)->where('data.totals.open', 3)
+            ->where('page.data', fn ($rows) => collect($rows)->pluck('status')->sort()->values()->all() === ['actions', 'investigating', 'triage']));
+        $this->actingAs($user)
+            ->get(route('emar.reports', ['site_id' => $site->id, 'report' => 'stock', 'period' => 'today']))
+            ->assertOk()->assertInertia(fn (Assert $page) => $page->where('page.data.0.on_hand', 9.5));
+        $this->actingAs($user)
+            ->getJson(route('emar.reports.medicines', ['client_id' => $client->id]))
+            ->assertOk()->assertJsonCount(1, 'medicines')->assertJsonPath('medicines.0.label', 'Oxycodone');
     }
 
     public function test_page_csv_and_api_reports_intersect_requested_site_with_canonical_access(): void
@@ -101,7 +107,7 @@ class EmarReportsTest extends TestCase
         $siteA = Site::factory()->create(['name' => 'Report Site A', 'is_active' => true]);
         $siteB = Site::factory()->create(['name' => 'Report Site B', 'is_active' => true]);
         $user = $this->makeRoleUser('support_worker');
-        $this->grantPermissions($user, ['medications.view', 'medications.reports.export']);
+        $this->grantPermissions($user, ['medications.view', 'medications.reports.view', 'medications.reports.export']);
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
             'primary_site_id' => $siteA->id,
@@ -139,24 +145,24 @@ class EmarReportsTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-06-15 10:00', 'Pacific/Auckland')->utc());
 
         $this->actingAs($user)
-            ->get('/emar/reports')
+            ->get('/emar/reports?period=today')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('adminSummary.total', 1)
-                ->has('clients', 1)
-                ->where('clients.0.id', $clientA->id)
+                ->where('data.totals.due', 1)
+                ->has('people', 1)
+                ->where('people.0.id', $clientA->id)
                 ->has('sites', 1));
         $this->actingAs($user)
             ->get('/emar/reports?site_id='.$siteB->id)
             ->assertNotFound();
         $this->actingAs($user)
-            ->get('/emar/reports/export?report_type=administration&site_id='.$siteB->id)
+            ->post('/emar/reports/export', ['type' => 'doses', 'site_id' => $siteB->id, 'purpose' => 'care'])
             ->assertNotFound();
         $this->actingAs($user)
-            ->get('/emar/reports/export-mar?site_id='.$siteB->id)
+            ->get('/emar/reports/export-mar?purpose=care&site_id='.$siteB->id)
             ->assertNotFound();
         $this->actingAs($user)
-            ->get('/emar/reports/export-controlled-discrepancies?site_id='.$siteB->id)
+            ->get('/emar/reports/export-controlled-discrepancies?purpose=care&site_id='.$siteB->id)
             ->assertNotFound();
 
         $legacyPage = $this->actingAs($user)
@@ -169,16 +175,16 @@ class EmarReportsTest extends TestCase
             ->has('administrations', 1));
 
         $legacyMarCsv = $this->actingAs($user)
-            ->get('/reports/medications/export-mar')
+            ->get('/reports/medications/export-mar?purpose=care')
             ->assertOk()
-            ->streamedContent();
+            ->getContent();
         $this->assertStringContainsString('Site A medicine', $legacyMarCsv);
         $this->assertStringNotContainsString('Site B medicine', $legacyMarCsv);
         $this->actingAs($user)
-            ->get('/reports/medications/export-mar?site_id='.$siteB->id)
+            ->get('/reports/medications/export-mar?purpose=care&site_id='.$siteB->id)
             ->assertNotFound();
         $this->actingAs($user)
-            ->get('/reports/medications/export-controlled-discrepancies?site_id='.$siteB->id)
+            ->get('/reports/medications/export-controlled-discrepancies?purpose=care&site_id='.$siteB->id)
             ->assertNotFound();
 
         $this->actingAs($user, 'sanctum')
@@ -197,7 +203,7 @@ class EmarReportsTest extends TestCase
         $siteA = Site::factory()->create(['is_active' => true]);
         $siteB = Site::factory()->create(['is_active' => true]);
         $user = $this->makeRoleUser('support_worker');
-        $this->grantPermissions($user, ['medications.view', 'medications.reports.export', 'sites.viewAll']);
+        $this->grantPermissions($user, ['medications.view', 'medications.reports.view', 'medications.reports.export', 'sites.viewAll']);
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
             'primary_site_id' => $siteA->id,
@@ -223,7 +229,7 @@ class EmarReportsTest extends TestCase
         $this->seed(RbacSeeder::class);
         $user = $this->makeRoleUser('support_worker');
         $view = Permission::query()->where('key', 'medications.view')->firstOrFail();
-        $this->grantPermissions($user, ['medications.reports.export']);
+        $this->grantPermissions($user, ['medications.reports.view', 'medications.reports.export']);
         $user->permissionOverrides()->syncWithoutDetaching([$view->id => ['allowed' => false]]);
 
         $this->actingAs($user)->get('/emar')->assertForbidden();
@@ -231,8 +237,8 @@ class EmarReportsTest extends TestCase
             ->get('/emar/reports')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('adminSummary.total', 0)
-                ->has('clients', 0)
+                ->where('data.totals.due', 0)
+                ->has('people', 0)
                 ->has('sites', 0));
         $this->actingAs($user)
             ->get('/reports/medications')
@@ -242,8 +248,8 @@ class EmarReportsTest extends TestCase
                 ->has('discrepancies', 0)
                 ->has('clients', 0));
         $this->actingAs($user)
-            ->get('/emar/reports/export-mar')
-            ->assertOk();
+            ->getJson('/emar/reports/export-mar?purpose=care')
+            ->assertUnprocessable();
         $this->actingAs($user, 'sanctum')
             ->getJson('/api/medications/reports')
             ->assertOk()
@@ -271,7 +277,7 @@ class EmarReportsTest extends TestCase
             'administered_at' => now(),
         ]);
         $actor = $this->makeRoleUser('support_worker');
-        $this->grantPermissions($actor, ['medications.view', 'medications.reports.export']);
+        $this->grantPermissions($actor, ['medications.view', 'medications.reports.view', 'medications.reports.export']);
         foreach (['clinical.accessAllSites', 'sites.viewAll'] as $globalPermission) {
             $permission = Permission::query()->where('key', $globalPermission)->firstOrFail();
             $actor->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => false]]);
@@ -281,8 +287,8 @@ class EmarReportsTest extends TestCase
             ->get('/emar/reports')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('adminSummary.total', 0)
-                ->has('clients', 0)
+                ->where('data.totals.due', 0)
+                ->has('people', 0)
                 ->has('sites', 0));
         $this->actingAs($actor)
             ->get('/reports/medications')
@@ -291,11 +297,10 @@ class EmarReportsTest extends TestCase
                 ->has('administrations', 0)
                 ->has('discrepancies', 0)
                 ->has('clients', 0));
-        $legacyCsv = $this->actingAs($actor)
-            ->get('/reports/medications/export-mar')
-            ->assertOk()
-            ->streamedContent();
-        $this->assertStringNotContainsString('Concealed report medication', $legacyCsv);
+        $this->actingAs($actor)
+            ->getJson('/reports/medications/export-mar?purpose=care')
+            ->assertUnprocessable();
+        $this->assertDatabaseCount('medication_events', 0);
         $this->actingAs($actor, 'sanctum')
             ->getJson('/api/medications/reports?type=mar')
             ->assertOk()

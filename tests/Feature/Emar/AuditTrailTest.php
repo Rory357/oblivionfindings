@@ -18,6 +18,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\ReadsRetainedMedicationAuditEvidence;
 use Tests\TestCase;
 
 /**
@@ -27,8 +28,8 @@ use Tests\TestCase;
  */
 class AuditTrailTest extends TestCase
 {
+    use ReadsRetainedMedicationAuditEvidence;
     use RefreshDatabase;
-    use \Tests\Support\ReadsRetainedMedicationAuditEvidence;
 
     private function seedAudit(): array
     {
