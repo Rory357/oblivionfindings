@@ -18,6 +18,7 @@ use Tests\TestCase;
 class MedicationPrescriberOrderAuditVisibilityTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Support\ReadsRetainedMedicationAuditEvidence;
 
     public function test_prescriber_order_snapshot_controls_audit_feed_and_direct_actions(): void
     {
@@ -57,8 +58,7 @@ class MedicationPrescriberOrderAuditVisibilityTest extends TestCase
         ];
         $allOrders = [...$ordinaryVisible, ...$ordinaryConcealed];
 
-        $ordinaryFeedIds = collect($this->actingAs($ordinaryReader)
-            ->get(route('emar.audit'))
+        $ordinaryFeedIds = collect($this->retainedAuditFeed($ordinaryReader)
             ->assertOk()
             ->inertiaProps('events'))
             ->where('event_type', 'prescriber_order')
@@ -69,8 +69,7 @@ class MedicationPrescriberOrderAuditVisibilityTest extends TestCase
             $ordinaryFeedIds,
         );
 
-        $controlledFeedIds = collect($this->actingAs($controlledReader)
-            ->get(route('emar.audit'))
+        $controlledFeedIds = collect($this->retainedAuditFeed($controlledReader)
             ->assertOk()
             ->inertiaProps('events'))
             ->where('event_type', 'prescriber_order')
@@ -88,7 +87,7 @@ class MedicationPrescriberOrderAuditVisibilityTest extends TestCase
                 ->assertOk()
                 ->assertExactJson(['backed' => true]);
             $this->actingAs($ordinaryReader)
-                ->get(route('emar.audit.event.export', ['id' => $eventId]))
+                ->get(route('emar.audit.event.export', ['id' => $eventId, 'purpose' => 'audit']))
                 ->assertOk();
         }
 
@@ -98,7 +97,7 @@ class MedicationPrescriberOrderAuditVisibilityTest extends TestCase
                 ->getJson(route('emar.audit.event.integrity', ['id' => $eventId]))
                 ->assertNotFound();
             $this->actingAs($ordinaryReader)
-                ->get(route('emar.audit.event.export', ['id' => $eventId]))
+                ->get(route('emar.audit.event.export', ['id' => $eventId, 'purpose' => 'audit']))
                 ->assertNotFound();
             $this->actingAs($ordinaryReader)
                 ->post(route('emar.audit.event.flag', ['id' => $eventId]), [
@@ -126,7 +125,7 @@ class MedicationPrescriberOrderAuditVisibilityTest extends TestCase
             ->assertOk()
             ->assertExactJson(['backed' => true]);
         $this->actingAs($controlledReader)
-            ->get(route('emar.audit.event.export', ['id' => $restrictedEventId]))
+            ->get(route('emar.audit.event.export', ['id' => $restrictedEventId, 'purpose' => 'audit']))
             ->assertOk();
         $this->actingAs($controlledReader)
             ->post(route('emar.audit.event.flag', ['id' => $restrictedEventId]), [
@@ -181,7 +180,8 @@ class MedicationPrescriberOrderAuditVisibilityTest extends TestCase
         $permissions = [
             MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
             'medications.audit.view',
-            'medications.reports.export',
+            'medications.reports.view',
+            'medications.audit.export',
             'medications.administer.record',
             ...($controlled ? [MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY] : []),
         ];
@@ -194,6 +194,10 @@ class MedicationPrescriberOrderAuditVisibilityTest extends TestCase
         $reader->permissionOverrides()->sync(
             $permissionIds->mapWithKeys(fn (int $id) => [$id => ['allowed' => true]])->all(),
         );
+        if (! $controlled) {
+            $controlledPermission = Permission::query()->where('key', MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)->firstOrFail();
+            $reader->permissionOverrides()->syncWithoutDetaching([$controlledPermission->id => ['allowed' => false]]);
+        }
         HrEmployeeProfile::factory()->create([
             'user_id' => $reader->id,
             'primary_site_id' => $site->id,

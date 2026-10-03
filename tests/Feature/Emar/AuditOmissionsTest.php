@@ -20,7 +20,8 @@ use Tests\TestCase;
  * doses Meds today and the overdue alerts call overdue — over the whole
  * period (no 31-day clamp), for orders since ceased too; never a dose still
  * in its window, waiting for the order check, or recorded (missed is a
- * record). Controlled ones only for controlled-medicine readers.
+ * record). Controlled medicine names require controlled-medicine access;
+ * the concealed dose still counts for other readers.
  *
  * "Now" is Monday 15 June 2026, 08:30 NZST.
  */
@@ -92,7 +93,7 @@ class AuditOmissionsTest extends TestCase
         $this->assertSame(['Metformin 2026-06-15 07:00'], $this->omissions($this->reader()));
     }
 
-    public function test_controlled_omissions_are_only_for_controlled_medicine_readers(): void
+    public function test_controlled_omission_names_require_controlled_access_without_changing_counts(): void
     {
         $this->at('2026-06-15 00:00');
         $this->order('Metformin', ['07:00']);
