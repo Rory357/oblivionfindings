@@ -69,6 +69,7 @@ export function ChartSection({
             {week && view !== 'asneeded' ? (
                 <WeekChart
                     clientId={clientId}
+                    personName={personName}
                     date={date}
                     onChange={onChange}
                 />
@@ -90,10 +91,12 @@ export function ChartSection({
 
 function WeekChart({
     clientId,
+    personName,
     date,
     onChange,
 }: {
     clientId: number;
+    personName: string;
     date: string | null;
     onChange: (date: string | null, week: boolean) => void;
 }) {
