@@ -10,6 +10,8 @@ use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
+use App\Models\MedicationDoseScheduleVersion;
+use App\Models\MedicationDoseSlot;
 use App\Models\MedicationOrderVersion;
 use App\Models\MedicationPrescriberOrder;
 use App\Models\Permission;
@@ -17,12 +19,18 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\DoseSlots\DoseSlotProjection;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationOrderLifecycleService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\Reporting\MedicationReportAccess;
+use App\Services\Medication\Reporting\MedicationReportDataset;
+use App\Services\Medication\Reporting\MedicationReportPeriod;
 use App\Services\MedicationReportingService;
 use App\Services\NotificationService;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -767,25 +775,61 @@ class MedicationOrderLifecycleTest extends TestCase
         $scheduledAt = now('Pacific/Auckland')->startOfMinute();
         Carbon::setTestNow($scheduledAt->copy()->subHour()->utc());
         try {
+            // A modern creator-bearing row is forced pending by the model,
+            // even when this helper requests verified. It owes no slots yet.
+            $pendingOrder = $this->medication([
+                'name' => 'Unchecked modern setup control',
+                'dose_times' => [$scheduledAt->format('H:i')],
+                'is_prn' => false,
+                'controlled_drug' => false,
+            ]);
+            // The retained fixture represents a legacy verified row from
+            // before creator/check provenance, not a new unchecked order.
             $medication = $this->medication([
+                'created_by' => null,
                 'name' => 'Legacy retained administration order',
                 'dose_times' => [$scheduledAt->format('H:i')],
+                'is_prn' => false,
                 'controlled_drug' => false,
             ]);
         } finally {
             Carbon::setTestNow($clock);
         }
+        $this->assertSame('pending_verification', $pendingOrder->fresh()->approval_status);
+        $this->assertNull(MedicationDoseScheduleVersion::query()->where('client_medication_id', $pendingOrder->id)->sole()->verified_at);
+        $this->assertSame(0, MedicationDoseSlot::query()->where('client_medication_id', $pendingOrder->id)->count());
+        $medication->refresh();
+        $this->assertNull($medication->created_by);
+        $this->assertSame('verified', $medication->approval_status);
+        $this->assertFalse($medication->is_prn);
+        $this->assertTrue($medication->created_at->lt($scheduledAt));
+        $schedule = MedicationDoseScheduleVersion::query()->where('client_medication_id', $medication->id)->sole();
+        $this->assertSame([$scheduledAt->format('H:i')], $schedule->dose_times);
+        $this->assertNotNull($schedule->verified_at);
+        $this->assertTrue($schedule->verified_at->lte($scheduledAt));
+        $slot = MedicationDoseSlot::query()
+            ->where('client_medication_id', $medication->id)
+            ->where('client_id', $this->client->id)
+            ->where('nz_date', $scheduledAt->toDateString())
+            ->where('ordered_time', $scheduledAt->format('H:i'))
+            ->whereNull('superseded_at')->sole();
+        $this->assertTrue($slot->due_at->equalTo($scheduledAt));
         $administration = ClientMedicationAdministration::query()->create([
             'client_id' => $this->client->id,
             'client_medication_id' => $medication->id,
             'shift_id' => $this->shift->id,
             'service_context_id' => $this->serviceContext->id,
             'administered_by' => $this->manager->id,
-            'scheduled_for' => now(),
+            // The scheduled instant is the dose minute; wall-clock seconds
+            // must not round the outcome onto the following minute's slot.
+            'scheduled_for' => $scheduledAt->copy()->utc(),
             'administered_at' => now(),
             'status' => 'given',
             'dose_given' => '1 tablet',
         ]);
+        $slot->refresh();
+        $this->assertSame('given', $slot->outcome);
+        $this->assertSame($administration->id, (int) $slot->outcome_administration_id);
         $controlledEntry = ClientControlledDrugEntry::query()->create([
             'client_id' => $this->client->id,
             'client_medication_id' => $medication->id,
@@ -833,6 +877,28 @@ class MedicationOrderLifecycleTest extends TestCase
         $reportPermissions = Permission::query()->whereIn('key', ['medications.reports.view', 'medications.reports.export'])->pluck('id');
         $this->assertCount(2, $reportPermissions);
         $this->manager->permissionOverrides()->syncWithoutDetaching($reportPermissions->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])->all());
+        $this->manager->refresh();
+        $access = app(MedicationReportAccess::class);
+        $siteIds = $access->siteIds($this->manager, $this->site->id, $this->client->id);
+        $this->assertSame([$this->site->id], $siteIds);
+        $clientIds = $access->clientIds($this->manager, $siteIds);
+        $this->assertSame([$this->client->id], $clientIds);
+        $period = new MedicationReportPeriod($scheduledAt->toDateString(), $scheduledAt->toDateString());
+        $projected = app(DoseSlotProjection::class)->rows(
+            DoseSlotReaderScope::forAuthorisedClients($this->manager, $clientIds),
+            $period->from, $period->to, CarbonImmutable::now('UTC'),
+        );
+        $this->assertCount(1, $projected);
+        $this->assertSame($slot->id, $projected->sole()['id']);
+        $this->assertSame('given', $projected->sole()['state']);
+        $this->assertSame($administration->id, $projected->sole()['outcome_administration_id']);
+        $this->assertFalse($projected->sole()['concealed']);
+        $reportRows = app(MedicationReportDataset::class)->doseRows($this->manager, $period, $siteIds, $this->client->id);
+        $this->assertCount(1, $reportRows);
+        $this->assertSame('Legacy retained administration order (legacy removed order)', $reportRows[0]['medicine']);
+        $this->assertSame('given', $reportRows[0]['status']);
+        $retainedEvidence = [$historicalOrder, $administration, $slot, $schedule, $version, $controlledEntry];
+        $beforeReads = array_map(fn ($record) => $record->fresh()->getAttributes(), $retainedEvidence);
         $csv = $this->actingAs($this->manager->refresh())
             ->postJson(route('emar.reports.export'), ['type' => 'doses', 'period' => 'today', 'client_id' => $this->client->id, 'purpose' => 'audit'])
             ->assertOk()
@@ -841,6 +907,7 @@ class MedicationOrderLifecycleTest extends TestCase
             'Legacy retained administration order (legacy removed order)',
             $csv,
         );
+        $this->assertStringNotContainsString('Unchecked modern setup control', $csv);
         $mar = app(MedicationReportingService::class)->exportMar(
             $this->client->id,
             now()->subDay(),
@@ -851,6 +918,7 @@ class MedicationOrderLifecycleTest extends TestCase
             'Legacy retained administration order (legacy removed order)',
             data_get($mar, 'records.0.medication'),
         );
+        $this->assertSame($beforeReads, array_map(fn ($record) => $record->fresh()->getAttributes(), $retainedEvidence));
     }
 
     public function test_replay_and_direct_model_delete_are_fail_closed(): void
