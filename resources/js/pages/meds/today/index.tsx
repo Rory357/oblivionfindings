@@ -789,6 +789,7 @@ export default function MedsToday(props: MedsTodayProps) {
     const clockedIn = props.clocked_in ?? true;
     const header = (
         <PageHeader
+            frontline
             icon={Pill}
             title="Meds today"
             titleChip={

@@ -1222,6 +1222,10 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 
 /* The active rail meets the page edge; its existing 6px optical offset
  * sits above the same real target as the inactive tabs and utility pills. */
+.eh-meter.frontline-tap {
+    min-width: max(140px, 2.75rem);
+}
+
 .eh-header-frontline .eh-frontline-rail-active {
     min-height: calc(max(44px, 2.75rem) + 6px);
 }

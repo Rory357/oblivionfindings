@@ -405,6 +405,7 @@ export default function Orders(props: Props) {
             <Head title="Medication orders" />
             <div className="flex flex-col gap-5 [&_button]:min-h-[44px] [&_button]:min-w-[44px] [&_input[type=search]]:min-h-[44px]">
                 <PageHeader
+                    frontline
                     icon={Pill}
                     title="Medication orders"
                     subline={`Prescriber’s instructions, checks and transitions · loaded ${formatDateTime(props.loaded_at)}`}

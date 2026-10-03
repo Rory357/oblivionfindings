@@ -153,6 +153,7 @@ function AvailableRecord({
             <Head title={`${person.preferred} · Medication record`} />
             <div className="flex min-w-0 max-w-full flex-col gap-5">
                 <PageHeader
+                    frontline
                     variant="profile"
                     wrapTitle
                     backHref="/emar/mar"
