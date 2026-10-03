@@ -30,6 +30,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
@@ -56,8 +57,11 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'emar.destructions.void',
                 'emar.cd_loss.store',
                 'emar.cd_loss.investigate',
-                'emar.cd_loss.resolve',
                 'clients.medical.controlled_discrepancies.close',
+            ],
+            'medications.controlled.manage' => [
+                'emar.controlled.discrepancies.resolve', 'emar.destructions.void',
+                'emar.cd_loss.resolve', 'clients.medical.controlled_discrepancies.close',
             ],
             'medications.stock.update' => [
                 'emar.pharmacy_orders.store',
@@ -812,13 +816,21 @@ class MedicationRbacAuthorizationTest extends TestCase
         $this->withoutMiddleware(EnsurePermission::class);
 
         $this->actingAs($actor)
-            ->post(route('emar.controlled.entries.store'))
+            ->post(route('emar.controlled.entries.store'), [
+                'client_medication_id' => $medication->id, 'client_request_uuid' => (string) Str::uuid(),
+                'movement_type' => 'going_out', 'quantity' => 1, 'expected_balance' => 10,
+                'expected_entry_id' => null, 'actual_balance' => 9,
+            ])
             ->assertForbidden();
         $this->actingAs($actor)
             ->patch(route('emar.stock.update', $stock), ['reorder_level' => 8])
             ->assertForbidden();
         $this->actingAs($actor)
-            ->post(route('emar.cd_loss.store'))
+            ->post(route('emar.cd_loss.store'), [
+                'client_medication_id' => $medication->id, 'client_request_uuid' => (string) Str::uuid(),
+                'movement_type' => 'going_out', 'quantity' => 1, 'expected_balance' => 10,
+                'expected_entry_id' => null, 'actual_balance' => 9,
+            ])
             ->assertForbidden();
         $this->actingAs($actor)
             ->put(route('clients.medical.medications.stock.update', [$client, $medication]), ['on_hand' => 8])
@@ -905,7 +917,7 @@ class MedicationRbacAuthorizationTest extends TestCase
             'on_hand' => 10,
             'reorder_level' => 5,
         ]);
-        $controlledActor = $this->userWithPermissions(['medications.controlled.record'], $site);
+        $controlledActor = $this->controlledRecorder($client);
         $witness = $this->userWithPermissions(['medications.controlled.witness'], $site);
         $this->qualifyControlledWitness($witness, $site, $client, $controlledActor);
 
@@ -916,13 +928,16 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'client_medication_id' => $controlledMedication->id,
                 'client_id' => $client->id,
                 'medication_name' => $controlledMedication->name,
-                'entry_type' => 'administration',
+                'movement_type' => 'going_out',
+                'client_request_uuid' => (string) Str::uuid(),
+                'expected_entry_id' => null, 'expected_balance' => 10, 'actual_balance' => 8,
                 'quantity' => 2,
                 'on_hand_before' => 10,
                 'on_hand_after' => 8,
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
+            ->assertOk()
             ->assertSessionHasNoErrors();
         $this->assertDatabaseHas('client_controlled_drug_entries', [
             'client_medication_id' => $controlledMedication->id,
@@ -954,7 +969,8 @@ class MedicationRbacAuthorizationTest extends TestCase
             ->assertSessionHasNoErrors();
         $this->assertSame(3, (int) $ordinaryStock->refresh()->on_hand);
 
-        $administrationActor = $this->userWithPermissions(['medications.administer.record'], $site);
+        $administrationActor = $this->userWithPermissions(['medications.view', 'medications.administer.record'], $site);
+        $this->recordPresence($administrationActor, $client);
         $result = app(EnhancedMarService::class)->recordAdministration(
             $client,
             $ordinaryMedication,
@@ -962,6 +978,7 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'status' => 'refused',
                 'reason' => 'Client declined',
                 'reason_code' => 'refused',
+                'client_request_uuid' => (string) Str::uuid(),
             ],
             $administrationActor->id,
         );
@@ -991,21 +1008,21 @@ class MedicationRbacAuthorizationTest extends TestCase
             'on_hand' => 10,
             'reorder_level' => 5,
         ]);
-        $actor = $this->userWithPermissions([
-            'medications.controlled.record',
-            'medications.controlled.witness',
-        ], $site);
+        $actor = $this->controlledRecorder($client, ['medications.controlled.witness']);
 
         $this->actingAs($actor)
             ->postJson(route('emar.controlled.entries.store'), [
                 'client_medication_id' => $medication->id,
                 'client_id' => $client->id,
                 'medication_name' => $medication->name,
-                'entry_type' => 'administration',
+                'movement_type' => 'going_out',
+                'client_request_uuid' => (string) Str::uuid(),
+                'expected_entry_id' => null, 'expected_balance' => 10, 'actual_balance' => 9,
                 'quantity' => 1,
                 'on_hand_before' => 10,
                 'on_hand_after' => 9,
                 'witnessed_by' => $actor->id,
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('witnessed_by');
@@ -1015,9 +1032,12 @@ class MedicationRbacAuthorizationTest extends TestCase
                 'client_medication_id' => $medication->id,
                 'client_id' => $client->id,
                 'medication_name' => $medication->name,
+                'client_request_uuid' => (string) Str::uuid(),
+                'expected_entry_id' => null,
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $actor->id,
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('witnessed_by');
@@ -1931,6 +1951,27 @@ class MedicationRbacAuthorizationTest extends TestCase
     }
 
     /** @param list<string> $permissions */
+    private function controlledRecorder(Client $client, array $extraPermissions = []): User
+    {
+        $actor = $this->userWithPermissions([
+            'medications.view', 'medications.controlled.view', 'medications.controlled.record', ...$extraPermissions,
+        ], $client->site);
+        $this->recordPresence($actor, $client);
+
+        return $actor;
+    }
+
+    private function recordPresence(User $actor, Client $client): void
+    {
+        $client->supportWorkers()->syncWithoutDetaching([$actor->id]);
+        Shift::factory()->create([
+            'user_id' => $actor->id, 'client_id' => $client->id, 'site_id' => $client->site_id,
+            'service_context_id' => $client->service_context_id, 'status' => 'in_progress',
+            'starts_at' => now()->utc()->subHour(), 'ends_at' => now()->utc()->addHour(),
+            'actual_starts_at' => now()->utc()->subHour(), 'started_by' => $actor->id,
+        ]);
+    }
+
     private function qualifyControlledWitness(User $witness, Site $site, Client $client, User $assessor): void
     {
         MedicationCompetencyAssessment::query()->create([
@@ -1943,15 +1984,17 @@ class MedicationRbacAuthorizationTest extends TestCase
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
             'can_witness_controlled' => true,
+            'controlled_drugs' => true,
+            'restricted' => false,
         ]);
         Shift::factory()->create([
             'client_id' => $client->id,
             'site_id' => $site->id,
             'service_context_id' => $client->service_context_id,
             'user_id' => $witness->id,
-            'starts_at' => now()->subHour(),
-            'ends_at' => now()->addHour(),
-            'actual_starts_at' => now()->subHour(),
+            'starts_at' => now()->utc()->subHour(),
+            'ends_at' => now()->utc()->addHour(),
+            'actual_starts_at' => now()->utc()->subHour(),
             'status' => 'in_progress',
         ]);
     }
