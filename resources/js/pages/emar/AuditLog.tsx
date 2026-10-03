@@ -1,8 +1,6 @@
-/* eslint-disable no-restricted-syntax -- the audit timeline/table/gaps surfaces + hero footer are
-   custom-layout bordered rows / chip buttons (not Card/Button); all colours are semantic tokens. */
+/* eslint-disable no-restricted-syntax -- history rows, date fields and category tabs use page-specific layouts with semantic tokens. */
 /* DESIGN REVIEW: docs/emar-redesign/audit-design-review.md — design spec, intended look,
    deliberate deviations, and a fidelity checklist for reviewing this page's design. */
-import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import { HistoricalAuditExportDialog } from '@/components/emar/historical-audit-export-dialog';
 import {
     eventMeta,
@@ -12,45 +10,29 @@ import {
     type AuditEvent,
 } from '@/components/emar/medication-event-drawer';
 import {
-    addDays,
-    DayPickerChip,
-    parseYmd,
-    toYmd,
-} from '@/components/meds/day-picker-chip';
-import {
-    PageHero,
-    type PageHeroBadge,
-    type PageHeroMetaItem,
-    type PageHeroStat,
-} from '@/components/page';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
-import {
-    EntityFilter,
-    ShiftContextMenu,
-    TabStrip,
-    type RosterTabItem,
-    type ShiftCtxItem,
-    type ShiftCtxState,
-} from '@/components/rostering';
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+} from '@/components/page/page-header';
+import type { ShiftCtxItem, ShiftCtxState } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import {
+    formatDateLong,
+    formatDateOnly,
+    formatTime,
+    toDateInput,
+} from '@/lib/datetime';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertOctagon,
     AlertTriangle,
-    ChevronLeft,
-    ChevronRight,
     ClipboardCheck,
-    Clock,
     Copy,
     Download,
     Eye,
@@ -58,20 +40,30 @@ import {
     Fingerprint,
     History,
     Lock,
+    MoreHorizontal,
     Package,
     Pill,
     Printer,
-    Search,
     ShieldAlert,
-    ShieldCheck,
     Table,
     User,
-    Users,
     X,
     type LucideIcon,
 } from 'lucide-react';
-import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+    useEffect,
+    useMemo,
+    useState,
+    type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { toast } from 'sonner';
+import {
+    historyPeriodEnding,
+    historyQuery,
+    historyRange,
+    type HistoryFilters,
+} from './audit-history-period';
+import { HistoryRecordMenu } from './audit-history-record-menu';
 
 type Stats = {
     total: number;
@@ -82,6 +74,7 @@ type Stats = {
 type Props = {
     events: AuditEvent[];
     stats: Stats;
+    filters: HistoryFilters;
     clients: { id: number; name: string }[];
     staff: { id: number; name: string }[];
     sites: { id: number; name: string }[];
@@ -96,7 +89,12 @@ type Props = {
 };
 
 const CATEGORIES = [
-    { id: 'all', label: 'All events', icon: History, tone: 'primary' as const },
+    {
+        id: 'all',
+        label: 'All records',
+        icon: History,
+        tone: 'primary' as const,
+    },
     { id: 'doses', label: 'Doses', icon: Pill, tone: 'success' as const },
     {
         id: 'controlled',
@@ -119,9 +117,11 @@ const CATEGORIES = [
     },
 ];
 const RANGES = [
-    { v: '7', l: '7 days' },
-    { v: '30', l: '30 days' },
-    { v: '90', l: '90 days' },
+    { value: 'all', label: 'All available history' },
+    { value: '7', label: '7 days' },
+    { value: '30', label: '30 days' },
+    { value: '90', label: '90 days' },
+    { value: 'custom', label: 'Custom period' },
 ];
 
 // Right-click menu tag colours (token-based; mirrors ControlledDrugs' CTX_TAG).
@@ -186,59 +186,92 @@ function persistDismissedAlerts(kinds: string[]): string[] {
     }
     return unique;
 }
-const fmtTime = (iso: string) =>
-    new Date(iso).toLocaleTimeString('en-NZ', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-const dayKey = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-NZ', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-    });
-const fmtShort = (d: Date) =>
-    d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
-const stepLabel = (ymd: string) =>
-    parseYmd(ymd).toLocaleDateString('en-NZ', {
-        weekday: 'short',
-        day: 'numeric',
-    });
-const initials = (n: string) =>
-    n
-        .split(' ')
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((p) => p[0])
-        .join('')
-        .toUpperCase() || '?';
-
+const fmtTime = formatTime;
+const dayKey = (iso: string) => formatDateLong(iso);
 export default function AuditLog({
     events,
     stats,
+    filters,
     clients,
     staff,
     sites,
     active_site: activeSite,
-    site_brand_colour: brandColour,
-    user_first_name: userFirstName,
     omissions_notice: omissionsNotice = null,
     history_notice: historyNotice = null,
     can_export_history: canExportHistory,
     export_purposes: exportPurposes,
 }: Props) {
     const breadcrumbs = useEmarBreadcrumbs();
-    const [view, setView] = useState('timeline');
-    const [cat, setCat] = useState('all');
-    const [search, setSearch] = useState('');
-    const [clientId, setClientId] = useState('');
-    const [staffName, setStaffName] = useState('');
-    const [range, setRange] = useState('90');
-    const [source, setSource] = useState('');
-    const [anchor, setAnchor] = useState(() => toYmd(new Date()));
-    const [siteFilter, setSiteFilter] = useState<number | null>(
-        activeSite?.id ?? null,
+    const { url } = usePage();
+    const params = new URLSearchParams(url.split('?')[1] ?? '');
+    const [view, setView] = useState(params.get('history_view') ?? 'timeline');
+    const [cat, setCat] = useState(params.get('history_category') ?? 'all');
+    const [search, setSearch] = useState(params.get('history_search') ?? '');
+    const [staffName, setStaffName] = useState(
+        params.get('history_staff') ?? '',
     );
+    const [source, setSource] = useState(params.get('history_source') ?? '');
+    const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
+    const [dateTo, setDateTo] = useState(filters.date_to ?? '');
+    const clientId = filters.client_id ? String(filters.client_id) : '';
+    const siteFilter = activeSite?.id ?? null;
+    const range = historyRange(filters);
+    const todayYmd = toDateInput(new Date());
+
+    // Server props are authoritative after a visit, including browser back/forward.
+    useEffect(() => {
+        setDateFrom(filters.date_from ?? '');
+        setDateTo(filters.date_to ?? '');
+        const query = new URLSearchParams(url.split('?')[1] ?? '');
+        setView(query.get('history_view') ?? 'timeline');
+        setCat(query.get('history_category') ?? 'all');
+        setSearch(query.get('history_search') ?? '');
+        setStaffName(query.get('history_staff') ?? '');
+        setSource(query.get('history_source') ?? '');
+    }, [url, filters.date_from, filters.date_to]);
+
+    const visitHistory = (
+        changes: Partial<HistoryFilters> & { site_id?: number | null } = {},
+        clearFacets = false,
+    ) =>
+        router.get(
+            '/emar/reports/history',
+            {
+                ...historyQuery(url, filters, siteFilter, changes),
+                history_view: view,
+                history_category: clearFacets ? 'all' : cat,
+                history_search: clearFacets ? '' : search,
+                history_staff: clearFacets ? '' : staffName,
+                history_source: clearFacets ? '' : source,
+            },
+            { preserveState: true, preserveScroll: true },
+        );
+
+    const onRange = (value: string) => {
+        if (value === 'all') {
+            visitHistory({ date_from: null, date_to: null });
+        } else if (value === 'custom') {
+            requestAnimationFrame(() =>
+                document.getElementById('history-date-from')?.focus(),
+            );
+        } else {
+            visitHistory(
+                historyPeriodEnding(filters.date_to ?? todayYmd, Number(value)),
+            );
+        }
+    };
+    const periodLabel =
+        filters.date_from && filters.date_to
+            ? `${formatDateOnly(filters.date_from)} – ${formatDateOnly(filters.date_to)}`
+            : filters.date_from
+              ? `From ${formatDateOnly(filters.date_from)}`
+              : filters.date_to
+                ? `Up to ${formatDateOnly(filters.date_to)}`
+                : 'All available history';
+    const scopedHref = (path: string) => {
+        const query = historyQuery('', filters, siteFilter);
+        return `${path}?${new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)]))}`;
+    };
     const [selected, setSelected] = useState<AuditEvent | null>(null);
     const [selectedSection, setSelectedSection] = useState<string | undefined>(
         undefined,
@@ -253,7 +286,6 @@ export default function AuditLog({
     };
 
     // Read-only / navigational right-click menu for an event row (parity with PRN/CD).
-    // No record/edit/delete items — this surface is append-only.
     const openRowCtx = (ev: ReactMouseEvent, e: AuditEvent) => {
         ev.preventDefault();
         const link = eventPrimaryLink(e);
@@ -288,8 +320,8 @@ export default function AuditLog({
             },
             {
                 icon: <Fingerprint className="h-3.5 w-3.5" />,
-                label: 'Verify integrity',
-                sub: 'Canonical record check',
+                label: 'Check source record',
+                sub: 'View the saved record behind this entry',
                 onClick: () => openEvent(e, 'integrity'),
             },
             { sep: true },
@@ -297,7 +329,7 @@ export default function AuditLog({
                 ? [
                       {
                           icon: <Download className="h-3.5 w-3.5" />,
-                          label: 'Export this event',
+                          label: 'Export this record',
                           sub: 'CSV',
                           onClick: () =>
                               setExportUrl(
@@ -308,11 +340,11 @@ export default function AuditLog({
                 : []),
             {
                 icon: <Copy className="h-3.5 w-3.5" />,
-                label: 'Copy event ID',
+                label: 'Copy record reference',
                 onClick: () => {
                     void navigator.clipboard
                         ?.writeText(e.id)
-                        .then(() => toast.success('Event ID copied'))
+                        .then(() => toast.success('Record reference copied'))
                         .catch(() => toast.error('Could not copy'));
                 },
             },
@@ -332,44 +364,26 @@ export default function AuditLog({
         });
     };
 
-    const todayYmd = toYmd(new Date());
-    const isToday = anchor === todayYmd;
-    const sources = useMemo(
-        () => [...new Set(events.map((e) => e.source))].sort(),
-        [events],
+    // The server supplies the NZ period. Facets apply only to those loaded records.
+    const windowEvents = useMemo(
+        () =>
+            events.filter((e) => {
+                if (staffName && e.performed_by !== staffName) return false;
+                if (source && e.source !== source) return false;
+                const query = search.trim().toLowerCase();
+                return (
+                    !query ||
+                    `${e.description} ${e.client_name} ${e.performed_by ?? ''}`
+                        .toLowerCase()
+                        .includes(query)
+                );
+            }),
+        [events, staffName, source, search],
     );
-    // EntityFilter works on {id,name}; sources are bare strings, so index them.
-    const sourceItems = useMemo(
-        () => sources.map((s, i) => ({ id: i, name: s })),
-        [sources],
+    const filtered = useMemo(
+        () => windowEvents.filter((e) => cat === 'all' || e.category === cat),
+        [windowEvents, cat],
     );
-
-    const filtered = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        // The day-stepper sets the window's *end* (anchor); the range select sets
-        // how far back it reaches — "the {range} days ending {anchor}".
-        const end = parseYmd(anchor);
-        end.setHours(23, 59, 59, 999);
-        const windowEnd = end.getTime();
-        const windowStart = windowEnd - Number(range) * 86400000;
-        return events.filter((e) => {
-            if (cat !== 'all' && e.category !== cat) return false;
-            if (clientId && String(e.client_id) !== clientId) return false;
-            if (staffName && e.performed_by !== staffName) return false;
-            if (source && e.source !== source) return false;
-            const t = new Date(e.timestamp).getTime();
-            if (t < windowStart || t > windowEnd) return false;
-            if (
-                q &&
-                !`${e.description} ${e.client_name} ${e.performed_by ?? ''}`
-                    .toLowerCase()
-                    .includes(q)
-            )
-                return false;
-            return true;
-        });
-    }, [events, cat, clientId, staffName, source, range, search, anchor]);
-
     const gaps = useMemo(
         () => filtered.filter((e) => e.flags.length > 0),
         [filtered],
@@ -380,46 +394,33 @@ export default function AuditLog({
         clientId ||
         staffName ||
         source ||
-        range !== '90' ||
-        cat !== 'all' ||
-        !isToday
+        filters.date_from ||
+        filters.date_to ||
+        filters.event_types.length ||
+        siteFilter ||
+        cat !== 'all'
     );
-    const clearFilters = () => {
-        setSearch('');
-        setClientId('');
-        setStaffName('');
-        setSource('');
-        setRange('90');
-        setCat('all');
-        setAnchor(todayYmd);
-    };
-
-    const missingWitness = useMemo(
-        () => events.filter((e) => e.flags.includes('missing_witness')).length,
-        [events],
-    );
-
-    // ── Compliance alert strip (Gap D) — dismissible per session, mirrors /emar/controlled.
-    //    Counts are windowed by the date range + client/staff/source facets (not the category
-    //    tab) so the signal persists regardless of which category you are viewing.
+    const clearFilters = () =>
+        visitHistory(
+            {
+                client_id: null,
+                site_id: null,
+                date_from: null,
+                date_to: null,
+                event_types: [],
+            },
+            true,
+        );
     const [dismissedAlerts, setDismissedAlerts] = useState<string[]>(() =>
         readDismissedAlerts(),
     );
     const dismissAlert = (kind: string) =>
         setDismissedAlerts((prev) => persistDismissedAlerts([...prev, kind]));
-    const windowEvents = useMemo(() => {
-        const end = parseYmd(anchor);
-        end.setHours(23, 59, 59, 999);
-        const windowEnd = end.getTime();
-        const windowStart = windowEnd - Number(range) * 86400000;
-        return events.filter((e) => {
-            if (clientId && String(e.client_id) !== clientId) return false;
-            if (staffName && e.performed_by !== staffName) return false;
-            if (source && e.source !== source) return false;
-            const t = new Date(e.timestamp).getTime();
-            return t >= windowStart && t <= windowEnd;
-        });
-    }, [events, clientId, staffName, source, range, anchor]);
+    const sources = useMemo(
+        () => [...new Set(events.map((e) => e.source))].sort(),
+        [events],
+    );
+
     const windowOmissions = useMemo(
         () => windowEvents.filter((e) => e.flags.includes('omission')).length,
         [windowEvents],
@@ -438,7 +439,7 @@ export default function AuditLog({
             kind: 'omission',
             tone: 'critical',
             icon: AlertTriangle,
-            message: `${windowOmissions} MAR omission${windowOmissions === 1 ? '' : 's'} in this window — reconcile each with an outcome and reason.`,
+            message: `${windowOmissions} MAR omission${windowOmissions === 1 ? '' : 's'} in these records. Open each record to review the outcome and reason.`,
             onReview: () => {
                 setCat('doses');
                 setView('gaps');
@@ -461,22 +462,19 @@ export default function AuditLog({
         (a) => !dismissedAlerts.includes(a.kind),
     );
 
-    const catCounts = useMemo(() => {
-        const base = events.filter((e) => {
-            if (clientId && String(e.client_id) !== clientId) return false;
-            if (staffName && e.performed_by !== staffName) return false;
-            if (source && e.source !== source) return false;
-            return true;
-        });
-        return Object.fromEntries(
-            CATEGORIES.map((c) => [
-                c.id,
-                c.id === 'all'
-                    ? base.length
-                    : base.filter((e) => e.category === c.id).length,
-            ]),
-        );
-    }, [events, clientId, staffName, source]);
+    const catCounts = useMemo(
+        () =>
+            Object.fromEntries(
+                CATEGORIES.map((c) => [
+                    c.id,
+                    c.id === 'all'
+                        ? windowEvents.length
+                        : windowEvents.filter((e) => e.category === c.id)
+                              .length,
+                ]),
+            ),
+        [windowEvents],
+    );
 
     const byDay = useMemo(() => {
         const groups = new Map<string, AuditEvent[]>();
@@ -488,217 +486,198 @@ export default function AuditLog({
         return [...groups.entries()];
     }, [rows]);
 
-    const onSite = (id: number | null) => {
-        setSiteFilter(id);
-        router.get('/emar/reports/history', id ? { site_id: id } : {}, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const VIEW_TABS: RosterTabItem[] = [
-        { id: 'timeline', label: 'Timeline', icon: Activity, tone: 'primary' },
-        { id: 'table', label: 'Table', icon: Table, tone: 'primary' },
+    const viewTabs = [
+        { key: 'timeline', label: 'Timeline', icon: Activity },
+        { key: 'table', label: 'Table', icon: Table },
         {
-            id: 'gaps',
-            label: 'Compliance gaps',
+            key: 'gaps',
+            label: 'Needs review',
             icon: ShieldAlert,
-            tone: 'critical',
-            badge: gaps.length || undefined,
+            count: gaps.length,
+            alert: true,
         },
     ];
-    const CAT_TABS: RosterTabItem[] = CATEGORIES.map((c) => ({
-        id: c.id,
-        label: c.label,
-        icon: c.icon,
-        tone: c.tone,
-        badge: catCounts[c.id] || undefined,
-    }));
-
-    const heroStats: PageHeroStat[] = [
-        { label: 'Total events', value: stats.total },
-        { label: 'This week', value: stats.this_week },
-        { label: 'This month', value: stats.this_month },
-        {
-            label: 'Open gaps',
-            value: stats.open_gaps,
-            tone: stats.open_gaps > 0 ? 'warning' : 'neutral',
-        },
-    ];
-
-    const windowFrom = fmtShort(
-        new Date(parseYmd(anchor).getTime() - Number(range) * 86400000),
-    );
-    const windowTo = fmtShort(parseYmd(anchor));
-    const heroMeta: PageHeroMetaItem[] = [
-        {
-            icon: Clock,
-            label: `${range}-day window · ${windowFrom} – ${windowTo}`,
-        },
-        { icon: ShieldCheck, label: 'Append-only · immutable source records' },
-        {
-            icon: Users,
-            label: `${stats.total} actions · ${staff.length} staff · ${sites.length} site${sites.length === 1 ? '' : 's'}`,
-        },
-    ];
-
-    const heroBadges: PageHeroBadge[] = [];
-    if (stats.open_gaps > 0) {
-        heroBadges.push({
-            icon: AlertTriangle,
-            label: `${stats.open_gaps} unexplained MAR gap${stats.open_gaps === 1 ? '' : 's'}`,
-            tone: 'critical',
-            onClick: () => setView('gaps'),
-            'aria-label': 'View compliance gaps',
-        });
-    }
-    if (missingWitness > 0) {
-        heroBadges.push({
-            icon: Lock,
-            label: `${missingWitness} CD ${missingWitness === 1 ? 'entry' : 'entries'} missing witness`,
-            tone: 'critical',
-            onClick: () => {
-                setCat('controlled');
-                setView('gaps');
-            },
-            'aria-label': 'View controlled-drug entries missing a witness',
-        });
-    }
-
-    const refreshed = new Date().toLocaleTimeString('en-NZ', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medication clinical history" />
-            {historyNotice && (
-                <p className="text-subtle" role="status">
-                    {historyNotice}
-                </p>
-            )}
-            <div className="flex flex-col gap-6 p-6">
-                <PageHero
-                    rail={<EmarHubRail />}
-                    variant="hero"
-                    category="ops"
-                    brandColour={brandColour}
+            <div className="flex min-w-0 flex-col gap-4 p-3 sm:p-6">
+                <PageHeader
+                    frontline
                     icon={History}
-                    meta={heroMeta}
-                    badges={heroBadges}
-                    title={
-                        <span>
-                            <span className="text-primary-foreground/80 flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wide">
-                                <span
-                                    aria-hidden
-                                    className="relative inline-flex h-2 w-2"
-                                >
-                                    <span className="bg-status-success/70 absolute inset-0 animate-ping rounded-full" />
-                                    <span className="bg-status-success relative inline-flex h-2 w-2 rounded-full" />
-                                </span>
-                                Clinical history · refreshed {refreshed}
-                            </span>
-                            <span className="mt-1 block text-[26px] font-bold leading-tight">
-                                {userFirstName ? (
-                                    <span className="text-primary-foreground/80 font-normal">
-                                        Kia ora {userFirstName} —{' '}
-                                    </span>
-                                ) : null}
-                                Medication history across{' '}
-                                <span className="border-primary-foreground/40 border-b-2">
-                                    {activeSite?.name ?? 'your services'}
-                                </span>
-                            </span>
-                        </span>
-                    }
-                    description={`Retained dose, controlled-register, prescriber, pharmacy and review evidence. These historical records are separate from the event ledger and its chain check.${stats.open_gaps > 0 ? ` ${stats.open_gaps} recorded gap${stats.open_gaps === 1 ? '' : 's'} need review.` : ''}`}
-                    stats={heroStats}
+                    title="Medication history"
+                    subline="Dose outcomes, medicine changes, stock and controlled-drug records."
                     actions={
                         <>
-                            <PageHeaderPrimaryButton asChild icon={History}>
-                                <a href="/emar/reports/history/logs">
+                            <PageHeaderGlassButton asChild icon={History}>
+                                <a
+                                    href={scopedHref(
+                                        '/emar/reports/history/logs',
+                                    )}
+                                >
                                     Change log
                                 </a>
-                            </PageHeaderPrimaryButton>
-                            <a href="/emar/reports">
-                                <Button
-                                    variant="outline"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                >
-                                    <Printer className="h-4 w-4" />
+                            </PageHeaderGlassButton>
+                            <PageHeaderPrimaryButton asChild icon={Printer}>
+                                <a href={scopedHref('/emar/reports')}>
                                     Print MAR &amp; CD register
-                                </Button>
-                            </a>
+                                </a>
+                            </PageHeaderPrimaryButton>
                         </>
                     }
-                    footer={
-                        <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setAnchor(addDays(anchor, -1))
-                                    }
-                                    className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold"
-                                >
-                                    <ChevronLeft className="h-3.5 w-3.5" />
-                                    {stepLabel(addDays(anchor, -1))}
-                                </button>
-                                <DayPickerChip
-                                    date={anchor}
-                                    isToday={isToday}
-                                    onPick={setAnchor}
-                                    label="audit window"
-                                    caption="The audit window ends on the selected day; the range filter sets how far back it reaches."
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setAnchor(addDays(anchor, 1))
-                                    }
-                                    disabled={isToday}
-                                    className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
-                                >
-                                    {stepLabel(addDays(anchor, 1))}
-                                    <ChevronRight className="h-3.5 w-3.5" />
-                                </button>
-                                {!isToday ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => setAnchor(todayYmd)}
-                                        className="border-primary-foreground/35 bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30 inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold"
-                                    >
-                                        Back to today
-                                    </button>
-                                ) : null}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <div className="bg-primary-foreground flex items-center gap-2 rounded-full px-3 py-1.5">
-                                    <Search className="text-muted-foreground h-3.5 w-3.5" />
-                                    <input
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                        placeholder="Search client, medication, staff or NHI…"
-                                        className="text-foreground placeholder:text-muted-foreground w-64 bg-transparent text-sm outline-none"
-                                    />
-                                </div>
-                                {sites.length > 0 && (
-                                    <EntityFilter
-                                        label="Site"
-                                        allLabel="All sites"
-                                        items={sites}
-                                        value={siteFilter}
-                                        onChange={onSite}
-                                        onDark
-                                    />
-                                )}
-                            </div>
-                        </div>
+                    filters={
+                        <>
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                placeholder="Search loaded records"
+                                ariaLabel="Search loaded history"
+                            />
+                            <PageHeaderFilterSelect
+                                label="All sites"
+                                value={siteFilter ? String(siteFilter) : 'all'}
+                                options={[
+                                    { value: 'all', label: 'All sites' },
+                                    ...sites.map((s) => ({
+                                        value: String(s.id),
+                                        label: s.name,
+                                    })),
+                                ]}
+                                onChange={(id) =>
+                                    visitHistory({
+                                        site_id:
+                                            id === 'all' ? null : Number(id),
+                                    })
+                                }
+                            />
+                            <PageHeaderFilterSelect
+                                label="All clients"
+                                value={clientId || 'all'}
+                                options={[
+                                    { value: 'all', label: 'All clients' },
+                                    ...clients.map((c) => ({
+                                        value: String(c.id),
+                                        label: c.name,
+                                    })),
+                                ]}
+                                onChange={(id) =>
+                                    visitHistory({
+                                        client_id:
+                                            id === 'all' ? null : Number(id),
+                                    })
+                                }
+                            />
+                            <PageHeaderFilterSelect
+                                label="Period"
+                                value={range}
+                                allValue="all"
+                                options={RANGES}
+                                onChange={onRange}
+                            />
+                        </>
+                    }
+                    rail={
+                        <PageHeaderRail
+                            ariaLabel="History views"
+                            value={view}
+                            onSelect={setView}
+                            items={viewTabs}
+                        />
                     }
                 />
+                <form
+                    className="bg-card flex min-w-0 flex-wrap items-end gap-3 rounded-xl border p-4"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        if (dateFrom && dateTo && dateFrom <= dateTo)
+                            visitHistory({
+                                date_from: dateFrom,
+                                date_to: dateTo,
+                            });
+                    }}
+                >
+                    <label
+                        className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium"
+                        htmlFor="history-date-from"
+                    >
+                        From (NZ date)
+                        <input
+                            id="history-date-from"
+                            type="date"
+                            required
+                            value={dateFrom}
+                            max={dateTo || undefined}
+                            onChange={(event) =>
+                                setDateFrom(event.target.value)
+                            }
+                            className="frontline-tap frontline-focus bg-background w-full min-w-0 rounded-md border px-3 py-2 text-sm"
+                        />
+                    </label>
+                    <label
+                        className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium"
+                        htmlFor="history-date-to"
+                    >
+                        To (NZ date)
+                        <input
+                            id="history-date-to"
+                            type="date"
+                            required
+                            value={dateTo}
+                            min={dateFrom || undefined}
+                            onChange={(event) => setDateTo(event.target.value)}
+                            className="frontline-tap frontline-focus bg-background w-full min-w-0 rounded-md border px-3 py-2 text-sm"
+                        />
+                    </label>
+                    <Button
+                        type="submit"
+                        className="frontline-tap frontline-focus"
+                    >
+                        Apply dates
+                    </Button>
+                    {hasFilters && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="frontline-tap frontline-focus"
+                            onClick={clearFilters}
+                        >
+                            Clear filters
+                        </Button>
+                    )}
+                </form>
+                <div className="flex flex-col gap-2 text-sm">
+                    <p className="font-medium">
+                        {periodLabel} · Pacific/Auckland
+                    </p>
+                    <p className="text-muted-foreground">
+                        {stats.total} records in period · {stats.this_week} this
+                        week · {stats.this_month} this month · {stats.open_gaps}{' '}
+                        dose or witness flags
+                    </p>
+                    {historyNotice && (
+                        <p role="status" className="text-status-warning">
+                            {historyNotice}
+                        </p>
+                    )}
+                    {omissionsNotice && (
+                        <p className="text-muted-foreground">
+                            MAR omissions: {omissionsNotice}
+                        </p>
+                    )}
+                    <p className="text-muted-foreground">
+                        Categories, search, staff and source filters cover the{' '}
+                        {events.length} loaded records.
+                    </p>
+                    {filters.event_types.length > 0 && (
+                        <p className="text-muted-foreground">
+                            Record types:{' '}
+                            {filters.event_types
+                                .map((type) => eventMeta(type).label)
+                                .join(', ')}
+                            .
+                        </p>
+                    )}
+                </div>
 
                 {auditAlerts.length > 0 && (
                     <div className="flex flex-col gap-2">
@@ -712,118 +691,114 @@ export default function AuditLog({
                     </div>
                 )}
 
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <TabStrip
-                        value={view}
-                        onChange={setView}
-                        items={VIEW_TABS}
-                        ariaLabel="Audit views"
-                    />
-                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                        {view === 'gaps'
-                            ? `${rows.length} gap${rows.length === 1 ? '' : 's'} detected`
-                            : `Showing ${rows.length} of ${stats.total} events`}
-                        {hasFilters && (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={clearFilters}
-                            >
-                                Clear
-                            </Button>
-                        )}
-                    </div>
-                </div>
-                {omissionsNotice ? (
-                    <p className="text-caption">
-                        MAR omissions{' '}
-                        {omissionsNotice.charAt(0).toLowerCase() +
-                            omissionsNotice.slice(1)}{' '}
-                        — the dose record starts then.
-                    </p>
-                ) : null}
+                <p className="text-muted-foreground text-sm" role="status">
+                    {view === 'gaps'
+                        ? `${rows.length} loaded record${rows.length === 1 ? '' : 's'} need review`
+                        : `Showing ${rows.length} of ${events.length} loaded records`}
+                </p>
 
                 <div className="bg-card overflow-hidden rounded-2xl border shadow-sm">
-                    {view !== 'gaps' && (
-                        <div className="flex flex-col gap-3 border-b p-4">
-                            <TabStrip
-                                value={cat}
-                                onChange={setCat}
-                                items={CAT_TABS}
-                                ariaLabel="Event categories"
-                            />
-                            <div className="flex flex-wrap items-center gap-2">
-                                <EntityFilter
-                                    label="Client"
-                                    allLabel="All clients"
-                                    items={clients}
-                                    value={clientId ? Number(clientId) : null}
-                                    onChange={(id) =>
-                                        setClientId(
-                                            id == null ? '' : String(id),
-                                        )
-                                    }
-                                />
-                                <EntityFilter
-                                    label="Staff"
-                                    allLabel="All staff"
-                                    pluralLabel="staff"
-                                    items={staff}
-                                    value={
-                                        staff.find((s) => s.name === staffName)
-                                            ?.id ?? null
-                                    }
-                                    onChange={(id) =>
-                                        setStaffName(
-                                            id == null
-                                                ? ''
-                                                : (staff.find(
-                                                      (s) => s.id === id,
-                                                  )?.name ?? ''),
-                                        )
-                                    }
-                                />
-                                <EntityFilter
-                                    label="Source"
-                                    allLabel="All sources"
-                                    pluralLabel="sources"
-                                    items={sourceItems}
-                                    value={
-                                        sourceItems.find(
-                                            (s) => s.name === source,
-                                        )?.id ?? null
-                                    }
-                                    onChange={(id) =>
-                                        setSource(
-                                            id == null
-                                                ? ''
-                                                : (sourceItems.find(
-                                                      (s) => s.id === id,
-                                                  )?.name ?? ''),
-                                        )
-                                    }
-                                />
-                                <Select value={range} onValueChange={setRange}>
-                                    <SelectTrigger className="h-9 w-[130px]">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {RANGES.map((r) => (
-                                            <SelectItem key={r.v} value={r.v}>
-                                                {r.l}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                    <div className="flex min-w-0 flex-col gap-3 border-b p-4">
+                        <div
+                            role="tablist"
+                            aria-label="Record categories"
+                            className="flex flex-wrap gap-2"
+                            onKeyDown={(event) => {
+                                const tabs = [
+                                    ...event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                                        '[role="tab"]',
+                                    ),
+                                ];
+                                const current = tabs.indexOf(
+                                    document.activeElement as HTMLButtonElement,
+                                );
+                                let next: number | undefined;
+                                if (event.key === 'ArrowRight')
+                                    next = (current + 1) % tabs.length;
+                                if (event.key === 'ArrowLeft')
+                                    next =
+                                        (current - 1 + tabs.length) %
+                                        tabs.length;
+                                if (event.key === 'Home') next = 0;
+                                if (event.key === 'End') next = tabs.length - 1;
+                                if (next !== undefined) {
+                                    event.preventDefault();
+                                    setCat(CATEGORIES[next].id);
+                                    tabs[next]?.focus();
+                                }
+                            }}
+                        >
+                            {CATEGORIES.map((category) => {
+                                const Icon = category.icon;
+                                return (
+                                    <Button
+                                        key={category.id}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={cat === category.id}
+                                        variant={
+                                            cat === category.id
+                                                ? 'secondary'
+                                                : 'ghost'
+                                        }
+                                        className="frontline-tap frontline-focus gap-2 whitespace-normal"
+                                        onClick={() => setCat(category.id)}
+                                    >
+                                        <Icon className="size-4 shrink-0" />
+                                        {category.label}{' '}
+                                        <span className="tabular-nums">
+                                            {catCounts[category.id]}
+                                        </span>
+                                    </Button>
+                                );
+                            })}
                         </div>
-                    )}
+                        <div className="flex flex-wrap items-end gap-3">
+                            <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+                                Staff in loaded records
+                                <select
+                                    value={staffName}
+                                    onChange={(event) =>
+                                        setStaffName(event.target.value)
+                                    }
+                                    className="frontline-tap frontline-focus bg-background w-full min-w-0 rounded-md border px-3 py-2"
+                                >
+                                    <option value="">All staff</option>
+                                    {staff.map((person) => (
+                                        <option
+                                            key={person.id}
+                                            value={person.name}
+                                        >
+                                            {person.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+                                Source in loaded records
+                                <select
+                                    value={source}
+                                    onChange={(event) =>
+                                        setSource(event.target.value)
+                                    }
+                                    className="frontline-tap frontline-focus bg-background w-full min-w-0 rounded-md border px-3 py-2"
+                                >
+                                    <option value="">All sources</option>
+                                    {sources.map((name) => (
+                                        <option key={name} value={name}>
+                                            {name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        </div>
+                    </div>
 
                     {rows.length === 0 ? (
                         <div className="text-muted-foreground px-5 py-16 text-center text-sm">
                             {view === 'gaps'
-                                ? 'No compliance gaps — every record is attributed and witnessed.'
-                                : 'No events match the current filters.'}
+                                ? 'No flagged records in the loaded results. This does not confirm that every dose is recorded.'
+                                : 'No loaded records match these filters. Change the period or clear a filter.'}
                         </div>
                     ) : view === 'timeline' ? (
                         <div className="flex flex-col gap-4 p-4">
@@ -835,7 +810,7 @@ export default function AuditLog({
                                         </span>
                                         <span className="bg-border h-px flex-1" />
                                         <span className="text-muted-foreground text-xs">
-                                            {items.length} events
+                                            {items.length} records
                                         </span>
                                     </div>
                                     <div className="flex flex-col gap-2">
@@ -854,97 +829,157 @@ export default function AuditLog({
                             ))}
                         </div>
                     ) : view === 'table' ? (
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[920px] text-sm">
-                                <thead>
-                                    <tr className="bg-muted/50 text-muted-foreground text-left text-[11px] uppercase tracking-wide">
-                                        <th className="px-4 py-2.5">Time</th>
-                                        <th className="px-4 py-2.5">Event</th>
-                                        <th className="px-4 py-2.5">Client</th>
-                                        <th className="px-4 py-2.5">Outcome</th>
-                                        <th className="px-4 py-2.5">
-                                            Performed by
-                                        </th>
-                                        <th className="px-4 py-2.5">Witness</th>
-                                        <th className="px-4 py-2.5">Source</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {rows.map((e) => {
-                                        const m = eventMeta(e.event_type);
-                                        const Icon = m.icon;
-                                        return (
-                                            <tr
-                                                key={e.id}
-                                                className="hover:bg-muted/30 cursor-pointer border-b last:border-b-0"
-                                                onClick={() => openEvent(e)}
-                                                onContextMenu={(ev) =>
-                                                    openRowCtx(ev, e)
-                                                }
-                                            >
-                                                <td className="px-4 py-3 font-mono text-xs">
-                                                    {fmtTime(e.timestamp)}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span className="inline-flex items-center gap-1.5">
-                                                        <span
-                                                            className={`flex h-5 w-5 items-center justify-center rounded ${m.cls}`}
+                        <div className="min-w-0">
+                            <div className="flex flex-col gap-2 p-4 md:hidden">
+                                {rows.map((e) => (
+                                    <TimelineRow
+                                        key={e.id}
+                                        e={e}
+                                        onOpen={() => openEvent(e)}
+                                        onCtx={(event) => openRowCtx(event, e)}
+                                        showOutcome
+                                    />
+                                ))}
+                            </div>
+                            <div className="hidden overflow-x-auto md:block">
+                                <table className="w-full min-w-[920px] text-sm">
+                                    <thead>
+                                        <tr className="bg-muted/50 text-muted-foreground text-left text-xs uppercase tracking-wide">
+                                            <th className="px-4 py-2.5">
+                                                NZ date / time
+                                            </th>
+                                            <th className="px-4 py-2.5">
+                                                Record
+                                            </th>
+                                            <th className="px-4 py-2.5">
+                                                Client
+                                            </th>
+                                            <th className="px-4 py-2.5">
+                                                Outcome
+                                            </th>
+                                            <th className="px-4 py-2.5">
+                                                Performed by
+                                            </th>
+                                            <th className="px-4 py-2.5">
+                                                Witness
+                                            </th>
+                                            <th className="px-4 py-2.5">
+                                                Source
+                                            </th>
+                                            <th className="px-4 py-2.5">
+                                                <span className="sr-only">
+                                                    Record actions
+                                                </span>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {rows.map((e) => {
+                                            const m = eventMeta(e.event_type);
+                                            const Icon = m.icon;
+                                            return (
+                                                <tr
+                                                    key={e.id}
+                                                    className="hover:bg-muted/30 cursor-pointer border-b last:border-b-0"
+                                                    onContextMenu={(ev) =>
+                                                        openRowCtx(ev, e)
+                                                    }
+                                                >
+                                                    <td className="px-4 py-3 font-mono text-xs">
+                                                        <button
+                                                            type="button"
+                                                            className="frontline-tap frontline-focus flex flex-col items-start text-left"
+                                                            onClick={() =>
+                                                                openEvent(e)
+                                                            }
                                                         >
-                                                            <Icon className="h-3 w-3" />
-                                                        </span>
-                                                        {m.label}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {e.client_name}
-                                                </td>
-                                                <td className="text-muted-foreground px-4 py-3">
-                                                    {e.outcome ?? '—'}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {e.performed_by ?? (
-                                                        <span className="bg-status-warning-bg text-status-warning rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
-                                                            Not captured
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {e.witness_required ? (
-                                                        e.witness ? (
-                                                            <span className="text-status-success">
-                                                                {e.witness}
+                                                            <span>
+                                                                {formatDateLong(
+                                                                    e.timestamp,
+                                                                )}
                                                             </span>
+                                                            <span>
+                                                                {fmtTime(
+                                                                    e.timestamp,
+                                                                )}
+                                                            </span>
+                                                            <span className="text-primary">
+                                                                View record
+                                                            </span>
+                                                        </button>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            <span
+                                                                className={`flex h-5 w-5 items-center justify-center rounded ${m.cls}`}
+                                                            >
+                                                                <Icon className="h-3 w-3" />
+                                                            </span>
+                                                            {m.label}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {e.client_name}
+                                                    </td>
+                                                    <td className="text-muted-foreground px-4 py-3">
+                                                        {e.outcome ?? '—'}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {e.performed_by ?? (
+                                                            <span className="bg-status-warning-bg text-status-warning rounded-full px-1.5 py-0.5 text-xs font-semibold">
+                                                                Not captured
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {e.witness_required ? (
+                                                            e.witness ? (
+                                                                <span className="text-status-success">
+                                                                    {e.witness}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="bg-status-critical-bg text-status-critical rounded-full px-1.5 py-0.5 text-xs font-semibold">
+                                                                    Required —
+                                                                    missing
+                                                                </span>
+                                                            )
                                                         ) : (
-                                                            <span className="bg-status-critical-bg text-status-critical rounded-full px-1.5 py-0.5 text-[10px] font-semibold">
-                                                                Required —
-                                                                missing
-                                                            </span>
-                                                        )
-                                                    ) : (
-                                                        '—'
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[11px]">
-                                                        {e.source}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                                                            '—'
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
+                                                            {e.source}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-2 py-3">
+                                                        <Button
+                                                            variant="ghost"
+                                                            className="frontline-tap frontline-focus"
+                                                            aria-label={`Actions for ${e.description}`}
+                                                            onClick={(event) =>
+                                                                openRowCtx(
+                                                                    event,
+                                                                    e,
+                                                                )
+                                                            }
+                                                        >
+                                                            <MoreHorizontal className="size-4" />
+                                                        </Button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     ) : (
                         <div className="flex flex-col gap-4 p-4">
                             <div className="border-status-critical/30 bg-status-critical-bg/50 text-status-critical rounded-xl border px-4 py-3 text-sm">
-                                <span className="font-semibold">
-                                    Why this matters:
-                                </span>{' '}
-                                a blank MAR slot or an unwitnessed
-                                controlled-drug transaction is a medication
-                                error in CQC's view (NICE SC1). Each gap below
-                                needs a clinician to reconcile or countersign.
+                                Open each flagged record to review what happened
+                                and decide whether follow-up is needed. Flags
+                                may describe an earlier issue.
                             </div>
                             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                                 {rows.map((e) => {
@@ -980,19 +1015,27 @@ export default function AuditLog({
                                             </div>
                                             <div className="text-muted-foreground mt-1 text-xs">
                                                 {e.performed_by ??
-                                                    'Unattributed'}{' '}
-                                                ·{' '}
-                                                {new Date(
-                                                    e.timestamp,
-                                                ).toLocaleDateString('en-NZ')}
+                                                    'Staff not captured'}{' '}
+                                                · {formatDateLong(e.timestamp)}{' '}
+                                                · {fmtTime(e.timestamp)}
                                             </div>
                                             <div className="mt-3">
                                                 <Button
-                                                    size="sm"
+                                                    className="frontline-tap frontline-focus"
                                                     variant="outline"
                                                     onClick={() => openEvent(e)}
                                                 >
                                                     View record
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    className="frontline-tap frontline-focus"
+                                                    aria-label={`Actions for ${e.description}`}
+                                                    onClick={(event) =>
+                                                        openRowCtx(event, e)
+                                                    }
+                                                >
+                                                    <MoreHorizontal className="size-4" />
                                                 </Button>
                                             </div>
                                         </div>
@@ -1023,7 +1066,9 @@ export default function AuditLog({
                     }}
                 />
             )}
-            {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
+            {ctx && (
+                <HistoryRecordMenu ctx={ctx} onClose={() => setCtx(null)} />
+            )}
             {exportUrl && (
                 <HistoricalAuditExportDialog
                     url={exportUrl}
@@ -1050,21 +1095,25 @@ function AuditAlertRow({
             : 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning';
     return (
         <div
-            className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${tone}`}
+            className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 ${tone}`}
         >
             <span className="flex items-center gap-2 text-sm font-medium">
                 <Icon className="h-4 w-4 shrink-0" />
                 {alert.message}
             </span>
             <span className="flex items-center gap-1.5">
-                <Button size="sm" variant="outline" onClick={alert.onReview}>
+                <Button
+                    className="frontline-tap frontline-focus"
+                    variant="outline"
+                    onClick={alert.onReview}
+                >
                     Review
                 </Button>
                 <button
                     type="button"
                     aria-label="Dismiss alert"
                     onClick={onDismiss}
-                    className="hover:bg-foreground/10 grid h-7 w-7 place-items-center rounded-md opacity-70 hover:opacity-100"
+                    className="frontline-tap frontline-focus hover:bg-foreground/10 grid size-11 place-items-center rounded-md"
                 >
                     <X className="h-4 w-4" />
                 </button>
@@ -1077,61 +1126,80 @@ function TimelineRow({
     e,
     onOpen,
     onCtx,
+    showOutcome = false,
 }: {
     e: AuditEvent;
     onOpen: () => void;
     onCtx: (ev: ReactMouseEvent) => void;
+    showOutcome?: boolean;
 }) {
     const m = eventMeta(e.event_type);
     const Icon = m.icon;
     const isGap = e.flags.length > 0;
     return (
-        <button
-            onClick={onOpen}
+        <div
+            className={`bg-card flex min-w-0 items-center gap-1 rounded-xl border ${isGap ? 'border-status-critical/50 border-dashed' : ''}`}
             onContextMenu={onCtx}
-            className={`bg-card hover:border-primary/40 hover:bg-muted/30 flex w-full items-center gap-3 rounded-[14px] border px-3 py-2.5 text-left transition ${isGap ? 'border-status-critical/50 border-dashed' : ''}`}
         >
-            <span
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${m.cls}`}
+            <button
+                type="button"
+                onClick={onOpen}
+                className="frontline-tap frontline-focus hover:bg-muted/30 flex min-w-0 flex-1 items-start gap-3 rounded-xl px-3 py-3 text-left"
             >
-                <Icon className="h-4 w-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-xs font-semibold">{m.label}</span>
-                    <span className="text-muted-foreground font-mono text-[11px]">
-                        {fmtTime(e.timestamp)}
-                    </span>
-                    <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px]">
-                        {e.source}
-                    </span>
-                    {e.flags.map((f) => (
-                        <span
-                            key={f}
-                            className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${FLAG_META[f]?.cls ?? ''}`}
-                        >
-                            {FLAG_META[f]?.label ?? f}
+                <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${m.cls}`}
+                >
+                    <Icon className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs font-semibold">{m.label}</span>
+                        <span className="text-muted-foreground font-mono text-xs">
+                            {fmtTime(e.timestamp)}
                         </span>
-                    ))}
-                </div>
-                <div className="truncate text-sm font-medium">
-                    {e.description}
-                </div>
-                <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                    <span className="bg-primary/10 text-primary flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold">
-                        {e.performed_by ? initials(e.performed_by) : '?'}
-                    </span>
-                    {e.performed_by ?? (
-                        <span className="text-status-warning">
-                            Not attributed
+                        <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-xs">
+                            {e.source}
                         </span>
+                        {e.flags.map((f) => (
+                            <span
+                                key={f}
+                                className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${FLAG_META[f]?.cls ?? ''}`}
+                            >
+                                {FLAG_META[f]?.label ?? f}
+                            </span>
+                        ))}
+                    </div>
+                    <div className="break-words text-sm font-medium">
+                        {e.description}
+                    </div>
+                    <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+                        <span className="font-medium">{e.client_name}</span> ·
+                        {e.performed_by ?? (
+                            <span className="text-status-warning">
+                                Staff not captured
+                            </span>
+                        )}
+                        {e.site_name ? ` · ${e.site_name}` : ''}
+                    </div>
+                    {showOutcome && (
+                        <div className="text-muted-foreground mt-1 text-sm">
+                            Outcome: {e.outcome ?? 'Not captured'} ·{' '}
+                            {e.witness_required
+                                ? `Witness: ${e.witness ?? 'Required — missing'}`
+                                : 'No witness required'}
+                        </div>
                     )}
-                    {e.site_name ? ` · ${e.site_name}` : ''}
                 </div>
-            </div>
-            <span className="text-primary shrink-0 text-xs font-medium">
-                View record ›
-            </span>
-        </button>
+            </button>
+            <Button
+                type="button"
+                variant="ghost"
+                className="frontline-tap frontline-focus mr-1 shrink-0"
+                aria-label={`Actions for ${e.description}`}
+                onClick={onCtx}
+            >
+                <MoreHorizontal className="size-4" />
+            </Button>
+        </div>
     );
 }
