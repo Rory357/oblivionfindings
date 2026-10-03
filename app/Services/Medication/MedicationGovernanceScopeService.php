@@ -67,6 +67,10 @@ final class MedicationGovernanceScopeService
         'medications.breakglass',
         'medications.breakglass.end',
         'medications.audit.view',
+        // Per-person medication readers re-check these capabilities on the locked actor.
+        'clients.viewAny',
+        'medications.reports.export',
+        'reports.viewAny',
         'fleet.manage',
         'fleet.medication.manage',
         'clinical.accessAllSites',

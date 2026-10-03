@@ -69,6 +69,24 @@ class MedicationReviewWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_booking_retains_each_exact_person_read_permission_in_locked_authorization_evidence(): void
+    {
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        foreach (['clients.viewAny', 'medications.reports.export', 'reports.viewAny'] as $readPermission) {
+            $actor = $this->userAt($site, ['medications.view', 'medications.reviews.manage', $readPermission], personScoped: true);
+            $review = $this->book($actor, $client, 'triggered');
+            $this->assertSame($actor->id, $review->owner_id);
+            $this->assertDatabaseHas('medication_review_events', [
+                'review_id' => $review->id, 'actor_id' => $actor->id, 'event' => 'booked',
+            ]);
+        }
+        $unassigned = $this->userAt($site, ['medications.view', 'medications.reviews.manage'], personScoped: true);
+        $this->actingAs($unassigned)->postJson('/emar/reviews', $this->bookingPayload($unassigned, $client, 'triggered'))
+            ->assertNotFound();
+        $this->assertSame(3, MedicationReview::query()->where('client_id', $client->id)->count());
+    }
+
     public function test_booking_uses_the_nz_day_and_requires_an_other_trigger_reason(): void
     {
         ['actor' => $actor, 'client' => $client] = $this->context();
