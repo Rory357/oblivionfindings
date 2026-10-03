@@ -131,7 +131,11 @@ export function CountWizard({ item, onClose, onSaved }: { item: ItemDetail; onCl
     const [saved, setSaved] = useState(false);
     const [discard, setDiscard] = useState(false);
     const command = useStockCommand();
-    const complete = packs.length > 0 && packs.every((pack) => values[pack.id] !== undefined && values[pack.id] !== '');
+    const complete = packs.length > 0 && packs.every((pack) => /^\d+(?:\.\d{1,2})?$/.test(values[pack.id] ?? '') && Number.isFinite(Number(values[pack.id])));
+    const navigate = (index: number) => {
+        if (command.saving || (index > 0 && !complete) || (index === 2 && different && !reason.trim())) return;
+        setStep(index);
+    };
     const different = packs.some((pack) => Number(values[pack.id]) !== Number(pack.quantity_remaining));
     const close = () => { if (!command.saving) { if (!saved && Object.keys(values).length) setDiscard(true); else onClose(); } };
     const save = async () => {
@@ -142,9 +146,9 @@ export function CountWizard({ item, onClose, onSaved }: { item: ItemDetail; onCl
     };
     return <>
         <WizardShell open onClose={close} title="Count stock" description="Count each pack before comparing with the recorded balance." railIcon={ClipboardCheck} railTitle="Count stock" railSub={`${item.client_name} · ${item.name}`}
-            steps={[{ key: 'count', label: 'Count the packs', blurb: 'Recorded amounts hidden', icon: Package }, { key: 'differences', label: 'Check differences', blurb: 'Explain what changed', icon: ClipboardCheck }, { key: 'review', label: 'Review and save', blurb: 'Permanent count record', icon: ShieldCheck }]}
-            stepIndex={step} onStepClick={setStep} pct={(step + 1) / 3 * 100} footerStart={<Button variant="outline" disabled={command.saving} onClick={close}>Cancel</Button>}
-            footerEnd={<><Button variant="outline" disabled={step === 0 || command.saving} onClick={() => setStep(step - 1)}>Back</Button><Button disabled={command.saving || !complete || (step > 0 && different && !reason.trim())} onClick={() => step < 2 ? setStep(step + 1) : void save()}>{command.saving ? 'Saving…' : step === 2 ? 'Save count' : 'Continue'}</Button></>}
+            steps={[{ key: 'count', label: 'Count the packs', blurb: 'Recorded amounts hidden', icon: Package }, { key: 'differences', label: 'Check differences', blurb: 'Explain what changed', icon: ClipboardCheck, disabled: !complete || command.saving }, { key: 'review', label: 'Review and save', blurb: 'Permanent count record', icon: ShieldCheck, disabled: !complete || (different && !reason.trim()) || command.saving }]}
+            stepIndex={step} onStepClick={navigate} pct={(step + 1) / 3 * 100} footerStart={<Button variant="outline" disabled={command.saving} onClick={close}>Cancel</Button>}
+            footerEnd={<><Button variant="outline" disabled={step === 0 || command.saving} onClick={() => setStep(step - 1)}>Back</Button><Button disabled={command.saving || !complete || (step > 0 && different && !reason.trim())} onClick={() => step < 2 ? navigate(step + 1) : void save()}>{command.saving ? 'Saving…' : step === 2 ? 'Save count' : 'Continue'}</Button></>}
             success={saved ? <WizardSuccessPane title="Count saved" blurb={different ? 'The difference is kept for the house lead to review. The stock balance has not been changed.' : 'The count matches. Last counted has been updated.'} actions={<Button onClick={onClose}>Done</Button>} /> : undefined}>
             <WizardStepPane><Errors values={command.errors} /><div className="space-y-4">
                 {step === 0 && <><SettingsNotice role="note">Count the packs physically. The recorded quantities stay hidden until you have entered every count.</SettingsNotice>{packs.map((pack) => <div key={pack.id}><Label htmlFor={`count-${pack.id}`}>{pack.batch_number ?? (pack.batch_not_printed ? 'Batch not printed' : 'Batch unknown')} · {pack.expiry_date?.slice(0, 10) ?? 'Expiry unknown'}</Label><Input id={`count-${pack.id}`} type="number" min="0" step="0.01" value={values[pack.id] ?? ''} onChange={(event) => setValues({ ...values, [pack.id]: event.target.value })} /></div>)}</>}

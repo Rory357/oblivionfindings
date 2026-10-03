@@ -17,6 +17,7 @@ use App\Services\AuditLogger;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\Stock\MedicationStockService;
+use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\Stock\StockReadPayload;
 use App\Support\Medication\MedicationStockQuantity as Qty;
 use App\Support\Medication\PharmacySupplyRules;
@@ -72,6 +73,22 @@ final class MedicationStockController extends Controller
                 $result = $this->execute($med, $actor, $action, $data);
                 $payload = ['success' => true, ...$result];
                 $this->scope->rememberIdempotencyResult('emar-p06-command', $replay, $payload, $fingerprint, durable: true);
+                if ($action === 'count') {
+                    $count = MedicationStockCountRecord::findOrFail($result['count_id']);
+                    if ($count->state === 'needs_review') {
+                        app(MedicationFollowupService::class)->ensureForSource(
+                            'stock-discrepancy', $count->id, $client, $med, null, null, null,
+                            ['count_id' => $count->id, 'source_url' => '/emar/stock/packs?view=counts&count_id='.$count->id],
+                        );
+                    }
+                } elseif ($action === 'count_review') {
+                    // All source locks, writes and the durable receipt are done.
+                    // Completion appends P09; only audit appends follow it.
+                    app(MedicationFollowupService::class)->completeFromSource(
+                        'stock-discrepancy:'.$result['count_id'], $actor, 'count_reviewed',
+                        ['count_id' => $result['count_id']],
+                    );
+                }
                 $subjectKey = array_key_first($result);
                 app(MedicationEventRecorder::class)->append(new MedicationEventData(
                     siteId: (int) $client->site_id, kind: 'stock.'.$action,

@@ -8,6 +8,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationStock;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationEvent;
+use App\Models\MedicationFollowup;
 use App\Models\MedicationPharmacyOrder;
 use App\Models\MedicationStockCountRecord;
 use App\Models\MedicationStockLot;
@@ -94,12 +95,35 @@ class StockPacksWorkflowTest extends TestCase
         $countId = $this->actingAs($actor)->postJson('/emar/stock/packs/commands', $data)->assertOk()->json('count_id');
         $this->assertSame('10.00', $stock->fresh()->on_hand);
         $this->assertSame('needs_review', MedicationStockCountRecord::findOrFail($countId)->state);
+        $this->assertSame(1, MedicationFollowup::where('source_key', 'stock-discrepancy:'.$countId)->count());
         DB::transaction(fn () => app(MedicationStockService::class)->move($stock, $actor, [
             'lot_id' => $lot->id, 'kind' => 'damaged', 'quantity' => '1.00', 'reason' => 'Synthetic damage', 'request_uuid' => (string) Str::uuid(),
         ]));
         $this->postJson('/emar/stock/packs/commands', ['action' => 'count_review', 'client_medication_id' => $med->id,
             'request_uuid' => (string) Str::uuid(), 'count_id' => $countId, 'reason' => 'Synthetic review'])->assertUnprocessable()->assertJsonValidationErrors('reason');
         $this->assertSame('9.00', $stock->fresh()->on_hand);
+    }
+
+    public function test_lead_signoff_completes_the_same_discrepancy_workflow_once(): void
+    {
+        extract($this->fixture());
+        $lot = MedicationStockLot::firstOrFail();
+        $data = ['action' => 'count', 'client_medication_id' => $med->id, 'request_uuid' => (string) Str::uuid(),
+            'lines' => [['lot_id' => $lot->id, 'revision' => $lot->revision, 'quantity' => '9.00']],
+            'reason' => 'Synthetic discrepancy'];
+        $countId = $this->actingAs($actor)->postJson('/emar/stock/packs/commands', $data)->assertOk()->json('count_id');
+        $this->postJson('/emar/stock/packs/commands', $data)->assertOk()->assertJson(['duplicate' => true]);
+        $followup = MedicationFollowup::where('source_key', 'stock-discrepancy:'.$countId)->sole();
+        $review = ['action' => 'count_review', 'client_medication_id' => $med->id, 'count_id' => $countId,
+            'request_uuid' => (string) Str::uuid(), 'reason' => 'Synthetic checked reconciliation'];
+        $this->postJson('/emar/stock/packs/commands', $review)->assertOk();
+        $this->postJson('/emar/stock/packs/commands', $review)->assertOk()->assertJson(['duplicate' => true]);
+        $this->assertSame('9.00', $stock->fresh()->on_hand);
+        $this->assertSame('done', $followup->fresh()->state);
+        $this->assertNotNull($followup->fresh()->completed_at);
+        $this->assertSame(1, MedicationFollowup::where('source_key', 'stock-discrepancy:'.$countId)->count());
+        $this->assertSame(1, MedicationStockMovement::where('kind', 'count_correction')->count());
+        $this->assertSame(1, MedicationEvent::where('kind', 'stock.count_review')->count());
     }
 
     public function test_dose_recorded_after_count_opening_rejects_stale_count_without_creating_review_work(): void
@@ -124,6 +148,7 @@ class StockPacksWorkflowTest extends TestCase
         $this->assertSame('9.00', $stock->fresh()->on_hand);
         $this->assertSame('9.00', $lot->fresh()->quantity_remaining);
         $this->assertSame(0, MedicationStockCountRecord::count());
+        $this->assertSame(0, MedicationFollowup::where('type', 'stock_discrepancy')->count());
         $this->assertSame(0, MedicationEvent::where('kind', 'stock.count')->count());
         $this->assertSame($countedAt->toIso8601String(), $stock->fresh()->last_counted_at->toIso8601String());
 
