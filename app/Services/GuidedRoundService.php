@@ -152,10 +152,16 @@ class GuidedRoundService
             $administrationQuery->lockForUpdate();
         }
 
-        $administrations = $administrationQuery
+        $records = $administrationQuery
             ->with(['administeredBy:id,name', 'witnessedBy:id,name'])
             ->orderBy('id')
-            ->get()
+            ->get();
+        // A refusal that was offered again (P01 re-offer) is history: the
+        // re-offer is the slot's current record, wherever it was made.
+        $reofferedIds = $records->pluck('reoffer_of_id')->filter()->map(fn ($id): int => (int) $id)->all();
+        $administrations = $records
+            ->reject(fn (ClientMedicationAdministration $administration): bool => in_array((int) $administration->id, $reofferedIds, true)
+                || ($administration->is_correction && in_array((int) $administration->corrected_of_id, $reofferedIds, true)))
             ->sortBy(fn (ClientMedicationAdministration $administration): int => (int) $administration->medication_round_id === (int) $round->id ? 0 : 1)
             ->unique(fn (ClientMedicationAdministration $administration): string => $this->recordKey($administration))
             ->keyBy(fn (ClientMedicationAdministration $administration): string => $this->recordKey($administration));

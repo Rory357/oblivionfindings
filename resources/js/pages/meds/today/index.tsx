@@ -22,6 +22,7 @@ import {
     Clock,
     Copy,
     Eye,
+    Repeat,
     FileText,
     Hand,
     History,
@@ -121,7 +122,13 @@ import {
 /* ------------------------------------------------------------------ */
 
 type WizardState =
-    | { type: 'dose'; row: ScheduleRow; initialOutcome?: 'given' | 'withheld' }
+    | {
+          type: 'dose';
+          row: ScheduleRow;
+          initialOutcome?: 'given' | 'withheld';
+          /** P01: offered again after a refusal (linked to it). */
+          reoffer?: boolean;
+      }
     | { type: 'prn'; medId?: number }
     | null;
 
@@ -1488,6 +1495,25 @@ export default function MedsToday(props: MedsTodayProps) {
                         tone: 'primary',
                         onClick: () => setRecordedDetail(row),
                     },
+                    // P01 (NF-11, Q8): a refusal can be offered again the
+                    // same day while its follow-up is open; the dialog
+                    // checks that with the server.
+                    ...(row.status === 'refused' &&
+                    canRecordMedication(row.is_controlled)
+                        ? [
+                              {
+                                  icon: <Repeat className="h-3.5 w-3.5" />,
+                                  label: 'Record re-offer',
+                                  sub: 'Offered again — given or refused again',
+                                  onClick: () =>
+                                      setWizard({
+                                          type: 'dose',
+                                          row,
+                                          reoffer: true,
+                                      }),
+                              } satisfies ShiftCtxItem,
+                          ]
+                        : []),
                     { sep: true },
                     ...common,
                 ]
@@ -2050,7 +2076,7 @@ export default function MedsToday(props: MedsTodayProps) {
             {wizard?.type === 'dose' &&
             canRecordMedication(wizard.row.is_controlled) ? (
                 <RecordDoseDialog
-                    key={`${wizard.row.key}:${wizard.initialOutcome ?? 'given'}`}
+                    key={`${wizard.row.key}:${wizard.reoffer ? 'reoffer' : (wizard.initialOutcome ?? 'given')}`}
                     target={{
                         kind: 'scheduled',
                         orderId: wizard.row.medication_id,
@@ -2063,7 +2089,13 @@ export default function MedsToday(props: MedsTodayProps) {
                         },
                     }}
                     entry="meds-today"
-                    mode={wizard.initialOutcome === 'withheld' ? 'notgiven' : 'record'}
+                    mode={
+                        wizard.reoffer
+                            ? 'reoffer'
+                            : wizard.initialOutcome === 'withheld'
+                              ? 'notgiven'
+                              : 'record'
+                    }
                     signedAs={board_user}
                     onEligibility={() => {
                         setWizard(null);

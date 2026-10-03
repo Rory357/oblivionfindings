@@ -458,7 +458,7 @@ class WorkerMedsController extends Controller
                     [
                         'status' => 'given',
                         'reason' => trim($data['reason']),
-                        'dose_given' => $data['dose_given'] ?? null,
+                        'dose_given' => $data['dose_given'] ?? $medication->dosage,
                         'quantity_administered' => $data['quantity_administered'] ?? null,
                         'cd_balance' => $data['cd_balance'] ?? null,
                         'witnessed_by' => $data['witnessed_by'] ?? null,

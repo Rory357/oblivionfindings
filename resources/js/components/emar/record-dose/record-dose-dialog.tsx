@@ -353,7 +353,11 @@ function RecordDoseForm({
         block?.copy.title ??
         (competencyStops ? 'Your competency doesn’t cover “given”' : noCosigner ? 'Nobody on shift can co-sign this dose' : null);
     const notYetDue = !isPrn && due?.state === 'notdue';
-    const tiles = outcomeTiles(req, mode, givenWhy ?? (notYetDue ? `Not yet due — the window opens at ${timeLabel(due?.window_opens_at)}` : null));
+    // A re-offer needs today's refusal with its follow-up still open (Q8).
+    const reofferClosed = mode === 'reoffer' && !req.reoffer;
+    const tiles = outcomeTiles(req, mode, givenWhy ?? (notYetDue ? `Not yet due — the window opens at ${timeLabel(due?.window_opens_at)}` : null)).map((t) =>
+        reofferClosed ? { ...t, disabled: 'This refusal can’t be offered again' } : t,
+    );
     const givenLike = !!f.outcome && GIVEN_LIKE.includes(f.outcome);
 
     /* ── second person ── */
@@ -823,6 +827,11 @@ function RecordDoseForm({
         <div className="space-y-4">
             <IdentityHeader req={req} compact />
             <AllergyNotice req={req} compact />
+            {reofferClosed ? (
+                <Notice tone="warning" icon={Link2} title="This refusal can’t be offered again">
+                    Its follow-up is closed, or the refusal was on another day. The refusal stays in the history; record anything new as a separate note.
+                </Notice>
+            ) : null}
             {mode === 'reoffer' && req.reoffer ? (
                 <Notice tone="neutral" icon={Link2} title={`Linked to the refusal at ${timeLabel(req.reoffer.refused_at)}`}>
                     The refusal stays in the history. Re-offer rule: <NotConfigured />

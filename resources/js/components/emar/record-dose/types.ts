@@ -150,6 +150,7 @@ export type EntryPoint =
     | 'meds-today'
     | 'round'
     | 'as-needed'
+    | 'prn-records'
     | 'mar'
     | 'dashboard'
     | 'client-profile'
@@ -161,6 +162,7 @@ export const ENTRY_LABEL: Record<EntryPoint, string> = {
     'meds-today': 'Meds today › Schedule',
     round: 'Meds today › Rounds (guided round)',
     'as-needed': 'Meds today › As-needed',
+    'prn-records': 'Medication › As-needed records',
     mar: 'MAR chart',
     dashboard: 'Medication dashboard',
     'client-profile': 'Client profile',

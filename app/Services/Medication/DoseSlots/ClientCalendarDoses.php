@@ -81,11 +81,15 @@ final class ClientCalendarDoses
         $startUtc = $start->copy()->utc();
         $endUtc = $end->copy()->utc();
 
-        $records = $this->records($client, $startUtc, $endUtc, $includeControlled);
-        $recordedSlots = $records
-            ->mapWithKeys(fn (ClientMedicationAdministration $record): array => [
-                $this->schedule->slotKey((int) $record->client_id, (int) $record->client_medication_id, $this->rawUtc($record, 'scheduled_for')) => true,
-            ]);
+        // One event per dose: the slot's latest effective record (records
+        // come oldest first, so a re-offer after a refusal — P01 — wins).
+        $records = $this->records($client, $startUtc, $endUtc, $includeControlled)
+            ->keyBy(fn (ClientMedicationAdministration $record): string => $this->schedule->slotKey(
+                (int) $record->client_id,
+                (int) $record->client_medication_id,
+                $this->rawUtc($record, 'scheduled_for'),
+            ));
+        $recordedSlots = $records->map(fn (): bool => true);
 
         $events = $records
             ->map(fn (ClientMedicationAdministration $record): array => $this->recordEvent($record, $timezone))

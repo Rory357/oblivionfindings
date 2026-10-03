@@ -410,12 +410,15 @@ final class DoseRecordingRequirements
         }
 
         if ($safetyCheck['blocked'] ?? false) {
-            $danger = collect($safetyCheck['warnings'] ?? [])
-                ->filter(fn ($w): bool => is_array($w) && ($w['severity'] ?? null) === 'danger');
-            // A severe register allergy, or a health-profile match when the
-            // organisation blocks matches (P11 "When a medicine matches a
-            // recorded allergy": Block), is a danger-level allergy warning.
-            $allergy = $danger->firstWhere('type', 'allergy');
+            $warnings = collect($safetyCheck['warnings'] ?? [])->filter(fn ($w): bool => is_array($w));
+            $danger = $warnings->filter(fn (array $w): bool => ($w['severity'] ?? null) === 'danger');
+            // What blocks "given" for an allergy: a severe or life-threatening
+            // register allergy (the safety check blocks both; only the second
+            // is a danger-level warning), or a health-profile match when the
+            // organisation blocks matches (P11: Block).
+            $allergy = $warnings->first(fn (array $w): bool => ($w['type'] ?? null) === 'allergy'
+                && (($w['severity'] ?? null) === 'danger'
+                    || in_array($w['details']['severity'] ?? null, ['severe', 'life_threatening'], true)));
             if ($allergy !== null) {
                 return ['key' => self::BLOCK_ALLERGY, 'facts' => [
                     'allergen' => $allergy['details']['allergen'] ?? null,
