@@ -87,9 +87,30 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             $route = Route::getRoutes()->getByName($routeName);
             $this->assertNotNull($route, $routeName);
             $middleware = $route->gatherMiddleware();
-            $this->assertContains('permission:medications.reports.export|reports.viewAny', $middleware, $routeName);
+            $this->assertContains('permission:medications.reports.view', $middleware, $routeName);
+            $this->assertNotContains('permission:medications.reports.export|reports.viewAny', $middleware, $routeName);
             $this->assertNotContains('permission:medications.view', $middleware, $routeName);
+            if (in_array($routeName, [
+                'emar.reports.export_mar', 'emar.reports.export_discrepancies',
+                'reports.medications.export_mar', 'reports.medications.export_discrepancies',
+                'api.medications.reports.export',
+            ], true)) {
+                $this->assertContains('permission:medications.reports.export', $middleware, $routeName);
+            }
+            if (in_array($routeName, ['emar.reports.export_discrepancies', 'reports.medications.export_discrepancies'], true)) {
+                $this->assertContains('permission:medications.controlled.view', $middleware, $routeName);
+            }
         }
+
+        // Generic reports or export alone cannot open the medication reader.
+        foreach ([['reports.viewAny'], ['medications.reports.export']] as $permissions) {
+            $reportActor = $this->userWithPermissions($permissions);
+            $this->actingAs($reportActor)->get(route('emar.reports'))->assertForbidden();
+        }
+        // The mixed POST export route exact-gates its selected export type in
+        // the controller; a report reader cannot export clinical doses.
+        $reportReader = $this->userWithPermissions(['medications.reports.view']);
+        $this->actingAs($reportReader)->postJson(route('emar.reports.export'), ['type' => 'doses'])->assertForbidden();
 
         $sharedPermissions = file_get_contents(app_path('Http/Middleware/HandleInertiaRequests.php'));
         // NAV: hub rail views live in lib/emar-navigation.ts (the sidebar and
@@ -99,6 +120,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         $this->assertIsString($navigation);
         $this->assertStringContainsString("'controlledView' => \$user->canDo('medications.controlled.view')", $sharedPermissions);
         $this->assertStringContainsString("'stockUpdate' => \$user->canDo('medications.stock.update')", $sharedPermissions);
+        $this->assertStringContainsString("'reportsView' => \$user->canDo('medications.reports.view')", $sharedPermissions);
         $this->assertMatchesRegularExpression(
             "/label: 'Controlled register',\s*href: '\/emar\/controlled',\s*icon: \w+,\s*visible: all\(view, controlledView\)/s",
             $navigation,
@@ -109,6 +131,10 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         );
         $this->assertMatchesRegularExpression(
             "/label: 'Stock & pharmacy',\s*href: '\/emar\/stock',\s*icon: \w+,\s*visible: all\(view, stockUpdate\)/s",
+            $navigation,
+        );
+        $this->assertMatchesRegularExpression(
+            "/label: 'Standard reports',\s*href: '\/emar\/reports',\s*icon: \w+,\s*visible: reportsView/s",
             $navigation,
         );
 
@@ -461,12 +487,12 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         ], $context['local_site']);
 
         $controlled = $this->actingAs($actor)->get(route('emar.controlled'))->assertOk();
-        $this->assertSame([$context['local_medication']->id], collect($controlled->inertiaProps('medications'))->pluck('id')->all());
-        $this->assertSame([], collect($controlled->inertiaProps('discrepancies'))->pluck('id')->all());
-        $this->assertSame([], collect($controlled->inertiaProps('destructions'))->pluck('id')->all());
-        $this->assertSame([], collect($controlled->inertiaProps('lossReports'))->pluck('id')->all());
-        $this->assertSame([$context['local_client']->id], collect($controlled->inertiaProps('clients'))->pluck('id')->all());
-        $this->assertSame([$context['local_site']->id], collect($controlled->inertiaProps('sites'))->pluck('id')->all());
+        $this->assertSame([$context['local_medication']->id], collect($controlled->inertiaProps('product.medicines'))->pluck('id')->all());
+        $this->assertSame([], collect($controlled->inertiaProps('product.discrepancies'))->pluck('id')->all());
+        $this->assertSame([], collect($controlled->inertiaProps('product.destructions'))->pluck('id')->all());
+        $this->assertSame([], collect($controlled->inertiaProps('product.losses'))->pluck('id')->all());
+        $this->assertSame([$context['local_client']->id], collect($controlled->inertiaProps('product.people'))->pluck('id')->all());
+        $this->assertSame([$context['local_site']->id], collect($controlled->inertiaProps('product.sites'))->pluck('id')->all());
 
         $stock = $this->actingAs($actor)->get(route('emar.stock'))->assertOk();
         $this->assertSame([$context['local_stock']->id], collect($stock->inertiaProps('stockItems'))->pluck('id')->all());
@@ -480,13 +506,17 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         $this->assertSame([$context['local_client']->id], collect($medications->inertiaProps('clients'))->pluck('id')->all());
         $this->assertSame([$context['local_site']->id], collect($medications->inertiaProps('sites'))->pluck('id')->all());
 
-        $destructions = $this->actingAs($actor)->get(route('emar.destructions'))->assertOk();
-        $this->assertSame([], collect($destructions->inertiaProps('destructions'))->pluck('id')->all());
-        $this->assertSame([$context['local_medication']->id], collect($destructions->inertiaProps('medications'))->pluck('id')->all());
-        $this->assertSame([$context['local_client']->id], collect($destructions->inertiaProps('clients'))->pluck('id')->all());
+        $redirect = $this->actingAs($actor)->get(route('emar.destructions'))->assertRedirect('/emar/controlled?view=destructions');
+        $destructions = $this->actingAs($actor)->get($redirect->headers->get('Location'))->assertOk();
+        $this->assertSame([], collect($destructions->inertiaProps('product.destructions'))->pluck('id')->all());
+        $this->assertSame([$context['local_medication']->id], collect($destructions->inertiaProps('product.medicines'))->pluck('id')->all());
+        $this->assertSame([$context['local_client']->id], collect($destructions->inertiaProps('product.people'))->pluck('id')->all());
 
-        $lossReports = $this->actingAs($actor)->get(route('emar.cd_loss.index'))->assertOk();
-        $this->assertSame([], collect($lossReports->json())->pluck('id')->all());
+        $redirect = $this->actingAs($actor)->get(route('emar.cd_loss.index'))->assertRedirect('/emar/controlled?view=losses');
+        $lossReports = $this->actingAs($actor)->get($redirect->headers->get('Location'))->assertOk();
+        $this->assertSame([], collect($lossReports->inertiaProps('product.losses'))->pluck('id')->all());
+        $this->assertSame([$context['local_medication']->id], collect($lossReports->inertiaProps('product.medicines'))->pluck('id')->all());
+        $this->assertSame([$context['local_client']->id], collect($lossReports->inertiaProps('product.people'))->pluck('id')->all());
 
         $dashboard = $this->actingAs($actor)->get(route('emar.index'))->assertOk();
         $this->assertSame([$context['local_medication']->id], collect($dashboard->inertiaProps('medicationOptions'))->pluck('id')->all());
@@ -534,12 +564,18 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             $this->actingAs($globalReader)
                 ->get(route('emar.stock', ['site_id' => $context['foreign_site']->id]))
                 ->assertOk();
-            $this->actingAs($globalReader)
-                ->get(route('emar.destructions', ['site_id' => $context['foreign_site']->id]))
-                ->assertOk();
-            $this->actingAs($globalReader)
-                ->get(route('emar.cd_loss.index', ['site_id' => $context['foreign_site']->id]))
-                ->assertOk();
+            foreach (['emar.destructions' => 'destructions', 'emar.cd_loss.index' => 'losses'] as $routeName => $view) {
+                $redirect = $this->actingAs($globalReader)
+                    ->get(route($routeName, ['site_id' => $context['foreign_site']->id]))
+                    ->assertRedirect('/emar/controlled?view='.$view.'&site_id='.$context['foreign_site']->id);
+                $page = $this->actingAs($globalReader)->get($redirect->headers->get('Location'))->assertOk();
+                $this->assertSame($context['foreign_site']->id, $page->inertiaProps('product.filters.site_id'));
+                $this->assertSame([$context['foreign_medication']->id], collect($page->inertiaProps('product.medicines'))->pluck('id')->all());
+                $this->assertSame([$context['foreign_client']->id], collect($page->inertiaProps('product.people'))->pluck('id')->all());
+                $this->assertSame([$context['foreign_site']->id], collect($page->inertiaProps('product.sites'))->pluck('id')->all());
+                $expectedId = $view === 'destructions' ? $context['foreign_destruction']->id : $context['foreign_loss']->id;
+                $this->assertSame([$expectedId], collect($page->inertiaProps('product.'.$view))->pluck('id')->all());
+            }
         }
     }
 
