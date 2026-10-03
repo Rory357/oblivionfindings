@@ -17,7 +17,9 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationReportingService;
+use App\Support\WorkerClock;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -378,11 +380,15 @@ class OneChartGovernanceWorkflowTest extends TestCase
                 'dose' => '5 mg',
             ]],
         ]);
+        $driverBefore = $this->persistedEvidence($driver);
+        $controlledBefore = $this->persistedEvidence($controlled);
         $recordOnly = $this->syringeMutationActor([
+            'medications.view', 'clients.viewAny', 'medications.administer.record',
             'medications.orders.manage',
             'medications.controlled.record',
         ]);
         $viewOnly = $this->syringeMutationActor([
+            'medications.view', 'clients.viewAny', 'medications.administer.record',
             'medications.orders.manage',
             'medications.controlled.view',
         ]);
@@ -395,8 +401,20 @@ class OneChartGovernanceWorkflowTest extends TestCase
                 ->post("/emar/syringe-drivers/{$driver->id}/complete", [])
                 ->assertNotFound();
         }
+        $withoutCheckPermission = $this->syringeMutationActor([
+            'medications.view', 'clients.viewAny', 'medications.orders.manage',
+            'medications.controlled.view', 'medications.controlled.record',
+        ]);
+        $this->actingAs($withoutCheckPermission)->post("/emar/syringe-drivers/{$driver->id}/checks", [])->assertForbidden();
+        $withoutCompletionPermission = $this->syringeMutationActor([
+            'medications.view', 'clients.viewAny', 'medications.administer.record',
+            'medications.controlled.view', 'medications.controlled.record',
+        ]);
+        $this->actingAs($withoutCompletionPermission)->post("/emar/syringe-drivers/{$driver->id}/complete", [])->assertForbidden();
         $this->assertSame('running', $driver->fresh()->status);
         $this->assertSame(0, $driver->checks()->count());
+        $this->assertSame($driverBefore, $this->persistedEvidence($driver));
+        $this->assertSame($controlledBefore, $this->persistedEvidence($controlled));
 
         $foreignClient = Client::factory()->create(['status' => 'active']);
         $foreignMedication = ClientMedication::factory()->create([
@@ -437,6 +455,7 @@ class OneChartGovernanceWorkflowTest extends TestCase
         ]);
 
         foreach ([$forgedDriver, $malformedDriver, $unlinkedDriver] as $noncanonicalDriver) {
+            $before = $this->persistedEvidence($noncanonicalDriver);
             $this->actingAs($this->admin)
                 ->post("/emar/syringe-drivers/{$noncanonicalDriver->id}/checks", [
                     'infusion_running' => true,
@@ -449,36 +468,48 @@ class OneChartGovernanceWorkflowTest extends TestCase
                 ->assertNotFound();
             $this->assertSame('running', $noncanonicalDriver->fresh()->status);
             $this->assertSame(0, $noncanonicalDriver->checks()->count());
+            $this->assertSame($before, $this->persistedEvidence($noncanonicalDriver));
         }
     }
 
-    public function test_review_completion_sets_next_chart_review_date_from_client_interval(): void
+    public function test_review_completion_sets_next_chart_review_date_from_the_canonical_person_interval(): void
     {
-        $this->client->forceFill(['chart_review_interval_months' => 2])->save();
+        $this->actingAs($this->admin)->putJson("/emar/clients/{$this->client->id}/review-interval", [
+            'months' => 2, 'reason' => 'Synthetic clinician recommends a two-month review interval.',
+        ])->assertOk()->assertJsonPath('saved', true);
+        $day = WorkerClock::today()->toDateString();
+        $response = $this->actingAs($this->admin)->postJson('/emar/reviews', [
+            'client_id' => $this->client->id, 'review_type' => 'regular',
+            'scheduled_date' => $day, 'owner_id' => $this->admin->id,
+        ])->assertOk()->assertJsonPath('saved', true);
+        $review = MedicationReview::query()->findOrFail($response->json('review_id'));
 
-        $review = MedicationReview::query()->create([
-            'client_id' => $this->client->id,
-            'review_type' => 'routine',
-            'status' => 'scheduled',
-            'scheduled_date' => today(),
-            'requested_by' => $this->admin->id,
-        ]);
+        $this->actingAs($this->admin)->postJson("/emar/reviews/{$review->id}/complete", [
+            'revision' => $review->revision, 'completed_date' => $day,
+            'reviewer_name' => 'Dr Synthetic Clinician', 'reviewer_role' => 'GP',
+            'review_location' => 'house',
+            'participants' => ['person' => 'took', 'whanau' => 'told', 'whanau_detail' => 'Synthetic guardian informed.'],
+            'clinical_summary' => 'Medicines reviewed with no changes.', 'items' => [],
+        ])->assertOk()->assertJsonPath('saved', true)->assertJsonPath('review_id', $review->id);
 
-        $this->actingAs($this->admin)
-            ->post("/emar/reviews/{$review->id}/complete", [
-                'clinical_summary' => 'Medicines reviewed with no changes.',
-            ])
-            ->assertRedirect();
-
-        $expected = today()->addMonthsNoOverflow(2)->toDateString();
+        $expected = WorkerClock::today()->addMonthsNoOverflow(2)->toDateString();
         $this->assertDatabaseHas('medication_reviews', [
-            'id' => $review->id,
-            'status' => 'completed',
-            'next_review_date' => $expected,
+            'id' => $review->id, 'status' => 'completed', 'next_review_date' => $expected,
+            'completed_by' => $this->admin->id, 'clinical_summary' => 'Medicines reviewed with no changes.',
         ]);
         $this->assertDatabaseHas('clients', [
-            'id' => $this->client->id,
+            'id' => $this->client->id, 'medication_review_interval_months' => 2,
             'next_chart_review_date' => $expected,
+        ]);
+        $next = MedicationReview::query()->where('client_id', $this->client->id)
+            ->where('review_type', 'regular')->where('status', 'scheduled')->sole();
+        $this->assertSame($expected, $next->scheduled_date->toDateString());
+        $this->assertSame($this->admin->id, $next->owner_id);
+        $this->assertDatabaseHas('medication_review_events', [
+            'client_id' => $this->client->id, 'review_id' => null, 'event' => 'interval_changed', 'actor_id' => $this->admin->id,
+        ]);
+        $this->assertDatabaseHas('medication_review_events', [
+            'review_id' => $review->id, 'event' => 'completed', 'actor_id' => $this->admin->id,
         ]);
     }
 
@@ -538,6 +569,48 @@ class OneChartGovernanceWorkflowTest extends TestCase
         $this->assertSame('Antibacterials for systemic use', $report['records'][0]['pharmac_therapeutic_group']);
     }
 
+    /**
+     * Capture every persisted column, including defaults and private evidence.
+     * JSON object key order is storage formatting; its values and list order count.
+     *
+     * @return array<string, mixed>
+     */
+    private function persistedEvidence(Model $record): array
+    {
+        $record = $record->fresh();
+        $this->assertNotNull($record);
+        $attributes = $record->getRawOriginal();
+        foreach ($attributes as $key => $value) {
+            if ($value !== null && $record->hasCast($key, ['array', 'json', 'object', 'collection'])) {
+                $attributes[$key] = json_encode(
+                    $this->canonicalJson(json_decode($value, false, 512, JSON_THROW_ON_ERROR)),
+                    JSON_THROW_ON_ERROR,
+                );
+            }
+        }
+        ksort($attributes);
+
+        return $attributes;
+    }
+
+    private function canonicalJson(mixed $value): mixed
+    {
+        if ($value instanceof \stdClass) {
+            $properties = get_object_vars($value);
+            ksort($properties);
+            foreach ($properties as $key => $property) {
+                $properties[$key] = $this->canonicalJson($property);
+            }
+
+            return (object) $properties;
+        }
+        if (is_array($value)) {
+            return array_map(fn (mixed $item) => $this->canonicalJson($item), $value);
+        }
+
+        return $value;
+    }
+
     private function createMedication(array $overrides = []): ClientMedication
     {
         return ClientMedication::query()->create(array_merge([
@@ -582,6 +655,9 @@ class OneChartGovernanceWorkflowTest extends TestCase
             'expiry_date' => today()->addYear(),
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'controlled_drugs' => true,
+            'restricted' => false,
+            'not_seen_areas' => [],
             'can_witness_controlled' => true,
         ]);
         $presenceClient = (int) $site->id === (int) $this->client->site_id
