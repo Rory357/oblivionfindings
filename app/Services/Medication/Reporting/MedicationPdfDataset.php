@@ -6,9 +6,9 @@ use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
-use App\Services\Medication\ClientAllergyRecordService;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonPeriod;
@@ -29,7 +29,9 @@ final class MedicationPdfDataset
             abort_unless(in_array($clientId, $clientIds, true), 404);
             $clientIds = [$clientId];
         }
-        $result = ['title' => match ($type) { 'mar' => 'Medication Administration Record', 'cd_register' => 'Controlled Drug Register', default => 'Round Sheet' }, 'scope' => Site::query()->whereIn('id', $sites)->orderBy('id')->pluck('name')->implode(', '), 'period' => [$period->from, $period->to], 'chart' => [], 'dates' => [], 'orders' => [], 'allergies' => [], 'columns' => [], 'rows' => [], 'notes' => []];
+        $result = ['title' => match ($type) {
+            'mar' => 'Medication Administration Record', 'cd_register' => 'Controlled Drug Register', default => 'Round Sheet'
+        }, 'scope' => Site::query()->whereIn('id', $sites)->orderBy('id')->pluck('name')->implode(', '), 'period' => [$period->from, $period->to], 'chart' => [], 'dates' => [], 'orders' => [], 'allergies' => [], 'columns' => [], 'rows' => [], 'notes' => []];
         if ($type === 'mar') {
             abort_unless($clientId, 422, 'Choose one person for a MAR chart.');
             $client = Client::findOrFail($clientId);

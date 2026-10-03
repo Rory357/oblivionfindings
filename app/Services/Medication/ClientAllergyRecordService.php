@@ -8,6 +8,7 @@ use App\Models\MedicationAllergy;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * One read of a person's recorded allergies from both places staff record
@@ -93,13 +94,19 @@ class ClientAllergyRecordService
         $copied = [];
 
         foreach ($profile?->allergy_records ?? [] as $record) {
-            foreach ($record['source_register_ids'] ?? [] as $id) $copied[(int) $id] = true;
-            if (! empty($record['removed_at'])) continue;
+            foreach ($record['source_register_ids'] ?? [] as $id) {
+                $copied[(int) $id] = true;
+            }
+            if (! empty($record['removed_at'])) {
+                continue;
+            }
             $entries[] = [...$record, 'source' => self::SOURCE_PROFILE, 'allergy' => new MedicationAllergy(['client_id' => $clientId, 'allergen' => $record['allergen'] ?? '', 'severity' => $record['severity'] ?? null, 'reaction' => $record['reaction'] ?? null])];
         }
 
         foreach ($register as $allergy) {
-            if (isset($copied[(int) $allergy->id])) continue;
+            if (isset($copied[(int) $allergy->id])) {
+                continue;
+            }
             $entries[] = [
                 'key' => 'register-'.$allergy->id,
                 'allergen' => trim((string) $allergy->allergen),
@@ -140,6 +147,7 @@ class ClientAllergyRecordService
         foreach (['allergen', 'severity', 'reaction', 'notes', 'identified_date', 'identified_by', 'removed_at'] as $field) {
             $content[$field] = mb_strtolower(preg_replace('/\s+/u', ' ', trim((string) ($entry[$field] ?? ''))));
         }
+
         return hash('sha256', json_encode($content, JSON_THROW_ON_ERROR));
     }
 
@@ -149,14 +157,22 @@ class ClientAllergyRecordService
         $profile = ClientMedicalProfile::query()->where('client_id', $client->id)->lockForUpdate()->first() ?? new ClientMedicalProfile(['client_id' => $client->id]);
         $records = $profile->allergy_records ?? [];
         $copied = [];
-        foreach ($records as $record) foreach ($record['source_register_ids'] ?? [] as $id) $copied[(int) $id] = true;
+        foreach ($records as $record) {
+            foreach ($record['source_register_ids'] ?? [] as $id) {
+                $copied[(int) $id] = true;
+            }
+        }
         $incoming = [];
         foreach (MedicationAllergy::withTrashed()->where('client_id', $client->id)->orderBy('id')->lockForUpdate()->get() as $source) {
-            if (isset($copied[(int) $source->id])) continue;
+            if (isset($copied[(int) $source->id])) {
+                continue;
+            }
             $incoming[] = ['key' => 'register-'.$source->id, 'allergen' => $source->allergen, 'severity' => $source->severity, 'reaction' => $source->reaction, 'notes' => $source->notes, 'identified_date' => $source->identified_date?->toDateString(), 'identified_by' => $source->identified_by, 'source_recorded_by' => $source->recorded_by, 'source_register_ids' => [$source->id], 'source_evidence' => [$source->getAttributes()], 'removed_at' => $source->deleted_at?->toIso8601String()];
         }
         if (! $profile->allergies_canonical_at) {
-            foreach ($this->profileAllergens($profile) as $index => $label) $incoming[] = ['key' => 'profile-'.$index, 'allergen' => $label, 'severity' => null, 'reaction' => null, 'notes' => null, 'source_profile_values' => $profile->allergies, 'source_register_ids' => [], 'removed_at' => null];
+            foreach ($this->profileAllergens($profile) as $index => $label) {
+                $incoming[] = ['key' => 'profile-'.$index, 'allergen' => $label, 'severity' => null, 'reaction' => null, 'notes' => null, 'source_profile_values' => $profile->allergies, 'source_register_ids' => [], 'removed_at' => null];
+            }
         }
         foreach ($incoming as $entry) {
             $matching = array_search($this->entryKey($entry), array_map(fn ($record) => $this->entryKey($record), $records), true);
@@ -165,15 +181,22 @@ class ClientAllergyRecordService
             } else {
                 $records[$matching]['source_register_ids'] = array_values(array_unique([...($records[$matching]['source_register_ids'] ?? []), ...$entry['source_register_ids']]));
                 $records[$matching]['source_evidence'] = [...($records[$matching]['source_evidence'] ?? []), ...($entry['source_evidence'] ?? [])];
-                if (array_key_exists('source_profile_values', $entry)) $records[$matching]['source_profile_values'] = $entry['source_profile_values'];
+                if (array_key_exists('source_profile_values', $entry)) {
+                    $records[$matching]['source_profile_values'] = $entry['source_profile_values'];
+                }
             }
         }
         $profile->allergy_records = $records;
-        if ($incoming !== [] || ! $profile->allergies_canonical_at) $this->clearReview($profile);
+        if ($incoming !== [] || ! $profile->allergies_canonical_at) {
+            $this->clearReview($profile);
+        }
         $profile->allergies_canonical_at ??= now();
         // Compatibility labels are a projection, never a second clinical list.
         $profile->allergies = collect($records)->filter(fn ($entry) => empty($entry['removed_at']))->pluck('allergen')->unique()->values()->all();
-        if (! $profile->exists || $profile->isDirty()) $profile->saveOrFail();
+        if (! $profile->exists || $profile->isDirty()) {
+            $profile->saveOrFail();
+        }
+
         return $profile;
     }
 
@@ -182,6 +205,7 @@ class ClientAllergyRecordService
         $entries = $this->forClient($client);
         $profile = ClientMedicalProfile::query()->where('client_id', $client->id)->first();
         $reviewed = $profile?->allergies_reviewed_at && hash_equals((string) $profile->allergies_review_digest, $this->digest($entries));
+
         return [
             'status' => $entries ? 'recorded' : ($reviewed && $profile->allergies_review_status === 'no_known' ? 'no_known' : 'none'),
             'entries' => array_map(fn ($entry) => array_intersect_key($entry, array_flip(['key', 'allergen', 'severity', 'reaction', 'notes', 'identified_date', 'identified_by', 'source'])), $entries),
@@ -194,6 +218,7 @@ class ClientAllergyRecordService
     {
         $keys = array_map(fn ($entry) => $this->entryKey($entry), $entries);
         sort($keys, SORT_STRING);
+
         return hash('sha256', json_encode($keys, JSON_THROW_ON_ERROR));
     }
 
@@ -206,10 +231,12 @@ class ClientAllergyRecordService
     public function guardLegacyEdit(Client $client, mixed $labels): void
     {
         $profile = ClientMedicalProfile::query()->where('client_id', $client->id)->first();
-        if (! $profile?->allergies_canonical_at) return;
+        if (! $profile?->allergies_canonical_at) {
+            return;
+        }
         $normalize = fn ($values) => collect(is_array($values) ? $values : (filled($values) ? [$values] : []))->map(fn ($value) => mb_strtolower(trim((string) $value)))->sort()->values()->all();
         if ($normalize($labels) !== $normalize($profile->allergies)) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['allergies' => 'Edit allergies in the health profile’s Allergy record so reactions and review history are retained.']);
+            throw ValidationException::withMessages(['allergies' => 'Edit allergies in the health profile’s Allergy record so reactions and review history are retained.']);
         }
     }
 
@@ -217,7 +244,9 @@ class ClientAllergyRecordService
     private function profileAllergens(?ClientMedicalProfile $profile): array
     {
         $values = $profile?->allergies;
-        if (is_string($values)) $values = [$values];
+        if (is_string($values)) {
+            $values = [$values];
+        }
         if (! is_array($values)) {
             return [];
         }

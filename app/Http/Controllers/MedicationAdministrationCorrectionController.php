@@ -9,9 +9,9 @@ use App\Models\MedicationRefusalFollowup;
 use App\Models\MedicationRound;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
-use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
+use App\Services\Medication\Followups\MedicationFollowupService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\UserSiteAccessService;
@@ -21,8 +21,8 @@ use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class MedicationAdministrationCorrectionController extends Controller
 {
@@ -296,8 +296,11 @@ class MedicationAdministrationCorrectionController extends Controller
             facts: ['original_administration_id' => (int) $original->id, 'client_medication_id' => $medication?->id,
                 'correction_status' => $correction->correction_status, 'requested_by' => $correction->correction_requested_by ?? $correction->administered_by],
             clientId: (int) $client->id, controlled: (bool) $medication?->controlled_drug);
-        if ($auditEvents !== null) $auditEvents[] = $event;
-        else app(MedicationEventRecorder::class)->append($event);
+        if ($auditEvents !== null) {
+            $auditEvents[] = $event;
+        } else {
+            app(MedicationEventRecorder::class)->append($event);
+        }
     }
 
     private function withCanonicalCorrection(

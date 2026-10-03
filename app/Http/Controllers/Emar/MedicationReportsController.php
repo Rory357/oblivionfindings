@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Emar;
 
-use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\SanitizesCsvOutput;
+use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\User;
@@ -13,13 +13,14 @@ use App\Services\Medication\Audit\MedicationEventReader;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\Reporting\MedicationExportAudit;
+use App\Services\Medication\Reporting\MedicationPdfDataset;
 use App\Services\Medication\Reporting\MedicationReportAccess;
 use App\Services\Medication\Reporting\MedicationReportDataset;
 use App\Services\Medication\Reporting\MedicationReportPeriod;
-use App\Services\Medication\Reporting\MedicationPdfDataset;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -27,6 +28,7 @@ use Inertia\Inertia;
 class MedicationReportsController extends Controller
 {
     use SanitizesCsvOutput;
+
     public function __construct(private readonly MedicationReportAccess $access, private readonly MedicationReportDataset $datasets, private readonly MedicationEventReader $events) {}
 
     public function index(Request $request)
@@ -231,6 +233,7 @@ class MedicationReportsController extends Controller
                 $rows = array_values(array_filter($rows, fn ($row) => $row['reached'] === $data['reached']));
             }
         }
+
         return $rows;
     }
 
@@ -246,6 +249,6 @@ class MedicationReportsController extends Controller
 
     private function paginate(array $rows, Request $request): array
     {
-        return (new \Illuminate\Pagination\LengthAwarePaginator(array_slice($rows, max(0, $request->integer('page', 1) - 1) * 50, 50), count($rows), 50, $request->integer('page', 1), ['path' => $request->url(), 'query' => $request->query()]))->toArray();
+        return (new LengthAwarePaginator(array_slice($rows, max(0, $request->integer('page', 1) - 1) * 50, 50), count($rows), 50, $request->integer('page', 1), ['path' => $request->url(), 'query' => $request->query()]))->toArray();
     }
 }

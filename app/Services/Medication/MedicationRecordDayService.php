@@ -38,6 +38,7 @@ final class MedicationRecordDayService
                 if (! $includeControlled && $controlled) {
                     $hidden['total']++;
                     $hidden['overdue'] += ScheduledDoseStates::statusFor($dose, $record?->status) === 'overdue' ? 1 : 0;
+
                     continue;
                 }
                 $status = ScheduledDoseStates::statusFor($dose, $record?->status);
@@ -58,6 +59,7 @@ final class MedicationRecordDayService
                 ];
             }
         }
+
         return $rows;
     }
 
@@ -65,6 +67,7 @@ final class MedicationRecordDayService
     {
         $from = $day->copy()->utc();
         $to = $day->copy()->endOfDay()->utc();
+
         return ClientMedication::withTrashed()->whereIn('client_id', $clientIds)->where('is_prn', true)
             ->where(function ($orders) use ($day, $from, $to, $clientIds) {
                 $orders->where(function ($q) use ($day, $from, $to) {

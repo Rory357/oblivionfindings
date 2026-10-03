@@ -29,6 +29,7 @@ final class PersonMedicationCorrectionController extends Controller
             $receipt = MedicationIdempotencyResult::query()->where('scope', $scope)->where('request_uuid', $valid['request_uuid'])->lockForUpdate()->first();
             if ($receipt) {
                 abort_unless(hash_equals($receipt->response_payload['fingerprint'], $fingerprint), 409);
+
                 return $receipt->response_payload['result'];
             }
             $record = ClientMedicationAdministration::query()->where('client_id', $person->id)->findOrFail($administration);
@@ -42,8 +43,10 @@ final class PersonMedicationCorrectionController extends Controller
             $result = ['saved' => true];
             MedicationIdempotencyResult::query()->create(['scope' => $scope, 'request_uuid' => $valid['request_uuid'], 'response_payload' => ['fingerprint' => $fingerprint, 'result' => $result], 'expires_at' => now()->addDays(30)]);
             app(MedicationEventRecorder::class)->appendMany($events);
+
             return $result;
         }), 5);
+
         return response()->json($result)->header('Cache-Control', 'private, no-store');
     }
 }

@@ -6,13 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
-use App\Services\Medication\ClientAllergyRecordService;
 use App\Models\MedicationRound;
+use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class EmarPdfController extends Controller
@@ -100,7 +101,7 @@ class EmarPdfController extends Controller
     }
 
     /** Retained orders overlapping this period or containing actual dose evidence. */
-    private function ordersForPeriod(Client $client, string $from, string $to, Carbon $fromUtc, Carbon $toUtc, string $recordTime): \Illuminate\Database\Eloquent\Builder
+    private function ordersForPeriod(Client $client, string $from, string $to, Carbon $fromUtc, Carbon $toUtc, string $recordTime): Builder
     {
         return ClientMedication::withTrashed()->where('client_id', $client->id)->where(function ($orders) use ($client, $from, $to, $fromUtc, $toUtc, $recordTime) {
             $orders->where(function ($order) use ($from, $to, $fromUtc, $toUtc) {

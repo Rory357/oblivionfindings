@@ -3,28 +3,32 @@
 namespace App\Http\Controllers\Emar;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientInrRecord;
+use App\Models\ClientMedicalProfile;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
-use App\Models\ClientMedicationAlert;
-use App\Models\MedicationInteraction;
-use App\Models\AuditLog;
 use App\Models\MedicationEvent;
+use App\Models\MedicationInteraction;
+use App\Models\MedicationOrderVersion;
 use App\Models\MedicationSelfAdminAssessment;
+use App\Models\MedicationSupportChange;
 use App\Models\MedicationSyringeDriver;
 use App\Models\User;
 use App\Services\MarScheduleService;
 use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationConcealment;
 use App\Services\Medication\MedicationGovernanceScopeService;
-use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationProfileAuditPrivacy;
+use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\MedicationRecordSafetyPrivacy;
+use App\Services\Medication\Support\MedicationSupport;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -172,16 +176,17 @@ class PersonMedicationRecordController extends Controller
         $actor = $this->actor($request);
         $client = $this->access->client($actor, $clientId);
         $orders = $this->orders($client)->keyBy('id');
-        $changes = \App\Models\MedicationSupportChange::query()->where('client_id', $client->id)
+        $changes = MedicationSupportChange::query()->where('client_id', $client->id)
             ->whereIn('client_medication_id', $orders->keys())
             ->with('recorder:id,name')->latest('effective_at')->latest('id')->limit(100)->get();
         $changes->each(fn ($change) => $change->setRelation('medication', $orders->get($change->client_medication_id)));
         $rows = MedicationConcealment::for($actor)->redact($changes,
             fn ($change) => (bool) $change->medication->controlled_drug,
             fn ($change) => ['concealed' => true, 'key' => 'support'.$change->id]);
+
         return $this->privateJson([
-            'plan' => app(\App\Services\Medication\Support\MedicationSupport::class)->summary($client, $actor),
-            'changes' => array_map(fn ($change) => $change instanceof \App\Models\MedicationSupportChange ? [
+            'plan' => app(MedicationSupport::class)->summary($client, $actor),
+            'changes' => array_map(fn ($change) => $change instanceof MedicationSupportChange ? [
                 'key' => (string) $change->id, 'medicine' => $change->medication->name,
                 'mode' => $change->mode, 'previous' => $change->previous_mode, 'reason' => $change->reason,
                 'notes' => $change->notes, 'at' => $change->effective_at->toIso8601String(), 'by' => $change->recorder?->name,
@@ -195,7 +200,7 @@ class PersonMedicationRecordController extends Controller
         $client = $this->access->client($actor, $clientId);
         $concealment = MedicationConcealment::for($actor);
         $allergies = collect(app(ClientAllergyRecordService::class)->forClient($client))->map(fn ($entry) => array_intersect_key($entry, array_flip(['allergen', 'severity', 'reaction', 'source'])))->values();
-        $hideText = app(\App\Services\Medication\MedicationRecordSafetyPrivacy::class)->hidesUnstructuredText($actor, $client);
+        $hideText = app(MedicationRecordSafetyPrivacy::class)->hidesUnstructuredText($actor, $client);
         $alerts = $client->medicationAlerts()->with(['createdBy:id,name', 'resolvedBy:id,name'])->orderByDesc('created_at')->get()->map(fn ($alert) => $hideText ? ['concealed' => true, 'key' => 'alert'.$alert->id] : [
             'key' => (string) $alert->id,
             'id' => $alert->id, 'type' => $alert->type, 'title' => $alert->title, 'detail' => $alert->detail,
@@ -210,6 +215,7 @@ class PersonMedicationRecordController extends Controller
             fn ($pair) => $names[mb_strtolower(trim($pair->medication_a))]->contains('controlled_drug', true) || $names[mb_strtolower(trim($pair->medication_b))]->contains('controlled_drug', true),
             fn ($pair) => ['concealed' => true, 'key' => 'pair'.$pair->id],
         );
+
         return $this->privateJson([
             'allergies' => app(ClientAllergyRecordService::class)->summary($client),
             'alerts' => $alerts, 'interactions' => ['rows' => array_map(fn ($row) => $row instanceof MedicationInteraction ? [
@@ -233,12 +239,18 @@ class PersonMedicationRecordController extends Controller
         $inrRows = $concealment->redact($inr, fn ($result) => (bool) $result->medication?->controlled_drug, fn ($result) => ['concealed' => true, 'key' => 'inr'.$result->id]);
         $drivers = MedicationSyringeDriver::query()->where('client_id', $client->id)->where('site_id', $client->site_id)->with(['commencedBy:id,name', 'checks.checkedBy:id,name'])->latest('commenced_at')->get()->map(function ($driver) use ($scope, $client, $concealment) {
             $contents = $scope->visibleSyringeDriverContents($client, $driver->contents ?? [], $concealment->canViewControlled());
-            if ($contents === null) return ['concealed' => true, 'key' => 'driver'.$driver->id];
+            if ($contents === null) {
+                return ['concealed' => true, 'key' => 'driver'.$driver->id];
+            }
+
             return ['key' => (string) $driver->id, 'id' => $driver->id, 'status' => $driver->status, 'commenced_at' => $driver->commenced_at?->toIso8601String(), 'by' => $driver->commencedBy?->name, 'rate' => $driver->rate, 'rate_unit' => $driver->rate_unit, 'contents' => $contents, 'site_of_insertion' => $driver->site_of_insertion, 'notes' => $driver->notes, 'checks' => $driver->checks->sortByDesc('checked_at')->map(fn ($check) => ['id' => $check->id, 'at' => $check->checked_at?->toIso8601String(), 'by' => $check->checkedBy?->name, 'running' => $check->infusion_running, 'site_condition' => $check->site_condition, 'volume_remaining' => $check->volume_remaining, 'notes' => $check->notes])->values()];
         });
-        $observations = $scope->scopeCanonicalClientMedicationRows(ClientMedicationAdministration::query()->effectiveClinicalEvidence()->where('client_id', $client->id), [(int) $client->site_id], false)->where(function ($query) { $query->whereNotNull('blood_glucose_level')->orWhereNotNull('pulse_bpm')->orWhereNotNull('blood_pressure_systolic')->orWhereNotNull('blood_pressure_diastolic'); })->with(['medication:id,client_id,name,controlled_drug', 'administeredBy:id,name'])->latest('administered_at')->limit(100)->get();
+        $observations = $scope->scopeCanonicalClientMedicationRows(ClientMedicationAdministration::query()->effectiveClinicalEvidence()->where('client_id', $client->id), [(int) $client->site_id], false)->where(function ($query) {
+            $query->whereNotNull('blood_glucose_level')->orWhereNotNull('pulse_bpm')->orWhereNotNull('blood_pressure_systolic')->orWhereNotNull('blood_pressure_diastolic');
+        })->with(['medication:id,client_id,name,controlled_drug', 'administeredBy:id,name'])->latest('administered_at')->limit(100)->get();
         $obsRows = $concealment->redact($observations, fn ($dose) => (bool) $dose->medication?->controlled_drug, fn ($dose) => ['concealed' => true, 'key' => 'obs'.$dose->id]);
         $orders = $this->orders($client)->filter(fn ($order) => $this->status($order) !== 'stopped' && ! $concealment->hides((bool) $order->controlled_drug));
+
         return $this->privateJson([
             'inr' => ['rows' => array_map(fn ($row) => $row instanceof ClientInrRecord ? ['key' => (string) $row->id, 'id' => $row->id, 'medicine' => $row->medication?->name, 'medicine_id' => $row->client_medication_id, 'value' => (float) $row->inr_value, 'tested' => $row->tested_on?->toDateString(), 'target_low' => $row->target_range_low === null ? null : (float) $row->target_range_low, 'target_high' => $row->target_range_high === null ? null : (float) $row->target_range_high, 'dose' => $row->dose_mg, 'next' => $row->next_test_date?->toDateString(), 'notes' => $row->notes, 'by' => $row->recordedBy?->name, 'disabled' => $row->disabled_at !== null, 'unlinked_reason' => $row->unlinked_reason, 'instruction' => $row->instruction, 'instruction_source' => $row->instruction_source, 'disabled_reason' => $row->disabled_reason] : $row, $inrRows['rows']), 'hidden' => $inrRows['hidden']],
             'drivers' => $drivers->values(),
@@ -258,8 +270,8 @@ class PersonMedicationRecordController extends Controller
         if (($data['view'] ?? '') === 'changes') {
             abort_unless($actor->canDo('medications.audit.view'), 403);
             $privacy = app(MedicationProfileAuditPrivacy::class);
-            $query = AuditLog::query()->where('client_id', $client->id)->whereIn('auditable_type', [ClientMedication::class, ClientMedicationAdministration::class, ClientInrRecord::class, \App\Models\MedicationOrderVersion::class, \App\Models\ClientMedicalProfile::class]);
-            $query->where(fn ($q) => $q->where('auditable_type', '!=', \App\Models\ClientMedicalProfile::class)->orWhereHasMorph('auditable', [\App\Models\ClientMedicalProfile::class], fn ($profile) => $profile->where('client_id', $client->id)));
+            $query = AuditLog::query()->where('client_id', $client->id)->whereIn('auditable_type', [ClientMedication::class, ClientMedicationAdministration::class, ClientInrRecord::class, MedicationOrderVersion::class, ClientMedicalProfile::class]);
+            $query->where(fn ($q) => $q->where('auditable_type', '!=', ClientMedicalProfile::class)->orWhereHasMorph('auditable', [ClientMedicalProfile::class], fn ($profile) => $profile->where('client_id', $client->id)));
             $legacy = $privacy->apply($query, $actor, $client, true)->reorder()->selectRaw("'legacy' AS source, id, created_at AS at");
             $events = MedicationEvent::query()->where('client_id', $client->id)->where('site_id', $client->site_id)->selectRaw("'event' AS source, id, occurred_at AS at");
             // Paginate both retained trails together; fetching only a page of
@@ -271,31 +283,42 @@ class PersonMedicationRecordController extends Controller
             $page->setCollection($page->getCollection()->map(function ($ref) use ($actor, $privacy, $legacyLogs, $eventLogs, $eventActors) {
                 if ($ref->source === 'event') {
                     $event = $eventLogs->get($ref->id);
-                    if (! $actor->canDo('medications.controlled.view') && $event->controlled) return ['concealed' => true, 'key' => 'event'.$event->id];
+                    if (! $actor->canDo('medications.controlled.view') && $event->controlled) {
+                        return ['concealed' => true, 'key' => 'event'.$event->id];
+                    }
+
                     return ['key' => 'event'.$event->id, 'action' => $event->kind, 'at' => $event->occurred_at->toIso8601String(), 'by' => $event->actor_id ? $eventActors->get($event->actor_id) : 'Automated', 'meta' => ['summary' => $event->summary, 'facts' => $event->facts, 'sequence' => $event->sequence, 'hash' => $event->hash, 'previous_hash' => $event->previous_hash]];
                 }
                 $log = $legacyLogs->get($ref->id);
                 $record = $log->auditable;
                 $controlled = $privacy->containsControlledSnapshot($log->meta) || (bool) ($record?->controlled_drug ?? false) || (bool) ($record?->medication?->controlled_drug ?? false);
-                if (! $actor->canDo('medications.controlled.view') && $controlled) return ['concealed' => true, 'key' => 'audit'.$log->id];
+                if (! $actor->canDo('medications.controlled.view') && $controlled) {
+                    return ['concealed' => true, 'key' => 'audit'.$log->id];
+                }
                 $meta = $log->meta;
-                if ($log->auditable_type === \App\Models\ClientMedicalProfile::class) {
+                if ($log->auditable_type === ClientMedicalProfile::class) {
                     // Medication access must not expose unrelated health notes
                     // from the older general profile audit snapshots.
                     $fields = ['allergies', 'allergy_records', 'allergies_reviewed_at', 'allergies_reviewed_by', 'allergies_review_status', 'allergies_review_method'];
                     $meta = ['fields' => array_values(array_intersect($meta['fields'] ?? [], $fields)), 'before' => array_intersect_key($meta['before'] ?? [], array_flip($fields)), 'after' => array_intersect_key($meta['after'] ?? [], array_flip($fields))];
                 }
+
                 return ['key' => 'audit'.$log->id, 'action' => $log->action, 'at' => $log->created_at?->toIso8601String(), 'by' => $log->user?->name, 'meta' => $meta];
             })->values());
+
             return $this->privateJson(['page' => $page]);
         }
         $scope = app(MedicationGovernanceScopeService::class);
         $query = $scope->scopeCanonicalClientMedicationRows(ClientMedicationAdministration::query()->where('client_id', $client->id), [(int) $client->site_id], false)->with(['medication:id,client_id,name,controlled_drug', 'administeredBy:id,name', 'correctionRequestedBy:id,name']);
-        if (($data['view'] ?? 'doses') === 'corrections') $query->where('is_correction', true);
-        else $query->effectiveClinicalEvidence();
+        if (($data['view'] ?? 'doses') === 'corrections') {
+            $query->where('is_correction', true);
+        } else {
+            $query->effectiveClinicalEvidence();
+        }
         $records = $query->latest('administered_at')->latest('id')->paginate(25);
         $concealment = MedicationConcealment::for($actor);
         $records->setCollection($records->getCollection()->map(fn ($dose) => $concealment->hides((bool) $dose->medication?->controlled_drug) ? ['concealed' => true, 'key' => 'dose'.$dose->id] : ['key' => (string) $dose->id, 'id' => $dose->id, 'medicine' => $dose->medication?->name, 'status' => $dose->status, 'at' => $dose->administered_at?->toIso8601String(), 'scheduled_for' => $dose->scheduled_for?->toIso8601String(), 'by' => $dose->administeredBy?->name, 'dose' => $dose->dose_given, 'reason' => $dose->reason, 'notes' => $dose->notes, 'is_correction' => (bool) $dose->is_correction, 'correction_status' => $dose->correction_status, 'correction_reason' => $dose->correction_reason, 'requested_by' => $dose->correction_requested_by ?? $dose->administered_by]));
+
         return $this->privateJson(['page' => $records, 'can_correct' => $actor->canDo('medications.administer.correct'), 'actor_id' => $actor->id]);
     }
 
@@ -323,6 +346,7 @@ class PersonMedicationRecordController extends Controller
         } finally {
             $original === null ? $request->query->remove('date') : $request->query->set('date', $original);
         }
+
         return $this->privateJson(['days' => $days]);
     }
 
@@ -332,11 +356,14 @@ class PersonMedicationRecordController extends Controller
         $person = $this->access->client($actor, $clientId);
         $scope = app(MedicationGovernanceScopeService::class);
         $query = $scope->scopeCanonicalClientMedicationRows(ClientMedicationAdministration::query()->where('client_id', $person->id), [(int) $person->site_id], false);
-        if (! $actor->canDo('medications.controlled.view')) $scope->scopeWithoutControlledMedicationRows($query);
+        if (! $actor->canDo('medications.controlled.view')) {
+            $scope->scopeWithoutControlledMedicationRows($query);
+        }
         $dose = (clone $query)->with(['medication', 'administeredBy:id,name', 'witnessedBy:id,name'])->findOrFail($administrationId);
         $rootId = $dose->corrected_of_id ?? $dose->id;
         $chain = (clone $query)->where('client_medication_id', $dose->client_medication_id)->where(fn ($q) => $q->whereKey($rootId)->orWhere('corrected_of_id', $rootId)->orWhere('reoffer_of_id', $rootId))->with(['administeredBy:id,name', 'correctionRequestedBy:id,name', 'correctionApprovedBy:id,name'])->orderBy('id')->get();
         $map = fn ($row) => ['id' => $row->id, 'medicine' => $row->medication?->name ?? $dose->medication->name, 'status' => $row->status, 'at' => $row->administered_at?->toIso8601String(), 'scheduled_for' => $row->scheduled_for?->toIso8601String(), 'by' => $row->administeredBy?->name, 'dose' => $row->dose_given, 'reason' => $row->reason, 'notes' => $row->notes, 'witness' => $row->witnessedBy?->name, 'is_correction' => (bool) $row->is_correction, 'correction_status' => $row->correction_status, 'correction_reason' => $row->correction_reason, 'requested_by' => $row->correction_requested_by ?? $row->administered_by, 'reviewed_by' => $row->correctionApprovedBy?->name, 'reviewed_at' => $row->correction_approved_at?->toIso8601String(), 'rejection_reason' => $row->correction_rejection_reason, 'glucose' => $row->blood_glucose_level, 'pulse' => $row->pulse_bpm, 'systolic' => $row->blood_pressure_systolic, 'diastolic' => $row->blood_pressure_diastolic];
+
         return $this->privateJson(['dose' => $map($dose), 'chain' => $chain->map($map)->values()]);
     }
 
@@ -444,7 +471,7 @@ class PersonMedicationRecordController extends Controller
     private function supportByMedicine(Client $client, ?MedicationSelfAdminAssessment $assessment = null): array
     {
         $support = [];
-        $policy = app(\App\Services\Medication\Support\MedicationSupport::class);
+        $policy = app(MedicationSupport::class);
         foreach ($this->orders($client) as $order) {
             $support[(int) $order->id] = self::SUPPORT[$policy->mode($order)] ?? 'administer';
         }

@@ -3,19 +3,19 @@
 namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
-use App\Models\Client;
 use App\Models\AuditLog;
+use App\Models\Client;
 use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\MedicationSyringeDriver;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Medication\MedicationProfileAuditPrivacy;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
-use Carbon\CarbonImmutable;
+use App\Services\Medication\MedicationProfileAuditPrivacy;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
@@ -26,7 +26,9 @@ class PersonMedicationRecordTest extends TestCase
     use RefreshDatabase;
 
     private Site $site;
+
     private Client $person;
+
     private User $reader;
 
     protected function setUp(): void

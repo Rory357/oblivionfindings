@@ -27,6 +27,7 @@ class PersonMedicationCommandsTest extends TestCase
     use RefreshDatabase;
 
     private Client $person;
+
     private User $lead;
 
     protected function setUp(): void
@@ -213,6 +214,7 @@ class PersonMedicationCommandsTest extends TestCase
     private function correctionOriginal(): ClientMedicationAdministration
     {
         $med = ClientMedication::create(['client_id' => $this->person->id, 'name' => 'Paracetamol', 'dosage' => '1 tablet', 'state' => 'active', 'active' => true]);
+
         return ClientMedicationAdministration::create(['client_id' => $this->person->id, 'client_medication_id' => $med->id, 'administered_by' => $this->lead->id, 'administered_at' => now(), 'status' => 'given', 'dose_given' => '1 tablet', 'notes' => 'Original note']);
     }
 
@@ -222,6 +224,7 @@ class PersonMedicationCommandsTest extends TestCase
         $requester = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
         $correction = $original->replicate();
         $correction->forceFill(['is_correction' => true, 'corrected_of_id' => $original->id, 'correction_requested_by' => $requester->id, 'correction_status' => 'pending', 'correction_reason' => 'Clarify note', 'notes' => 'Corrected note'])->save();
+
         return $correction;
     }
 
