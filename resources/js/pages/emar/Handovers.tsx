@@ -457,7 +457,7 @@ export default function Handovers({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="eMAR - Medication Handovers" />
+            <Head title="Medication handovers" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
                     rail={<EmarHubRail />}

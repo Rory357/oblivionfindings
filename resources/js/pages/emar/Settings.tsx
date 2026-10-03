@@ -12,6 +12,7 @@ import {
     PageHeaderSearch,
     PageHeaderStatusChip,
 } from '@/components/page/page-header';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import { formatTime } from '@/lib/datetime';
 import { Sections } from '@/pages/fleet-assets/settings/_ui';
@@ -224,6 +225,7 @@ const DirtyDot = () => (
 );
 
 export default function EmarSettings(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const { witnessPin, settingsAccess, readOnlyAudit, alertAccess } = props;
     // The settings, with the names alert values list and house names, so
     // every change reads in words (P11 B2).
@@ -882,13 +884,7 @@ export default function EmarSettings(props: Props) {
         ) : null;
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Home', href: '/dashboard' },
-                { title: 'Medication', href: '/emar' },
-                { title: 'Settings', href: '/emar/settings' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medication settings" />
             <SettingsCtx.Provider value={ctx}>
                 <div className="space-y-5">

@@ -516,7 +516,7 @@ export default function MedicationErrors({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="eMAR - Medication Errors" />
+            <Head title="Medication errors" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
                     rail={<EmarHubRail />}

@@ -555,7 +555,7 @@ export default function Reviews({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="eMAR - Medication Reviews" />
+            <Head title="Medication reviews" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
                     rail={<EmarHubRail />}

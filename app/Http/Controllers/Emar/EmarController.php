@@ -46,6 +46,7 @@ use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\MarLinkService;
+use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationGovernanceScopeService;
@@ -116,6 +117,12 @@ class EmarController extends Controller
     private function marLinks(): MarLinkService
     {
         return $this->marLinks ??= app(MarLinkService::class);
+    }
+
+    /** The one per-person medication-record gate (P02). */
+    private function recordAccess(): MedicationRecordAccess
+    {
+        return app(MedicationRecordAccess::class);
     }
 
     /**
@@ -1309,12 +1316,7 @@ class EmarController extends Controller
             $selectedClient = Client::query()
                 ->whereIn('site_id', $allowedSiteIds)
                 ->find($requestedClientId);
-            abort_unless(
-                $selectedClient !== null
-                    && Gate::forUser($actor)->allows('viewMedications', $selectedClient),
-                404,
-                'The requested medication record was not found.',
-            );
+            $this->recordAccess()->assertReadable($actor, $selectedClient);
             $selectedClient->load($marWith);
         } else {
             $defaultClientId = $this->defaultMarClientId($request, $clients);
@@ -2278,7 +2280,7 @@ class EmarController extends Controller
     {
         $actor = $request->user();
         abort_unless($actor, 403);
-        $medication = $this->governanceScope->readableMedication($actor, (int) $medication->id);
+        $medication = $this->recordAccess()->medication($actor, (int) $medication->id);
         $canViewControlled = $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
         abort_if($medication->controlled_drug && ! $canViewControlled, 404);
 
@@ -2396,6 +2398,16 @@ class EmarController extends Controller
         );
         $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
         $canViewControlled = $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
+        // People, not a whole house: the register lists the medicines of the
+        // people whose record this user may open; a named person must pass
+        // the same per-person gate (404 otherwise).
+        if ($clientFilter !== null) {
+            $this->recordAccess()->client($user, $clientFilter);
+        }
+        $readableClientIds = $this->recordAccess()->readableClientIds(
+            $user,
+            Client::query()->whereIn('site_id', $readerSiteIds)->pluck('id'),
+        );
 
         // Flat register of current (non-superseded) medications — the redesigned
         // page filters by tab/search/client/sort entirely client-side, with live
@@ -2403,6 +2415,7 @@ class EmarController extends Controller
         $meds = ClientMedication::query()
             ->current()
             ->whereHas('client', fn ($query) => $query->whereIn('site_id', $readerSiteIds))
+            ->whereIn('client_id', $readableClientIds)
             ->when(! $canViewControlled, fn ($query) => $query->where('controlled_drug', false))
             ->with([
                 'client:id,first_name,last_name,site_id',
@@ -3426,10 +3439,17 @@ class EmarController extends Controller
         );
         $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
         $canViewControlled = $actor->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
+        // People, not a whole house (P02): only the assessments of people
+        // whose medication record this user may open.
+        $readableClientIds = $this->recordAccess()->readableClientIds(
+            $actor,
+            Client::query()->whereIn('site_id', $accessibleSiteIds)->pluck('id'),
+        );
 
         $models = MedicationSelfAdminAssessment::query()
             ->with(['client:id,first_name,last_name,nhi_number,site_id', 'client.site:id,name', 'assessor:id,name', 'agreementSigner:id,name'])
             ->whereHas('client', fn ($client) => $client->whereIn('site_id', $readerSiteIds))
+            ->whereIn('client_id', $readableClientIds)
             ->latest('assessment_date')
             ->limit(300)
             ->get();
@@ -3483,7 +3503,9 @@ class EmarController extends Controller
                 'unsigned' => $live->whereIn('outcome', ['independent', 'prompted'])->whereNull('agreement_signed_at')->count(),
                 'total' => $live->count(),
             ],
-            'clients' => $this->governanceScope->clientPicker($accessibleSiteIds),
+            'clients' => $this->governanceScope->clientPicker($accessibleSiteIds)
+                ->whereIn('id', $readableClientIds)
+                ->values(),
             'staff' => $this->governanceScope->staffPicker($accessibleSiteIds),
             'sites' => $sites->map(fn (Site $site) => $site->only(['id', 'name']))->values(),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
