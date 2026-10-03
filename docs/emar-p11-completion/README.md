@@ -49,7 +49,10 @@ Bell seam is one ordering call in HandleInertiaRequests. Consent seams are the a
 - First completion run: 1 genuine failure (missing numeric `off` metadata), fixed; 7 environment warnings; 50 assertions. See `p11-completion-php.log`.
 - Pure Settings model: 11 tests passed in `p11-model-unit.log`, including simultaneous policy duration drafts and Alerts-view confirmation behavior.
 - Scoped PHP syntax: 15 files passed (`php-lint.log`). Frontend syntax checked for the scoped changed TS/TSX files; this is not a combined typecheck/build or browser verification.
-- Focused functional regressions are queued through the existing machine-wide FIFO wrapper. Results will be appended here when complete.
+- Initial broad focused run: 104 cases had no assertion failures and one bell-order case failed (1347 assertions total). The failure showed that the notification relation already applies date ordering; the corrected pinning path now clears that ordering before applying the priority, with the caller adding date ordering afterward. The environment warnings came from the missing local testing environment file, which has been supplied.
+- Alert-log lifecycle and pure Settings model: 15 tests passed across two files (`p11-alert-log-ui-unit.log`), covering supplied-page pagination, partial reloads, stale success/error cancellation, retry with draft preservation, and concealed-row defence.
+- P09 event integration is included in this follow-up candidate. Original recorder dependency `466ce69df138cf20faac4ace81cdc26da1f03b2e` was cherry-picked locally as `fb540af09`; Main should integrate the original prerequisite once. Saves/keep and on-call changes append last inside their five-attempt transaction, use canonical subjects and omit contact/value secrets. Tests cover per-Site fan-out, unchanged/stale requests, and full rollback.
+- Corrected focused functional regressions are queued through the existing machine-wide FIFO wrapper. An earlier attempt stopped before executing tests because the runner rejected `--no-ansi`; this candidate is not yet backend-verified. Final results will be recorded separately.
 
 ## Integration dependencies / remaining verification
 

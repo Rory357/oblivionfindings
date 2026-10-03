@@ -26,6 +26,7 @@ use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\RoundTemplateCatalogue;
 use App\Services\Medication\Settings\EmergencyAccessPolicySettings;
 use App\Services\Medication\Settings\MedicationSettingDefinition;
+use App\Services\Medication\Settings\MedicationSettingsEvents;
 use App\Services\Medication\Settings\MedicationSettingsRegistry;
 use App\Services\Medication\Settings\MedicationSettingsStore;
 use App\Services\Medication\Settings\MedicineRuleScope;
@@ -131,7 +132,7 @@ class MedicationSettingsController extends Controller
             $this->assertQuietHoursConsistent($changes);
 
             return $this->settingsStore->apply($lockedActor, $changes, (bool) ($validated['confirm_loosening'] ?? false));
-        }, 3);
+        }, 5);
 
         $message = $result['saved'] === 0
             ? 'Nothing was saved — these settings already had those values.'
@@ -174,7 +175,7 @@ class MedicationSettingsController extends Controller
             $this->assertCurrentSettingsAuthority($lockedActor, $items);
 
             return $this->settingsStore->keep($lockedActor, $items);
-        }, 3);
+        }, 5);
 
         $message = $kept === 1
             ? 'Kept today’s value for “'.$items[0]['definition']->label.'”. It now shows as reviewed.'
@@ -925,14 +926,15 @@ class MedicationSettingsController extends Controller
             if ($before === $after) {
                 return;
             }
-            $this->settingsStore->recordOnCallChange($lockedActor, (int) $site->id, 'On-call contact', $before, $after, false, 'medications.oncall_contact.updated');
+            $change = $this->settingsStore->recordOnCallChange($lockedActor, (int) $site->id, 'On-call contact', $before, $after, false, 'medications.oncall_contact.updated');
             AuditLogger::logOrFail('medications.oncall_contact.updated', $rule, [
                 'actor_id' => (int) $lockedActor->id,
                 'site_id' => (int) $site->id,
                 'before' => $before,
                 'after' => $after,
             ]);
-        }, 3);
+            app(MedicationSettingsEvents::class)->onCall($lockedActor, $rule, $change, false);
+        }, 5);
 
         return redirect()->back()->with('medication_settings_saved', 'On-call contact saved for '.$site->name.'.');
     }
@@ -952,13 +954,14 @@ class MedicationSettingsController extends Controller
             }
             $before = app(OnCallResolver::class)->describe($rule);
             $rule->delete();
-            $this->settingsStore->recordOnCallChange($lockedActor, (int) $site->id, 'On-call contact removed', $before, 'Not configured', true, 'medications.oncall_contact.removed');
+            $change = $this->settingsStore->recordOnCallChange($lockedActor, (int) $site->id, 'On-call contact removed', $before, 'Not configured', true, 'medications.oncall_contact.removed');
             AuditLogger::logOrFail('medications.oncall_contact.removed', null, [
                 'actor_id' => (int) $lockedActor->id,
                 'site_id' => (int) $site->id,
                 'before' => $before,
             ]);
-        }, 3);
+            app(MedicationSettingsEvents::class)->onCall($lockedActor, $rule, $change, true);
+        }, 5);
 
         return redirect()->back()->with('medication_settings_saved', 'On-call contact removed for '.$site->name.'. Screens show “Not configured” again.');
     }

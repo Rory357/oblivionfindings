@@ -783,7 +783,7 @@ export default function EmarSettings(props: Props) {
                     Organisation
                 </PageHeaderStatusChip>
             }
-            subline={`Medication rules and house settings · ${accessText} · times in NZDT (Pacific/Auckland)`}
+            subline={`Medication rules and house settings · ${accessText} · times in Pacific/Auckland`}
             actions={
                 <>
                     <PageHeaderSearch
@@ -816,7 +816,7 @@ export default function EmarSettings(props: Props) {
                     <PageHeaderFilterButton
                         icon={RefreshCw}
                         onClick={refresh}
-                        aria-label={`Updated ${formatTime(loadedAt)} NZDT — refresh`}
+                        aria-label={`Updated ${formatTime(loadedAt)} Pacific/Auckland — refresh`}
                     >
                         Updated {formatTime(loadedAt)}
                     </PageHeaderFilterButton>

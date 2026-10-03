@@ -164,7 +164,7 @@ class MedicationSettingsStore
                 'saved' => count($planned),
                 'effect' => $this->registry->group($planned[0]['definition']->group)?->effect,
             ];
-        });
+        }, 5);
     }
 
     /**
@@ -197,7 +197,7 @@ class MedicationSettingsStore
             $this->record($actor, MedicationSettingChange::ACTION_KEPT, $planned, $revision);
 
             return count($planned);
-        });
+        }, 5);
     }
 
     /**
@@ -426,6 +426,7 @@ class MedicationSettingsStore
             $this->write($p['definition'], $p['site_id'], $p['value']);
         }
 
+        $eventChanges = [];
         foreach ($byGroup as $slot => $items) {
             $first = $items->first();
             $group = $this->registry->group($first['definition']->group);
@@ -446,6 +447,10 @@ class MedicationSettingsStore
                 'audit_event' => $group->auditEvent,
             ])->id)->values()->all();
 
+            array_push($eventChanges, ...$items->values()->map(fn (array $p, int $i): array => [
+                'site_id' => $p['site_id'], 'group' => $p['definition']->group, 'key' => $p['definition']->key, 'change_id' => $changeIds[$i],
+            ])->all());
+
             AuditLogger::logOrFail($group->auditEvent, null, [
                 'actor_id' => $actor->id,
                 'action' => $action,
@@ -459,6 +464,8 @@ class MedicationSettingsStore
         }
 
         $revision->update(['value' => ((int) $revision->value) + 1]);
+        // Last operation: failures roll back values, review markers, history and audits.
+        app(MedicationSettingsEvents::class)->settings($actor, $action, (int) $revision->value, $eventChanges);
     }
 
     private function write(MedicationSettingDefinition $definition, ?int $siteId, string $value): void
