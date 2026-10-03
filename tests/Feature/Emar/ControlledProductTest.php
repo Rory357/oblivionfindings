@@ -236,7 +236,11 @@ class ControlledProductTest extends TestCase
         $service = app(ControlledRegisterService::class);
         $this->actingAs($this->recorder);
         $result = $service->perform($this->recorder, 'loss_report', $input);
-        $this->assertSame($result, $service->perform($this->recorder->fresh(), 'loss_report', $input));
+        $replayed = $service->perform($this->recorder->fresh(), 'loss_report', $input);
+        // JSON object key order is not evidence; keep strict values and all keys.
+        ksort($result);
+        ksort($replayed);
+        $this->assertSame($result, $replayed);
         $loss = ControlledDrugLossReport::query()->sole();
         $this->assertSame($result['entry_id'], (int) $loss->register_entry_id);
         $this->assertSame('8.00', $this->stock->refresh()->on_hand);
@@ -571,7 +575,11 @@ class ControlledProductTest extends TestCase
         $lossTemplate = ControlledDrugLossReport::findOrFail($lossId)->getAttributes();
         unset($lossTemplate['id']);
         $lossTemplate['investigation_status'] = 'resolved';
-        DB::table('controlled_drug_loss_reports')->insert(array_fill(0, 501, $lossTemplate));
+        $closedLosses = [];
+        for ($i = 0; $i < 501; $i++) {
+            $closedLosses[] = [...$lossTemplate, 'reference_number' => 'CDL-SYNTHETIC-CLOSED-'.$i];
+        }
+        DB::table('controlled_drug_loss_reports')->insert($closedLosses);
         $destructionTemplate = MedicationDestruction::findOrFail($destructionId)->getAttributes();
         unset($destructionTemplate['id']);
         $destructionTemplate['pharmacy_received_at'] = now()->toDateTimeString();

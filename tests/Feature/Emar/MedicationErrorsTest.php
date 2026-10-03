@@ -265,7 +265,10 @@ class MedicationErrorsTest extends TestCase
         ]);
 
         // Historical controlled classification still governs attachment props.
-        $controlledMedication->delete();
+        // Model a retained historical soft-deletion from before orders became append-only.
+        // Current order deletion remains forbidden.
+        DB::table('client_medications')->where('id', $controlledMedication->id)->update(['deleted_at' => now()]);
+        $this->assertTrue(ClientMedication::withTrashed()->findOrFail($controlledMedication->id)->trashed());
 
         $this->actingAs($viewer)
             ->get('/emar/errors?site_id='.$site->id)

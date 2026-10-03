@@ -136,7 +136,7 @@ class MedicationFollowupWorkflowTest extends TestCase
         [$original, $old] = $this->effect();
         $correction = ClientMedicationAdministration::query()->create([
             'client_id' => $this->client->id, 'client_medication_id' => $original->client_medication_id,
-            'status' => 'not_given', 'is_correction' => true, 'corrected_of_id' => $original->id,
+            'status' => 'withheld', 'reason' => 'Corrected evidence: the dose was withheld.', 'is_correction' => true, 'corrected_of_id' => $original->id,
             'administered_by' => $this->worker->id,
             'correction_status' => 'approved', 'correction_approved_at' => now(), 'administered_at' => now(),
         ]);

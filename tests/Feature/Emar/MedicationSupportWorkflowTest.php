@@ -238,6 +238,8 @@ class MedicationSupportWorkflowTest extends TestCase
     {
         $a = $this->assess('self_managed');
         $this->agree($a);
+        $legacy = $legacy->fresh();
+        $legacyScopeBefore = $legacy->med_scope;
         $this->travelTo(Carbon::parse('2026-10-03 10:00', 'Pacific/Auckland')->utc());
         DB::transaction(fn () => app(DoseSlotGenerator::class)->generateAhead($this->medicine));
         $scope = DoseSlotReaderScope::internal([$this->person->id]);
@@ -253,9 +255,10 @@ class MedicationSupportWorkflowTest extends TestCase
     {
         $this->travelTo(Carbon::parse('2026-10-03 10:00', 'Pacific/Auckland')->utc());
         foreach (['2026-10-02', '2026-10-03', '2026-10-04'] as $date) {
-            MedicationDoseSlot::query()->create([
-                'client_id' => $this->person->id, 'client_medication_id' => $this->medicine->id,
-                'nz_date' => $date, 'ordered_time' => '08:00',
+            MedicationDoseSlot::query()->updateOrCreate([
+                'client_medication_id' => $this->medicine->id, 'nz_date' => $date, 'ordered_time' => '08:00',
+            ], [
+                'client_id' => $this->person->id,
                 'due_at' => Carbon::parse($date.' 08:00', 'Pacific/Auckland')->utc(),
                 'self_managed' => true, 'generated_at' => now(), 'reconstructed' => true,
             ]);
@@ -329,7 +332,7 @@ class MedicationSupportWorkflowTest extends TestCase
         }
         $this->assertDatabaseCount('client_medication_administrations', 0);
         $this->assertSame('self_managed', $support->mode($this->medicine));
-        $this->assertSame($legacy->med_scope, $legacy->fresh()->med_scope);
+        $this->assertSame($legacyScopeBefore, $legacy->fresh()->med_scope);
     }
 
     public function test_unchanged_legacy_support_survives_reassessment_until_real_agreement_or_explicit_withdrawal(): void
@@ -484,6 +487,8 @@ class MedicationSupportWorkflowTest extends TestCase
         $this->actingAs($this->actor)->post(route('emar.errors.store'), [
             'client_id' => $this->person->id, 'client_medication_id' => $this->medicine->id,
             'error_type' => 'wrong_dose', 'severity' => 'minor', 'description' => 'Synthetic recorded error.',
+                'reached_client' => 'yes', 'harm_level' => 'none',
+                'occurred_at' => CarbonImmutable::now('Pacific/Auckland')->format('Y-m-d\TH:i'), 'report_token' => (string) Str::uuid(),
         ])->assertSessionHasNoErrors()->assertRedirect();
         $source = MedicationError::query()->sole();
         $receipt = MedicationSupportTriggerOutbox::query()->sole();
@@ -515,6 +520,8 @@ class MedicationSupportWorkflowTest extends TestCase
             $this->actingAs($this->actor)->post(route('emar.errors.store'), [
                 'client_id' => $this->person->id, 'client_medication_id' => $this->medicine->id,
                 'error_type' => 'wrong_dose', 'severity' => 'minor', 'description' => 'Synthetic rolled back error.',
+                'reached_client' => 'yes', 'harm_level' => 'none',
+                'occurred_at' => CarbonImmutable::now('Pacific/Auckland')->format('Y-m-d\TH:i'), 'report_token' => (string) Str::uuid(),
             ]);
             $this->fail('Expected receipt failure');
         } catch (\RuntimeException $error) {
