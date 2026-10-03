@@ -330,7 +330,10 @@ class P01MedsTodayBoardTest extends TestCase
         $this->assertNull($tasks[0]->assignee);
         $this->assertStringContainsString('view=schedule', $tasks[0]->link);
         $this->assertStringContainsString('A lead can assign', $tasks[0]->actionHelp);
-        $this->actingAs($this->worker)->postJson(route('meds.round.start', $round))->assertForbidden();
+        $before = $round->fresh()->getRawOriginal();
+        $this->actingAs($this->worker)->postJson(route('meds.round.start', $round))->assertNotFound();
+        $this->assertSame($before, $round->fresh()->getRawOriginal());
+        $this->assertDatabaseCount('client_medication_administrations', 0);
 
         $events = $provider->calendar($this->worker, now(self::TZ)->startOfDay(), now(self::TZ)->endOfDay());
         $this->assertCount(1, $events);

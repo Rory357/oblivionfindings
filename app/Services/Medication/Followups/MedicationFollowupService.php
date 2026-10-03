@@ -196,12 +196,25 @@ final class MedicationFollowupService
         }
     }
 
+    /** Read-only preflight conceals hidden sources before transport validation. */
+    public function assertAdministrationReadable(User $actor, int $administrationId, string $type = 'effect'): ClientMedicationAdministration
+    {
+        abort_unless(in_array($type, ['effect', 'reoffer'], true) && $actor->canDo('medications.administer.record') && $this->staff->isCurrent($actor), 403);
+        $administration = ClientMedicationAdministration::query()->effectiveClinicalEvidence()->with('medication')->findOrFail($administrationId);
+        $this->records->client($actor, (int) $administration->client_id);
+        $medication = $administration->medication;
+        abort_unless($medication && (int) $medication->client_id === (int) $administration->client_id, 404);
+        abort_if($medication->controlled_drug && (! $actor->canDo('medications.controlled.view') || ! $actor->canDo('medications.controlled.record')), 404);
+        abort_unless($type === 'effect' ? $medication->is_prn && $administration->status === 'given'
+            : in_array($administration->status, ['refused', 'withheld'], true), 404);
+
+        return $administration;
+    }
+
     /** Prepare an existing source's canonical work, without recording an outcome. */
     public function prepareAdministration(User $actor, int $administrationId, string $type = 'effect'): MedicationFollowup
     {
-        abort_unless(in_array($type, ['effect', 'reoffer'], true) && $actor->canDo('medications.administer.record') && $this->staff->isCurrent($actor), 403);
-        $snapshot = ClientMedicationAdministration::query()->effectiveClinicalEvidence()->findOrFail($administrationId);
-        $this->records->client($actor, (int) $snapshot->client_id);
+        $snapshot = $this->assertAdministrationReadable($actor, $administrationId, $type);
 
         return DB::transaction(function () use ($actor, $snapshot, $type) {
             $client = Client::query()->whereKey($snapshot->client_id)->lockForUpdate()->firstOrFail();

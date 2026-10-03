@@ -13,6 +13,7 @@ use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationEvent;
+use App\Models\MedicationFollowup;
 use App\Models\MedicationStockLot;
 use App\Models\MedicationStockMovement;
 use App\Models\Permission;
@@ -35,6 +36,7 @@ use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use RuntimeException;
 use Tests\TestCase;
@@ -1426,6 +1428,8 @@ class WorkerMedsRecordDoseTest extends TestCase
                 'client_medication_administration_id' => $administration->id,
                 'effectiveness' => 'effective',
                 'observations' => 'Settled within half an hour.',
+                'request_uuid' => (string) Str::uuid(),
+                'revision' => 1,
             ])
             ->assertRedirect('/meds/today')
             ->assertSessionHas('success');
@@ -1436,15 +1440,16 @@ class WorkerMedsRecordDoseTest extends TestCase
             'reviewed_by' => $this->worker->id,
         ]);
 
-        // Re-recording revises the single register entry (updateOrCreate keyed
-        // on the administration) rather than blocking or duplicating it — the
-        // eMAR "Re-record effectiveness" action. (Updated: the duplicate path now
-        // succeeds with a revise message instead of the old "warning" no-op.)
+        // A new submission and current revision amend the retained effect row.
         $this->actingAs($this->worker)
             ->from('/meds/today')
             ->post('/meds/today/prn/effect', [
                 'client_medication_administration_id' => $administration->id,
                 'effectiveness' => 'not_effective',
+                'request_uuid' => (string) Str::uuid(),
+                'revision' => 2,
+                'told' => 'Shift lead',
+                'escalation_action' => 'Requested clinical review because the medicine did not help.',
             ])
             ->assertRedirect('/meds/today')
             ->assertSessionHas('success');
@@ -1503,6 +1508,8 @@ class WorkerMedsRecordDoseTest extends TestCase
         $this->actingAs($this->worker)->post('/meds/today/prn/effect', [
             'client_medication_administration_id' => $previousDay->id,
             'effectiveness' => 'effective',
+            'request_uuid' => (string) Str::uuid(),
+            'revision' => 1,
         ])->assertSessionHas('success');
         $this->get('/meds/today')->assertInertia(fn (Assert $page) => $page
             ->count('prn_follow_ups', 1)
@@ -1537,8 +1544,12 @@ class WorkerMedsRecordDoseTest extends TestCase
             'client_medication_administration_id' => $administration->id,
             'effectiveness' => 'effective',
             'observations' => 'Pain settled after the dose.',
+            'request_uuid' => (string) Str::uuid(),
+            'revision' => 1,
         ];
 
+        $before = $administration->fresh()->getRawOriginal();
+        $followupsBefore = MedicationFollowup::query()->orderBy('id')->get()->map->getRawOriginal()->all();
         foreach (['/meds/today/prn/effect', '/emar/prn/effectiveness'] as $endpoint) {
             $this->actingAs($this->worker)
                 ->post($endpoint, $payload)
@@ -1558,6 +1569,8 @@ class WorkerMedsRecordDoseTest extends TestCase
                 ->assertNotFound();
         }
         $this->assertDatabaseCount('medication_prn_effectiveness', 0);
+        $this->assertSame($before, $administration->fresh()->getRawOriginal());
+        $this->assertSame($followupsBefore, MedicationFollowup::query()->orderBy('id')->get()->map->getRawOriginal()->all());
 
         $this->grantPermissions($this->worker, ['medications.controlled.record']);
         $this->worker->unsetRelation('permissionOverrides')->unsetRelation('roles');

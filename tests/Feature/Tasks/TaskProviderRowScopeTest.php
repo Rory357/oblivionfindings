@@ -945,7 +945,11 @@ it('keeps list counts csv detail lookup reports my day and watchers in parity fo
             ->where('totals.open', count($visibleIds))
             ->where('totals.done', 0)
             ->where('modules', fn ($modules) => collect($modules)->pluck('key')->sort()->values()->all()
-                === collect(array_keys($matrix))->sort()->values()->all()));
+                === collect($visible)->pluck('source')->unique()->sort()->values()->all())
+            ->where('modules', fn ($modules) => collect($modules)->sum('open') === count($visibleIds))
+            ->where('sources', fn ($sources) => collect($sources)->pluck('key')->sort()->values()->all()
+                === collect(TaskAggregator::defaultProviders())->filter(fn ($provider) => $provider->canView($actor))
+                    ->map->sourceKey()->sort()->values()->all()));
 
     $csv = $this->actingAs($actor)->get('/tasks?format=csv')->assertOk()->streamedContent();
     foreach ($visible as $row) {
