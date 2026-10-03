@@ -197,7 +197,7 @@ final class ControlledProductPayload
                 ->join('clients as dose_owner', 'dose_owner.site_id', '=', 'controlled_witness_overrides.site_id')
                 ->whereColumn('dose_owner.id', 'client_medication_administrations.client_id')
                 ->whereColumn('controlled_witness_overrides.id', 'client_medication_administrations.witness_override_id')
-                ->whereJsonContains('controlled_witness_overrides.medicine_ids', DB::raw('client_medication_administrations.client_medication_id')));
+                ->whereJsonContains('controlled_witness_overrides.medicine_ids', DB::raw('JSON_ARRAY(client_medication_administrations.client_medication_id)')));
     }
 
     /** Outstanding records remain actionable even when completed history exceeds the display limit. */
