@@ -215,6 +215,8 @@ it('applies the error reporter and account scope before report builder and gover
     $actor = p09Reader('support_worker', $this->site);
     $id = Permission::where('key', 'medications.reports.view')->value('id');
     $actor->permissionOverrides()->syncWithoutDetaching([$id => ['allowed' => true]]);
+    $controlledPermission = Permission::where('key', 'medications.controlled.view')->firstOrFail();
+    $actor->permissionOverrides()->syncWithoutDetaching([$controlledPermission->id => ['allowed' => false]]);
     $actor = $actor->fresh();
     $other = p09Reader('coordinator', $this->site);
     $make = fn (array $extra = []) => App\Models\MedicationError::create(array_replace(['client_id' => $this->person->id, 'error_type' => 'wrong_dose', 'severity' => 'minor', 'reached_client' => 'yes', 'harm_level' => 'none', 'description' => 'Synthetic account', 'reported_by' => $other->id, 'occurred_at' => now(), 'reported_at' => now(), 'status' => 'resolved', 'workflow_stage' => 'actions'], $extra));
@@ -267,9 +269,9 @@ it('keeps proposed versions out of historical dose instructions and separates eq
     $actor = p09Reader('admin', $this->site);
     foreach (['1 tablet', '2 tablets'] as $dose) {
         $medicine = p09Medicine($this->person);
-        $version = App\Models\MedicationOrderVersion::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'version_number' => 1, 'name' => 'Synthetic medicine', 'dosage' => $dose, 'route' => 'oral', 'changed_at' => now()->subDay()]);
+        $version = App\Models\MedicationOrderVersion::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'version_number' => 1, 'name' => 'Synthetic medicine', 'dosage' => $dose, 'route' => 'oral', 'changed_by' => $actor->id, 'changed_at' => now()->subDay()]);
         App\Models\MedicationOrderRevision::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'medication_order_version_id' => $version->id, 'base_version' => 1, 'status' => 'checked', 'checked_at' => now()->subDay(), 'entered_by' => $actor->id]);
-        $proposal = App\Models\MedicationOrderVersion::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'version_number' => 2, 'name' => 'Synthetic medicine', 'dosage' => '99 tablets', 'route' => 'oral', 'changed_at' => now()]);
+        $proposal = App\Models\MedicationOrderVersion::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'version_number' => 2, 'name' => 'Synthetic medicine', 'dosage' => '99 tablets', 'route' => 'oral', 'changed_by' => $actor->id, 'changed_at' => now()]);
         App\Models\MedicationOrderRevision::create(['client_id' => $this->person->id, 'client_medication_id' => $medicine->id, 'medication_order_version_id' => $proposal->id, 'base_version' => 1, 'status' => 'pending', 'entered_by' => $actor->id]);
         App\Models\MedicationDoseSlot::firstOrCreate(['client_medication_id' => $medicine->id, 'nz_date' => '2026-09-29', 'ordered_time' => '07:00'], ['client_id' => $this->person->id, 'due_at' => Carbon::parse('2026-09-29 07:00', 'Pacific/Auckland')->utc(), 'generated_at' => now(), 'controlled' => false]);
     }
