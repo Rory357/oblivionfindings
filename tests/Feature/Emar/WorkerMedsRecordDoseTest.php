@@ -312,7 +312,7 @@ class WorkerMedsRecordDoseTest extends TestCase
 
     private function trackedStock(ClientMedication $medication): array
     {
-        $stock = ClientMedicationStock::create(['client_medication_id' => $medication->id, 'unit' => 'tablets',
+        $stock = ClientMedicationStock::query()->forceCreate(['client_medication_id' => $medication->id, 'unit' => 'tablets',
             'on_hand' => '25.00', 'lots_started_at' => now()]);
         $create = fn (string $quantity, string $expiry) => MedicationStockLot::create([
             'client_medication_stock_id' => $stock->id, 'quantity_received' => $quantity, 'quantity_remaining' => $quantity,
