@@ -1,5 +1,11 @@
 import type { ControlledProductPayload } from '@/components/emar/controlled/product-types';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    within,
+} from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -139,7 +145,14 @@ describe('controlled register reader filters', () => {
                 exact: true,
             }),
         ).toHaveClass('frontline-tap');
-        const actions = screen.getByRole('button', {
+        const mobileRecord = screen
+            .getByRole('button', {
+                name: 'Synthetic medicine',
+                exact: true,
+            })
+            .closest('li');
+        expect(mobileRecord).not.toBeNull();
+        const actions = within(mobileRecord!).getByRole('button', {
             name: 'Actions for Synthetic medicine',
             exact: true,
         });
