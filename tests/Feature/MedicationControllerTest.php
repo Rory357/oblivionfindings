@@ -13,6 +13,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationOrderRevision;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -24,6 +25,8 @@ use App\Support\EmarUrl;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Mockery\MockInterface;
 use Tests\TestCase;
 use Database\Factories\UserFactory;
@@ -3083,6 +3086,7 @@ class MedicationControllerTest extends TestCase
     public function test_full_medication_lifecycle(): void
     {
         $this->mockNotificationService();
+        Storage::fake('local');
         $administrationAt = $this->workerNow();
         // The order is entered now, so its dose is the next one: nothing is
         // owed before an order exists (P01 recording guard).
@@ -3096,6 +3100,9 @@ class MedicationControllerTest extends TestCase
                 'frequency' => 'Once daily',
                 'dose_times' => [$doseAt->format('H:i')],
                 'state' => 'active',
+                'controlled_drug' => false,
+                'high_risk' => false,
+                'witness_required' => false,
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -3103,11 +3110,39 @@ class MedicationControllerTest extends TestCase
         $med = ClientMedication::where('name', 'Lifecycle Med')->first();
         $this->assertNotNull($med);
 
-        // 2. Verify the newly created order before it can be administered.
+        // 2. Retain the signed source and independently check its revision.
+        $this->actingAs($this->admin)->post('/emar/orders', [
+            'client_id' => $this->client->id,
+            'medication_id' => $med->id,
+            'expected_version' => $med->version,
+            'request_key' => 'lifecycle-source-'.bin2hex(random_bytes(8)),
+            'change_reason' => 'Enter the signed prescription.',
+            'source' => [
+                'type' => 'written', 'prescriber' => 'Dr Lifecycle',
+                'received_at' => now()->subMinute()->toIso8601String(), 'description' => 'Signed prescription.',
+            ],
+            'source_file' => UploadedFile::fake()->create('prescription.pdf', 1, 'application/pdf'),
+            'prescription' => [
+                'name' => 'Lifecycle Med', 'dosage' => '10mg', 'frequency' => 'Once daily',
+                'dose_times' => [$doseAt->format('H:i')], 'is_prn' => false, 'route' => 'oral',
+                'indication' => 'Indication from source.', 'start_date' => now('Pacific/Auckland')->toDateString(),
+                'controlled_drug' => false, 'high_risk' => false, 'witness_required' => false,
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $revision = MedicationOrderRevision::where('client_medication_id', $med->id)->sole();
+        $versionEvidence = $revision->version->fresh()->getAttributes();
         $this->actingAs($this->providerManager)
-            ->post(route('emar.medications.verify', $med))
+            ->post('/emar/order-revisions/'.$revision->id.'/check', [
+                'source_matches' => true,
+                'dose_route_times_checked' => true,
+                'allergies_interactions_checked' => true,
+            ])
             ->assertRedirect()
+            ->assertSessionHasNoErrors()
             ->assertSessionHas('success');
+        $this->assertSame('checked', $revision->fresh()->status);
+        $this->assertSame('verified', $med->fresh()->approval_status);
+        $this->assertSame($this->providerManager->id, (int) $med->fresh()->verified_by);
 
         // 3. Update stock
         $this->actingAs($this->admin)
@@ -3162,6 +3197,15 @@ class MedicationControllerTest extends TestCase
             'id' => $med->id,
             'state' => 'ceased',
             'deleted_at' => null,
+            'ceased_reason' => 'No longer needed',
+            'ceased_by' => $this->admin->id,
         ]);
+        $this->assertDatabaseHas('client_medication_administrations', [
+            'client_medication_id' => $med->id,
+            'status' => 'given',
+            'administered_by' => $this->supportWorker->id,
+            'dose_given' => '10mg',
+        ]);
+        $this->assertSame($versionEvidence, $revision->version->fresh()->getAttributes());
     }
 }
