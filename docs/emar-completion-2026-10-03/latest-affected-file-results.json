@@ -1,0 +1,548 @@
+[
+  {
+    "File": "tests/Feature/Emar/MedicationAdministrationOwnershipTest.php",
+    "OriginalFailures": 7,
+    "LastBatch": "seventh-repair",
+    "Tests": 22,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationAlertSettingsTest.php",
+    "OriginalFailures": 3,
+    "LastBatch": "fourth-repair",
+    "Tests": 22,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationAlertsTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "fourth-repair",
+    "Tests": 41,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/EmarListPersonScopeTest.php",
+    "OriginalFailures": 3,
+    "LastBatch": "eighth-repair",
+    "Tests": 8,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationRbacAuthorizationTest.php",
+    "OriginalFailures": 6,
+    "LastBatch": "eighth-repair",
+    "Tests": 28,
+    "Failures": 1
+  },
+  {
+    "File": "tests/Feature/Emar/EmergencyAccessLifecycleTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "fourth-repair",
+    "Tests": 22,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationOrderVerificationTest.php",
+    "OriginalFailures": 10,
+    "LastBatch": "fifth-repair",
+    "Tests": 16,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/TeamLeadMedicationBaselineTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "eighth-repair",
+    "Tests": 4,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/GuidedRoundOfflineReplayTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "sixth-repair",
+    "Tests": 10,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "OriginalFailures": 17,
+    "LastBatch": "seventh-repair",
+    "Tests": 20,
+    "Failures": 17
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationAlertRoutingTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "fifth-repair",
+    "Tests": 11,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/MedicationsApiControllerTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "sixth-repair",
+    "Tests": 15,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDoseOverrideTest.php",
+    "OriginalFailures": 4,
+    "LastBatch": "eighth-repair",
+    "Tests": 15,
+    "Failures": 2
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationScopeAuthorizationTest.php",
+    "OriginalFailures": 3,
+    "LastBatch": "seventh-repair",
+    "Tests": 11,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationReportCanonicalScopeTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "seventh-repair",
+    "Tests": 7,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/MedicationControllerTest.php",
+    "OriginalFailures": 32,
+    "LastBatch": "seventh-repair",
+    "Tests": 167,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/ClientMedicationDayTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "second-repair",
+    "Tests": 15,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/P01RecordingContractTest.php",
+    "OriginalFailures": 6,
+    "LastBatch": "sixth-repair",
+    "Tests": 29,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicineRuleSettingsTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "first-repair",
+    "Tests": 7,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationErrorsTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "third-repair",
+    "Tests": 31,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/RoundsPagePayloadTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "sixth-repair",
+    "Tests": 6,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/PrnRecordsHistoryTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "third-repair",
+    "Tests": 4,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/PersonMedicationRecordTest.php",
+    "OriginalFailures": 13,
+    "LastBatch": "first-repair",
+    "Tests": 13,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/P01MedsTodayBoardTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "eighth-repair",
+    "Tests": 13,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/MyDayMedicationActionTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "sixth-repair",
+    "Tests": 14,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationSupportWorkflowTest.php",
+    "OriginalFailures": 4,
+    "LastBatch": "fourth-repair",
+    "Tests": 28,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/MedicationsSafetyOverrideAuthorizationTest.php",
+    "OriginalFailures": 4,
+    "LastBatch": "sixth-repair",
+    "Tests": 9,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/PersonMedicationCommandsTest.php",
+    "OriginalFailures": 20,
+    "LastBatch": "second-repair",
+    "Tests": 20,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/ReviewsTest.php",
+    "OriginalFailures": 8,
+    "LastBatch": "second-repair",
+    "Tests": 10,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationDowntimeTest.php",
+    "OriginalFailures": 5,
+    "LastBatch": "second-repair",
+    "Tests": 49,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/UnifiedMedicationReportsTest.php",
+    "OriginalFailures": 3,
+    "LastBatch": "sixth-repair",
+    "Tests": 20,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/OneChartAdministrationSafetyTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "seventh-repair",
+    "Tests": 7,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationGovernanceReaderSurfaceTest.php",
+    "OriginalFailures": 5,
+    "LastBatch": "sixth-repair",
+    "Tests": 7,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/ClientMedicationReportExportTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "first-repair",
+    "Tests": 3,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledProductTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "eighth-repair",
+    "Tests": 31,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/OneChartGovernanceWorkflowTest.php",
+    "OriginalFailures": 3,
+    "LastBatch": "second-repair",
+    "Tests": 6,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationScopeDecisionLockOrderTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "sixth-repair",
+    "Tests": 6,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Unit/MedicationSafetyServiceTest.php",
+    "OriginalFailures": 6,
+    "LastBatch": "second-repair",
+    "Tests": 9,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationFollowupWorkflowTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "third-repair",
+    "Tests": 45,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationsDatabaseTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "fifth-repair",
+    "Tests": 3,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/RoundDoseSlotsTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "sixth-repair",
+    "Tests": 7,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationOrderLifecycleTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "eighth-repair",
+    "Tests": 17,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/P11EventIntegrationTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "fourth-repair",
+    "Tests": 5,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/MyDayMedicationsDuePayloadTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "eighth-repair",
+    "Tests": 7,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Tasks/TaskProviderRowScopeTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "eighth-repair",
+    "Tests": 5,
+    "Failures": 1
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationReviewCadenceMigrationTest.php",
+    "OriginalFailures": 6,
+    "LastBatch": "second-repair",
+    "Tests": 8,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationRecoveryIntegrationRegressionTest.php",
+    "OriginalFailures": 5,
+    "LastBatch": "eighth-repair",
+    "Tests": 8,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/P11NavigationPayloadTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "fifth-repair",
+    "Tests": 4,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/AuditTrailTest.php",
+    "OriginalFailures": 10,
+    "LastBatch": "eighth-repair",
+    "Tests": 12,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationControlledOrderMutationAuthorizationTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "fifth-repair",
+    "Tests": 3,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/EnhancedMarReplayBindingTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "sixth-repair",
+    "Tests": 12,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationSecondPersonTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "seventh-repair",
+    "Tests": 11,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Sites/Calendar/MedicationCalendarObligationTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "sixth-repair",
+    "Tests": 4,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Tasks/TaskProviderAuthorizationArchitectureTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "sixth-repair",
+    "Tests": 5,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/HandoverFirstSaveConcurrencyTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "sixth-repair",
+    "Tests": 1,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/FleetAssets/ResidentTransportMedicationTransitTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "eighth-repair",
+    "Tests": 9,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationReviewWorkflowTest.php",
+    "OriginalFailures": 7,
+    "LastBatch": "second-repair",
+    "Tests": 34,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationGovernanceAuditTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "seventh-repair",
+    "Tests": 6,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationIntegrityAuditTest.php",
+    "OriginalFailures": 3,
+    "LastBatch": "seventh-repair",
+    "Tests": 8,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "OriginalFailures": 16,
+    "LastBatch": "eighth-repair",
+    "Tests": 16,
+    "Failures": 14
+  },
+  {
+    "File": "tests/Feature/Emar/WorkerMedsTodayPayloadTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "eighth-repair",
+    "Tests": 3,
+    "Failures": 1
+  },
+  {
+    "File": "tests/Feature/Emar/PrescriptionsPageTest.php",
+    "OriginalFailures": 12,
+    "LastBatch": "seventh-repair",
+    "Tests": 23,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationGovernanceResidualSurfaceTest.php",
+    "OriginalFailures": 4,
+    "LastBatch": "fifth-repair",
+    "Tests": 4,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/WorkerMedsRecordDoseTest.php",
+    "OriginalFailures": 12,
+    "LastBatch": "eighth-repair",
+    "Tests": 30,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationNzCalendarTest.php",
+    "OriginalFailures": 3,
+    "LastBatch": "fifth-repair",
+    "Tests": 55,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledMedicationReportAuthorizationTest.php",
+    "OriginalFailures": 4,
+    "LastBatch": "fifth-repair",
+    "Tests": 5,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php",
+    "OriginalFailures": 31,
+    "LastBatch": "eighth-repair",
+    "Tests": 41,
+    "Failures": 9
+  },
+  {
+    "File": "tests/Feature/Emar/EmarReportsTest.php",
+    "OriginalFailures": 5,
+    "LastBatch": "fifth-repair",
+    "Tests": 5,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "OriginalFailures": 25,
+    "LastBatch": "eighth-repair",
+    "Tests": 27,
+    "Failures": 17
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationPrescriberOrderAuditVisibilityTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "fifth-repair",
+    "Tests": 1,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/CompetencyRestrictionRulesTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "sixth-repair",
+    "Tests": 7,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationRoundsDemoSeederTest.php",
+    "OriginalFailures": 2,
+    "LastBatch": "fifth-repair",
+    "Tests": 3,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/StockPacksWorkflowTest.php",
+    "OriginalFailures": 11,
+    "LastBatch": "first-repair",
+    "Tests": 27,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/OrderAllergyEndpointTest.php",
+    "OriginalFailures": 1,
+    "LastBatch": "first-repair",
+    "Tests": 2,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/AuditOmissionsTest.php",
+    "OriginalFailures": 4,
+    "LastBatch": "sixth-repair",
+    "Tests": 5,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/StockManagementTest.php",
+    "OriginalFailures": 6,
+    "LastBatch": "seventh-repair",
+    "Tests": 25,
+    "Failures": 6
+  },
+  {
+    "File": "tests/Feature/Emar/HandoverMedicationLensTest.php",
+    "OriginalFailures": 5,
+    "LastBatch": "sixth-repair",
+    "Tests": 22,
+    "Failures": 0
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationOrdersWorkflowTest.php",
+    "OriginalFailures": 7,
+    "LastBatch": "third-repair",
+    "Tests": 31,
+    "Failures": 0
+  }
+]

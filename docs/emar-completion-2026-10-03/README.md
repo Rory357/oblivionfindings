@@ -1,6 +1,6 @@
 # eMAR completion — 3 October 2026
 
-Active implementation programme. This is not a completion or release claim.
+**Current evidence: [CURRENT-STATUS.md](CURRENT-STATUS.md).** The dated checkpoints below preserve the work history. This is a draft implementation and is not a clinical release.
 
 Stephan asked Main to audit and finish Claude's eMAR work, improve UI/UX using Rory's rules and existing mockups, orchestrate GPT-6.1 Sol Extra high sessions, pin active sessions and unpin completed ones, and push reviewed work. He subsequently delegated approvals while away. This authorises routine design and implementation decisions; approved care policies remain intact.
 

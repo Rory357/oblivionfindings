@@ -97,3 +97,19 @@ More importantly, AuditLog.tsx ignores the server filters prop, initializes its 
 ### 4 October 2026, 05:26 NZDT — week chart date proof
 
 Current compiled app-CKz5Hieu.js shows the week range as 28 Sep 2026 – 4 Oct 2026 · Pacific/Auckland. CSS390/document378; the table stays within its scroller and earlier days correctly show unavailable coverage. Saved and visually inspected the updated person-week-chart-phone.jpg. No clinical write was made. The one initial guessed /emar/people URL returned404; the canonical person page is /emar/mar?client_id=10.
+
+### 4 October 2026, 05:31 NZDT — final Safety overview copy
+
+Current app-CKz5Hieu.js at CSS1440/document1428 shows the approved seven medication hubs and updated supported-living wording. Saved updated-safety-desktop.jpg. No new medication action was submitted. The long synthetic organisation wordmark overlaps the separate global-header date at desktop width; Main will bound the wordmark width when the current source freeze ends.
+
+### 4 October 2026, 06:10 NZDT — medication history and keyboard checks
+
+At frontend revision 43c66c616, compiled asset app-EgGhS2mP.js:
+
+- The compact history header replaces the old greeting. Selecting Amelia Wilson fetched 14 records from the server (previously 123 across all people). Seven days fetched 28 September–4 October 2026 while preserving that person. Applying 3 October as both custom dates fetched nine records. Browser Back restored the seven-day person scope; Forward restored the one-day scope and nine records.
+- Print and Change log links retain the selected person and supported NZ date filters. Unsupported event-type arrays are not passed to those destinations.
+- CSS1440/document1428: bounded organisation wordmark ends at x242; the separate date starts at x304.6. They no longer overlap. CSS390/document378: phone filters, date fields, row actions and menu items are at least44px high, with no document overflow.
+- The phone Table view is available in More views. Record actions open inside the viewport with keyboard focus on the first item. Escape closes the menu and returns focus to the originating record action button.
+- A native date-input fill through this browser driver changes the DOM value without sending React's expected change event; ArrowUp does send it. The checks used native key entry before Apply. This automation behaviour was not treated as an application defect.
+
+Browser findings led to two final UI repairs: badd1bb53 names the nested breadcrumb Medication history and hides absent optional outcome/witness text; 66777fe40 uses event-specific destinations in both the menu and drawer. The drawer's timestamp uses the shared NZ formatter in d90605140. These three changes require the final rebuilt browser check below. The earlier history-desktop.jpg is a checkpoint, not final proof of those repairs.
