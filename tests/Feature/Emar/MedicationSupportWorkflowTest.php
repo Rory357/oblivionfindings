@@ -16,6 +16,7 @@ use App\Models\MedicationSupportChange;
 use App\Models\MedicationSupportTriggerOutbox;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\Audit\MedicationEventRecorder;
@@ -238,8 +239,6 @@ class MedicationSupportWorkflowTest extends TestCase
     {
         $a = $this->assess('self_managed');
         $this->agree($a);
-        $legacy = $legacy->fresh();
-        $legacyScopeBefore = $legacy->med_scope;
         $this->travelTo(Carbon::parse('2026-10-03 10:00', 'Pacific/Auckland')->utc());
         DB::transaction(fn () => app(DoseSlotGenerator::class)->generateAhead($this->medicine));
         $scope = DoseSlotReaderScope::internal([$this->person->id]);
@@ -306,6 +305,7 @@ class MedicationSupportWorkflowTest extends TestCase
             'agreement_signed_at' => now()->subDay(), 'agreement_signed_by' => $this->actor->id,
             'ordering_responsibility' => 'self', 'agreement_responsibilities' => 'Existing recorded support.',
         ]);
+        $legacyScopeBefore = $legacy->fresh()->med_scope;
         $this->travelTo(Carbon::parse('2026-10-03 10:00', 'Pacific/Auckland')->utc());
         DB::transaction(fn () => app(DoseSlotGenerator::class)->generateAhead($this->medicine));
         $support = app(MedicationSupport::class);
@@ -483,6 +483,14 @@ class MedicationSupportWorkflowTest extends TestCase
     public function test_trigger_delivery_failure_keeps_the_source_and_receipt_and_retries_once(): void
     {
         $this->assess();
+        Shift::factory()->create([
+            'client_id' => $this->person->id, 'site_id' => $this->site->id,
+            'service_context_id' => $this->person->service_context_id, 'user_id' => $this->actor->id,
+            'starts_at' => now()->subHour(), 'ends_at' => now()->addHours(7),
+            'actual_starts_at' => now()->subHour(), 'actual_ends_at' => null,
+            'started_by' => $this->actor->id, 'status' => 'in_progress',
+        ]);
+
         // Exercise the continuing canonical clinical source endpoint and its transaction.
         $this->actingAs($this->actor)->post(route('emar.errors.store'), [
             'client_id' => $this->person->id, 'client_medication_id' => $this->medicine->id,
@@ -511,6 +519,14 @@ class MedicationSupportWorkflowTest extends TestCase
     public function test_trigger_receipt_failure_rolls_back_the_source_transaction(): void
     {
         $this->assess();
+        Shift::factory()->create([
+            'client_id' => $this->person->id, 'site_id' => $this->site->id,
+            'service_context_id' => $this->person->service_context_id, 'user_id' => $this->actor->id,
+            'starts_at' => now()->subHour(), 'ends_at' => now()->addHours(7),
+            'actual_starts_at' => now()->subHour(), 'actual_ends_at' => null,
+            'started_by' => $this->actor->id, 'status' => 'in_progress',
+        ]);
+
         $old = $this->medicine->dosage;
         $event = 'eloquent.creating: '.MedicationSupportTriggerOutbox::class;
         // Fail actual receipt persistence, rather than bypassing the enqueue service.
