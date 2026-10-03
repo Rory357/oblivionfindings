@@ -1,19 +1,28 @@
 import { HistoricalAuditExportDialog } from '@/components/emar/historical-audit-export-dialog';
+import { LeaveCalendarRange } from '@/components/hr/leave-calendar-range';
 import {
     EntityTable,
     type EntityTableColumn,
 } from '@/components/lists/entity-table';
 import {
     PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderPrimaryButton,
 } from '@/components/page/page-header';
 import { RecordPicker } from '@/components/people-locations/record-picker';
+import { Button } from '@/components/ui/button';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
-import { Download, History } from 'lucide-react';
-import { useState } from 'react';
+import { CalendarDays, Download, History } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 type Log = {
     id: number;
@@ -33,8 +42,9 @@ type Props = {
         site_id: string | null;
         client_id: string | null;
         user_id: string | null;
-        from: string | null;
-        to: string | null;
+        period: string;
+        date_from: string;
+        date_to: string;
     };
     can_export_history: boolean;
     export_purposes: Record<string, string>;
@@ -92,18 +102,24 @@ function changedFields(row: Log): string {
 }
 export default function HistoricalChangeLogs(props: Props) {
     const [exportOpen, setExportOpen] = useState(false);
+    const [rangeOpen, setRangeOpen] = useState(false);
+    const [from, setFrom] = useState<string | null>(props.filters.date_from);
+    const [to, setTo] = useState<string | null>(props.filters.date_to);
+    useEffect(() => {
+        setFrom(props.filters.date_from);
+        setTo(props.filters.date_to);
+    }, [props.filters.date_from, props.filters.date_to]);
     const query = new URLSearchParams(
-        Object.entries(props.filters).filter(
+        Object.entries({ ...props.filters, period: 'custom' }).filter(
             ([, value]) => value !== null && value !== '',
         ) as [string, string][],
     );
-    const visit = (key: 'site_id' | 'client_id', value: string) =>
+    const visit = (changes: Partial<Props['filters']>) =>
         router.get(
             '/emar/reports/history/logs',
             {
                 ...props.filters,
-                [key]: value || null,
-                ...(key === 'site_id' ? { client_id: null } : {}),
+                ...changes,
             },
             { preserveScroll: true },
         );
@@ -120,7 +136,7 @@ export default function HistoricalChangeLogs(props: Props) {
                 <PageHeader
                     title="Medication change log"
                     icon={History}
-                    subline="Retained changes to medication records. Times use Pacific/Auckland."
+                    subline={`${formatDateOnly(props.filters.date_from)} – ${formatDateOnly(props.filters.date_to)} · Pacific/Auckland · Retained changes to medication records.`}
                     actions={
                         <>
                             <PageHeaderGlassButton
@@ -158,7 +174,12 @@ export default function HistoricalChangeLogs(props: Props) {
                                         label: site.name,
                                     })),
                                 ]}
-                                onChange={(value) => visit('site_id', value)}
+                                onChange={(value) =>
+                                    visit({
+                                        site_id: value || null,
+                                        client_id: null,
+                                    })
+                                }
                             />
                             <RecordPicker
                                 variant="header"
@@ -174,16 +195,91 @@ export default function HistoricalChangeLogs(props: Props) {
                                         label: person.name,
                                     })),
                                 ]}
-                                onChange={(value) => visit('client_id', value)}
+                                onChange={(value) =>
+                                    visit({ client_id: value || null })
+                                }
                             />
+                            <PageHeaderFilterSelect
+                                label="Period"
+                                value={props.filters.period}
+                                allValue=""
+                                options={[
+                                    { value: 'today', label: 'Today' },
+                                    { value: 'week', label: 'Last 7 days' },
+                                    { value: 'month', label: 'This month' },
+                                    {
+                                        value: 'last_month',
+                                        label: 'Last month',
+                                    },
+                                    { value: 'custom', label: 'Custom period' },
+                                ]}
+                                onChange={(period) =>
+                                    period === 'custom'
+                                        ? setRangeOpen(true)
+                                        : visit({ period })
+                                }
+                            />
+                            <Popover
+                                open={rangeOpen}
+                                onOpenChange={setRangeOpen}
+                            >
+                                <PopoverTrigger asChild>
+                                    <PageHeaderFilterButton
+                                        icon={CalendarDays}
+                                        active={
+                                            props.filters.period === 'custom'
+                                        }
+                                    >
+                                        {formatDateOnly(
+                                            props.filters.date_from,
+                                        )}{' '}
+                                        –{' '}
+                                        {formatDateOnly(props.filters.date_to)}
+                                    </PageHeaderFilterButton>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    align="end"
+                                    className="w-auto max-w-[90vw]"
+                                >
+                                    <p className="text-subtle mb-3">
+                                        Up to 12 months, ending today or
+                                        earlier.
+                                    </p>
+                                    <LeaveCalendarRange
+                                        start={from}
+                                        end={to}
+                                        onChange={(start, end) => {
+                                            setFrom(start);
+                                            setTo(end);
+                                        }}
+                                        required
+                                    />
+                                    <Button
+                                        className="mt-3 min-h-11 w-full"
+                                        disabled={!from || !to}
+                                        onClick={() => {
+                                            if (from && to)
+                                                visit({
+                                                    period: 'custom',
+                                                    date_from: from,
+                                                    date_to: to,
+                                                });
+                                            setRangeOpen(false);
+                                        }}
+                                    >
+                                        Apply period
+                                    </Button>
+                                </PopoverContent>
+                            </Popover>
                         </>
                     }
                 />
                 <p className="text-subtle">
                     Showing the latest {props.logs.length} changes, up to 200.
-                    The CSV includes every change in the selected scope.
-                    Clinical history and the event ledger remain available from
-                    Reports & audit.
+                    The CSV includes every change in the selected period, house
+                    and person, up to 100,000 rows. Larger results ask you to
+                    narrow the selection before a file is made. Clinical history
+                    and the event ledger remain available from Reports & audit.
                 </p>
                 <div className="hidden md:block">
                     <EntityTable

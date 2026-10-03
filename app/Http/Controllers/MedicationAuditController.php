@@ -13,6 +13,8 @@ use App\Models\ClientMedicationAdministration;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\Reporting\MedicationExportAudit;
 use App\Services\Medication\Reporting\MedicationReportAccess;
+use App\Services\Medication\Reporting\MedicationReportDataset;
+use App\Services\Medication\Reporting\MedicationReportPeriod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -87,7 +89,7 @@ class MedicationAuditController extends Controller
 
     public function index(Request $request)
     {
-        $request->validate(['client_id' => ['nullable', 'integer', 'min:1'], 'site_id' => ['nullable', 'integer', 'min:1'], 'user_id' => ['nullable', 'integer', 'min:1'], 'from' => ['nullable', 'date_format:Y-m-d'], 'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from']]);
+        $period = $this->period($request);
         $user = $request->user();
         abort_unless($user, 403);
         $clientId = $request->integer('client_id') ?: null;
@@ -114,12 +116,7 @@ class MedicationAuditController extends Controller
         if ($request->filled('user_id')) {
             $q->where('user_id', (int) $request->query('user_id'));
         }
-        if ($request->filled('from')) {
-            $q->whereDate('created_at', '>=', $request->query('from'));
-        }
-        if ($request->filled('to')) {
-            $q->whereDate('created_at', '<=', $request->query('to'));
-        }
+        $q->whereBetween('audit_logs.created_at', $period->bounds());
 
         $logs = $q->limit(200)->get()->map(fn ($l) => [
             'id' => $l->id,
@@ -143,8 +140,9 @@ class MedicationAuditController extends Controller
                 'client_id' => $request->query('client_id'),
                 'site_id' => $request->query('site_id'),
                 'user_id' => $request->query('user_id'),
-                'from' => $request->query('from'),
-                'to' => $request->query('to'),
+                'period' => $period->key,
+                'date_from' => $period->from,
+                'date_to' => $period->to,
             ],
             'logs' => $logs,
             'clients' => Client::query()->whereIn('id', $clientIds)->orderBy('first_name')->get(['id', 'first_name', 'last_name'])
@@ -157,6 +155,7 @@ class MedicationAuditController extends Controller
 
     public function exportCsv(Request $request): StreamedResponse
     {
+        $period = $this->period($request);
         $user = $request->user();
         abort_unless($user, 403);
         $clientId = $request->integer('client_id') ?: null;
@@ -174,9 +173,11 @@ class MedicationAuditController extends Controller
             $clientId,
         );
         $readerSiteIds = $siteId !== null ? [$siteId] : $siteIds;
+        $access = app(MedicationReportAccess::class);
+        $access->siteIds($user, $siteId, $clientId);
 
         $q = $this->baseQuery(
-            $this->clientIds($readerSiteIds),
+            $access->clientIds($user, $readerSiteIds),
             $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY),
         );
         if ($clientId !== null) {
@@ -185,21 +186,20 @@ class MedicationAuditController extends Controller
         if ($request->filled('user_id')) {
             $q->where('user_id', (int) $request->query('user_id'));
         }
-        if ($request->filled('from')) {
-            $q->whereDate('created_at', '>=', $request->query('from'));
-        }
-        if ($request->filled('to')) {
-            $q->whereDate('created_at', '<=', $request->query('to'));
-        }
+        $q->whereBetween('audit_logs.created_at', $period->bounds());
+        // Read one row beyond the shared bound before preparing any file. A
+        // large result must fail clearly rather than release a partial history.
+        $logs = $q->limit(MedicationReportDataset::MAX_ROWS + 1)->get();
+        abort_if($logs->count() > MedicationReportDataset::MAX_ROWS, 422, 'This change log has more than 100,000 rows. Choose a shorter period, house or person. No file has been made.');
 
         $filename = 'medications_audit_'.now()->format('Y-m-d_His').'.csv';
 
-        return response()->streamDownload(function () use ($q) {
+        return response()->streamDownload(function () use ($logs) {
             $out = fopen('php://output', 'w');
-            $this->putCsv($out, ['Time', 'Action', 'Type', 'ID', 'Client', 'User', 'Changed fields']);
-            $q->limit(5000)->get()->each(function ($l) use ($out) {
+            $this->putCsv($out, ['Time (Pacific/Auckland)', 'Action', 'Type', 'ID', 'Client', 'User', 'Changed fields']);
+            $logs->each(function ($l) use ($out) {
                 $this->putCsv($out, [
-                    optional($l->created_at)->toDateTimeString(),
+                    $l->created_at?->timezone('Pacific/Auckland')->format('Y-m-d H:i:s T'),
                     $l->action,
                     class_basename($l->auditable_type),
                     $l->auditable_id,
@@ -212,17 +212,16 @@ class MedicationAuditController extends Controller
         }, $filename, ['Content-Type' => 'text/csv']);
     }
 
-    /**
-     * @param  array<int, int>  $siteIds
-     * @return array<int, int>
-     */
-    private function clientIds(array $siteIds): array
+    private function period(Request $request): MedicationReportPeriod
     {
-        return Client::query()
-            ->whereIn('site_id', $siteIds)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        $request->validate(['client_id' => ['nullable', 'integer', 'min:1'], 'site_id' => ['nullable', 'integer', 'min:1'], 'user_id' => ['nullable', 'integer', 'min:1'], 'from' => ['nullable', 'date_format:Y-m-d'], 'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from']]);
+        // Retained links use from/to; new readers and the export guard use the
+        // canonical period fields. Both describe NZ dates, never UTC dates.
+        if ($request->filled('from') || $request->filled('to')) {
+            $request->merge(['period' => 'custom', 'date_from' => $request->input('from'), 'date_to' => $request->input('to')]);
+        }
+
+        return MedicationReportPeriod::fromRequest($request);
     }
 
     /** @return array{fields: array<int, string>} */
