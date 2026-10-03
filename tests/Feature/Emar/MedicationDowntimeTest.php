@@ -229,7 +229,10 @@ class MedicationDowntimeTest extends TestCase
         $pack = app(DowntimePackService::class)->build($reader, $this->site->id, '2026-10-03');
         $this->assertFalse($pack['controlled_pages_included']);
         $this->assertSame([], $pack['controlled_registers']);
-        $this->assertStringNotContainsString('Concealed synthetic medicine', json_encode($pack));
+        // Internal release evidence retains concealed records; public outputs must not.
+        $this->assertStringNotContainsString('Concealed synthetic medicine', json_encode(array_diff_key($pack, ['_source' => true])));
+        $this->actingAs($reader)->postJson('/emar/downtime/pack/preview', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03'])
+            ->assertOk()->assertDontSee('Concealed synthetic medicine');
         $dose = collect($pack['rounds'])->firstWhere('medicine', 'Synthetic medicine');
         $this->assertTrue($dose['second_person_required']);
         $this->assertContains('Blood sugar (BSL)', $dose['readings']);
@@ -451,7 +454,9 @@ class MedicationDowntimeTest extends TestCase
         $reader = $this->staff($this->site, 'clinical_lead', ['medications.view', 'clients.viewAny', 'medications.reports.view', 'medications.reports.export']);
         $reader->permissionOverrides()->syncWithoutDetaching([Permission::query()->where('key', 'medications.controlled.view')->firstOrFail()->id => ['allowed' => false]]);
         $pack = app(DowntimePackService::class)->build($reader->fresh(), $this->site->id, '2026-10-03');
-        $this->assertStringNotContainsString('Synthetic medicine', json_encode($pack));
+        $this->assertStringNotContainsString('Synthetic medicine', json_encode(array_diff_key($pack, ['_source' => true])));
+        $this->actingAs($reader->fresh())->postJson('/emar/downtime/pack/preview', ['site_id' => $this->site->id, 'nz_date' => '2026-10-03'])
+            ->assertOk()->assertDontSee('Synthetic medicine');
     }
 
     public function test_actual_pdf_download_renders_generic_concealment_notice_and_logs_release(): void

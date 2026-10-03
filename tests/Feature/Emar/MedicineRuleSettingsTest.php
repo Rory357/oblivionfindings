@@ -215,7 +215,7 @@ class MedicineRuleSettingsTest extends TestCase
     public function test_a_rule_naming_a_controlled_medicine_is_concealed_from_a_settings_manager_without_controlled_access(): void
     {
         $client = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active']);
-        $this->order($client, 'Methylphenidate', controlled: true);
+        $this->order($client, 'Synthetic restricted medicine', controlled: true);
         $this->order($client, 'Metformin');
         $cdManager = $this->staff(['medications.settings.manage', 'sites.viewAll', 'clients.viewAny']);
         $rule = fn (string $name): array => [
@@ -226,17 +226,18 @@ class MedicineRuleSettingsTest extends TestCase
             'required_observations' => [],
             'active' => true,
         ];
-        $this->actingAs($cdManager)->post('/emar/settings/rules', $rule('Methylphenidate'))->assertSessionHasNoErrors();
+        $this->actingAs($cdManager)->post('/emar/settings/rules', $rule('Synthetic restricted medicine'))->assertSessionHasNoErrors();
         $this->actingAs($cdManager)->post('/emar/settings/rules', $rule('Metformin'))->assertSessionHasNoErrors();
-        $controlledRule = MedicationAdminRule::query()->where('match_value', 'Methylphenidate')->sole();
+        $controlledRule = MedicationAdminRule::query()->where('match_value', 'Synthetic restricted medicine')->sole();
         $this->assertTrue(MedicationSettingChange::query()->where('setting_key', 'rule:'.$controlledRule->id)->sole()->controlled);
 
         $manager = $this->staff(['medications.settings.manage', 'sites.viewAll', 'clients.viewAny'], deny: ['medications.controlled.view']);
 
+        // A distinct fixture name avoids matching fixed synthetic alert samples.
         // The list and the history say nothing about the controlled medicine.
         $this->actingAs($manager)
             ->get('/emar/settings')
-            ->assertDontSee('Methylphenidate')
+            ->assertDontSee('Synthetic restricted medicine')
             ->assertInertia(fn (Assert $page) => $page
                 ->has('rules', 2)
                 ->where('rules', fn ($rules) => collect($rules)->contains(fn ($r) => $r['id'] === $controlledRule->id
@@ -252,20 +253,20 @@ class MedicineRuleSettingsTest extends TestCase
 
         // The preview leaves controlled orders out.
         $this->actingAs($manager)
-            ->getJson('/emar/settings/rules/preview?match_type=medicine_name&match_value=Methylphenidate')
+            ->getJson('/emar/settings/rules/preview?match_type=medicine_name&match_value=Synthetic%20restricted%20medicine')
             ->assertOk()
             ->assertJson(['medicines' => 0, 'people' => 0, 'rows' => [], 'limited' => true]);
 
         // Changing, pausing or writing it answers as if it weren't there.
         $this->actingAs($manager)
-            ->put("/emar/settings/rules/{$controlledRule->id}", $rule('Methylphenidate'))
+            ->put("/emar/settings/rules/{$controlledRule->id}", $rule('Synthetic restricted medicine'))
             ->assertNotFound();
         $this->actingAs($manager)
             ->post("/emar/settings/rules/{$controlledRule->id}/active", ['active' => false])
             ->assertNotFound();
         $this->actingAs($manager)
             ->from('/emar/settings')
-            ->post('/emar/settings/rules', $rule('Methylphenidate'))
+            ->post('/emar/settings/rules', $rule('Synthetic restricted medicine'))
             ->assertSessionHasErrors('match_value');
         $this->assertTrue($controlledRule->fresh()->active);
         $this->assertSame(2, MedicationAdminRule::query()->count());
@@ -274,9 +275,9 @@ class MedicineRuleSettingsTest extends TestCase
         $this->actingAs($cdManager)
             ->get('/emar/settings')
             ->assertInertia(fn (Assert $page) => $page
-                ->where('rules', fn ($rules) => collect($rules)->contains(fn ($r) => $r['what'] === 'Methylphenidate' && $r['can_change'] === true)));
+                ->where('rules', fn ($rules) => collect($rules)->contains(fn ($r) => $r['what'] === 'Synthetic restricted medicine' && $r['can_change'] === true)));
         $this->actingAs($cdManager)
-            ->getJson('/emar/settings/rules/preview?match_type=medicine_name&match_value=Methylphenidate')
+            ->getJson('/emar/settings/rules/preview?match_type=medicine_name&match_value=Synthetic%20restricted%20medicine')
             ->assertJson(['medicines' => 1, 'people' => 1, 'limited' => false]);
     }
 
