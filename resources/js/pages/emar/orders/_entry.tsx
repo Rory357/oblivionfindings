@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { DateTimeField } from '@/components/fleet-assets/maintenance/date-time-field';
 import { TimePicker } from '@/components/fleet-assets/maintenance/time-picker';
@@ -36,6 +37,7 @@ import type {
     Detail,
     Order,
     Prescription,
+    ReviewHandoff,
 } from './_types';
 
 const emptyPrescription = (): Prescription => ({
@@ -72,11 +74,13 @@ type Props = {
     existing: Order[];
     prefillClientId?: number;
     onUseExisting?: (order: Order) => void;
+    review?: ReviewHandoff;
 };
 
 export function OrderEntry(props: Props) {
     const [step, setStep] = useState(0);
     const [saved, setSaved] = useState(false);
+    const [confirmSwap, setConfirmSwap] = useState(false);
     const [errorTarget, setErrorTarget] = useState<string | null>(null);
     const pane = useRef<HTMLDivElement>(null);
     const prescription = props.detail?.order
@@ -93,6 +97,8 @@ export function OrderEntry(props: Props) {
         medication_id: props.order?.id ?? null,
         expected_version: props.order?.version ?? null,
         request_key: crypto.randomUUID(),
+        review_item: props.review?.id ?? null,
+        stop_reason: '',
         change_reason: '',
         prescription,
         source: {
@@ -216,9 +222,10 @@ export function OrderEntry(props: Props) {
                     p.name.toLowerCase().trim() &&
                 order.state !== 'ceased',
         );
-    const save = () => {
+    const save = (swapConfirmed = false) => {
         form.transform((data) => ({
             ...data,
+            confirm_swap: swapConfirmed,
             prescription: {
                 ...data.prescription,
                 prescriber: data.source.prescriber,
@@ -338,14 +345,19 @@ export function OrderEntry(props: Props) {
                         onClick={
                             step < steps.length - 1
                                 ? () => setStep(step + 1)
-                                : save
+                                : () =>
+                                      props.review?.outcome === 'swap'
+                                          ? setConfirmSwap(true)
+                                          : save()
                         }
                     >
                         {form.processing
                             ? 'Saving…'
                             : step < steps.length - 1
                               ? 'Continue'
-                              : 'Save — waiting to be checked'}
+                              : props.review?.outcome === 'swap'
+                                ? 'Stop old order and enter replacement'
+                                : 'Save — waiting to be checked'}
                     </Button>
                 }
             >
@@ -354,13 +366,29 @@ export function OrderEntry(props: Props) {
                 >
                     <div ref={pane} className="grid gap-5">
                         <Errors errors={form.errors} />
+                        {props.review && (
+                            <Note>
+                                <p className="font-semibold">
+                                    Agreed review recommendation:{' '}
+                                    {props.review.name_snapshot}
+                                </p>
+                                <p>{props.review.recommendation}</p>
+                                <p>
+                                    Enter the prescribing source and the full
+                                    instructions. This recommendation does not
+                                    authorise a dose.
+                                </p>
+                            </Note>
+                        )}
                         {step === 0 && (
                             <>
                                 <Field id="order-person" label="Person">
                                     <RecordPicker
                                         label="Person"
                                         value={form.data.client_id}
-                                        disabled={!!props.order}
+                                        disabled={
+                                            !!props.order || !!props.review
+                                        }
                                         options={props.clients
                                             .filter(
                                                 (client) =>
@@ -1038,12 +1066,48 @@ export function OrderEntry(props: Props) {
                                         : 'This new order cannot be given until it is checked.'}{' '}
                                     Source evidence and every version are kept.
                                 </Note>
+                                {props.review?.outcome === 'swap' && (
+                                    <>
+                                        <Field
+                                            id="order-swap-stop"
+                                            label={`Prescriber source reason for stopping ${props.review.name_snapshot}`}
+                                        >
+                                            <Textarea
+                                                id="order-swap-stop"
+                                                maxLength={255}
+                                                value={form.data.stop_reason}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'stop_reason',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </Field>
+                                        <Note>
+                                            The old order stops immediately when
+                                            saved. This separate replacement
+                                            remains waiting for its independent
+                                            check. Arrange that check before
+                                            giving the replacement.
+                                        </Note>
+                                    </>
+                                )}
                             </>
                         )}
                     </div>
                 </WizardStepPane>
             </WizardShell>
             {close.confirm}
+            <ConfirmDialog
+                open={confirmSwap}
+                onClose={() => setConfirmSwap(false)}
+                title={`Stop ${props.review?.name_snapshot} and enter its replacement?`}
+                description="The stop takes effect immediately. The replacement cannot be given until its saved version is checked. Both pieces of evidence are linked to the review."
+                confirmText="Stop and enter replacement"
+                processing={form.processing}
+                onConfirm={() => save(true)}
+            />
         </>
     );
 }

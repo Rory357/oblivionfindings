@@ -161,6 +161,15 @@ export type RespiteStayChoice = {
     actual_start: string | null;
     actual_end: string | null;
 };
+export type ReviewHandoff = {
+    id: number;
+    client_id: number;
+    client_medication_id: number | null;
+    outcome: string;
+    name_snapshot: string;
+    recommendation: string;
+    entered: boolean;
+};
 export type Reconciliation = {
     id: number;
     client_id: number;

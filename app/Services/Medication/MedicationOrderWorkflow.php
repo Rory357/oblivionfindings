@@ -11,12 +11,14 @@ use App\Models\MedicationOrderAction;
 use App\Models\MedicationOrderFile;
 use App\Models\MedicationOrderRevision;
 use App\Models\MedicationOrderVersion;
+use App\Models\MedicationReviewItem;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\MarScheduleService;
 use App\Services\Medication\Audit\MedicationEventData;
 use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\Followups\MedicationFollowupService;
+use App\Services\Medication\Reviews\MedicationReviewOrderAdapter;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -41,11 +43,52 @@ final class MedicationOrderWorkflow
         private readonly MedicationScopeDecisionService $workScope,
     ) {}
 
-    public function enter(User $actor, int $clientId, ?int $medicationId, array $input, ?UploadedFile $file = null): MedicationOrderRevision
+    public function enterFromRecommendation(User $actor, int $clientId, ?int $medicationId, int $itemId, array $input, ?UploadedFile $file): MedicationOrderRevision
+    {
+        return DB::transaction(function () use ($actor, $clientId, $medicationId, $itemId, $input, $file) {
+            $client = Client::query()->whereKey($clientId)->lockForUpdate()->firstOrFail();
+            $this->access->assertReadable($actor, $client);
+            $item = app(MedicationReviewOrderAdapter::class)->lockRecommendation($actor, $client, $itemId, $input['request_key'] ?? null);
+            if ($item->outcome === 'stop' || ($item->outcome === 'change' && (int) $medicationId !== (int) $item->client_medication_id)
+                || (in_array($item->outcome, ['swap', 'start'], true) && $medicationId !== null)) {
+                $this->invalid('review_item', 'Use the recommended medicine change, stop or separate replacement order.');
+            }
+            if ($item->client_medication_id !== null) {
+                ClientMedication::query()->whereKey($item->client_medication_id)->where('client_id', $client->id)->lockForUpdate()->firstOrFail();
+            }
+
+            return $this->enter($actor, $clientId, $medicationId, $input, $file, $item);
+        }, 5);
+    }
+
+    public function stopFromRecommendation(User $actor, int $medicationId, int $itemId, array $input): void
+    {
+        DB::transaction(function () use ($actor, $medicationId, $itemId, $input) {
+            $submitted = ClientMedication::query()->findOrFail($medicationId);
+            $client = Client::query()->whereKey($submitted->client_id)->lockForUpdate()->firstOrFail();
+            $this->access->assertReadable($actor, $client);
+            $key = 'review-stop:'.$itemId.':'.hash('sha256', (string) ($input['request_key'] ?? ''));
+            $item = app(MedicationReviewOrderAdapter::class)->lockRecommendation($actor, $client, $itemId, $key);
+            if ($item->outcome !== 'stop' || (int) $item->client_medication_id !== $medicationId) {
+                $this->invalid('review_item', 'This recommendation is not an agreed stop for this medicine.');
+            }
+            $this->forMedication($actor, $medicationId, 'medications.orders.manage', function ($client, $order, $locked) use ($input, $item, $key) {
+                $alreadyStopped = $order->state === 'ceased';
+                $ended = app(MedicationOrderLifecycleService::class)->discontinue($locked, $order, $input['reason'] ?? null, submittedClientId: $client->id, requestKey: $key);
+                $version = $ended->versions()->where('version_number', $ended->version)->where('client_id', $client->id)->firstOrFail();
+                app(MedicationReviewOrderAdapter::class)->linkStoppedVersion($locked, $item, $version);
+                if (! $alreadyStopped) {
+                    $this->action($locked, $ended, 'stopped', ['version' => $ended->version, 'reason' => $ended->ceased_reason, 'review_item_id' => $item->id]);
+                }
+            }, expectedClientId: (int) $client->id);
+        }, 5);
+    }
+
+    public function enter(User $actor, int $clientId, ?int $medicationId, array $input, ?UploadedFile $file = null, ?MedicationReviewItem $recommendation = null): MedicationOrderRevision
     {
         $paths = [];
         try {
-            $callback = function (Client $client, ?ClientMedication $medication, User $actor, Collection $users) use ($input, $file, &$paths): MedicationOrderRevision {
+            $callback = function (Client $client, ?ClientMedication $medication, User $actor, Collection $users) use ($input, $file, $recommendation, &$paths): MedicationOrderRevision {
                 $this->access->assertReadable($actor, $client);
                 if ($medication !== null) {
                     $this->assertControlled($actor, $medication);
@@ -64,7 +107,7 @@ final class MedicationOrderWorkflow
                 $key = Validator::make($input, ['request_key' => 'required|string|max:100|regex:/^[A-Za-z0-9][A-Za-z0-9._:-]*$/'])->validate()['request_key'];
                 $sourceForHash = $source;
                 unset($sourceForHash['read_back_at']);
-                $hash = hash('sha256', json_encode([$client->id, $medication?->id, $actor->id, $payload, $sourceForHash], JSON_THROW_ON_ERROR));
+                $hash = hash('sha256', json_encode([$client->id, $medication?->id, $actor->id, $payload, $sourceForHash, $recommendation?->id, $input['stop_reason'] ?? null], JSON_THROW_ON_ERROR));
                 $replay = MedicationOrderVersion::query()->where('entry_request_key', $key)->first();
                 if ($replay !== null) {
                     if (! hash_equals((string) $replay->entry_payload_sha256, $hash)) {
@@ -74,6 +117,17 @@ final class MedicationOrderWorkflow
                     return MedicationOrderRevision::query()->where('medication_order_version_id', $replay->id)->firstOrFail();
                 }
                 if ($medication === null) {
+                    if ($recommendation?->outcome === 'swap') {
+                        $stopReason = Validator::make($input, ['stop_reason' => 'required|string|max:255', 'confirm_swap' => 'required|accepted'])->validate()['stop_reason'];
+                        $old = ClientMedication::query()->whereKey($recommendation->client_medication_id)->where('client_id', $client->id)->firstOrFail();
+                        $this->assertControlled($actor, $old);
+                        if (OrderAllergyMatcher::normalise($old->name) === OrderAllergyMatcher::normalise($payload['name'])) {
+                            $this->invalid('prescription.name', 'A swap uses a separate replacement medicine. Use a change for the same medicine.');
+                        }
+                        $ended = app(MedicationOrderLifecycleService::class)->discontinue($actor, $old, $stopReason, submittedClientId: $client->id, requestKey: 'review-swap:'.$recommendation->id.':'.hash('sha256', $key));
+                        app(MedicationReviewOrderAdapter::class)->linkStoppedVersion($actor, $recommendation, $ended->versions()->where('version_number', $ended->version)->where('client_id', $client->id)->firstOrFail());
+                        $this->action($actor, $ended, 'stopped', ['version' => $ended->version, 'reason' => $stopReason, 'review_item_id' => $recommendation->id]);
+                    }
                     $medication = ClientMedication::query()->create(array_merge($payload, [
                         'client_id' => $client->id, 'created_by' => $actor->id,
                         'active' => true, 'state' => 'active', 'version' => 1,
@@ -95,6 +149,9 @@ final class MedicationOrderWorkflow
                     $number = max((int) $medication->version, (int) $medication->versions()->max('version_number')) + 1;
                 }
                 $version = $this->snapshot($medication, $payload, $number, $actor->id, $source, $input['change_reason'] ?? 'New order', $key, $hash);
+                if ($recommendation !== null) {
+                    app(MedicationReviewOrderAdapter::class)->linkVersion($actor, $recommendation, $version);
+                }
                 $revision = MedicationOrderRevision::query()->create([
                     'client_medication_id' => $medication->id, 'client_id' => $client->id,
                     'medication_order_version_id' => $version->id, 'base_version' => $medication->version,

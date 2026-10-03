@@ -34,7 +34,7 @@ import {
     SourceFiles,
     useDraftClose,
 } from './_parts';
-import type { Detail, Order, Revision } from './_types';
+import type { Detail, Order, ReviewHandoff, Revision } from './_types';
 
 type Action =
     | 'view'
@@ -74,6 +74,7 @@ export function OrderDetail({
     onClose,
     onEnter,
     initialAction = 'view',
+    review,
 }: {
     order: Order;
     detail: Detail;
@@ -82,6 +83,7 @@ export function OrderDetail({
     onClose: () => void;
     onEnter: () => void;
     initialAction?: Action;
+    review?: ReviewHandoff;
 }) {
     const [section, setSection] = useState(0);
     const [action, setAction] = useState<Action>(initialAction);
@@ -113,6 +115,7 @@ export function OrderDetail({
         file: null as File | null,
         client_id: order.client_id,
         request_key: crypto.randomUUID(),
+        review_item: review?.id ?? null,
     });
     const close = useDraftClose(form.isDirty, form.processing, onClose);
     const involved =

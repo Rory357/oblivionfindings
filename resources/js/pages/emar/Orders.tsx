@@ -53,6 +53,7 @@ import type {
     Order,
     Reconciliation,
     RespiteStayChoice,
+    ReviewHandoff,
 } from './orders/_types';
 
 type View = 'orders' | 'to_check' | 'covert' | 'reconciliation' | 'reviews';
@@ -66,9 +67,20 @@ type OrderAction =
     | 'resume'
     | 'entry';
 type Modal =
-    | { type: 'detail' | 'entry'; detail: Detail; action: OrderAction }
-    | { type: 'new'; clientId?: number }
-    | { type: 'opening'; id: number; action: OrderAction; error?: string }
+    | {
+          type: 'detail' | 'entry';
+          detail: Detail;
+          action: OrderAction;
+          review?: ReviewHandoff;
+      }
+    | { type: 'new'; clientId?: number; review?: ReviewHandoff }
+    | {
+          type: 'opening';
+          id: number;
+          action: OrderAction;
+          error?: string;
+          review?: ReviewHandoff;
+      }
     | { type: 'start_reconciliation' }
     | { type: 'reconciliation'; record: Reconciliation }
     | {
@@ -108,6 +120,8 @@ type Props = {
     me: { id: number; name: string };
     loaded_at: string;
     review_default: string;
+    review_handoff: ReviewHandoff | null;
+    prefill_client_id: number | null;
     filters: { view?: View; show?: string; search?: string; site_id?: string };
     respite_stays: RespiteStayChoice[];
     open_order_id: number | null;
@@ -117,6 +131,7 @@ export default function Orders(props: Props) {
     const [modal, setModal] = useState<Modal>(null);
     const [search, setSearch] = useState(props.filters.search ?? '');
     const request = useRef<AbortController | null>(null);
+    const handledRecommendation = useRef<number | null>(null);
     const context = useEntityContextMenu<Order>();
     const covertContext = useEntityContextMenu<Covert>();
     const reconciliationContext = useEntityContextMenu<Reconciliation>();
@@ -132,11 +147,15 @@ export default function Orders(props: Props) {
             { ...props.filters, search, ...change },
             { preserveState: true, preserveScroll: true, replace: true },
         );
-    const openOrder = (id: number, action: OrderAction = 'view') => {
+    const openOrder = (
+        id: number,
+        action: OrderAction = 'view',
+        review?: ReviewHandoff,
+    ) => {
         request.current?.abort();
         const controller = new AbortController();
         request.current = controller;
-        setModal({ type: 'opening', id, action });
+        setModal({ type: 'opening', id, action, review });
         axios
             .get<Detail>(`/emar/orders/${id}`, { signal: controller.signal })
             .then(({ data }) => {
@@ -145,6 +164,7 @@ export default function Orders(props: Props) {
                         type: action === 'entry' ? 'entry' : 'detail',
                         detail: data,
                         action,
+                        review,
                     });
             })
             .catch(() => {
@@ -153,6 +173,7 @@ export default function Orders(props: Props) {
                         type: 'opening',
                         id,
                         action,
+                        review,
                         error: 'This order could not be opened. Your access or the record may have changed.',
                     });
             });
@@ -160,6 +181,31 @@ export default function Orders(props: Props) {
     useEffect(() => {
         if (props.open_order_id) openOrder(props.open_order_id);
     }, [props.open_order_id]);
+    useEffect(() => {
+        const recommendation = props.review_handoff;
+        if (
+            !recommendation ||
+            recommendation.entered ||
+            handledRecommendation.current === recommendation.id
+        )
+            return;
+        handledRecommendation.current = recommendation.id;
+        if (
+            ['stop', 'change'].includes(recommendation.outcome) &&
+            recommendation.client_medication_id
+        )
+            openOrder(
+                recommendation.client_medication_id,
+                recommendation.outcome === 'stop' ? 'stop' : 'entry',
+                recommendation,
+            );
+        else
+            setModal({
+                type: 'new',
+                clientId: recommendation.client_id,
+                review: recommendation,
+            });
+    }, [props.review_handoff]);
     const actionsFor = (order: Order): MenuItem[] => {
         const managed = order.can_manage
             ? undefined
@@ -793,7 +839,11 @@ export default function Orders(props: Props) {
                             <Button
                                 variant="outline"
                                 onClick={() =>
-                                    openOrder(modal.id, modal.action)
+                                    openOrder(
+                                        modal.id,
+                                        modal.action,
+                                        modal.review,
+                                    )
                                 }
                             >
                                 Try again
@@ -808,6 +858,7 @@ export default function Orders(props: Props) {
                         canControlled={props.can.controlled_record}
                         existing={props.orders.data}
                         prefillClientId={modal.clientId}
+                        review={modal.review}
                         onUseExisting={(order) => openOrder(order.id, 'entry')}
                         onClose={close}
                     />
@@ -820,6 +871,7 @@ export default function Orders(props: Props) {
                         existing={props.orders.data}
                         order={modal.detail.summary}
                         detail={modal.detail}
+                        review={modal.review}
                         onClose={close}
                     />
                 )}
@@ -829,6 +881,7 @@ export default function Orders(props: Props) {
                         detail={modal.detail}
                         me={props.me.id}
                         canManage={props.can.manage}
+                        review={modal.review}
                         initialAction={
                             modal.action === 'entry' ? 'view' : modal.action
                         }

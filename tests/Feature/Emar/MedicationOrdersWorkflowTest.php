@@ -13,6 +13,8 @@ use App\Models\MedicationFollowup;
 use App\Models\MedicationOrderAction;
 use App\Models\MedicationOrderRevision;
 use App\Models\MedicationReconciliation;
+use App\Models\MedicationReview;
+use App\Models\MedicationReviewItem;
 use App\Models\Permission;
 use App\Models\RespiteBooking;
 use App\Models\RespiteMedicationReconciliation;
@@ -202,6 +204,57 @@ class MedicationOrdersWorkflowTest extends TestCase
         $this->actingAs($this->checker)->get('/emar/prescriptions?view=covert')->assertInertia(fn (Assert $page) => $page->has('covert', 0)->where('counts.covert', 0));
     }
 
+    public function test_agreed_review_change_links_waiting_version_and_replays_without_publication(): void
+    {
+        $order = $this->order();
+        $item = $this->recommendation($order, 'change');
+        $input = $this->entryInput($order, ['dosage' => '20 mg']) + ['review_item' => $item->id, 'source_file' => UploadedFile::fake()->create('source.pdf', 1, 'application/pdf')];
+        $this->actingAs($this->enterer)->get('/emar/prescriptions?client_id='.$this->client->id.'&review_item='.$item->id)->assertInertia(fn (Assert $page) => $page->where('review_handoff.id', $item->id));
+        $this->actingAs($this->enterer)->post('/emar/orders', $input)->assertSessionHasNoErrors();
+        $revision = MedicationOrderRevision::latest('id')->firstOrFail();
+        $this->assertSame($revision->medication_order_version_id, $item->refresh()->linked_order_version_id);
+        $this->assertSame('10 mg', $order->refresh()->dosage);
+        $this->assertSame('pending', $revision->status);
+        $this->actingAs($this->enterer)->post('/emar/orders', $input)->assertSessionHasNoErrors();
+        $this->assertSame(1, MedicationOrderAction::where('action', 'entered')->count());
+    }
+
+    public function test_review_swap_requires_explicit_stop_and_retains_two_distinct_clinical_links(): void
+    {
+        $old = $this->order();
+        $item = $this->recommendation($old, 'swap');
+        $input = $this->entryInput(null, ['name' => 'Replacement medicine']) + ['review_item' => $item->id, 'stop_reason' => 'Prescriber source replaces the previous medicine.', 'source_file' => UploadedFile::fake()->create('swap.pdf', 1, 'application/pdf')];
+        $this->actingAs($this->enterer)->postJson('/emar/orders', $input)->assertUnprocessable()->assertJsonValidationErrors('confirm_swap');
+        $this->assertSame('active', $old->refresh()->state);
+        $this->assertNull($item->refresh()->linked_order_version_id);
+        $input['confirm_swap'] = true;
+        $this->actingAs($this->enterer)->post('/emar/orders', $input)->assertSessionHasNoErrors();
+        $new = ClientMedication::where('name', 'Replacement medicine')->sole();
+        $this->assertSame('ceased', $old->refresh()->state);
+        $this->assertSame('pending_verification', $new->approval_status);
+        $this->assertFalse($new->isAdministrable());
+        $item->refresh();
+        $this->assertNotNull($item->linked_stopped_order_version_id);
+        $this->assertNotNull($item->linked_replacement_order_version_id);
+        $this->assertNotSame($item->linked_stopped_order_version_id, $item->linked_replacement_order_version_id);
+        $this->assertSame($item->linked_replacement_order_version_id, $item->linked_order_version_id);
+        $this->actingAs($this->enterer)->post('/emar/orders', $input)->assertSessionHasNoErrors();
+        $this->assertSame(1, MedicationOrderAction::where('action', 'stopped')->count());
+    }
+
+    public function test_agreed_review_stop_links_cessation_once_without_replacement_or_check(): void
+    {
+        $order = $this->order();
+        $item = $this->recommendation($order, 'stop');
+        $input = ['review_item' => $item->id, 'reason' => 'Prescriber confirmed stopping.', 'request_key' => 'review-stop-request'];
+        $this->actingAs($this->enterer)->post('/emar/orders/'.$order->id.'/stop', $input)->assertSessionHasNoErrors();
+        $this->assertSame('ceased', $order->refresh()->state);
+        $this->assertSame($order->versions()->where('version_number', $order->version)->sole()->id, $item->refresh()->linked_stopped_order_version_id);
+        $this->assertNull($item->linked_replacement_order_version_id);
+        $this->actingAs($this->enterer)->post('/emar/orders/'.$order->id.'/stop', $input)->assertSessionHasNoErrors();
+        $this->assertSame(1, MedicationEvent::where('kind', 'order.stopped')->count());
+    }
+
     public function test_reconciliation_stores_summer_nz_times_as_correct_utc_instants(): void
     {
         $this->assertNzReconciliationTimes('2026-10-03', '2026-10-02T21:30:00+00:00', '2026-10-02T22:00:00+00:00');
@@ -329,5 +382,15 @@ class MedicationOrdersWorkflowTest extends TestCase
         }
 
         return $user;
+    }
+
+    private function recommendation(ClientMedication $order, string $outcome): MedicationReviewItem
+    {
+        $review = MedicationReview::create(['client_id' => $this->client->id, 'review_type' => 'quarterly', 'status' => 'completed',
+            'scheduled_date' => '2026-10-03', 'completed_date' => '2026-10-03', 'completed_by' => $this->checker->id, 'requested_by' => $this->checker->id]);
+
+        return MedicationReviewItem::create(['review_id' => $review->id, 'client_id' => $this->client->id, 'client_medication_id' => $order->id,
+            'name_snapshot' => $order->name, 'controlled_snapshot' => false, 'classification_pending' => false, 'outcome' => $outcome,
+            'decision' => 'agreed', 'prescriber_name' => 'Dr Test', 'recommendation' => 'Agreed prescriber recommendation from the review source.']);
     }
 }

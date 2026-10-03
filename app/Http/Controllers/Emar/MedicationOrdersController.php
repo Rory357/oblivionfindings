@@ -11,6 +11,7 @@ use App\Models\MedicationOrderAction;
 use App\Models\MedicationOrderFile;
 use App\Models\MedicationOrderRevision;
 use App\Models\MedicationReconciliation;
+use App\Models\MedicationReviewItem;
 use App\Models\RespiteStay;
 use App\Models\User;
 use App\Services\Medication\Followups\MedicationFollowupService;
@@ -89,6 +90,16 @@ final class MedicationOrdersController extends Controller
                 ->when(! $actor->canDo('medications.controlled.view'), fn ($q) => $q->where('controlled_drug', false))->select('id'))
             ->with(['medication:id,name,client_id,controlled_drug', 'client:id,first_name,last_name'])->orderByDesc('id')->limit(100)->get()
             ->map(fn ($record) => $record->toArray() + ['can_manage' => $actor->canDo('medications.orders.manage') && (! $record->medication->controlled_drug || $actor->canDo('medications.controlled.record'))]);
+        $handoff = null;
+        if ($request->integer('review_item')) {
+            abort_unless($actor->canDo('medications.orders.manage'), 403);
+            $person = $this->access->client($actor, $request->integer('client_id'));
+            $item = MedicationReviewItem::query()->whereKey($request->integer('review_item'))->where('client_id', $person->id)
+                ->where('decision', 'agreed')->whereHas('review', fn ($q) => $q->where('client_id', $person->id)->where('status', 'completed'))->firstOrFail();
+            abort_if($item->isRestricted() && ! $actor->canDo('medications.controlled.view'), 404);
+            abort_unless($item->isChange() && ($item->client_medication_id === null || (int) $item->medication?->client_id === (int) $person->id), 404);
+            $handoff = $item->only('id', 'client_id', 'client_medication_id', 'outcome', 'name_snapshot', 'recommendation') + ['entered' => $item->linked_order_version_id !== null];
+        }
 
         return Inertia::render('emar/Orders', [
             'orders' => $page, 'counts' => $counts, 'houses' => $this->scope->sitePicker($sites),
@@ -100,6 +111,8 @@ final class MedicationOrdersController extends Controller
             'me' => ['id' => $actor->id, 'name' => $actor->name], 'loaded_at' => now()->toIso8601String(),
             'review_default' => now()->timezone('Pacific/Auckland')->addMonthsNoOverflow(3)->toDateString(),
             'open_order_id' => $request->integer('order_id') ?: null,
+            'review_handoff' => $handoff,
+            'prefill_client_id' => in_array($request->integer('client_id'), $readableIds, true) ? $request->integer('client_id') : null,
             'filters' => $request->only('view', 'show', 'search', 'site_id'),
         ]);
     }
@@ -153,7 +166,9 @@ final class MedicationOrdersController extends Controller
 
     public function enter(Request $request)
     {
-        $revision = $this->orders->enter($request->user(), $request->integer('client_id'), $request->integer('medication_id') ?: null, $request->all(), $request->file('source_file'));
+        $revision = $request->integer('review_item')
+            ? $this->orders->enterFromRecommendation($request->user(), $request->integer('client_id'), $request->integer('medication_id') ?: null, $request->integer('review_item'), $request->all(), $request->file('source_file'))
+            : $this->orders->enter($request->user(), $request->integer('client_id'), $request->integer('medication_id') ?: null, $request->all(), $request->file('source_file'));
 
         return back()->with('success', 'Version '.$revision->version->version_number.' saved. Waiting to be checked.');
     }
@@ -189,6 +204,11 @@ final class MedicationOrdersController extends Controller
 
     public function stop(Request $request, int $medication)
     {
+        if ($request->integer('review_item')) {
+            $this->orders->stopFromRecommendation($request->user(), $medication, $request->integer('review_item'), $request->all());
+
+            return back()->with('success', 'Order stopped and cessation evidence linked to the agreed recommendation.');
+        }
         $this->orders->forMedication($request->user(), $medication, 'medications.orders.manage', function ($client, $order, $actor) use ($request) {
             $this->access->assertReadable($actor, $client);
             $this->orders->assertControlled($actor, $order);
