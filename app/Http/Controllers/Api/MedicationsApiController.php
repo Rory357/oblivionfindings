@@ -1950,9 +1950,10 @@ class MedicationsApiController extends Controller
             'medication' => [
                 'id' => $medication->id,
                 'name' => $medication->name,
-                'on_hand' => $medication->stock?->on_hand !== null
-                    ? MedicationStockQuantity::toFloat($medication->stock->on_hand)
+                'on_hand' => $medication->stock?->availableQuantity() !== null
+                    ? MedicationStockQuantity::toFloat($medication->stock->availableQuantity())
                     : null,
+                'pack_workflow_url' => ! $medication->controlled_drug ? $medication->stock?->pack_workflow_url : null,
                 'scan_verification' => $this->buildMedicationScanPayload($client, $medication),
             ],
             'counts' => $counts,
@@ -2039,7 +2040,7 @@ class MedicationsApiController extends Controller
                     ->lockForUpdate()
                     ->first();
                 $expectedQuantity = $data['expected_quantity']
-                    ?? ($stock?->on_hand !== null ? MedicationStockQuantity::normalize($stock->on_hand) : null);
+                    ?? $stock?->availableQuantity();
 
                 $count = MedicationScheduledStockCount::create([
                     'client_id' => $canonicalClient->id,
@@ -2181,6 +2182,7 @@ class MedicationsApiController extends Controller
                     ]);
                 }
 
+                $stock?->rejectScalarWrite('actual_quantity');
                 $scanAudit = $this->verifyMedicationScanOrFail($canonicalClient, $medication, $data);
                 $beforeOnHand = $stock?->on_hand !== null
                     ? MedicationStockQuantity::normalize($stock->on_hand)

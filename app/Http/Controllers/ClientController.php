@@ -1843,14 +1843,15 @@ class ClientController extends Controller
         $payload['stock'] = $stock ? [
             // The decimal:2 cast yields "24.00"; send a number like the eMAR
             // stock payloads so the profile reads "24 doses on hand".
-            'on_hand' => $stock->on_hand !== null
-                ? MedicationStockQuantity::toFloat($stock->on_hand)
+            'on_hand' => $stock->availableQuantity() !== null
+                ? MedicationStockQuantity::toFloat($stock->availableQuantity())
                 : null,
             'unit' => $stock->unit,
             'reorder_threshold' => $stock->reorder_level,
             'is_low' => $stock->isLowStock(),
             'last_counted_at' => $stock->last_counted_at?->toISOString(),
-            'expiry_date' => $stock->expiry_date?->toDateString(),
+            'expiry_date' => $stock->currentExpiryDate()?->toDateString(),
+            'pack_workflow_url' => ! $medication->controlled_drug ? $stock->pack_workflow_url : null,
         ] : null;
 
         return $payload;

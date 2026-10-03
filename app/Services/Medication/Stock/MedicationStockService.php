@@ -29,7 +29,7 @@ final class MedicationStockService
 {
     public function today(): string
     {
-        return CarbonImmutable::now('Pacific/Auckland')->toDateString();
+        return StockAvailability::today();
     }
 
     public function lockedStock(ClientMedication $medication): ClientMedicationStock
@@ -65,7 +65,7 @@ final class MedicationStockService
             ]);
             $this->movement($lot, $actor, $operationUuid, 'opening', $stock->on_hand, '0.00', $stock->on_hand, 'Recorded balance carried forward; not a new receipt.');
         }
-        $stock->forceFill(['lots_started_at' => now()])->save();
+        $stock->forceFill(['lots_started_at' => now()])->saveFromPackLedger();
         AuditLogger::logOrFail('medications.stock.lots_started', $stock, ['actor_id' => $actor->id, 'recorded_balance' => $stock->on_hand]);
     }
 
@@ -315,7 +315,7 @@ final class MedicationStockService
         ]);
         // Counts with a difference wait for review; they never silently rewrite supply.
         if (! $different) {
-            $stock->forceFill(['last_counted_at' => $record->counted_at])->save();
+            $stock->forceFill(['last_counted_at' => $record->counted_at])->saveFromPackLedger();
         }
         AuditLogger::logOrFail('medications.stock.counted', $record, ['actor_id' => $actor->id, 'stock_id' => $stock->id, 'needs_review' => $different]);
 
@@ -352,13 +352,16 @@ final class MedicationStockService
             $this->movement($lot, $actor, $operationUuid, 'count_correction', Qty::subtract($line['counted'], $line['expected']), $line['expected'], $line['counted'], $reason);
         }
         $record->forceFill(['state' => 'reviewed', 'reviewed_by' => $actor->id, 'reviewed_at' => now(), 'review_reason' => $reason])->save();
-        $stock->forceFill(['last_counted_at' => $record->counted_at])->save();
+        $stock->forceFill(['last_counted_at' => $record->counted_at])->saveFromPackLedger();
         $this->refreshBalance($stock);
         AuditLogger::logOrFail('medications.stock.count_reviewed', $record, ['actor_id' => $actor->id, 'reason' => $reason]);
     }
 
     public function refreshBalance(ClientMedicationStock $stock): void
     {
+        if (app(StockAvailability::class)->controlled($stock)) {
+            throw new LogicException('The controlled register owns its physical balance.');
+        }
         $this->requireLots($stock);
         $lots = $this->lots($stock);
         $usable = $lots->filter(fn ($lot) => StockLotRules::usable($lot->toArray(), $this->today()));
@@ -367,7 +370,7 @@ final class MedicationStockService
             'on_hand' => StockLotRules::onHand($lots->toArray(), $this->today()),
             'batch_number' => $first?->batch_number,
             'expiry_date' => $first?->expiry_date,
-        ])->save();
+        ])->saveFromPackLedger();
     }
 
     private function receiptExpiry(array $data): ?string
@@ -413,6 +416,7 @@ final class MedicationStockService
         $this->assertTransaction();
         $locked = ClientMedicationStock::query()->whereKey($stock->id)->lockForUpdate()->firstOrFail();
         $stock->setRawAttributes($locked->getAttributes(), true);
+        $stock->unsetRelation('lots');
     }
 
     private function requireLots(ClientMedicationStock $stock): void

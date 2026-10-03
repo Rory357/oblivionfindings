@@ -465,6 +465,7 @@ class ClientMedicalController extends Controller
                         ->where('client_medication_id', $lockedMedication->id)
                         ->lockForUpdate()
                         ->first() ?? new ClientMedicationStock(['client_medication_id' => $lockedMedication->id]);
+                    $stock->rejectScalarWrite('on_hand');
                     $beforeOnHand = $stock->exists && $stock->on_hand !== null
                         ? MedicationStockQuantity::normalize($stock->on_hand)
                         : null;

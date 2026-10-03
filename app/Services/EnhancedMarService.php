@@ -444,7 +444,8 @@ class EnhancedMarService
             'is_administrable' => $medication->isAdministrable(),
             'admin_rules' => $this->ruleService->requirementsFor($medication),
             'stock' => $medication->stock ? [
-                'on_hand' => $medication->stock->on_hand,
+                'on_hand' => $medication->stock->availableQuantity(),
+                'pack_workflow_url' => $medication->stock->pack_workflow_url,
                 'unit' => $medication->stock->unit,
                 'reorder_level' => $medication->stock->reorder_level,
             ] : null,

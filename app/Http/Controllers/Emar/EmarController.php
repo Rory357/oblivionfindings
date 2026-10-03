@@ -1521,7 +1521,8 @@ class EmarController extends Controller
                 'administrations' => $administrations->merge($unmatchedAdmins)->values(),
                 'scan_verification' => $this->buildMedicationScanPayload($client, $med),
                 'stock' => $med->stock ? [
-                    'on_hand' => $med->stock->on_hand,
+                    'on_hand' => $med->stock->availableQuantity(),
+                    'pack_workflow_url' => $med->stock->pack_workflow_url,
                     'unit' => $med->stock->unit,
                 ] : null,
             ];
@@ -1549,7 +1550,8 @@ class EmarController extends Controller
                 'administrations' => $med->administrations->map(fn ($a) => $this->serializeAdministration($a))->values(),
                 'scan_verification' => $this->buildMedicationScanPayload($client, $med),
                 'stock' => $med->stock ? [
-                    'on_hand' => $med->stock->on_hand,
+                    'on_hand' => $med->stock->availableQuantity(),
+                    'pack_workflow_url' => $med->stock->pack_workflow_url,
                     'unit' => $med->stock->unit,
                 ] : null,
             ];
@@ -1583,7 +1585,8 @@ class EmarController extends Controller
                     'pharmac_subgroup' => $med->pharmac_subgroup,
                     'scan_verification' => $this->buildMedicationScanPayload($client, $med),
                     'stock' => $med->stock ? [
-                        'on_hand' => $med->stock->on_hand,
+                        'on_hand' => $med->stock->availableQuantity(),
+                        'pack_workflow_url' => $med->stock->pack_workflow_url,
                         'unit' => $med->stock->unit,
                     ] : null,
                 ];
@@ -2143,7 +2146,8 @@ class EmarController extends Controller
                     'days_since_check' => $daysSince,
                     'overdue_check' => $daysSince === null || $daysSince >= 7,
                     'stock' => $m->stock ? [
-                        'on_hand' => $m->stock->on_hand,
+                        'on_hand' => $m->stock->availableQuantity(),
+                        'pack_workflow_url' => $m->stock->pack_workflow_url,
                         'unit' => $m->stock->unit,
                         'last_counted_at' => $m->stock->last_counted_at instanceof \DateTimeInterface ? $m->stock->last_counted_at->toIso8601String() : null,
                         'expiry_date' => $m->stock->expiry_date instanceof \DateTimeInterface ? $m->stock->expiry_date->toDateString() : ($m->stock->expiry_date ?: null),
@@ -2515,7 +2519,8 @@ class EmarController extends Controller
                 'ceased_reason' => $m->ceased_reason,
                 'review_date' => $m->review_date?->format('j M Y'),
                 'stock' => $m->stock ? [
-                    'on_hand' => $m->stock->on_hand,
+                    'on_hand' => $m->stock->availableQuantity(),
+                    'pack_workflow_url' => $m->stock->pack_workflow_url,
                     'unit' => $m->stock->unit,
                     'low' => $m->stock->isLowStock(),
                 ] : null,
@@ -2556,7 +2561,7 @@ class EmarController extends Controller
         $byClient = fn ($q) => $q->where('client_id', $clientFilter);
 
         $stockModels = ClientMedicationStock::query()
-            ->with(['medication' => fn ($q) => $q->with(['client:id,first_name,last_name,site_id,room_id', 'client.site:id,name', 'client.room:id,name'])])
+            ->with(['lots', 'medication' => fn ($q) => $q->with(['client:id,first_name,last_name,site_id,room_id', 'client.site:id,name', 'client.room:id,name'])])
             ->whereHas('medication', fn ($q) => $q->active()
                 ->when(! $canViewControlled, fn ($medications) => $medications->where('controlled_drug', false))
                 ->whereHas('client', fn ($c) => $c->whereIn('site_id', $readerSiteIds))
@@ -2598,8 +2603,8 @@ class EmarController extends Controller
             'mar_url' => $this->marUrlFor($s->medication?->client_id),
             'site_id' => $s->medication?->client?->site_id,
             'site_name' => $s->medication?->client?->site?->name,
-            'on_hand' => $s->on_hand !== null
-                ? MedicationStockQuantity::toFloat($s->on_hand)
+            'on_hand' => $s->availableQuantity() !== null
+                ? MedicationStockQuantity::toFloat($s->availableQuantity())
                 : null,
             'unit' => $s->unit,
             'reorder_level' => $s->reorder_level,
@@ -2608,8 +2613,9 @@ class EmarController extends Controller
             'controlled' => (bool) $s->medication?->controlled_drug,
             'storage_condition' => $s->storage_condition ?? 'ambient',
             'requires_cold_chain' => $s->requiresColdChain(),
-            'expiry_date' => $s->expiry_date?->toDateString(),
-            'batch_number' => $s->batch_number,
+            'expiry_date' => $s->currentExpiryDate()?->toDateString(),
+            'batch_number' => $s->currentBatchNumber(),
+            'pack_workflow_url' => ! $s->medication?->controlled_drug ? $s->pack_workflow_url : null,
             'supplier_name' => $s->supplier_name,
             'reorder_quantity' => $s->reorder_quantity,
             'is_expired' => $s->isExpired(),
@@ -2730,7 +2736,7 @@ class EmarController extends Controller
             'pharmacyOrders' => $pharmacyOrders,
             'clients' => $this->governanceScope->clientPicker($accessibleSiteIds),
             'activeMedications' => ClientMedication::active()
-                ->with('client:id,first_name,last_name')
+                ->with(['client:id,first_name,last_name', 'stock.lots'])
                 ->when(! $canViewControlled, fn ($medications) => $medications->where('controlled_drug', false))
                 ->whereHas('client', fn ($q) => $q->whereIn('site_id', $readerSiteIds))
                 ->when($clientFilter, $byClient)
@@ -2741,6 +2747,7 @@ class EmarController extends Controller
                     'name' => $medication->name,
                     'client_id' => $medication->client_id,
                     'controlled' => (bool) $medication->controlled_drug,
+                    'pack_workflow_url' => ! $medication->controlled_drug ? $medication->stock?->pack_workflow_url : null,
                     'client' => $medication->client ? [
                         'first_name' => $medication->client->first_name,
                         'last_name' => $medication->client->last_name,
@@ -3781,7 +3788,8 @@ class EmarController extends Controller
                 'client_id' => $m->client_id,
                 'client_name' => $m->client ? trim($m->client->first_name.' '.$m->client->last_name) : 'Unknown',
                 'stock' => $m->stock ? [
-                    'on_hand' => $m->stock->on_hand,
+                    'on_hand' => $m->stock->availableQuantity(),
+                    'pack_workflow_url' => $m->stock->pack_workflow_url,
                     'unit' => $m->stock->unit,
                 ] : null,
             ])->values(),
@@ -6685,6 +6693,7 @@ class EmarController extends Controller
                 ]);
             }
 
+            $stock->rejectScalarWrite('quantity');
             $before = MedicationStockQuantity::normalize($stock->on_hand ?? 0);
             $qty = $payload['quantity'];
 
@@ -7164,6 +7173,10 @@ class EmarController extends Controller
                     return redirect()->back()->withErrors(['status' => 'Order cannot be advanced from its current status.']);
                 }
 
+                // New pack orders require the explicit communication/dispense/receipt workflow.
+                // Replay above still returns evidence from a previously completed legacy request.
+                $packStock = ClientMedicationStock::where('client_medication_id', $medication->id)->lockForUpdate()->first();
+                $packStock?->rejectScalarWrite('status');
                 $updateData = ['status' => $nextStatus];
                 switch ($nextStatus) {
                     case 'submitted':
@@ -7584,6 +7597,7 @@ class EmarController extends Controller
                     ]);
                 }
 
+                $stock->rejectScalarWrite('quantity');
                 $stock->on_hand = $this->addMedicationStockBalanceOrFail(
                     $stock->on_hand ?? 0,
                     $validated['quantity'],
@@ -7691,6 +7705,16 @@ class EmarController extends Controller
                         throw ValidationException::withMessages($errors);
                     }
                 }
+                if ($lockedStock->lots_started_at !== null && ! $medication->controlled_drug) {
+                    $submitted = array_intersect_key($validated, array_flip(['batch_number', 'expiry_date']));
+                    $changed = (array_key_exists('batch_number', $submitted) && ($submitted['batch_number'] ?: null) !== $lockedStock->batch_number)
+                        || (array_key_exists('expiry_date', $submitted) && ($submitted['expiry_date'] ?: null) !== $lockedStock->expiry_date?->toDateString());
+                    if ($changed) {
+                        $lockedStock->rejectScalarWrite('batch_number');
+                    }
+                    // Aggregate batch metadata is historic evidence; pack labels are recorded at receipt.
+                    $validated = array_diff_key($validated, array_flip(['batch_number', 'expiry_date']));
+                }
                 $lockedStock->update($validated);
 
                 AuditLogger::logOrFail('medications.stock.metadata.update', $lockedStock, [
@@ -7785,6 +7809,7 @@ class EmarController extends Controller
                         'unit' => 'units',
                     ]);
                 }
+                $stock->rejectScalarWrite('new_quantity');
                 $onHandBefore = MedicationStockQuantity::normalize($stock->on_hand ?? 0);
                 $stock->update([
                     'on_hand' => $validated['new_quantity'],

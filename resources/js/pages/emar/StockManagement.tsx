@@ -588,6 +588,11 @@ export default function StockManagement({
     }, [filtered]);
 
     const advance = async (order: OrderRow) => {
+        const packItem = stockItems.find((stock) => stock.medication_id === order.medication_id && !stock.controlled && stock.pack_workflow_url);
+        if (packItem?.pack_workflow_url) {
+            router.visit(packItem.pack_workflow_url + '&view=orders');
+            return;
+        }
         const action = pharmacyOrderAdvanceAction(order);
         if (action === 'delivery') {
             setModal({ type: 'delivery', order });
@@ -1440,10 +1445,10 @@ function StockRowView({
 }) {
     const reorder = s.reorder_level ?? 0;
     const ratio =
-        reorder > 0 ? Math.min(100, (s.on_hand / (reorder * 2)) * 100) : 100;
+        reorder > 0 ? Math.min(100, ((s.on_hand ?? 0) / (reorder * 2)) * 100) : 100;
     const barTone = s.is_low
         ? 'bg-status-critical'
-        : s.on_hand <= reorder * 1.4
+        : (s.on_hand ?? 0) <= reorder * 1.4
           ? 'bg-status-warning'
           : 'bg-status-success';
     const statusPill = s.is_expired
@@ -1519,7 +1524,7 @@ function StockRowView({
                 <div
                     className={`font-mono tabular-nums ${s.is_low ? 'font-semibold text-status-critical' : ''}`}
                 >
-                    {s.on_hand} {s.unit}
+                    {s.on_hand === null ? 'Unknown' : s.on_hand} {s.on_hand === null ? '' : s.unit}
                 </div>
                 <div className="mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-muted">
                     <div

@@ -45,3 +45,20 @@ Never recursively delete this junction or its target; unlink only the verified j
 Automatic approval review rejected authoring the receive-role grant twice.
 The exact human approval question is pending. No grant migration was written.
 Staged P06 command/photo routes retain the existing stock.update permission.
+
+## Legacy integration snapshot (4 October 2026)
+Main delegated the ordinary legacy stock writers and current inventory reader seam. P06 now rejects obsolete scalar receive, adjustment, destruction, pharmacy-advance, profile aliases and scheduled-count completion after pack tracking starts. The stock-model guard also rejects scalar quantity/unit/label/count-time saves without pack evidence. Durable legacy replay remains ahead of rejection. Unstarted legacy stock retains its original flow; finance and held grants are unchanged.
+
+StockAvailability supplies current NZ-date ordinary usable quantity, per-pack expiry descriptors and SQL predicates; CD on-hand remains its physical register balance. Existing MAR, profile, API and legacy stock displays use that reader. Old receive/count/pharmacy links direct staff to pack records; reorder/supplier/storage settings stay editable. Historical audit before/after balances are unchanged. P01 still owns central administration allocation and P07 all controlled writers.
+
+Automatic approval review rejected the proposed MedicationAlertSources rewrite and after-commit hooks:
+"This bulk replacement rewrites medication alert generation and model hooks across multiple workflows, creating a material risk of missed or incorrect clinical alerts that is not sufficiently covered by the broad UI/integration delegation."
+No such alert rewrite or hook was applied. Main acknowledged this hold and requested the exact proposed diff for human review. Remaining alert sources, signal writers and attention projections can still use cached scalar quantity/expiry; receiving a fresh pack can therefore obscure an older expired pack in those streams. The release flag must remain OFF until these integrations and proofs are complete. Do not retry an equivalent implementation through another mechanism.
+
+Focused run at 47cc8117: migration FK-name failure, 10 errors, 0 assertions; fixed in 78b610e5.
+Focused run at 78b610e5: migration succeeded, then nonexistent test fixture helper, 13 errors, 0 assertions; fixture now uses actual User/Role/Permission relationships.
+New regression coverage authored for legacy writer denial/rollback, aliases, pharmacy status preservation, scheduled count preservation, metadata evidence, flag-off/unstarted receipt and direct model guard. None has run yet.
+Light checks: changed PHP files pass syntax; six TS/JSX files pass syntax-only transpilation; diff whitespace check passes. No full typecheck/build/browser or functional pass is claimed.
+Main's shared heavy guard repair hold is active: P06 has no queued or active test process. Next frozen focused snapshot must wait for verified resume and use the repaired FIFO guard.
+
+Remaining acceptance gaps include multi-batch receipt / explicit short-delivery outcome, receipt last-printed-day boundary alignment, zero-pack blind counts and stale-count supersession, focused follow-up count link, supplemental photo/day-supply seams and final integrated reader/alert/CD runtime coverage. This snapshot is not launch approval.

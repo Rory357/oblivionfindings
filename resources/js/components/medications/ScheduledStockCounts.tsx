@@ -72,6 +72,7 @@ export default function ScheduledStockCounts({
     onUpdate,
 }: ScheduledStockCountsProps) {
     const [counts, setCounts] = useState<StockCount[]>([]);
+    const [packWorkflowUrl, setPackWorkflowUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [showAddForm, setShowAddForm] = useState(false);
@@ -105,6 +106,7 @@ export default function ScheduledStockCounts({
                 `/api/medications/clients/${clientId}/medications/${medicationId}/scheduled-counts`,
             );
             setCounts(response.data.counts);
+            setPackWorkflowUrl(response.data.medication?.pack_workflow_url ?? null);
         } catch (error) {
             console.error('Failed to load stock counts:', error);
         } finally {
@@ -455,7 +457,8 @@ export default function ScheduledStockCounts({
                                                     ` at ${count.scheduled_time}`}
                                             </span>
                                         </div>
-                                        {count.status === 'pending' && (
+                                        {count.status === 'pending' && packWorkflowUrl && <Button asChild size="sm" variant="outline"><a href={packWorkflowUrl + '&view=counts'}>Open pack counts</a></Button>}
+                                        {count.status === 'pending' && !packWorkflowUrl && (
                                             <Button
                                                 size="sm"
                                                 variant="outline"
