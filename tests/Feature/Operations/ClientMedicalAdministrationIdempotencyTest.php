@@ -119,6 +119,9 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
             'status' => 'in_progress',
         ]);
 
+        // Entered the day before: nothing is owed before an order exists, so
+        // an order entered at 08:10 would owe no 08:00 dose today.
+        Carbon::setTestNow(Carbon::now()->subDay());
         $this->medication = ClientMedication::query()->create([
             'client_id' => $this->client->id,
             'name' => 'Paracetamol',
@@ -130,6 +133,7 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
             'active' => true,
             'state' => 'active',
         ]);
+        Carbon::setTestNow(Carbon::now()->addDay());
 
         $notification = Mockery::mock(NotificationService::class);
         $notification->shouldReceive('notifyCrud')->andReturnNull();

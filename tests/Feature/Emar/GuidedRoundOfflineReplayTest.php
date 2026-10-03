@@ -41,6 +41,10 @@ class GuidedRoundOfflineReplayTest extends TestCase
     {
         parent::setUp();
 
+        // A fixed NZ morning inside the 08:00 round's window: the tests record
+        // the 08:00 dose "now", which only works between 07:30 and 09:00.
+        Carbon::setTestNow(Carbon::parse('2026-07-01 08:10:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
+
         $this->seed(RbacSeeder::class);
         Cache::flush();
 
@@ -95,6 +99,8 @@ class GuidedRoundOfflineReplayTest extends TestCase
             'status' => 'in_progress',
         ]);
 
+        // Entered the day before: nothing is owed before an order exists.
+        Carbon::setTestNow(Carbon::now()->subDay());
         $this->medication = ClientMedication::query()->create([
             'client_id' => $this->client->id,
             'name' => 'Loratadine',
@@ -104,6 +110,7 @@ class GuidedRoundOfflineReplayTest extends TestCase
             'active' => true,
             'state' => 'active',
         ]);
+        Carbon::setTestNow(Carbon::now()->addDay());
 
         $this->round = MedicationRound::query()->create([
             'service_context_id' => $this->serviceContext->id,
@@ -118,6 +125,13 @@ class GuidedRoundOfflineReplayTest extends TestCase
             'started_at' => now(),
             'total_medications' => 1,
         ]);
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
     }
 
     public function test_duplicate_round_admin_uuid_is_idempotent(): void
