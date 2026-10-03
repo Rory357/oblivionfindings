@@ -42,4 +42,3 @@ class StockLotRulesTest extends TestCase
         StockLotRules::monthExpiry('13/2027');
     }
 }
-

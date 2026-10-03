@@ -138,4 +138,3 @@ test('checkPrnInterval returns unblocked when min_hours is zero', function () {
 
     expect($result['blocked'])->toBeFalse();
 });
-

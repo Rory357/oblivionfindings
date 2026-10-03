@@ -176,4 +176,3 @@ export function CountReview({ record, canManage = false, onClose, onSaved }: { r
         <ConfirmDialog open={confirm} onClose={() => setConfirm(false)} onConfirm={() => void save()} processing={command.saving} title="Apply these counted quantities?" description="This changes the stock balance and records your reason. Historic receipts, movements and this count stay intact." confirmText="Apply count" variant="default" />
     </>;
 }
-

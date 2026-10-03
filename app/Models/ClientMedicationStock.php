@@ -196,5 +196,3 @@ class ClientMedicationStock extends Model
         return $this->isLowStock() || $this->isExpiringSoon() || $this->isExpired();
     }
 }
-
-

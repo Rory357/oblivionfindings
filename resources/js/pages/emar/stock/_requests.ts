@@ -42,4 +42,3 @@ export function useStockCommand() {
     };
     return { saving, errors, run };
 }
-

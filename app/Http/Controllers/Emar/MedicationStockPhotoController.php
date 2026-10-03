@@ -116,4 +116,3 @@ final class MedicationStockPhotoController extends Controller
             : $disk->response($photo->path, $photo->original_name, $headers, 'inline');
     }
 }
-

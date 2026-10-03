@@ -41,5 +41,3 @@ class MedicationStockMovement extends Model
         return $this->belongsTo(self::class, 'return_of_id');
     }
 }
-
-

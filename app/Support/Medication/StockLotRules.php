@@ -57,4 +57,3 @@ final class StockLotRules
             self::usable($lot, $today) ? MedicationStockQuantity::add($sum, $lot['quantity_remaining']) : $sum, '0.00');
     }
 }
-

@@ -32,4 +32,3 @@ class PharmacySupplyRulesTest extends TestCase
         PharmacySupplyRules::assertClosure('part_received', 'cancelled', 'Pharmacy cannot supply the rest.');
     }
 }
-

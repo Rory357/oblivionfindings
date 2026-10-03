@@ -8,4 +8,3 @@ export type StockCount = { id: number; medication_id: number; medication_name: s
 export type Movement = { id: number; medication_id: number; medication_name: string; client_name: string; kind: string; quantity: string; balance_before: string; balance_after: string; reason: string; notes: string | null; recorded_at: string; recorded_by_name: string | null };
 export type Capabilities = { receive: boolean; manage: boolean; controlled: boolean };
 export type StockResponse = { success: true; lot_id?: number; lot_ids?: number[]; quantity_received?: string; order_id?: number; count_id?: number; movement_id?: number; stock_id?: number };
-

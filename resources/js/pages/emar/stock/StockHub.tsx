@@ -179,4 +179,3 @@ function ItemWorkspace({ id, initialAction, order, pharmacies, can, lotsEnabled,
         <FilePreviewDialog file={file} onClose={() => setFile(null)} />
     </>;
 }
-

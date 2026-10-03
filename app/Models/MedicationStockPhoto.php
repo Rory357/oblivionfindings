@@ -32,4 +32,3 @@ class MedicationStockPhoto extends Model
         return $this->belongsTo(User::class, 'taken_by');
     }
 }
-

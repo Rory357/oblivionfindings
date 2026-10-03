@@ -101,5 +101,3 @@ return new class extends Migration
         throw new RuntimeException('Stock lot and movement evidence must be retained. Use a reviewed forward migration.');
     }
 };
-
-

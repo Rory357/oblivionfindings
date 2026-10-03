@@ -34,4 +34,3 @@ class MedicationStockCountRecord extends Model
         return $this->belongsTo(User::class, 'counted_by');
     }
 }
-

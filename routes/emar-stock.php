@@ -19,4 +19,3 @@ Route::middleware(['auth', 'permission:medications.view'])->prefix('emar/stock/p
     Route::get('/{photo}', [MedicationStockPhotoController::class, 'view'])->whereNumber('photo')->name('emar.stock.photos.view');
     Route::get('/{photo}/download', [MedicationStockPhotoController::class, 'download'])->whereNumber('photo')->name('emar.stock.photos.download');
 });
-

@@ -503,7 +503,3 @@ final class MedicationStockService
         }
     }
 }
-
-
-
-

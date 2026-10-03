@@ -54,4 +54,3 @@ class MedicationStockLot extends Model
         return $this->belongsTo(MedicationPharmacyOrder::class);
     }
 }
-

@@ -686,4 +686,3 @@ PHP;
         $this->assertSame(1, MedicationStockPhoto::count());
     }
 }
-
