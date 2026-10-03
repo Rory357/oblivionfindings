@@ -183,22 +183,105 @@ const fmtDateTime = (iso: string) =>
         hour: '2-digit',
         minute: '2-digit',
     });
-const CATEGORY_LINK: Record<string, { href: string; label: string }> = {
-    doses: { href: '/emar/mar', label: 'MAR chart' },
-    controlled: { href: '/emar/controlled', label: 'CD register' },
-    clinical: { href: '/emar/reviews', label: 'Reviews' },
-    stock: { href: '/emar/destructions', label: 'Destruction register' },
-    errors: { href: '/emar/errors', label: 'Error register' },
+type EventLink = { href: string; label: string; clientFilter?: boolean };
+const MAR_LINK: EventLink = {
+    href: '/emar/mar',
+    label: 'MAR chart',
+    clientFilter: true,
+};
+const MEDICINES_LINK: EventLink = {
+    href: '/emar/medications',
+    label: 'Medicines',
+    clientFilter: true,
+};
+const CONTROLLED_LINK: EventLink = {
+    href: '/emar/controlled',
+    label: 'CD register',
+    clientFilter: true,
+};
+const ORDERS_LINK: EventLink = {
+    href: '/emar/prescriptions',
+    label: 'Orders',
+};
+const REVIEWS_LINK: EventLink = {
+    href: '/emar/reviews',
+    label: 'Reviews',
+    clientFilter: true,
+};
+const STOCK_LINK: EventLink = {
+    href: '/emar/stock',
+    label: 'Stock',
+    clientFilter: true,
+};
+const ERRORS_LINK: EventLink = {
+    href: '/emar/errors',
+    label: 'Error register',
+};
+const EVENT_LINK: Record<string, EventLink> = {
+    dose_administered: MAR_LINK,
+    dose_refused: MAR_LINK,
+    dose_missed: MAR_LINK,
+    dose_withheld: MAR_LINK,
+    dose_pending: MAR_LINK,
+    dose_recorded: MAR_LINK,
+    correction_submitted: MAR_LINK,
+    correction_approved: MAR_LINK,
+    correction_rejected: MAR_LINK,
+    correction_recorded: MAR_LINK,
+    omission: MAR_LINK,
+    medication_started: MEDICINES_LINK,
+    medication_ceased: MEDICINES_LINK,
+    medication_changed: MEDICINES_LINK,
+    prescriber_order: ORDERS_LINK,
+    review_completed: { ...REVIEWS_LINK, href: '/emar/reviews?view=recorded' },
+    cd_given: CONTROLLED_LINK,
+    cd_received: CONTROLLED_LINK,
+    cd_wasted: CONTROLLED_LINK,
+    cd_adjustment: CONTROLLED_LINK,
+    cd_balance_check: CONTROLLED_LINK,
+    destruction: {
+        ...CONTROLLED_LINK,
+        href: '/emar/controlled?view=destructions',
+        label: 'Destruction register',
+    },
+    stock_received: STOCK_LINK,
+    medication_error: ERRORS_LINK,
+};
+const SOURCE_LINK: Record<string, EventLink> = {
+    MAR: MAR_LINK,
+    CD: CONTROLLED_LINK,
+    Orders: ORDERS_LINK,
+    Clinical: REVIEWS_LINK,
+    Stock: STOCK_LINK,
+    Errors: ERRORS_LINK,
 };
 
 const HIDDEN_DETAIL_KEYS = new Set(['changes', 'scheduled_for']);
 
-/** The primary cross-link for an event (MAR chart / CD register / Reviews / …),
- *  shared by the drawer footer and the row context menu so both stay in sync. */
+/** Shared by the drawer and row menu. Event type takes priority because MAR
+ *  includes medicine changes and Stock includes both receipts and destructions. */
 export const eventPrimaryLink = (
     event: AuditEvent,
-): { href: string; label: string } =>
-    CATEGORY_LINK[event.category] ?? { href: '/emar', label: 'eMAR' };
+): { href: string; label: string } => {
+    const link: EventLink = EVENT_LINK[event.event_type] ??
+        SOURCE_LINK[event.source] ?? { href: '/emar', label: 'eMAR' };
+    return { href: eventLinkHref(link, event), label: link.label };
+};
+
+function eventLinkHref(link: EventLink, event: AuditEvent): string {
+    // Only add a person filter that the destination's reader actually applies.
+    // Orders uses client_id as entry prefill; Errors does not filter by it.
+    const clientId = event.client_id;
+    return link.clientFilter &&
+        clientId !== null &&
+        Number.isSafeInteger(clientId) &&
+        clientId > 0
+        ? link.href +
+              (link.href.includes('?') ? '&' : '?') +
+              'client_id=' +
+              clientId
+        : link.href;
+}
 
 export function MedicationEventDrawer({
     event,
@@ -221,11 +304,10 @@ export function MedicationEventDrawer({
             v !== undefined &&
             v !== '',
     );
-    const link = CATEGORY_LINK[event.category];
-    const primaryHref =
-        event.category === 'doses' ? '/emar/mar' : (link?.href ?? '/emar');
+    const link = eventPrimaryLink(event);
+    const primaryHref = link.href;
     const resolveHref = event.flags.includes('missing_witness')
-        ? '/emar/controlled'
+        ? eventLinkHref(CONTROLLED_LINK, event)
         : primaryHref;
     const isGap = event.flags.length > 0;
 
@@ -695,7 +777,7 @@ export function MedicationEventDrawer({
                                     onClick={() => router.visit(primaryHref)}
                                 >
                                     <Eye className="h-4 w-4" />
-                                    Open on {link?.label ?? 'eMAR'}
+                                    Open on {link.label}
                                 </Button>
                                 <Button
                                     variant="ghost"
