@@ -69,7 +69,7 @@ export function AsNeededView({
                 <ListCaption title="As-needed medicines for people on your shift" caption={`${rows.length} of ${medications.length} shown`} />
                 {rows.length === 0 ? (
                     <Card className="p-2">
-                        <EmptyState icon={Pill} title={medications.length ? 'No as-needed medicines match' : 'No as-needed medicines'} description={medications.length ? 'Clear the search or choose “All people”.' : 'Nobody on your shift has an as-needed medicine ordered.'} />
+                        <EmptyState icon={Pill} title={medications.length ? 'No as-needed medicines match' : 'No as-needed medicines to show'} description={medications.length ? 'Clear the search or choose “All people”.' : 'This view shows current medicines available to you. Check the person’s medication record or ask the house lead if you need to confirm an order.'} />
                     </Card>
                 ) : (
                     <EntityTable<PrnMedication>
