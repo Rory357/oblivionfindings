@@ -34,7 +34,7 @@ class PersonMedicationRecordTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Carbon::setTestNow(Carbon::parse('2026-10-03 09:00', 'Pacific/Auckland'));
+        Carbon::setTestNow(Carbon::parse('2026-10-03 09:00', 'Pacific/Auckland')->utc());
         $this->seed(RbacSeeder::class);
         config(['medications.person_record' => 'p02']);
         $this->site = Site::factory()->create(['is_active' => true]);

@@ -34,7 +34,7 @@ class PersonMedicationCommandsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Carbon::setTestNow(Carbon::parse('2026-10-03 09:00', 'Pacific/Auckland'));
+        Carbon::setTestNow(Carbon::parse('2026-10-03 09:00', 'Pacific/Auckland')->utc());
         $this->seed(RbacSeeder::class);
         $site = Site::factory()->create(['is_active' => true]);
         $this->person = Client::factory()->create(['site_id' => $site->id]);
