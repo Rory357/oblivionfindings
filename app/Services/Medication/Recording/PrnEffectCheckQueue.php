@@ -26,7 +26,9 @@ final class PrnEffectCheckQueue
             ->where('status', 'given')
             ->where('administered_at', '<=', $now->copy()->utc())
             ->whereHas('medication', fn ($orders) => $orders->where('is_prn', true))
-            ->whereDoesntHave('prnEffectiveness');
+            ->whereDoesntHave('prnEffectiveness', fn ($effects) => $effects
+                ->whereColumn('medication_prn_effectiveness.client_id', 'client_medication_administrations.client_id')
+                ->whereColumn('medication_prn_effectiveness.client_medication_id', 'client_medication_administrations.client_medication_id'));
 
         $governance = app(MedicationGovernanceScopeService::class);
         $governance->scopeCanonicalClientMedicationRows($query, null, false);

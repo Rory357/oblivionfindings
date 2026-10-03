@@ -116,6 +116,8 @@ export interface MyDayMedDue {
     can_record: boolean;
     can_give: boolean;
     scheduled_for: string;
+    /** Canonical window state; due-soon list status alone is not due now. */
+    state?: string;
     /**
      * pending_check: waiting for the order check — shown, not recordable.
      * missed: recorded as missed — "Missed (recorded)", never overdue.

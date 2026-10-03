@@ -880,6 +880,9 @@ class MyTasksController extends Controller
                     if ($scheduled->lt($windowStart) || $scheduled->gt($windowEnd)) {
                         continue;
                     }
+                    if ($dose['state'] === 'self_managed') {
+                        continue;
+                    }
 
                     $scheduledIso = $scheduled->toIso8601String();
                     $snoozeKey = sprintf(
@@ -934,6 +937,7 @@ class MyTasksController extends Controller
                         'can_give' => ! $awaitingCheck && $canRecord && ! $med->controlled_drug,
                         'scheduled_for' => $scheduledIso,
                         'status' => $status,
+                        'state' => $dose['state'],
                         // Away (C7): why, shown as "Away · reason".
                         'away_reason' => $status === 'away' ? $dose['away_reason'] : null,
                         'emar_url' => $canOpenEmar

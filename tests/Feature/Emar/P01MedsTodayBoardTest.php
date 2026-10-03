@@ -6,7 +6,9 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationPrnEffectiveness;
 use App\Models\MedicationRefusalFollowup;
+use App\Models\MedicationRound;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -14,6 +16,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\Recording\RecordingContract;
+use App\Services\Tasks\Providers\MedicationRoundProvider;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -234,17 +237,17 @@ class P01MedsTodayBoardTest extends TestCase
         $this->shift(clockedIn: true);
         $this->order($this->client, '10 am medicine', ['10:00']);
         foreach ([
-            ['09:15', 'not_due', 'due'],
-            ['09:45', 'due', 'due'],
-            ['10:15', 'due', 'due'],
-            ['10:16', 'late', 'overdue'],
-        ] as [$at, $state, $status]) {
+            ['09:15', 'not_due', 'due', 'notdue'],
+            ['09:45', 'due', 'due', 'due'],
+            ['10:15', 'due', 'due', 'due'],
+            ['10:16', 'late', 'overdue', 'late'],
+        ] as [$at, $state, $status, $window]) {
             Carbon::setTestNow(Carbon::parse('2026-04-30 '.$at, self::TZ)->utc());
             $this->actingAs($this->worker)->get('/meds/today')->assertOk()
                 ->assertInertia(fn (Assert $page) => $page
                     ->where('schedule.0.state', $state)
                     ->where('schedule.0.status', $status)
-                    ->where('schedule.0.requirements.due.state', $state)
+                    ->where('schedule.0.requirements.window', $window)
                 );
         }
     }
@@ -313,6 +316,91 @@ class P01MedsTodayBoardTest extends TestCase
             ->get('/meds/today?view=activity&q=sertra')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('activity_page.total', 1));
+    }
+
+    public function test_rostered_round_tasks_are_read_only_and_share_the_calendar_source(): void
+    {
+        $this->shift(clockedIn: true);
+        $this->order($this->client, 'Morning medicine', ['09:30']);
+        $round = $this->round();
+        $provider = app(MedicationRoundProvider::class);
+
+        $tasks = $provider->authorizedTasks($this->worker);
+        $this->assertCount(1, $tasks);
+        $this->assertNull($tasks[0]->assignee);
+        $this->assertStringContainsString('view=schedule', $tasks[0]->link);
+        $this->assertStringContainsString('A lead can assign', $tasks[0]->actionHelp);
+        $this->actingAs($this->worker)->postJson('/meds/rounds/'.$round->id.'/guided/start')->assertForbidden();
+
+        $events = $provider->calendar($this->worker, now(self::TZ)->startOfDay(), now(self::TZ)->endOfDay());
+        $this->assertCount(1, $events);
+        $this->assertSame($tasks[0]->id, $events[0]['id']);
+        $this->assertSame('2026-04-30T09:30:00+12:00', $events[0]['start']);
+        $this->assertArrayNotHasKey('end', $events[0]);
+    }
+
+    public function test_round_tasks_recheck_roster_person_scope_and_current_permission(): void
+    {
+        $this->order($this->client, 'Visible medicine', ['09:30']);
+        $this->round();
+        $provider = app(MedicationRoundProvider::class);
+        $this->assertSame([], $provider->authorizedTasks($this->worker));
+        $this->shift(clockedIn: true);
+        $this->assertCount(1, $provider->authorizedTasks($this->worker));
+        $this->setPermissions(['medications.view' => false, 'medications.administer.record' => false]);
+        $this->assertSame([], $provider->authorizedTasks($this->worker));
+    }
+
+    public function test_rostered_round_progress_counts_concealed_work_without_disclosing_it(): void
+    {
+        $this->setPermissions(['medications.controlled.view' => false, 'medications.controlled.record' => false]);
+        $this->shift(clockedIn: true);
+        $order = $this->order($this->client, 'PRIVATE CONTROLLED TASK MEDICINE', ['09:30'], ['controlled_drug' => true]);
+        $other = $this->person('PRIVATE TASK PERSON', 'Outside');
+        $this->order($other, 'PRIVATE OTHER MEDICINE', ['09:30']);
+        $this->round();
+        $provider = app(MedicationRoundProvider::class);
+        $tasks = $provider->authorizedTasks($this->worker);
+        $this->assertCount(1, $tasks);
+        $this->assertSame('0/1 staff doses recorded', $tasks[0]->description);
+        $this->assertStringNotContainsString('PRIVATE', json_encode($tasks));
+
+        ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id, 'client_medication_id' => $order->id,
+            'administered_by' => $this->worker->id, 'administered_at' => now(),
+            'scheduled_for' => now(), 'status' => 'given',
+        ]);
+        $this->assertSame([], $provider->authorizedTasks($this->worker));
+        $this->assertSame('completed', $provider->authorizedTasks($this->worker, ['include_done' => true])[0]->status);
+    }
+
+    public function test_a_mismatched_effect_child_cannot_hide_an_unresolved_as_needed_check(): void
+    {
+        $this->shift(clockedIn: true);
+        $order = $this->order($this->client, 'Visible as needed', [], ['is_prn' => true]);
+        $other = $this->person('Restricted', 'Person');
+        $foreign = $this->order($other, 'PRIVATE EFFECT CHILD MEDICINE', [], ['is_prn' => true]);
+        $dose = ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id, 'client_medication_id' => $order->id,
+            'administered_by' => $this->worker->id, 'administered_at' => now()->subHour(), 'status' => 'given',
+        ]);
+        MedicationPrnEffectiveness::query()->create([
+            'client_medication_administration_id' => $dose->id,
+            'client_id' => $other->id, 'client_medication_id' => $foreign->id,
+            'reviewed_by' => $this->worker->id, 'reviewed_at' => now(), 'effectiveness' => 'effective',
+        ]);
+        $this->actingAs($this->worker)->get('/meds/today')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('prn_follow_ups', 1)->where('prn_follow_ups.0.administration_id', $dose->id));
+    }
+
+    private function round(): MedicationRound
+    {
+        return MedicationRound::query()->create([
+            'site_id' => $this->site->id, 'service_context_id' => $this->context->id,
+            'name' => 'Morning', 'round_date' => '2026-04-30', 'scheduled_time' => '09:30',
+            'window_minutes' => 30, 'status' => 'pending', 'assigned_to' => null,
+        ]);
     }
 
     private function person(string $first, string $last): Client

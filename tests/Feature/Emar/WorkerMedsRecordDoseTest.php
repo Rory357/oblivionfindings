@@ -22,17 +22,19 @@ use App\Models\User;
 use App\Models\UserWitnessPin;
 use App\Services\ControlRoom\SignalProcessingService;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Medication\Audit\MedicationEventRecorder;
 use App\Services\Medication\MedicationSignalService;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationIncidentIntegrationService;
+use App\Services\MedicationScanVerificationService;
 use Carbon\Carbon;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Testing\AssertableInertia as Assert;
 use RuntimeException;
 use Tests\TestCase;
-use Database\Factories\UserFactory;
 
 /**
  * Desktop medication board — scheduled-dose recording (Record Dose wizard),
@@ -183,9 +185,9 @@ class WorkerMedsRecordDoseTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('scan_code');
         $this->assertDatabaseCount('client_medication_administrations', 0);
 
-        $payload['scan_code'] = app(\App\Services\MedicationScanVerificationService::class)->internalCode($this->client, $medication);
+        $payload['scan_code'] = app(MedicationScanVerificationService::class)->internalCode($this->client, $medication);
         $payload['shift_id'] = 999999999;
-        $this->actingAs($this->worker)->postJson('/meds/today/record', $payload)->assertNotFound();
+        $this->actingAs($this->worker)->postJson('/meds/today/record', $payload)->assertForbidden();
         $this->assertDatabaseCount('client_medication_administrations', 0);
         $payload['shift_id'] = Shift::query()->where('user_id', $this->worker->id)->sole()->id;
         $payload['client_request_uuid'] = '09e7da73-b562-49f0-895b-b51991584892';
@@ -199,7 +201,7 @@ class WorkerMedsRecordDoseTest extends TestCase
     public function test_audit_append_failure_rolls_back_the_dose_and_its_follow_up(): void
     {
         $medication = $this->scheduledMedication(['09:30']);
-        $this->mock(\App\Services\Medication\Audit\MedicationEventRecorder::class)
+        $this->mock(MedicationEventRecorder::class)
             ->shouldReceive('append')->once()->andThrow(new RuntimeException('Audit recorder unavailable'));
         $this->withoutExceptionHandling();
         try {

@@ -31,6 +31,8 @@ use App\Services\Tasks\Providers\ItProvisioningTaskProvider;
 use App\Services\Tasks\Providers\ItRecurrenceFailureTaskProvider;
 use App\Services\Tasks\Providers\ItWorkTaskProvider;
 use App\Services\Tasks\Providers\MedicationErrorProvider;
+use App\Services\Tasks\Providers\MedicationFollowupProvider;
+use App\Services\Tasks\Providers\MedicationRoundProvider;
 use App\Services\Tasks\Providers\RespiteTaskProvider;
 use App\Services\Tasks\Providers\RestraintReviewProvider;
 use App\Services\Tasks\Providers\SafeguardingActionPlanProvider;
@@ -48,7 +50,7 @@ use Illuminate\Support\Facades\Route;
 it('registers every task source behind exactly one authorization boundary', function () {
     $providers = TaskAggregator::defaultProviders();
 
-    expect($providers)->toHaveCount(31);
+    expect($providers)->toHaveCount(33);
     expect(collect($providers)->mapWithKeys(fn (TaskProvider $provider): array => [
         $provider::class => $provider->sourceKey(),
     ])->all())->toBe([
@@ -73,6 +75,8 @@ it('registers every task source behind exactly one authorization boundary', func
         FleetMaintenanceProvider::class => 'fleet_maintenance',
         FleetFinanceReviewProvider::class => 'fleet_finance_review',
         MedicationErrorProvider::class => 'med_error',
+        MedicationFollowupProvider::class => 'medication-followup',
+        MedicationRoundProvider::class => 'medication-round',
         CdLossReportProvider::class => 'cd_loss',
         DataBreachProvider::class => 'breach',
         DataSubjectRequestProvider::class => 'dsr',

@@ -93,6 +93,7 @@ class TaskAggregator
             new Providers\MedicationEmergencyAccessReviewProvider,
             new Providers\MedicationPaperGiverConfirmationProvider,
             new Providers\MedicationPaperWitnessConfirmationProvider,
+            new Providers\MedicationRoundProvider,
             new Providers\CdLossReportProvider,
             new Providers\DataBreachProvider,
             new Providers\DataSubjectRequestProvider,

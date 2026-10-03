@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -25,7 +26,7 @@ vi.mock('@/components/emar/record-dose/record-dose-dialog', () => ({
         <div role="dialog" aria-label="Record a dose">
             {entry}|{target.kind}|{target.orderId}|{target.scheduledFor}|
             {shiftContext.shiftId}
-            <button onClick={onClose}>Cancel</button>
+            <Button onClick={onClose}>Cancel</Button>
         </div>
     ),
 }));
