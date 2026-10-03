@@ -135,6 +135,7 @@ class MedicationFollowupWorkflowTest extends TestCase
         $correction = ClientMedicationAdministration::query()->create([
             'client_id' => $this->client->id, 'client_medication_id' => $original->client_medication_id,
             'status' => 'not_given', 'is_correction' => true, 'corrected_of_id' => $original->id,
+            'administered_by' => $this->worker->id,
             'correction_status' => 'approved', 'correction_approved_at' => now(), 'administered_at' => now(),
         ]);
         DB::transaction(function () use ($original, $correction) {
@@ -466,6 +467,7 @@ class MedicationFollowupWorkflowTest extends TestCase
             'client_id' => $this->client->id, 'site_id' => $this->site->id,
             'outgoing_shift_id' => $this->shift->id, 'incoming_shift_id' => $shift->id,
             'outgoing_staff_id' => $this->worker->id, 'incoming_staff_id' => $incoming->id,
+            'handover_notes' => 'Synthetic handover for carry-over regression only.',
             'status' => 'acknowledged', 'acknowledged_at' => now(), 'acknowledged_by' => $incoming->id,
         ]);
         DB::transaction(fn () => $this->work()->acknowledged($handover, $shift, $incoming));
@@ -482,6 +484,8 @@ class MedicationFollowupWorkflowTest extends TestCase
         $handover = ShiftHandover::query()->create([
             'client_id' => $this->client->id, 'site_id' => $this->site->id,
             'outgoing_shift_id' => $this->shift->id, 'incoming_shift_id' => $incoming->id,
+            'outgoing_staff_id' => $this->worker->id, 'incoming_staff_id' => $incoming->user_id,
+            'handover_notes' => 'Synthetic handover for the missed acknowledgement regression only.',
             'status' => 'submitted',
         ]);
         $this->work()->headsUp($handover);

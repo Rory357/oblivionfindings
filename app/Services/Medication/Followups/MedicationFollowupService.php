@@ -95,6 +95,7 @@ final class MedicationFollowupService
             'administration_id' => $administration?->id,
             'owner_id' => $ownerId, 'original_owner_id' => $ownerId,
             'due_at' => $dueAt ? CarbonImmutable::instance($dueAt)->utc() : null,
+            'state' => 'open', 'revision' => 1,
             'context' => $context,
         ]);
         abort_unless((int) $row->client_id === (int) $client->id
