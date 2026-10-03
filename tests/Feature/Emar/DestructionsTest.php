@@ -3,6 +3,7 @@
 namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
@@ -16,6 +17,7 @@ use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Controlled\ControlledPolicy;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -58,6 +60,18 @@ class DestructionsTest extends TestCase
             ]);
         }
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $client->supportWorkers()->syncWithoutDetaching([$user->id]);
+        Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'service_context_id' => $client->service_context_id,
+            'user_id' => $user->id,
+            'starts_at' => now()->utc()->subHour(),
+            'ends_at' => now()->utc()->addHour(),
+            'actual_starts_at' => now()->utc()->subHour(),
+            'status' => 'in_progress',
+            'created_by' => $user->id,
+        ]);
         foreach ([$w1, $w2] as $witness) {
             MedicationCompetencyAssessment::query()->create([
                 'user_id' => $witness->id,
@@ -68,16 +82,18 @@ class DestructionsTest extends TestCase
                 'expiry_date' => today()->addYear(),
                 'assessor_declared_at' => now()->subMonth(),
                 'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+                'controlled_drugs' => true,
                 'can_witness_controlled' => true,
+                'restricted' => false,
             ]);
             Shift::factory()->create([
                 'client_id' => $client->id,
                 'site_id' => $site->id,
                 'service_context_id' => $client->service_context_id,
                 'user_id' => $witness->id,
-                'starts_at' => now()->subHour(),
-                'ends_at' => now()->addHour(),
-                'actual_starts_at' => now()->subHour(),
+                'starts_at' => now()->utc()->subHour(),
+                'ends_at' => now()->utc()->addHour(),
+                'actual_starts_at' => now()->utc()->subHour(),
                 'status' => 'in_progress',
                 'created_by' => $user->id,
             ]);
@@ -182,6 +198,12 @@ class DestructionsTest extends TestCase
     public function test_cd_destruction_rejects_duplicate_witnesses(): void
     {
         ['user' => $user, 'w1' => $w1, 'client' => $client, 'med' => $med] = $this->setupRegister();
+        AppSetting::query()->create(['key' => ControlledPolicy::ONSITE_DESTRUCTION, 'value' => 'on']);
+        ClientMedicationStock::create([
+            'client_medication_id' => $med->id,
+            'on_hand' => 10,
+            'unit' => 'tablets',
+        ]);
 
         $this->actingAs($user)
             ->from('/emar/destructions')
@@ -193,6 +215,13 @@ class DestructionsTest extends TestCase
                 'unit' => 'tablets',
                 'reason' => 'expired',
                 'disposal_method' => 'denaturing',
+                'method' => 'denaturing',
+                'expected_entry_id' => null,
+                'expected_balance' => '10.00',
+                'witnessed_by' => $w1->id,
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+                'second_witness_id' => $w1->id,
+                'second_witness_credential' => 'second-witness-secret',
                 'is_controlled_drug' => true,
                 'witness_1_id' => $w1->id,
                 'witness_1_credential' => 'first-witness-secret',
@@ -202,7 +231,7 @@ class DestructionsTest extends TestCase
                 'denaturing_confirmed' => true,
                 'client_request_uuid' => (string) Str::uuid(),
             ])
-            ->assertSessionHasErrors('witness_2_id');
+            ->assertSessionHasErrors('second_witness_id');
 
         $oldInput = session()->getOldInput();
         $this->assertArrayNotHasKey('witness_1_credential', $oldInput);
@@ -265,6 +294,7 @@ class DestructionsTest extends TestCase
     public function test_cd_destruction_records_with_two_distinct_witnesses(): void
     {
         ['user' => $user, 'w1' => $w1, 'w2' => $w2, 'client' => $client, 'med' => $med] = $this->setupRegister();
+        AppSetting::query()->create(['key' => ControlledPolicy::ONSITE_DESTRUCTION, 'value' => 'on']);
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
             'on_hand' => 10,
@@ -281,6 +311,13 @@ class DestructionsTest extends TestCase
                 'unit' => 'tablets',
                 'reason' => 'expired',
                 'disposal_method' => 'denaturing',
+                'method' => 'denaturing',
+                'expected_entry_id' => null,
+                'expected_balance' => '10.00',
+                'witnessed_by' => $w1->id,
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+                'second_witness_id' => $w2->id,
+                'second_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'is_controlled_drug' => true,
                 'witness_1_id' => $w1->id,
                 'witness_1_credential' => UserFactory::TEST_WITNESS_PIN,
@@ -290,9 +327,18 @@ class DestructionsTest extends TestCase
                 'denaturing_confirmed' => true,
                 'client_request_uuid' => (string) Str::uuid(),
             ])
+            ->assertOk()
             ->assertSessionHasNoErrors();
 
         $this->assertSame(1, MedicationDestruction::count());
+        $this->assertDatabaseHas('medication_destructions', [
+            'client_medication_id' => $med->id,
+            'witness_1_id' => $w1->id,
+            'witness_2_id' => $w2->id,
+            'disposal_method' => 'denaturing',
+        ]);
+        $this->assertSame(8.0, (float) $med->stock()->firstOrFail()->on_hand);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
     }
 
     public function test_destruction_replay_is_single_effect_and_changed_payload_conflicts(): void
