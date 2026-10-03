@@ -308,8 +308,12 @@ class MedicationOrdersWorkflowTest extends TestCase
         $revision = $this->enter($order, ['dosage' => '20 mg']);
         $fileId = $revision->files()->sole()->id;
         $foreign = $this->order(['name' => 'Foreign medicine']);
-        app(MedicationOrderWorkflow::class)->snapshotExisting($foreign);
-        $revision->forceFill(['medication_order_version_id' => $foreign->versions()->sole()->id])->save();
+        $workflow = app(MedicationOrderWorkflow::class);
+        $workflow->snapshotExisting($foreign);
+        // The existing snapshot already has its own unique revision. Build a
+        // free foreign version so this fixture reaches the ownership check.
+        $foreignVersion = $workflow->snapshot($foreign, $workflow->payload($foreign), 2, $this->enterer->id, ['type' => 'written'], 'Foreign source version');
+        $revision->forceFill(['medication_order_version_id' => $foreignVersion->id])->save();
         $this->actingAs($this->checker)->getJson('/emar/orders/'.$order->id)->assertOk()->assertJsonCount(1, 'revisions')->assertJsonMissing(['name' => 'Foreign medicine']);
         $this->actingAs($this->checker)->get('/emar/order-files/'.$fileId)->assertNotFound();
         $response = $this->actingAs($this->checker)->getJson('/emar/orders/candidates/'.$this->client->id)->assertOk();
@@ -380,8 +384,8 @@ class MedicationOrdersWorkflowTest extends TestCase
     public function test_reconciliation_last_given_evidence_excludes_later_refusal_and_chart_drift_blocks_apply(): void
     {
         $order = $this->order();
-        $given = ClientMedicationAdministration::factory()->create(['client_id' => $this->client->id, 'client_medication_id' => $order->id, 'status' => 'given', 'administered_at' => now()->subHour(), 'administered_by' => $this->enterer->id, 'dose_given' => '10 mg', 'is_correction' => false]);
-        ClientMedicationAdministration::factory()->create(['client_id' => $this->client->id, 'client_medication_id' => $order->id, 'status' => 'refused', 'administered_at' => now()->subMinutes(20), 'administered_by' => $this->enterer->id, 'is_correction' => false]);
+        $given = ClientMedicationAdministration::create(['client_id' => $this->client->id, 'client_medication_id' => $order->id, 'status' => 'given', 'administered_at' => now()->subHour(), 'administered_by' => $this->enterer->id, 'dose_given' => '10 mg', 'is_correction' => false]);
+        ClientMedicationAdministration::create(['client_id' => $this->client->id, 'client_medication_id' => $order->id, 'status' => 'refused', 'reason' => 'Person declined the later offer.', 'administered_at' => now()->subMinutes(20), 'administered_by' => $this->enterer->id, 'is_correction' => false]);
         $record = $this->startReconciliation();
         $item = $record->items()->sole();
         $this->assertSame($given->id, $item->last_dose_evidence['administration_id']);
@@ -401,7 +405,7 @@ class MedicationOrdersWorkflowTest extends TestCase
         $this->actingAs($this->enterer)->put('/emar/reconciliations/'.$record->id, ['items' => [['id' => $item->id, 'decision' => 'change', 'notes' => 'Changed dose on signed source.']]])->assertSessionHasNoErrors();
         $revision = $this->enter($order, ['dosage' => '20 mg']);
         $this->actingAs($this->enterer)->post('/emar/reconciliations/'.$record->id.'/apply', ['revision_ids' => [$item->id => $revision->id]])->assertSessionHasNoErrors();
-        $this->actingAs($this->checker)->post('/emar/reconciliations/'.$record->id.'/sign-off')->assertSessionHasNoErrors();
+        $this->actingAs($this->checker)->post('/emar/reconciliations/'.$record->id.'/sign-off')->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('in_progress', RespiteMedicationReconciliation::where('stay_id', $stay->id)->sole()->status);
         $this->check($revision);
         $this->assertSame('completed', RespiteMedicationReconciliation::where('stay_id', $stay->id)->sole()->status);
@@ -418,6 +422,27 @@ class MedicationOrdersWorkflowTest extends TestCase
         $this->order(['name' => 'Another chart medicine']);
         $this->actingAs($this->checker)->postJson('/emar/reconciliations/'.$record->id.'/sign-off')->assertUnprocessable()->assertJsonValidationErrors('items');
         $this->assertNull($record->refresh()->signed_off_at);
+    }
+
+    public function test_reconciliation_verification_denial_preserves_signoff_query_and_followup_evidence(): void
+    {
+        $this->order();
+        $record = $this->startReconciliation();
+        $item = $record->items()->sole();
+        $this->actingAs($this->enterer)->put('/emar/reconciliations/'.$record->id, ['items' => [['id' => $item->id, 'decision' => 'ask', 'notes' => 'Confirm dose with prescriber.', 'next_dose_at' => now()->addHour()->toIso8601String()]]])->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($this->enterer)->post('/emar/reconciliations/'.$record->id.'/apply')->assertRedirect()->assertSessionHasNoErrors();
+        $permission = Permission::where('key', 'medications.orders.verify')->sole();
+        $this->checker->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => false]]);
+        $this->checker->unsetRelations();
+        $eventsBefore = MedicationEvent::count();
+
+        $this->actingAs($this->checker)->postJson('/emar/reconciliations/'.$record->id.'/sign-off')->assertForbidden();
+        $this->actingAs($this->checker)->postJson('/emar/reconciliations/'.$record->id.'/items/'.$item->id.'/query', ['prescriber' => 'Dr Test', 'method' => 'phone', 'confirmed_at' => now()->subMinute()->toIso8601String(), 'instruction' => 'Documented response.'])->assertForbidden();
+
+        $this->assertNull($record->refresh()->signed_off_at);
+        $this->assertNull($item->refresh()->prescriber_query_resolved_at);
+        $this->assertNull(MedicationFollowup::where('source_key', 'reconciliation-query:'.$item->id)->sole()->completed_at);
+        $this->assertSame($eventsBefore, MedicationEvent::count());
     }
 
     public function test_reconciliation_cannot_sign_off_a_continued_order_changed_after_apply(): void
@@ -478,7 +503,7 @@ class MedicationOrdersWorkflowTest extends TestCase
         $this->assertSame($nextUtc, $item->next_dose_at->utc()->toIso8601String());
         $this->actingAs($this->enterer)->post('/emar/reconciliations/'.$record->id.'/apply')->assertSessionHasNoErrors();
         $this->assertSame($nextUtc, MedicationFollowup::where('source_key', 'reconciliation-query:'.$item->id)->sole()->due_at->utc()->toIso8601String());
-        $this->actingAs($this->checker)->post('/emar/reconciliations/'.$record->id.'/items/'.$item->id.'/query', ['prescriber' => 'Dr Test', 'method' => 'phone', 'confirmed_at' => $date.'T10:40', 'instruction' => 'Documented response; any dose change needs a separate order.'])->assertSessionHasNoErrors();
+        $this->actingAs($this->checker)->post('/emar/reconciliations/'.$record->id.'/items/'.$item->id.'/query', ['prescriber' => 'Dr Test', 'method' => 'phone', 'confirmed_at' => $date.'T10:40', 'instruction' => 'Documented response; any dose change needs a separate order.'])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertNotNull(MedicationFollowup::where('source_key', 'reconciliation-query:'.$item->id)->sole()->completed_at);
     }
 
