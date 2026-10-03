@@ -19,27 +19,16 @@ import { formatTime } from '@/lib/datetime';
 import { Sections } from '@/pages/fleet-assets/settings/_ui';
 import { Head, router } from '@inertiajs/react';
 import {
-    Activity,
     Bell,
-    BellRing,
-    ClipboardCheck,
-    Clock,
-    FileText,
-    HelpCircle,
     History,
     Home,
-    KeyRound,
     Layers,
-    LockKeyhole,
     Pencil,
     Pill,
     RefreshCw,
     Repeat,
     Settings as SettingsIcon,
-    Shield,
-    ShieldCheck,
     UserCheck,
-    Users,
     type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -90,6 +79,7 @@ import {
     sectionLabel,
     SET_VIEWS,
     settingsHash,
+    settingsSectionTabs,
     visibleSections,
     visibleViews,
     type Built,
@@ -182,27 +172,6 @@ const VIEW_ICON: Record<ViewKey, LucideIcon> = {
     staff: UserCheck,
     alerts: Bell,
     history: History,
-};
-const SEC_ICON: Record<string, LucideIcon> = {
-    overview: Activity,
-    medicines: Pill,
-    safety: Shield,
-    reviews: Repeat,
-    controlled: LockKeyhole,
-    photos: FileText,
-    templates: Repeat,
-    timing: Clock,
-    competency: ClipboardCheck,
-    exemptions: ShieldCheck,
-    pins: KeyRound,
-    status: Users,
-    decide: HelpCircle,
-    changes: History,
-    alerts: Bell,
-    delivery: BellRing,
-    oncall: Bell,
-    log: History,
-    emergency: LockKeyhole,
 };
 /** Tabs whose settings are saved through the save bar. */
 const SAVED_SECTIONS = [
@@ -875,14 +844,12 @@ export default function EmarSettings(props: Props) {
 
     const secChanges = (k: string) =>
         changes(s, draft, view).filter((c) => c.section === k).length;
-    const tabs = visibleSections(built, view).map(([key, label]) => ({
-        key,
-        label,
-        icon: SEC_ICON[key],
-        ...(key === 'decide' && pending.length
+    const tabs = settingsSectionTabs(built, view).map((tab) => ({
+        ...tab,
+        ...(tab.key === 'decide' && pending.length
             ? { count: pending.length }
             : {}),
-        ...(secChanges(key) ? { warningCount: secChanges(key) } : {}),
+        ...(secChanges(tab.key) ? { warningCount: secChanges(tab.key) } : {}),
     }));
     const clearQ = () => setQuery('');
     const body =

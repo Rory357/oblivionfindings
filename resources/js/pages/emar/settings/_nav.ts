@@ -1,6 +1,25 @@
 /* Medication › Settings views and their tabs (eMAR P11 v5 `nav.tsx`). A view
  * or tab is shown only once it is built (hide-unbuilt); the address is
  * `#<view>/<tab>` so a link opens the right place. */
+import {
+    Activity,
+    Bell,
+    BellRing,
+    ClipboardCheck,
+    Clock,
+    FileText,
+    HelpCircle,
+    History,
+    KeyRound,
+    LockKeyhole,
+    Pill,
+    Repeat,
+    Shield,
+    ShieldCheck,
+    UserCheck,
+    Users,
+    type LucideIcon,
+} from 'lucide-react';
 import type { ViewKey } from './_model';
 
 export const SET_VIEWS: Record<
@@ -58,6 +77,30 @@ export const SET_VIEWS: Record<
     },
 };
 
+const SECTION_ICON: Record<string, LucideIcon> = {
+    overview: Activity,
+    medicines: Pill,
+    safety: Shield,
+    reviews: Repeat,
+    controlled: LockKeyhole,
+    photos: FileText,
+    records: FileText,
+    templates: Repeat,
+    timing: Clock,
+    competency: ClipboardCheck,
+    exemptions: ShieldCheck,
+    pins: KeyRound,
+    status: Users,
+    decide: HelpCircle,
+    changes: History,
+    alerts: Bell,
+    delivery: BellRing,
+    triage: ClipboardCheck,
+    oncall: Bell,
+    log: History,
+    emergency: LockKeyhole,
+};
+
 export const sectionLabel = (view: ViewKey, sec: string) =>
     SET_VIEWS[view].secs.find(([k]) => k === sec)?.[1] ?? '';
 
@@ -72,6 +115,15 @@ export function visibleViews(built: Built): ViewKey[] {
 
 export function visibleSections(built: Built, view: ViewKey) {
     return SET_VIEWS[view].secs.filter(([k]) => built[view]?.includes(k));
+}
+
+/** The page and renderer tests share the exact tab/icon data. */
+export function settingsSectionTabs(built: Built, view: ViewKey) {
+    return visibleSections(built, view).map(([key, label]) => ({
+        key,
+        label,
+        icon: SECTION_ICON[key],
+    }));
 }
 
 /** Read `#view/tab`, falling back to the first view and tab that exist. */
