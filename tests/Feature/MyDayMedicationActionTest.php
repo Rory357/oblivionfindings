@@ -178,6 +178,8 @@ it('records a witnessed controlled drug My Day give through the MAR service', fu
             'scheduled_for' => Carbon::parse('2026-05-21 10:00:00', 'Pacific/Auckland')->toIso8601String(),
             'witnessed_by' => $witness->id,
             'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+            // NF-18 (P01 C1): controlled stock is never assumed to be one unit.
+            'quantity_administered' => 1,
         ])
         ->assertRedirect()
         ->assertSessionHas('success');

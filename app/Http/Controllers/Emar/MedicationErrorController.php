@@ -12,8 +12,8 @@ use App\Models\MedicationMarAttachment;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Incidents\IncidentJourneyService;
-use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\MarLinkService;
+use App\Services\Medication\MedicationErrorReporter;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
@@ -284,10 +284,6 @@ class MedicationErrorController extends Controller
             (int) $validated['client_id'],
             function (MedicationScopeDecision $scope) use ($request, $validated, $user) {
                 $attributes = $validated;
-                $attributes['client_id'] = $scope->client->id;
-                $attributes['reported_by'] = $user->id;
-                $attributes['reported_at'] = now();
-                $attributes['status'] = 'reported';
 
                 if (($attributes['client_medication_id'] ?? null) !== null) {
                     $medication = ClientMedication::withTrashed()
@@ -303,58 +299,16 @@ class MedicationErrorController extends Controller
                     );
                 }
 
-                $incident = null;
-                if ($request->boolean('create_incident')) {
-                    $incident = ClientIncident::withoutEvents(
-                        fn () => ClientIncident::create([
-                            'client_id' => $scope->client->id,
-                            'site_id' => $scope->siteId,
-                            'title' => 'Medication Error: '.str_replace('_', ' ', $attributes['error_type']),
-                            'description' => $attributes['description'],
-                            'immediate_action_taken' => $attributes['immediate_action'] ?? null,
-                            'occurred_at' => now(),
-                            'reported_by' => $user->id,
-                            'severity' => match ($attributes['severity']) {
-                                'critical' => 'critical',
-                                'major' => 'high',
-                                'moderate' => 'medium',
-                                default => 'low',
-                            },
-                            'status' => 'submitted',
-                            'submitted_at' => now(),
-                            'type' => 'medication_error',
-                        ]),
-                    );
-                    app(IncidentJourneyService::class)
-                        ->ensureForSubmittedIncident($incident, $user);
-                }
-
                 unset($attributes['create_incident']);
-                $attributes['client_incident_id'] = $incident?->id;
-                $error = MedicationError::create($attributes);
-
-                app(MedicationSignalService::class)->emitError($error);
-                // Every reported error tells whoever Medication Settings ›
-                // Alerts & access chooses (P11 B2); Control Room still gets
-                // major and critical ones.
-                app(MedicationAlertSources::class)->error($error);
-
-                if ($incident !== null) {
-                    app(TimelineEmitter::class)->project($incident->fresh());
-
-                    $incidentId = (int) $incident->id;
-                    DB::afterCommit(function () use ($incidentId): void {
-                        try {
-                            RegisterIncidentGovernanceEscalationJob::dispatch($incidentId);
-                        } catch (Throwable $exception) {
-                            Log::error('Medication incident governance dispatch failed', [
-                                'client_incident_id' => $incidentId,
-                                'exception' => $exception::class,
-                                'error' => $exception->getMessage(),
-                            ]);
-                        }
-                    });
-                }
+                // The same writes and hooks as the recording dialog's
+                // "More than ordered was given" (P01).
+                app(MedicationErrorReporter::class)->report(
+                    $scope->client,
+                    (int) $scope->siteId,
+                    $user,
+                    $attributes,
+                    $request->boolean('create_incident'),
+                );
 
                 return redirect()->back()->with('success', 'Medication error reported successfully.');
             },

@@ -40,6 +40,8 @@ class MedicationError extends Model
         'closed_at',
         'closed_by',
         'status',
+        // P01 C1: the dose whose "more than ordered" record raised this error.
+        'client_medication_administration_id',
     ];
 
     protected $casts = [
