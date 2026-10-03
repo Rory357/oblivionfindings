@@ -177,7 +177,7 @@ export function MarDayGrid({
                     <tbody>
                         {day.medicines.map((medicine, row) => (
                             <tr
-                                key={medicine.id}
+                                key={medicine.key ?? medicine.id}
                                 onContextMenu={(event) => open(event, medicine)}
                                 className="group"
                             >

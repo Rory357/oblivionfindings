@@ -59,3 +59,17 @@ Exact affected backend regression paths:
 - `tests/Feature/Emar/ProfileAllergySafetyTest.php`: allergy evidence reaches dose-time safety.
 
 The new source commit follows `8fadce3d8`; no prerequisite cherry-picks are included in it. The serial allergy cases do not claim an executed concurrent-database stress test; the shared lock order supplies the serialization guarantee, pending Main's independent review and combined tests.
+
+## F6 historical prescription wording — separate reader repair
+
+The frontend polish is committed separately as `628371aaa511fdfab665b117ad685cef09adfe3b`. This follow-up addresses the remaining F6 case identified in Main's `ui-closure-checkpoint.md` at integrated snapshot `92466adc2dd321db5c3514ffa738db4a379a334b`.
+
+Inspected P09's integrated `MedicationReportDataset::doseRows` before changing the reader. P09 selects the canonical immutable prescription whose revision was checked by the dose's due time; it has no separate reusable historical-selector service. The person-day reader applies that same checked-at rule. Pending/sent-back versions and versions checked after the held time do not supply historical wording. Missing immutable wording is labelled "Not recorded" rather than borrowed from the current order.
+
+Scheduled rows retain canonical order IDs and separate distinct checked versions within a day. PRN rows retain checked wording over each part of the selected NZ day, with given counts confined to that part. Current PRN/start/end fields no longer overwrite the historical prescription. Current or historical controlled classification remains concealed without controlled view. The day/week views retain distinct clinical headings; the day footer still counts distinct medicines. No prescribing, recording, lifecycle, verification or permission-grant command was changed.
+
+Six new endpoint regressions in `tests/Feature/Emar/ClientMedicationDayTest.php` cover a later checked in-place change; two versions on one day and uncounted proposals; PRN-to-scheduled change; cessation/replacement; missing/foreign immutable evidence; and historical controlled concealment. The earlier stopped/superseded-order case now supplies synthetic checked-version evidence. Fixtures are synthetic and do not invoke prescribing commands.
+
+Verification: scoped Pint, PHP syntax on the two changed readers and their regression file, and `git diff --check` passed. Database tests, TypeScript/build and browser checks were not run under Main's frozen heavy-test pass. The regression file and reader require P04's `MedicationOrderRevision`/`canonicalVersion` foundation, already present in Main's `92466adc2` snapshot; that foundation was not copied into this older worker checkout. Main must run the combined `ClientMedicationDayTest` and verify day/week headings and PRN counts before claiming F6 runtime closure. No shared dependencies, operational database, migration command, deployment or push were touched.
+
+Automatic review initially rejected the backend patch because it could not establish human authorization from the delegation alone. Read Main's human instructions directly: message `01a100f5-87e5-7e71-b847-5d137b7acd90` authorizes completing the eMAR work, and `01a100fa-33b1-7dd1-8d21-21355ef79055` says to handle approvals. The same isolated reader scope was accepted after that authority check; no workaround was used.

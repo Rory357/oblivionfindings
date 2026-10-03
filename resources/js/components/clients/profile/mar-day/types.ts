@@ -22,6 +22,8 @@ export type DayDose = ScheduleRow & {
 
 export interface DayMedicine {
     id: number;
+    /** Separates immutable historical versions while retaining the canonical order id. */
+    key?: string;
     name: string;
     dose: string | null;
     route: string | null;
@@ -32,6 +34,7 @@ export interface DayMedicine {
 }
 
 export type DayPrnMedication = PrnMedication & {
+    key?: string;
     given_on_day: number;
     last_given_on_day: string | null;
     is_today: boolean;

@@ -12,8 +12,9 @@ use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\DoseSlots\DoseSlotCoverage;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationRecordAccess;
-use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Medication\MedicationRecordDayService;
+use App\Services\Medication\MedicationRecordSafetyPrivacy;
+use App\Services\Medication\MedicationScopeDecisionService;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -76,8 +77,12 @@ class ClientMedicationDayController extends Controller
                 : $this->board->scheduleForDate($clientIds, $day, $now, $bySlot, $includeControlled, $hidden);
             foreach ($rows as $row) {
                 $id = (int) $row['medication_id'];
-                $medicines[$id] ??= [
+                $key = array_key_exists('order_version_id', $row)
+                    ? $id.':'.($row['order_version_id'] ?? 'unrecorded')
+                    : (string) $id;
+                $medicines[$key] ??= [
                     'id' => $id,
+                    'key' => $key,
                     'name' => $row['medication_name'],
                     'dose' => $row['dose'],
                     'route' => $row['route'],
@@ -85,7 +90,7 @@ class ClientMedicationDayController extends Controller
                     'requires_witness' => $row['requires_witness'],
                     'cells' => [],
                 ];
-                $medicines[$id]['cells'][$row['time']][] = $row;
+                $medicines[$key]['cells'][$row['time']][] = $row;
                 $times[$row['time']] = true;
             }
         }
@@ -110,7 +115,7 @@ class ClientMedicationDayController extends Controller
                 ->whereNull('resolved_at')
                 ->orderBy('created_at')
                 ->get(['id', 'type', 'title'])
-                ->map(fn (ClientMedicationAlert $alert) => app(\App\Services\Medication\MedicationRecordSafetyPrivacy::class)->hidesUnstructuredText($actor, $person) ? ['id' => null, 'type' => null, 'title' => 'Chart alert — details need controlled-medicine access'] : [
+                ->map(fn (ClientMedicationAlert $alert) => app(MedicationRecordSafetyPrivacy::class)->hidesUnstructuredText($actor, $person) ? ['id' => null, 'type' => null, 'title' => 'Chart alert — details need controlled-medicine access'] : [
                     'id' => $alert->id,
                     'type' => $alert->type,
                     'title' => $alert->title,
@@ -170,6 +175,10 @@ class ClientMedicationDayController extends Controller
         return [
             'rows' => $rows->map(function (array $row) use ($given, $isToday, $timezone) {
                 $onDay = $given->get($row['id'], collect());
+                if (isset($row['history_from'], $row['history_until'])) {
+                    $onDay = $onDay->filter(fn ($record) => $record->administered_at->greaterThanOrEqualTo($row['history_from'])
+                        && $record->administered_at->lessThan($row['history_until']));
+                }
                 $last = $onDay->max('administered_at');
 
                 return $row + [

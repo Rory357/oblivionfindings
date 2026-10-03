@@ -279,6 +279,9 @@ export function MarTab({
     const label = day ? dayLabel(day.date, day.today, day.tomorrow) : 'Today';
     const canGoForward = day ? day.date < day.tomorrow : false;
     const canGoBack = day ? day.date > day.coverage.available_from : false;
+    const medicineCount = new Set(
+        day?.medicines.map((medicine) => medicine.id),
+    ).size;
 
     return (
         <div className="space-y-5">
@@ -541,8 +544,8 @@ export function MarTab({
                                 onMedicineDetails={setDetails}
                             />
                             <p className="text-caption text-muted-foreground">
-                                {day.medicines.length}{' '}
-                                {day.medicines.length === 1
+                                {medicineCount}{' '}
+                                {medicineCount === 1
                                     ? 'medicine'
                                     : 'medicines'}{' '}
                                 · times in NZ time

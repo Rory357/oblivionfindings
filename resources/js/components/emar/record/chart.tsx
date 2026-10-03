@@ -124,11 +124,20 @@ function WeekChart({
     if (!data || load !== 'ready')
         return <ReadingState load={load} reload={reload} />;
     const last = data.days.at(-1)!;
+    const clinicalKey = (medicine: DayMedicine) =>
+        JSON.stringify([
+            medicine.id,
+            medicine.name,
+            medicine.dose,
+            medicine.route,
+            medicine.is_controlled,
+            medicine.requires_witness,
+        ]);
     const orders = [
         ...new Map(
             data.days.flatMap((day) =>
                 day.medicines.map(
-                    (medicine) => [medicine.id, medicine] as const,
+                    (medicine) => [clinicalKey(medicine), medicine] as const,
                 ),
             ),
         ).values(),
@@ -189,7 +198,7 @@ function WeekChart({
             {orders.length ? (
                 <EntityTable
                     rows={orders}
-                    rowKey={(medicine) => medicine.id}
+                    rowKey={clinicalKey}
                     identityLabel="Medicine"
                     identity={(medicine) => ({
                         icon: Pill,
@@ -205,7 +214,8 @@ function WeekChart({
                         width: '1fr',
                         cell: (medicine: DayMedicine) => {
                             const current = day.medicines.find(
-                                (row) => row.id === medicine.id,
+                                (row) =>
+                                    clinicalKey(row) === clinicalKey(medicine),
                             );
                             const doses = current
                                 ? Object.values(current.cells).flat()

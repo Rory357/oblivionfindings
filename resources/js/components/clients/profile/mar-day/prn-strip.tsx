@@ -85,7 +85,7 @@ export function PrnStrip({
                         );
                         return (
                             <li
-                                key={med.id}
+                                key={med.key ?? med.id}
                                 className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5"
                             >
                                 <div className="min-w-0 flex-1">

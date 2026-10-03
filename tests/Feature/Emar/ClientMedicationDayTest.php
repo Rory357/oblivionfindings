@@ -6,6 +6,9 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationDoseSlot;
+use App\Models\MedicationOrderRevision;
+use App\Models\MedicationOrderVersion;
 use App\Models\Permission;
 use App\Models\ServiceContext;
 use App\Models\Shift;
@@ -237,9 +240,14 @@ class ClientMedicationDayTest extends TestCase
         $this->record($scheduled, '2026-06-14 08:00', 'given');
         ClientMedicationAdministration::query()->create(['client_id' => $this->aroha->id, 'client_medication_id' => $prn->id, 'administered_by' => $this->reader->id, 'administered_at' => Carbon::parse('2026-06-14 11:00', 'Pacific/Auckland')->utc(), 'status' => 'given']);
         $this->at('2026-06-15 07:00');
-        foreach ([$scheduled, $prn] as $order) $order->update(['active' => false, 'state' => 'ceased', 'ceased_at' => now(), 'ceased_reason' => 'Written stop', 'ceased_by' => $this->reader->id]);
+        foreach ([$scheduled, $prn] as $order) {
+            $order->update(['active' => false, 'state' => 'ceased', 'ceased_at' => now(), 'ceased_reason' => 'Written stop', 'ceased_by' => $this->reader->id]);
+        }
         $replacement = $replaced->createVersion($this->reader->id, 'Written change');
         $replacement->update(['dosage' => '3 tablets']);
+        foreach ([$scheduled, $prn, $replaced] as $order) {
+            $this->historicalVersion($order, 1, [], '2026-06-12 00:00');
+        }
         $this->artisan('emar:generate-dose-slots')->assertSuccessful();
         $day = $this->day('2026-06-14');
         $this->assertSame('given', $this->cells($day)['Old scheduled 08:00']['status']);
@@ -248,6 +256,207 @@ class ClientMedicationDayTest extends TestCase
         $this->assertSame('Old PRN', $day['prn']['rows'][0]['name']);
         $this->assertSame(1, $day['prn']['rows'][0]['given_on_day']);
         $this->assertNotContains('Old scheduled', array_column($this->day()['medicines'], 'name'));
+    }
+
+    public function test_a_checked_in_place_change_does_not_rewrite_yesterdays_scheduled_or_prn_wording(): void
+    {
+        $scheduled = $this->historicalOrder('Scheduled before change', ['08:00']);
+        $prn = $this->historicalOrder('PRN before change', [], [
+            'is_prn' => true, 'prn_reason' => 'Original reason', 'max_per_day' => 3,
+            'min_hours_between_doses' => 6, 'form' => 'tablet', 'instructions' => 'Original instructions',
+        ]);
+        foreach ([$scheduled, $prn] as $order) {
+            $this->historicalVersion($order, 1, [], '2026-06-12 00:00');
+        }
+        $this->heldSlot($scheduled, '2026-06-14 08:00');
+        $this->record($scheduled, '2026-06-14 08:00', 'given');
+        $this->historicalPrnRecord($prn, '2026-06-14 10:00');
+        $changes = ['name' => 'Current wording', 'dosage' => '10 mg', 'route' => 'topical',
+            'prn_reason' => 'New reason', 'max_per_day' => 9, 'min_hours_between_doses' => 1,
+            'form' => 'cream', 'instructions' => 'New instructions', 'start_date' => '2026-06-15'];
+        foreach ([$scheduled, $prn] as $order) {
+            $this->historicalVersion($order, 2, $changes, '2026-06-15 07:00', publish: true);
+        }
+        $this->at('2026-06-15 12:00');
+
+        $day = $this->day('2026-06-14');
+        $this->assertSame('10 mg', $scheduled->fresh()->dosage);
+        $this->assertSame('Scheduled before change', $day['medicines'][0]['name']);
+        $this->assertSame('5 mg', $day['medicines'][0]['dose']);
+        $this->assertSame('oral', $day['medicines'][0]['route']);
+        $this->assertSame('given', $this->cells($day)['Scheduled before change 08:00']['status']);
+        $row = $day['prn']['rows'][0];
+        $this->assertSame(['PRN before change', '5 mg', 'oral', 'Original reason', 3, 6, 'tablet', 'Original instructions'],
+            [$row['name'], $row['dose'], $row['route'], $row['prn_reason'], $row['max_per_day'], $row['min_hours_between'], $row['form'], $row['instructions']]);
+        $this->assertSame(1, $row['given_on_day']);
+    }
+
+    public function test_two_checked_versions_on_one_day_keep_distinct_headings_and_prn_counts(): void
+    {
+        $scheduled = $this->historicalOrder('Same medicine', ['08:00', '20:00']);
+        $prn = $this->historicalOrder('Same PRN', [], ['is_prn' => true]);
+        foreach ([$scheduled, $prn] as $order) {
+            $this->historicalVersion($order, 1, [], '2026-06-12 00:00');
+            $this->historicalVersion($order, 2, ['dosage' => '10 mg', 'route' => 'topical'], '2026-06-14 12:00', publish: true);
+            $this->historicalVersion($order, 3, ['dosage' => '99 mg', 'route' => 'nasal'], '2026-06-14 06:00', status: 'pending');
+        }
+        foreach (['08:00', '20:00'] as $time) {
+            $this->heldSlot($scheduled, '2026-06-14 '.$time);
+        }
+        foreach (['10:00', '15:00'] as $time) {
+            $this->historicalPrnRecord($prn, '2026-06-14 '.$time);
+        }
+        $this->at('2026-06-15 12:00');
+
+        $day = $this->day('2026-06-14');
+        $this->assertCount(2, $day['medicines']);
+        $this->assertSame([$scheduled->id, $scheduled->id], array_column($day['medicines'], 'id'));
+        $this->assertCount(2, array_unique(array_column($day['medicines'], 'key')));
+        $this->assertSame(['5 mg', '10 mg'], array_column($day['medicines'], 'dose'));
+        $this->assertSame(['08:00'], array_keys($day['medicines'][0]['cells']));
+        $this->assertSame(['20:00'], array_keys($day['medicines'][1]['cells']));
+        $this->assertSame(['5 mg', '10 mg'], array_column($day['prn']['rows'], 'dose'));
+        $this->assertSame([1, 1], array_column($day['prn']['rows'], 'given_on_day'));
+        $this->assertSame(['10:00', '15:00'], array_column($day['prn']['rows'], 'last_given_on_day'));
+        $this->assertCount(2, array_unique(array_column($day['prn']['rows'], 'key')));
+        $this->assertStringNotContainsString('99 mg', json_encode($day));
+    }
+
+    public function test_a_later_switch_from_prn_to_scheduled_keeps_the_past_prn_prescription(): void
+    {
+        $order = $this->historicalOrder('Past PRN', [], ['is_prn' => true]);
+        $this->historicalVersion($order, 1, [], '2026-06-12 00:00');
+        $this->historicalVersion($order, 2, ['is_prn' => false, 'dose_times' => ['08:00'], 'dosage' => '10 mg'], '2026-06-15 07:00', publish: true);
+        $this->at('2026-06-15 12:00');
+
+        $row = $this->day('2026-06-14')['prn']['rows'][0];
+        $this->assertFalse($order->fresh()->is_prn);
+        $this->assertSame('Past PRN', $row['name']);
+        $this->assertSame('5 mg', $row['dose']);
+        $this->assertSame(0, $row['given_on_day']);
+    }
+
+    public function test_retained_ceased_and_replaced_orders_keep_their_checked_wording(): void
+    {
+        $scheduled = $this->historicalOrder('Ceased scheduled', ['08:00']);
+        $prn = $this->historicalOrder('Ceased PRN', [], ['is_prn' => true]);
+        $replaced = $this->historicalOrder('Replaced original', ['20:00']);
+        foreach ([$scheduled, $prn, $replaced] as $order) {
+            $this->historicalVersion($order, 1, [], '2026-06-12 00:00');
+        }
+        $this->heldSlot($scheduled, '2026-06-14 08:00');
+        $this->heldSlot($replaced, '2026-06-14 20:00');
+        $this->at('2026-06-15 07:00');
+        foreach ([$scheduled, $prn] as $order) {
+            $order->update(['active' => false, 'state' => 'ceased', 'ceased_at' => now(), 'ceased_reason' => 'Synthetic written stop', 'ceased_by' => $this->reader->id]);
+        }
+        $replacement = $this->historicalOrder('New replacement', ['20:00'], ['created_at' => now(), 'dosage' => '10 mg']);
+        $replaced->update(['superseded_at' => now(), 'superseded_by' => $replacement->id]);
+
+        $day = $this->day('2026-06-14');
+        $this->assertSame(['Ceased scheduled', 'Replaced original'], array_column($day['medicines'], 'name'));
+        $this->assertSame(['5 mg', '5 mg'], array_column($day['medicines'], 'dose'));
+        $this->assertSame('Ceased PRN', $day['prn']['rows'][0]['name']);
+        $this->assertSame('5 mg', $day['prn']['rows'][0]['dose']);
+        $this->assertStringNotContainsString('New replacement', json_encode($day));
+    }
+
+    public function test_missing_or_foreign_version_evidence_does_not_borrow_current_instructions(): void
+    {
+        $order = $this->historicalOrder('Current unproven name', ['08:00'], ['dosage' => '99 mg', 'route' => 'nasal']);
+        $prn = $this->historicalOrder('Current unproven PRN', [], ['is_prn' => true, 'dosage' => '99 mg', 'route' => 'nasal', 'instructions' => 'Unproven instructions']);
+        $this->heldSlot($order, '2026-06-14 08:00');
+        $other = Client::factory()->create(['site_id' => $this->site->id]);
+        $foreign = MedicationOrderVersion::query()->create(['client_id' => $other->id, 'client_medication_id' => $order->id, 'version_number' => 8, 'name' => 'Foreign wording', 'dosage' => '88 mg', 'route' => 'topical', 'changed_at' => Carbon::parse('2026-06-12 00:00', 'Pacific/Auckland')->utc()]);
+        MedicationOrderRevision::query()->create(['client_id' => $this->aroha->id, 'client_medication_id' => $order->id, 'medication_order_version_id' => $foreign->id, 'base_version' => 1, 'status' => 'checked', 'checked_at' => Carbon::parse('2026-06-12 00:00', 'Pacific/Auckland')->utc(), 'entered_by' => $this->reader->id]);
+        $this->historicalVersion($order, 2, [], '2026-06-15 07:00');
+        $this->historicalVersion($prn, 2, [], '2026-06-15 07:00');
+        $this->at('2026-06-15 12:00');
+
+        $day = $this->day('2026-06-14');
+        $this->assertSame('Not recorded', $day['medicines'][0]['dose']);
+        $this->assertSame('Not recorded', $day['medicines'][0]['route']);
+        $this->assertSame('Not recorded', $day['prn']['rows'][0]['dose']);
+        $this->assertNull($day['prn']['rows'][0]['instructions']);
+        foreach (['Current unproven name', 'Current unproven PRN', 'Foreign wording', '99 mg', '88 mg', 'nasal', 'topical', 'Unproven instructions'] as $wording) {
+            $this->assertStringNotContainsString($wording, json_encode($day));
+        }
+    }
+
+    public function test_historical_controlled_versions_stay_hidden_after_a_plain_version_is_checked(): void
+    {
+        $scheduled = $this->historicalOrder('Private scheduled wording', ['08:00'], ['controlled_drug' => true]);
+        $prn = $this->historicalOrder('Private PRN wording', [], ['is_prn' => true, 'controlled_drug' => true]);
+        foreach ([$scheduled, $prn] as $order) {
+            $this->historicalVersion($order, 1, [], '2026-06-12 00:00');
+            $this->historicalVersion($order, 2, ['controlled_drug' => false, 'name' => 'Plain current wording'], '2026-06-15 07:00', publish: true);
+        }
+        $this->heldSlot($scheduled, '2026-06-14 08:00', controlled: true);
+        $this->at('2026-06-15 12:00');
+
+        $day = $this->day('2026-06-14');
+        $this->assertSame([], $day['medicines']);
+        $this->assertSame(1, $day['hidden_controlled']['total']);
+        $this->assertSame([], $day['prn']['rows']);
+        $this->assertSame(1, $day['prn']['hidden']);
+        $this->grant($this->reader, ['medications.controlled.view']);
+        $visible = $this->day('2026-06-14');
+        $this->assertSame('Private scheduled wording', $visible['medicines'][0]['name']);
+        $this->assertSame('Private PRN wording', $visible['prn']['rows'][0]['name']);
+    }
+
+    /** Synthetic checked snapshots only; these fixtures never invoke a clinical command. */
+    private function historicalOrder(string $name, array $times, array $changes = []): ClientMedication
+    {
+        return ClientMedication::withoutEvents(fn () => ClientMedication::query()->create(array_merge([
+            'client_id' => $this->aroha->id, 'created_by' => $this->reader->id,
+            'name' => $name, 'dosage' => '5 mg', 'route' => 'oral', 'dose_times' => $times,
+            'is_prn' => false, 'controlled_drug' => false, 'active' => true, 'state' => 'active',
+            'version' => 1, 'approval_status' => 'verified', 'verified_by' => $this->reader->id,
+            'verified_at' => Carbon::parse('2026-06-12 00:00', 'Pacific/Auckland')->utc(),
+            'start_date' => '2026-06-01', 'created_at' => Carbon::parse('2026-06-12 00:00', 'Pacific/Auckland')->utc(),
+        ], $changes)));
+    }
+
+    private function historicalVersion(ClientMedication $order, int $number, array $changes, string $checkedNz, string $status = 'checked', bool $publish = false): MedicationOrderVersion
+    {
+        $at = Carbon::parse($checkedNz, 'Pacific/Auckland')->utc();
+        $attributes = array_intersect_key($order->attributesToArray(), array_flip((new MedicationOrderVersion)->getFillable()));
+        $version = MedicationOrderVersion::query()->firstOrCreate([
+            'client_id' => $order->client_id, 'client_medication_id' => $order->id, 'version_number' => $number,
+        ], array_merge($attributes, $changes, ['changed_at' => $at, 'changed_by' => $this->reader->id, 'active' => true, 'state' => 'active']));
+        MedicationOrderRevision::query()->create([
+            'client_id' => $order->client_id, 'client_medication_id' => $order->id,
+            'medication_order_version_id' => $version->id, 'base_version' => $number,
+            'entered_by' => $this->reader->id, 'status' => $status,
+            'checked_at' => $status === 'pending' ? null : $at,
+        ]);
+        if ($publish) {
+            ClientMedication::withoutEvents(fn () => $order->forceFill(array_merge($changes, [
+                'version' => $number, 'approval_status' => 'verified', 'verified_at' => $at,
+            ]))->save());
+        }
+
+        return $version;
+    }
+
+    private function historicalPrnRecord(ClientMedication $order, string $givenNz): void
+    {
+        ClientMedicationAdministration::withoutEvents(fn () => ClientMedicationAdministration::query()->create([
+            'client_id' => $order->client_id, 'client_medication_id' => $order->id,
+            'administered_by' => $this->reader->id, 'status' => 'given',
+            'administered_at' => Carbon::parse($givenNz, 'Pacific/Auckland')->utc(),
+        ]));
+    }
+
+    private function heldSlot(ClientMedication $order, string $dueNz, bool $controlled = false): void
+    {
+        $due = Carbon::parse($dueNz, 'Pacific/Auckland');
+        MedicationDoseSlot::query()->create([
+            'client_id' => $order->client_id, 'client_medication_id' => $order->id,
+            'nz_date' => $due->toDateString(), 'ordered_time' => $due->format('H:i'), 'due_at' => $due->utc(),
+            'controlled' => $controlled, 'generated_at' => Carbon::parse('2026-06-12 00:00', 'Pacific/Auckland')->utc(),
+        ]);
     }
 
     /** @return array<string, mixed> */
