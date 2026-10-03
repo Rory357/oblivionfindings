@@ -8,6 +8,7 @@ use App\Models\ClientMedication;
 use App\Models\MedicationEvent;
 use App\Models\MedicationFollowup;
 use App\Models\MedicationFollowupEvent;
+use App\Models\MedicationOrderRevision;
 use App\Models\MedicationOrderVersion;
 use App\Models\MedicationReview;
 use App\Models\MedicationReviewEvent;
@@ -74,7 +75,7 @@ class MedicationReviewWorkflowTest extends TestCase
     {
         $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
-        foreach (['clients.viewAny', 'medications.reports.export', 'reports.viewAny'] as $readPermission) {
+        foreach (['clients.viewAny', 'medications.reports.view', 'medications.reports.export', 'medications.audit.view', 'medications.stock.update'] as $readPermission) {
             $actor = $this->userAt($site, ['medications.view', 'medications.reviews.manage', $readPermission], personScoped: true);
             $review = $this->book($actor, $client, 'triggered');
             $this->assertSame($actor->id, $review->owner_id);
@@ -82,10 +83,13 @@ class MedicationReviewWorkflowTest extends TestCase
                 'review_id' => $review->id, 'actor_id' => $actor->id, 'event' => 'booked',
             ]);
         }
-        $unassigned = $this->userAt($site, ['medications.view', 'medications.reviews.manage'], personScoped: true);
-        $this->actingAs($unassigned)->postJson('/emar/reviews', $this->bookingPayload($unassigned, $client, 'triggered'))
-            ->assertNotFound();
-        $this->assertSame(3, MedicationReview::query()->where('client_id', $client->id)->count());
+        // A generic Reports permission does not authorize this person's medication record.
+        foreach ([[], ['reports.viewAny']] as $genericPermissions) {
+            $unassigned = $this->userAt($site, ['medications.view', 'medications.reviews.manage', ...$genericPermissions], personScoped: true);
+            $this->actingAs($unassigned)->postJson('/emar/reviews', $this->bookingPayload($unassigned, $client, 'triggered'))
+                ->assertNotFound();
+        }
+        $this->assertSame(5, MedicationReview::query()->where('client_id', $client->id)->count());
     }
 
     public function test_booking_owner_requires_current_review_permission_and_membership_of_the_persons_house(): void
@@ -544,15 +548,32 @@ class MedicationReviewWorkflowTest extends TestCase
         $this->assertSame(2, MedicationReviewItem::query()->where('review_id', $review->id)->count());
     }
 
-    public function test_review_links_effective_canonical_version_despite_waiting_or_rejected_later_evidence(): void
+    public function test_review_links_effective_canonical_version_despite_waiting_or_sent_back_later_evidence(): void
     {
-        foreach (['pending_verification', 'rejected'] as $draftStatus) {
-            ['actor' => $actor, 'client' => $client] = $this->context();
+        foreach (['pending', 'sent_back'] as $draftStatus) {
+            ['actor' => $actor, 'site' => $site, 'client' => $client] = $this->context();
+            $checker = $this->userAt($site, ['medications.view', 'medications.orders.verify']);
             $medicine = $this->medication($client, 'Synthetic effective version one');
             $effective = $this->orderVersion($actor, $medicine, 1, '10 mg', 'Synthetic checked effective baseline.');
+            $checkedRevision = MedicationOrderRevision::query()->create([
+                'client_id' => $client->id, 'client_medication_id' => $medicine->id,
+                'medication_order_version_id' => $effective->id, 'base_version' => 1,
+                'entered_by' => $actor->id, 'status' => 'checked',
+                'checked_by' => $checker->id, 'checked_at' => now(),
+            ]);
             $draft = $this->orderVersion($actor, $medicine, 2, '20 mg', 'Synthetic '.$draftStatus.' change that is not published.');
-            $medicine->forceFill(['version' => 1, 'approval_status' => $draftStatus])->saveQuietly();
+            $draftRevision = MedicationOrderRevision::query()->create([
+                'client_id' => $client->id, 'client_medication_id' => $medicine->id,
+                'medication_order_version_id' => $draft->id, 'base_version' => 1,
+                'entered_by' => $actor->id, 'status' => $draftStatus,
+                'rejection_reason' => $draftStatus === 'sent_back' ? 'Synthetic source dose did not match.' : null,
+            ]);
+            // P04 keeps the checked chart row effective while the later revision waits.
+            $this->assertSame('verified', $medicine->fresh()->approval_status);
+            $this->assertSame(1, $medicine->fresh()->version);
             $before = $this->persistedEvidence($medicine);
+            $evidence = [$effective, $draft, $checkedRevision, $draftRevision];
+            $versionEvidence = array_map(fn (Model $record) => $this->persistedEvidence($record), $evidence);
             $review = $this->book($actor, $client, 'triggered');
 
             $this->complete($actor, $review);
@@ -561,8 +582,10 @@ class MedicationReviewWorkflowTest extends TestCase
             $this->assertSame($effective->id, $item->order_version_id);
             $this->assertNotSame($draft->id, $item->order_version_id);
             $this->assertSame($before, $this->persistedEvidence($medicine));
+            $this->assertSame($versionEvidence, array_map(fn (Model $record) => $this->persistedEvidence($record), $evidence));
             $this->assertSame('10 mg', $effective->fresh()->dosage);
             $this->assertSame('20 mg', $draft->fresh()->dosage);
+            $this->assertSame($draftStatus, $draftRevision->fresh()->status);
         }
     }
 
@@ -650,7 +673,7 @@ class MedicationReviewWorkflowTest extends TestCase
         $this->assertSame($prescription, $this->persistedEvidence($medicine));
     }
 
-    public function test_legacy_audit_review_summary_requires_review_and_controlled_access_and_names_the_recorder(): void
+    public function test_legacy_review_summary_requires_review_and_controlled_access_and_names_the_recorder(): void
     {
         ['actor' => $actor, 'site' => $site, 'client' => $client] = $this->context();
         $historicalReviewer = $this->userAt($site, ['medications.view']);
@@ -661,25 +684,59 @@ class MedicationReviewWorkflowTest extends TestCase
             'reviewer_user_id' => $historicalReviewer->id, 'reviewer_name' => 'Dr Synthetic Legacy Clinician',
             'clinical_summary' => 'Sensitive legacy clinician summary.',
         ]);
+        // Retained domain history identifies the recorder separately from the clinician.
+        $recorded = MedicationReviewEvent::query()->create([
+            'review_id' => $legacy->id, 'client_id' => $client->id, 'actor_id' => $actor->id,
+            'event' => 'completed', 'created_at' => now(),
+            'details' => ['summary' => $legacy->clinical_summary, 'completed_date' => '2026-10-03'],
+        ]);
+        $before = $this->persistedEvidence($legacy);
+        $eventBefore = $this->persistedEvidence($recorded);
         $auditWithoutManage = $this->userAt($site, ['medications.view', 'medications.audit.view', 'medications.controlled.view']);
         $managerWithoutControlled = $this->userAt($site, ['medications.view', 'medications.audit.view', 'medications.reviews.manage']);
 
         foreach ([$auditWithoutManage, $managerWithoutControlled] as $restricted) {
-            $response = $this->actingAs($restricted)->get('/emar/audit?event_types=review_completed')->assertOk();
-            $event = collect($response->inertiaProps('events'))->firstWhere('id', 'review_'.$legacy->id);
-            $this->assertNotNull($event);
-            $this->assertNull($event['details']['summary']);
-            $this->assertSame($actor->name, $event['performed_by']);
+            $response = $this->actingAs($restricted)->get('/emar/reviews?view=recorded&review='.$legacy->id)->assertOk();
+            $this->assertSame($legacy->id, $response->inertiaProps('selected.id'));
+            $this->assertNull($response->inertiaProps('selected.clinical_summary'));
+            $this->assertNull($response->inertiaProps('selected.happened_at'));
+            $this->assertSame($actor->name, $response->inertiaProps('selected.history.0.actor_name'));
             $this->assertStringNotContainsString('Sensitive legacy clinician summary.', json_encode($response->inertiaProps()));
         }
         $authorised = $this->userAt($site, [
             'medications.view', 'medications.audit.view', 'medications.reviews.manage', 'medications.controlled.view',
         ]);
-        $response = $this->actingAs($authorised)->get('/emar/audit?event_types=review_completed')->assertOk();
-        $event = collect($response->inertiaProps('events'))->firstWhere('id', 'review_'.$legacy->id);
-        $this->assertSame('Sensitive legacy clinician summary.', $event['details']['summary']);
-        $this->assertSame($actor->name, $event['performed_by']);
-        $this->assertSame('2026-10-02 11:14:00', CarbonImmutable::parse($event['timestamp'])->utc()->format('Y-m-d H:i:s'));
+        $response = $this->actingAs($authorised)->get('/emar/reviews?view=recorded&review='.$legacy->id)->assertOk();
+        $this->assertSame('Sensitive legacy clinician summary.', $response->inertiaProps('selected.clinical_summary'));
+        $this->assertSame('Dr Synthetic Legacy Clinician', $response->inertiaProps('selected.reviewer_name'));
+        $this->assertSame($actor->name, $response->inertiaProps('selected.history.0.actor_name'));
+        $this->assertSame('2026-10-02 11:14:00', CarbonImmutable::parse($response->inertiaProps('selected.happened_at'))->utc()->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-10-02 11:15:00', CarbonImmutable::parse($response->inertiaProps('selected.history.0.created_at'))->utc()->format('Y-m-d H:i:s'));
+        $this->actingAs($authorised)->get('/emar/audit?event_types=review_completed')
+            ->assertRedirect('/emar/reports?event_types=review_completed&view=audit');
+        $this->assertSame($before, $this->persistedEvidence($legacy));
+        $this->assertSame($eventBefore, $this->persistedEvidence($recorded));
+    }
+
+    public function test_canonical_audit_names_the_review_recorder_without_copying_clinical_summary(): void
+    {
+        ['actor' => $actor, 'site' => $site, 'client' => $client] = $this->context();
+        $review = $this->book($actor, $client, 'triggered');
+        $this->complete($actor, $review, ['clinical_summary' => 'Sensitive canonical clinician summary.']);
+        $event = MedicationEvent::query()->where('subject_type', 'medication_review')
+            ->where('subject_id', (string) $review->id)->where('kind', 'review.completed')->sole();
+        $reader = $this->userAt($site, ['medications.view', 'medications.reports.view', 'medications.audit.view']);
+        $day = WorkerClock::today()->toDateString();
+        $response = $this->actingAs($reader)->get('/emar/reports?view=audit&kind=review.completed&period=custom&date_from='.$day.'&date_to='.$day)->assertOk();
+        $row = collect($response->inertiaProps('page.data'))->firstWhere('id', $event->id);
+        $this->assertNotNull($row);
+        $this->assertSame($actor->name, $row['actor']);
+        $this->assertSame('Medication review completed', $row['summary']);
+        $this->assertSame('2026-10-02 11:15:00', CarbonImmutable::parse($row['occurred_at'])->utc()->format('Y-m-d H:i:s'));
+        $this->assertSame($actor->id, $review->fresh()->completed_by);
+        $this->assertSame('Dr Synthetic Reviewer', $review->fresh()->reviewer_name);
+        $this->assertTrue($event->hasValidFingerprint());
+        $this->assertStringNotContainsString('Sensitive canonical clinician summary.', json_encode($response->inertiaProps()));
     }
 
     public function test_controlled_outcome_is_pending_instead_of_continue_and_requires_controlled_access_to_add(): void
@@ -1050,7 +1107,7 @@ class MedicationReviewWorkflowTest extends TestCase
         $keys = array_values(array_unique([
             ...$permissions, 'medications.view', 'medications.reviews.manage', 'medications.controlled.view',
             'medications.orders.manage', 'medications.orders.verify', 'clinical.accessAllSites', 'sites.viewAll',
-            'clients.viewAny', 'medications.stock.update', 'medications.audit.view', 'medications.reports.export', 'reports.viewAny',
+            'clients.viewAny', 'medications.stock.update', 'medications.audit.view', 'medications.reports.view', 'medications.reports.export', 'reports.viewAny',
         ]));
         $permissionRows = Permission::query()->whereIn('key', $keys)->get();
         $this->assertCount(count($keys), $permissionRows, 'The review permission migration must be available.');
