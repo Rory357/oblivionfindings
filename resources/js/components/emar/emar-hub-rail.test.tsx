@@ -1,4 +1,4 @@
-import { PageHero } from '@/components/page';
+import { PageHeader } from '@/components/page';
 import type { EmarNavigationPermissions } from '@/lib/emar-navigation';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -28,6 +28,7 @@ const coordinator: EmarNavigationPermissions = {
         controlledView: true,
         auditView: true,
         reportsExport: true,
+        reportsView: true,
     },
 };
 const auditor: EmarNavigationPermissions = {
@@ -91,13 +92,13 @@ describe('EmarHubRail', () => {
     it('lists only the views the viewer may open, plus the page itself', () => {
         at('/emar/errors', auditor);
         render(<EmarHubRail />);
-        expect(tabs()).toEqual(['Medication errors']);
+        expect(tabs()).toEqual(['Follow-ups', 'Medication errors']);
         cleanup();
 
         // Overview is lead-only, but the server let this person open it.
         at('/emar', auditor);
         render(<EmarHubRail />);
-        expect(tabs()).toEqual(['Overview', 'Medication errors']);
+        expect(tabs()).toEqual(['Overview', 'Follow-ups', 'Medication errors']);
     });
 
     it('renders nothing for hubs with their own rail or outside the module', () => {
@@ -105,6 +106,8 @@ describe('EmarHubRail', () => {
             '/meds/today',
             '/emar/rounds',
             '/emar/settings',
+            '/emar/settings#alerts/log',
+            '/emar/reports?view=audit',
             '/fleet-assets',
         ]) {
             at(url, coordinator);
@@ -123,16 +126,35 @@ describe('EmarHubRail', () => {
         ).toBe('Staff eligibility3');
     });
 
-    it('sits in the PageHero rail row, inside the banner', () => {
+    it('keeps the query-selected order view active and opens canonical targets', () => {
+        at('/emar/prescriptions?site_id=2&view=reconciliation', coordinator);
+        render(<EmarHubRail />);
+        expect(
+            screen
+                .getByRole('tab', { name: 'Reconciliation' })
+                .getAttribute('aria-selected'),
+        ).toBe('true');
+        expect(
+            screen
+                .getByRole('tab', { name: 'Prescriptions' })
+                .getAttribute('aria-selected'),
+        ).toBe('false');
+        fireEvent.click(screen.getByRole('tab', { name: 'Orders to check' }));
+        expect(fixture.visit).toHaveBeenCalledWith(
+            '/emar/prescriptions?view=to_check',
+        );
+    });
+
+    it('sits inside the shared PageHeader', () => {
         at('/emar/stock', coordinator);
         const { container } = render(
-            <PageHero title="Stock" rail={<EmarHubRail />} />,
+            <PageHeader title="Stock" rail={<EmarHubRail />} />,
         );
 
-        const hero = container.querySelector('[data-page-hero]');
+        const header = container.querySelector('.eh-header');
         const tablist = screen.getByRole('tablist', {
             name: 'Stock & controlled drugs pages',
         });
-        expect(hero?.contains(tablist)).toBe(true);
+        expect(header?.contains(tablist)).toBe(true);
     });
 });

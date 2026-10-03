@@ -5,7 +5,10 @@
 import { ClientAvatar } from '@/components/meds/board-bits';
 import { DonutChart, OPS_COLORS } from '@/components/ops-stat-card';
 import { PageHero } from '@/components/page';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
+import {
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import type { PageHeroBadge } from '@/components/page/page-hero-badges';
 import type { PageHeroMetaItem } from '@/components/page/page-hero-meta';
 import type { PageHeroStat } from '@/components/page/page-hero-stats';
@@ -15,6 +18,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
+import {
+    canOpenEmarAudit,
+    canOpenEmarReports,
+    emarReportsHref,
+    type EmarNavigationPermissions,
+} from '@/lib/emar-navigation';
 import { cn } from '@/lib/utils';
 import type { SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -58,12 +67,12 @@ import {
 } from 'recharts';
 
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
+import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog';
 import {
     addDays,
     DayPickerChip,
     parseYmd,
 } from '@/components/meds/day-picker-chip';
-import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog';
 import type {
     ClientInfo,
     CompetencyNotice,
@@ -71,7 +80,6 @@ import type {
     ScheduleRow,
 } from '@/pages/meds/today/types';
 import { AddMedicationModal } from './components/add-medication-modal';
-import { AuditLogModal } from './components/audit-log-modal';
 import {
     CdRegisterModal,
     type MedicationOption,
@@ -83,7 +91,6 @@ import {
     ReportErrorModal,
     type ClientOption,
 } from './components/report-error-modal';
-import { ReportsModal } from './components/reports-modal';
 import { StockMovementModal } from './components/stock-movement-modal';
 
 /* ── Types (mirror MedicationOverviewService::payload) ───────────────── */
@@ -479,6 +486,11 @@ export default function EmarHome(props: Props) {
     } = props;
 
     const page = usePage<SharedData>();
+    const navigationCan = page.props.auth?.can as
+        | EmarNavigationPermissions
+        | undefined;
+    const canReadReports = canOpenEmarReports(navigationCan);
+    const canReadAudit = canOpenEmarAudit(navigationCan);
     const firstName =
         (page.props.auth?.user?.name ?? '').split(' ')[0] || 'there';
     const currentUserId = page.props.auth?.user?.id ?? 0;
@@ -486,6 +498,9 @@ export default function EmarHome(props: Props) {
     const [acFilter, setAcFilter] = useState<'all' | AcCategory>('all');
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(null);
+    const reportScope = { date, site_id: siteFilter };
+    const auditHref = emarReportsHref('audit', reportScope);
+    const exportsHref = emarReportsHref('exports', reportScope);
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
     const [modal, setModal] = useState<
         | null
@@ -495,8 +510,6 @@ export default function EmarHome(props: Props) {
         | 'medication-review'
         | 'cd-register'
         | 'stock-movement'
-        | 'reports'
-        | 'audit-log'
     >(null);
     const [modalClientId, setModalClientId] = useState<number | null>(null);
     const [recordWizard, setRecordWizard] = useState<{
@@ -877,18 +890,16 @@ export default function EmarHome(props: Props) {
                                     Generate today&rsquo;s rounds
                                 </PageHeaderPrimaryButton>
                             ) : null}
-                            {can.export_reports ? (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                                    onClick={() => setModal('reports')}
+                            {canReadReports ? (
+                                <PageHeaderGlassButton
+                                    icon={Printer}
+                                    className="frontline-hit"
+                                    asChild
                                 >
-                                    <Printer className="h-4 w-4" />
-                                    {can.view_controlled
-                                        ? 'Export MAR & CD register'
-                                        : 'Export MAR'}
-                                </Button>
+                                    <Link href={exportsHref}>
+                                        Print &amp; exports
+                                    </Link>
+                                </PageHeaderGlassButton>
                             ) : null}
                         </>
                     }
@@ -1233,15 +1244,18 @@ export default function EmarHome(props: Props) {
                                     </div>
                                 ))
                             )}
-                            {/* eslint-disable-next-line no-restricted-syntax -- inline text trigger; a shadcn Button would change the link styling. */}
-                            <button
-                                type="button"
-                                onClick={() => setModal('audit-log')}
-                                className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-                            >
-                                <FileText className="h-3.5 w-3.5" />
-                                View audit log &amp; resolved history
-                            </button>
+                            {canReadAudit && (
+                                <Button
+                                    variant="link"
+                                    className="frontline-tap mt-2"
+                                    asChild
+                                >
+                                    <Link href={auditHref}>
+                                        <FileText className="h-3.5 w-3.5" />
+                                        View audit trail &amp; resolved history
+                                    </Link>
+                                </Button>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -1934,12 +1948,14 @@ export default function EmarHome(props: Props) {
                                     </div>
                                 ))
                             )}
-                            <Link
-                                href="/emar/audit"
-                                className="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary hover:underline"
-                            >
-                                Full audit trail →
-                            </Link>
+                            {canReadAudit && (
+                                <Link
+                                    href={auditHref}
+                                    className="frontline-tap inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary hover:underline"
+                                >
+                                    Full audit trail →
+                                </Link>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -1974,11 +1990,14 @@ export default function EmarHome(props: Props) {
                                     icon: ClipboardCheck,
                                     tone: 'warning' as KpiTone,
                                 },
-                                ...(can.export_reports
+                                ...(canReadReports
                                     ? [
                                           {
                                               title: 'Reports',
-                                              href: '/emar/reports',
+                                              href: emarReportsHref(
+                                                  'standard',
+                                                  reportScope,
+                                              ),
                                               icon: Printer,
                                               tone: 'primary' as KpiTone,
                                           },
@@ -2070,19 +2089,6 @@ export default function EmarHome(props: Props) {
                     initialClientId={modalClientId}
                 />
             ) : null}
-            {can.export_reports ? (
-                <ReportsModal
-                    open={modal === 'reports'}
-                    onClose={() => setModal(null)}
-                    clients={clientOptions}
-                    defaultDate={date}
-                />
-            ) : null}
-            <AuditLogModal
-                open={modal === 'audit-log'}
-                onClose={() => setModal(null)}
-                activity={recentActivity}
-            />
             {recordWizard &&
             can.record &&
             (!recordWizard.row.is_controlled || can.record_controlled) ? (

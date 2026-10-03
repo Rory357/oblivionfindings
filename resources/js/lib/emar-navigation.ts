@@ -22,14 +22,11 @@ import {
 
 /**
  * Medication (eMAR) navigation — the Fleet pattern: one map owns the hub
- * labels, each hub's rail views (existing routes only), the permission-ordered
+ * labels, each hub's built views, the permission-ordered
  * landing, visibility and command-search entries.
  *
- * Source: the approved P00 mockup's HUBS table (eMAR second review §2.1–2.2,
- * §3). Views that are new surfaces — Follow-ups, Controlled checks, Witness
- * overrides, Loss reports as a page, Print & exports, Reconciliation, the
- * report builder — join their hub only once their package builds them, never
- * as an empty or denied tab.
+ * Source: the approved P00 hub map and integrated package routes. Page-local
+ * rails retain their own workflow sections; this map also owns discovery.
  *
  * Navigation only. The server keeps every medication permission check; a
  * hidden link is never the security boundary.
@@ -41,6 +38,10 @@ export interface EmarNavigationPermissions {
         ordersManage?: boolean;
         ordersVerify?: boolean;
         settingsManage?: boolean;
+        alertsManageHouse?: boolean;
+        witnessPinReset?: boolean;
+        /** Server-supplied scoped emergency-policy access, when available. */
+        emergencyPolicyAccess?: boolean;
         stockUpdate?: boolean;
         controlledView?: boolean;
         controlledRecord?: boolean;
@@ -112,6 +113,9 @@ export const isFrontlineMedication: Visibility = (can) => {
         m.reportsExport ||
         m.reportsView ||
         m.settingsManage ||
+        m.alertsManageHouse ||
+        m.witnessPinReset ||
+        m.emergencyPolicyAccess ||
         m.breakGlass
     );
 };
@@ -156,6 +160,43 @@ const auditView = flag('auditView');
 const reportsView = flag('reportsView');
 const settingsManage = flag('settingsManage');
 const breakGlass = flag('breakGlass');
+const safetyAccess = any(hasLeadCapability, auditView, breakGlass);
+const settingsReader = any(settingsManage, auditView);
+const settingsAccess = any(
+    settingsReader,
+    flag('ordersManage'),
+    flag('alertsManageHouse'),
+    flag('witnessPinReset'),
+    flag('emergencyPolicyAccess'),
+);
+
+/** The reports route requires module read access; audit adds its own gate. */
+export const canOpenEmarReports = reportsView;
+export const canOpenEmarAudit = all(reportsView, auditView);
+
+/** Translate a source page's scope into the canonical report period/filter. */
+export function emarReportsHref(
+    reportView: 'standard' | 'audit' | 'exports',
+    scope: {
+        date?: string;
+        site_id?: number | null;
+        client_id?: number | null;
+        q?: string | null;
+        report?: string;
+    } = {},
+): string {
+    const params = new URLSearchParams({ view: reportView });
+    if (scope.date) {
+        params.set('period', 'custom');
+        params.set('date_from', scope.date);
+        params.set('date_to', scope.date);
+    }
+    if (scope.site_id) params.set('site_id', String(scope.site_id));
+    if (scope.client_id) params.set('client_id', String(scope.client_id));
+    if (scope.q?.trim()) params.set('q', scope.q.trim());
+    if (scope.report) params.set('report', scope.report);
+    return `/emar/reports?${params}`;
+}
 
 export const EMAR_HUBS: EmarHub[] = [
     {
@@ -175,8 +216,16 @@ export const EMAR_HUBS: EmarHub[] = [
             {
                 key: 'rounds',
                 label: 'Rounds',
-                href: '/emar/rounds',
+                href: '/meds/today?view=rounds',
                 icon: Repeat,
+                visible: any(view, administer),
+                aliases: ['/emar/rounds'],
+            },
+            {
+                key: 'followups',
+                label: 'Follow-ups',
+                href: '/meds/today?view=followups',
+                icon: ClipboardList,
                 visible: any(view, administer),
             },
         ],
@@ -235,6 +284,27 @@ export const EMAR_HUBS: EmarHub[] = [
                 visible: view,
             },
             {
+                key: 'to-check',
+                label: 'Orders to check',
+                href: '/emar/prescriptions?view=to_check',
+                icon: ShieldCheck,
+                visible: view,
+            },
+            {
+                key: 'covert',
+                label: 'Covert giving',
+                href: '/emar/prescriptions?view=covert',
+                icon: ShieldCheck,
+                visible: view,
+            },
+            {
+                key: 'reconciliation',
+                label: 'Reconciliation',
+                href: '/emar/prescriptions?view=reconciliation',
+                icon: Repeat,
+                visible: view,
+            },
+            {
                 key: 'reviews',
                 label: 'Medication reviews',
                 href: '/emar/reviews',
@@ -266,11 +336,20 @@ export const EMAR_HUBS: EmarHub[] = [
                 visible: all(view, controlledView),
             },
             {
+                key: 'losses',
+                label: 'Loss reports',
+                href: '/emar/controlled?view=losses',
+                icon: OctagonAlert,
+                visible: all(view, controlledView),
+                aliases: ['/emar/controlled/loss-reports'],
+            },
+            {
                 key: 'destructions',
                 label: 'Destructions & returns',
                 href: '/emar/destructions',
                 icon: Ban,
                 visible: all(view, controlledView),
+                aliases: ['/emar/controlled?view=destructions'],
             },
         ],
     },
@@ -278,7 +357,9 @@ export const EMAR_HUBS: EmarHub[] = [
         key: 'safety',
         label: 'Safety & oversight',
         icon: ShieldCheck,
-        visible: any(view, hasLeadCapability, auditView, breakGlass),
+        // Workers reach their follow-ups on Meds today; that read permission
+        // alone must not add a second sidebar entry. Break-glass remains scoped.
+        visible: safetyAccess,
         views: [
             {
                 key: 'overview',
@@ -354,17 +435,30 @@ export const EMAR_HUBS: EmarHub[] = [
                 label: 'Audit trail',
                 href: '/emar/reports?view=audit',
                 icon: Activity,
-                visible: auditView,
+                visible: canOpenEmarAudit,
+                aliases: ['/emar/audit', '/medications/audit'],
             },
-            { key: 'builder', label: 'Report builder', href: '/emar/reports/builder', icon: BarChart3, visible: reportsView },
-            { key: 'exports', label: 'Print & exports', href: '/emar/reports?view=exports', icon: FileText, visible: reportsView },
+            {
+                key: 'builder',
+                label: 'Report builder',
+                href: '/emar/reports/builder',
+                icon: BarChart3,
+                visible: reportsView,
+            },
+            {
+                key: 'exports',
+                label: 'Print & exports',
+                href: '/emar/reports?view=exports',
+                icon: FileText,
+                visible: reportsView,
+            },
         ],
     },
     {
         key: 'settings',
         label: 'Settings',
         icon: Settings,
-        visible: settingsManage,
+        visible: settingsAccess,
         ownRail: true,
         views: [
             {
@@ -372,7 +466,47 @@ export const EMAR_HUBS: EmarHub[] = [
                 label: 'Medication rules',
                 href: '/emar/settings',
                 icon: Settings,
-                visible: settingsManage,
+                visible: settingsReader,
+                aliases: ['/emar/settings#rules'],
+            },
+            {
+                key: 'templates',
+                label: 'Round templates',
+                href: '/emar/settings#rounds/templates',
+                aliases: ['/emar/settings#rounds'],
+                icon: Repeat,
+                visible: any(settingsReader, flag('ordersManage')),
+            },
+            {
+                key: 'witness-pins',
+                label: 'Witness PINs',
+                href: '/emar/settings#staff/pins',
+                aliases: ['/emar/settings#staff'],
+                icon: UserCheck,
+                visible: any(settingsReader, flag('witnessPinReset')),
+            },
+            {
+                key: 'alerts',
+                label: 'Alerts & access',
+                href: '/emar/settings#alerts/overview',
+                aliases: ['/emar/settings#alerts'],
+                icon: OctagonAlert,
+                visible: any(settingsReader, flag('alertsManageHouse')),
+            },
+            {
+                key: 'emergency-policy',
+                label: 'Emergency access policy',
+                href: '/emar/settings#alerts/emergency',
+                icon: Lock,
+                visible: any(settingsReader, flag('emergencyPolicyAccess')),
+            },
+            {
+                key: 'changes',
+                label: 'Settings change history',
+                href: '/emar/settings#history/changes',
+                aliases: ['/emar/settings#history'],
+                icon: History,
+                visible: settingsReader,
             },
         ],
     },
@@ -433,25 +567,47 @@ export function emarNavigationPath(url: string): string {
     return (url.split(/[?#]/)[0] || '/').replace(/\/+$/, '') || '/';
 }
 
-const viewOwnsPath = (item: EmarHubView, path: string) =>
-    [item.href, ...(item.aliases ?? [])].some(
-        (href) =>
-            path === href ||
-            // `/emar` (Overview) is a prefix of every eMAR URL, so it owns
-            // only itself; deeper paths belong to their own views.
-            (href !== '/emar' && path.startsWith(`${href}/`)),
+const navigationUrl = (url: string) => new URL(url, 'https://medication.local');
+
+/** Exact view selectors outrank their page's default view; filters are ignored. */
+function targetSpecificity(target: string, current: URL): number | undefined {
+    const expected = navigationUrl(target);
+    const path = emarNavigationPath(current.pathname);
+    const targetPath = emarNavigationPath(expected.pathname);
+    if (
+        path !== targetPath &&
+        (targetPath === '/emar' || !path.startsWith(`${targetPath}/`))
+    )
+        return undefined;
+    for (const [key, value] of expected.searchParams) {
+        if (current.searchParams.get(key) !== value) return undefined;
+    }
+    const hash = expected.hash.replace(/^#\/?/, '');
+    const currentHash = current.hash.replace(/^#\/?/, '');
+    if (hash && currentHash !== hash && !currentHash.startsWith(`${hash}/`))
+        return undefined;
+    return (
+        targetPath.length * 1000 +
+        expected.searchParams.size * 100 +
+        hash.length
     );
+}
 
 /** The hub and view a URL belongs to, or undefined outside the module. */
 export function emarHubForUrl(
     url: string,
 ): { hub: EmarHub; view: EmarHubView } | undefined {
-    const path = emarNavigationPath(url);
+    const current = navigationUrl(url);
     return EMAR_HUBS.flatMap((hub) =>
-        hub.views
-            .filter((item) => viewOwnsPath(item, path))
-            .map((item) => ({ hub, view: item })),
-    ).sort((a, b) => b.view.href.length - a.view.href.length)[0];
+        hub.views.flatMap((item) => {
+            const matches = [item.href, ...(item.aliases ?? [])]
+                .map((target) => targetSpecificity(target, current))
+                .filter((score): score is number => score !== undefined);
+            return matches.length
+                ? [{ hub, view: item, score: Math.max(...matches) }]
+                : [];
+        }),
+    ).sort((a, b) => b.score - a.score)[0];
 }
 
 /** The viewer's way into the module: their first hub's landing. */
@@ -524,8 +680,7 @@ export function emarHubLinkActive(
     url: string,
     href: string,
 ): boolean | undefined {
-    const linkPath = emarNavigationPath(href);
-    const linkHub = emarHubForUrl(linkPath)?.hub;
+    const linkHub = emarHubForUrl(href)?.hub;
     if (!linkHub) return undefined;
     return emarHubForUrl(url)?.hub.key === linkHub.key;
 }
