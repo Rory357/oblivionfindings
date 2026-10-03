@@ -306,17 +306,30 @@ class AuditTrailTest extends TestCase
         );
         $this->assertSame($correctionRequester->name, $rejectedEvent['details']['submitted_by']);
 
-        $todayApprovedCorrections = collect($this->retainedAuditFeed($user, [
-            'date_from' => today()->toDateString(),
-            'date_to' => today()->toDateString(),
+        // Approval is an evidence event at the decision instant, on its NZ
+        // calendar day; the proposed dose still belongs to the older dose day.
+        $correctionDay = $approvedCorrection->correction_approved_at->copy()
+            ->setTimezone('Pacific/Auckland')->toDateString();
+        $this->assertTrue(Carbon::parse($approvedEvent['timestamp'])->equalTo($approvedCorrection->correction_approved_at));
+        $this->assertTrue(Carbon::parse($events->firstWhere('id', 'admin_'.$original->id)['timestamp'])->equalTo($original->administered_at));
+        $correctionDayEvents = collect($this->retainedAuditFeed($user, [
+            'date_from' => $correctionDay,
+            'date_to' => $correctionDay,
             'event_types' => 'correction_approved',
         ])
             ->assertOk()
             ->inertiaProps('events'));
         $this->assertSame(
             ['admin_'.$approvedCorrection->id],
-            $todayApprovedCorrections->pluck('id')->all(),
+            $correctionDayEvents->pluck('id')->all(),
         );
+        $this->assertSame(['correction_approved'], $correctionDayEvents->pluck('event_type')->all());
+        $originalDay = $original->administered_at->copy()->setTimezone('Pacific/Auckland')->toDateString();
+        $this->retainedAuditFeed($user, [
+            'date_from' => $originalDay,
+            'date_to' => $originalDay,
+            'event_types' => 'correction_approved',
+        ])->assertOk()->assertInertia(fn (Assert $page) => $page->has('events', 0));
     }
 
     public function test_unrecorded_scheduled_dose_becomes_an_omission(): void
