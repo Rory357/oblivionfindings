@@ -39,3 +39,11 @@ Worker completion is allowed for the current owner or a current covering worker.
 Dependency: P09 466ce69df is cherry-picked locally as a434bf1d6; Main integrates the dependency once. Foundation PHP syntax passed and physical vendor resolves the owned appbase. Functional tests are pending under Main's granted heavy-lock slot; this is a reviewable foundation candidate, not a readiness claim. UI and legacy PRN adapter work follows separately. No node_modules or vendor junctions exist here.
 
 Deployment: migration adds only workflow/history and grants. emar:workflow-followups --import is an explicit bounded idempotent source-identity import; it does not change doses. It has not been run on live data. The every-minute command only creates missed-acknowledgement heads-up work and sends no messages.
+
+## Batch audit correction (supersedes the single-item-only completion wording)
+
+completeFromSource(sourceKey, actor, outcome, facts, ?array &$auditEvents = null) now accepts a caller-owned audit collection. With an array passed, it resolves the ledger/history only and adds MedicationEventData to the array; it does not acquire a P09 head. The source owner must appendMany($auditEvents) inside the SAME transaction after ALL domain writes/locks/receipts. Never discard the collection or publish after commit.
+
+completeSources(array $completions) accepts [{source_key, actor, outcome, facts?}, ...], prelocks the workflow set in id order, resolves every item, then appends its audit events last using appendMany. It requires the owner's already authorized transaction and canonical clinical/source locks. Duplicate source entries in a batch are rejected. The method returns workflow rows. Single-item completeFromSource without a collection still appends immediately, so it must be the LAST domain operation.
+
+Source creation ensure remains ledger/history only and never acquires P09 heads. This supports P03/P04/P05/P06/PIN-2 composing multiple work identities and closures safely. Public actions still cannot bypass source evidence.

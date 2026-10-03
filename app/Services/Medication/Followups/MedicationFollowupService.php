@@ -480,7 +480,7 @@ final class MedicationFollowupService
     }
 
     /** Domain-only: call LAST after source authorization/evidence, no further domain locks. */
-    public function completeFromSource(string $sourceKey, ?User $actor, string $outcome, array $facts = []): MedicationFollowup
+    public function completeFromSource(string $sourceKey, ?User $actor, string $outcome, array $facts = [], ?array &$auditEvents = null): MedicationFollowup
     {
         if (DB::transactionLevel() < 1) {
             throw new \LogicException('Resolve source follow-ups in the source transaction.');
@@ -509,16 +509,53 @@ final class MedicationFollowupService
                 ['confirmation_id' => $row->id, 'outcome' => $outcome]);
         }
         $this->close($row, (int) $actor?->id, 'source_completed', ['outcome' => $outcome, ...$facts]);
-        app(MedicationEventRecorder::class)->append(new MedicationEventData(
+        $audit = new MedicationEventData(
             siteId: (int) $row->client->site_id, kind: 'followup.source_completed',
             subjectType: 'medication_followup', subjectId: (string) $row->id,
             actorId: $actor ? (int) $actor->id : null, occurredAt: CarbonImmutable::now('UTC'),
             summary: 'Medication follow-up completed in its source workflow.',
             facts: ['outcome' => $outcome, 'revision' => $row->revision],
             clientId: (int) $row->client_id, controlled: (bool) $row->medication?->controlled_drug,
-        ));
+        );
+        if ($auditEvents !== null) {
+            $auditEvents[] = $audit;
+        } else {
+            app(MedicationEventRecorder::class)->append($audit);
+        }
 
         return $row;
+    }
+
+    /**
+     * Domain-only batch completion. Caller owns source/clinical locks and receipts.
+     *
+     * @param  array<int, array{source_key:string,actor:?User,outcome:string,facts?:array}>  $completions
+     * @return array<int, MedicationFollowup>
+     */
+    public function completeSources(array $completions): array
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new \LogicException('Complete source work inside its authorized transaction.');
+        }
+        $keys = array_column($completions, 'source_key');
+        if (count($keys) !== count(array_unique($keys))) {
+            throw new \InvalidArgumentException('A batch must name each source once.');
+        }
+        $locked = MedicationFollowup::query()->whereIn('source_key', $keys)->orderBy('id')->lockForUpdate()->get()->keyBy('source_key');
+        abort_unless($locked->count() === count($keys), 404);
+        $auditEvents = [];
+        $rows = [];
+        // Process the prelocked workflow set in deterministic order too.
+        $commands = collect($completions)->keyBy('source_key');
+        foreach ($locked as $key => $row) {
+            $command = $commands->get($key);
+            $rows[] = $this->completeFromSource($key, $command['actor'], $command['outcome'], $command['facts'] ?? [], $auditEvents);
+        }
+        if ($auditEvents !== []) {
+            app(MedicationEventRecorder::class)->appendMany($auditEvents);
+        }
+
+        return $rows;
     }
 
     /** Source-owned evidence updates; the public controller never accepts context. */
