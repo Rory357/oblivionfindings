@@ -108,6 +108,9 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
             'frequency' => 'Once daily',
             'dose_times' => [$this->doseSlot->format('H:i')],
             'controlled_drug' => true,
+            'nz_controlled_class' => 'B',
+            'controlled_class_source' => 'Synthetic reviewed test configuration',
+            'approval_status' => 'verified',
             'active' => true,
             'state' => 'active',
         ]));
@@ -477,6 +480,7 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
             'expiry_date' => now()->addYear()->toDateString(),
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'controlled_drugs' => $canWitnessControlled,
             'can_witness_controlled' => $canWitnessControlled,
         ]);
     }

@@ -1,168 +1,118 @@
+import { Button } from '@/components/ui/button';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-
-vi.mock('@inertiajs/react', async () => {
-    const ReactActual = await vi.importActual<typeof import('react')>('react');
-
-    return {
-        Link: ({ href, children }: { href: string; children?: ReactNode }) =>
-            ReactActual.createElement('a', { href }, children),
-        router: { reload: vi.fn() },
-        useForm: (initial: Record<string, unknown>) => {
-            const [data, setDataState] = ReactActual.useState(initial);
-
-            return {
-                data,
-                errors: {},
-                processing: false,
-                setData: (key: string, value: unknown) =>
-                    setDataState((current) => ({ ...current, [key]: value })),
-                reset: () => setDataState(initial),
-            };
-        },
-    };
-});
-
-vi.mock('@/lib/emar-offline', () => ({
-    emarMutationWasAccepted: vi.fn(() => true),
-    submitEmarMutation: vi.fn(),
-}));
-
 import ShiftMedicationCard from './shift-medication-card';
 
-type Summary = NonNullable<
-    ComponentProps<typeof ShiftMedicationCard>['summary']
->;
+vi.mock('@inertiajs/react', () => ({
+    Link: ({ href, children }: { href: string; children?: ReactNode }) => (
+        <a href={href}>{children}</a>
+    ),
+    router: { reload: vi.fn() },
+    usePage: () => ({ props: { auth: { user: { name: 'Priya Shah' } } } }),
+}));
+vi.mock('@/components/emar/record-dose/record-dose-dialog', () => ({
+    RecordDoseDialog: ({
+        target,
+        entry,
+        shiftContext,
+        onClose,
+    }: {
+        target: { orderId: number; kind: string; scheduledFor?: string };
+        entry: string;
+        shiftContext: { shiftId: number };
+        onClose: () => void;
+    }) => (
+        <div role="dialog" aria-label="Record a dose">
+            {entry}|{target.kind}|{target.orderId}|{target.scheduledFor}|
+            {shiftContext.shiftId}
+            <Button onClick={onClose}>Cancel</Button>
+        </div>
+    ),
+}));
 
+type Props = ComponentProps<typeof ShiftMedicationCard>;
 const scheduledFor = '2026-09-29T08:00:00+13:00';
-
-function summaryWithWindow(doseWindow: Summary['dose_window']): Summary {
+function props(): Props {
     return {
-        stats: { scheduled: { due: 1 } },
-        allergies: [],
-        due: [
-            {
-                client_medication_id: 11,
-                scheduled_for: scheduledFor,
-                scheduled_time: '08:00',
-                schedule_state: 'due',
-                can_record: true,
-                medication: {
-                    id: 11,
-                    name: 'Paracetamol',
-                    dosage: '500 mg',
+        clientId: 5,
+        shiftId: 9,
+        shiftStatus: 'in_progress',
+        canRecord: true,
+        canRecordControlled: false,
+        witnesses: [],
+        summary: {
+            stats: { scheduled: { due: 1 } },
+            allergies: [],
+            recent_history: [],
+            due: [
+                {
+                    client_medication_id: 11,
+                    scheduled_for: scheduledFor,
+                    scheduled_time: '08:00',
+                    schedule_state: 'due',
+                    can_record: true,
+                    medication: {
+                        id: 11,
+                        name: 'Paracetamol',
+                        dosage: '500 mg',
+                    },
                 },
-            },
-        ],
-        prn: [],
-        recent_history: [],
-        dose_window: doseWindow,
+            ],
+            prn: [
+                {
+                    client_medication_id: 12,
+                    can_record: true,
+                    medication: {
+                        id: 12,
+                        name: 'As-needed medicine',
+                        dosage: '1 tablet',
+                        is_prn: true,
+                    },
+                },
+            ],
+            dose_window: { early_minutes: 90, late_minutes: 15 },
+        },
     };
 }
 
-// The dialog's "Administered at" field is a local datetime-local value.
-function localInputAt(offsetMinutes: number): string {
-    const d = new Date(Date.parse(scheduledFor) + offsetMinutes * 60000);
-    const pad = (n: number) => String(n).padStart(2, '0');
-
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function openDialogGivenAt(
-    doseWindow: Summary['dose_window'],
-    offsetMinutes: number,
-) {
-    render(
-        <ShiftMedicationCard
-            clientId={5}
-            shiftId={9}
-            shiftStatus="in_progress"
-            canRecord
-            canRecordControlled={false}
-            summary={summaryWithWindow(doseWindow)}
-            witnesses={[]}
-        />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Record' }));
-
-    const administeredAt = document.querySelector<HTMLInputElement>(
-        'input[type="datetime-local"]',
-    );
-    expect(administeredAt).not.toBeNull();
-    fireEvent.change(administeredAt!, {
-        target: { value: localInputAt(offsetMinutes) },
-    });
-}
-
-const saveButton = () =>
-    screen.getByRole('button', { name: 'Save administration' });
-
-describe('ShiftMedicationCard dose window', () => {
-    const serverDefault = { early_minutes: 30, late_minutes: 60 };
-
-    it('asks for a reason when a dose is given 45 minutes early', () => {
-        openDialogGivenAt(serverDefault, -45);
-
+describe('Shift medicines shared recorder', () => {
+    it('keeps the scheduled dose identity and shift through the shared recorder and allows cancellation', () => {
+        render(<ShiftMedicationCard {...props()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Record' }));
         expect(
-            screen.getByText(
-                'This is more than 30 minutes before the scheduled time. Add a reason.',
-            ),
-        ).toBeInTheDocument();
-        expect(saveButton()).toBeDisabled();
+            screen.getByRole('dialog', { name: 'Record a dose' }),
+        ).toHaveTextContent(`shift|scheduled|11|${scheduledFor}|9`);
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
-
-    it('does not ask for a reason when a dose is given 45 minutes late', () => {
-        openDialogGivenAt(serverDefault, 45);
-
-        expect(screen.queryByText(/Add a reason\./)).not.toBeInTheDocument();
-        expect(saveButton()).toBeEnabled();
+    it('opens the chosen PRN through the same recorder', () => {
+        render(<ShiftMedicationCard {...props()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Record PRN' }));
+        expect(
+            screen.getByRole('dialog', { name: 'Record a dose' }),
+        ).toHaveTextContent('shift|prn|12||9');
     });
-
-    it.each([-30, 60])(
-        'treats the window edge (%i minutes) as on time, like the server',
-        (offset) => {
-            openDialogGivenAt(serverDefault, offset);
-
-            expect(saveButton()).toBeEnabled();
+    it.each(['completed', 'cancelled'])(
+        'does not offer recording from a %s shift',
+        (shiftStatus) => {
+            render(
+                <ShiftMedicationCard {...props()} shiftStatus={shiftStatus} />,
+            );
+            expect(
+                screen.queryByRole('button', { name: 'Record' }),
+            ).not.toBeInTheDocument();
+            expect(
+                screen.queryByRole('button', { name: 'Record PRN' }),
+            ).not.toBeInTheDocument();
         },
     );
-
-    it('asks for a reason once a dose is past the late edge', () => {
-        openDialogGivenAt(serverDefault, 61);
-
+    it('does not offer a controlled dose to a worker without controlled-record authority', () => {
+        const data = props();
+        data.summary!.due[0].medication.controlled_drug = true;
+        render(<ShiftMedicationCard {...data} />);
         expect(
-            screen.getByText(
-                'This is more than 60 minutes after the scheduled time. Add a reason.',
-            ),
-        ).toBeInTheDocument();
-        expect(saveButton()).toBeDisabled();
-
-        fireEvent.change(
-            screen.getByPlaceholderText('Required for this administration'),
-            { target: { value: 'Client was at an appointment' } },
-        );
-
-        expect(saveButton()).toBeEnabled();
-    });
-
-    it('uses the window the server sends, not a built-in default', () => {
-        openDialogGivenAt({ early_minutes: 90, late_minutes: 15 }, -45);
-        expect(saveButton()).toBeEnabled();
-
-        fireEvent.change(
-            document.querySelector<HTMLInputElement>(
-                'input[type="datetime-local"]',
-            )!,
-            { target: { value: localInputAt(20) } },
-        );
-
-        expect(
-            screen.getByText(
-                'This is more than 15 minutes after the scheduled time. Add a reason.',
-            ),
-        ).toBeInTheDocument();
-        expect(saveButton()).toBeDisabled();
+            screen.queryByRole('button', { name: 'Record' }),
+        ).not.toBeInTheDocument();
     });
 });

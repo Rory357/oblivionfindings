@@ -71,6 +71,9 @@ class ControlledDrugsTest extends TestCase
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
             'can_witness_controlled' => true,
+            'controlled_drugs' => true,
+            'restricted' => false,
+            'not_seen_areas' => [],
         ]);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         Shift::factory()->create([
@@ -80,6 +83,20 @@ class ControlledDrugsTest extends TestCase
             'user_id' => $witness->id,
             'starts_at' => now()->subHour(),
             'ends_at' => now()->addHour(),
+            'status' => 'in_progress',
+            'created_by' => $user->id,
+        ]);
+
+        // The recorder also needs current house presence for the witnessed cupboard command.
+        Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'service_context_id' => $client->service_context_id,
+            'user_id' => $user->id,
+            'starts_at' => now()->subHour()->utc(),
+            'ends_at' => now()->addHours(3)->utc(),
+            'actual_starts_at' => now()->subMinutes(30)->utc(),
+            'actual_ends_at' => null,
             'status' => 'in_progress',
             'created_by' => $user->id,
         ]);
@@ -104,17 +121,21 @@ class ControlledDrugsTest extends TestCase
         $this->actingAs($user)
             ->from('/emar/controlled')
             ->post('/emar/controlled/entries', [
+                ...$this->controlledCommandHead($med),
                 'client_medication_id' => $med->id,
                 'client_id' => $client->id,
                 'medication_name' => 'Morphine sulfate',
                 'entry_type' => 'administration',
+                'movement_type' => 'going_out',
+                'expected_balance' => 10,
+                'actual_balance' => 9, // same unreconciled observation as on_hand_after
                 'quantity' => 2,
                 'on_hand_before' => 10,
                 'on_hand_after' => 9, // should be 8
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
-            ->assertSessionHasErrors('on_hand_after');
+            ->assertSessionHasErrors('actual_balance');
 
         $this->assertSame(0, ClientControlledDrugEntry::count());
     }
@@ -126,10 +147,14 @@ class ControlledDrugsTest extends TestCase
         $this->actingAs($user)
             ->from('/emar/controlled')
             ->post('/emar/controlled/entries', [
+                ...$this->controlledCommandHead($med),
                 'client_medication_id' => $med->id,
                 'client_id' => $client->id,
                 'medication_name' => 'Morphine sulfate',
                 'entry_type' => 'administration',
+                'movement_type' => 'going_out',
+                'expected_balance' => 10,
+                'actual_balance' => 8,
                 'quantity' => 2,
                 'on_hand_before' => 10,
                 'on_hand_after' => 8,
@@ -152,10 +177,14 @@ class ControlledDrugsTest extends TestCase
         $entry = fn (string $credential, int $before) => $this->actingAs($user)
             ->from('/emar/controlled')
             ->post('/emar/controlled/entries', [
+                ...$this->controlledCommandHead($med),
                 'client_medication_id' => $med->id,
                 'client_id' => $client->id,
                 'medication_name' => 'Morphine sulfate',
                 'entry_type' => 'administration',
+                'movement_type' => 'going_out',
+                'expected_balance' => $before,
+                'actual_balance' => $before - 1,
                 'quantity' => 1,
                 'on_hand_before' => $before,
                 'on_hand_after' => $before - 1,
@@ -164,7 +193,7 @@ class ControlledDrugsTest extends TestCase
             ]);
 
         // Their login password is no longer accepted.
-        $entry('password', 10)->assertSessionHasErrors(['witness_credential' => WitnessPinService::INCORRECT]);
+        $entry('password', 10)->assertSessionHasErrors('witness_credential');
         $this->assertSame(1, (int) UserWitnessPin::query()->where('user_id', $witness->id)->value('failed_attempts'));
         $this->assertSame(1, AuditLog::query()->where('action', 'medications.witness_pin.failed')->count());
         $this->assertSame(0, ClientControlledDrugEntry::count());
@@ -670,37 +699,48 @@ class ControlledDrugsTest extends TestCase
             ->get('/emar/controlled?site_id='.$site->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('emar/ControlledDrugs')
+                ->component('emar/ControlledRegister')
+                // The product reader still has no equivalent site-brand projection.
                 ->where('site_brand_colour', '#5E35B1')
-                ->has('medications', 1)
-                ->has('recentEntries')
-                ->has('staff')
+                ->has('product.medicines', 1)
+                ->has('product.entries')
+                ->has('product.witnesses_by_site.'.$site->id)
             );
     }
 
     public function test_page_exposes_reconciliation_fields_filters_and_current_user(): void
     {
-        ['user' => $user] = $this->setupCd();
+        ['user' => $user, 'client' => $client, 'med' => $med] = $this->setupCd();
+        ClientMedication::query()->create([
+            'client_id' => $client->id, 'name' => 'Ordinary medicine sentinel', 'dosage' => '500mg', 'frequency' => 'PRN',
+            'controlled_drug' => false, 'is_prn' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified',
+        ]);
 
         $this->actingAs($user)
-            ->get('/emar/controlled')
+            ->get('/emar/controlled?q=Morphine')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('emar/ControlledDrugs')
-                ->has('medications.0', fn (Assert $m) => $m
-                    ->where('controlled_drug', true)
-                    ->where('overdue_check', true)
-                    ->has('last_balance_check_at')
-                    ->has('days_since_check')
-                    ->has('stock')
-                    ->etc()
-                )
-                ->where('current_user.id', $user->id)
-                ->has('date')
-                ->has('today')
-                ->where('is_today', true)
-                ->has('client_id')
-                ->has('q')
+                ->component('emar/ControlledRegister')
+                // ControlledRegister hydrates its search from the page URL.
+                ->url('/emar/controlled?q=Morphine')
+                ->has('product.medicines', 1)
+                ->where('product.medicines.0.id', $med->id)
+                ->where('product.medicines.0.client_id', $client->id)
+                ->where('product.medicines.0.balance', 10)
+                ->where('product.medicines.0.entry_version', null)
+                ->where('product.medicines.0.count.last_at', null)
+                ->where('product.medicines.0.count.last_entry_id', null)
+                // No configured cadence must never become an invented overdue count.
+                ->where('product.cadence.configured', false)
+                ->where('product.medicines.0.count.state', 'not_configured')
+                ->where('product.medicines.0.count.due_at', null)
+                ->where('product.medicines.0.count.overdue_at', null)
+                ->where('product.current_user_id', $user->id)
+                ->where('product.current_user_name', $user->name)
+                ->where('product.filters.date', null)
+                ->where('product.filters.client_id', null)
+                ->where('product.as_at', fn (string $at): bool => Carbon::parse($at)
+                    ->setTimezone('Pacific/Auckland')->toDateString() === now('Pacific/Auckland')->toDateString())
             );
     }
 
@@ -714,7 +754,7 @@ class ControlledDrugsTest extends TestCase
             'status' => 'active',
         ]);
 
-        ClientControlledDrugEntry::query()->create([
+        $legitimate = ClientControlledDrugEntry::query()->create([
             'client_id' => $client->id,
             'client_medication_id' => $med->id,
             'entry_type' => 'balance_check',
@@ -725,7 +765,7 @@ class ControlledDrugsTest extends TestCase
             'recorded_by' => $user->id,
             'witnessed_by' => $witness->id,
         ]);
-        ClientControlledDrugEntry::query()->create([
+        $noncanonical = ClientControlledDrugEntry::query()->create([
             'client_id' => $otherClient->id,
             'client_medication_id' => $med->id,
             'entry_type' => 'balance_check',
@@ -741,53 +781,135 @@ class ControlledDrugsTest extends TestCase
             ->get('/emar/controlled?site_id='.$site->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->has('medications', 1)
-                ->where('medications.0.last_balance_check_at', $legitimateAt->toIso8601String())
-                ->where('medications.0.days_since_check', 8)
-                ->where('medications.0.overdue_check', true)
+                ->component('emar/ControlledRegister')
+                ->has('product.medicines', 1)
+                ->where('product.medicines.0.id', $med->id)
+                ->where('product.medicines.0.count.last_at', $legitimateAt->toIso8601String())
+                ->where('product.medicines.0.count.last_entry_id', $legitimate->id)
+                ->where('product.medicines.0.entry_version', $legitimate->id)
+                ->where('product.cadence.configured', false)
+                ->where('product.medicines.0.count.state', 'not_configured')
+                ->has('product.entries', 1)
+                ->where('product.entries.0.id', $legitimate->id)
+                ->whereNot('product.entries.0.id', $noncanonical->id)
             );
     }
 
     public function test_client_filter_scopes_medications(): void
     {
-        ['user' => $user, 'client' => $client] = $this->setupCd();
+        ['user' => $user, 'client' => $client, 'med' => $med] = $this->setupCd();
         $other = Client::factory()->create(['site_id' => $client->site_id, 'status' => 'active']);
+
+        $this->actingAs($user)
+            ->get('/emar/controlled')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('emar/ControlledRegister')
+                ->has('product.medicines', 1)
+                ->where('product.medicines.0.id', $med->id)
+                ->has('product.people', 2)
+                ->where('product.filters.client_id', null)
+            );
 
         $this->actingAs($user)
             ->get('/emar/controlled?client_id='.$other->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->has('medications', 0)
-                ->where('client_id', $other->id)
+                ->component('emar/ControlledRegister')
+                ->has('product.medicines', 0)
+                ->has('product.entries', 0)
+                ->where('product.filters.client_id', $other->id)
+            );
+
+        $this->actingAs($user)
+            ->get('/emar/controlled?client_id='.$client->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('emar/ControlledRegister')
+                ->has('product.medicines', 1)
+                ->where('product.medicines.0.id', $med->id)
+                ->where('product.medicines.0.client_id', $client->id)
+                ->where('product.filters.client_id', $client->id)
             );
     }
 
     public function test_date_param_scopes_movements_window(): void
     {
-        ['user' => $user] = $this->setupCd();
+        ['user' => $user, 'witness' => $witness, 'client' => $client, 'med' => $med] = $this->setupCd();
+        $start = Carbon::parse('2020-01-01', 'Pacific/Auckland')->startOfDay();
+        $end = $start->copy()->addDay();
+        $entryAt = fn (Carbon $at, int $before, int $after) => ClientControlledDrugEntry::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $med->id,
+            'entry_type' => 'receipt',
+            'quantity' => $after - $before,
+            'unit' => 'tablets',
+            'on_hand_before' => $before,
+            'on_hand_after' => $after,
+            'recorded_at' => $at->copy()->utc(),
+            'recorded_by' => $user->id,
+            'witnessed_by' => $witness->id,
+        ]);
+        $before = $entryAt($start->copy()->subSecond(), 6, 7);
+        $first = $entryAt($start, 7, 8);
+        $last = $entryAt($end->copy()->subSecond(), 8, 9);
+        $after = $entryAt($end, 9, 10);
+
+        $this->actingAs($user)
+            ->get('/emar/controlled')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('emar/ControlledRegister')
+                ->has('product.entries', 4)
+                ->where('product.entries.0.id', $after->id)
+                ->where('product.entries.1.id', $last->id)
+                ->where('product.entries.2.id', $first->id)
+                ->where('product.entries.3.id', $before->id)
+            );
 
         $this->actingAs($user)
             ->get('/emar/controlled?date=2020-01-01')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('date', '2020-01-01')
-                ->where('is_today', false)
-                ->has('recentEntries', 0)
+                ->component('emar/ControlledRegister')
+                ->where('product.filters.date', '2020-01-01')
+                ->has('product.entries', 2)
+                ->where('product.entries.0.id', $last->id)
+                ->where('product.entries.1.id', $first->id)
+                ->where('product.medicines.0.balance', 10)
+                ->where('product.medicines.0.entry_version', $after->id)
+                ->where('product.as_at', fn (string $at): bool => Carbon::parse($at)
+                    ->setTimezone('Pacific/Auckland')->toDateString() === now('Pacific/Auckland')->toDateString())
+            );
+
+        $this->actingAs($user)
+            ->get('/emar/controlled?date=2020-01-03')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('emar/ControlledRegister')
+                ->where('product.filters.date', '2020-01-03')
+                ->has('product.entries', 0)
             );
     }
 
     public function test_loss_report_captures_accountable_officer_and_regulator(): void
     {
-        ['user' => $user, 'client' => $client] = $this->setupCd();
+        ['user' => $user, 'witness' => $witness, 'client' => $client, 'med' => $med] = $this->setupCd();
 
         $this->actingAs($user)
             ->from('/emar/controlled')
             ->post('/emar/controlled/loss-reports', [
+                ...$this->controlledCommandHead($med),
+                'expected_balance' => 10,
+                'witnessed_by' => $witness->id,
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_id' => $client->id,
                 'medication_name' => 'Morphine sulfate',
                 'quantity_lost' => 2,
+                'quantity' => 2,
                 'unit' => 'tablets',
                 'circumstances' => 'Vial dropped and broke during the count.',
+                'notes' => 'Vial dropped and broke during the count.',
                 'immediate_action_taken' => 'The area was isolated, remaining stock was secured, and the client was checked.',
                 'accountable_officer_name' => 'Jane CDAO',
                 'reported_to_regulator' => true,
@@ -1185,24 +1307,26 @@ class ControlledDrugsTest extends TestCase
         $response = $this->actingAs($user)
             ->from('/emar/controlled')
             ->post('/emar/controlled/balance-check', [
+                ...$this->controlledCommandHead($med),
                 'client_medication_id' => $med->id,
                 'client_id' => $client->id,
                 'medication_name' => 'Morphine sulfate',
                 'expected_balance' => 10,
                 'actual_balance' => 8,
+                'recount_balance' => 8,
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Two tablets unaccounted for.',
+                'notes' => 'Two tablets unaccounted for.',
                 'immediate_action_taken' => 'Remaining stock was secured and the client was checked while a recount began.',
             ]);
 
-        $response
-            ->assertRedirect('/emar/controlled')
-            ->assertSessionHasNoErrors()
-            ->assertSessionHas('success');
+        $response->assertOk()->assertJsonStructure(['entry_id', 'counted_entry_id', 'discrepancy_id']);
 
         $discrepancy = ClientControlledDrugDiscrepancy::first();
         $this->assertNotNull($discrepancy);
+        $response->assertJsonPath('discrepancy_id', $discrepancy->id);
+        $this->assertSame($response->json('entry_id'), $response->json('counted_entry_id'));
         $this->assertNotNull($discrepancy->incident_id, 'Balance-check discrepancy should link the auto-created incident.');
         $this->assertDatabaseHas('client_incidents', [
             'id' => $discrepancy->incident_id,
@@ -1227,6 +1351,7 @@ class ControlledDrugsTest extends TestCase
         $this->actingAs($user)
             ->from('/emar/controlled')
             ->post('/emar/controlled/balance-check', [
+                ...$this->controlledCommandHead($med),
                 'client_medication_id' => $med->id,
                 'expected_balance' => '10.00',
                 'actual_balance' => '100000000.00',
@@ -1276,14 +1401,17 @@ class ControlledDrugsTest extends TestCase
         $this->actingAs($user)
             ->from('/emar/controlled')
             ->post('/emar/controlled/balance-check', [
+                ...$this->controlledCommandHead($med),
                 'client_medication_id' => $med->id,
                 'client_id' => $client->id,
                 'medication_name' => 'Morphine sulfate',
                 'expected_balance' => 10,
                 'actual_balance' => 8,
+                'recount_balance' => 8,
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'discrepancy_notes' => 'Two tablets unaccounted for.',
+                'notes' => 'Two tablets unaccounted for.',
             ])
             ->assertSessionHasErrors('immediate_action_taken');
 
@@ -1294,16 +1422,22 @@ class ControlledDrugsTest extends TestCase
 
     public function test_controlled_loss_requires_a_truthful_immediate_action_before_any_write(): void
     {
-        ['user' => $user, 'client' => $client] = $this->setupCd();
+        ['user' => $user, 'witness' => $witness, 'client' => $client, 'med' => $med] = $this->setupCd();
 
         $this->actingAs($user)
             ->from('/emar/controlled')
             ->post('/emar/controlled/loss-reports', [
+                ...$this->controlledCommandHead($med),
+                'expected_balance' => 10,
+                'witnessed_by' => $witness->id,
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_id' => $client->id,
                 'medication_name' => 'Morphine sulfate',
                 'quantity_lost' => 2,
+                'quantity' => 2,
                 'unit' => 'tablets',
                 'circumstances' => 'Two tablets were missing at handover.',
+                'notes' => 'Two tablets were missing at handover.',
             ])
             ->assertSessionHasErrors('immediate_action_taken');
 
@@ -1329,6 +1463,7 @@ class ControlledDrugsTest extends TestCase
         $this->actingAs($user)
             ->from('/emar/controlled')
             ->post('/emar/controlled/balance-check', [
+                ...$this->controlledCommandHead($med),
                 'client_medication_id' => $med->id,
                 'client_id' => $client->id,
                 'medication_name' => 'Morphine sulfate',
@@ -1391,6 +1526,20 @@ class ControlledDrugsTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertSame(2, $med->fresh()->cd_schedule);
+    }
+
+    /** Required canonical command fields for the synthetic register fixture; PINs stay outside replay identity. */
+    private function controlledCommandHead(ClientMedication $medication): array
+    {
+        return [
+            'client_medication_id' => $medication->id,
+            'client_request_uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'expected_entry_id' => ClientControlledDrugEntry::query()
+                ->where('client_medication_id', $medication->id)
+                ->where('client_id', $medication->client_id)
+                ->latest('id')
+                ->value('id'),
+        ];
     }
 
     /** @param  array<string, mixed>  $meta */

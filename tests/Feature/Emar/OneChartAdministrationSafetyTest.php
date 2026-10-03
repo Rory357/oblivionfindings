@@ -9,16 +9,20 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationAdminRule;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationOrderRevision;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\MedicationOrderWorkflow;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 use Database\Factories\UserFactory;
 
@@ -162,7 +166,7 @@ class OneChartAdministrationSafetyTest extends TestCase
             'controlled_drug' => true,
             'witness_required' => true,
         ]);
-        ClientMedicationStock::query()->create([
+        $stock = ClientMedicationStock::query()->create([
             'client_medication_id' => $medication->id,
             'on_hand' => 10,
             'unit' => 'tablets',
@@ -173,6 +177,7 @@ class OneChartAdministrationSafetyTest extends TestCase
             ->postJson($this->administrationUrl($medication), [
                 'status' => 'given',
                 'dose_given' => '5mg',
+                'quantity_administered' => 1,
                 'witnessed_by' => $witness->id,
                 'scheduled_for' => now()->toIso8601String(),
                 'administered_at' => now()->toIso8601String(),
@@ -184,6 +189,7 @@ class OneChartAdministrationSafetyTest extends TestCase
             ->postJson($this->administrationUrl($medication), [
                 'status' => 'given',
                 'dose_given' => '5mg',
+                'quantity_administered' => 1,
                 'witnessed_by' => $witness->id,
                 'witness_credential' => 'wrong-secret',
                 'scheduled_for' => now()->toIso8601String(),
@@ -196,11 +202,14 @@ class OneChartAdministrationSafetyTest extends TestCase
             'client_medication_id' => $medication->id,
             'status' => 'given',
         ]);
+        $this->assertSame('10.00', $stock->fresh()->on_hand);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
 
         $this->actingAs($this->admin, 'sanctum')
             ->postJson($this->administrationUrl($medication), [
                 'status' => 'given',
                 'dose_given' => '5mg',
+                'quantity_administered' => 1,
                 'witnessed_by' => $witness->id,
                 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'scheduled_for' => now()->toIso8601String(),
@@ -216,9 +225,11 @@ class OneChartAdministrationSafetyTest extends TestCase
         $this->assertSame($witness->id, $admin->witnessed_by);
         $this->assertSame('witness_pin', $admin->witness_method);
         $this->assertNotNull($admin->witnessed_at);
+        $this->assertSame('9.00', $stock->fresh()->on_hand);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
     }
 
-    public function test_facility_rule_requires_pulse_and_mirrors_vitals_observation(): void
+    public function test_facility_rule_requires_pulse_and_keeps_the_reading_on_the_dose_only(): void
     {
         $medication = $this->createMedication([
             'name' => 'Digoxin',
@@ -262,7 +273,7 @@ class OneChartAdministrationSafetyTest extends TestCase
             'pulse_bpm' => 72,
         ]);
 
-        $this->assertDatabaseHas('clinical_observations', [
+        $this->assertDatabaseMissing('clinical_observations', [
             'client_id' => $this->client->id,
             'observation_type' => 'vitals',
             'recorded_by' => $this->admin->id,
@@ -295,9 +306,42 @@ class OneChartAdministrationSafetyTest extends TestCase
         // check isn't owed (P01 recording guard), so verify at 09:00.
         $recordingAt = Carbon::now();
         $this->travelTo(Carbon::parse('2026-07-01 09:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
+        Storage::fake('local');
+        $enterer = User::factory()->create(['approved_at' => now()]);
+        $workflow = app(MedicationOrderWorkflow::class);
+        $medication->refresh();
+        $file = UploadedFile::fake()->create('prescription.pdf', 1, 'application/pdf');
+        $path = $file->store('test-prescription-sources', 'local');
+        $source = [
+            'type' => 'written', 'prescriber' => 'Dr Safety', 'received_at' => now()->subMinute()->toIso8601String(),
+            'description' => 'Signed prescription.', 'file_sha256' => hash_file('sha256', $file->getRealPath()),
+        ];
+        $payload = array_merge($workflow->payload($medication), [
+            'route' => 'oral', 'indication' => 'Indication from the signed source.',
+            'start_date' => now('Pacific/Auckland')->subDay()->toDateString(),
+        ]);
+        $version = $workflow->snapshot($medication, $payload, (int) $medication->version, $enterer->id, $source, 'Safety fixture source');
+        $versionEvidence = $version->fresh()->getAttributes();
+        $revision = MedicationOrderRevision::create([
+            'client_id' => $this->client->id, 'client_medication_id' => $medication->id,
+            'medication_order_version_id' => $version->id, 'base_version' => $medication->version,
+            'entered_by' => $enterer->id,
+        ]);
+        $revision->files()->create([
+            'purpose' => 'source', 'file_name' => 'prescription.pdf', 'file_path' => $path,
+            'file_size' => $file->getSize(), 'mime_type' => 'application/pdf', 'sha256' => $source['file_sha256'],
+            'uploaded_by' => $enterer->id, 'created_at' => now(),
+        ]);
         $this->actingAs($this->admin)
-            ->post("/emar/medications/{$medication->id}/verify")
-            ->assertRedirect();
+            ->post('/emar/order-revisions/'.$revision->id.'/check', [
+                'source_matches' => true,
+                'dose_route_times_checked' => true,
+                'allergies_interactions_checked' => true,
+            ])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('checked', $revision->fresh()->status);
+        $this->assertSame($versionEvidence, $version->fresh()->getAttributes());
+        Storage::disk('local')->assertExists($path);
         $this->travelTo($recordingAt);
 
         $this->assertDatabaseHas('client_medications', [
@@ -441,6 +485,8 @@ class OneChartAdministrationSafetyTest extends TestCase
                 'frequency' => 'Once daily',
                 'dose_times' => [$doseTime],
                 'controlled_drug' => false,
+                'nz_controlled_class' => ($overrides['controlled_drug'] ?? false) ? 'B' : null,
+                'controlled_class_source' => ($overrides['controlled_drug'] ?? false) ? 'Synthetic reviewed test configuration' : null,
                 'witness_required' => false,
                 'active' => true,
                 'state' => 'active',
@@ -485,6 +531,7 @@ class OneChartAdministrationSafetyTest extends TestCase
             'expiry_date' => today()->addYear(),
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'controlled_drugs' => true,
             'can_witness_controlled' => true,
         ]);
         Shift::factory()->create([

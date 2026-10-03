@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\CoverageRoleService;
 use App\Services\EnhancedMarService;
+use App\Services\MarScheduleService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\DoseSlots\DoseSlotGenerator;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
@@ -25,7 +26,6 @@ use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\WitnessPinService;
-use App\Services\MarScheduleService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationRuleService;
 use App\Services\MedicationSafetyService;
@@ -222,7 +222,7 @@ class ResidentTransportJourneyService
             ? $actor->getRelation('controlledMedicationPresenceEffectiveAt')
             : null;
         if (! $effectiveAt instanceof CarbonInterface) {
-            throw new \LogicException('Fleet medication presence time was not frozen before authorization Users.');
+            throw new LogicException('Fleet medication presence time was not frozen before authorization Users.');
         }
 
         return $effectiveAt;
@@ -235,7 +235,7 @@ class ResidentTransportJourneyService
             ? $actor->getRelation('controlledMedicationPresenceShifts')
             : null;
         if (! $shifts instanceof Collection) {
-            throw new \LogicException('Fleet medication presence Shifts were not frozen before authorization Users.');
+            throw new LogicException('Fleet medication presence Shifts were not frozen before authorization Users.');
         }
 
         return $shifts;
@@ -809,7 +809,7 @@ class ResidentTransportJourneyService
                 404,
             );
             abort_unless(
-                $log->witness_required || $log->is_controlled_drug,
+                (bool) $log->witness_required,
                 409,
                 'This packing record does not require a second checker.',
             );
@@ -979,11 +979,7 @@ class ResidentTransportJourneyService
                 );
             }
             $requiresWitness = $action === 'medication_administered'
-                && (
-                    $log->witness_required
-                    || $medication->requiresWitness()
-                    || ($this->medicationRules->requirementsFor($medication, true)['requires_countersign'] ?? false)
-                );
+                && $this->requiresAdministrationWitness($log, $medication, true);
             $lockedUsers = $this->lockCurrentFleetMedicationUsers(
                 $actor,
                 (int) $resident->site_id,
@@ -1810,13 +1806,26 @@ class ResidentTransportJourneyService
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
     }
 
+    /** Keep the packing requirement recorded at departure, then apply current dose rules. */
+    public function requiresAdministrationWitness(FleetMedicationTransitLog $log, ClientMedication $medication, bool $lockForUpdate = false): bool
+    {
+        if ((bool) $log->witness_required) {
+            return true;
+        }
+
+        if (! $medication->relationLoaded('client') && $log->relationLoaded('client') && $log->client !== null
+            && (int) $log->client_id === (int) $medication->client_id) {
+            $medication->setRelation('client', $log->client);
+        }
+
+        return $medication->requiresWitness()
+            || (bool) ($this->medicationRules->requirementsFor($medication, $lockForUpdate)['requires_countersign'] ?? false);
+    }
+
     public function governedPackingAttestationGaps(Builder $query): Builder
     {
         return $query
-            ->where(function (Builder $required): void {
-                $required->where('witness_required', true)
-                    ->orWhere('is_controlled_drug', true);
-            })
+            ->where('witness_required', true)
             ->where(function (Builder $gap): void {
                 $gap->whereNull('packing_attestation_event_id')
                     ->orWhereNull('packed_witnessed_by_user_id')
@@ -2082,7 +2091,7 @@ class ResidentTransportJourneyService
 
         try {
             $quantity = MedicationStockQuantity::normalizeMovement($payload['quantity_administered']);
-        } catch (\InvalidArgumentException) {
+        } catch (InvalidArgumentException) {
             throw ValidationException::withMessages([
                 'quantity_administered' => 'Quantity administered must use no more than two decimal places and must not exceed '
                     .MedicationStockQuantity::DECIMAL_10_2_MAX.'.',

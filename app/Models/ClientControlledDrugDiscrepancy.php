@@ -29,6 +29,9 @@ class ClientControlledDrugDiscrepancy extends Model
         'resolved_at',
         'resolved_by',
         'resolution_notes',
+        'count_entry_id',
+        'owner_id',
+        'resolution_outcome',
     ];
 
     protected $casts = [

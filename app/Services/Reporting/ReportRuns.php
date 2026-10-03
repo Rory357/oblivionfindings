@@ -50,6 +50,9 @@ final class ReportRuns
                 $previous['date_from'] = CarbonImmutable::parse($definition['date_from'])->subDays($days)->toDateString();
                 $previousSource = $this->reader->read($actor, $previous);
                 $source['comparison_evidence'] = $previousSource['evidence'];
+                if (isset($previousSource['watermark']['medication_digest'])) {
+                    $source['medication_comparison'] = ['definition' => $previous, 'digest' => $previousSource['watermark']['medication_digest']];
+                }
                 $source['assignment_fingerprints'] += $previousSource['assignment_fingerprints'];
                 $expiries = array_filter([$source['retention_expires_at'], $previousSource['retention_expires_at']]);
                 $source['retention_expires_at'] = $expiries ? min($expiries) : null;
@@ -99,6 +102,14 @@ final class ReportRuns
     private function assertEvidence(User $actor, array $source, array $definition): void
     {
         $actor = $this->access->actor($actor);
+        if (config('operational-reports.sources.'.$definition['source'].'.domain') === 'medication') {
+            app(\App\Services\Medication\Reporting\MedicationBuilderSource::class)->assertCurrent($actor, $definition, $source['watermark']['medication_digest'] ?? '');
+            if ($definition['comparison']) {
+                $previous = $source['medication_comparison'] ?? [];
+                abort_unless(isset($previous['definition'], $previous['digest']), 403);
+                app(\App\Services\Medication\Reporting\MedicationBuilderSource::class)->assertCurrent($actor, $previous['definition'], $previous['digest']);
+            }
+        }
         ReportSourceEvidence::assertCurrent($actor, $source['evidence'] ?? null);
         if ($definition['comparison']) {
             ReportSourceEvidence::assertCurrent($actor, $source['comparison_evidence'] ?? null);
@@ -107,7 +118,7 @@ final class ReportRuns
 
     public static function publicSource(array $source): array
     {
-        unset($source['fingerprint'], $source['assignment_fingerprints'], $source['evidence'], $source['comparison_evidence']);
+        unset($source['fingerprint'], $source['assignment_fingerprints'], $source['evidence'], $source['comparison_evidence'], $source['medication_comparison']);
         $watermark = $source['watermark'];
         $source['watermark'] = ['captured_at' => $watermark['captured_at'] ?? null, 'snapshot_id' => hash_hmac('sha256', json_encode($watermark, JSON_THROW_ON_ERROR), (string) config('app.key'))];
 

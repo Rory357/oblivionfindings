@@ -9,6 +9,7 @@ use App\Models\Timesheet;
 use App\Models\UserNotificationPreference;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -346,6 +347,12 @@ class NotificationService
     public function applyPreferences(Collection $recipients, string $eventKey): Collection
     {
         if ($recipients->isEmpty()) return $recipients;
+
+        // Some explicit recipient lists use a support collection. Keep the
+        // same user instances so their roles can be loaded in one query.
+        if (! $recipients instanceof EloquentCollection) {
+            $recipients = new EloquentCollection($recipients->all());
+        }
 
         // Log a warning so we can track how often channel-level preferences are bypassed.
         // Remove this once per-channel filtering is implemented in notification via() methods.

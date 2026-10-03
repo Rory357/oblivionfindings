@@ -5,12 +5,21 @@ import {
     StockDetailDialog,
     type OpenOrderSummary,
 } from '@/components/emar/stock-detail-dialog';
-import { PageHero, type PageHeroStat } from '@/components/page';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
+import {
+    EmarMeters,
+    EmarViewFilter,
+} from '@/components/emar/workspace-navigation';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
-    TabStrip,
     type RosterTabItem,
     type ShiftCtxItem,
     type ShiftCtxState,
@@ -52,7 +61,6 @@ import {
     Package,
     Pencil,
     Plus,
-    Search,
     ShieldCheck,
     ShoppingCart,
     Snowflake,
@@ -588,6 +596,16 @@ export default function StockManagement({
     }, [filtered]);
 
     const advance = async (order: OrderRow) => {
+        const packItem = stockItems.find(
+            (stock) =>
+                stock.medication_id === order.medication_id &&
+                !stock.controlled &&
+                stock.pack_workflow_url,
+        );
+        if (packItem?.pack_workflow_url) {
+            router.visit(packItem.pack_workflow_url + '&view=orders');
+            return;
+        }
         const action = pharmacyOrderAdvanceAction(order);
         if (action === 'delivery') {
             setModal({ type: 'delivery', order });
@@ -722,75 +740,86 @@ export default function StockManagement({
         },
     ];
 
-    const heroStats: PageHeroStat[] = [
-        { label: 'Tracked', value: stockItems.length },
-        {
-            label: 'Low',
-            value: lowStockCount,
-            tone: lowStockCount > 0 ? 'warning' : 'neutral',
-        },
-        {
-            label: 'Expiring',
-            value: expiringCount,
-            tone: expiringCount > 0 ? 'warning' : 'neutral',
-        },
-        { label: 'Orders', value: openOrders.length },
-    ];
-
-    const description = `${stockItems.length} item${stockItems.length === 1 ? '' : 's'} tracked${activeSite ? ` at ${activeSite.name}` : ' across your services'}. ${lowStockCount} below reorder level, ${expiringCount} expiring within 30 days${cdDiscrepancies > 0 ? `, and ${cdDiscrepancies} controlled-drug count${cdDiscrepancies === 1 ? '' : 's'} needs investigation` : ''}.`;
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Stock & pharmacy" />
-            <div className="flex flex-col gap-6 p-6">
-                <PageHero
-                    rail={<EmarHubRail />}
-                    variant="hero"
-                    category="ops"
+            <div className="flex flex-col gap-5">
+                <PageHeader
+                    frontline
                     brandColour={brandColour}
+                    rail={<EmarHubRail />}
                     icon={Package}
-                    title={
-                        <span>
-                            <span className="flex items-center gap-2 text-[10.5px] font-semibold tracking-wide text-primary-foreground/80 uppercase">
-                                <span
-                                    aria-hidden
-                                    className="relative inline-flex h-2 w-2"
-                                >
-                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
-                                </span>
-                                Live stock board · live
-                            </span>
-                            <span className="mt-1 block text-[26px] leading-tight font-bold">
-                                Medication stock for{' '}
-                                <span className="border-b-2 border-primary-foreground/40">
-                                    {activeSite?.name ?? 'your services'}
-                                </span>
-                            </span>
-                        </span>
+                    title="Stock & pharmacy"
+                    titleChip={
+                        <PageHeaderStatusChip variant="neutral">
+                            {activeSite?.name ?? 'All permitted houses'}
+                        </PageHeaderStatusChip>
                     }
-                    description={description}
-                    stats={heroStats}
+                    subline="Person-owned medication stock, counts and pharmacy orders"
+                    meters={
+                        <EmarMeters
+                            items={[
+                                {
+                                    label: 'Tracked',
+                                    value: stockItems.length,
+                                    caption: 'Items in the selected scope',
+                                    onClick: () => setActiveTab('all'),
+                                },
+                                {
+                                    label: 'Low stock',
+                                    value: lowStockCount,
+                                    caption: 'At or below reorder level',
+                                    tone:
+                                        lowStockCount > 0 ? 'warning' : 'brand',
+                                    onClick: () => setActiveTab('low'),
+                                },
+                                {
+                                    label: 'Expiring',
+                                    value: expiringCount,
+                                    caption: 'Within the next 30 days',
+                                    tone:
+                                        expiringCount > 0 ? 'warning' : 'brand',
+                                    onClick: () => setActiveTab('expiring'),
+                                },
+                                {
+                                    label: 'Pharmacy orders',
+                                    value: openOrders.length,
+                                    caption: 'Orders still open',
+                                    onClick: () => setActiveTab('orders'),
+                                },
+                            ]}
+                        />
+                    }
                     actions={
                         <>
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                placeholder="Search medication, person or batch…"
+                                ariaLabel="Search stock"
+                            />
                             <PageHeaderPrimaryButton
                                 icon={Plus}
                                 onClick={() => setModal({ type: 'order' })}
                             >
                                 New pharmacy order
                             </PageHeaderPrimaryButton>
-                            <Button
-                                variant="outline"
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                            <PageHeaderGlassButton
+                                icon={Truck}
                                 onClick={() => setModal({ type: 'receive' })}
                             >
-                                <Truck className="h-4 w-4" />
                                 Receive stock
-                            </Button>
+                            </PageHeaderGlassButton>
                         </>
                     }
-                    footer={
-                        <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+                    filters={
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                            <EmarViewFilter
+                                value={activeTab}
+                                onChange={setActiveTab}
+                                items={TABS}
+                                label="Stock view"
+                            />
                             <div className="flex flex-wrap items-center gap-2">
                                 {[
                                     {
@@ -810,47 +839,30 @@ export default function StockManagement({
                                         label: 'Cold chain',
                                     },
                                 ].map(({ id, label }) => (
-                                    <button
+                                    <PageHeaderFilterButton
                                         key={id}
                                         onClick={() => setChip(id)}
-                                        className={`rounded-full px-3 py-1 text-xs font-medium transition ${chip === id ? 'bg-primary-foreground text-primary-strong' : 'border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20'}`}
+                                        active={chip === id}
+                                        aria-pressed={chip === id}
                                     >
                                         {label}
-                                    </button>
+                                    </PageHeaderFilterButton>
                                 ))}
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                <PageHeaderGlassButton
+                                    icon={Barcode}
                                     onClick={() => setModal({ type: 'count' })}
                                 >
-                                    <Barcode className="h-3.5 w-3.5" />
                                     Run stock count
-                                </Button>
+                                </PageHeaderGlassButton>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
-                                <div className="relative w-full max-w-xs md:w-[260px]">
-                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                    <input
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                        placeholder="Search medication, client or batch…"
-                                        aria-label="Search stock"
-                                        className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-8 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
-                                    />
-                                    {search ? (
-                                        <button
-                                            type="button"
-                                            aria-label="Clear search"
-                                            onClick={() => setSearch('')}
-                                            className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"
-                                        >
-                                            <X className="h-3.5 w-3.5" />
-                                        </button>
-                                    ) : null}
-                                </div>
+                                {search && (
+                                    <PageHeaderGlassButton
+                                        onClick={() => setSearch('')}
+                                    >
+                                        Clear search
+                                    </PageHeaderGlassButton>
+                                )}
                                 {sites.length > 0 && (
                                     <EntityFilter
                                         label="Site"
@@ -859,6 +871,7 @@ export default function StockManagement({
                                         value={siteFilter}
                                         onChange={onSite}
                                         onDark
+                                        className="rounded-lg"
                                     />
                                 )}
                                 <EntityFilter
@@ -871,6 +884,7 @@ export default function StockManagement({
                                     value={clientFilter}
                                     onChange={onClient}
                                     onDark
+                                    className="rounded-lg"
                                 />
                             </div>
                         </div>
@@ -921,13 +935,6 @@ export default function StockManagement({
                         })}
                     </div>
                 )}
-
-                <TabStrip
-                    value={activeTab}
-                    onChange={setActiveTab}
-                    items={TABS}
-                    ariaLabel="Stock views"
-                />
 
                 {['all', 'low', 'expiring', 'expired'].includes(activeTab) &&
                     (byClient.length === 0 ? (
@@ -1440,10 +1447,12 @@ function StockRowView({
 }) {
     const reorder = s.reorder_level ?? 0;
     const ratio =
-        reorder > 0 ? Math.min(100, (s.on_hand / (reorder * 2)) * 100) : 100;
+        reorder > 0
+            ? Math.min(100, ((s.on_hand ?? 0) / (reorder * 2)) * 100)
+            : 100;
     const barTone = s.is_low
         ? 'bg-status-critical'
-        : s.on_hand <= reorder * 1.4
+        : (s.on_hand ?? 0) <= reorder * 1.4
           ? 'bg-status-warning'
           : 'bg-status-success';
     const statusPill = s.is_expired
@@ -1519,7 +1528,8 @@ function StockRowView({
                 <div
                     className={`font-mono tabular-nums ${s.is_low ? 'font-semibold text-status-critical' : ''}`}
                 >
-                    {s.on_hand} {s.unit}
+                    {s.on_hand === null ? 'Unknown' : s.on_hand}{' '}
+                    {s.on_hand === null ? '' : s.unit}
                 </div>
                 <div className="mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-muted">
                     <div

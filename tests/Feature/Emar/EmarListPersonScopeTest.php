@@ -82,11 +82,14 @@ class EmarListPersonScopeTest extends TestCase
 
     public function test_medication_errors_list_and_stats_only_count_residents_a_support_worker_may_open(): void
     {
-        $errorIds = collect($this->residents())->mapWithKeys(fn (Client $client) => [
+        $foreign = $this->foreignResident();
+        $errorIds = collect([...$this->residents(), $foreign])->mapWithKeys(fn (Client $client) => [
             $client->id => MedicationError::query()->create([
                 'client_id' => $client->id,
                 'error_type' => 'omission',
                 'severity' => 'near_miss',
+                'reached_client' => 'no',
+                'harm_level' => 'none',
                 'description' => 'Dose missed but caught.',
                 'status' => 'reported',
                 'reported_by' => $this->worker->id,
@@ -101,41 +104,69 @@ class EmarListPersonScopeTest extends TestCase
         );
         $this->assertSame(2, $page->inertiaProps('stats.total_open'));
         $this->assertSame(2, $page->inertiaProps('stats.near_miss'));
+        foreach ([$this->unassigned, $foreign] as $hidden) {
+            $this->actingAs($this->worker)
+                ->get(route('emar.errors', ['error' => $errorIds[$hidden->id]]))
+                ->assertNotFound();
+        }
 
-        $lead = $this->actingAs($this->lead())->get(route('emar.errors'))->assertOk();
-        $this->assertCount(3, $lead->inertiaProps('errors'));
-        $this->assertSame(3, $lead->inertiaProps('stats.total_open'));
+        $lead = $this->lead(['medications.errors.manage']);
+        $page = $this->actingAs($lead)->get(route('emar.errors'))->assertOk();
+        $this->assertCount(3, $page->inertiaProps('errors'));
+        $this->assertSame(3, $page->inertiaProps('stats.total_open'));
+        $this->assertSame(3, $page->inertiaProps('stats.near_miss'));
+        $this->actingAs($lead)->get(route('emar.errors', ['error' => $errorIds[$foreign->id]]))->assertNotFound();
     }
 
     public function test_medication_reviews_list_only_the_residents_a_support_worker_may_open(): void
     {
-        foreach ($this->residents() as $client) {
-            MedicationReview::query()->create([
+        $foreign = $this->foreignResident();
+        $reviewIds = collect([...$this->residents(), $foreign])->mapWithKeys(fn (Client $client) => [
+            $client->id => MedicationReview::query()->create([
                 'client_id' => $client->id,
                 'review_type' => 'routine',
                 'status' => 'scheduled',
                 'scheduled_date' => now()->addWeek()->toDateString(),
-            ]);
-        }
+            ])->id,
+        ]);
 
         $page = $this->actingAs($this->worker)->get(route('emar.reviews'))->assertOk();
-        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('reviews'), 'client_id'));
-        $this->assertSame(2, $page->inertiaProps('kpis.due_30'));
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('reviews.data'), 'client_id'));
+        $this->assertSame(2, $page->inertiaProps('meters.due_30'));
+        foreach ([$this->unassigned, $foreign] as $hidden) {
+            $this->actingAs($this->worker)
+                ->get(route('emar.reviews', ['review' => $reviewIds[$hidden->id]]))
+                ->assertNotFound();
+        }
 
-        $lead = $this->actingAs($this->lead())->get(route('emar.reviews'))->assertOk();
-        $this->assertSame($this->allIds(), $this->sortedIds($lead->inertiaProps('reviews'), 'client_id'));
+        $lead = $this->lead();
+        $page = $this->actingAs($lead)->get(route('emar.reviews'))->assertOk();
+        $this->assertSame($this->allIds(), $this->sortedIds($page->inertiaProps('reviews.data'), 'client_id'));
+        $this->assertSame(3, $page->inertiaProps('meters.due_30'));
+        $this->actingAs($lead)->get(route('emar.reviews', ['review' => $reviewIds[$foreign->id]]))->assertNotFound();
     }
 
     public function test_destructions_register_and_its_medicine_list_only_show_residents_a_support_worker_may_open(): void
     {
-        // The seeded Support Worker role holds controlled view, so it can open
-        // the register; the person rule still narrows its rows.
+        // Controlled-view permission still requires current site and person access.
         $this->assertTrue($this->worker->canDo('medications.controlled.view'));
-        foreach ($this->residents() as $client) {
-            $this->medication($client, 'Paracetamol');
-            MedicationDestruction::create([
+        $foreign = $this->foreignResident();
+        $medicationIds = [];
+        $destructionIds = [];
+        foreach ([...$this->residents(), $foreign] as $client) {
+            $medication = $this->medication($client, 'Synthetic controlled medicine', overrides: [
+                'controlled_drug' => true,
+                'nz_controlled_class' => 'B',
+                'controlled_class_source' => 'Synthetic checked test fixture',
+                'controlled_class_reviewed_at' => now(),
+                'controlled_class_reviewed_by' => $this->worker->id,
+            ]);
+            $medicationIds[$client->id] = $medication->id;
+            $destructionIds[$client->id] = MedicationDestruction::create([
                 'client_id' => $client->id,
-                'medication_name' => 'Oxycodone',
+                'client_medication_id' => $medication->id,
+                'site_id' => $client->site_id,
+                'medication_name' => $medication->name,
                 'quantity' => 4,
                 'unit' => 'tablets',
                 'reason' => 'expired',
@@ -144,15 +175,38 @@ class EmarListPersonScopeTest extends TestCase
                 'witness_1_id' => User::factory()->create()->id,
                 'destroyed_at' => now(),
                 'is_controlled_drug' => true,
-            ]);
+                'controlled_drug_class' => 'B',
+            ])->id;
         }
 
-        $page = $this->actingAs($this->worker)->get(route('emar.destructions'))->assertOk();
-        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('destructions'), 'client_id'));
-        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('medications'), 'client_id'));
+        $this->actingAs($this->worker)->get(route('emar.destructions'))
+            ->assertRedirect('/emar/controlled?view=destructions');
+        $page = $this->actingAs($this->worker)->get(route('emar.controlled', ['view' => 'destructions']))->assertOk();
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('product.medicines'), 'client_id'));
+        $this->assertSame(
+            collect($destructionIds)->only($this->visibleIds())->sort()->values()->all(),
+            $this->sortedIds($page->inertiaProps('product.destructions'), 'id'),
+        );
+        $this->assertSame(
+            collect($medicationIds)->only($this->visibleIds())->sort()->values()->all(),
+            $this->sortedIds($page->inertiaProps('product.destructions'), 'client_medication_id'),
+        );
+        foreach ([$this->unassigned, $foreign] as $hidden) {
+            $this->actingAs($this->worker)
+                ->getJson(route('emar.controlled.product', ['client_medication_id' => $medicationIds[$hidden->id]]))
+                ->assertNotFound();
+        }
 
-        $lead = $this->actingAs($this->lead(['medications.controlled.view']))->get(route('emar.destructions'))->assertOk();
-        $this->assertSame($this->allIds(), $this->sortedIds($lead->inertiaProps('destructions'), 'client_id'));
+        $lead = $this->lead(['medications.controlled.view']);
+        $page = $this->actingAs($lead)->get(route('emar.controlled', ['view' => 'destructions']))->assertOk();
+        $this->assertSame($this->allIds(), $this->sortedIds($page->inertiaProps('product.medicines'), 'client_id'));
+        $this->assertSame(
+            collect($destructionIds)->only($this->allIds())->sort()->values()->all(),
+            $this->sortedIds($page->inertiaProps('product.destructions'), 'id'),
+        );
+        $this->actingAs($lead)
+            ->getJson(route('emar.controlled.product', ['client_medication_id' => $medicationIds[$foreign->id]]))
+            ->assertNotFound();
     }
 
     public function test_stock_is_only_for_medication_operations_roles_which_keep_the_whole_site(): void
@@ -224,12 +278,12 @@ class EmarListPersonScopeTest extends TestCase
         }
 
         $page = $this->actingAs($this->worker)->get(route('emar.self_admin'))->assertOk();
-        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('assessments'), 'client_id'));
-        $this->assertSame(2, $page->inertiaProps('kpis.total'));
-        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('clients'), 'id'));
+        $this->assertSame($this->visibleIds(), $this->sortedIds($page->inertiaProps('register'), 'client_id'));
+        $this->assertSame(2, $page->inertiaProps('counts.people'));
+        $this->assertSame(0, $page->inertiaProps('counts.self_managed'));
 
         $lead = $this->actingAs($this->lead())->get(route('emar.self_admin'))->assertOk();
-        $this->assertSame($this->allIds(), $this->sortedIds($lead->inertiaProps('assessments'), 'client_id'));
+        $this->assertSame($this->allIds(), $this->sortedIds($lead->inertiaProps('register'), 'client_id'));
     }
 
     /** @return array<int, Client> */
@@ -266,9 +320,21 @@ class EmarListPersonScopeTest extends TestCase
         ]);
     }
 
-    private function medication(Client $client, string $name, bool $prn = false): ClientMedication
+    /** Assignment cannot bypass the reader's approved-site boundary. */
+    private function foreignResident(): Client
     {
-        return ClientMedication::query()->create([
+        $client = Client::factory()->create([
+            'site_id' => Site::factory()->create(['is_active' => true])->id,
+            'status' => 'active',
+        ]);
+        $client->supportWorkers()->attach($this->worker->id);
+
+        return $client;
+    }
+
+    private function medication(Client $client, string $name, bool $prn = false, array $overrides = []): ClientMedication
+    {
+        return ClientMedication::query()->create(array_merge([
             'client_id' => $client->id,
             'name' => $name,
             'dosage' => '500mg',
@@ -279,7 +345,7 @@ class EmarListPersonScopeTest extends TestCase
             'active' => true,
             'state' => 'active',
             'approval_status' => 'verified',
-        ]);
+        ], $overrides));
     }
 
     /** A clocked-in shift covering one resident (recording authority). */

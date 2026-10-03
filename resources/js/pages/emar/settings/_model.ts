@@ -472,6 +472,7 @@ export function format(
     value: string,
     names?: Record<string, string>,
 ): string {
+    if (def.when_not_configured && def.default === '' && value === '' && def.options.length > 0) return 'Not configured';
     if (def.kind === 'alert') {
         const a = parseAlert(value);
         if (!a) return value;
@@ -533,7 +534,7 @@ export function format(
 export const notConfigured = (
     def: SettingDefinition | undefined,
     value: string,
-) => !!def?.when_not_configured && value === offValue(def);
+) => !!def?.when_not_configured && (value === offValue(def) || (def.default === '' && value === '' && def.options.length > 0));
 
 /** Does changing from one value to another turn a check off or make it less strict? */
 export function loosens(
@@ -854,6 +855,15 @@ export function validateView(
                     `“${def.alert.label}”: turn on ${channelWords(def.alert.channels)} — otherwise nobody is told.`;
         });
     });
+    if (
+        s.groups.ea?.view === view &&
+        draft.ea &&
+        Number(draftValue(s, draft, 'ea', 'default_minutes')) >
+            Number(draftValue(s, draft, 'ea', 'max_minutes'))
+    ) {
+        errors['ea.default_minutes'] =
+            'A grant cannot last longer than the longest time in all.';
+    }
     // Follow-up settings that only work together (B2 C3; the server checks the same).
     if (s.groups.delivery?.view === view && draft.delivery) {
         const v = (key: string) => draftValue(s, draft, 'delivery', key);

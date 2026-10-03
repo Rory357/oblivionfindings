@@ -272,7 +272,7 @@ export function AllChanges({
                         columns={[
                             {
                                 key: 'when',
-                                label: 'When (NZDT)',
+                                label: 'When (NZ time)',
                                 width: '1fr',
                                 cell: (h) => (
                                     <span className="text-[13px]">

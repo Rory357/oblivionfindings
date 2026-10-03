@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -67,13 +68,14 @@ class MedicationsDatabaseTest extends TestCase
         $this->seed(RbacSeeder::class);
 
         $user = $this->makeRoleUser('admin');
-        $this->grantPermissions($user, ['medications.view', 'medications.administer.record', 'clients.update']);
+        $this->grantPermissions($user, ['medications.view', 'medications.orders.manage', 'medications.administer.record', 'clients.update']);
 
         // Order actions (add, edit, discontinue) share one authority rule
         // since 0cb4a4190: the client's Site plus a clocked-in Shift covering
         // the client (or break-glass). Give the actor that genuine authority.
         $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        HrEmployeeProfile::factory()->create(['user_id' => $user->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [], 'start_date' => today()->subMonth(), 'end_date' => null, 'is_active' => true]);
         Shift::factory()->create([
             'client_id' => $client->id,
             'site_id' => $site->id,
@@ -90,6 +92,7 @@ class MedicationsDatabaseTest extends TestCase
             'name' => 'Amlodipine',
             'dosage' => '5mg',
             'frequency' => 'Once daily',
+            'controlled_drug' => false,
             'active' => true,
             'state' => 'active',
             'approval_status' => 'verified',
@@ -106,7 +109,7 @@ class MedicationsDatabaseTest extends TestCase
         // With reason → ceased.
         $this->actingAs($user)
             ->post('/emar/medications/'.$med->id.'/discontinue', ['reason' => 'Prescriber ceased — no longer indicated'])
-            ->assertSessionHasNoErrors();
+            ->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertSame('ceased', $med->fresh()->state);
     }

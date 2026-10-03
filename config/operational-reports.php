@@ -1,6 +1,6 @@
 <?php
 
-return json_decode(<<<'JSON'
+$reports = json_decode(<<<'JSON'
 {
   "sources": {
     "journeys": {
@@ -1573,3 +1573,7 @@ return json_decode(<<<'JSON'
   ]
 }
 JSON, true, 512, JSON_THROW_ON_ERROR);
+
+$reports['sources'] += (require __DIR__.'/medication-reports.php')['sources'];
+
+return $reports;

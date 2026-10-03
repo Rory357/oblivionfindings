@@ -11,9 +11,10 @@ import {
  * The connected-tab rail for a Medication hub (lib/emar-navigation.ts) — the
  * Governance SectionRail pattern. The hub and active view come from the URL,
  * so a hub page mounts it in one line: `rail={<EmarHubRail />}` on its
- * PageHeader or PageHero. Tabs open the views' existing URLs.
+ * PageHeader. Query-selected views share the same page without sharing an
+ * active key; tabs open each view's canonical URL.
  *
- * Hubs with their own in-page rail (Meds today, Settings) render nothing.
+ * Hubs with their own in-page rail (Meds today, Reports, Settings) render nothing.
  * Navigation only — every page is still authorised on the server.
  */
 export function EmarHubRail({

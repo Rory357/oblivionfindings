@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\SsoConfigurationService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -61,6 +62,7 @@ class ProfileController extends Controller
                 // Personal mobile only. Never fall back to the HR work phone,
                 // which would present a work number as the personal one.
                 'phone' => $user->cellphone,
+                'onCallCellphoneConsentedAt' => $this->serializeDateTime($user->on_call_cellphone_consented_at),
                 'jobTitle' => $employeeProfile?->position_title,
                 'timezone' => $user->timezone ?? 'Pacific/Auckland',
                 'locale' => $user->locale ?? 'en',
@@ -159,6 +161,17 @@ class ProfileController extends Controller
                 $user->email_verified_at = null;
             }
 
+            // Only the person's own explicit consent field changes consent;
+            // other partial account forms leave it alone. Never change HR contacts.
+            if (array_key_exists('on_call_cellphone_consent', $validated)) {
+                $consented = (bool) $validated['on_call_cellphone_consent'];
+                $before = $user->on_call_cellphone_consented_at !== null;
+                if ($before !== $consented) {
+                    $user->forceFill(['on_call_cellphone_consented_at' => $consented ? now() : null]);
+                    $user->save();
+                    AuditLogger::logOrFail('medications.on_call_cellphone_consent.updated', $user, ['actor_id' => (int) $user->id, 'before' => $before, 'after' => $consented]);
+                }
+            }
             $user->save();
 
             // The phone here is the user's personal mobile (users.cellphone)

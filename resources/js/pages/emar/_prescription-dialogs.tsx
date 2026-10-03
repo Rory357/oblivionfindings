@@ -1,3 +1,4 @@
+import { LegacyOrderLink } from '@/pages/emar/orders/_legacy-link';
 /* eslint-disable no-restricted-syntax -- summary/detail panes are custom-layout
    bordered surfaces inside the wizard, not Card components; all colours are tokens. */
 import type {
@@ -13,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
-    ChipMulti,
     Field,
     InfoCard,
     Segmented,
@@ -35,7 +35,6 @@ import {
     Package,
     PenTool,
     Pill,
-    ShieldCheck,
     Stethoscope,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -704,6 +703,7 @@ export function CountersignDialog({
             open
             onClose={onClose}
             title="Countersign order"
+            formState={form}
             description="Prescriber countersignature for a verbal/telephone order."
             railIcon={PenTool}
             railTitle="Countersign"
@@ -805,6 +805,7 @@ export function DispenseDialog({
             open
             onClose={onClose}
             title="Record dispensing"
+            formState={form}
             description="Record the pharmacy dispense for this order."
             railIcon={Package}
             railTitle="Dispensing"
@@ -931,6 +932,7 @@ export function CancelOrderDialog({
             open
             onClose={onClose}
             title="Cancel order"
+            formState={form}
             description="Record why this prescriber order is being cancelled."
             railIcon={Ban}
             railTitle="Cancellation"
@@ -1131,6 +1133,7 @@ export function LinkMarDialog({
             open
             onClose={onClose}
             title="Link order to MAR"
+            formState={form}
             description="Link this order to a charted medication."
             railIcon={Link2}
             railTitle="Link → MAR"
@@ -1195,15 +1198,6 @@ export function LinkMarDialog({
     );
 }
 
-const MDT_OPTIONS = [
-    'Prescriber',
-    'Pharmacist',
-    'Family / whānau',
-    'Welfare guardian',
-    'Advocate',
-    'Care manager',
-];
-
 // ── Covert authorisation (4-step) ────────────────────────────────────────────
 export function CovertDialog({
     clients,
@@ -1214,366 +1208,14 @@ export function CovertDialog({
     medications: GovernedMedOption[];
     onClose: () => void;
 }) {
-    const [step, setStep] = useState(0);
-    const form = useForm({
-        client_id: '',
-        client_medication_id: '',
-        lacks_capacity: 'yes',
-        capacity_note: '',
-        mdt: [] as string[],
-        rationale: '',
-        least_restrictive: '',
-        administration_method: '',
-        pharmacist_confirmed: 'yes',
-        pharmacist_advice: '',
-        offered_overtly: false,
-        authorised_by_name: '',
-        authorised_by_registration: '',
-        authorised_date: '',
-        review_date: '',
-    });
-    const clientMeds = medications.filter(
-        (m) =>
-            m.client_id === Number(form.data.client_id) &&
-            m.can_create_covert_authorisation,
-    );
-
-    const submit = () => {
-        form.transform((d) => ({
-            client_id: Number(d.client_id),
-            client_medication_id: Number(d.client_medication_id),
-            authorised_by_name: d.authorised_by_name,
-            authorised_by_registration: d.authorised_by_registration,
-            clinical_justification: [
-                d.rationale,
-                d.capacity_note ? `Capacity: ${d.capacity_note}` : '',
-                d.least_restrictive
-                    ? `Least-restrictive options: ${d.least_restrictive}`
-                    : '',
-            ]
-                .filter(Boolean)
-                .join('\n'),
-            legal_basis: `Best interests (PPPR Act). Capacity: ${d.lacks_capacity === 'yes' ? 'lacks capacity' : 'has capacity'}. MDT consulted: ${d.mdt.join(', ') || 'none'}.${d.offered_overtly ? ' Offered overtly first.' : ''}`,
-            administration_method: d.administration_method,
-            pharmacist_advice: [
-                d.pharmacist_confirmed === 'yes' ? 'Pharmacist confirmed.' : '',
-                d.pharmacist_advice,
-            ]
-                .filter(Boolean)
-                .join(' '),
-            authorised_date: d.authorised_date,
-            review_date: d.review_date,
-        }));
-        form.post('/emar/prescriptions/covert', {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Covert authorisation recorded');
-                onClose();
-            },
-            onError: () =>
-                toast.error('Please check the authorisation details'),
-        });
-    };
-
-    const valid = [
-        !!form.data.client_id && !!form.data.client_medication_id,
-        !!form.data.rationale,
-        !!form.data.administration_method,
-        !!form.data.authorised_by_name &&
-            !!form.data.authorised_date &&
-            !!form.data.review_date,
-    ];
-
     return (
-        <MedsWizardDialog
-            open
+        <LegacyOrderLink
+            covert
+            clients={clients}
+            medications={medications.filter(
+                (item) => item.can_create_covert_authorisation,
+            )}
             onClose={onClose}
-            title="Covert authorisation"
-            description="Authorise covert (disguised) administration under a best-interest process."
-            railIcon={ShieldCheck}
-            railTitle="Covert authorisation"
-            railSubtitle="Best-interest process"
-            steps={[
-                {
-                    key: 'capacity',
-                    label: 'Capacity',
-                    blurb: 'Assessment',
-                    icon: ShieldCheck,
-                },
-                {
-                    key: 'mdt',
-                    label: 'Best interest',
-                    blurb: 'MDT decision',
-                    icon: Stethoscope,
-                },
-                {
-                    key: 'method',
-                    label: 'Med & method',
-                    blurb: 'How given',
-                    icon: Pill,
-                },
-                {
-                    key: 'review',
-                    label: 'Authorise',
-                    blurb: 'Sign & review',
-                    icon: PenTool,
-                },
-            ]}
-            stepIndex={step}
-            onStepClick={(i) => i < step && setStep(i)}
-            footer={
-                <>
-                    <Button
-                        variant="ghost"
-                        onClick={step === 0 ? onClose : () => setStep(step - 1)}
-                        disabled={form.processing}
-                    >
-                        {step === 0 ? 'Cancel' : 'Back'}
-                    </Button>
-                    {step < 3 ? (
-                        <Button
-                            onClick={() => setStep(step + 1)}
-                            disabled={!valid[step]}
-                        >
-                            Continue
-                        </Button>
-                    ) : (
-                        <Button
-                            onClick={submit}
-                            disabled={!valid[3] || form.processing}
-                        >
-                            Authorise
-                        </Button>
-                    )}
-                </>
-            }
-        >
-            <div className="mb-3">
-                <InfoCard icon={AlertTriangle} tone="crit">
-                    Covert administration is a restrictive practice. It requires
-                    a capacity assessment, a best-interest MDT decision,
-                    pharmacist advice, and a review date — and the medication
-                    must be offered overtly first.
-                </InfoCard>
-            </div>
-
-            {step === 0 && (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field
-                        label="Resident"
-                        required
-                        error={form.errors.client_id}
-                    >
-                        <SelectInput
-                            value={form.data.client_id}
-                            onChange={(v) => {
-                                form.setData('client_id', v);
-                                form.setData('client_medication_id', '');
-                            }}
-                            placeholder="Select resident…"
-                            options={clients.map((c) => ({
-                                value: String(c.id),
-                                label: `${c.last_name}, ${c.first_name}`,
-                            }))}
-                        />
-                    </Field>
-                    <Field
-                        label="Medication"
-                        required
-                        error={form.errors.client_medication_id}
-                    >
-                        <SelectInput
-                            value={form.data.client_medication_id}
-                            onChange={(v) =>
-                                form.setData('client_medication_id', v)
-                            }
-                            placeholder={
-                                form.data.client_id
-                                    ? 'Select medication…'
-                                    : 'Pick a resident first'
-                            }
-                            options={clientMeds.map((m) => ({
-                                value: String(m.id),
-                                label: m.name,
-                            }))}
-                        />
-                    </Field>
-                    {form.data.client_id && clientMeds.length === 0 ? (
-                        <div className="sm:col-span-2">
-                            <InfoCard icon={AlertTriangle} tone="warn">
-                                No charted medications are available for a new
-                                covert authorisation.
-                            </InfoCard>
-                        </div>
-                    ) : null}
-                    <Field label="Lacks capacity for this decision" span>
-                        <Segmented
-                            value={form.data.lacks_capacity}
-                            onChange={(v) => form.setData('lacks_capacity', v)}
-                            options={[
-                                { value: 'yes', label: 'Yes' },
-                                { value: 'no', label: 'No' },
-                            ]}
-                        />
-                    </Field>
-                    <Field label="Capacity assessment note" span>
-                        <Input
-                            value={form.data.capacity_note}
-                            onChange={(e) =>
-                                form.setData('capacity_note', e.target.value)
-                            }
-                            placeholder="Assessor & date"
-                        />
-                    </Field>
-                </div>
-            )}
-
-            {step === 1 && (
-                <>
-                    <Field label="MDT consulted" span>
-                        <ChipMulti
-                            values={form.data.mdt}
-                            onChange={(v) => form.setData('mdt', v)}
-                            options={MDT_OPTIONS}
-                        />
-                    </Field>
-                    <div className="mt-3 grid grid-cols-1 gap-4">
-                        <Field label="Best-interest rationale" required>
-                            <Input
-                                value={form.data.rationale}
-                                onChange={(e) =>
-                                    form.setData('rationale', e.target.value)
-                                }
-                                placeholder="Why covert administration is in the resident's best interest"
-                            />
-                        </Field>
-                        <Field label="Least-restrictive options considered">
-                            <Input
-                                value={form.data.least_restrictive}
-                                onChange={(e) =>
-                                    form.setData(
-                                        'least_restrictive',
-                                        e.target.value,
-                                    )
-                                }
-                                placeholder="What else was tried"
-                            />
-                        </Field>
-                    </div>
-                </>
-            )}
-
-            {step === 2 && (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field
-                        label="Administration method"
-                        required
-                        span
-                        error={form.errors.administration_method}
-                    >
-                        <Input
-                            value={form.data.administration_method}
-                            onChange={(e) =>
-                                form.setData(
-                                    'administration_method',
-                                    e.target.value,
-                                )
-                            }
-                            placeholder="e.g. crushed in yoghurt"
-                        />
-                    </Field>
-                    <Field label="Pharmacist confirmed safe to disguise" span>
-                        <Segmented
-                            value={form.data.pharmacist_confirmed}
-                            onChange={(v) =>
-                                form.setData('pharmacist_confirmed', v)
-                            }
-                            options={[
-                                { value: 'yes', label: 'Yes' },
-                                { value: 'no', label: 'No' },
-                            ]}
-                        />
-                    </Field>
-                    <Field label="Pharmacist advice" span>
-                        <Input
-                            value={form.data.pharmacist_advice}
-                            onChange={(e) =>
-                                form.setData(
-                                    'pharmacist_advice',
-                                    e.target.value,
-                                )
-                            }
-                            placeholder="Advice on covert administration"
-                        />
-                    </Field>
-                    <Field label="Offered overtly first" span>
-                        <CheckRow
-                            checked={form.data.offered_overtly}
-                            label="The medication was offered openly before covert administration."
-                            onChange={(v) => form.setData('offered_overtly', v)}
-                        />
-                    </Field>
-                </div>
-            )}
-
-            {step === 3 && (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field
-                        label="Authorising prescriber"
-                        required
-                        span
-                        error={form.errors.authorised_by_name}
-                    >
-                        <Input
-                            value={form.data.authorised_by_name}
-                            onChange={(e) =>
-                                form.setData(
-                                    'authorised_by_name',
-                                    e.target.value,
-                                )
-                            }
-                            placeholder="e.g. Dr Singh"
-                        />
-                    </Field>
-                    <Field label="Registration">
-                        <Input
-                            value={form.data.authorised_by_registration}
-                            onChange={(e) =>
-                                form.setData(
-                                    'authorised_by_registration',
-                                    e.target.value,
-                                )
-                            }
-                        />
-                    </Field>
-                    <Field
-                        label="Authorised date"
-                        required
-                        error={form.errors.authorised_date}
-                    >
-                        <Input
-                            type="date"
-                            value={form.data.authorised_date}
-                            onChange={(e) =>
-                                form.setData('authorised_date', e.target.value)
-                            }
-                        />
-                    </Field>
-                    <Field
-                        label="Next review"
-                        required
-                        error={form.errors.review_date}
-                    >
-                        <Input
-                            type="date"
-                            value={form.data.review_date}
-                            onChange={(e) =>
-                                form.setData('review_date', e.target.value)
-                            }
-                        />
-                    </Field>
-                </div>
-            )}
-        </MedsWizardDialog>
+        />
     );
 }

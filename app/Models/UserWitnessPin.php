@@ -25,6 +25,7 @@ class UserWitnessPin extends Model
     protected $fillable = [
         'user_id',
         'pin_hash',
+        'hash_version',
         'set_at',
         'failed_attempts',
         'last_failed_at',
@@ -34,7 +35,7 @@ class UserWitnessPin extends Model
         'reset_at',
     ];
 
-    protected $hidden = ['pin_hash'];
+    protected $hidden = ['pin_hash', 'hash_version'];
 
     protected function casts(): array
     {

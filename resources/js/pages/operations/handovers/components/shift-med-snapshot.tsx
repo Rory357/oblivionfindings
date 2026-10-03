@@ -4,6 +4,10 @@
  * app/Services/Emar/ShiftMedicationSnapshotService. Operations never wires the
  * snapshot URL, so this is eMAR-only in practice. Semantic tokens throughout. */
 import { AlertTriangle, Loader2, Pill } from 'lucide-react';
+import { Link } from '@inertiajs/react';
+import { FollowupStatus } from '@/components/emar/followups/followup-list';
+import type { MedicationFollowup } from '@/components/emar/followups/types';
+import { formatDateTime } from '@/lib/datetime';
 
 import { cn } from '@/lib/utils';
 
@@ -22,6 +26,7 @@ export type ShiftMedSnapshot = {
     due: { name: string; time: string; state: string; controlled: boolean }[];
     alerts: { kind: string; tone: string; message: string }[];
     generated_at: string;
+    followups?: MedicationFollowup[];
 };
 
 function ShiftMedStat({
@@ -96,6 +101,57 @@ export function ShiftMedSummary({
                 </div>
             ) : (
                 <div className="space-y-2.5">
+                    {!!snapshot.followups?.length && (
+                        <section
+                            aria-label="Medication work to carry over"
+                            className="space-y-3"
+                        >
+                            <p className="font-medium">Still to follow up</p>
+                            <p className="text-subtle">
+                                Acknowledging this handover carries eligible
+                                work to the incoming worker. Each follow-up
+                                stays open until its own action is recorded.
+                            </p>
+                            <ul className="divide-y divide-border">
+                                {snapshot.followups.map((row) => (
+                                    <li
+                                        key={row.id}
+                                        className="flex flex-wrap items-start justify-between gap-3 py-3"
+                                    >
+                                        <div className="min-w-0 space-y-1">
+                                            <Link
+                                                href={row.url}
+                                                className="frontline-tap inline-flex items-center font-medium text-primary underline"
+                                            >
+                                                {row.label} ·{' '}
+                                                {row.medication?.name ??
+                                                    'Handover'}
+                                            </Link>
+                                            <p>
+                                                {formatDateTime(
+                                                    row.due_at,
+                                                    'Time not set',
+                                                )}
+                                            </p>
+                                            <p className="text-caption">
+                                                Owner:{' '}
+                                                {row.owner?.name ??
+                                                    (row.lead
+                                                        ? 'House lead'
+                                                        : 'Unassigned')}
+                                                {row.original_owner &&
+                                                row.original_owner.id !==
+                                                    row.owner?.id
+                                                    ? ` · Originally ${row.original_owner.name}`
+                                                    : ''}
+                                            </p>
+                                        </div>
+                                        <FollowupStatus row={row} />
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+                    )}
                     <div className="grid grid-cols-4 gap-1.5">
                         <ShiftMedStat label="Due" value={snapshot.counts.due} />
                         <ShiftMedStat

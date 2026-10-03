@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\AuditableChanges;
 use App\Services\Medication\DoseSlots\DoseSlotOutcomeWriter;
 use App\Services\Medication\OverdueDoseAlerts;
+use App\Services\Medication\Support\SupportRecordingGuard;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -28,6 +29,7 @@ class ClientMedicationAdministration extends Model
         $lockOrder = static fn (self $administration) => app(DoseSlotOutcomeWriter::class)->lockOrderOf($administration);
 
         static::saving($lockOrder);
+        static::saving(static fn (self $record) => app(SupportRecordingGuard::class)->saving($record));
         static::deleting($lockOrder);
         static::restoring($lockOrder);
         static::forceDeleting($lockOrder);
@@ -102,6 +104,7 @@ class ClientMedicationAdministration extends Model
         'correction_rejection_reason',
         'witnessed_at',
         'witness_method',
+        'witness_override_id',
         // P01 C1 recording contract.
         'late_reason',
         'amount_mode',
@@ -116,6 +119,7 @@ class ClientMedicationAdministration extends Model
 
     protected $casts = [
         'quantity_given' => 'decimal:2',
+        'witness_override_id' => 'integer',
         'reoffer_of_id' => 'integer',
         'effect_check_due_at' => 'datetime',
         'scheduled_for' => 'datetime',
@@ -264,6 +268,11 @@ class ClientMedicationAdministration extends Model
     public function correctionRequestedBy()
     {
         return $this->belongsTo(User::class, 'correction_requested_by');
+    }
+
+    public function correctionApprovedBy()
+    {
+        return $this->belongsTo(User::class, 'correction_approved_by');
     }
 
     public function reviewFlaggedBy()

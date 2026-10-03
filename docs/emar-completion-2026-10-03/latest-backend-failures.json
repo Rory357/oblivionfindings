@@ -1,0 +1,374 @@
+[
+  {
+    "File": "tests/Feature/Emar/MedicationRbacAuthorizationTest.php",
+    "Case": "Manual controlled record replays recheck witness and canonical binding",
+    "Batch": "eighth-repair",
+    "Reason": "Manual controlled record replays recheck witness and canonical bindingExpected response status code [404] but received 200. Failed asserting that 200 is identical to 404. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "A named colleague confirms in their own login and replay does not duplicate",
+    "Batch": "seventh-repair",
+    "Reason": "A named colleague confirms in their own login and replay does not duplicateExpected response status code [200] but received 404. Failed asserting that 404 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "A dispute flags one review on the original dose",
+    "Batch": "seventh-repair",
+    "Reason": "A dispute flags one review on the original doseExpected response status code [200] but received 404. Failed asserting that 404 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "Expiry at the exact deadline is durable and idempotent",
+    "Batch": "seventh-repair",
+    "Reason": "Expiry at the exact deadline is durable and idempotentExpected response status code [200] but received 404. Failed asserting that 404 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "A late answer commits expiry before returning the expired result",
+    "Batch": "seventh-repair",
+    "Reason": "A late answer commits expiry before returning the expired resultExpected response status code [200] but received 404. Failed asserting that 404 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "Fallback cannot bypass locked reset expired unset or actor attempt budgets",
+    "Batch": "seventh-repair",
+    "Reason": "Fallback cannot bypass locked reset expired unset or actor attempt budgetsExpected response status code [422] but received 404. Failed asserting that 404 is identical to 422. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "Only the nominee can answer and current person and staff authority still apply",
+    "Batch": "seventh-repair",
+    "Reason": "Only the nominee can answer and current person and staff authority still applyExpected response status code [200] but received 404. Failed asserting that 404 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "A revoked permission or departed employee cannot confirm",
+    "Batch": "seventh-repair",
+    "Reason": "A revoked permission or departed employee cannot confirmExpected response status code [200] but received 404. Failed asserting that 404 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "As needed recording keeps the fallback field",
+    "Batch": "seventh-repair",
+    "Reason": "As needed recording keeps the fallback fieldExpected response status code [200] but received 404. Failed asserting that 404 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "A missing protected pin key is not a fallback or an attempt",
+    "Batch": "seventh-repair",
+    "Reason": "A missing protected pin key is not a fallback or an attemptExpected response status code [422] but received 404. Failed asserting that 404 is identical to 422. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "Audit chain failure rolls back the dose nomination receipt bell and followup",
+    "Batch": "seventh-repair",
+    "Reason": "Audit chain failure rolls back the dose nomination receipt bell and followupFailed asserting that two strings are identical. at tests\\Feature\\Emar\\ForgottenWitnessPinTest.php:340"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "Expiry resolves the canonical workflow for a deleted person without exposing it",
+    "Batch": "seventh-repair",
+    "Reason": "Expiry resolves the canonical workflow for a deleted person without exposing itExpected response status code [200] but received 404. Failed asserting that 404 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "The source http consumer only answers in the named colleagues login",
+    "Batch": "seventh-repair",
+    "Reason": "The source http consumer only answers in the named colleagues loginExpected response status code [200] but received 404. Failed asserting that 404 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "Source http reads and answers recheck current person and witness authority",
+    "Batch": "seventh-repair",
+    "Reason": "Source http reads and answers recheck current person and witness authorityExpected response status code [200] but received 404. Failed asserting that 404 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "The scheduled expiry command runs at the exact deadline and replays safely",
+    "Batch": "seventh-repair",
+    "Reason": "The scheduled expiry command runs at the exact deadline and replays safelyExpected response status code [200] but received 404. Failed asserting that 404 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "Terminal attestation preserves an existing clinical review with data set \"confirmed\"",
+    "Batch": "seventh-repair",
+    "Reason": "Terminal attestation preserves an existing clinical review with data set \"confirmed\"Expected response status code [200] but received 404. Failed asserting that 404 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "Terminal attestation preserves an existing clinical review with data set \"disputed\"",
+    "Batch": "seventh-repair",
+    "Reason": "Terminal attestation preserves an existing clinical review with data set \"disputed\"Expected response status code [200] but received 404. Failed asserting that 404 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ForgottenWitnessPinTest.php",
+    "Case": "Terminal attestation preserves an existing clinical review with data set \"expired\"",
+    "Batch": "seventh-repair",
+    "Reason": "Terminal attestation preserves an existing clinical review with data set \"expired\"Expected response status code [200] but received 404. Failed asserting that 404 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDoseOverrideTest.php",
+    "Case": "Active dose override never bypasses witnessed register counts",
+    "Batch": "eighth-repair",
+    "Reason": "Active dose override never bypasses witnessed register countsExpected response status code [422] but received 404. Failed asserting that 404 is identical to 422. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDoseOverrideTest.php",
+    "Case": "Override dose signoff requires a post dose participant count and closes source once",
+    "Batch": "eighth-repair",
+    "Reason": "Override dose signoff requires a post dose participant count and closes source onceExpected response status code [422] but received 500. Failed asserting that 500 is identical to 422. The following exception occurred during the last request:"
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "Case": "Void marks record voided not deleted",
+    "Batch": "eighth-repair",
+    "Reason": "Void marks record voided not deletedFailed asserting that null is not null. at tests\\Feature\\Emar\\DestructionsTest.php:139"
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "Case": "Void is administrative only and records explicit reconciliation provenance",
+    "Batch": "eighth-repair",
+    "Reason": "Void is administrative only and records explicit reconciliation provenanceFailed asserting that null matches expected 'Destruction record voided. Stock and register balances were not changed; record any correction through witnessed reconciliation.'. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45 at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponse.php:1575"
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "Case": "Void requires a reason",
+    "Batch": "eighth-repair",
+    "Reason": "Void requires a reasonSession is missing expected key [errors]. Failed asserting that false is true. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "Case": "Destruction rejects incomplete or contradictory offline provenance",
+    "Batch": "eighth-repair",
+    "Reason": "Destruction rejects incomplete or contradictory offline provenanceFailed to find a validation error in the response for key: 'client_request_uuid' Response does not have JSON validation errors. Failed asserting that an array has the key 'client_request_uuid'."
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "Case": "Destruction replay is single effect and changed payload conflicts",
+    "Batch": "eighth-repair",
+    "Reason": "Destruction replay is single effect and changed payload conflictsSession has unexpected errors:  {     \"default\": ["
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "Case": "Destruction replay rechecks current witness authority before returning success",
+    "Batch": "eighth-repair",
+    "Reason": "Destruction replay rechecks current witness authority before returning successSession has unexpected errors:  {     \"default\": ["
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "Case": "Destruction replay key is durable and conflicts when the target changes",
+    "Batch": "eighth-repair",
+    "Reason": "Destruction replay key is durable and conflicts when the target changesSession has unexpected errors:  {     \"default\": ["
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "Case": "New destruction requires a canonical link and conceals site mismatch before clinical validation",
+    "Batch": "eighth-repair",
+    "Reason": "New destruction requires a canonical link and conceals site mismatch before clinical validationExpected response status code [404] but received 302. Failed asserting that 302 is identical to 404. The following errors occurred during the last request:"
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "Case": "Ordinary destruction locks current site witness and records truthful method",
+    "Batch": "eighth-repair",
+    "Reason": "Ordinary destruction locks current site witness and records truthful methodSession has unexpected errors:  {     \"default\": ["
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "Case": "Void uses immutable classification and retains soft deleted medication link",
+    "Batch": "eighth-repair",
+    "Reason": "Void uses immutable classification and retains soft deleted medication linkFailed asserting that null is not null. at tests\\Feature\\Emar\\DestructionsTest.php:615"
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "Case": "Record only actor cannot probe store or void a controlled destruction",
+    "Batch": "eighth-repair",
+    "Reason": "Record only actor cannot probe store or void a controlled destructionExpected response status code [404] but received 302. Failed asserting that 302 is identical to 404. The following errors occurred during the last request:"
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "Case": "Non controlled destruction conceals noncanonical witness before insert",
+    "Batch": "eighth-repair",
+    "Reason": "Non controlled destruction conceals noncanonical witness before insertExpected response status code [404] but received 302. Failed asserting that 302 is identical to 404. The following errors occurred during the last request:"
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "Case": "Page serves brand colour and payload",
+    "Batch": "eighth-repair",
+    "Reason": "Page serves brand colour and payloadExpected response status code [200] but received 302. Failed asserting that 302 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/DestructionsTest.php",
+    "Case": "Payload carries detail fields for voided cd record",
+    "Batch": "eighth-repair",
+    "Reason": "Payload carries detail fields for voided cd recordExpected response status code [200] but received 302. Failed asserting that 302 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php",
+    "Case": "Explicit global site role still requires and honours each exact capability",
+    "Batch": "ninth-repair",
+    "Reason": "Explicit global site role still requires and honours each exact capabilityExpected response status code [201, 301, 302, 303, 307, 308] but received 404. Failed asserting that false is true. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php",
+    "Case": "Controlled entry replay is bound to the canonical action payload",
+    "Batch": "ninth-repair",
+    "Reason": "Controlled entry replay is bound to the canonical action payloadFailed asserting that null is identical to false. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\AssertableJsonString.php:243 at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponse.php:873"
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php",
+    "Case": "Controlled balance check replay is bound to the canonical action payload",
+    "Batch": "ninth-repair",
+    "Reason": "Controlled balance check replay is bound to the canonical action payloadFailed asserting that null is identical to false. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\AssertableJsonString.php:243 at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponse.php:873"
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php",
+    "Case": "Controlled mutations bind to the locked canonical medication identity",
+    "Batch": "ninth-repair",
+    "Reason": "Controlled mutations bind to the locked canonical medication identityExpected response status code [404] but received 200. Failed asserting that 200 is identical to 404. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php",
+    "Case": "Stock movement requires a complete valid transition and constrained initialization",
+    "Batch": "ninth-repair",
+    "Reason": "Stock movement requires a complete valid transition and constrained initializationSession is missing expected key [errors]. Failed asserting that false is true. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php",
+    "Case": "Balance check requires existing locked stock and canonical medication",
+    "Batch": "ninth-repair",
+    "Reason": "Balance check requires existing locked stock and canonical medicationSession is missing expected key [errors]. Failed asserting that false is true. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Cd witness confirms with their witness pin not their login password",
+    "Batch": "ninth-repair",
+    "Reason": "Cd witness confirms with their witness pin not their login passwordErrorException: Undefined array key \"witness_method\" at vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Bootstrap\\HandleExceptions.php:258 at tests\\Feature\\Emar\\ControlledDrugsTest.php:207"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Manual controlled entry rejects incomplete or contradictory offline provenance",
+    "Batch": "ninth-repair",
+    "Reason": "Manual controlled entry rejects incomplete or contradictory offline provenanceFailed to find a validation error in the response for key: 'client_request_uuid' Response does not have JSON validation errors. Failed asserting that an array has the key 'client_request_uuid'."
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Manual controlled balance check rejects incomplete or contradictory offline provenance",
+    "Batch": "ninth-repair",
+    "Reason": "Manual controlled balance check rejects incomplete or contradictory offline provenanceFailed to find a validation error in the response for key: 'client_request_uuid' Response does not have JSON validation errors. Failed asserting that an array has the key 'client_request_uuid'."
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Manual controlled entry and balance accept online idempotency uuids without provenance",
+    "Batch": "ninth-repair",
+    "Reason": "Manual controlled entry and balance accept online idempotency uuids without provenanceExpected response status code [200] but received 422. Failed asserting that 422 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Controlled inertia forms redirect while json replays return sync payloads",
+    "Batch": "ninth-repair",
+    "Reason": "Controlled inertia forms redirect while json replays return sync payloadsExpected response status code [201, 301, 302, 303, 307, 308] but received 422. Failed asserting that false is true. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Controlled entry and balance check replays remain durable after pruning",
+    "Batch": "ninth-repair",
+    "Reason": "Controlled entry and balance check replays remain durable after pruningExpected response status code [200] but received 422. Failed asserting that 422 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Controlled offline entry and balance audit failures roll back receipts stock and replay bindings",
+    "Batch": "ninth-repair",
+    "Reason": "Controlled offline entry and balance audit failures roll back receipts stock and replay bindingsFailed asserting that two strings are identical. at tests\\Feature\\Emar\\ControlledDrugsTest.php:655"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Page serves brand colour",
+    "Batch": "ninth-repair",
+    "Reason": "Page serves brand colourProperty [site_brand_colour] does not exist. Failed asserting that false is true. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\Fluent\\Concerns\\Has.php:91"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Loss report captures accountable officer and regulator",
+    "Batch": "ninth-repair",
+    "Reason": "Loss report captures accountable officer and regulatorFailed asserting that null is identical to 'Jane CDAO'. at tests\\Feature\\Emar\\ControlledDrugsTest.php:922"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Loss report rejects incomplete or contradictory offline provenance",
+    "Batch": "ninth-repair",
+    "Reason": "Loss report rejects incomplete or contradictory offline provenanceFailed to find a validation error in the response for key: 'client_request_uuid' Response does not have JSON validation errors. Failed asserting that an array has the key 'client_request_uuid'."
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Loss report replay is bound to authority target and report semantics",
+    "Batch": "ninth-repair",
+    "Reason": "Loss report replay is bound to authority target and report semanticsExpected response status code [200] but received 422. Failed asserting that 422 is identical to 200. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Loss report and durable replay result commit atomically",
+    "Batch": "ninth-repair",
+    "Reason": "Loss report and durable replay result commit atomicallyIlluminate\\Validation\\ValidationException: The expected entry id field must be present. at vendor\\laravel\\framework\\src\\Illuminate\\Support\\helpers.php:423 at vendor\\laravel\\framework\\src\\Illuminate\\Validation\\Validator.php:598"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Loss report audit failure rolls back report incident and replay binding",
+    "Batch": "ninth-repair",
+    "Reason": "Loss report audit failure rolls back report incident and replay bindingIlluminate\\Validation\\ValidationException: The expected entry id field must be present. at vendor\\laravel\\framework\\src\\Illuminate\\Support\\helpers.php:423 at vendor\\laravel\\framework\\src\\Illuminate\\Validation\\Validator.php:598"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Controlled loss mutations require canonical local ownership",
+    "Batch": "ninth-repair",
+    "Reason": "Controlled loss mutations require canonical local ownershipExpected response status code [404] but received 302. Failed asserting that 302 is identical to 404. The following errors occurred during the last request:"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Overdue cd check command raises then balance check resolves alert",
+    "Batch": "ninth-repair",
+    "Reason": "Overdue cd check command raises then balance check resolves alertFailed asserting that two strings are identical. at tests\\Feature\\Emar\\ControlledDrugsTest.php:1477"
+  },
+  {
+    "File": "tests/Feature/Emar/ControlledDrugsTest.php",
+    "Case": "Cd entry classifies schedule on medication",
+    "Batch": "ninth-repair",
+    "Reason": "Cd entry classifies schedule on medicationFailed asserting that null is identical to 2. at tests\\Feature\\Emar\\ControlledDrugsTest.php:1528"
+  },
+  {
+    "File": "tests/Feature/Emar/StockManagementTest.php",
+    "Case": "Controlled pharmacy delivery is atomic fractional and replay safe",
+    "Batch": "seventh-repair",
+    "Reason": "Controlled pharmacy delivery is atomic fractional and replay safeIlluminate\\Database\\Eloquent\\ModelNotFoundException: No query results for model [App\\Models\\ClientControlledDrugEntry]. at vendor\\laravel\\framework\\src\\Illuminate\\Database\\Eloquent\\Builder.php:827 at tests\\Feature\\Emar\\StockManagementTest.php:514"
+  },
+  {
+    "File": "tests/Feature/Emar/StockManagementTest.php",
+    "Case": "Controlled pharmacy delivery retains its replay binding indefinitely",
+    "Batch": "seventh-repair",
+    "Reason": "Controlled pharmacy delivery retains its replay binding indefinitelyExpected response status code [201, 301, 302, 303, 307, 308] but received 404. Failed asserting that false is true. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/StockManagementTest.php",
+    "Case": "Controlled pharmacy delivery replay rechecks current witness authority",
+    "Batch": "seventh-repair",
+    "Reason": "Controlled pharmacy delivery replay rechecks current witness authorityFailed asserting that table [client_controlled_drug_entries] matches expected entries count of 1. Entries found: 0. . at vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Testing\\Concerns\\InteractsWithDatabase.php:110"
+  },
+  {
+    "File": "tests/Feature/Emar/StockManagementTest.php",
+    "Case": "Controlled pharmacy delivery rejects forged medication and incomplete or stale balance without effects",
+    "Batch": "seventh-repair",
+    "Reason": "Controlled pharmacy delivery rejects forged medication and incomplete or stale balance without effectsSession is missing expected key [errors]. Failed asserting that false is true. at vendor\\laravel\\framework\\src\\Illuminate\\Testing\\TestResponseAssert.php:45"
+  },
+  {
+    "File": "tests/Feature/Emar/StockManagementTest.php",
+    "Case": "Controlled pharmacy delivery audit failure rolls back order stock register and replay result",
+    "Batch": "seventh-repair",
+    "Reason": "Controlled pharmacy delivery audit failure rolls back order stock register and replay resultFailed asserting that two strings are identical. at tests\\Feature\\Emar\\StockManagementTest.php:1112 at tests\\Feature\\Emar\\StockManagementTest.php:735"
+  },
+  {
+    "File": "tests/Feature/Emar/StockManagementTest.php",
+    "Case": "A controlled delivery keeps the earlier batch and expiry",
+    "Batch": "seventh-repair",
+    "Reason": "A controlled delivery keeps the earlier batch and expiryFailed asserting that two strings are identical. at tests\\Feature\\Emar\\StockManagementTest.php:916"
+  }
+]

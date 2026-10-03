@@ -89,6 +89,7 @@ class ClinicalGovernanceAutomationTest extends TestCase
         MedicationError::create([
             'client_id' => $client->id,
             'error_type' => 'wrong_dose',
+            'reached_client' => 'yes',
             'severity' => 'minor',
             'description' => 'Incorrect dose recorded.',
             'reported_by' => $reporter->id,
@@ -99,6 +100,7 @@ class ClinicalGovernanceAutomationTest extends TestCase
         MedicationError::create([
             'client_id' => $client->id,
             'error_type' => 'wrong_time',
+            'reached_client' => 'yes',
             'severity' => 'minor',
             'description' => 'Older month medication error.',
             'reported_by' => $reporter->id,
@@ -111,7 +113,7 @@ class ClinicalGovernanceAutomationTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Governance/Clinical/Dashboard')
-            ->has('indicators', 4)
+            ->has('indicators', 5)
             ->where('sourceHint', 'Counted automatically from medication errors in eMAR and from falls, skin injuries and signs of infection recorded in Health & clinical.')
             ->where('latestSnapshot.period_label', 'May so far (1–15 May)')
             ->where('latestSnapshot.short_label', 'May 2026 (so far)')
@@ -122,8 +124,8 @@ class ClinicalGovernanceAutomationTest extends TestCase
         $values = collect($snapshot->indicator_values)->keyBy('indicator_code');
         $indicatorCodes = collect($response->inertiaProps('indicators'))->pluck('indicator_code')->all();
 
-        $this->assertSame(['HCG-001', 'HCG-002', 'HCG-003', 'HCG-004'], $indicatorCodes);
-        $this->assertSame(['Medication errors', 'Falls', 'Skin injuries', 'Signs of infection'], collect($response->inertiaProps('indicators'))->pluck('name')->all());
+        $this->assertSame(['HCG-001', 'HCG-002', 'HCG-003', 'HCG-004', 'HCG-005'], $indicatorCodes);
+        $this->assertSame(['Medication errors that reached the person', 'Falls', 'Skin injuries', 'Signs of infection', 'Near misses reported'], collect($response->inertiaProps('indicators'))->pluck('name')->all());
         $this->assertEquals(1, $values->get('HCG-001')['value']);
         $this->assertEquals(1, $values->get('HCG-002')['value']);
         $this->assertEquals(1, $values->get('HCG-003')['value']);
@@ -133,7 +135,9 @@ class ClinicalGovernanceAutomationTest extends TestCase
 
         $currentValues = collect($response->inertiaProps('latestSnapshot.indicator_values'))->keyBy('indicator_code');
 
-        $this->assertSame('/emar/errors?date_from=2026-05-01&date_to=2026-05-15', $currentValues->get('HCG-001')['source_href']);
+        $this->assertSame('/emar/reports?report=errors&period=custom&date_from=2026-05-01&date_to=2026-05-15&reached=yes', $currentValues->get('HCG-001')['source_href']);
+        $this->assertSame('not_configured', $currentValues->get('HCG-001')['status']);
+        $this->assertSame('reported', $currentValues->get('HCG-005')['status']);
         $this->assertSame('/health-clinical/events?event_type=fall&date_from=2026-05-01&date_to=2026-05-15', $currentValues->get('HCG-002')['source_href']);
         // Compared with the same days last month (1–15 April): one fall then, one now.
         $this->assertEquals(1, $currentValues->get('HCG-002')['previous_value']);
@@ -148,7 +152,7 @@ class ClinicalGovernanceAutomationTest extends TestCase
         $trendsResponse->assertOk();
         $trendsResponse->assertInertia(fn (Assert $page) => $page
             ->component('Governance/Clinical/Trends')
-            ->has('indicators', 4)
+            ->has('indicators', 5)
             ->has('snapshots', 1)
         );
 
@@ -231,7 +235,7 @@ class ClinicalGovernanceAutomationTest extends TestCase
 
         $response->assertInertia(fn (Assert $page) => $page
             ->where('filters.status', 'no_data')
-            ->has('latestSnapshot.indicator_values', 4));
+            ->has('latestSnapshot.indicator_values', 5));
 
         foreach ($response->inertiaProps('latestSnapshot.indicator_values') as $value) {
             $this->assertFalse($value['recorded'], "{$value['indicator_code']} should have no data yet.");

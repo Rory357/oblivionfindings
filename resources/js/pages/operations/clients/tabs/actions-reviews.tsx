@@ -58,6 +58,9 @@ const severityMeta = {
 
 const typeLabels: Record<string, string> = {
     overdue_follow_up: 'Overdue follow-up',
+    medication_review: 'Medication review',
+    overdue_medication_review: 'Medication review',
+    medication_change: 'Medication change',
     open_follow_up: 'Open follow-up',
     flagged_note_review: 'Flagged note',
     document_expiring: 'Document review',

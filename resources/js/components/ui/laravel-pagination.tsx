@@ -16,10 +16,16 @@ interface LaravelPaginationProps {
     className?: string;
     preserveState?: boolean;
     preserveScroll?: boolean;
+    /** Same-page partial visits preserve an owning settings draft. */
+    only?: string[];
 }
 
 function stripHtml(html: string): string {
-    return html.replace(/&laquo;/g, '').replace(/&raquo;/g, '').replace(/<[^>]*>/g, '').trim();
+    return html
+        .replace(/&laquo;/g, '')
+        .replace(/&raquo;/g, '')
+        .replace(/<[^>]*>/g, '')
+        .trim();
 }
 
 function isNavLabel(label: string): 'prev' | 'next' | false {
@@ -28,16 +34,33 @@ function isNavLabel(label: string): 'prev' | 'next' | false {
     return false;
 }
 
-export function LaravelPagination({ links, lastPage, className, preserveState = true, preserveScroll = false }: LaravelPaginationProps) {
+export function LaravelPagination({
+    links,
+    lastPage,
+    className,
+    preserveState = true,
+    preserveScroll = false,
+    only,
+}: LaravelPaginationProps) {
     if (!links || links.length <= 3) return null;
     if (lastPage !== undefined && lastPage <= 1) return null;
-    const visitOptions = { preserveState, ...(preserveScroll ? { preserveScroll: true } : {}) };
+    const visitOptions = {
+        preserveState,
+        ...(only ? { only } : {}),
+        ...(preserveScroll ? { preserveScroll: true } : {}),
+    };
 
     // The buttons keep the compact sm size; frontline-hit gives each a 44 px
     // target, and the 36 px minimum width plus gap-2.5 keep neighbouring
     // targets from overlapping.
     return (
-        <nav aria-label="Pagination" className={cn('flex items-center justify-center gap-2.5', className)}>
+        <nav
+            aria-label="Pagination"
+            className={cn(
+                'flex items-center justify-center gap-2.5',
+                className,
+            )}
+        >
             {links.map((link, i) => {
                 const nav = isNavLabel(link.label);
 
@@ -48,7 +71,10 @@ export function LaravelPagination({ links, lastPage, className, preserveState = 
                             variant="outline"
                             size="sm"
                             disabled={!link.url}
-                            onClick={() => link.url && router.get(link.url, {}, visitOptions)}
+                            onClick={() =>
+                                link.url &&
+                                router.get(link.url, {}, visitOptions)
+                            }
                             aria-label="Previous page"
                             className="frontline-hit min-w-[36px]"
                         >
@@ -64,7 +90,10 @@ export function LaravelPagination({ links, lastPage, className, preserveState = 
                             variant="outline"
                             size="sm"
                             disabled={!link.url}
-                            onClick={() => link.url && router.get(link.url, {}, visitOptions)}
+                            onClick={() =>
+                                link.url &&
+                                router.get(link.url, {}, visitOptions)
+                            }
                             aria-label="Next page"
                             className="frontline-hit min-w-[36px]"
                         >
@@ -79,7 +108,9 @@ export function LaravelPagination({ links, lastPage, className, preserveState = 
                         variant={link.active ? 'default' : 'outline'}
                         size="sm"
                         disabled={!link.url}
-                        onClick={() => link.url && router.get(link.url, {}, visitOptions)}
+                        onClick={() =>
+                            link.url && router.get(link.url, {}, visitOptions)
+                        }
                         aria-current={link.active ? 'page' : undefined}
                         className="frontline-hit min-w-[36px]"
                     >

@@ -21,8 +21,8 @@ use Illuminate\Support\Carbon;
  * moment it's needed, from the roster and staff records; only the rule and
  * the backup's account are stored.
  *
- * The phone is the work phone on their staff record (Q8): the cellphone
- * channel isn't used.
+ * The work phone is used first; a personal cellphone is used only when
+ * that person explicitly consented in their own account (P11 Q10).
  */
 class OnCallResolver
 {
@@ -189,7 +189,7 @@ class OnCallResolver
             : 'Follows the roster'.($rule->team_lead ? ', then the team lead on shift' : '').' · backup '.$name;
     }
 
-    /** The work phone on their current staff record, or null (Q8: work phone only). */
+    /** Work phone first; personal cellphone only with the account owner’s consent. */
     public function phoneOf(?User $user): ?string
     {
         if ($user === null) {
@@ -201,7 +201,12 @@ class OnCallResolver
         }
         $phone = trim((string) $profile->work_phone);
 
-        return $phone === '' ? null : $phone;
+        if ($phone !== '') {
+            return $phone;
+        }
+        $personal = trim((string) $user->cellphone);
+
+        return $user->on_call_cellphone_consented_at !== null && $personal !== '' ? $personal : null;
     }
 
     /** Approved leave covering any of this window. */

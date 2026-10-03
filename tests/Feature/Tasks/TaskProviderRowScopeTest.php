@@ -575,7 +575,8 @@ function taskRbacMatrix(): array
         'error_type' => 'wrong_time',
         'severity' => 'minor',
         'description' => 'TASK-RBAC private medication error',
-        'reported_by' => $staffB->id,
+        // Person/account authority stays valid when the Site assignment moves.
+        'reported_by' => $actor->id,
         'reported_at' => now(),
         'status' => 'reported',
     ]));
@@ -845,6 +846,16 @@ function taskRbacMatrix(): array
         ],
         'fleet_finance_review' => $pair('fleet_finance_review', $financeReviewA, $financeReviewB, 'FRQ-91001', 'FRQ-92001'),
         'med_error' => $pair('med_error', $medicationA, $medicationB, 'MED-91001', 'MED-92001'),
+        // Dedicated MedicationTaskProviderScopeTest fixtures cover the six
+        // new sources; this cross-module matrix creates none of their work.
+        'medication-followup' => ['visible' => [], 'hidden' => []],
+        'med_error_action' => ['visible' => [], 'hidden' => []],
+        'medication_review' => ['visible' => [], 'hidden' => []],
+        'medication_review_change' => ['visible' => [], 'hidden' => []],
+        'med_emergency_review' => ['visible' => [], 'hidden' => []],
+        'med_paper_giver' => ['visible' => [], 'hidden' => []],
+        'med_paper_witness' => ['visible' => [], 'hidden' => []],
+        'medication-round' => ['visible' => [], 'hidden' => []],
         'cd_loss' => $pair('cd_loss', $cdLossA, $cdLossB, 'CDL-91001', 'CDL-92001'),
         'breach' => ['visible' => [['id' => 'breach-'.$breach->id, 'source' => 'breach', 'numeric_id' => (int) $breach->id, 'token' => 'DBR-93001']], 'hidden' => []],
         'dsr' => ['visible' => [['id' => 'dsr-'.$dsr->id, 'source' => 'dsr', 'numeric_id' => (int) $dsr->id, 'token' => 'DSR-93001']], 'hidden' => []],
@@ -904,6 +915,9 @@ it('keeps list counts csv detail lookup reports my day and watchers in parity fo
     $hidden = taskRbacRows($matrix, 'hidden');
     $visibleIds = collect($visible)->pluck('id')->sort()->values()->all();
     $hiddenIds = collect($hidden)->pluck('id')->sort()->values()->all();
+    // Reports group by provider; composite providers retain separate detail aliases.
+    $expectedModuleKeys = collect($matrix)->filter(fn (array $rows) => count($rows['visible']) > 0)
+        ->keys()->sort()->values()->all();
     $aggregator = new TaskAggregator;
 
     expect(array_keys($matrix))->toBe(collect(TaskAggregator::defaultProviders())->map->sourceKey()->all());
@@ -934,7 +948,11 @@ it('keeps list counts csv detail lookup reports my day and watchers in parity fo
             ->where('totals.open', count($visibleIds))
             ->where('totals.done', 0)
             ->where('modules', fn ($modules) => collect($modules)->pluck('key')->sort()->values()->all()
-                === collect(array_keys($matrix))->sort()->values()->all()));
+                === $expectedModuleKeys)
+            ->where('modules', fn ($modules) => collect($modules)->sum('open') === count($visibleIds))
+            ->where('sources', fn ($sources) => collect($sources)->pluck('key')->sort()->values()->all()
+                === collect(TaskAggregator::defaultProviders())->filter(fn ($provider) => $provider->canView($actor))
+                    ->map->sourceKey()->sort()->values()->all()));
 
     $csv = $this->actingAs($actor)->get('/tasks?format=csv')->assertOk()->streamedContent();
     foreach ($visible as $row) {

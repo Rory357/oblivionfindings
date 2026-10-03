@@ -44,6 +44,7 @@ const log: TransportMedicationLog = {
     medication_name: 'Paracetamol 500mg',
     is_controlled_drug: false,
     witness_required: false,
+    requires_administration_witness: false,
     packed_by: { id: 3, name: 'Packing Worker' },
     packed_at: '2026-07-13T08:00:00+12:00',
     administered_by: null,
@@ -130,6 +131,40 @@ describe('transport medication payload contract', () => {
 });
 
 describe('transport medication wizard family', () => {
+    it('uses the effective administration requirement instead of controlled or packing flags', () => {
+        const common = { onClose: vi.fn(), onCompleted: vi.fn() };
+        const exempt = render(
+            <AdministerTransportMedicationWizard
+                log={{
+                    ...log,
+                    is_controlled_drug: true,
+                    requires_administration_witness: false,
+                }}
+                witnesses={[]}
+                {...common}
+            />,
+        );
+        expect(
+            screen.queryByRole('combobox', { name: 'Witness' }),
+        ).not.toBeInTheDocument();
+        exempt.unmount();
+
+        render(
+            <AdministerTransportMedicationWizard
+                log={{
+                    ...log,
+                    witness_required: false,
+                    requires_administration_witness: true,
+                }}
+                witnesses={[]}
+                {...common}
+            />,
+        );
+        expect(
+            screen.getByRole('combobox', { name: 'Witness' }),
+        ).toBeInTheDocument();
+    });
+
     it('provides accessible pack, administration, and return workflows with review steps', () => {
         const common = {
             onClose: vi.fn(),

@@ -15,14 +15,19 @@ use App\Models\MedicationRound;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\Medication\Controlled\ControlledDoseOverrideService;
 use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\DoseSlots\DoseSlotProjection;
 use App\Services\Medication\DoseSlots\ScheduledDoseStates;
+use App\Services\Medication\Followups\MedicationFollowupService;
+use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\Recording\RecordingContract;
 use App\Services\Medication\Recording\RecordingContractEnforcer;
+use App\Services\Medication\Stock\MedicationStockService;
 use App\Services\Medication\WitnessPinService;
 use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
@@ -56,6 +61,7 @@ class EnhancedMarService
         protected MedicationGovernanceScopeService $medicationGovernanceScope,
         protected MedicationCompetencyRestrictionRules $competencyRestrictions,
         protected RecordingContractEnforcer $recordingContract,
+        protected ForgottenWitnessPinService $forgottenPins,
     ) {
         $this->scheduleService = $scheduleService;
         $this->safetyService = $safetyService;
@@ -438,7 +444,8 @@ class EnhancedMarService
             'is_administrable' => $medication->isAdministrable(),
             'admin_rules' => $this->ruleService->requirementsFor($medication),
             'stock' => $medication->stock ? [
-                'on_hand' => $medication->stock->on_hand,
+                'on_hand' => $medication->stock->availableQuantity(),
+                'pack_workflow_url' => $medication->stock->pack_workflow_url,
                 'unit' => $medication->stock->unit,
                 'reorder_level' => $medication->stock->reorder_level,
             ] : null,
@@ -972,6 +979,8 @@ class EnhancedMarService
                     && ! $lockedActor->canDo('medications.controlled.record'),
                     403,
                 );
+                $doseOverride = app(ControlledDoseOverrideService::class)->forAdministration($lockedActor, $client, $medication, $data, $adminAt, $lockedPresenceShifts);
+                $secondPersonKind = $this->recordingContract->secondPersonKind($data, $medication, $currentAdminRules, $requiresCosigner, $doseOverride !== null);
                 if (is_array($data['safety_override'] ?? null)
                     && ! $lockedActor->canDo('medications.administer.override_safety')) {
                     return [
@@ -1028,7 +1037,7 @@ class EnhancedMarService
                 if ($secondPersonKind !== null
                     && empty($data['witnessed_by'])
                     && filter_var($data['second_person_unavailable'] ?? false, FILTER_VALIDATE_BOOL)) {
-                    if (! $this->recordingContract->mayGoUnconfirmed($secondPersonKind)) {
+                    if ($doseOverride !== null || ! $this->recordingContract->mayGoUnconfirmed($secondPersonKind)) {
                         return [
                             'success' => false,
                             'error' => $secondPersonKind === RecordingContract::SECOND_COSIGNER
@@ -1037,7 +1046,7 @@ class EnhancedMarService
                             'error_field' => 'witnessed_by',
                         ];
                     }
-                    if (! $this->recordingContract->nobodyCanConfirm($client, $userId, $adminAt)) {
+                    if (! $this->recordingContract->nobodyCanConfirm($client, $userId, $adminAt, (bool) $medication->controlled_drug)) {
                         return [
                             'success' => false,
                             'error' => 'A colleague on shift can confirm this dose. Choose them and ask them to type their witness PIN.',
@@ -1051,18 +1060,33 @@ class EnhancedMarService
                 // medication row is locked. The shared governance service then
                 // locks the witness and their current Site staff profile in this
                 // same transaction before any administration or stock write.
-                $witnessValidation = $secondPersonUnconfirmed ? ['success' => true] : $this->validateWitness(
-                    $client,
-                    $medication,
-                    $currentAdminRules,
-                    $data,
-                    $userId,
-                    $adminAt,
-                    $lockedAuthorizationUsers,
-                    $lockedPresenceShifts,
-                    $requiresCosigner,
-                    $secondPersonKind === RecordingContract::SECOND_AMOUNT,
-                );
+                $forgottenPin = filter_var($data['second_person_pin_forgotten'] ?? false, FILTER_VALIDATE_BOOL);
+                if ($forgottenPin && $secondPersonUnconfirmed) {
+                    throw ValidationException::withMessages([
+                        'witnessed_by' => 'Choose the eligible colleague who was there, or use the separate nobody-on-shift option.',
+                    ]);
+                }
+                if ($forgottenPin) {
+                    $witnessValidation = $this->forgottenPins->prepare(
+                        $lockedActor, $client, $medication, $secondPersonKind,
+                        (int) ($data['witnessed_by'] ?? 0), $adminAt,
+                        $lockedAuthorizationUsers, $lockedPresenceShifts,
+                    );
+                } else {
+                    $witnessValidation = $secondPersonUnconfirmed ? ['success' => true] : $this->validateWitness(
+                        $client,
+                        $medication,
+                        $currentAdminRules,
+                        $data,
+                        $userId,
+                        $adminAt,
+                        $lockedAuthorizationUsers,
+                        $lockedPresenceShifts,
+                        $requiresCosigner,
+                        $secondPersonKind === RecordingContract::SECOND_AMOUNT,
+                        $doseOverride !== null,
+                    );
+                }
                 if (! ($witnessValidation['success'] ?? false)) {
                     return $witnessValidation;
                 }
@@ -1328,6 +1352,30 @@ class EnhancedMarService
                     }
                 }
 
+                // Once pack tracking has started it remains authoritative,
+                // including when the rollout flag is subsequently disabled.
+                // Unstarted legacy stock is not migrated by a clinical dose.
+                $ordinaryStockQuantity = null;
+                if (! $medication->controlled_drug && ($data['status'] ?? null) === 'given') {
+                    $ordinaryStock = $medication->stock()->lockForUpdate()->first();
+                    if ($ordinaryStock?->lots_started_at !== null) {
+                        if (blank($ordinaryStock->unit)) {
+                            return ['success' => false, 'error_field' => 'quantity_administered',
+                                'error' => 'The stock unit is unknown. Ask the house lead to reconcile the stock before recording this dose.'];
+                        }
+                        $comparable = $this->recordingContract->stockQuantity($data, $medication, $ordinaryStock->unit);
+                        $ordinaryStockQuantity = $data['quantity_administered'] ?? $comparable;
+                        if ($ordinaryStockQuantity === null || ! MedicationStockQuantity::greaterThan($ordinaryStockQuantity, 0)) {
+                            return ['success' => false, 'error_field' => 'quantity_administered',
+                                'error' => 'Enter the quantity given from stock, in '.$ordinaryStock->unit.'. The dose and stock units cannot be converted here.'];
+                        }
+                        if ($comparable !== null && ! MedicationStockQuantity::equals($ordinaryStockQuantity, $comparable)) {
+                            return ['success' => false, 'error_field' => 'quantity_administered',
+                                'error' => 'Enter the stock quantity actually given for this dose. Record any damaged or wasted stock separately with the house lead.'];
+                        }
+                    }
+                }
+
                 // Create administration record
                 $admin = new ClientMedicationAdministration;
                 $admin->client_request_uuid = $clientRequestUuid;
@@ -1335,7 +1383,7 @@ class EnhancedMarService
                 $admin->client_medication_id = $medication->id;
                 $admin->shift_id = $shiftId;
                 $admin->administered_by = $userId;
-                $admin->witnessed_by = $witnessValidation['witnessed_by'] ?? null;
+                $admin->witnessed_by = $forgottenPin ? null : ($witnessValidation['witnessed_by'] ?? null);
                 $admin->witnessed_at = $witnessValidation['witnessed_at'] ?? null;
                 $admin->witness_method = $witnessValidation['witness_method'] ?? null;
                 $admin->scheduled_for = $scheduledFor?->copy()->utc();
@@ -1371,10 +1419,13 @@ class EnhancedMarService
                     ? ($data['amount_reason'] ?? null)
                     : null;
                 $admin->quantity_given = $this->recordingContract->quantityGiven($data, $medication);
-                $admin->second_person_kind = $secondPersonKind;
+                $admin->witness_override_id = $doseOverride?->id;
+                $admin->second_person_kind = $secondPersonKind ?? ($doseOverride !== null ? RecordingContract::SECOND_WITNESS : null);
                 $admin->second_person_status = match (true) {
+                    $doseOverride !== null => RecordingContract::SECOND_OVERRIDE_PENDING,
                     $secondPersonKind === null => null,
                     $secondPersonUnconfirmed => RecordingContract::SECOND_NOT_CONFIRMED,
+                    $forgottenPin => RecordingContract::SECOND_NOT_VERIFIED,
                     default => RecordingContract::SECOND_VERIFIED,
                 };
                 if ($secondPersonUnconfirmed) {
@@ -1413,6 +1464,19 @@ class EnhancedMarService
 
                 $admin->save();
 
+                if ($ordinaryStockQuantity !== null) {
+                    $admin->setRelation('medication', $medication);
+                    app(MedicationStockService::class)
+                        ->ordinaryDose($admin, $lockedActor, $ordinaryStockQuantity);
+                }
+
+                $secondPersonNomination = null;
+                if ($forgottenPin) {
+                    $admin->setRelation('client', $client);
+                    $admin->setRelation('medication', $medication);
+                    $secondPersonNomination = $this->forgottenPins->start($admin, $witnessValidation);
+                }
+
                 if ($overrideAudit !== null) {
                     AuditLogger::logOrFail(
                         'medications.safety_override.authorized',
@@ -1424,9 +1488,9 @@ class EnhancedMarService
                     );
                 }
 
-                if ($admin->status === 'given') {
-                    $this->mirrorClinicalObservations($admin, $medication, $data, $userId);
-                }
+                // P02 Q-D: dose-linked readings belong to this administration.
+                // Keep historical ClinicalObservation copies, but create no
+                // new second clinical record with a medication name in notes.
 
                 // Handle controlled drug register entry
                 if ($medication->controlled_drug && $admin->status === 'given') {
@@ -1462,6 +1526,9 @@ class EnhancedMarService
                     $this->recordingContract->raiseMoreThanOrderedError($client, $medication, $admin, $lockedActor, $data);
                 }
 
+                app(ControlledDoseOverrideService::class)->recordApplied($doseOverride, $admin, $lockedActor, $medication);
+                app(MedicationFollowupService::class)->syncAdministration($admin);
+
                 AuditLogger::logOrFail('medications.administration.record', $admin, [
                     'actor_id' => $userId,
                     'client_id' => $client->id,
@@ -1474,6 +1541,7 @@ class EnhancedMarService
                     'witnessed_by' => $admin->witnessed_by,
                     'second_person_kind' => $admin->second_person_kind,
                     'second_person_status' => $admin->second_person_status,
+                    'witness_override_id' => $admin->witness_override_id,
                     'reoffer_of_id' => $admin->reoffer_of_id,
                     'amount_mode' => $admin->amount_mode,
                 ]);
@@ -1488,13 +1556,18 @@ class EnhancedMarService
                     $requestFingerprint,
                 );
 
+                // P09 Site head is locked only after domain writes and receipt.
+                if ($secondPersonNomination !== null) {
+                    $this->forgottenPins->appendEvent($secondPersonNomination, $admin, $userId);
+                }
+
                 return [
                     'success' => true,
                     'administration' => $admin,
                     'safety_check' => $safetyCheck,
                     'prn_over_limit_attempt' => $prnOverLimitAttempt,
                 ];
-            }, 3);
+            }, 5);
         } catch (QueryException $exception) {
             if ($clientRequestUuid === null) {
                 throw $exception;
@@ -1934,6 +2007,7 @@ class EnhancedMarService
 
         if (in_array($key, [
             'witnessed_by',
+            'witness_override_id',
             'pulse_bpm',
             'blood_pressure_systolic',
             'blood_pressure_diastolic',
@@ -1948,6 +2022,7 @@ class EnhancedMarService
             'queued_offline',
             'scan_verified',
             'second_person_unavailable',
+            'second_person_pin_forgotten',
         ], true)) {
             return filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? (bool) $value;
         }
@@ -2266,8 +2341,9 @@ class EnhancedMarService
         Collection $lockedPresenceShifts,
         bool $requireCosigner = false,
         bool $requireAmountConfirmation = false,
+        bool $controlledWitnessWaived = false,
     ): array {
-        $medicationRequiresWitness = $medication->requiresWitness() || ($adminRules['requires_countersign'] ?? false);
+        $medicationRequiresWitness = (($medication->witness_required || ! $controlledWitnessWaived) && $medication->requiresWitness()) || ($adminRules['requires_countersign'] ?? false);
         $requiresWitness = $medicationRequiresWitness || $requireCosigner || $requireAmountConfirmation;
 
         if (($data['status'] ?? null) !== 'given' || ! $requiresWitness) {
@@ -2294,7 +2370,7 @@ class EnhancedMarService
                 'error_field' => 'witnessed_by',
             ];
         }
-        $witness = $this->medicationGovernanceScope->confirmedControlledWitness(
+        $witness = $medication->controlled_drug ? $this->medicationGovernanceScope->confirmedControlledWitness(
             $recorder,
             $client,
             (int) $data['witnessed_by'],
@@ -2303,7 +2379,11 @@ class EnhancedMarService
             lockedUsers: $lockedWitnessUsers,
             effectiveAt: $effectiveAt,
             lockedPresenceShifts: $lockedPresenceShifts,
-        );
+        ) : app(MedicationSecondPersonService::class)->authenticate(
+            $recorder, (int) $client->site_id, (int) $data['witnessed_by'],
+            $data['witness_credential'] ?? null, $effectiveAt,
+            $lockedWitnessUsers, $lockedPresenceShifts,
+        )['witness'];
 
         return [
             'success' => true,

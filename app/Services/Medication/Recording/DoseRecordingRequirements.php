@@ -7,18 +7,23 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationAdminRule;
+use App\Models\MedicationRefusalFollowup;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\MarScheduleService;
 use App\Services\Medication\Alerts\OnCallResolver;
 use App\Services\Medication\ClientAllergyRecordService;
+use App\Services\Medication\Controlled\ControlledDoseOverrideService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\DoseSlots\DoseOrderTimelineFactory;
 use App\Services\Medication\DoseSlots\DoseWindowResolver;
+use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationCompetencyRestrictionRules;
 use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\MedicationSafetyPolicySettings;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\MedicationSecondPersonService;
 use App\Services\Medication\Settings\MedicineRuleWording;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationRuleService;
@@ -275,13 +280,15 @@ final class DoseRecordingRequirements
         $competency = $this->competencyFor($viewer, $order, $siteId, $now, $cache);
         $requiresCosigner = $competency['state'] === 'cosigner';
 
+        $doseOverride = app(ControlledDoseOverrideService::class)->preview($viewer, $order, $now);
         $kind = match (true) {
-            $order->requiresWitness() => RecordingContract::SECOND_WITNESS,
+            $doseOverride === null && $order->requiresWitness() => RecordingContract::SECOND_WITNESS,
             $requiresCosigner => RecordingContract::SECOND_COSIGNER,
             (bool) ($adminRules['requires_countersign'] ?? false) => RecordingContract::SECOND_RULE,
             default => null,
         };
-        $candidates = $cache->candidates[$siteId] ??= $this->candidates($viewer, $siteId, $now);
+        $candidateKey = $siteId.($order->controlled_drug ? '/controlled' : '/ordinary');
+        $candidates = $cache->candidates[$candidateKey] ??= $this->candidates($viewer, $siteId, $now, (bool) $order->controlled_drug);
         $anyoneAvailable = $candidates->contains(fn (array $c): bool => $c['can_confirm']);
 
         $blockGiven = $this->blockGiven($order, $safetyCheck, $kind, $anyoneAvailable);
@@ -298,8 +305,15 @@ final class DoseRecordingRequirements
             'block_all' => null,
             'block_given' => $blockGiven,
             'competency' => $competency,
+            'witness_override' => $doseOverride === null ? null : ['id' => (int) $doseOverride->id, 'expires_at' => $doseOverride->expires_at->toIso8601String(), 'followup_due_at' => $doseOverride->followup_due_at->toIso8601String()],
             'second_person' => [
                 'kind' => $kind,
+                // PIN-2 stays off until its own-login consumer and expiry job
+                // are integrated; the recorder never advertises a dead flow.
+                'forgotten_pin_allowed' => app(ForgottenWitnessPinService::class)->available()
+                    && ! $order->controlled_drug
+                    && in_array($kind, [RecordingContract::SECOND_RULE, RecordingContract::SECOND_AMOUNT, RecordingContract::SECOND_COSIGNER], true),
+                'confirm_within_minutes' => ForgottenWitnessPinService::CONFIRM_WITHIN_MINUTES,
                 'rule_sentences' => $detail && $kind === RecordingContract::SECOND_RULE
                     ? $this->ruleSentences($adminRules, true)
                     : [],
@@ -307,7 +321,7 @@ final class DoseRecordingRequirements
                 // Q2: a rule's second person (or a smaller amount) may go
                 // unconfirmed only when nobody on shift can confirm. A
                 // witness or a restricted worker's co-signer never can.
-                'may_go_unconfirmed' => ! $anyoneAvailable
+                'may_go_unconfirmed' => $doseOverride === null && ! $anyoneAvailable
                     && ! in_array($kind, [RecordingContract::SECOND_WITNESS, RecordingContract::SECOND_COSIGNER], true),
                 'candidates' => $detail ? $candidates->values()->all() : [],
             ],
@@ -501,7 +515,7 @@ final class DoseRecordingRequirements
      *
      * @return Collection<int, array{id: int, name: string, can_confirm: bool}>
      */
-    private function candidates(User $viewer, int $siteId, CarbonImmutable $now): Collection
+    private function candidates(User $viewer, int $siteId, CarbonImmutable $now, bool $controlledDrug): Collection
     {
         if ($siteId <= 0) {
             return collect();
@@ -515,7 +529,9 @@ final class DoseRecordingRequirements
         }
 
         $users = User::query()->whereIn('id', $presentIds)->orderBy('name')->get();
-        $eligibleIds = $this->witnesses->eligibleWitnessesForSite($siteId, $now, (int) $viewer->id)
+        $eligibleIds = ($controlledDrug
+            ? $this->witnesses->eligibleWitnessesForSite($siteId, $now, (int) $viewer->id)
+            : app(MedicationSecondPersonService::class)->candidatesForSite($siteId, $now, (int) $viewer->id))
             ->map(fn (User $user): int => (int) $user->id)
             ->all();
         $pins = $this->pins->pickerRows($users)->keyBy('id');
@@ -531,6 +547,7 @@ final class DoseRecordingRequirements
     /** @return Collection<int, int> */
     private function presentUserIdsAtSite(int $siteId, CarbonImmutable $now): Collection
     {
+        $now = $now->utc();
         $attendance = HrAttendanceSession::query()
             ->where('site_id', $siteId)
             ->where('clock_in_at', '<=', $now)
@@ -682,7 +699,7 @@ final class DoseRecordingRequirements
                 'source' => $match['details']['source'] ?? null,
                 'severity' => $match['details']['severity'] ?? null,
             ],
-            'rule' => app(\App\Services\Medication\MedicationSafetyPolicySettings::class)->profileAllergyMatch(),
+            'rule' => app(MedicationSafetyPolicySettings::class)->profileAllergyMatch(),
         ];
     }
 
@@ -751,17 +768,20 @@ final class DoseRecordingRequirements
             // NF-18: for a controlled medicine, whether the stock taken can be
             // worked out from the order (its amount is in the stock's unit);
             // otherwise the dialog asks for it.
-            'stock' => $order->controlled_drug ? $this->stockFacts($order) : null,
+            'stock' => $order->controlled_drug || $order->stock()->whereNotNull('lots_started_at')->exists()
+                ? $this->stockFacts($order) : null,
         ];
     }
 
-    /** @return array{unit: ?string, from_order: bool} */
+    /** @return array{unit: ?string, from_order: bool, tracked: bool} */
     private function stockFacts(ClientMedication $order): array
     {
-        $unit = $order->stock()->value('unit');
+        $stock = $order->stock()->first();
+        $unit = $stock?->unit;
 
         return [
             'unit' => $unit,
+            'tracked' => $stock?->lots_started_at !== null,
             'from_order' => $this->contract->stockQuantity(
                 ['status' => 'given', 'amount_mode' => RecordingContract::AMOUNT_AS_ORDERED],
                 $order,
@@ -834,7 +854,7 @@ final class DoseRecordingRequirements
             return null;
         }
 
-        $followUp = \App\Models\MedicationRefusalFollowup::query()
+        $followUp = MedicationRefusalFollowup::query()
             ->whereIn('client_medication_administration_id', array_values(array_unique([$rootId, (int) $existing->id])))
             ->whereNull('follow_up_completed_at')
             ->latest('id')
@@ -904,6 +924,9 @@ final class DoseRecordingRequirements
         }
         if ($req['order']['awaiting_check']) {
             $out[] = 'order_check';
+        }
+        if (($req['order']['stock']['tracked'] ?? false) && ! ($req['order']['stock']['from_order'] ?? false)) {
+            $out[] = 'stock_quantity';
         }
 
         return array_values(array_unique($out));

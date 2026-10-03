@@ -9,18 +9,20 @@ use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedicationAdministration;
 use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Reporting\MedicationReportAccess;
 use App\Support\ReportCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class ModuleReportController extends Controller
 {
     public function __construct(
         private readonly MedicationGovernanceScopeService $medicationScope,
         private readonly BoardPackAccessService $boardPackAccess,
+        private readonly MedicationReportAccess $medicationReports,
     ) {}
 
     public function show(Request $request, string $module)
@@ -53,6 +55,10 @@ class ModuleReportController extends Controller
                 'label' => $definition['label'],
                 'description' => $definition['description'],
                 'route' => $definition['route'],
+                'export_route' => in_array($this->medicationGovernance($definition), ['administration', 'controlled'], true)
+                    ? ($this->medicationReports->canExport($user, $this->medicationGovernance($definition) === 'controlled' ? 'controlled' : 'doses') ? '/emar/reports?view=exports' : null)
+                    : '/reports/modules/'.$definition['key'].'/export',
+                'export_label' => in_array($this->medicationGovernance($definition), ['administration', 'controlled'], true) ? 'Print & exports' : 'Export CSV',
                 'columns' => $columns,
             ],
             'filters' => [
@@ -66,13 +72,21 @@ class ModuleReportController extends Controller
         ]);
     }
 
-    public function export(Request $request, string $module): StreamedResponse
+    public function export(Request $request, string $module): Response
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('reports.viewAny'), 403);
 
         $definition = ReportCatalog::find($module);
         abort_unless(is_array($definition), 404);
+
+        if (in_array($this->medicationGovernance($definition), ['administration', 'controlled'], true)) {
+            $type = $this->medicationGovernance($definition) === 'controlled' ? 'controlled' : 'doses';
+            abort_unless($this->medicationReports->canExport($user, $type), 403);
+            $this->medicationReports->siteIds($user, report: $type);
+
+            return redirect('/emar/reports?view=exports');
+        }
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:120'],
@@ -270,15 +284,13 @@ class ModuleReportController extends Controller
         }
 
         $isControlledModule = $governance === 'controlled';
-        $siteIds = $this->medicationScope->reportSiteIds(
-            $user,
-            controlled: $isControlledModule,
-        );
+        $siteIds = $this->medicationReports->siteIds($user, report: $isControlledModule ? 'controlled' : 'doses');
         $this->medicationScope->scopeCanonicalClientMedicationRows(
             $query,
             $siteIds,
             allowNullMedication: false,
         );
+        $query->whereIn($query->getModel()->qualifyColumn('client_id'), $this->medicationReports->clientIds($user, $siteIds));
 
         if (! $isControlledModule
             && ! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {

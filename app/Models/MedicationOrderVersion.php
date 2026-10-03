@@ -18,6 +18,10 @@ class MedicationOrderVersion extends Model
         'version_number',
         'cessation_request_key',
         'cessation_payload_sha256',
+        'prescription_payload',
+        'source_evidence',
+        'entry_request_key',
+        'entry_payload_sha256',
         'name',
         'dosage',
         'dose_amount',
@@ -51,6 +55,8 @@ class MedicationOrderVersion extends Model
     ];
 
     protected $casts = [
+        'prescription_payload' => 'array',
+        'source_evidence' => 'array',
         'dose_times' => 'array',
         'start_date' => 'date',
         'end_date' => 'date',
@@ -70,6 +76,8 @@ class MedicationOrderVersion extends Model
     protected $hidden = [
         'cessation_request_key',
         'cessation_payload_sha256',
+        'entry_request_key',
+        'entry_payload_sha256',
     ];
 
     public function medication(): BelongsTo

@@ -388,9 +388,12 @@ class MedicationControlledApiConcealmentTest extends TestCase
             ])
             ->assertNotFound();
 
+        // Approving your own correction is a validation error (P02-1).
         $this->actingAs($actor)
             ->post(route('emar.corrections.approve', $pending))
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors([
+                'correction' => 'A correction must be approved by someone other than the person who raised it.',
+            ]);
         $this->actingAs($approver)
             ->post(route('emar.corrections.approve', $pending))
             ->assertRedirect();

@@ -1,69 +1,44 @@
-/* eslint-disable no-restricted-syntax -- dose/resident/summary panes are
-   custom-layout bordered surfaces inside the wizard, not Card components; all
-   colours are semantic tokens. */
+import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog';
 import RoundAuditTimeline, {
     itemsToAuditEntries,
-    type RoundAuditMeta,
 } from '@/components/emar/rounds/round-audit-timeline';
 import { DoseStatusBadge } from '@/components/emar/rounds/round-bits';
 import {
-    doseStatusMeta,
-    isAway,
     isRecordable,
-    isWaitingForCheck,
     notOwedCaption,
     type GuidedRound,
     type RoundItem,
     type StaffOption,
 } from '@/components/emar/rounds/types';
-import { WitnessPinInput } from '@/components/medications/witness-pin-input';
+import {
+    EntityContextMenu,
+    EntityKebab,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists/entity-menu';
+import { EntityTable } from '@/components/lists/entity-table';
 import { ClientAvatar } from '@/components/meds/board-bits';
-import { MedsWizardDialog } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Field, InfoCard, SelectInput } from '@/components/wizard/primitives';
-import {
-    emarMutationWasAccepted,
-    submitEmarMutation,
-} from '@/lib/emar-offline';
-import { createOfflineRequestUuid } from '@/lib/offline-queue';
-import { cn } from '@/lib/utils';
-import { witnessIsSelectable, witnessOptionLabel } from '@/lib/witness-pin';
+import { Card } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { formatTime } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
-import {
-    Activity,
-    AlertTriangle,
-    ArrowRight,
-    Ban,
-    Check,
-    CheckCircle2,
-    ClipboardCheck,
-    Clock,
-    Droplet,
-    Hand,
-    Heart,
-    Pencil,
-    Pill,
-    Plane,
-    Printer,
-    ShieldAlert,
-    Users,
-} from 'lucide-react';
-import type { ComponentType } from 'react';
-import { useMemo, useRef, useState } from 'react';
+import { Check, Eye, Pill, Play, Printer, Repeat } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
-
-type NotGivenReason = {
-    value: string;
-    label: string;
-    requires_detail: boolean;
-};
 
 type Props = {
     guided: GuidedRound;
     witnesses: StaffOption[];
-    notGivenReasons: NotGivenReason[];
+    notGivenReasons: {
+        value: string;
+        label: string;
+        requires_detail: boolean;
+    }[];
     signer: {
+        name?: string;
+        role_label?: string | null;
         med_competent: boolean;
         controlled_record: boolean;
         cd_witness: boolean;
@@ -71,1014 +46,432 @@ type Props = {
     canExport: boolean;
     onPrint: () => void;
     onClose: () => void;
+    /** Worker board stays on Meds today through start/finish redirects. */
+    workerBoard?: boolean;
 };
 
-type Pending = 'given' | 'refused' | 'held' | null;
+const slotKey = (item: RoundItem) =>
+    `${item.medication_id}|${item.scheduled_for}`;
 
-function firstName(name: string): string {
-    return name.split(/\s+/)[0] ?? name;
-}
-function shortMed(name: string): string {
-    return name.length > 16 ? `${name.slice(0, 15)}…` : name;
-}
-function fmtWhen(iso: string | null): string {
-    if (!iso) return 'just now';
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime())
-        ? ''
-        : d.toLocaleString('en-NZ', {
-              day: 'numeric',
-              month: 'short',
-              hour: '2-digit',
-              minute: '2-digit',
-          });
-}
-
+/** P01 C4: the round walks the same live dose rows and opens the one recorder. */
 export default function GuidedRoundDialog({
     guided,
-    witnesses,
-    notGivenReasons,
     signer,
     canExport,
     onPrint,
     onClose,
+    workerBoard = false,
 }: Props) {
     const { round, items, progress } = guided;
-    const [stepIndex, setStepIndex] = useState(progress.next_index ?? 0);
-    const [identity, setIdentity] = useState(false);
-    const [pending, setPending] = useState<Pending>(null);
-    const [reasonCode, setReasonCode] = useState('');
-    const [reason, setReason] = useState('');
-    const [witnessedBy, setWitnessedBy] = useState('');
-    const [witnessCredential, setWitnessCredential] = useState('');
-    const [quantityGiven, setQuantityGiven] = useState('');
-    const [bloodGlucose, setBloodGlucose] = useState('');
-    const [pulse, setPulse] = useState('');
+    const mobile = useIsMobile();
+    const [recording, setRecording] = useState<{
+        item: RoundItem;
+        reoffer: boolean;
+    } | null>(null);
     const [saving, setSaving] = useState(false);
-    const [reRecording, setReRecording] = useState<Record<number, boolean>>({});
-    const administrationReplay = useRef({
-        uuid: createOfflineRequestUuid(),
-        fingerprint: null as string | null,
-    });
+    const ctx = useEntityContextMenu<RoundItem>();
     const canRecordRound = guided.can_record && signer.med_competent;
-    const canStartRound = guided.can_start && signer.med_competent;
     const canCompleteRound = guided.can_complete && canRecordRound;
-
-    const isSummary = stepIndex >= items.length;
-    const item: RoundItem | undefined = items[stepIndex];
-    const showRecorded =
-        !!item?.administration && !reRecording[item.medication_id];
-
-    const resetPanel = () => {
-        setPending(null);
-        setReasonCode('');
-        setReason('');
-        setWitnessedBy('');
-        setWitnessCredential('');
-        setQuantityGiven('');
-        setBloodGlucose('');
-        setPulse('');
-    };
-
-    const goTo = (index: number) => {
-        resetPanel();
-        administrationReplay.current = {
-            uuid: createOfflineRequestUuid(),
-            fingerprint: null,
-        };
-        setIdentity(false);
-        setStepIndex(index);
-    };
-
-    const startReRecord = (medicationId: number) => {
-        resetPanel();
-        administrationReplay.current = {
-            uuid: createOfflineRequestUuid(),
-            fingerprint: null,
-        };
-        setIdentity(false);
-        setReRecording((prev) => ({ ...prev, [medicationId]: true }));
-    };
-
-    const steps = useMemo(
-        () => [
-            ...items.map((it) => {
-                const status = it.administration?.status ?? null;
-                const icon =
-                    status === 'given'
-                        ? CheckCircle2
-                        : status === 'refused' || status === 'withheld'
-                          ? Ban
-                          : isWaitingForCheck(it)
-                            ? Clock
-                            : isAway(it)
-                              ? Plane
-                              : Pill;
-                return {
-                    key: `${it.medication_id}-${it.scheduled_for}`,
-                    label: `${firstName(it.client_name)} · ${shortMed(it.medication_name)}`,
-                    blurb: it.dose ?? '',
-                    icon,
-                };
-            }),
-            {
-                key: 'summary',
-                label: 'Round summary',
-                blurb: `${progress.percent}% complete`,
-                icon: ClipboardCheck,
-            },
-        ],
-        [items, progress.percent],
-    );
-
-    const reasonObj = notGivenReasons.find((r) => r.value === reasonCode);
-    const confirmValid = (() => {
-        if (!pending || !item) return false;
-        if (pending === 'given') {
-            if (item.requires_witness && !witnessedBy) return false;
-            if (item.requires_witness && !witnessCredential) return false;
-            if (item.is_controlled && !quantityGiven) return false;
-            if (item.requires_blood_glucose && !bloodGlucose) return false;
-            if (item.requires_pulse && !pulse) return false;
-            return true;
-        }
-        if (!reasonCode) return false;
-        if (reasonObj?.requires_detail && !reason.trim()) return false;
-        return true;
-    })();
-
-    const submit = async () => {
-        if (!item || !pending) return;
-        if (
-            !canRecordRound ||
-            (item.is_controlled && !signer.controlled_record)
-        ) {
-            return;
-        }
-        const medicationId = item.medication_id;
-        const materialPayload = {
-            status: pending,
-            scheduled_for: item.scheduled_for,
-            reason: reason || null,
-            reason_code: pending === 'given' ? null : reasonCode || null,
-            witnessed_by:
-                pending === 'given' && witnessedBy ? Number(witnessedBy) : null,
-            witness_credential: witnessCredential || null,
-            quantity_administered:
-                pending === 'given' && quantityGiven
-                    ? Number(quantityGiven)
-                    : null,
-            blood_glucose_level:
-                pending === 'given' && bloodGlucose
-                    ? Number(bloodGlucose)
-                    : null,
-            pulse_bpm: pending === 'given' && pulse ? Number(pulse) : null,
-        };
-        const materialFingerprint = JSON.stringify({
-            ...materialPayload,
-            witness_credential: undefined,
-        });
-        if (
-            administrationReplay.current.fingerprint !== null &&
-            administrationReplay.current.fingerprint !== materialFingerprint
-        ) {
-            administrationReplay.current.uuid = createOfflineRequestUuid();
-        }
-        administrationReplay.current.fingerprint = materialFingerprint;
-        const payload = {
-            ...materialPayload,
-            client_request_uuid: administrationReplay.current.uuid,
-        };
-        const advance = () => {
-            setReRecording((prev) => {
-                const next = { ...prev };
-                delete next[medicationId];
-                return next;
-            });
-            const nextDue = items.findIndex(
-                (it, i) => i > stepIndex && isRecordable(it),
-            );
-            goTo(nextDue === -1 ? items.length : nextDue);
-        };
-
-        setSaving(true);
-        try {
-            const result = await submitEmarMutation(
-                `/emar/rounds/${round.id}/guided/items/${medicationId}`,
-                payload,
-                {
-                    action: 'round_admin',
-                    allowQueueWhenOffline: !(
-                        pending === 'given' && item.requires_witness
-                    ),
-                    successMessage: `Dose ${pending}`,
-                    queuedMessage:
-                        'Dose saved on this device and queued to sync when you reconnect.',
-                },
-            );
-
-            if (emarMutationWasAccepted(result.status)) {
-                advance();
-            }
-        } catch {
-            toast.error('Could not record this dose');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const finish = () => {
-        if (!canRecordRound) return;
+    const permitted = (item: RoundItem) =>
+        canRecordRound && (!item.is_controlled || signer.controlled_record);
+    const isDue = (item: RoundItem) =>
+        isRecordable(item) && item.dose_state !== 'upcoming';
+    const next = items.find((item) => isDue(item) && permitted(item));
+    const nextAfter = recording
+        ? items.find(
+              (item) =>
+                  slotKey(item) !== slotKey(recording.item) &&
+                  isDue(item) &&
+                  permitted(item),
+          )
+        : next;
+    const startable = round.status === 'pending' || round.status === 'partial';
+    const transition = (action: 'start' | 'complete') => {
+        if (saving) return;
         setSaving(true);
         router.post(
-            `/emar/rounds/${round.id}/guided/complete`,
-            {},
+            action === 'start'
+                ? `/emar/rounds/${round.id}/guided/start`
+                : `/emar/rounds/${round.id}/guided/complete`,
+            workerBoard ? { return_to: 'meds-today' } : {},
             {
                 preserveScroll: true,
-                onSuccess: () => {
-                    toast.success('Round completed');
-                    onClose();
-                },
                 onError: () =>
-                    toast.error('This round cannot be completed yet'),
+                    toast.error(
+                        action === 'start'
+                            ? 'Could not start this round'
+                            : 'This round cannot be completed yet',
+                    ),
                 onFinish: () => setSaving(false),
             },
         );
     };
-
-    const goToFirstDue = () => {
-        const idx = items.findIndex((it) => isRecordable(it));
-        goTo(idx === -1 ? items.length : idx);
-    };
-
-    const startRound = () => {
-        if (!canStartRound) return;
-        setSaving(true);
-        router.post(
-            `/emar/rounds/${round.id}/guided/start`,
-            {},
-            {
-                preserveScroll: true,
-                onError: () => toast.error('Could not start this round'),
-                onFinish: () => setSaving(false),
-            },
-        );
-    };
-
-    // ── Footer ──────────────────────────────────────────────────────────────
-    const footer =
-        round.status === 'pending' || round.status === 'partial' ? (
-            <>
-                <Button variant="ghost" onClick={onClose} disabled={saving}>
-                    Close
-                </Button>
-                {canStartRound ? (
-                    <Button onClick={startRound} disabled={saving}>
-                        <ArrowRight className="h-4 w-4" />
-                        {round.status === 'partial'
-                            ? 'Resume round'
-                            : 'Start round'}
+    const menu = (item: RoundItem): MenuItem[] => [
+        ...(isRecordable(item)
+            ? [
+                  {
+                      label: 'Record dose',
+                      icon: Pill,
+                      ...(permitted(item)
+                          ? {
+                                onClick: () =>
+                                    setRecording({ item, reoffer: false }),
+                            }
+                          : {
+                                disabled:
+                                    'Start the round and check your recording permission.',
+                            }),
+                  },
+              ]
+            : []),
+        ...(item.administration?.status === 'refused' && permitted(item)
+            ? [
+                  {
+                      label: 'Record re-offer',
+                      icon: Repeat,
+                      onClick: () => setRecording({ item, reoffer: true }),
+                  },
+              ]
+            : []),
+        {
+            label: 'View dose requirements',
+            icon: Eye,
+            ...(permitted(item) && !item.administration
+                ? { onClick: () => setRecording({ item, reoffer: false }) }
+                : {
+                      disabled: item.administration
+                          ? 'This dose is already recorded.'
+                          : 'Recording is not available for this round.',
+                  }),
+        },
+    ];
+    return (
+        <Card className="gap-5 p-5" aria-label={`Guided round: ${round.name}`}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <h2 className="text-section-title">
+                        Guided round · {round.name}
+                    </h2>
+                    <p className="text-subtle">
+                        {progress.completed} of {progress.total} recorded ·{' '}
+                        {round.scheduled_time} · ±{round.window_minutes} min
+                    </p>
+                    {notOwedCaption(progress.waiting, progress.away) && (
+                        <p className="text-caption">
+                            {notOwedCaption(progress.waiting, progress.away)}
+                        </p>
+                    )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <Button
+                        className="frontline-tap"
+                        variant="outline"
+                        onClick={onClose}
+                        disabled={saving}
+                    >
+                        Leave the round
                     </Button>
-                ) : (
-                    <span />
-                )}
-            </>
-        ) : isSummary ? (
-            <>
-                {canExport ? (
-                    <Button variant="outline" onClick={onPrint}>
-                        <Printer className="h-4 w-4" />
-                        Print round sheet
-                    </Button>
-                ) : (
-                    <span />
-                )}
-                {canRecordRound ? (
-                    progress.pending === 0 && canCompleteRound ? (
-                        <Button onClick={finish} disabled={saving}>
-                            <Check className="h-4 w-4" />
+                    {canExport && (
+                        <Button
+                            className="frontline-tap"
+                            variant="outline"
+                            onClick={onPrint}
+                        >
+                            <Printer className="size-4" />
+                            Print round sheet
+                        </Button>
+                    )}
+                    {startable && guided.can_start && signer.med_competent ? (
+                        <Button
+                            className="frontline-tap"
+                            onClick={() => transition('start')}
+                            disabled={saving}
+                        >
+                            <Play className="size-4" />
+                            {round.status === 'partial'
+                                ? 'Resume round'
+                                : 'Start round'}
+                        </Button>
+                    ) : next ? (
+                        <Button
+                            className="frontline-tap max-w-full whitespace-normal"
+                            onClick={() =>
+                                setRecording({ item: next, reoffer: false })
+                            }
+                        >
+                            <Play className="size-4 shrink-0" />
+                            Record next: {next.client_name} ·{' '}
+                            {next.medication_name}
+                        </Button>
+                    ) : progress.pending === 0 && canCompleteRound ? (
+                        <Button
+                            className="frontline-tap"
+                            onClick={() => transition('complete')}
+                            disabled={saving}
+                        >
+                            <Check className="size-4" />
                             Finish round
                         </Button>
-                    ) : progress.pending > 0 ? (
-                        <Button onClick={goToFirstDue}>
-                            <ArrowRight className="h-4 w-4" />
-                            Go to next due
-                        </Button>
                     ) : (
-                        <span className="text-sm text-muted-foreground">
-                            Round completion is not available yet.
-                        </span>
-                    )
-                ) : (
-                    <Button variant="outline" onClick={onClose}>
-                        Close
-                    </Button>
-                )}
-            </>
-        ) : pending ? (
-            <>
-                <Button variant="ghost" onClick={resetPanel} disabled={saving}>
-                    Cancel
-                </Button>
-                <Button onClick={submit} disabled={!confirmValid || saving}>
-                    <Check className="h-4 w-4" />
-                    Confirm
-                </Button>
-            </>
-        ) : (
-            <>
-                <Button
-                    variant="ghost"
-                    onClick={() => goTo(Math.max(0, stepIndex - 1))}
-                    disabled={stepIndex === 0}
-                >
-                    Previous
-                </Button>
-                <Button variant="outline" onClick={() => goTo(stepIndex + 1)}>
-                    {stepIndex >= items.length - 1 ? 'Summary' : 'Next'}
-                </Button>
-            </>
-        );
-
-    return (
-        <MedsWizardDialog
-            open
-            onClose={onClose}
-            title={`Guided round · ${round.name}`}
-            description="Record each dose in the round with the safety gate."
-            railIcon={Pill}
-            railTitle={round.name}
-            railSubtitle={`${round.scheduled_time} · ±${round.window_minutes} min`}
-            railFooter={
-                <span className="text-xs text-muted-foreground">
-                    Round progress {progress.percent}%
-                    {notOwedCaption(progress.waiting, progress.away)
-                        ? ` · ${notOwedCaption(progress.waiting, progress.away)}`
-                        : ''}
-                </span>
-            }
-            steps={steps}
-            stepIndex={stepIndex}
-            onStepClick={(i) => goTo(i)}
-            footer={footer}
-        >
-            {round.status === 'pending' || round.status === 'partial' ? (
-                <div className="flex min-h-64 flex-col items-center justify-center gap-4 rounded-xl border bg-muted/30 p-8 text-center">
-                    <Clock className="h-8 w-8 text-muted-foreground" />
-                    <div>
-                        <div className="font-semibold">
-                            {round.status === 'partial'
-                                ? 'Ready to resume'
-                                : 'Ready to start'}
-                        </div>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {round.status === 'partial'
-                                ? 'Resume this assigned round before recording more doses.'
-                                : 'Start this assigned round before recording its doses.'}
-                        </p>
-                    </div>
+                        round.status !== 'completed' && (
+                            <p className="text-caption">
+                                Round completion is not available yet.
+                            </p>
+                        )
+                    )}
                 </div>
-            ) : isSummary ? (
-                <SummaryPane
-                    round={round}
-                    progress={progress}
-                    canComplete={guided.can_complete}
-                    entries={itemsToAuditEntries(items)}
-                    meta={summaryMeta(guided)}
-                />
-            ) : item ? (
-                isWaitingForCheck(item) ? (
-                    <WaitingForCheckPane item={item} />
-                ) : isAway(item) ? (
-                    <AwayPane item={item} />
-                ) : showRecorded ? (
-                    <RecordedPane
-                        item={item}
-                        onReRecord={
-                            canRecordRound &&
-                            (!item.is_controlled || signer.controlled_record)
-                                ? () => startReRecord(item.medication_id)
-                                : undefined
-                        }
-                    />
-                ) : (
-                    <DosePane
-                        item={item}
-                        identity={identity}
-                        setIdentity={setIdentity}
-                        pending={pending}
-                        setPending={setPending}
-                        canRecord={
-                            canRecordRound &&
-                            (!item.is_controlled || signer.controlled_record)
-                        }
-                        reasonCode={reasonCode}
-                        setReasonCode={setReasonCode}
-                        reason={reason}
-                        setReason={setReason}
-                        reasonObj={reasonObj}
-                        notGivenReasons={notGivenReasons}
-                        witnesses={witnesses}
-                        witnessedBy={witnessedBy}
-                        setWitnessedBy={setWitnessedBy}
-                        witnessCredential={witnessCredential}
-                        setWitnessCredential={setWitnessCredential}
-                        quantityGiven={quantityGiven}
-                        setQuantityGiven={setQuantityGiven}
-                        bloodGlucose={bloodGlucose}
-                        setBloodGlucose={setBloodGlucose}
-                        pulse={pulse}
-                        setPulse={setPulse}
-                    />
-                )
-            ) : null}
-        </MedsWizardDialog>
-    );
-}
-
-function summaryMeta(guided: GuidedRound): RoundAuditMeta {
-    const r = guided.round;
-    return {
-        template_name: r.template_name,
-        created_at: r.created_at,
-        assignee: r.assignee,
-        started_at: r.started_at,
-        started_by: r.started_by,
-        completed_at: r.completed_at,
-        completed_by: r.completed_by,
-    };
-}
-
-function FlagPill({
-    icon: Icon,
-    label,
-    tone,
-}: {
-    icon: ComponentType<{ className?: string }>;
-    label: string;
-    tone: string;
-}) {
-    return (
-        <span
-            className={cn(
-                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                tone,
-            )}
-        >
-            <Icon className="h-3 w-3" />
-            {label}
-        </span>
-    );
-}
-
-function DoseCard({ item }: { item: RoundItem }) {
-    const hasFlags =
-        item.is_controlled ||
-        item.requires_witness ||
-        item.is_high_risk ||
-        item.requires_blood_glucose ||
-        item.requires_pulse;
-    return (
-        <div className="overflow-hidden rounded-xl border">
-            <div className="flex items-center gap-3.5 border-b bg-muted/40 p-4">
-                <ClientAvatar
-                    name={item.client_name}
-                    clientId={item.client_id}
-                    className="h-13 w-13 text-base"
-                />
-                <div className="min-w-0 flex-1">
-                    <div className="text-[17px] font-bold">
-                        {item.client_name}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                        {item.site_name ?? '—'}
-                    </div>
-                </div>
-                {item.administration ? (
-                    <DoseStatusBadge status={item.administration.status} />
-                ) : null}
             </div>
-            <div className="flex flex-col gap-2.5 p-4">
-                <div className="flex flex-wrap items-baseline gap-2">
-                    <span className="text-[19px] font-bold">
-                        {item.medication_name}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                        {[item.dose, item.route, item.form]
-                            .filter(Boolean)
-                            .join(' · ')}
-                    </span>
-                </div>
-                {item.instructions ? (
-                    <InfoCard icon={AlertTriangle} tone="warn">
-                        {item.instructions}
-                    </InfoCard>
-                ) : null}
-                {hasFlags ? (
-                    <div className="flex flex-wrap gap-1.5">
-                        {item.is_controlled ? (
-                            <FlagPill
-                                icon={ShieldAlert}
-                                label="Controlled drug"
-                                tone="bg-status-info-bg text-status-info"
-                            />
-                        ) : null}
-                        {item.requires_witness ? (
-                            <FlagPill
-                                icon={Users}
-                                label="Witness required"
-                                tone="bg-status-warning-bg text-status-warning"
-                            />
-                        ) : null}
-                        {item.is_high_risk ? (
-                            <FlagPill
-                                icon={AlertTriangle}
-                                label="High-risk"
-                                tone="bg-status-critical-bg text-status-critical"
-                            />
-                        ) : null}
-                        {item.requires_blood_glucose ? (
-                            <FlagPill
-                                icon={Droplet}
-                                label="Record blood glucose"
-                                tone="bg-status-info-bg text-status-info"
-                            />
-                        ) : null}
-                        {item.requires_pulse ? (
-                            <FlagPill
-                                icon={Heart}
-                                label="Check apical pulse"
-                                tone="bg-status-info-bg text-status-info"
-                            />
-                        ) : null}
-                    </div>
-                ) : null}
-            </div>
-        </div>
-    );
-}
-
-/** A dose whose order change waits for the order check: shown, not recordable. */
-function WaitingForCheckPane({ item }: { item: RoundItem }) {
-    return (
-        <div className="flex flex-col gap-4">
-            <DoseCard item={item} />
-            <InfoCard icon={Clock}>
-                <span className="font-semibold">
-                    Waiting for the order check.
-                </span>{' '}
-                A change to this order is waiting for its check. This dose can
-                be recorded once the order has been checked.
-            </InfoCard>
-        </div>
-    );
-}
-
-/** A dose due while the person is away: shown with its reason, nothing to do in the round. */
-function AwayPane({ item }: { item: RoundItem }) {
-    return (
-        <div className="flex flex-col gap-4">
-            <DoseCard item={item} />
-            <InfoCard icon={Plane}>
-                <span className="font-semibold">
-                    {item.away_reason ? `Away · ${item.away_reason}.` : 'Away.'}
-                </span>{' '}
-                This dose isn’t owed here while they’re away.{' '}
-                {item.away_source === 'leave'
-                    ? 'If they’re back, ask a lead to update their leave.'
-                    : 'If they’re back, ask a lead to record the discharge in Respite.'}
-            </InfoCard>
-        </div>
-    );
-}
-
-type DosePaneProps = {
-    item: RoundItem;
-    identity: boolean;
-    setIdentity: (v: boolean) => void;
-    pending: Pending;
-    setPending: (p: Pending) => void;
-    canRecord: boolean;
-    reasonCode: string;
-    setReasonCode: (v: string) => void;
-    reason: string;
-    setReason: (v: string) => void;
-    reasonObj: NotGivenReason | undefined;
-    notGivenReasons: NotGivenReason[];
-    witnesses: StaffOption[];
-    witnessedBy: string;
-    setWitnessedBy: (v: string) => void;
-    witnessCredential: string;
-    setWitnessCredential: (v: string) => void;
-    quantityGiven: string;
-    setQuantityGiven: (v: string) => void;
-    bloodGlucose: string;
-    setBloodGlucose: (v: string) => void;
-    pulse: string;
-    setPulse: (v: string) => void;
-};
-
-function DosePane(props: DosePaneProps) {
-    const { item, identity, setIdentity, pending, setPending, canRecord } =
-        props;
-    return (
-        <div className="flex flex-col gap-4">
-            <DoseCard item={item} />
-
-            <label
-                className={cn(
-                    'flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3',
-                    identity
-                        ? 'border-status-success/40 bg-status-success-bg'
-                        : 'bg-card',
-                )}
-            >
-                <input
-                    type="checkbox"
-                    checked={identity}
-                    onChange={(e) => setIdentity(e.target.checked)}
-                    className="mt-0.5 h-4 w-4"
-                />
-                <span>
-                    <span className="block text-sm font-semibold">
-                        Right resident, right medication
-                    </span>
-                    <span className="mt-0.5 block text-[11.5px] text-muted-foreground">
-                        I have confirmed identity against the photo and NHI, and
-                        checked the medication, dose, route and time.
-                    </span>
-                </span>
-            </label>
-
-            {!pending ? (
-                <>
-                    <div className="grid grid-cols-3 gap-2">
-                        <Button
-                            variant="outline"
-                            className="h-12 text-sm"
-                            disabled={!identity || !canRecord}
-                            onClick={() => setPending('given')}
+            <Progress
+                value={progress.percent}
+                aria-label="Round progress"
+                className="h-1.5"
+            />
+            {mobile ? (
+                <ul className="divide-y" aria-label="Round doses">
+                    {items.map((item) => (
+                        <li
+                            key={slotKey(item)}
+                            className="min-w-0 space-y-2 py-3"
+                            onContextMenu={(event) => ctx.open(event, item)}
                         >
-                            <Check className="h-4 w-4" />
-                            Given
-                        </Button>
-                        <Button
-                            variant="outline"
-                            className="h-12 text-sm"
-                            disabled={!identity || !canRecord}
-                            onClick={() => setPending('refused')}
-                        >
-                            <Ban className="h-4 w-4" />
-                            Refused
-                        </Button>
-                        <Button
-                            variant="outline"
-                            className="h-12 text-sm"
-                            disabled={!identity || !canRecord}
-                            onClick={() => setPending('held')}
-                        >
-                            <Hand className="h-4 w-4" />
-                            Held
-                        </Button>
-                    </div>
-                    {!identity ? (
-                        <p className="text-center text-[11.5px] text-muted-foreground">
-                            Confirm identity above to enable recording.
-                        </p>
-                    ) : null}
-                </>
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="font-semibold break-words">
+                                        {item.client_name}
+                                    </p>
+                                    <p className="text-caption">
+                                        {item.site_name}
+                                    </p>
+                                </div>
+                                <EntityKebab
+                                    actions={menu(item)}
+                                    label={`Actions for ${item.client_name} · ${item.medication_name}`}
+                                />
+                            </div>
+                            <p className="font-semibold break-words">
+                                {item.medication_name}
+                                {item.is_controlled ? ' · controlled' : ''}
+                            </p>
+                            <p className="text-caption">
+                                {[item.dose, item.route]
+                                    .filter(Boolean)
+                                    .join(' · ')}{' '}
+                                · Due {formatTime(item.scheduled_for)}
+                            </p>
+                            <DoseStatusBadge
+                                status={
+                                    item.administration?.status ??
+                                    item.dose_state ??
+                                    'due'
+                                }
+                            />
+                            {item.away_reason && (
+                                <p className="text-caption">
+                                    {item.away_reason}
+                                </p>
+                            )}
+                            {item.administration && (
+                                <p className="text-caption">
+                                    {formatTime(
+                                        item.administration.administered_at,
+                                    )}{' '}
+                                    · {item.administration.administered_by}
+                                </p>
+                            )}
+                            {isRecordable(item) && permitted(item) && (
+                                <Button
+                                    className="frontline-tap"
+                                    onClick={() =>
+                                        setRecording({ item, reoffer: false })
+                                    }
+                                >
+                                    Record dose
+                                </Button>
+                            )}
+                        </li>
+                    ))}
+                </ul>
             ) : (
-                <ConfirmPanel {...props} />
+                <EntityTable
+                    rows={items}
+                    rowKey={slotKey}
+                    rowHeight="content"
+                    identityLabel="Person"
+                    minWidth={850}
+                    identity={(item) => ({
+                        name: item.client_name,
+                        mark: item.client_photo_url ? (
+                            <img
+                                src={item.client_photo_url}
+                                alt={`Photo of ${item.client_name} on file`}
+                                className="size-8 rounded-full object-cover"
+                            />
+                        ) : (
+                            <ClientAvatar
+                                name={item.client_name}
+                                clientId={item.client_id}
+                            />
+                        ),
+                        subline: item.site_name,
+                    })}
+                    columns={[
+                        {
+                            key: 'medicine',
+                            label: 'Medicine',
+                            width: '1.6fr',
+                            cell: (item) => (
+                                <div>
+                                    <p className="font-semibold">
+                                        {item.medication_name}
+                                        {item.is_controlled
+                                            ? ' · controlled'
+                                            : ''}
+                                    </p>
+                                    <p className="text-caption">
+                                        {[item.dose, item.route]
+                                            .filter(Boolean)
+                                            .join(' · ')}
+                                    </p>
+                                </div>
+                            ),
+                        },
+                        {
+                            key: 'due',
+                            label: 'Due',
+                            width: '100px',
+                            cell: (item) => formatTime(item.scheduled_for),
+                        },
+                        {
+                            key: 'state',
+                            label: 'State',
+                            width: '1.3fr',
+                            cell: (item) => (
+                                <div className="flex flex-col gap-1">
+                                    <DoseStatusBadge
+                                        status={
+                                            item.administration?.status ??
+                                            item.dose_state ??
+                                            'due'
+                                        }
+                                    />
+                                    {item.away_reason && (
+                                        <p className="text-caption">
+                                            {item.away_reason}
+                                        </p>
+                                    )}
+                                    {item.administration && (
+                                        <p className="text-caption">
+                                            {formatTime(
+                                                item.administration
+                                                    .administered_at,
+                                            )}{' '}
+                                            ·{' '}
+                                            {
+                                                item.administration
+                                                    .administered_by
+                                            }
+                                        </p>
+                                    )}
+                                </div>
+                            ),
+                        },
+                        {
+                            key: 'action',
+                            label: '',
+                            width: '130px',
+                            align: 'right',
+                            cell: (item) =>
+                                isRecordable(item) && permitted(item) ? (
+                                    <Button
+                                        className="frontline-tap"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setRecording({
+                                                item,
+                                                reoffer: false,
+                                            });
+                                        }}
+                                    >
+                                        Record
+                                    </Button>
+                                ) : (
+                                    <span className="text-caption">
+                                        {item.administration
+                                            ? 'Recorded'
+                                            : item.dose_state ===
+                                                'pending_check'
+                                              ? 'Order to check'
+                                              : item.dose_state === 'away'
+                                                ? 'Away'
+                                                : 'View only'}
+                                    </span>
+                                ),
+                        },
+                    ]}
+                    actionsFor={menu}
+                    onRowContextMenu={ctx.open}
+                />
             )}
-        </div>
-    );
-}
-
-function ConfirmPanel(props: DosePaneProps) {
-    const {
-        item,
-        pending,
-        reasonCode,
-        setReasonCode,
-        reason,
-        setReason,
-        reasonObj,
-        notGivenReasons,
-        witnesses,
-        witnessedBy,
-        setWitnessedBy,
-        witnessCredential,
-        setWitnessCredential,
-        quantityGiven,
-        setQuantityGiven,
-        bloodGlucose,
-        setBloodGlucose,
-        pulse,
-        setPulse,
-    } = props;
-
-    const title =
-        pending === 'given'
-            ? 'Confirm administration'
-            : pending === 'refused'
-              ? 'Record refusal'
-              : 'Record withheld dose';
-    const tone =
-        pending === 'given' ? 'text-status-success' : 'text-status-warning';
-
-    return (
-        <div className="flex flex-col gap-4 rounded-xl border bg-background p-4">
-            <div className={cn('text-sm font-bold', tone)}>{title}</div>
-            {pending !== 'given' ? (
-                <>
-                    <Field label="Coded reason" required>
-                        <SelectInput
-                            value={reasonCode}
-                            onChange={setReasonCode}
-                            placeholder="Select reason…"
-                            options={notGivenReasons.map((r) => ({
-                                value: r.value,
-                                label: r.label,
-                            }))}
-                        />
-                    </Field>
-                    <Field
-                        label="Reason detail"
-                        required={!!reasonObj?.requires_detail}
-                    >
-                        <Input
-                            value={reason}
-                            onChange={(e) => setReason(e.target.value)}
-                            placeholder="Add a note"
-                        />
-                    </Field>
-                </>
-            ) : null}
-            {pending === 'given' && item.is_controlled ? (
-                <Field
-                    label="Units given"
-                    required
-                    hint="Removed from CD stock — the register entry uses this quantity."
-                >
-                    <Input
-                        type="number"
-                        min={0.01}
-                        step={0.01}
-                        value={quantityGiven}
-                        onChange={(e) => setQuantityGiven(e.target.value)}
-                        placeholder="e.g. 1"
+            <details className="rounded-lg border p-3">
+                <summary className="frontline-tap flex cursor-pointer items-center font-semibold">
+                    Round history and observations
+                </summary>
+                <div className="pt-3">
+                    <RoundAuditTimeline
+                        meta={round}
+                        entries={itemsToAuditEntries(items)}
                     />
-                </Field>
-            ) : null}
-            {pending === 'given' && item.requires_witness ? (
-                <>
-                    <Field
-                        label="Controlled-drug witness"
-                        required
-                        hint="Both signatures are written to the CD register."
-                    >
-                        <SelectInput
-                            value={witnessedBy}
-                            onChange={setWitnessedBy}
-                            placeholder="Select a second signatory…"
-                            options={witnesses.map((w) => ({
-                                value: String(w.id),
-                                label: witnessOptionLabel(w),
-                                disabled: !witnessIsSelectable(w),
-                            }))}
-                        />
-                    </Field>
-                    <WitnessPinInput
-                        label="Their witness PIN"
-                        value={witnessCredential}
-                        onChange={setWitnessCredential}
-                        atCupboard
-                    />
-                </>
-            ) : null}
-            {pending === 'given' && item.requires_blood_glucose ? (
-                <Field label="Blood glucose (mmol/L)" required>
-                    <Input
-                        type="number"
-                        step="0.1"
-                        value={bloodGlucose}
-                        onChange={(e) => setBloodGlucose(e.target.value)}
-                        placeholder="e.g. 7.2"
-                    />
-                </Field>
-            ) : null}
-            {pending === 'given' && item.requires_pulse ? (
-                <Field
-                    label="Apical pulse (bpm)"
-                    required
-                    hint="Withhold and tell the nurse if under 60 bpm."
-                >
-                    <Input
-                        type="number"
-                        value={pulse}
-                        onChange={(e) => setPulse(e.target.value)}
-                        placeholder="e.g. 72"
-                    />
-                </Field>
-            ) : null}
-        </div>
-    );
-}
-
-function RecordedPane({
-    item,
-    onReRecord,
-}: {
-    item: RoundItem;
-    onReRecord?: () => void;
-}) {
-    const a = item.administration!;
-    const meta = doseStatusMeta(a.status);
-    const toneText =
-        meta.tone === 'success'
-            ? 'text-status-success'
-            : meta.tone === 'critical'
-              ? 'text-status-critical'
-              : 'text-status-warning';
-    const toneBg =
-        meta.tone === 'success'
-            ? 'bg-status-success-bg'
-            : meta.tone === 'critical'
-              ? 'bg-status-critical-bg'
-              : 'bg-status-warning-bg';
-    const dotBg =
-        meta.tone === 'success'
-            ? 'bg-status-success'
-            : meta.tone === 'critical'
-              ? 'bg-status-critical'
-              : 'bg-status-warning';
-    const Icon =
-        a.status === 'given'
-            ? Check
-            : a.status === 'refused'
-              ? Ban
-              : a.status === 'missed'
-                ? AlertTriangle
-                : Hand;
-    const chips = [
-        a.witnessed_by ? `Witness: ${a.witnessed_by}` : null,
-        a.blood_glucose_level != null
-            ? `BG ${a.blood_glucose_level} mmol/L`
-            : null,
-        a.pulse_bpm != null ? `Pulse ${a.pulse_bpm} bpm` : null,
-    ].filter(Boolean) as string[];
-
-    return (
-        <div className="flex flex-col gap-4">
-            <DoseCard item={item} />
-            <div className={cn('rounded-xl border p-4', toneBg)}>
-                <div className="flex items-center gap-3">
-                    <span
-                        className={cn(
-                            'grid h-8 w-8 shrink-0 place-items-center rounded-full text-white',
-                            dotBg,
-                        )}
-                    >
-                        <Icon className="h-4 w-4" />
-                    </span>
-                    <div>
-                        <div className={cn('text-sm font-bold', toneText)}>
-                            Recorded as {meta.label}
-                        </div>
-                        <div className="text-[11.5px] text-muted-foreground">
-                            {a.administered_by ?? 'Staff'} ·{' '}
-                            {fmtWhen(a.administered_at)}
-                        </div>
-                    </div>
                 </div>
-                {chips.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                        {chips.map((c) => (
-                            <span
-                                key={c}
-                                className="rounded-md border bg-card px-2 py-0.5 text-[11.5px]"
-                            >
-                                {c}
-                            </span>
-                        ))}
-                    </div>
-                ) : null}
-                {a.reason ? (
-                    <div className="mt-2 text-xs text-foreground italic">
-                        “{a.reason}”
-                    </div>
-                ) : null}
-                {onReRecord ? (
-                    <div className="mt-3">
-                        <Button variant="ghost" size="sm" onClick={onReRecord}>
-                            <Pencil className="h-4 w-4" />
-                            Re-record
-                        </Button>
-                    </div>
-                ) : null}
-            </div>
-        </div>
-    );
-}
-
-function SummaryStat({
-    label,
-    value,
-    tone,
-    bg,
-}: {
-    label: string;
-    value: number;
-    tone: string;
-    bg: string;
-}) {
-    return (
-        <div className={cn('rounded-xl px-2 py-3 text-center', bg)}>
-            <div className={cn('text-[19px] font-bold', tone)}>{value}</div>
-            <div className="text-[11px] text-muted-foreground">{label}</div>
-        </div>
-    );
-}
-
-function SummaryPane({
-    round,
-    progress,
-    canComplete,
-    entries,
-    meta,
-}: {
-    round: GuidedRound['round'];
-    progress: GuidedRound['progress'];
-    canComplete: boolean;
-    entries: ReturnType<typeof itemsToAuditEntries>;
-    meta: RoundAuditMeta;
-}) {
-    const done = round.status === 'completed' || canComplete;
-    return (
-        <div className="flex flex-col gap-5">
-            <div className="flex flex-col items-center gap-3 pt-1 text-center">
-                <span
-                    className={cn(
-                        'grid h-16 w-16 place-items-center rounded-full',
-                        done
-                            ? 'bg-status-success-bg text-status-success'
-                            : 'bg-status-warning-bg text-status-warning',
-                    )}
-                >
-                    {done ? (
-                        <Check className="h-8 w-8" />
-                    ) : (
-                        <Clock className="h-8 w-8" />
-                    )}
-                </span>
-                <div>
-                    <h2 className="text-xl font-bold">
-                        {done ? 'Round complete' : 'Round summary'}
-                    </h2>
-                    <p className="mx-auto mt-1 max-w-[440px] text-[13px] leading-relaxed text-muted-foreground">
-                        {done
-                            ? `Every dose in ${round.name} has been recorded. Refusals and held doses are flagged for follow-up.`
-                            : progress.pending > 0
-                              ? `${progress.pending} dose${progress.pending === 1 ? '' : 's'} still to give in ${round.name}.`
-                              : 'Round completion is not available yet.'}
-                    </p>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-4 gap-2">
-                <SummaryStat
-                    label="Given"
-                    value={progress.given}
-                    tone="text-status-success"
-                    bg="bg-status-success-bg"
+            </details>
+            {ctx.ctx && (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    title={ctx.ctx.record.medication_name}
+                    items={menu(ctx.ctx.record)}
+                    onClose={ctx.close}
                 />
-                <SummaryStat
-                    label="Refused"
-                    value={progress.refused}
-                    tone="text-status-warning"
-                    bg="bg-status-warning-bg"
+            )}
+            {recording && (
+                <RecordDoseDialog
+                    key={`${slotKey(recording.item)}:${recording.reoffer}`}
+                    target={{
+                        kind: 'scheduled',
+                        orderId: recording.item.medication_id,
+                        scheduledFor: recording.item.scheduled_for,
+                        label: {
+                            person: recording.item.client_name,
+                            medicine: recording.item.medication_name,
+                        },
+                    }}
+                    entry="round"
+                    roundId={round.id}
+                    mode={recording.reoffer ? 'reoffer' : 'record'}
+                    signedAs={{
+                        name: signer.name ?? 'Signed-in worker',
+                        role_label: signer.role_label ?? null,
+                    }}
+                    onRecorded={(result) => {
+                        if (result.status !== 'queued')
+                            router.reload({ preserveScroll: true });
+                    }}
+                    nextLabel={
+                        nextAfter
+                            ? `Next due: ${nextAfter.client_name} · ${nextAfter.medication_name}`
+                            : null
+                    }
+                    onNext={
+                        nextAfter
+                            ? () =>
+                                  setRecording({
+                                      item: nextAfter,
+                                      reoffer: false,
+                                  })
+                            : undefined
+                    }
+                    onClose={() => setRecording(null)}
                 />
-                <SummaryStat
-                    label="Held"
-                    value={progress.held}
-                    tone="text-status-warning"
-                    bg="bg-status-warning-bg"
-                />
-                <SummaryStat
-                    label="Due"
-                    value={progress.pending}
-                    tone="text-status-critical"
-                    bg="bg-status-critical-bg"
-                />
-            </div>
-
-            <div className="border-t pt-4">
-                <div className="mb-3.5 flex items-center gap-2 text-[13px] font-bold">
-                    <Activity className="h-4 w-4 text-primary" />
-                    Audit &amp; timeline
-                </div>
-                <RoundAuditTimeline meta={meta} entries={entries} />
-            </div>
-        </div>
+            )}
+        </Card>
     );
 }

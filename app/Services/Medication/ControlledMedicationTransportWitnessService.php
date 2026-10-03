@@ -96,6 +96,49 @@ final class ControlledMedicationTransportWitnessService
         ?Collection $lockedUsers = null,
         ?Collection $lockedPresenceShifts = null,
     ): array {
+        $attestation = $this->attestEligibility(
+            $actor, $siteId, $witnessId, $effectiveAt, $witnessErrorKey,
+            $lockedUsers, $lockedPresenceShifts,
+        );
+        $witness = $attestation['witness'];
+        $beforeCredentialCheck?->__invoke($witness);
+
+        // PIN-1: the second checker confirms with their personal witness PIN,
+        // never their login password (Stephan, 29 Sep 2026). Wrong PINs count
+        // towards that person's lock across every screen.
+        $this->witnessPins->verify($witness, $credential, $credentialErrorKey, [
+            'site_id' => $siteId,
+            'surface' => $credentialErrorKey,
+            'actor_id' => (int) $actor->id,
+        ]);
+
+        return [
+            'witness' => $witness,
+            'witnessed_at' => Carbon::instance($effectiveAt)->copy(),
+            'method' => WitnessPinService::METHOD,
+            ...collect($attestation)->except('witness')->all(),
+        ];
+    }
+
+    /**
+     * Eligibility evidence only; this never authenticates a credential.
+     * PIN-2 uses it for an explicitly unverified, non-controlled nomination.
+     * The caller must hold the governing transaction and sorted Shift/User locks.
+     *
+     * @return array<string, mixed>
+     */
+    public function attestEligibility(
+        User $actor,
+        int $siteId,
+        int $witnessId,
+        CarbonInterface $effectiveAt,
+        string $witnessErrorKey = 'witnessed_by',
+        ?Collection $lockedUsers = null,
+        ?Collection $lockedPresenceShifts = null,
+    ): array {
+        if (DB::transactionLevel() < 1) {
+            throw new LogicException('Second-person eligibility must be attested in the governing transaction.');
+        }
         if ($witnessId <= 0 || $witnessId === (int) $actor->id) {
             throw ValidationException::withMessages([
                 $witnessErrorKey => 'The witness must be a different eligible staff member.',
@@ -135,23 +178,8 @@ final class ControlledMedicationTransportWitnessService
             $lockedPresenceShifts,
         );
         abort_unless($qualification, 404);
-        $beforeCredentialCheck?->__invoke($witness);
 
-        // PIN-1: the second checker confirms with their personal witness PIN,
-        // never their login password (Stephan, 29 Sep 2026). Wrong PINs count
-        // towards that person's lock across every screen.
-        $this->witnessPins->verify($witness, $credential, $credentialErrorKey, [
-            'site_id' => $siteId,
-            'surface' => $credentialErrorKey,
-            'actor_id' => (int) $actor->id,
-        ]);
-
-        return [
-            'witness' => $witness,
-            'witnessed_at' => Carbon::instance($effectiveAt)->copy(),
-            'method' => WitnessPinService::METHOD,
-            ...$qualification,
-        ];
+        return ['witness' => $witness, ...$qualification];
     }
 
     /**
@@ -270,6 +298,9 @@ final class ControlledMedicationTransportWitnessService
             $assessment === null
             || (int) $assessment->user_id !== (int) $witness->id
             || $assessment->status !== 'passed'
+            || $assessment->restricted
+            || ! $assessment->controlled_drugs
+            || in_array('controlled_drugs', $assessment->not_seen_areas ?? [], true)
             || ! $assessment->can_witness_controlled
             || $assessment->assessor_id === null
             || (int) $assessment->assessor_id === (int) $witness->id

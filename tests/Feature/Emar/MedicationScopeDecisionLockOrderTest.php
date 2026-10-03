@@ -192,6 +192,7 @@ class MedicationScopeDecisionLockOrderTest extends TestCase
                 'shifts', // Complete performer/witness presence union.
                 'shifts', // Selected canonical performer assignment.
                 'medication_rounds',
+                'client_medications', // Recheck the canonical order after the round lock.
             ],
         );
     }

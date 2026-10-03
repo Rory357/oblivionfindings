@@ -400,7 +400,7 @@ class MedicationOverviewService
 
         $reviewsDue = MedicationReview::due()
             ->whereIn('client_id', $this->allowedClientIds())
-            ->whereDate('scheduled_date', '<=', $date->copy()->addDays(7)->toDateString())
+            ->whereDate('scheduled_date', '<=', $date->copy()->addDays(30)->toDateString())
             ->count();
 
         $workerToday = $this->workerNow()->startOfDay();

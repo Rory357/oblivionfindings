@@ -272,3 +272,57 @@ describe('put the earlier value back', () => {
         expect(canRestore(payload(), {}, entry(), () => false)).toBe(false);
     });
 });
+
+describe('emergency-access draft review', () => {
+    const number = (key: string, value: string): SettingDefinition => ({
+        ...renewal,
+        group: 'ea',
+        key,
+        section: 'emergency',
+        default: value,
+        numeric: {
+            direction: 'higher_is_looser',
+            off: null,
+            off_is_loosest: false,
+        },
+        range: [5, 1440],
+        unit: 'minutes',
+        off_label: null,
+    });
+    const s = payload({
+        groups: {
+            ea: {
+                key: 'ea',
+                view: 'alerts',
+                effect: 'From the next grant',
+                audit_event: 'medications.emergency_policy.updated',
+                keys: ['default_minutes', 'max_minutes'],
+            },
+        },
+        definitions: {
+            ea: {
+                default_minutes: number('default_minutes', '60'),
+                max_minutes: number('max_minutes', '240'),
+            },
+        },
+        values: { ea: { default_minutes: '60', max_minutes: '240' } },
+        reviewed: { ea: { default_minutes: null, max_minutes: null } },
+    });
+    it('does not offer save when the grant would exceed the saved longest time', () => {
+        expect(
+            validateView(
+                s,
+                withDraft({}, 'ea', 'default_minutes', '300'),
+                'alerts',
+            ),
+        ).toHaveProperty('ea.default_minutes');
+    });
+    it('reviews simultaneous grant and longest-time changes together, in the Alerts view', () => {
+        let draft = withDraft({}, 'ea', 'default_minutes', '300');
+        draft = withDraft(draft, 'ea', 'max_minutes', '600');
+        expect(validateView(s, draft, 'alerts')).toEqual({});
+        expect(changes(s, draft, 'alerts')).toHaveLength(2);
+        expect(changes(s, draft, 'alerts').every((c) => c.loosens)).toBe(true);
+        expect(changes(s, draft, 'rules')).toHaveLength(0);
+    });
+});

@@ -19,9 +19,9 @@ use App\Services\Medication\ControlledMedicationTransportWitnessService;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationScanVerificationService;
 use App\Support\Medication\MedicationStockQuantity;
+use App\Support\SchemaCache;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Support\SchemaCache;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -367,7 +367,7 @@ class ResidentTransportController extends Controller
                     'frequency' => $medication->frequency,
                     'is_prn' => (bool) $medication->is_prn,
                     'controlled_drug' => (bool) $medication->controlled_drug,
-                    'witness_required' => $medication->requiresWitness(),
+                    'witness_required' => $medication->setRelation('client', $selectedClient)->requiresWitness(),
                     'dose_times' => $medication->dose_times,
                     'route' => $medication->route,
                     'instructions' => $medication->instructions,
@@ -539,6 +539,7 @@ class ResidentTransportController extends Controller
                 })
                 ->get([
                     'id',
+                    'client_id',
                     'name',
                     'dosage',
                     'frequency',
@@ -556,7 +557,7 @@ class ResidentTransportController extends Controller
                     'frequency' => $medication->frequency,
                     'is_prn' => (bool) $medication->is_prn,
                     'controlled_drug' => (bool) $medication->controlled_drug,
-                    'witness_required' => $medication->requiresWitness(),
+                    'witness_required' => $medication->setRelation('client', $transportClient)->requiresWitness(),
                     'dose_times' => $medication->dose_times,
                     'route' => $medication->route,
                     'instructions' => $medication->instructions,
@@ -571,8 +572,8 @@ class ResidentTransportController extends Controller
         if ($canViewMedicationTransit && SchemaCache::hasTable('fleet_medication_transit_logs')) {
             $transitQuery = FleetMedicationTransitLog::query()
                 ->with([
-                    'client:id,first_name,last_name',
-                    'medication:id,client_id,name,dosage,barcode,nzulm_code',
+                    'client:id,first_name,last_name,site_id',
+                    'medication:id,client_id,name,dosage,barcode,nzulm_code,controlled_drug,witness_required,route',
                     'packedBy:id,name',
                     'packedWitness:id,name',
                     'packingAttestationEvent:id,action,witness_user_id,occurred_at,context',
@@ -593,6 +594,9 @@ class ResidentTransportController extends Controller
                     'medication_name' => $log->medication_name,
                     'is_controlled_drug' => $log->is_controlled_drug,
                     'witness_required' => $log->witness_required,
+                    'requires_administration_witness' => $log->medication
+                        ? $this->journeys->requiresAdministrationWitness($log, $log->medication)
+                        : (bool) $log->witness_required,
                     'packed_witness_name' => $log->packed_witness_name,
                     'packed_witness' => $log->packedWitness ? [
                         'id' => $log->packedWitness->id,
@@ -863,7 +867,7 @@ class ResidentTransportController extends Controller
 
         $query = FleetMedicationTransitLog::query()
             ->with([
-                'client:id,first_name,last_name',
+                'client:id,first_name,last_name,site_id',
                 'transport:id,resident_name,transport_type,status,departed_at,arrived_at,asset_id',
                 'transport.asset:id,name,asset_tag',
                 'packedBy:id,name',
@@ -998,6 +1002,9 @@ class ResidentTransportController extends Controller
                     'medication_name' => $log->medication_name,
                     'is_controlled_drug' => $log->is_controlled_drug,
                     'witness_required' => $log->witness_required,
+                    'requires_administration_witness' => $log->medication
+                        ? $this->journeys->requiresAdministrationWitness($log, $log->medication)
+                        : (bool) $log->witness_required,
                     'packed_witness_name' => $log->packed_witness_name,
                     'packed_witness' => $log->packedWitness ? ['id' => $log->packedWitness->id, 'name' => $log->packedWitness->name] : null,
                     'packed_witnessed_at' => optional($log->packed_witnessed_at)->toISOString(),

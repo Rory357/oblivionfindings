@@ -1,0 +1,20 @@
+No syntax errors detected in app/Http/Controllers/Emar/MedicationSettingsController.php
+No syntax errors detected in app/Services/Medication/Alerts/MedicationAlertPreviews.php
+No syntax errors detected in app/Services/Medication/Settings/MedicationSettingsStore.php
+No syntax errors detected in app/Services/NotificationService.php
+No syntax errors detected in tests/Feature/Emar/EmergencyAccessLifecycleTest.php
+No syntax errors detected in tests/Feature/Emar/MedicationAlertRoutingTest.php
+No syntax errors detected in tests/Feature/Emar/MedicationAlertSettingsTest.php
+No syntax errors detected in tests/Feature/Emar/MedicationAlertsTest.php
+No syntax errors detected in tests/Feature/Emar/MedicationSettingsAuditorAccessTest.php
+No syntax errors detected in tests/Feature/Emar/MedicationSettingsSiteScopeTest.php
+No syntax errors detected in tests/Feature/Emar/MedicationSettingsStorageTest.php
+No syntax errors detected in tests/Feature/Emar/P11EventIntegrationTest.php
+No syntax errors detected in tests/Feature/Emar/P11NavigationPayloadTest.php
+PASS scoped TSX syntax: resources/js/pages/emar/Settings.tsx
+PASS git diff --check
+Core-only formatting check: baseline=false, current=false. Existing page formatting preserved; no formatting-pass claim.
+No backend/frontend tests, build, install or queued heavy job launched. Main owns verification.
+PASS scoped TSX syntax: resources/js/pages/emar/Settings.tsx
+PASS scoped TSX syntax: resources/js/pages/emar/settings/_rules.tsx
+PASS scoped TSX syntax: resources/js/pages/emar/settings/settings-rules-concealed.test.tsx

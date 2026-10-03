@@ -13,6 +13,9 @@ use App\Models\ConsentRequest;
 use App\Models\FamilyVisitRequest;
 use App\Models\User;
 use App\Services\Clients\ClientProfileSectionAccess;
+use App\Services\Medication\MarLinkService;
+use App\Services\Tasks\Providers\MedicationReviewChangeProvider;
+use App\Services\Tasks\Providers\MedicationReviewProvider;
 use Illuminate\Support\Collection;
 
 class ActionsAggregator
@@ -45,6 +48,7 @@ class ActionsAggregator
             ->merge($this->riskReviews($client, (bool) ($access['risks'] ?? false)))
             ->merge($this->carePlanReviews($client, (bool) ($access['care_plans'] ?? false)))
             ->merge($this->assessmentReviews($client, (bool) ($access['assessments'] ?? false)))
+            ->merge($this->medicationReviews($client, $user))
             ->merge($this->pathPlanReviews($client, (bool) ($access['care_plans'] ?? false)))
             ->merge($this->consentRequests($client, (bool) ($access['consents'] ?? false)))
             ->merge($this->visitRequests($client, (bool) ($access['family_notes'] ?? false)))
@@ -281,6 +285,31 @@ class ActionsAggregator
                 deepLink: "/operations/clients/{$client->id}/visit-requests",
                 sourceId: $request->id,
             ));
+    }
+
+    /** P05 reads the same canonical records as All Tasks, without a second action store. */
+    private function medicationReviews(Client $client, ?User $user): Collection
+    {
+        if (! $user || ! $user->canDo('medications.view')) {
+            return collect();
+        }
+        if (! app(MarLinkService::class)->canOpen($user, $client->id)) {
+            return collect();
+        }
+        $tasks = [];
+        foreach ([new MedicationReviewProvider, new MedicationReviewChangeProvider] as $provider) {
+            foreach ($provider->authorizedTasks($user) as $task) {
+                if ((int) ($task->client['id'] ?? 0) !== (int) $client->id) {
+                    continue;
+                }
+                $overdue = $task->isOverdue();
+                $tasks[] = $this->item(type: $task->type === 'Medication change' ? 'medication_change' : ($overdue ? 'overdue_medication_review' : 'medication_review'),
+                    severity: $overdue ? 'critical' : 'info', dueAt: $task->dueAt,
+                    summary: $task->title.' — '.$task->status, deepLink: $task->link, sourceId: $task->numericId());
+            }
+        }
+
+        return collect($tasks);
     }
 
     private function item(

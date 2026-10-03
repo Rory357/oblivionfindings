@@ -82,7 +82,10 @@ export type TransportMedicationLog = {
     medication_id: number | null;
     medication_name: string;
     is_controlled_drug: boolean;
+    /** Requirement recorded when packed. */
     witness_required: boolean;
+    /** Historical packing requirement or current dose and countersign policy. */
+    requires_administration_witness: boolean;
     packed_witness_name?: string | null;
     packed_witness?: { id: number; name: string } | null;
     packed_witnessed_at?: string | null;
@@ -308,10 +311,7 @@ export function PackMedicationWizard({
             ) ?? null,
         [form.data.medication_id, medications],
     );
-    const requiresWitness = !!(
-        selectedMedication?.witness_required ||
-        selectedMedication?.controlled_drug
-    );
+    const requiresWitness = !!selectedMedication?.witness_required;
     const requiresScan = !!selectedMedication?.scan_verification;
     const acceptedForPacking =
         !requiresWitness || form.data.attestation_state === 'accepted';
@@ -1151,9 +1151,7 @@ export function AdministerTransportMedicationWizard({
         notes: '',
         scan_code: '',
     });
-    const requiresWitness = !!(
-        log?.witness_required || log?.is_controlled_drug
-    );
+    const requiresWitness = !!log?.requires_administration_witness;
     const requiresScan = !!log?.scan_verification;
     const normalizedQuantity = form.data.quantity_administered.trim();
     const quantityIsValid =

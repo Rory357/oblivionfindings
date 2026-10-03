@@ -978,3 +978,13 @@ Artisan::command('finance:review-reminders', function () {
 app(Schedule::class)->command('finance:review-notices')->everyMinute()->withoutOverlapping();
 app(Schedule::class)->command('finance:review-reminders')->dailyAt('08:30')->timezone('Pacific/Auckland')->withoutOverlapping();
 Illuminate\Support\Facades\Schedule::command('reports:run-schedules')->everyFiveMinutes()->withoutOverlapping();
+
+// Medication work is visible independently of Delivery. This creates one
+// lead heads-up for a handover still unread an hour into the incoming shift.
+app(Schedule::class)->command('emar:workflow-followups')->everyMinute()->withoutOverlapping()->onOneServer();
+
+Illuminate\Support\Facades\Schedule::command('emar:support-reviews')->dailyAt('06:00')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
+Illuminate\Support\Facades\Schedule::command('emar:support-review-delivery')->everyMinute()->withoutOverlapping()->onOneServer();
+app(Schedule::class)->command('emar:expire-emergency-access')->everyMinute()->onOneServer()->withoutOverlapping()->name('medication.emergency-access.expiry');
+// A 30-minute attestation window expires even if nobody opens its notification.
+app(Schedule::class)->command('emar:expire-second-person-confirmations')->everyMinute()->withoutOverlapping()->onOneServer();

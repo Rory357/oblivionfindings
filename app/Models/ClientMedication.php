@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\Medication\Controlled\ControlledPolicy;
 use App\Services\Medication\DoseSlots\DoseSlotOrderSync;
 use App\Services\Medication\OverdueDoseAlerts;
 use App\Support\WorkerClock;
@@ -19,6 +20,22 @@ class ClientMedication extends Model
     use AuditableChanges;
     use HasFactory;
     use SoftDeletes;
+
+    private bool $publishingCheckedPrescription = false;
+
+    /** Only the locked P04 workflow publishes a proposed prescription. */
+    public function publishCheckedPrescription(array $payload, int $version, int $verifierId): void
+    {
+        $this->publishingCheckedPrescription = true;
+        try {
+            $this->forceFill(array_merge($payload, [
+                'version' => $version, 'approval_status' => 'verified',
+                'verified_by' => $verifierId, 'verified_at' => now(), 'rejection_reason' => null,
+            ]))->save();
+        } finally {
+            $this->publishingCheckedPrescription = false;
+        }
+    }
 
     private const VERIFICATION_SENSITIVE_FIELDS = [
         'client_id',
@@ -140,7 +157,7 @@ class ClientMedication extends Model
         });
 
         static::updating(function (self $medication): void {
-            if (! $medication->isDirty(self::VERIFICATION_SENSITIVE_FIELDS)) {
+            if ($medication->publishingCheckedPrescription || ! $medication->isDirty(self::VERIFICATION_SENSITIVE_FIELDS)) {
                 return;
             }
 
@@ -156,7 +173,12 @@ class ClientMedication extends Model
             $wasCeased = $medication->getOriginal('state') === 'ceased'
                 || $medication->getRawOriginal('ceased_at') !== null;
 
-            if ($wasCeased && $medication->isDirty()) {
+            // A reviewed NZ register classification annotates retained stock evidence;
+            // cessation, the prescription and the legacy schedule stay immutable.
+            $classificationOnly = array_diff(array_keys($medication->getDirty()), [
+                'nz_controlled_class', 'controlled_class_reviewed_by', 'controlled_class_reviewed_at', 'controlled_class_source', 'updated_at',
+            ]) === [];
+            if ($wasCeased && $medication->isDirty() && ! $classificationOnly) {
                 throw new \LogicException('Ceased medication orders are immutable.');
             }
 
@@ -354,7 +376,7 @@ class ClientMedication extends Model
      */
     public function requiresWitness(): bool
     {
-        return $this->witness_required || $this->controlled_drug;
+        return app(ControlledPolicy::class)->witnessRequired($this);
     }
 
     /**

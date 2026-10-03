@@ -42,7 +42,7 @@ export const MY_CALENDAR_SOURCES: SourceDef[] = [
         short: 'Meds',
         group: 'auto',
         icon: 'Pill',
-        origin: 'Your medication rounds',
+        origin: 'Medicines work on your roster',
     },
     {
         key: 'leave',
@@ -108,11 +108,13 @@ export function myCalendarItem(
         priority: props.priority ?? null,
         desc: personal
             ? personal.description
-            : props.timed_tasks
+            : props.description ||
+              props.timed_tasks
                   ?.map((task) =>
                       `${task.scheduled_time ?? ''} ${task.label}`.trim(),
                   )
-                  .join('\n') || null,
+                  .join('\n') ||
+              null,
     };
 }
 

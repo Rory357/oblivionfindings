@@ -354,11 +354,16 @@ it('tells people about a reported medication error and a controlled-drug discrep
     app(MedicationAlertSources::class)->discrepancy($discrepancy);
 
     expect(MedicationAlert::query()->where('type', 'errors')->value('message'))
-        ->toBe('A medication error was reported at Rimu House: Aroha N., Methylphenidate — wrong time.')
+        ->toBe('Medication error '.$error->fresh()->reference_number.'. Reach not known yet. Details are held in the medication error record.')
+        ->and(MedicationAlert::query()->where('type', 'errors')->value('action_url'))->toBe('/emar/errors')
         ->and(MedicationAlert::query()->where('type', 'cdDiscrepancy')->value('message'))
         ->toBe('Controlled-drug count doesn’t match — Methylphenidate at Rimu House: 1 short.')
         ->and(b2Told($lead, 'errors'))->toBeTrue()
         ->and(b2Told($lead, 'cdDiscrepancy'))->toBeTrue();
+    $sentError = Notification::sent($lead, MedicationAlertNotification::class)
+        ->first(fn (MedicationAlertNotification $notification): bool => $notification->alert->type === 'errors');
+    expect($sentError->toArray($lead)['message'])->not->toContain('Aroha N.', 'Methylphenidate', 'Given at the wrong time.')
+        ->and($sentError->toArray($lead)['medication_error_id'])->toBe($error->id);
 
     app(MedicationAlertSources::class)->discrepancyResolved($discrepancy);
     expect(MedicationAlert::query()->where('type', 'cdDiscrepancy')->value('status'))->toBe('dealt_with');
@@ -394,10 +399,20 @@ it('never raises an alert that isn’t offered yet', function () {
     $site = Site::factory()->create();
     b2Staff($site, 'team_lead');
 
-    // Witness overrides arrive with PIN-2; the emergency-access report keeps its routing until B3.
-    expect(app(MedicationAlerts::class)->raise('override', b2Subject($site, 'override:1')))->toBeNull()
-        ->and(app(MedicationAlerts::class)->raise('breakglass', b2Subject($site, 'report:1')))->toBeNull();
+    // Witness overrides still arrive with PIN-2. Emergency reports are released.
+    expect(app(MedicationAlerts::class)->raise('override', b2Subject($site, 'override:1')))->toBeNull();
     expect(MedicationAlert::query()->count())->toBe(0);
+});
+
+it('raises the released emergency report for a reviewer once per open daily subject', function () {
+    $site = Site::factory()->create(['is_active' => true]);
+    $reviewer = b2Staff($site, 'auditor');
+    $alerts = app(MedicationAlerts::class);
+
+    expect($alerts->raise('breakglass', b2Subject($site, 'report:1')))->not->toBeNull()
+        ->and(b2Told($reviewer, 'breakglass'))->toBeTrue();
+    expect($alerts->raise('breakglass', b2Subject($site, 'report:1')))->toBeNull();
+    expect(MedicationAlert::where('type', 'breakglass')->count())->toBe(1);
 });
 
 /** How many of this alert type the person was sent. */

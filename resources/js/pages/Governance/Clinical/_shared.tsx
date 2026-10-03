@@ -18,13 +18,13 @@ const CLINICAL_VIEW_HREFS: Record<ClinicalView, string> = {
 };
 
 /** This month · Month by month — switches between the Care quality views. */
-export function ClinicalViewToggle({ value }: { value: ClinicalView }) {
+export function ClinicalViewToggle({ value, siteId }: { value: ClinicalView; siteId?: number | null }) {
     return (
         <PageHeaderViewToggle<ClinicalView>
             ariaLabel="Care quality view"
             value={value}
             onChange={(next) => {
-                if (next !== value) router.visit(CLINICAL_VIEW_HREFS[next]);
+                if (next !== value) router.visit(CLINICAL_VIEW_HREFS[next] + (siteId ? `?site_id=${siteId}` : ''));
             }}
             options={[
                 { value: 'dashboard', label: 'This month', icon: LayoutGrid },
@@ -34,12 +34,12 @@ export function ClinicalViewToggle({ value }: { value: ClinicalView }) {
     );
 }
 
-export type IndicatorStatus = 'normal' | 'warning' | 'critical';
+export type IndicatorStatus = 'normal' | 'warning' | 'critical' | 'not_configured' | 'reported' | 'no_access';
 
 export type SnapshotValue = {
     indicator_id: number;
     indicator_code: string;
-    value: number;
+    value: number | null;
     status: IndicatorStatus;
     trend: 'up' | 'down' | 'stable';
     previous_value: number | null;
@@ -64,6 +64,9 @@ export type Snapshot = {
 export function indicatorChip(
     value: SnapshotValue | null | undefined,
 ): GovernanceStatusChip {
+    if (value?.status === 'no_access') return { label: 'Medication report access required', variant: 'neutral' };
+    if (value?.status === 'not_configured') return { label: 'Not configured', variant: 'neutral' };
+    if (value?.status === 'reported') return { label: 'Reported', variant: 'neutral' };
     if (!value || !value.recorded) {
         return governanceStatus('care_quality_status', 'no_data');
     }
@@ -73,6 +76,7 @@ export function indicatorChip(
 export function indicatorStatusKey(
     value: SnapshotValue | null | undefined,
 ): IndicatorStatus | 'no_data' {
+    if (value?.status === 'no_access') return 'no_access';
     return !value || !value.recorded ? 'no_data' : value.status;
 }
 
@@ -99,7 +103,7 @@ export function comparisonText(
     value: SnapshotValue,
     comparedWith: string | null,
 ): string | null {
-    if (value.previous_value === null || !comparedWith) return null;
+    if (value.previous_value === null || value.value === null || !comparedWith) return null;
     const previous = formatCount(value.previous_value);
     if (value.value > value.previous_value) {
         return `Up from ${previous} in ${comparedWith}`;
@@ -110,6 +114,7 @@ export function comparisonText(
     return `Same as ${comparedWith}`;
 }
 
-export function formatCount(value: number): string {
+export function formatCount(value: number | null): string {
+    if (value === null) return '—';
     return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }

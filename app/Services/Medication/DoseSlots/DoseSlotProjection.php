@@ -128,6 +128,7 @@ final class DoseSlotProjection
                     'controlled' => (bool) $row->controlled,
                     'concealed' => $concealed,
                     'order_change_pending' => (bool) $row->order_change_pending,
+                    'support_mode' => $concealed ? null : (string) $row->support_mode,
                     'dst_adjustment' => $row->dst_adjustment,
                     'last_day' => (bool) $row->last_day,
                     // Rebuilt from history by the backfill, not generated live.
@@ -164,7 +165,7 @@ final class DoseSlotProjection
     public function totalsBy(string $group, DoseSlotReaderScope $scope, string $from, string $to, CarbonImmutable $now): array
     {
         if (! in_array($group, self::GROUPS, true)) {
-            throw new InvalidArgumentException("Dose totals group by one of: ".implode(', ', self::GROUPS).'.');
+            throw new InvalidArgumentException('Dose totals group by one of: '.implode(', ', self::GROUPS).'.');
         }
 
         return DB::query()
@@ -249,13 +250,28 @@ final class DoseSlotProjection
         // (C7), read live; the window and state are worked out over them.
         $slots = $scoped->select([
             's.id', 's.client_id', 's.client_medication_id', 's.schedule_version_id', 's.nz_date', 's.ordered_time',
-            's.due_at', 's.controlled', 's.order_change_pending', 's.dst_adjustment', 's.self_managed', 's.last_day', 's.reconstructed',
+            's.due_at', 's.controlled', 's.order_change_pending', 's.dst_adjustment', 's.last_day', 's.reconstructed',
             's.outcome', 's.outcome_administration_id', 's.outcome_at',
         ]);
+        // P03: support is versioned independently of the prescription. Today's
+        // unrecorded doses follow support now (withdrawal takes effect at once);
+        // historical doses retain the support in effect when they were due.
+        $supportAt = 'CASE WHEN s.outcome IS NOT NULL THEN COALESCE(s.outcome_at, s.due_at) WHEN s.nz_date = ? AND s.due_at < ? THEN ? ELSE s.due_at END';
+        $supportSql = "(SELECT c.mode FROM medication_support_changes c WHERE c.client_medication_id = s.client_medication_id AND c.client_id = s.client_id AND c.effective_at <= ({$supportAt}) ORDER BY c.effective_at DESC, c.id DESC LIMIT 1)";
+        // Existing completed per-medicine plans and retained slot flags remain
+        // recorded support evidence. Empty new tables do not instruct staff to
+        // give a medicine the person already manages themselves.
+        $legacySql = "(SELECT legacy.mode FROM medication_self_admin_assessments a JOIN JSON_TABLE(COALESCE(a.med_scope, JSON_ARRAY()), '$[*]' COLUMNS (med_id BIGINT PATH '$.med_id' NULL ON ERROR, mode VARCHAR(32) PATH '$.scope' NULL ON ERROR)) legacy ON legacy.med_id = s.client_medication_id WHERE a.client_id = s.client_id AND a.status = 'completed' AND a.deleted_at IS NULL AND a.created_at <= ({$supportAt}) AND legacy.mode IN ('self_managed', 'prompted', 'assisted', 'staff_given') AND NOT EXISTS (SELECT 1 FROM medication_self_admin_assessments child WHERE child.client_id = a.client_id AND child.supersedes_id = a.id) ORDER BY a.id DESC LIMIT 1)";
+        $supportFallback = "COALESCE({$legacySql}, CASE WHEN s.self_managed = 1 THEN 'self_managed' ELSE 'staff_given' END)";
+        $supportBindings = [$today, $nowUtc, $nowUtc, $today, $nowUtc, $nowUtc];
+        $slots->selectRaw("COALESCE({$supportSql}, {$supportFallback}) as support_mode", $supportBindings);
+        $slots->selectRaw("CASE WHEN COALESCE({$supportSql}, {$supportFallback}) = 'self_managed' THEN 1 ELSE 0 END as self_managed", $supportBindings);
         foreach (DoseAwaySources::sql() as $column => $sql) {
             $slots->selectRaw("({$sql}) as {$column}");
         }
 
+        // The derived table exposes the computed self_managed column above;
+        // state/denominator expressions below read that value, not the stored flag.
         return DB::query()->fromSub($slots, 's')
             ->select('s.*')
             ->selectRaw("{$opens} as window_opens_at")
@@ -263,9 +279,9 @@ final class DoseSlotProjection
             ->selectRaw("CASE WHEN ? > {$ends} THEN 1 ELSE 0 END as window_ended", [$nowUtc])
             ->selectRaw("CASE WHEN s.outcome = 'given' AND s.outcome_at > {$ends} THEN 1 ELSE 0 END as recorded_late")
             ->selectRaw(
-                "CASE
+                'CASE
                     WHEN s.outcome IS NOT NULL THEN s.outcome
-                    WHEN ".DoseAwaySources::awaySql('s')." THEN '".self::STATE_AWAY."'
+                    WHEN '.DoseAwaySources::awaySql('s')." THEN '".self::STATE_AWAY."'
                     WHEN s.self_managed = 1 THEN '".self::STATE_SELF_MANAGED."'
                     WHEN s.order_change_pending = 1 THEN '".self::STATE_PENDING_CHECK."'
                     WHEN ? < {$opens} THEN '".self::STATE_NOT_DUE."'
@@ -334,7 +350,7 @@ final class DoseSlotProjection
             "SUM(CASE WHEN {$counted} AND outcome IS NULL THEN 1 ELSE 0 END) as not_recorded",
             "SUM(CASE WHEN {$counted} AND recorded_late = 1 THEN 1 ELSE 0 END) as recorded_late",
             "SUM(CASE WHEN {$away} THEN 1 ELSE 0 END) as away",
-            "SUM(CASE WHEN self_managed = 1 THEN 1 ELSE 0 END) as self_managed",
+            'SUM(CASE WHEN self_managed = 1 THEN 1 ELSE 0 END) as self_managed',
             "SUM(CASE WHEN {$open} AND state = '".self::STATE_DUE."' THEN 1 ELSE 0 END) as due_now",
             "SUM(CASE WHEN {$open} AND state = '".self::STATE_NOT_DUE."' THEN 1 ELSE 0 END) as not_yet_due",
             "SUM(CASE WHEN state = '".self::STATE_LATE."' THEN 1 ELSE 0 END) as late_today",

@@ -44,6 +44,7 @@ class MedicationGenericReportingSurfaceTest extends TestCase
         $ordinary = $this->userWithPermissions([
             'reports.viewAny',
             'medications.view',
+            'medications.reports.view',
             'shifts.manageAny',
             'compliance.view',
         ], $context['site']);
@@ -57,19 +58,12 @@ class MedicationGenericReportingSurfaceTest extends TestCase
             $administrations->pluck('id')->map(fn (mixed $id): int => (int) $id)->all(),
         );
 
-        $administrationCsv = $this->actingAs($ordinary)
+        $this->actingAs($ordinary)
             ->get(route('reports.modules.export', 'medication_administrations'))
-            ->assertOk()
-            ->streamedContent();
-        $exportedAdministrationIds = collect(preg_split('/\r?\n/', trim($administrationCsv)))
-            ->skip(1)
-            ->filter()
-            ->map(fn (string $line): int => (int) str_getcsv($line)[0])
-            ->values();
-        $this->assertSame([$context['ordinary_administration']->id], $exportedAdministrationIds->all());
-        foreach ($context['concealed_administration_ids'] as $id) {
-            $this->assertFalse($exportedAdministrationIds->contains($id));
-        }
+            ->assertForbidden();
+        $this->actingAs($ordinary)
+            ->get(route('reports.combined.export', 'care-quality'))
+            ->assertForbidden();
 
         $this->actingAs($ordinary)
             ->get(route('reports.modules.show', 'controlled_drug_discrepancies'))
@@ -186,6 +180,7 @@ class MedicationGenericReportingSurfaceTest extends TestCase
         $controlledReader = $this->userWithPermissions([
             'reports.viewAny',
             'medications.view',
+            'medications.reports.view',
             'medications.controlled.view',
             'shifts.manageAny',
             'compliance.view',

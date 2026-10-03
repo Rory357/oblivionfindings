@@ -3,6 +3,8 @@
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
 import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
+import { SettingsModal } from '@/components/settings/settings-modal';
+import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -56,7 +58,32 @@ import {
     stockItemQuantityDestination,
 } from './medication-stock-governance';
 
+function PackWorkflowNotice({
+    url,
+    onClose,
+}: {
+    url: string;
+    onClose: () => void;
+}) {
+    return (
+        <SettingsModal
+            title="Open pack records"
+            description="This medicine is tracked by its physical packs."
+            onClose={onClose}
+        >
+            <SettingsNotice role="note">
+                Receive deliveries, count packs, record removals and manage
+                pharmacy supply in the pack workflow.
+            </SettingsNotice>
+            <Button asChild>
+                <a href={url}>Open pack records</a>
+            </Button>
+        </SettingsModal>
+    );
+}
+
 export type StockMed = {
+    pack_workflow_url?: string | null;
     id: number;
     name: string;
     client_id: number;
@@ -80,6 +107,7 @@ export type StockMovement = {
     unit: string | null;
 };
 export type StockRow = {
+    pack_workflow_url?: string | null;
     id: number;
     medication_id: number;
     medication_name: string | null;
@@ -90,7 +118,7 @@ export type StockRow = {
     mar_url: string | null;
     site_id: number | null;
     site_name: string | null;
-    on_hand: number;
+    on_hand: number | null;
     unit: string;
     reorder_level: number | null;
     reorder_quantity: number | null;
@@ -186,13 +214,13 @@ export function NewPharmacyOrderDialog({
     const position = stockFor(stockItems, form.data.client_medication_id);
     const pickMed = (id: string) => {
         const row = stockFor(stockItems, id);
-        form.setData({
-            ...form.data,
+        form.setData((current) => ({
+            ...current,
             client_medication_id: id,
             quantity_ordered:
-                form.data.quantity_ordered ||
+                current.quantity_ordered ||
                 (row?.reorder_quantity ? String(row.reorder_quantity) : ''),
-        });
+        }));
     };
     const submit = () =>
         form.post('/emar/stock/pharmacy-orders', {
@@ -214,6 +242,7 @@ export function NewPharmacyOrderDialog({
             open
             onClose={onClose}
             title="New pharmacy order"
+            formState={form}
             description="Order medication stock from a pharmacy."
             railIcon={ShoppingCart}
             railTitle="Pharmacy order"
@@ -282,11 +311,11 @@ export function NewPharmacyOrderDialog({
                             <SelectInput
                                 value={form.data.client_id}
                                 onChange={(v) =>
-                                    form.setData({
-                                        ...form.data,
+                                    form.setData((current) => ({
+                                        ...current,
                                         client_id: v,
                                         client_medication_id: '',
-                                    })
+                                    }))
                                 }
                                 placeholder="Select client…"
                                 options={clients.map((c) => ({
@@ -590,6 +619,10 @@ export function ReceiveStockDialog({
         scanOk,
         scanOk,
     ];
+    if (med?.pack_workflow_url)
+        return (
+            <PackWorkflowNotice url={med.pack_workflow_url} onClose={onClose} />
+        );
     return (
         <MedsWizardDialog
             open
@@ -1086,6 +1119,7 @@ export function ControlledPharmacyDeliveryDialog({
             onClose={onClose}
             title="Receive stock"
             description="Record incoming controlled-drug stock with a witness."
+            formState={form}
             railIcon={Truck}
             railTitle="Receive stock"
             railSubtitle="Controlled drug"
@@ -1474,6 +1508,13 @@ export function StockCountDialog({
                     (variance === 0 ||
                         !!form.data.immediate_action_taken.trim()))),
     ];
+    if (!isCd && row?.pack_workflow_url)
+        return (
+            <PackWorkflowNotice
+                url={row.pack_workflow_url + '&view=counts'}
+                onClose={onClose}
+            />
+        );
     return (
         <MedsWizardDialog
             open
@@ -1748,8 +1789,12 @@ export function AdjustStockDialog({
         const details = {
             reorder_level: form.data.reorder_level,
             reorder_quantity: form.data.reorder_quantity,
-            expiry_date: form.data.expiry_date,
-            batch_number: form.data.batch_number,
+            ...(item.pack_workflow_url
+                ? {}
+                : {
+                      expiry_date: form.data.expiry_date,
+                      batch_number: form.data.batch_number,
+                  }),
             supplier_name: form.data.supplier_name,
             storage_condition: form.data.storage_condition,
         };
@@ -1869,6 +1914,7 @@ export function AdjustStockDialog({
                         >
                             <Input
                                 type="date"
+                                disabled={!!item.pack_workflow_url}
                                 value={form.data.expiry_date}
                                 onChange={(e) =>
                                     form.setData('expiry_date', e.target.value)
@@ -1880,6 +1926,7 @@ export function AdjustStockDialog({
                             error={form.errors.batch_number}
                         >
                             <Input
+                                disabled={!!item.pack_workflow_url}
                                 value={form.data.batch_number}
                                 onChange={(e) =>
                                     form.setData('batch_number', e.target.value)
@@ -1939,7 +1986,16 @@ export function AdjustStockDialog({
                             value={`${item.on_hand} ${item.unit}`}
                         />
                     </div>
-                    {controlledQuantity ? (
+                    {!item.controlled && item.pack_workflow_url ? (
+                        <SettingsNotice role="note">
+                            Count or remove actual packs to change stock.{' '}
+                            <Button asChild variant="outline">
+                                <a href={item.pack_workflow_url}>
+                                    Open pack records
+                                </a>
+                            </Button>
+                        </SettingsNotice>
+                    ) : controlledQuantity ? (
                         <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm">
                             <p>
                                 A second current staff member must witness and

@@ -6,275 +6,159 @@ use App\Models\BreakGlassFlagDismissal;
 use App\Models\BreakGlassPolicy;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
-use App\Models\ClientIncident;
+use App\Models\MedicationEvent;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Alerts\OnCallResolver;
+use App\Services\Medication\WitnessPinService;
 use App\Services\UserSiteAccessService;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 
 class EmergencyAccessController extends Controller
 {
-    private const SITE_BYPASS_PERMISSIONS = ['medications.audit.view'];
+    public function __construct(private readonly UserSiteAccessService $siteAccess, private readonly WitnessPinService $pins, private readonly OnCallResolver $onCall) {}
 
-    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
-
-    private function canRevoke($user, ClientBreakGlassAccess $access): bool
-    {
-        $isManager = $user->hasRole('admin', 'provider_manager') || $user->canDo('medications.audit.view');
-
-        return $isManager || (int) $access->user_id === (int) $user->id;
-    }
-
-    /**
-     * Break-glass discovery flow.
-     *
-     * This endpoint intentionally returns only minimal client identity fields.
-     * It exists so authorised staff can request emergency access without
-     * broadening the normal Clients list permissions.
-     */
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('medications.breakglass'), 403);
-
-        $policy = BreakGlassPolicy::current();
-
-        $visibleSiteIds = $this->siteAccess->accessibleSiteIds(
-            $user,
-            self::SITE_BYPASS_PERMISSIONS,
-        );
+        abort_unless($user && ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view')), 403);
+        $reviewer = $user->canDo('medications.audit.view');
+        $canStart = $user->canDo('medications.breakglass');
+        $visible = $this->siteAccess->accessibleSiteIds($user, $reviewer ? ['medications.audit.view'] : []);
         $siteId = $request->integer('site_id') ?: null;
-        if ($siteId !== null) {
-            abort_unless(in_array($siteId, $visibleSiteIds, true), 403);
-        }
-        $scopedSiteIds = $siteId === null ? $visibleSiteIds : [$siteId];
-        $accessScope = fn (Builder $query): Builder => $query->whereHas(
-            'client',
-            fn (Builder $clients): Builder => $clients->whereIn('site_id', $scopedSiteIds),
-        );
+        abort_if($siteId !== null && ! in_array($siteId, $visible, true), 403);
+        $scoped = $siteId ? [$siteId] : $visible;
+        $base = ClientBreakGlassAccess::withTrashed()
+            ->whereHas('client', fn ($q) => $q->whereIn('site_id', $scoped));
+        $relations = ['client.site', 'user:id,name', 'coSignedBy:id,name', 'reviewedBy:id,name',
+            'revokedBy:id,name', 'reviews.user:id,name', 'extensions', 'accessEvents'];
+        $history = (clone $base)->with($relations)->orderByDesc('created_at')->paginate(50, ['*'], 'history_page')->withQueryString();
+        $queue = (clone $base)->with($relations)->whereNull('review_outcome')
+            ->where(fn ($w) => $w->whereNotNull('deleted_at')->orWhereNotNull('ended_at')->orWhere('expires_at', '<=', now()))
+            ->orderByRaw('COALESCE(review_due_at, deleted_at, expires_at) ASC')->paginate(50, ['*'], 'review_page')->withQueryString();
+        $running = (clone $base)->with($relations)->whereNull('deleted_at')->whereNull('ended_at')->where('expires_at', '>', now())->orderBy('expires_at')->get();
+        $all = $history->getCollection();
+        $openGrant = $request->integer('grant') ? (clone $base)->with($relations)->find($request->integer('grant')) : null;
+        $eventGrants = $all->merge($queue->getCollection())->merge($running)->when($openGrant, fn ($rows) => $rows->push($openGrant))->keyBy('id');
+        $chainEvents = MedicationEvent::query()->whereIn('site_id', $scoped)
+            ->whereIn('client_id', $eventGrants->pluck('client_id'))
+            ->where(function ($events) use ($eventGrants): void {
+                $events->where(fn ($q) => $q->where('subject_type', 'emergency_access')->whereIn('subject_id', $eventGrants->keys()->map(fn ($id) => (string) $id)))
+                    ->orWhereIn('facts->break_glass_access_id', $eventGrants->keys());
+            })->when(! $user->canDo('medications.controlled.view'), fn ($q) => $q->where('controlled', false))
+            ->orderBy('occurred_at')->get()
+            ->filter(function ($event) use ($eventGrants): bool {
+                $id = $event->facts['break_glass_access_id'] ?? ($event->subject_type === 'emergency_access' ? $event->subject_id : null);
+                $grant = $eventGrants->get($id);
 
-        $q = trim((string) $request->get('q', ''));
+                return $grant && (int) $event->client_id === (int) $grant->client_id
+                    && (int) $event->site_id === (int) $grant->client->site_id;
+            })->groupBy(fn ($event) => $event->facts['break_glass_access_id'] ?? $event->subject_id);
+        $present = function (ClientBreakGlassAccess $grant) use ($user, $reviewer, $chainEvents): array {
+            $running = $grant->isRunning();
+            $own = (int) $grant->user_id === (int) $user->id;
+            $independent = ! in_array((int) $user->id, [(int) $grant->user_id, (int) $grant->co_signed_by], true);
 
-        $results = collect();
-        if (mb_strlen($q) >= 2) {
-            $results = Client::query()
-                ->with('site:id,name')
-                ->whereIn('site_id', $scopedSiteIds)
-                ->where(function ($query) use ($q) {
-                    $searchTerm = '%'.$q.'%';
-                    $query
-                        ->where('first_name', 'like', $searchTerm)
-                        ->orWhere('last_name', 'like', $searchTerm)
-                        ->orWhereRaw("concat(first_name, ' ', last_name) like ?", [$searchTerm]);
-                })
-                ->orderBy('last_name')
-                ->limit(25)
-                ->get(['id', 'first_name', 'last_name', 'date_of_birth', 'status', 'site_id'])
-                ->map(fn ($c) => [
-                    'id' => $c->id,
-                    'first_name' => $c->first_name,
-                    'last_name' => $c->last_name,
-                    'date_of_birth' => optional($c->date_of_birth)->format('Y-m-d'),
-                    'status' => $c->status,
-                    'site' => $c->site?->only(['id', 'name']),
-                ]);
-        }
-
-        $clientName = fn ($a) => $a->client ? trim(($a->client->first_name ?? '').' '.($a->client->last_name ?? '')) : 'Unknown';
-
-        // Live grants visible through canonical Site access — not revoked, not expired.
-        $activeAccesses = ClientBreakGlassAccess::query()
-            ->tap($accessScope)
-            ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'user:id,name', 'coSignedBy:id,name'])
-            ->where(fn ($w) => $w->whereNull('expires_at')->orWhere('expires_at', '>', now()))
-            ->orderByDesc('created_at')
-            ->limit(60)
-            ->get()
-            ->map(fn ($a) => [
-                'id' => $a->id,
-                'client_id' => $a->client_id,
-                'client_name' => $clientName($a),
-                'site_name' => $a->client?->site?->name,
-                'reason' => $a->reason,
-                'reason_category' => $a->reason_category,
-                'cosign_label' => $a->authorizationLabel(),
-                'granted_by' => $a->user?->name,
-                'created_at' => $a->created_at?->toIso8601String(),
-                'expires_at' => $a->expires_at?->toIso8601String(),
-                'can_revoke' => $this->canRevoke($user, $a),
-            ])
-            ->values();
-
-        // Audit log — every activation, including revoked (soft-deleted) ones.
-        $auditLog = ClientBreakGlassAccess::withTrashed()
-            ->tap($accessScope)
-            ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'user:id,name', 'revokedBy:id,name', 'reviewedBy:id,name', 'accessEvents'])
-            ->orderByDesc('created_at')
-            ->limit(150)
-            ->get()
-            ->map(fn ($a) => [
-                'id' => $a->id,
-                'client_id' => $a->client_id,
-                'staff' => $a->user?->name ?? 'Unknown',
-                'client_name' => $clientName($a),
-                'site_name' => $a->client?->site?->name,
-                'reason' => $a->reason,
-                'reason_category' => $a->reason_category,
-                'minutes' => $a->created_at && $a->expires_at ? $a->created_at->diffInMinutes($a->expires_at) : null,
-                'created_at' => $a->created_at?->toIso8601String(),
-                'expires_at' => $a->expires_at?->toIso8601String(),
-                'status' => $a->deleted_at ? 'revoked' : ($a->expires_at && $a->expires_at->isPast() ? 'expired' : 'active'),
-                'revoked_by' => $a->revokedBy?->name,
-                'review_outcome' => $a->review_outcome,
-                'reviewed_by' => $a->reviewedBy?->name,
-                'incident_report_id' => $a->incident_report_id,
-                'events' => $a->accessEvents->sortBy('created_at')->values()->map(fn ($e) => [
+            return [
+                'id' => $grant->id, 'client_id' => $grant->client_id,
+                'client_name' => $grant->client?->full_name ?? 'Person', 'site_name' => $grant->client?->site?->name,
+                'staff' => $grant->user?->name ?? 'Staff member', 'granted_by' => $grant->user?->name,
+                'reason' => $grant->reason, 'reason_category' => $grant->reason_category,
+                'cosign_label' => $grant->authorizationLabel(),
+                'created_at' => $grant->created_at?->toIso8601String(), 'expires_at' => $grant->expires_at?->toIso8601String(),
+                'ended_at' => $grant->endedTime()?->toIso8601String(), 'ended_how' => $grant->ended_how,
+                'end_reason' => $grant->end_reason, 'review_due_at' => $grant->reviewDueTime()?->toIso8601String(),
+                'minutes' => $grant->created_at && $grant->expires_at ? (int) $grant->created_at->diffInMinutes($grant->expires_at) : null,
+                'status' => $grant->trashed() ? 'revoked' : ($running ? 'active' : 'expired'),
+                'can_revoke' => $running && ($own ? $user->canDo('medications.breakglass') : $user->canDo('medications.breakglass.end')),
+                'can_extend' => $running && $own && $user->canDo('medications.breakglass')
+                    && $grant->expires_at->lt($grant->created_at->copy()->addMinutes($grant->effectivePolicy()['max_minutes'])),
+                'own' => $own, 'can_review' => ! $running && $reviewer && $independent,
+                'can_report_error' => $user->canDo('medications.view') && $user->canDo('medications.administer.record'),
+                'review_denial' => $independent ? null : ($own ? 'You used it — someone else reviews it' : 'You confirmed it — someone else reviews it'),
+                'review_outcome' => $grant->review_outcome, 'reviewed_by' => $grant->reviewedBy?->name,
+                'incident_report_id' => $grant->incident_report_id,
+                'reviews' => $grant->reviews->map(fn ($r) => [
+                    'id' => $r->id, 'outcome' => $r->outcome, 'notes' => $r->notes, 'by' => $r->user?->name,
+                    'at' => $r->created_at->toIso8601String(), 'correction_reason' => $r->correction_reason,
+                ])->values(),
+                'extensions' => $grant->extensions,
+                'events' => $grant->accessEvents->map(fn ($e) => [
                     'action' => $e->action,
-                    'detail' => $e->detail,
+                    // Old activity rows carry no controlled marker; do not disclose their free text to a reader without controlled view.
+                    'detail' => $user->canDo('medications.controlled.view') ? $e->detail : null,
                     'at' => $e->created_at?->toIso8601String(),
-                ])->all(),
-            ])
-            ->values();
-
-        // Acknowledged signals are suppressed until newer activity appears (re-surface).
-        $dismissals = BreakGlassFlagDismissal::query()
-            ->get()
-            ->keyBy(fn ($d) => $d->signal_type.':'.$d->signal_key);
-        $isDismissed = function (string $type, string $key, ?Carbon $freshAt) use ($dismissals): bool {
-            $d = $dismissals->get($type.':'.$key);
-
-            return $d && $d->dismissed_through && $freshAt && $d->dismissed_through->gte($freshAt);
+                ])->concat(($chainEvents->get($grant->id) ?? collect())->map(fn ($e) => [
+                    'id' => $e->id, 'action' => $e->summary, 'detail' => null,
+                    'at' => $e->occurred_at->toIso8601String(),
+                ]))->sortBy('at')->values(),
+            ];
         };
-
-        // Flagged: repeat break-glass — one user activating ≥ the policy threshold within its window.
-        $windowStart = now()->subDays($policy->repeat_window_days);
-        $recent = ClientBreakGlassAccess::withTrashed()
-            ->tap($accessScope)
-            ->where('created_at', '>=', $windowStart)
-            ->with('user:id,name')
-            ->get();
-        $flaggedSignals = $recent->groupBy('user_id')
+        $q = trim((string) $request->query('q', ''));
+        $discoverySites = $canStart ? $this->siteAccess->accessibleSiteIds($user) : [];
+        $results = mb_strlen($q) >= 2 && $canStart ? Client::whereIn('site_id', array_intersect($scoped, $discoverySites))
+            ->with('site:id,name')->where(fn ($w) => $w->where('first_name', 'like', '%'.$q.'%')->orWhere('last_name', 'like', '%'.$q.'%'))
+            ->orderBy('last_name')->limit(25)->get(['id', 'first_name', 'last_name', 'date_of_birth', 'site_id'])->map(fn ($c) => $c->only(['id', 'first_name', 'last_name']) + ['date_of_birth' => $c->date_of_birth?->toDateString(), 'site' => $c->site?->only(['id', 'name'])]) : collect();
+        $requestClient = $canStart && $request->integer('request_client') ? Client::whereIn('site_id', array_intersect($scoped, $discoverySites))
+            ->with('site:id,name')->find($request->integer('request_client')) : null;
+        $candidates = User::whereNotNull('approved_at')->where('id', '!=', $user->id)->with(['roles.permissions', 'hrEmployeeProfile'])
+            ->orderBy('name')->get()->filter(fn (User $u) => ($u->canDo('medications.breakglass') || $u->canDo('medications.audit.view'))
+                && array_intersect($scoped, $this->siteAccess->accessibleSiteIds($u)) !== []);
+        $byId = $candidates->keyBy('id');
+        $pinRows = $this->pins->pickerRows($candidates)->map(fn ($row) => $row + [
+            'site_ids' => array_values(array_intersect($scoped, $this->siteAccess->accessibleSiteIds($byId->get($row['id'])))),
+        ]);
+        $onCallContacts = [];
+        foreach (array_intersect($scoped, $discoverySites) as $houseId) {
+            $contact = $this->onCall->at((int) $houseId, now());
+            $onCallContacts[(int) $houseId] = [
+                'name' => $contact['user']?->name,
+                'phone' => $contact['user'] ? $this->onCall->phoneOf($contact['user']) : null,
+                'how' => $contact['how'], 'warning' => $contact['warning'],
+            ];
+        }
+        $policy = BreakGlassPolicy::current();
+        $recent = (clone $base)->where('created_at', '>=', now()->subDays($policy->repeat_window_days))->with(['user:id,name', 'client.site'])->get();
+        $dismissals = BreakGlassFlagDismissal::where('signal_type', 'repeat')->get()->keyBy('signal_key');
+        $flags = $recent->groupBy(fn ($g) => $g->client->site_id.':'.$g->user_id)
             ->filter(fn ($g) => $g->count() >= $policy->repeat_threshold_count)
-            ->reject(fn ($g) => $isDismissed('repeat', (string) $g->first()->user_id, $g->max('created_at')))
-            ->map(fn ($g) => [
-                'type' => 'repeat',
-                'key' => (string) $g->first()->user_id,
-                'severity' => 'critical',
-                'title' => 'Repeat break-glass — same user',
-                'detail' => ($g->first()->user?->name ?? 'A staff member').' activated break-glass '.$g->count().' times in the last '.$policy->repeat_window_days.' days.',
-            ])
-            ->values();
+            ->reject(function ($g, $key) use ($dismissals): bool {
+                $ack = $dismissals->get((string) $key) ?? $dismissals->get((string) $g->first()->user_id);
 
-        // Oversight gap: activations that have ended (expired) without a post-event review.
-        $awaitingBase = ClientBreakGlassAccess::query()
-            ->tap($accessScope)
-            ->whereNotNull('expires_at')->where('expires_at', '<', now())
-            ->whereNull('review_outcome');
-        $awaitingReview = (clone $awaitingBase)->count();
-        $awaitingFresh = $awaitingReview > 0 ? Carbon::parse((clone $awaitingBase)->max('expires_at')) : null;
-
-        if ($awaitingReview > 0 && ! $isDismissed('awaiting_review', 'awaiting_review', $awaitingFresh)) {
-            $flaggedSignals->push([
-                'type' => 'awaiting_review',
-                'key' => 'awaiting_review',
-                'severity' => 'warning',
-                'title' => 'Activations awaiting review',
-                'detail' => $awaitingReview.' expired break-glass activation'.($awaitingReview === 1 ? ' has' : 's have').' not had a post-event review.',
-            ]);
-        }
-
-        // Co-sign approver pool: approved staff who can access at least one
-        // currently visible Site and hold break-glass or audit permission.
-        $approvers = User::query()
-            ->where('id', '!=', $user->id)
-            ->whereNotNull('approved_at')
-            ->orderBy('name')
-            ->limit(100)
-            ->get(['id', 'name', 'role'])
-            ->filter(function (User $candidate) use ($scopedSiteIds): bool {
-                if (! $candidate->canDo('medications.breakglass') && ! $candidate->canDo('medications.audit.view')) {
-                    return false;
-                }
-
-                return array_intersect(
-                    $scopedSiteIds,
-                    // Co-signing is a care authorisation action, so audit
-                    // visibility cannot replace a current HR Site assignment.
-                    $this->siteAccess->accessibleSiteIds($candidate),
-                ) !== [];
+                return $ack && ($ack->dismissed_through_access_id !== null
+                    ? (int) $ack->dismissed_through_access_id >= (int) $g->max('id')
+                    : (bool) $ack->dismissed_through?->gt($g->max('created_at')));
             })
-            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name, 'role' => $u->role])
-            ->values();
-
-        $activeSite = $siteId ? Site::query()->whereIn('id', $visibleSiteIds)->find($siteId) : null;
-
-        // Deep-link from the MAR interstitial: pre-open the request wizard for this client.
-        $requestClientId = $request->integer('request_client') ?: null;
-        $requestClient = null;
-        if ($requestClientId) {
-            $rc = Client::query()
-                ->whereIn('site_id', $scopedSiteIds)
-                ->with('site:id,name')
-                ->find($requestClientId);
-            if ($rc) {
-                $requestClient = [
-                    'id' => $rc->id,
-                    'first_name' => $rc->first_name,
-                    'last_name' => $rc->last_name,
-                    'date_of_birth' => optional($rc->date_of_birth)->format('Y-m-d'),
-                    'status' => $rc->status,
-                    'site' => $rc->site?->only(['id', 'name']),
-                ];
-            }
-        }
-
-        // Incidents for the audit-log clients, for the review modal's link picker.
-        $incidentsByClient = ClientIncident::query()
-            ->whereIn('client_id', $auditLog->pluck('client_id')->unique()->values())
-            ->orderByDesc('occurred_at')
-            ->get(['id', 'client_id', 'type', 'title', 'occurred_at'])
-            ->groupBy('client_id')
-            ->map(fn ($g) => $g->map(fn ($i) => [
-                'id' => $i->id,
-                'label' => $i->title ?: ucfirst((string) $i->type),
-                'date' => $i->occurred_at?->toDateString(),
-            ])->values());
+            ->map(fn ($g, $id) => [
+                'type' => 'repeat', 'key' => (string) $id, 'severity' => 'warning', 'title' => 'Repeat emergency access',
+                'detail' => ($g->first()->user?->name ?? 'Staff member').' — '.$g->count().' grants at '.($g->first()->client?->site?->name ?? 'this house').' within '.$policy->repeat_window_days.' days. Reported, never blocked.',
+                'can_acknowledge' => $reviewer && (int) $g->first()->user_id !== (int) $user->id,
+            ])->values();
+        $rows = $all->map($present);
+        $site = $siteId ? Site::find($siteId) : null;
 
         return inertia('emergency/access', [
-            'query' => $q,
-            'results' => $results,
-            'activeAccesses' => $activeAccesses,
-            'auditLog' => $auditLog,
-            'flaggedSignals' => $flaggedSignals,
-            'approvers' => $approvers,
-            'can_review' => $user->hasRole('admin', 'provider_manager') || $user->canDo('medications.audit.view'),
-            'policy' => [
-                'default_minutes' => $policy->default_minutes,
-                'max_minutes' => $policy->max_minutes,
-                'extend_minutes' => $policy->extend_minutes,
-                'auto_revoke' => true,
-                'reason_required' => $policy->reason_required,
-                'repeat_threshold_count' => $policy->repeat_threshold_count,
-                'repeat_window_days' => $policy->repeat_window_days,
-            ],
-            'can_edit_policy' => $user->hasRole('admin', 'provider_manager'),
+            'query' => $q, 'results' => $results, 'activeAccesses' => $running->map($present)->values(),
+            'auditLog' => $rows, 'reviewQueue' => $queue->getCollection()->map($present)->values(),
+            'history_pagination' => collect($history->toArray())->except('data'),
+            'review_pagination' => collect($queue->toArray())->except('data'), 'flaggedSignals' => $flags, 'approvers' => $pinRows,
+            'on_call_contacts' => $onCallContacts,
+            'open_grant' => $openGrant ? $present($openGrant) : null,
+            'can_review' => $reviewer, 'can_start' => $canStart,
+            'policy' => $policy->snapshot() + ['auto_revoke' => true],
+            'can_edit_policy' => false, 'incidents_by_client' => [],
             'stats' => [
-                'active' => $activeAccesses->count(),
+                'active' => (clone $base)->whereNull('deleted_at')->whereNull('ended_at')->where('expires_at', '>', now())->count(),
                 'granted_week' => $recent->count(),
-                'awaiting_review' => $awaitingReview,
-                'flagged' => $flaggedSignals->count(),
+                'awaiting_review' => (clone $base)->whereNull('review_outcome')
+                    ->where(fn ($w) => $w->whereNotNull('deleted_at')->orWhereNotNull('ended_at')->orWhere('expires_at', '<=', now()))->count(),
+                'flagged' => $flags->count(),
+                'month' => (clone $base)->where('created_at', '>=', now('Pacific/Auckland')->startOfMonth()->utc())->count(),
             ],
-            'sites' => Site::query()
-                ->whereIn('id', $visibleSiteIds)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(['id', 'name']),
-            'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
-            'site_brand_colour' => $activeSite?->brand_colour,
-            'request_client' => $requestClient,
-            'incidents_by_client' => $incidentsByClient,
+
+            'sites' => Site::whereIn('id', $visible)->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'active_site' => $site?->only(['id', 'name']), 'site_brand_colour' => $site?->brand_colour,
+            'request_client' => $requestClient ? $requestClient->only(['id', 'first_name', 'last_name']) + ['date_of_birth' => $requestClient->date_of_birth?->toDateString(), 'site' => $requestClient->site?->only(['id', 'name'])] : null,
         ]);
     }
 }

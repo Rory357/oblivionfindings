@@ -7,20 +7,30 @@ import {
 } from '@/components/emar/prn-detail-dialog';
 import { PrnEffectivenessDialog } from '@/components/emar/prn-effectiveness-dialog';
 import { PrnNearLimitDialog } from '@/components/emar/prn-near-limit-dialog';
+import { AsNeededPicker } from '@/components/emar/record-dose/dialogs';
+import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog';
+import {
+    EmarMeters,
+    EmarViewFilter,
+} from '@/components/emar/workspace-navigation';
 import {
     DayPickerChip,
     addDays,
     parseYmd,
 } from '@/components/meds/day-picker-chip';
-import { PageHero, type PageHeroStat } from '@/components/page';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import {
     Donut,
     DonutLegend,
     EntityFilter,
     MicroStats,
     ShiftContextMenu,
-    TabStrip,
     type MicroStat,
     type RosterTabItem,
     type ShiftCtxItem,
@@ -29,8 +39,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
-import { AsNeededPicker } from '@/components/emar/record-dose/dialogs';
-import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog';
 import type {
     ClientInfo,
     PrnFollowUp,
@@ -51,11 +59,9 @@ import {
     Plus,
     Printer,
     RotateCcw,
-    Search,
     Stethoscope,
     TrendingUp,
     User,
-    X,
 } from 'lucide-react';
 import {
     useMemo,
@@ -530,25 +536,6 @@ export default function PrnRecords(props: Props) {
         },
     ];
 
-    const heroStats: PageHeroStat[] = [
-        {
-            label: 'Given',
-            value: administrations.filter((a) => a.status === 'given').length,
-            sub: 'last 30d',
-        },
-        {
-            label: 'Reviews',
-            value: reviews.length,
-            sub: 'due now',
-            tone: reviews.length > 0 ? 'warning' : 'neutral',
-        },
-        {
-            label: 'Near limit',
-            value: nearLimit.length,
-            tone: nearLimit.length > 0 ? 'critical' : 'neutral',
-        },
-    ];
-
     const trends = useMemo(() => {
         const byMed = new Map<string, number>();
         const byInd = new Map<string, number>();
@@ -657,47 +644,81 @@ export default function PrnRecords(props: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="PRN Records" />
-            <div className="flex flex-col gap-6 p-6">
-                <PageHero
+            <div className="flex flex-col gap-5">
+                <PageHeader
+                    frontline
                     rail={<EmarHubRail />}
-                    variant="hero"
-                    category="ops"
                     brandColour={brandColour}
                     icon={Pill}
-                    title={
-                        <span>
-                            <span className="flex items-center gap-2 text-[10.5px] font-semibold tracking-wide text-primary-foreground/80 uppercase">
-                                <span
-                                    aria-hidden
-                                    className="relative inline-flex h-2 w-2"
-                                >
-                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
-                                </span>
-                                As-needed medication register
-                            </span>
-                            <span className="mt-1 block text-[26px] leading-tight font-bold">
-                                PRN records for{' '}
-                                <span className="border-b-2 border-primary-foreground/40">
-                                    {activeSite?.name ?? 'your services'}
-                                </span>
-                            </span>
-                        </span>
+                    title="As-needed medication"
+                    titleChip={
+                        <PageHeaderStatusChip variant="neutral">
+                            {activeSite?.name ?? 'All permitted houses'}
+                        </PageHeaderStatusChip>
                     }
-                    description="Record as-needed doses, track daily limits and complete effectiveness reviews — every action stays on this page."
-                    stats={heroStats}
+                    subline="PRN doses, daily limits and effectiveness reviews"
+                    meters={
+                        <EmarMeters
+                            items={[
+                                {
+                                    label: 'Given',
+                                    value: administrations.filter(
+                                        (a) => a.status === 'given',
+                                    ).length,
+                                    caption: 'In the selected 30-day lookback',
+                                    onClick: () => setActiveTab('register'),
+                                },
+                                {
+                                    label: 'Reviews due',
+                                    value: reviews.length,
+                                    caption:
+                                        'Effectiveness reviews to complete',
+                                    tone: reviews.length ? 'warning' : 'brand',
+                                    onClick: () => setActiveTab('reviews'),
+                                },
+                                {
+                                    label: 'Near limit',
+                                    value: nearLimit.length,
+                                    caption: 'Check before giving another dose',
+                                    tone: nearLimit.length
+                                        ? 'critical'
+                                        : 'brand',
+                                    onClick: () => setActiveTab('near'),
+                                },
+                            ]}
+                        />
+                    }
                     actions={
-                        canRecord ? (
-                            <PageHeaderPrimaryButton
-                                icon={Plus}
-                                onClick={() => setModal({ type: 'record' })}
-                            >
-                                Record PRN dose
-                            </PageHeaderPrimaryButton>
-                        ) : null
+                        <>
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                onKeyDown={(event) => {
+                                    if (
+                                        event.key === 'Enter' &&
+                                        activeTab === 'history'
+                                    )
+                                        setHist({});
+                                }}
+                                placeholder={
+                                    activeTab === 'history'
+                                        ? 'Search archive — press Enter…'
+                                        : 'Search person or medication…'
+                                }
+                                ariaLabel="Search PRN records"
+                            />
+                            {canRecord ? (
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
+                                    onClick={() => setModal({ type: 'record' })}
+                                >
+                                    Record PRN dose
+                                </PageHeaderPrimaryButton>
+                            ) : null}
+                        </>
                     }
-                    footer={
-                        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
+                    filters={
+                        <div className="flex w-full flex-wrap items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-1.5">
                                 {/* eslint-disable no-restricted-syntax -- segmented day-stepper on the dark hero; not a shadcn Button (rostering idiom). */}
                                 <button
@@ -733,48 +754,26 @@ export default function PrnRecords(props: Props) {
                                 ) : null}
                             </div>
                             <div className="flex flex-wrap items-center gap-2 md:ml-auto md:justify-end">
-                                <div className="relative w-full max-w-xs md:w-[260px]">
-                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                    {/* eslint-disable-next-line no-restricted-syntax -- white pill search on the dark hero per the design handoff. */}
-                                    <input
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                        onKeyDown={(e) => {
-                                            if (
-                                                e.key === 'Enter' &&
-                                                activeTab === 'history'
-                                            )
-                                                setHist({});
+                                <EmarViewFilter
+                                    value={activeTab}
+                                    onChange={setActiveTab}
+                                    items={TABS}
+                                    label="PRN view"
+                                />
+                                {search && (
+                                    <PageHeaderGlassButton
+                                        onClick={() => {
+                                            setSearch('');
+                                            if (activeTab === 'history')
+                                                reload({
+                                                    q: undefined,
+                                                    history_page: 1,
+                                                });
                                         }}
-                                        placeholder={
-                                            activeTab === 'history'
-                                                ? 'Search archive — press Enter…'
-                                                : 'Search client or medication…'
-                                        }
-                                        aria-label="Search PRN records"
-                                        className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-3 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
-                                    />
-                                    {search ? (
-                                        // eslint-disable-next-line no-restricted-syntax -- inline clear affordance inside the pill search input.
-                                        <button
-                                            type="button"
-                                            aria-label="Clear search"
-                                            onClick={() => {
-                                                setSearch('');
-                                                if (activeTab === 'history')
-                                                    reload({
-                                                        q: undefined,
-                                                        history_page: 1,
-                                                    });
-                                            }}
-                                            className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"
-                                        >
-                                            <X className="h-3.5 w-3.5" />
-                                        </button>
-                                    ) : null}
-                                </div>
+                                    >
+                                        Clear search
+                                    </PageHeaderGlassButton>
+                                )}
                                 {sites.length > 0 ? (
                                     <EntityFilter
                                         label="Site"
@@ -800,13 +799,6 @@ export default function PrnRecords(props: Props) {
                             </div>
                         </div>
                     }
-                />
-
-                <TabStrip
-                    value={activeTab}
-                    onChange={setActiveTab}
-                    items={TABS}
-                    ariaLabel="PRN views"
                 />
 
                 {activeTab === 'register' && (

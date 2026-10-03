@@ -1,9 +1,12 @@
 /* eslint-disable no-restricted-syntax -- detail rows are a custom definition list
    inside a Dialog, not standalone Cards. All colours are semantic tokens. */
 import { ClientAvatar } from '@/components/meds/board-bits';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
@@ -16,6 +19,7 @@ function fmt(iso: string | null): string | null {
     return Number.isNaN(d.getTime())
         ? null
         : d.toLocaleString('en-NZ', {
+              timeZone: 'Pacific/Auckland',
               weekday: 'short',
               day: 'numeric',
               month: 'short',
@@ -53,8 +57,18 @@ export default function RoundActivityDialog({
 
     return (
         <Dialog open onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="max-w-[520px] gap-0 p-0">
-                <DialogHeader className="space-y-0 border-b p-5 pr-12">
+            <DialogContent
+                className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0"
+                style={{
+                    width: 'min(92vw, 480px)',
+                    maxWidth: 'min(92vw, 480px)',
+                }}
+            >
+                <DialogHeader className="shrink-0 space-y-0 border-b p-5 pr-12">
+                    <DialogDescription className="sr-only">
+                        Recorded medication outcome and observations. Times use
+                        Pacific/Auckland.
+                    </DialogDescription>
                     <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
                             <ClientAvatar
@@ -75,7 +89,7 @@ export default function RoundActivityDialog({
                     </div>
                 </DialogHeader>
 
-                <div className="px-5 py-4">
+                <div className="min-h-0 overflow-y-auto px-5 py-4">
                     <div className="flex flex-wrap items-baseline gap-2">
                         <span className="text-[17px] font-bold">
                             {item.medication_name ?? 'Medication'}
@@ -141,6 +155,11 @@ export default function RoundActivityDialog({
                         </div>
                     ) : null}
                 </div>
+                <DialogFooter className="shrink-0 border-t bg-muted/30 p-4">
+                    <Button variant="outline" onClick={onClose}>
+                        Close
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

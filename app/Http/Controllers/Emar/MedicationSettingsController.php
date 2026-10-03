@@ -17,13 +17,16 @@ use App\Models\UserPushSubscription;
 use App\Models\WitnessPinReminder;
 use App\Notifications\WitnessPinReminderNotification;
 use App\Services\AuditLogger;
+use App\Services\Medication\Alerts\MedicationAlertLog;
 use App\Services\Medication\Alerts\MedicationAlertPreviews;
 use App\Services\Medication\Alerts\MedicationAlertReachGaps;
 use App\Services\Medication\Alerts\MedicationAlertRecipients;
 use App\Services\Medication\Alerts\OnCallResolver;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\RoundTemplateCatalogue;
+use App\Services\Medication\Settings\EmergencyAccessPolicySettings;
 use App\Services\Medication\Settings\MedicationSettingDefinition;
+use App\Services\Medication\Settings\MedicationSettingsEvents;
 use App\Services\Medication\Settings\MedicationSettingsRegistry;
 use App\Services\Medication\Settings\MedicationSettingsStore;
 use App\Services\Medication\Settings\MedicineRuleScope;
@@ -34,12 +37,12 @@ use App\Services\Medication\WitnessPinResetAuthority;
 use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationRuleService;
 use App\Services\UserSiteAccessService;
-use Illuminate\Database\Eloquent\Builder;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -93,7 +96,7 @@ class MedicationSettingsController extends Controller
     public function saveChanges(Request $request)
     {
         $actor = $request->user();
-        abort_unless($this->canManageSettings($actor) || $this->canManageHouseAlerts($actor), 403);
+        abort_unless($this->canManageSettings($actor) || $this->canManageHouseAlerts($actor) || $this->canManageEmergencyPolicy($actor), 403);
 
         $validated = $request->validate([
             'view' => ['required', 'string', Rule::in($this->settingsRegistry->views())],
@@ -129,7 +132,7 @@ class MedicationSettingsController extends Controller
             $this->assertQuietHoursConsistent($changes);
 
             return $this->settingsStore->apply($lockedActor, $changes, (bool) ($validated['confirm_loosening'] ?? false));
-        }, 3);
+        }, 5);
 
         $message = $result['saved'] === 0
             ? 'Nothing was saved — these settings already had those values.'
@@ -146,7 +149,7 @@ class MedicationSettingsController extends Controller
     public function keepDefaults(Request $request)
     {
         $actor = $request->user();
-        abort_unless($this->canManageSettings($actor), 403);
+        abort_unless($this->canManageSettings($actor) || $this->canManageEmergencyPolicy($actor), 403);
 
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1', 'max:200'],
@@ -172,7 +175,7 @@ class MedicationSettingsController extends Controller
             $this->assertCurrentSettingsAuthority($lockedActor, $items);
 
             return $this->settingsStore->keep($lockedActor, $items);
-        }, 3);
+        }, 5);
 
         $message = $kept === 1
             ? 'Kept today’s value for “'.$items[0]['definition']->label.'”. It now shows as reviewed.'
@@ -232,7 +235,14 @@ class MedicationSettingsController extends Controller
      */
     private function assertSettingsAuthority(User $actor, array $items): void
     {
-        if (! $this->canManageSettings($actor)) {
+        if (collect($items)->contains(fn ($item) => str_starts_with($item['definition']->group, 'controlled_'))) {
+            abort_unless($actor->canDo('medications.controlled.view'), 403);
+        }
+        if (collect($items)->contains(fn (array $item): bool => $item['definition']->group === 'ea')) {
+            abort_unless($this->canManageEmergencyPolicy($actor), 403);
+        }
+        $policyOnly = $items !== [] && collect($items)->every(fn (array $item): bool => $item['definition']->group === 'ea');
+        if (! $this->canManageSettings($actor) && ! ($policyOnly && $this->canManageEmergencyPolicy($actor))) {
             abort_unless($this->canManageHouseAlerts($actor) && $this->onlyHouseManaged($items), 403);
         }
         if (collect($items)->contains(fn (array $item): bool => ! $item['definition']->isSiteScoped())) {
@@ -240,7 +250,12 @@ class MedicationSettingsController extends Controller
         }
     }
 
-    /** @param  list<array{definition: MedicationSettingDefinition, site_id: int|null}>  $items */
+    /** A separate policy grant plus the existing all-sites authority. */
+    private function canManageEmergencyPolicy(?User $actor): bool
+    {
+        return $actor !== null && $actor->canDo(EmergencyAccessPolicySettings::PERMISSION) && $this->canManageGlobalRules($actor);
+    }
+
     private function onlyHouseManaged(array $items): bool
     {
         return $items !== [] && collect($items)->every(
@@ -456,6 +471,7 @@ class MedicationSettingsController extends Controller
      */
     private function assertCurrentSettingsAuthority(User $lockedActor, array $items): void
     {
+        $this->assertSettingsAuthority($lockedActor, $items);
         $this->assertSettingsAuthority($lockedActor, $items);
         $siteIds = collect($items)->pluck('site_id')->filter()->unique()->values()->all();
         if ($siteIds === []) {
@@ -724,7 +740,8 @@ class MedicationSettingsController extends Controller
         $canManageGlobal = $this->canManageGlobalRules($actor);
         $houseSiteIds = $canManage || $canHouseAlerts ? $this->ownHouseSiteIds($actor) : [];
         $siteIds = $canView ? $this->accessibleSiteIds($actor) : $houseSiteIds;
-        $alertPayload = $this->alertPayload($actor, $canView, $canManage, $canManageGlobal, $canHouseAlerts, $siteIds, $houseSiteIds);
+        $savedSettings = $this->settingsStore->valuesAndReviews($siteIds);
+        $alertPayload = $this->alertPayload($actor, $canView, $canManage, $canManageGlobal, $canHouseAlerts, $siteIds, $houseSiteIds, $savedSettings);
         // Rules that name a controlled medicine are concealed from anyone
         // without controlled-medicine access, here and in the history (EM-12).
         $canSeeControlled = $this->ruleScope->canSeeControlled($actor);
@@ -733,11 +750,8 @@ class MedicationSettingsController extends Controller
             : [];
         $settings = [
             ...$this->settingsRegistry->toClient(),
-            'values' => $this->settingsStore->organisationValues(),
-            // null = still the default; nobody has deliberately saved or kept it.
-            'reviewed' => $this->settingsStore->reviewed(),
-            'site_values' => $this->settingsStore->siteValues($siteIds),
-            'site_reviewed' => $this->settingsStore->siteReviewed($siteIds),
+            // Values and review markers share the same stored rows.
+            ...$savedSettings,
             // Organisation-wide changes, plus changes at the houses this person can see.
             'history' => $canView
                 ? $this->settingsStore->history($canManageGlobal ? null : $siteIds, 500, $canSeeControlled, $controlledRuleIds)
@@ -761,7 +775,9 @@ class MedicationSettingsController extends Controller
                 'witnessPin' => $witnessPin,
                 ...$roundTemplates,
                 ...$alertPayload,
+                'emergencyPolicyAccess' => $this->canManageEmergencyPolicy($actor),
                 'settingsAccess' => false,
+                'controlledSettingsAccess' => ['view' => false, 'manageable_site_ids' => []],
                 'readOnlyAudit' => false,
                 'rules' => [],
                 'ruleOptions' => ['names' => [], 'routes' => [], 'nzulm' => []],
@@ -769,7 +785,7 @@ class MedicationSettingsController extends Controller
                 'sites' => $canHouseAlerts ? $this->siteChoices($houseSiteIds) : [],
                 'observationOptions' => self::OBSERVATION_OPTIONS,
                 'matchTypes' => self::MATCH_TYPES,
-                'can' => ['manage' => false, 'manage_global' => false],
+                'settingsCan' => ['manage' => false, 'manage_global' => false],
             ]);
         }
 
@@ -840,7 +856,10 @@ class MedicationSettingsController extends Controller
             'witnessPin' => $witnessPin,
             ...$roundTemplates,
             ...$alertPayload,
+            'emergencyPolicyAccess' => $this->canManageEmergencyPolicy($actor),
             'settingsAccess' => true,
+            'controlledSettingsAccess' => ['view' => $canSeeControlled, 'manageable_site_ids' => $canManage && $canSeeControlled
+                ? array_values(array_filter($siteIds, fn ($id) => $this->canUseRuleSiteNow($actor, (int) $id))) : []],
             'readOnlyAudit' => $readOnlyAudit,
             'rules' => $rules,
             // A concealed rule's medicine never becomes a choice either.
@@ -856,7 +875,7 @@ class MedicationSettingsController extends Controller
                 ->get(['id', 'name']),
             'observationOptions' => self::OBSERVATION_OPTIONS,
             'matchTypes' => self::MATCH_TYPES,
-            'can' => [
+            'settingsCan' => [
                 'manage' => $canManage && ($canManageGlobal || $siteIds !== []),
                 'manage_global' => $canManage && $canManageGlobal,
             ],
@@ -905,14 +924,15 @@ class MedicationSettingsController extends Controller
             if ($before === $after) {
                 return;
             }
-            $this->settingsStore->recordOnCallChange($lockedActor, (int) $site->id, 'On-call contact', $before, $after, false, 'medications.oncall_contact.updated');
+            $change = $this->settingsStore->recordOnCallChange($lockedActor, (int) $site->id, 'On-call contact', $before, $after, false, 'medications.oncall_contact.updated');
             AuditLogger::logOrFail('medications.oncall_contact.updated', $rule, [
                 'actor_id' => (int) $lockedActor->id,
                 'site_id' => (int) $site->id,
                 'before' => $before,
                 'after' => $after,
             ]);
-        }, 3);
+            app(MedicationSettingsEvents::class)->onCall($lockedActor, $rule, $change, false);
+        }, 5);
 
         return redirect()->back()->with('medication_settings_saved', 'On-call contact saved for '.$site->name.'.');
     }
@@ -932,13 +952,14 @@ class MedicationSettingsController extends Controller
             }
             $before = app(OnCallResolver::class)->describe($rule);
             $rule->delete();
-            $this->settingsStore->recordOnCallChange($lockedActor, (int) $site->id, 'On-call contact removed', $before, 'Not configured', true, 'medications.oncall_contact.removed');
+            $change = $this->settingsStore->recordOnCallChange($lockedActor, (int) $site->id, 'On-call contact removed', $before, 'Not configured', true, 'medications.oncall_contact.removed');
             AuditLogger::logOrFail('medications.oncall_contact.removed', null, [
                 'actor_id' => (int) $lockedActor->id,
                 'site_id' => (int) $site->id,
                 'before' => $before,
             ]);
-        }, 3);
+            app(MedicationSettingsEvents::class)->onCall($lockedActor, $rule, $change, true);
+        }, 5);
 
         return redirect()->back()->with('medication_settings_saved', 'On-call contact removed for '.$site->name.'. Screens show “Not configured” again.');
     }
@@ -1126,6 +1147,20 @@ class MedicationSettingsController extends Controller
             ->all();
     }
 
+    /** Validated filters narrow the current house and person access; they never grant it. */
+    private function alertLogFilters(): array
+    {
+        $data = request()->validate([
+            'log_house' => ['nullable', 'integer', 'min:1'],
+            'log_show' => ['nullable', Rule::in(['all', 'open', 'attended', 'afterhours'])],
+            'log_range' => ['nullable', Rule::in(['recent', 'all'])],
+            'log_q' => ['nullable', 'string', 'max:150'],
+            'alert_page' => ['nullable', 'integer', 'min:1', 'max:1000000'],
+        ]);
+
+        return ['house' => $data['log_house'] ?? null, 'show' => $data['log_show'] ?? 'all', 'range' => $data['log_range'] ?? 'recent', 'q' => $data['log_q'] ?? ''];
+    }
+
     /**
      * Alerts & access (P11 B2): whether this person sees it, whether they set
      * who gets each alert organisation-wide, the houses whose extras they
@@ -1134,9 +1169,10 @@ class MedicationSettingsController extends Controller
      *
      * @param  list<int>  $siteIds  Houses whose settings this person reads.
      * @param  list<int>  $houseSiteIds  Their own houses (HR profile).
-     * @return array{alertAccess: array<string, mixed>, alertPeople: list<array<string, mixed>>, alertNames: array<int, string>, alertReach: array<string, mixed>, alertNobodyOpen: int, alertPreviews: array<string, mixed>, alertDelivery: array{push_ready: int, people: int}, onCall: array<string, mixed>, alertHouses: list<array{id: int, name: string}>, alertReachGaps: list<array<string, mixed>>}
+     * @param  array{values: array, reviewed: array, site_values: array, site_reviewed: array}  $savedSettings
+     * @return array{alertAccess: array<string, mixed>, alertPeople: list<array<string, mixed>>, alertNames: array<int, string>, alertReach: array<string, mixed>, alertNobodyOpen: int, alertPreviews: array<string, mixed>, alertDelivery: array{push_ready: int, people: int}, onCall: array<string, mixed>, alertHouses: list<array{id: int, name: string}>, alertReachGaps: list<array<string, mixed>>, alertLogSummary: array{recent: int, open: int}, alertLog: mixed}
      */
-    private function alertPayload(User $actor, bool $canView, bool $canManage, bool $canManageGlobal, bool $canHouseAlerts, array $siteIds, array $houseSiteIds): array
+    private function alertPayload(User $actor, bool $canView, bool $canManage, bool $canManageGlobal, bool $canHouseAlerts, array $siteIds, array $houseSiteIds, array $savedSettings): array
     {
         $view = $canView || $canHouseAlerts;
         $manageOrg = $canManage && $canManageGlobal;
@@ -1155,14 +1191,16 @@ class MedicationSettingsController extends Controller
                 'onCall' => ['houses' => [], 'staff' => []],
                 'alertHouses' => [],
                 'alertReachGaps' => [],
+                'alertLogSummary' => ['recent' => 0, 'open' => 0],
+                'alertLog' => null,
             ];
         }
 
         $named = [];
-        foreach ($this->settingsStore->organisationValues()['alerts'] ?? [] as $value) {
+        foreach ($savedSettings['values']['alerts'] ?? [] as $value) {
             array_push($named, ...(json_decode($value, true)['people'] ?? []));
         }
-        foreach ($this->settingsStore->siteValues($siteIds) as $groups) {
+        foreach ($savedSettings['site_values'] as $groups) {
             foreach ($groups['alertExtra'] ?? [] as $value) {
                 array_push($named, ...(json_decode($value, true) ?? []));
             }
@@ -1215,6 +1253,12 @@ class MedicationSettingsController extends Controller
             // Who can't be reached (B2 chunk 5): people with a contact gap;
             // the page works out from its draft which gaps matter.
             'alertReachGaps' => app(MedicationAlertReachGaps::class)->rows($visiblePeople, $onCall['houses'], now(), $this->alertUsers),
+            // The alert log (B2 chunk 6), at the houses this person sees: a
+            // count for the Overview now; the rows only when the tab asks.
+            'alertLogSummary' => app(MedicationAlertLog::class)->summary($actor, $siteIds, $canManageGlobal, now()),
+            'alertLog' => fn (): ?array => request()->boolean('log') ? app(MedicationAlertLog::class)->page(
+                $actor, $siteIds, $canManageGlobal, now(), $this->alertLogFilters(),
+            ) : null,
             // Message preview (B2 chunk 2): synthetic samples through the real
             // notification, with the privacy switch on and off.
             'alertPreviews' => app(MedicationAlertPreviews::class)->all(),
@@ -1262,7 +1306,6 @@ class MedicationSettingsController extends Controller
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
     }
-
 
     /**
      * A person's own houses: their current HR profile's primary and other
@@ -1706,6 +1749,7 @@ class MedicationSettingsController extends Controller
             $lockedActor instanceof User
                 && $lockedActor->approved_at !== null
                 && ($lockedActor->canDo('medications.settings.manage')
+                    || $this->canManageEmergencyPolicy($lockedActor)
                     || ($houseManagedOnly && $lockedActor->canDo('medications.alerts.manage_house'))),
             403,
         );

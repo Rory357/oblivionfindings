@@ -12,6 +12,15 @@ const readSource = (path: string) =>
     readFileSync(resolve(process.cwd(), path), 'utf8');
 
 const controller = readSource('app/Http/Controllers/Emar/EmarController.php');
+const ordersController = readSource(
+    'app/Http/Controllers/Emar/MedicationOrdersController.php',
+);
+const orderWorkflow = readSource(
+    'app/Services/Medication/MedicationOrderWorkflow.php',
+);
+const legacyOrderBridge = readSource(
+    'app/Services/Medication/MedicationLegacyOrderBridge.php',
+);
 const governanceScope = readSource(
     'app/Services/Medication/MedicationGovernanceScopeService.php',
 );
@@ -307,8 +316,39 @@ describe('prescriber order governance contracts', () => {
         expect(controller).toContain("'status' => 'prohibited'");
         expect(controller).toContain("->where('status', 'active')");
         expect(controller).toContain('->lockForUpdate()');
-        expect(controller).toContain(
-            "'authorised_date' => 'The authorisation date cannot be in the future.'",
+        const covertSource = ordersController.slice(
+            ordersController.indexOf('public function authoriseCovert('),
+            ordersController.indexOf('private function readableOrder('),
+        );
+        expect(routes).toContain("'/orders/{medication}/covert'");
+        expect(routes).toContain("'/order-covert/{authorisation}/revoke'");
+        expect(legacyOrderBridge).toContain(
+            'app(MedicationOrdersController::class)->authoriseCovert($request, $medicationId)',
+        );
+        expect(covertSource).toContain('$this->orders->forOfficeMedication(');
+        expect(covertSource).toContain(
+            '$this->access->assertReadable($actor, $client);',
+        );
+        expect(covertSource).toContain(
+            '$this->orders->assertControlled($actor, $order);',
+        );
+        expect(covertSource).toContain('$this->orders->assertOpen($order);');
+        expect(covertSource).toContain(
+            "now()->timezone('Pacific/Auckland')->toDateString()",
+        );
+        expect(covertSource).toContain(
+            "'authorised_date' => 'required|date_format:Y-m-d|before_or_equal:'.$today",
+        );
+        expect(covertSource).toContain(
+            "->where('client_id', $client->id)->where('client_medication_id', $order->id)",
+        );
+        expect(covertSource).toContain('->lockForUpdate()->get()');
+        expect(covertSource).toContain("$existing->where('status', 'active')");
+        expect(covertSource).toContain(
+            "'revoke_reason' => 'Replaced by the recorded review and new authorisation.'",
+        );
+        expect(orderWorkflow).toContain(
+            "abort_if($controlled && (! $actor->canDo('medications.controlled.view') || ! $actor->canDo('medications.controlled.record')), 404)",
         );
     });
 
@@ -321,11 +361,37 @@ describe('prescriber order governance contracts', () => {
             'medications.prescriber_order.countersigned',
             'medications.prescriber_order.dispensed',
             'medications.prescriber_order.cancelled',
-            'medications.covert_authorisation.created',
-            'medications.covert_authorisation.revoked',
         ]) {
             expect(controller).toContain(`'${action}'`);
         }
         expect(controller).toContain('AuditLogger::logOrFail(');
+
+        // Covert transitions moved to Orders and use its transactional action
+        // helper. Keep checking both actions and the fatal audit call they share.
+        for (const action of ['covert_authorised', 'covert_revoked']) {
+            expect(ordersController).toContain(
+                `$this->orders->action($actor, $order, '${action}',`,
+            );
+        }
+        const officeScope = orderWorkflow.slice(
+            orderWorkflow.indexOf('public function forOfficeMedication('),
+            orderWorkflow.indexOf('public function finishActions('),
+        );
+        expect(officeScope).toContain('return DB::transaction(');
+        expect(officeScope).toContain(
+            "$this->scope->forMedication($actor, $medicationId, 'medications.orders.manage'",
+        );
+        const actionSource = orderWorkflow.slice(
+            orderWorkflow.indexOf('public function action('),
+            orderWorkflow.indexOf('public function assertControlled('),
+        );
+        expect(actionSource).toContain(
+            'MedicationOrderAction::query()->create(',
+        );
+        expect(actionSource).toContain(
+            "AuditLogger::logOrFail('medication_order.'.$action",
+        );
+        expect(actionSource).not.toContain('catch (');
+        expect(ordersController).toContain('throw $exception;');
     });
 });

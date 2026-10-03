@@ -21,7 +21,7 @@ final class TaskProviderAuthorization
      *
      * @param  Builder<TModel>  $query
      * @param  Closure(Builder<TModel>, User): Builder<TModel>  $applyCanonicalScope
-     * @param  Closure(TModel): TaskItem  $project
+     * @param  Closure(TModel): TaskItem|null  $project
      * @return TaskItem[]
      */
     public function siteScoped(
@@ -40,7 +40,11 @@ final class TaskProviderAuthorization
             throw new LogicException('A task provider Site scope must return an Eloquent builder.');
         }
 
-        return $scoped->get()->map($project)->all();
+        $items = $scoped->get()->map($project)->all();
+
+        // A live source projection may become inapplicable after its SQL scope
+        // (for example a roster instant at a DST boundary). Conceal it entirely.
+        return array_values(array_filter($items, static fn ($item): bool => $item instanceof TaskItem));
     }
 
     /**

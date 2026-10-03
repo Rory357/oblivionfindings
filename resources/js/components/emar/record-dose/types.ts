@@ -4,10 +4,20 @@
  * server) and the target each entry point opens it for. */
 
 /** Nothing can be recorded: the server answers with the reason and the house only (P0-1). */
-export type BlockAllKey = 'notClockedIn' | 'notOnShift' | 'siteNotApproved' | 'controlledNotAllowed' | 'awaitingVerification' | 'prnLimit';
+export type BlockAllKey =
+    | 'notClockedIn'
+    | 'notOnShift'
+    | 'siteNotApproved'
+    | 'controlledNotAllowed'
+    | 'awaitingVerification'
+    | 'prnLimit';
 
 /** "Given" can't be recorded; a refusal, withhold or absence still can. */
-export type BlockGivenKey = 'covertMissing' | 'allergyBlocked' | 'safetyBlocked' | 'noWitness';
+export type BlockGivenKey =
+    | 'covertMissing'
+    | 'allergyBlocked'
+    | 'safetyBlocked'
+    | 'noWitness';
 
 export type BlockKey = BlockAllKey | BlockGivenKey;
 
@@ -52,6 +62,7 @@ export interface Observation {
 }
 
 export interface DoseRequirements {
+    witness_override?: { id: number; expires_at: string; followup_due_at: string } | null;
     kind: 'scheduled' | 'prn';
     order: {
         id: number;
@@ -71,7 +82,11 @@ export interface DoseRequirements {
         verified: { at: string | null; by: string | null } | null;
         awaiting_check: boolean;
         /** Controlled medicines: the stock's unit, and whether the order's amount is in it (NF-18). */
-        stock: { unit: string | null; from_order: boolean } | null;
+        stock: {
+            unit: string | null;
+            from_order: boolean;
+            tracked?: boolean;
+        } | null;
     };
     due: {
         due_at: string;
@@ -100,10 +115,18 @@ export interface DoseRequirements {
     allergy: {
         status: 'recorded' | 'none_recorded' | 'unavailable';
         list: string[];
-        match: { allergen: string | null; source: string | null; severity: string | null } | null;
+        match: {
+            allergen: string | null;
+            source: string | null;
+            severity: string | null;
+        } | null;
         rule: 'warn' | 'block' | string;
     };
-    covert: { state: 'none' | 'active' | 'missing'; plan: string | null; review_date: string | null };
+    covert: {
+        state: 'none' | 'active' | 'missing';
+        plan: string | null;
+        review_date: string | null;
+    };
     support: 'administer' | 'prompt' | 'assist' | 'independent';
     variable: boolean;
     not_simple: string[];
@@ -120,7 +143,12 @@ export interface DoseRequirements {
     who_can_give: { id: number; name: string }[];
     house_lead: { id: number; name: string } | null;
     /** The house's on-call contact now (Settings › On-call, P11 B2), or why there's nobody. */
-    on_call: { configured: boolean; name: string | null; phone: string | null; warning: string | null };
+    on_call: {
+        configured: boolean;
+        name: string | null;
+        phone: string | null;
+        warning: string | null;
+    };
     prn: {
         count_24h: number;
         max_24h: number | null;
@@ -129,7 +157,11 @@ export interface DoseRequirements {
         last_by: string | null;
         reasons: string[];
     } | null;
-    reoffer: { refusal_id: number; refused_at: string | null; follow_up_due_at: string | null } | null;
+    reoffer: {
+        refusal_id: number;
+        refused_at: string | null;
+        follow_up_due_at: string | null;
+    } | null;
     options: {
         late_reasons: Record<string, string>;
         amount_reasons: Record<string, string>;
@@ -143,7 +175,9 @@ export interface DoseRequirements {
 /** What the requirements endpoints answer: everything the dialog needs, or only why nothing can be recorded. */
 export type RequirementsAnswer = DoseRequirements | BlockedRequirements;
 
-export const isBlockedAnswer = (answer: RequirementsAnswer): answer is BlockedRequirements => answer.block_all !== null;
+export const isBlockedAnswer = (
+    answer: RequirementsAnswer,
+): answer is BlockedRequirements => answer.block_all !== null;
 
 /** Where the dialog was opened from ("Opened from" on the rail and review). */
 export type EntryPoint =
@@ -182,7 +216,12 @@ export interface DoseLabel {
 }
 
 export type DoseTarget =
-    | { kind: 'scheduled'; orderId: number; scheduledFor: string; label?: DoseLabel }
+    | {
+          kind: 'scheduled';
+          orderId: number;
+          scheduledFor: string;
+          label?: DoseLabel;
+      }
     | { kind: 'prn'; orderId: number; label?: DoseLabel };
 
 /** record = all outcomes; notgiven = refusal/withhold/away only; reoffer = linked to a refusal. */

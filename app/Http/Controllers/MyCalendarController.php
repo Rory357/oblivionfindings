@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\It\Services\ItTicketBookingService;
 use App\Models\ControlRoom\AlertTask;
-use App\Models\MedicationRound;
 use App\Models\PersonalCalendarEntry;
 use App\Models\Shift;
+use App\Services\Tasks\Providers\MedicationRoundProvider;
 use App\Services\WorkCalendar\WorkCalendarSettings;
 use App\Support\ShiftTaskSupport;
 use Illuminate\Http\Request;
@@ -71,38 +72,13 @@ class MyCalendarController extends Controller
             ];
         }
 
-        // 2. Medication Rounds
+        // Medicines tasks use exactly the same roster, Site and person read
+        // scope as All Tasks. Visibility does not confer recording permission.
         try {
-            $rounds = MedicationRound::where('assigned_to', $userId)
-                ->whereDate('round_date', '>=', $start)
-                ->whereDate('round_date', '<=', $end)
-                ->get();
-
-            foreach ($rounds as $round) {
-                // The round's date and time are NZ wall-clock.
-                $roundStart = $round->scheduledAt();
-                if ($roundStart === null) {
-                    continue;
-                }
-                $roundEnd = $roundStart->copy()->addHour();
-
-                $events[] = [
-                    'id' => 'med-round-'.$round->id,
-                    'title' => 'Medication Round',
-                    'start' => $roundStart->toIso8601String(),
-                    'end' => $roundEnd->toIso8601String(),
-                    'backgroundColor' => '#fdba74',
-                    'textColor' => '#7c2d12',
-                    'borderColor' => 'transparent',
-                    'extendedProps' => [
-                        'type' => 'medication_round',
-                        'link' => '/meds/today',
-                        'status' => $round->status ?? null,
-                    ],
-                ];
-            }
-        } catch (\Throwable $e) {
-            report($e);
+            $events = [...$events, ...app(MedicationRoundProvider::class)
+                ->calendar($request->user(), Carbon::instance($start), Carbon::instance($end))];
+        } catch (\Throwable $error) {
+            report($error);
             $unavailable['medication_round'] = 'unavailable';
         }
 
@@ -181,7 +157,7 @@ class MyCalendarController extends Controller
             }
         }
 
-        $events = [...$events, ...app(\App\Domain\It\Services\ItTicketBookingService::class)->calendar($request->user(), $start, $end)];
+        $events = [...$events, ...app(ItTicketBookingService::class)->calendar($request->user(), $start, $end)];
 
         return response()->json($events)
             ->header('X-Calendar-Unavailable', json_encode((object) $unavailable))

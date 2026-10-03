@@ -530,7 +530,7 @@ class GuidedRoundService
             'site_name' => $client?->site?->name,
             'is_controlled' => (bool) $medication->controlled_drug,
             'is_high_risk' => (bool) $medication->high_risk,
-            'requires_witness' => (bool) ($medication->witness_required || $medication->controlled_drug),
+            'requires_witness' => $medication->requiresWitness(),
             // TODO(G4): promote the existing name-derived safety prompts to
             // explicit medication fields with matching server enforcement.
             'requires_blood_glucose' => $this->requiresBloodGlucose($medication),

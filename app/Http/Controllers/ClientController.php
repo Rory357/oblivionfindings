@@ -98,6 +98,7 @@ use App\Services\Clients\ClientStaffPreparationProjection;
 use App\Services\Clients\ClientWorkerEligibility;
 use App\Services\ConsentValidationService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
+use App\Services\Fleet\TransportRequestService;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\Medication\DoseSlots\ClientCalendarDoses;
 use App\Services\Medication\MedicationGovernanceScopeService;
@@ -108,8 +109,8 @@ use App\Services\Respite\ClientRespiteAllocationSummary;
 use App\Services\ShiftCoverageService;
 use App\Services\Tracking\ClientLocationAccessService;
 use App\Services\Tracking\ClientLocationHistoryService;
-use App\Services\Tracking\ClientTrackerStatusService;
 use App\Services\Tracking\ClientLocationLocateService;
+use App\Services\Tracking\ClientTrackerStatusService;
 use App\Services\Tracking\GeofenceStatusService;
 use App\Services\UserSiteAccessService;
 use App\Support\ClientSafetyPayload;
@@ -927,12 +928,14 @@ class ClientController extends Controller
                 })
                 ->values() : null,
             'audit_history' => $sectionAccess['audit']
-                ? AuditLog::query()
+                ? app(\App\Services\Medication\MedicationProfileAuditPrivacy::class)->apply(AuditLog::query(), $request->user(), $client)
                     ->where('client_id', $client->id)
                     ->with('user:id,name,email')
                     ->orderByDesc('created_at')
                     ->limit(200)
                     ->get()
+                    ->reject(fn ($log) => ! $canViewControlledMedication && app(\App\Services\Medication\MedicationProfileAuditPrivacy::class)->containsControlledSnapshot($log->meta))
+                    ->values()
                     ->map(fn ($log) => [
                         'id' => $log->id,
                         'action' => $log->action,
@@ -1660,9 +1663,8 @@ class ClientController extends Controller
                 'last_administration' => $lastMedicationAdministration,
                 'pending_alerts_count' => $pendingMedicationAlertsCount,
                 'next_review_date' => MedicationReview::where('client_id', $client->id)
-                    ->where('status', '!=', 'completed')
+                    ->whereIn('status', ['scheduled', 'overdue', 'in_progress'])
                     ->whereNotNull('scheduled_date')
-                    ->where('scheduled_date', '>=', now((string) config('app.worker_timezone', 'Pacific/Auckland'))->toDateString())
                     ->orderBy('scheduled_date')
                     ->value('scheduled_date'),
             ] : null,
@@ -1831,6 +1833,7 @@ class ClientController extends Controller
     private function medicationPayload(ClientMedication $medication): array
     {
         $payload = $medication->toArray();
+        $payload['requires_witness'] = $medication->requiresWitness();
         $stock = $medication->stock;
 
         // The profile records as-needed doses only: its endpoint carries no
@@ -1842,14 +1845,15 @@ class ClientController extends Controller
         $payload['stock'] = $stock ? [
             // The decimal:2 cast yields "24.00"; send a number like the eMAR
             // stock payloads so the profile reads "24 doses on hand".
-            'on_hand' => $stock->on_hand !== null
-                ? MedicationStockQuantity::toFloat($stock->on_hand)
+            'on_hand' => $stock->availableQuantity() !== null
+                ? MedicationStockQuantity::toFloat($stock->availableQuantity())
                 : null,
             'unit' => $stock->unit,
             'reorder_threshold' => $stock->reorder_level,
             'is_low' => $stock->isLowStock(),
             'last_counted_at' => $stock->last_counted_at?->toISOString(),
-            'expiry_date' => $stock->expiry_date?->toDateString(),
+            'expiry_date' => $stock->currentExpiryDate()?->toDateString(),
+            'pack_workflow_url' => ! $medication->controlled_drug ? $stock->pack_workflow_url : null,
         ] : null;
 
         return $payload;
@@ -2988,11 +2992,13 @@ class ClientController extends Controller
 
     private function syncClientMedicalProfile(Client $client, array $medical): void
     {
+        $canonical = $client->medicalProfile()->whereNotNull('allergies_canonical_at')->exists();
+        if ($canonical) app(\App\Services\Medication\ClientAllergyRecordService::class)->guardLegacyEdit($client, $medical['allergies'] ?? []);
         $medicalFilled = collect($medical)->contains(
             fn ($v) => is_array($v) ? count($v) > 0 : (filled($v) && $v !== false && $v !== '0')
         );
 
-        if (! $medicalFilled) {
+        if (! $medicalFilled && ! $canonical) {
             $client->medicalProfile()->delete();
 
             return;
@@ -3342,7 +3348,7 @@ class ClientController extends Controller
         // Client-scoped transport bookings (Book transport workflow)
         $transportViewer = auth()->user();
         $workspaceIds = $transportViewer && ($transportViewer->canDo('fleet.viewAny') || $transportViewer->canDo('assets.viewAny'))
-            ? app(\App\Services\Fleet\TransportRequestService::class)->query($transportViewer)->where('client_id', $client->id)->pluck('id')->all()
+            ? app(TransportRequestService::class)->query($transportViewer)->where('client_id', $client->id)->pluck('id')->all()
             : [];
         $bookings = SchemaCache::hasTable('client_transport_bookings')
             ? ClientTransportBooking::query()

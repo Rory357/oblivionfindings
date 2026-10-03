@@ -1,6 +1,16 @@
 <?php
 
 return [
+    // The person medication record at /emar/mar?client_id=… (eMAR P02):
+    // "legacy" keeps today's MAR chart page; "p02" serves the rebuilt record.
+    // It switches to p02 when the record reaches today's page (the Chart,
+    // P02-4) and the switch is then removed.
+    'person_record' => env('EMAR_PERSON_RECORD', 'legacy'),
+
+    // P06 release gate: enable only after every stock writer and P07 ledger
+    // adapter are integrated. This is not a clinical policy setting.
+    'stock_lots_enabled' => env('MEDICATION_STOCK_LOTS_ENABLED', false),
+
     // Dose timing defaults. Medication › Settings › Rounds & timing saves the
     // organisation's own values; DoseTimingSettings reads them, falling back
     // to these until someone saves one.
@@ -44,6 +54,14 @@ return [
         // renewal), so a colleague at an unlocked session can't choose it for
         // them. On by default (Stephan, 30 Sep 2026: approved with PIN-1).
         'login_check_to_set' => (bool) env('MEDICATION_WITNESS_PIN_LOGIN_CHECK', true),
+
+        // Enable only when the P08a own-login confirmation consumer and
+        // expiry scheduler ship with PIN-2. No dead notification links.
+        'forgotten_fallback_enabled' => false,
+
+        // Server-managed PIN pepper; never reuse the login/session APP_KEY.
+        // Existing pin_v1 hashes remain valid until the owner sets a new PIN.
+        'pepper' => env('MEDICATION_WITNESS_PIN_PEPPER'),
     ],
 
     // Away (P01 C7): which records say a person is away, so a dose due then

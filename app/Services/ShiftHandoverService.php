@@ -59,6 +59,12 @@ class ShiftHandoverService
         MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
         MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
         'medications.controlled.witness',
+        'medications.view',
+        'medications.administer.record',
+        'medications.stock.update',
+        'medications.audit.view',
+        'medications.reports.export',
+        'medications.breakglass',
         ...MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
     ];
 
@@ -724,6 +730,7 @@ class ShiftHandoverService
 
             $fresh = $this->freshHandover($handover, includeAcknowledger: true);
 
+            app(\App\Services\Medication\Followups\MedicationFollowupService::class)->acknowledged($fresh, $incomingShift, $actor);
             $this->timelineService->recordHandoverAcknowledged($fresh, $fresh->outgoingShift, $actor);
             AuditLogger::logOrFail('shift.handover.acknowledged', $fresh, [
                 'shift_id' => $fresh->outgoing_shift_id,

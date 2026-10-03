@@ -541,6 +541,8 @@ class GuidedRoundOfflineReplayTest extends TestCase
         ]);
         $this->medication->forceFill([
             'controlled_drug' => true,
+            'nz_controlled_class' => 'B',
+            'controlled_class_source' => 'Synthetic reviewed test configuration',
             'witness_required' => true,
             'approval_status' => 'verified',
         ])->saveQuietly();
@@ -616,6 +618,7 @@ class GuidedRoundOfflineReplayTest extends TestCase
             'expiry_date' => now()->addYear()->toDateString(),
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'controlled_drugs' => true,
             'can_witness_controlled' => true,
         ]);
         Shift::factory()->create([

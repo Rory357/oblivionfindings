@@ -60,7 +60,7 @@ class RoundsPagePayloadTest extends TestCase
             'assigned_to' => $user->id,
             'status' => 'pending',
         ]);
-        $target = route('emar.rounds', ['date' => '2026-05-04', 'guided' => $round->id]);
+        $target = route('meds.today', ['view' => 'rounds', 'round' => $round->id, 'date' => '2026-05-04']);
 
         $this->assertFalse($user->canDo('medications.view'));
         $this->actingAs($user)
@@ -72,7 +72,7 @@ class RoundsPagePayloadTest extends TestCase
             ->get($target)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('emar/Rounds')
+                ->component('meds/today/index')
                 ->where('guidedRound.round.id', $round->id)
                 ->where('guidedRound.round.status', 'pending')
                 ->where('guidedRound.can_start', true)
@@ -82,7 +82,7 @@ class RoundsPagePayloadTest extends TestCase
         $this->assertSame('pending', $round->fresh()->status);
 
         $this->actingAs($user)
-            ->post(route('meds.round.start', $round))
+            ->post(route('meds.round.start', $round), ['return_to' => 'meds-today'])
             ->assertRedirect($target);
 
         $started = $round->fresh();
@@ -92,7 +92,7 @@ class RoundsPagePayloadTest extends TestCase
         $startedAt = $started->started_at->toIso8601String();
 
         $this->actingAs($user)
-            ->post(route('meds.round.start', $round))
+            ->post(route('meds.round.start', $round), ['return_to' => 'meds-today'])
             ->assertRedirect($target);
         $this->assertSame($startedAt, $round->fresh()->started_at?->toIso8601String());
 

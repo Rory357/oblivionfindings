@@ -31,6 +31,7 @@ export function ConfirmDialog({
     cancelText = 'Cancel',
     variant = 'destructive',
     processing,
+    buttonClassName,
     onCloseAutoFocus,
 }: {
     open: boolean;
@@ -43,6 +44,8 @@ export function ConfirmDialog({
     variant?: 'destructive' | 'default';
     /** Request in flight: disable both buttons and leave closing to the caller. */
     processing?: boolean;
+    /** Optional sizing for both confirmation controls, such as frontline-hit. */
+    buttonClassName?: string;
     onCloseAutoFocus?: ComponentProps<
         typeof AlertDialogContent
     >['onCloseAutoFocus'];
@@ -64,7 +67,11 @@ export function ConfirmDialog({
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel onClick={onClose} disabled={processing}>
+                    <AlertDialogCancel
+                        onClick={onClose}
+                        disabled={processing}
+                        className={buttonClassName}
+                    >
                         {cancelText}
                     </AlertDialogCancel>
                     <AlertDialogAction
@@ -80,6 +87,7 @@ export function ConfirmDialog({
                         }}
                         disabled={processing}
                         variant={variant}
+                        className={buttonClassName}
                     >
                         {confirmText}
                     </AlertDialogAction>

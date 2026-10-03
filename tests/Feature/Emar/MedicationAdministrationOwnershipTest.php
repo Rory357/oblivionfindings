@@ -18,6 +18,7 @@ use App\Services\MedicationIncidentIntegrationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 use Mockery;
 use Tests\TestCase;
 
@@ -87,12 +88,13 @@ class MedicationAdministrationOwnershipTest extends TestCase
         $foreignCorrection = $this->correction($foreignOriginal, $reporter);
         $localFollowup = $this->followup($localClient, $localOriginal, $reporter);
         $foreignFollowup = $this->followup($foreignClient, $foreignOriginal, $reporter);
-        $localError = $this->error($localClient, $reporter, 'resolved');
         $foreignError = $this->error($foreignClient, $reporter, 'resolved');
         $corrector = $this->userWithPermissions(
-            ['medications.administer.correct'],
+            ['medications.administer.correct', 'medications.administer.record', 'medications.errors.manage'],
             $localSite,
+            $localClient,
         );
+        $localError = $this->error($localClient, $reporter, 'resolved', $corrector);
 
         $this->actingAs($corrector)
             ->post(route('emar.corrections.approve', $localCorrection))
@@ -103,18 +105,20 @@ class MedicationAdministrationOwnershipTest extends TestCase
             ->post(route('emar.corrections.approve', $foreignCorrection))
             ->assertNotFound();
         $this->actingAs($corrector)
-            ->post(route('emar.refusal_followups.complete', $localFollowup), ['outcome' => 'Reviewed locally.'])
-            ->assertRedirect();
+            ->post(route('emar.refusal_followups.complete', $localFollowup), $this->completionPayload('Reviewed locally.'))
+            ->assertRedirect()->assertSessionHasNoErrors();
         $this->actingAs($corrector)
-            ->post(route('emar.refusal_followups.complete', $foreignFollowup), ['outcome' => 'Must remain hidden.'])
+            ->post(route('emar.refusal_followups.complete', $foreignFollowup), $this->completionPayload('Must remain hidden.'))
             ->assertNotFound();
         $this->actingAs($corrector)
             ->post(route('emar.errors.close', $localError), ['close_note' => 'Local learning recorded.'])
-            ->assertRedirect();
+            ->assertRedirect()->assertSessionHasNoErrors();
         $this->actingAs($corrector)
             ->post(route('emar.errors.close', $foreignError), ['close_note' => 'Must remain hidden.'])
             ->assertNotFound();
 
+        $this->assertNotNull($localFollowup->fresh()->follow_up_completed_at);
+        $this->assertSame('closed', $localError->fresh()->status);
         $this->assertSame('pending', $foreignCorrection->fresh()->correction_status);
         $this->assertNull($foreignFollowup->fresh()->follow_up_completed_at);
         $this->assertSame('resolved', $foreignError->fresh()->status);
@@ -148,7 +152,7 @@ class MedicationAdministrationOwnershipTest extends TestCase
 
         $this->actingAs($recorder)
             ->post(route('emar.errors.store'), $this->errorPayload($assignedClient, $assignedMedication))
-            ->assertRedirect();
+            ->assertRedirect()->assertSessionHasNoErrors();
         $this->actingAs($recorder)
             ->post(route('emar.errors.store'), $this->errorPayload($assignedClient, $unassignedMedication))
             ->assertNotFound();
@@ -254,8 +258,7 @@ class MedicationAdministrationOwnershipTest extends TestCase
     {
         $site = Site::factory()->create(['is_active' => true]);
         $client = Client::factory()->create(['site_id' => $site->id]);
-        $medication = $this->medication($client);
-        $medication->forceFill(['controlled_drug' => true])->save();
+        $medication = $this->medication($client, controlled: true);
         $performer = User::factory()->create();
         $original = $this->administration($client, $medication, $performer, 'given');
         $original->forceFill([
@@ -355,17 +358,23 @@ class MedicationAdministrationOwnershipTest extends TestCase
         $this->assertSame($original->id, (int) $followup->client_medication_administration_id);
         $this->assertFalse((bool) $followup->escalated_to_manager);
 
-        $corrector = $this->userWithPermissions(['medications.administer.correct'], $site);
+        $corrector = $this->userWithPermissions([
+            'medications.administer.correct', 'medications.administer.record', 'medications.followups.manage',
+        ], $site, $client);
+        $completion = $this->completionPayload('Original completion evidence.');
         $this->actingAs($corrector)
-            ->post(route('emar.refusal_followups.complete', $followup), ['outcome' => 'Original completion evidence.'])
-            ->assertRedirect();
+            ->post(route('emar.refusal_followups.complete', $followup), $completion)
+            ->assertRedirect()->assertSessionHasNoErrors();
         $completed = $followup->fresh();
         $this->actingAs($corrector)
-            ->post(route('emar.refusal_followups.complete', $followup), ['outcome' => 'Must not overwrite evidence.'])
-            ->assertRedirect();
+            ->post(route('emar.refusal_followups.complete', $followup), $completion)
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($corrector)
+            ->post(route('emar.refusal_followups.complete', $followup), [...$completion, 'reason' => 'Must not overwrite evidence.'])
+            ->assertSessionHasErrors('request_uuid');
         $replayed = $followup->fresh();
 
-        $this->assertSame('Original completion evidence.', $replayed->follow_up_outcome);
+        $this->assertSame('not_needed: Original completion evidence.', $replayed->follow_up_outcome);
         $this->assertSame($completed->follow_up_completed_by, $replayed->follow_up_completed_by);
         $this->assertTrue($completed->follow_up_completed_at->equalTo($replayed->follow_up_completed_at));
 
@@ -604,8 +613,7 @@ class MedicationAdministrationOwnershipTest extends TestCase
     {
         $site = Site::factory()->create(['is_active' => true]);
         $client = Client::factory()->create(['site_id' => $site->id]);
-        $medication = $this->medication($client);
-        $medication->forceFill(['controlled_drug' => true])->save();
+        $medication = $this->medication($client, controlled: true);
         $reporter = User::factory()->create();
         $original = $this->administration($client, $medication, $reporter, 'given');
         $approvedWinner = $this->correction($original, $reporter);
@@ -785,13 +793,14 @@ class MedicationAdministrationOwnershipTest extends TestCase
     {
         $site = Site::factory()->create(['is_active' => true]);
         $client = Client::factory()->create(['site_id' => $site->id]);
-        $medication = $this->medication($client);
-        $medication->forceFill(['controlled_drug' => true])->save();
+        $medication = $this->medication($client, controlled: true);
         $reporter = User::factory()->create();
         $original = $this->administration($client, $medication, $reporter, 'refused');
         $pending = $this->correction($original, $reporter);
         $followup = $this->followup($client, $original, $reporter);
-        $ordinaryCorrector = $this->userWithPermissions(['medications.administer.correct'], $site);
+        $ordinaryCorrector = $this->userWithPermissions([
+            'medications.administer.correct', 'medications.administer.record', 'medications.followups.manage',
+        ], $site, $client);
         $ordinaryRecorder = $this->userWithPermissions(['medications.administer.record'], $site, $client);
 
         $this->actingAs($ordinaryCorrector)
@@ -810,7 +819,7 @@ class MedicationAdministrationOwnershipTest extends TestCase
             ->post(route('emar.refusal_followups.store'), $this->followupPayload($client, $original))
             ->assertNotFound();
         $this->actingAs($ordinaryCorrector)
-            ->post(route('emar.refusal_followups.complete', $followup), ['outcome' => 'Must remain hidden.'])
+            ->post(route('emar.refusal_followups.complete', $followup), $this->completionPayload('Must remain hidden.'))
             ->assertNotFound();
         $this->actingAs($ordinaryCorrector)
             ->post(route('emar.refusal_followups.notify_gp', $followup), ['gp_response' => 'Must remain hidden.'])
@@ -822,8 +831,11 @@ class MedicationAdministrationOwnershipTest extends TestCase
 
         $controlledCorrector = $this->userWithPermissions([
             'medications.administer.correct',
+            'medications.administer.record',
+            'medications.followups.manage',
             'medications.controlled.record',
-        ], $site);
+            'medications.controlled.view',
+        ], $site, $client);
         $controlledRecorder = $this->userWithPermissions([
             'medications.administer.record',
             'medications.controlled.record',
@@ -836,21 +848,20 @@ class MedicationAdministrationOwnershipTest extends TestCase
         $this->actingAs($controlledRecorder)
             ->post(route('emar.refusal_followups.store'), $this->followupPayload($client, $pending))
             ->assertRedirect();
-        $effectiveFollowup = MedicationRefusalFollowup::query()
-            ->where('client_medication_administration_id', $original->id)
-            ->where('id', '!=', $followup->id)
-            ->sole();
+        $effectiveFollowup = $followup->fresh();
+        $this->assertDatabaseCount('medication_refusal_followups', 1);
+        $this->assertSame($original->id, (int) $effectiveFollowup->client_medication_administration_id);
         $this->assertDatabaseMissing('medication_refusal_followups', [
             'client_medication_administration_id' => $pending->id,
         ]);
         $this->actingAs($controlledCorrector)
-            ->post(route('emar.refusal_followups.complete', $effectiveFollowup), ['outcome' => 'Controlled follow-up completed.'])
-            ->assertRedirect();
+            ->post(route('emar.refusal_followups.complete', $effectiveFollowup), $this->completionPayload('Controlled follow-up completed.'))
+            ->assertRedirect()->assertSessionHasNoErrors();
         $this->actingAs($controlledCorrector)
             ->post(route('emar.refusal_followups.notify_gp', $effectiveFollowup), ['gp_response' => 'Controlled GP response.'])
             ->assertRedirect();
 
-        $this->assertSame('Controlled follow-up completed.', $effectiveFollowup->fresh()->follow_up_outcome);
+        $this->assertSame('not_needed: Controlled follow-up completed.', $effectiveFollowup->fresh()->follow_up_outcome);
         $this->assertSame('Controlled GP response.', $effectiveFollowup->fresh()->gp_response);
     }
 
@@ -858,8 +869,7 @@ class MedicationAdministrationOwnershipTest extends TestCase
     {
         $site = Site::factory()->create(['is_active' => true]);
         $client = Client::factory()->create(['site_id' => $site->id]);
-        $medication = $this->medication($client);
-        $medication->forceFill(['controlled_drug' => true])->save();
+        $medication = $this->medication($client, controlled: true);
         $reporter = User::factory()->create();
         $original = $this->administration($client, $medication, $reporter, 'given');
         $corrector = $this->userWithPermissions([
@@ -991,7 +1001,9 @@ class MedicationAdministrationOwnershipTest extends TestCase
             'escalated_to_manager' => true,
             'escalated_at' => now(),
         ])->save();
-        $corrector = $this->userWithPermissions(['medications.administer.correct'], $site);
+        $corrector = $this->userWithPermissions([
+            'medications.administer.correct', 'medications.administer.record',
+        ], $site, $client);
         $integration = Mockery::mock(MedicationIncidentIntegrationService::class);
         $integration->shouldReceive('resolveUnsafeCorrection')->twice();
         $integration->shouldReceive('resolveRefusalEscalation')
@@ -1028,7 +1040,7 @@ class MedicationAdministrationOwnershipTest extends TestCase
         $this->assertFalse(MedicationRefusalFollowup::query()->requiresGpNotification()->whereKey($followup->id)->exists());
 
         $this->actingAs($corrector)
-            ->post(route('emar.refusal_followups.complete', $followup), ['outcome' => 'Must stay terminal.'])
+            ->post(route('emar.refusal_followups.complete', $followup), $this->completionPayload('Must stay terminal.'))
             ->assertNotFound();
         $this->assertSame($terminal->follow_up_outcome, $followup->fresh()->follow_up_outcome);
     }
@@ -1039,8 +1051,7 @@ class MedicationAdministrationOwnershipTest extends TestCase
         $site = Site::factory()->create(['is_active' => true]);
         $foreignSite = Site::factory()->create(['is_active' => true]);
         $client = Client::factory()->create(['site_id' => $site->id]);
-        $medication = $this->medication($client);
-        $medication->forceFill(['controlled_drug' => true])->save();
+        $medication = $this->medication($client, controlled: true);
         $reporter = User::factory()->create();
         $original = $this->administration($client, $medication, $reporter, 'refused');
         $submitter = $this->userWithPermissions([
@@ -1088,12 +1099,13 @@ class MedicationAdministrationOwnershipTest extends TestCase
         $localClient = Client::factory()->create(['site_id' => $localSite->id]);
         $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
         $reporter = User::factory()->create();
-        $localError = $this->error($localClient, $reporter, 'reported');
-        $this->error($foreignClient, $reporter, 'reported');
         $reader = $this->userWithPermissions(['medications.view'], $localSite);
         // The register is person-scoped for assignment readers too.
         $localClient->supportWorkers()->attach($reader->id);
-        $foreignStaff = $this->userWithPermissions(['medications.view'], $foreignSite);
+        $localError = $this->error($localClient, $reader, 'reported');
+        $this->error($foreignClient, $reporter, 'reported');
+        $localManager = $this->userWithPermissions(['medications.errors.manage'], $localSite, $localClient);
+        $foreignStaff = $this->userWithPermissions(['medications.errors.manage'], $foreignSite);
 
         $response = $this->actingAs($reader)
             ->get(route('emar.errors'))
@@ -1105,7 +1117,7 @@ class MedicationAdministrationOwnershipTest extends TestCase
         );
         $this->assertSame(1, $response->inertiaProps('stats.total_open'));
         $this->assertSame([$localClient->id], collect($response->inertiaProps('clients'))->pluck('id')->all());
-        $this->assertContains($reader->id, collect($response->inertiaProps('staff'))->pluck('id')->all());
+        $this->assertContains($localManager->id, collect($response->inertiaProps('staff'))->pluck('id')->all());
         $this->assertNotContains($foreignStaff->id, collect($response->inertiaProps('staff'))->pluck('id')->all());
         $this->assertSame([$localSite->id], collect($response->inertiaProps('sites'))->pluck('id')->all());
 
@@ -1114,63 +1126,44 @@ class MedicationAdministrationOwnershipTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_error_lifecycle_uses_only_monotonic_dedicated_transitions(): void
+    public function test_closed_error_lifecycle_requires_reopening_before_mutation(): void
     {
         $site = Site::factory()->create(['is_active' => true]);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $reporter = User::factory()->create();
-        $error = $this->error($client, $reporter, 'reported');
-        $corrector = $this->userWithPermissions(['medications.administer.correct'], $site);
+        $corrector = $this->userWithPermissions(['medications.errors.manage'], $site, $client);
+        $error = $this->error($client, $reporter, 'closed', $corrector);
+        $error->entries()->create([
+            'actor_id' => $corrector->id, 'kind' => 'closed', 'text' => $error->close_note,
+            'data' => [], 'created_at' => $error->closed_at,
+        ]);
+        $closedFacts = $error->fresh()->getRawOriginal();
+        $closedEntries = $error->entries()->orderBy('id')->get()->map->getRawOriginal()->all();
 
         $this->actingAs($corrector)
-            ->put(route('emar.errors.update', $error), [
-                'description' => 'Corrected description without a lifecycle bypass.',
-                'status' => 'closed',
+            ->putJson(route('emar.errors.update', $error), ['text' => 'Must remain immutable.', 'status' => 'reported'])
+            ->assertUnprocessable()->assertJsonValidationErrors('status');
+        $this->actingAs($corrector)
+            ->postJson(route('emar.errors.note', $error), ['text' => 'Must not append to a closed record.'])
+            ->assertUnprocessable()->assertJsonValidationErrors('status');
+        $this->actingAs($corrector)
+            ->postJson(route('emar.errors.review', $error), [
+                'owner_id' => $corrector->id, 'investigation_due_at' => now('Pacific/Auckland')->addDay()->format('Y-m-d\TH:i'),
+                'reached_client' => 'no', 'harm_level' => 'none', 'review_notes' => 'Must not reopen.',
             ])
-            ->assertRedirect();
-        $this->assertSame('reported', $error->fresh()->status);
-
+            ->assertUnprocessable()->assertJsonValidationErrors('status');
         $this->actingAs($corrector)
-            ->post(route('emar.errors.review', $error), [
-                'review_notes' => 'Clinical review started.',
-                'status' => 'closed',
-            ])
-            ->assertRedirect();
-        $this->assertSame('investigating', $error->fresh()->status);
-
-        $this->actingAs($corrector)
-            ->post(route('emar.errors.resolve', $error), [
-                'outcome' => 'The chart was corrected and the client remained well.',
-                'preventive_actions' => 'A second-person chart review was introduced.',
-            ])
-            ->assertRedirect();
-        $this->assertSame('resolved', $error->fresh()->status);
-
-        $this->actingAs($corrector)
-            ->put(route('emar.errors.update', $error), ['description' => 'Must remain immutable.'])
-            ->assertStatus(409);
-        $this->actingAs($corrector)
-            ->post(route('emar.errors.review', $error), ['review_notes' => 'Must not reopen.'])
-            ->assertStatus(409);
-        $this->actingAs($corrector)
-            ->post(route('emar.errors.resolve', $error), [
+            ->postJson(route('emar.errors.resolve', $error), [
                 'outcome' => 'Must not resolve twice.',
                 'preventive_actions' => 'Must not replace prior evidence.',
             ])
-            ->assertStatus(409);
+            ->assertUnprocessable()->assertJsonValidationErrors('status');
 
         $this->actingAs($corrector)
-            ->post(route('emar.errors.close', $error), ['close_note' => 'Governed close-out complete.'])
-            ->assertRedirect();
-        $closed = $error->fresh();
-        $this->actingAs($corrector)
             ->post(route('emar.errors.close', $error), ['close_note' => 'Must not overwrite close-out evidence.'])
-            ->assertRedirect();
-        $replayedClose = $error->fresh();
-        $this->assertSame('closed', $replayedClose->status);
-        $this->assertSame($closed->close_note, $replayedClose->close_note);
-        $this->assertSame($closed->closed_by, $replayedClose->closed_by);
-        $this->assertTrue($closed->closed_at->equalTo($replayedClose->closed_at));
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame($closedFacts, $error->fresh()->getRawOriginal());
+        $this->assertSame($closedEntries, $error->entries()->orderBy('id')->get()->map->getRawOriginal()->all());
     }
 
     private function completedMedicationRound(Client $client): MedicationRound
@@ -1202,10 +1195,16 @@ class MedicationAdministrationOwnershipTest extends TestCase
         $this->assertSame($missed, $freshRound->missed_count);
     }
 
-    private function medication(Client $client): ClientMedication
+    private function medication(Client $client, bool $controlled = false): ClientMedication
     {
         return ClientMedication::factory()->create([
             'client_id' => $client->id,
+            'controlled_drug' => $controlled,
+            'high_risk' => false,
+            'witness_required' => $controlled,
+            'approval_status' => 'verified',
+            'start_date' => today()->subDay(),
+            'end_date' => null,
             'active' => true,
             'state' => 'active',
         ]);
@@ -1260,16 +1259,25 @@ class MedicationAdministrationOwnershipTest extends TestCase
         ]);
     }
 
-    private function error(Client $client, User $reporter, string $status): MedicationError
+    private function error(Client $client, User $reporter, string $status, ?User $owner = null): MedicationError
     {
         return MedicationError::query()->create([
             'client_id' => $client->id,
             'error_type' => 'documentation',
             'severity' => 'near_miss',
+            'reached_client' => 'no',
+            'harm_level' => 'none',
             'description' => 'Medication documentation error.',
             'status' => $status,
             'reported_by' => $reporter->id,
             'reported_at' => now(),
+            'occurred_at' => now(),
+            'owner_id' => $owner?->id,
+            'reviewed_by' => $owner?->id,
+            'reviewed_at' => $owner ? now() : null,
+            'closed_by' => $status === 'closed' ? $owner?->id : null,
+            'closed_at' => $status === 'closed' ? now() : null,
+            'close_note' => $status === 'closed' ? 'Governed close-out complete.' : null,
         ]);
     }
 
@@ -1292,7 +1300,20 @@ class MedicationAdministrationOwnershipTest extends TestCase
             'client_medication_id' => $medication?->id,
             'error_type' => 'documentation',
             'severity' => 'near_miss',
+            'reached_client' => 'no',
+            'harm_level' => 'none',
+            'occurred_at' => now('Pacific/Auckland')->subMinute()->format('Y-m-d\TH:i'),
+            'report_token' => (string) Str::uuid(),
             'description' => 'Medication documentation error.',
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function completionPayload(string $reason): array
+    {
+        return [
+            'request_uuid' => (string) Str::uuid(), 'revision' => 1, 'outcome' => 'not_needed', 'reason' => $reason,
+            'reason_category' => 'personal_choice', 'capacity' => 'has_capacity', 'next_action' => 'Continue the agreed medication plan.',
         ];
     }
 
@@ -1302,6 +1323,7 @@ class MedicationAdministrationOwnershipTest extends TestCase
         Site $site,
         ?Client $assignedClient = null,
     ): User {
+        $permissions = array_values(array_unique(['medications.view', ...$permissions]));
         $user = User::factory()->create([
             'role' => 'support_worker',
             'approved_at' => now(),
@@ -1312,6 +1334,7 @@ class MedicationAdministrationOwnershipTest extends TestCase
             'secondary_site_ids' => [],
             'is_active' => true,
             'start_date' => today()->subDay(),
+            'end_date' => null,
         ]);
         $permissionIds = Permission::query()->whereIn('key', $permissions)->pluck('id');
         $this->assertCount(count($permissions), $permissionIds, 'Missing seeded permission in test setup.');
@@ -1320,6 +1343,7 @@ class MedicationAdministrationOwnershipTest extends TestCase
         );
 
         if ($assignedClient !== null) {
+            $assignedClient->supportWorkers()->attach($user->id);
             Shift::factory()->create([
                 'client_id' => $assignedClient->id,
                 'site_id' => $site->id,

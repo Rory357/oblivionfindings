@@ -47,8 +47,8 @@ class MedicationSettingsSiteScopeTest extends TestCase
             [$localSite->id],
             collect($response->inertiaProps('sites'))->pluck('id')->all(),
         );
-        $this->assertTrue($response->inertiaProps('can.manage'));
-        $this->assertFalse($response->inertiaProps('can.manage_global'));
+        $this->assertTrue($response->inertiaProps('settingsCan.manage'));
+        $this->assertFalse($response->inertiaProps('settingsCan.manage_global'));
 
         $this->actingAs($actor)
             ->post(route('emar.settings.rules.store'), $this->payload($localSite->id, 'LOCAL CREATE'))
@@ -164,7 +164,7 @@ class MedicationSettingsSiteScopeTest extends TestCase
             [$firstSite->id, $secondSite->id],
             collect($response->inertiaProps('sites'))->pluck('id')->all(),
         );
-        $this->assertTrue($response->inertiaProps('can.manage_global'));
+        $this->assertTrue($response->inertiaProps('settingsCan.manage_global'));
 
         $this->actingAs($actor)
             ->post(route('emar.settings.rules.store'), $this->payload(null, 'GLOBAL CREATE'))

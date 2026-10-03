@@ -142,8 +142,7 @@ class CompetencyRestrictionRulesTest extends TestCase
         $this->recordGiven($first, [
             'witnessed_by' => $restrictedColleague->id,
             'witness_credential' => UserFactory::TEST_WITNESS_PIN,
-        ])->assertSessionHasErrors('witnessed_by');
-        $this->assertStringContainsString('restricted', session('errors')->first('witnessed_by'));
+        ])->assertNotFound();
         $this->assertDatabaseCount('client_medication_administrations', 0);
 
         $cosigner = $this->qualifiedWitness();

@@ -158,6 +158,7 @@ use App\Observers\HouseLedgerEntryObserver;
 use App\Observers\HrCourseEnrollmentObserver;
 use App\Observers\HrEmployeeProfileObserver;
 use App\Observers\HrLeaveRequestObserver;
+use App\Observers\MedicationReviewClientObserver;
 use App\Observers\ProjectsToTimelineObserver;
 use App\Observers\RestraintEventObserver;
 use App\Observers\SafeguardingConcernObserver;
@@ -494,6 +495,7 @@ class AppServiceProvider extends ServiceProvider
         ClientRoutine::observe(ProjectsToTimelineObserver::class);
         ClientAppointment::observe(ProjectsToTimelineObserver::class);
         ClientAssessment::observe(ProjectsToTimelineObserver::class);
+        Client::observe(MedicationReviewClientObserver::class);
         ClientDocument::observe(ProjectsToTimelineObserver::class);
         ClientLeaveRequest::observe(ProjectsToTimelineObserver::class);
         ClientExcursionRequest::observe(ProjectsToTimelineObserver::class);

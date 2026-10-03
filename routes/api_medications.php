@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\MedicationsApiController;
+use App\Http\Middleware\MedicationExportGuard;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -99,11 +100,12 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
     // Mixed report endpoints stay available for ordinary report types. The
     // controller conjunctively exact-gates controlled selectors.
     Route::get('/reports', [MedicationsApiController::class, 'getReports'])
-        ->middleware('permission:medications.reports.export|reports.viewAny')
+        ->middleware('permission:medications.reports.view')
         ->name('api.medications.reports');
 
     Route::get('/reports/export', [MedicationsApiController::class, 'exportReportCsv'])
-        ->middleware('permission:medications.reports.export|reports.viewAny')
+        ->middleware(['permission:medications.reports.view', 'permission:medications.reports.export'])
+        ->middleware(MedicationExportGuard::class.':doses')
         ->name('api.medications.reports.export');
 
     // Shift summary

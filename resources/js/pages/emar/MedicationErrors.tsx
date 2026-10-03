@@ -1,1112 +1,618 @@
-/* eslint-disable no-restricted-syntax -- error table, summary/analytics cards, filter toolbar and
-   hero month stepper are custom-layout bordered surfaces / chip buttons (not Card/Button); colours
-   are semantic tokens. */
+import { MedicationExportButton } from '@/components/emar/medication-export-button';
 import { EmarHubRail } from '@/components/emar/emar-hub-rail';
-import { PageHero, type PageHeroStat } from '@/components/page';
-import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
-    EntityFilter,
-    ShiftContextMenu,
-    TabStrip,
-    type RosterTabItem,
-    type ShiftCtxItem,
-    type ShiftCtxState,
-} from '@/components/rostering';
+    EntityContextMenu,
+    EntityKebab,
+    type MenuItem,
+    useEntityContextMenu,
+} from '@/components/lists/entity-menu';
+import { EntityTable } from '@/components/lists/entity-table';
+import { ListCaption } from '@/components/lists/list-caption';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+} from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
-import {
-    CloseErrorDialog,
-    ERROR_TYPES,
-    ResolveErrorDialog,
-    ReviewErrorDialog,
-    SEVERITIES,
-    severityMeta,
-    statusMeta,
-    TriageDialog,
-    typeLabel,
-    type ErrorRow,
-    type TriageAction,
-} from '@/pages/emar/_error-dialogs';
-import { ReportErrorModal } from '@/pages/emar/components/report-error-modal';
+import { formatDateTime } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
+import { AlertTriangle, Eye, Plus, Siren } from 'lucide-react';
+import { useState } from 'react';
+import { ReportErrorModal } from './components/report-error-modal';
+import { ErrorDetail } from './errors/_detail';
 import {
-    AlertTriangle,
-    CheckCircle2,
-    ChevronLeft,
-    ChevronRight,
-    ClipboardList,
-    Eye,
-    FileText,
-    Link2,
-    ListChecks,
-    Lock,
-    Paperclip,
-    Plus,
-    Search,
-    ShieldCheck,
-    User,
-    X,
-} from 'lucide-react';
-import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
+    HARMS,
+    labelFor,
+    personName,
+    REACH,
+    Stage,
+    TYPES,
+    type ErrorRecord,
+    type Person,
+} from './errors/_shared';
 
-type Trend = { week: string; count: number; near_miss: number };
-type Stats = {
-    total_open: number;
-    critical: number;
-    this_month: number;
-    resolved_this_month: number;
-    near_miss: number;
-    trend: Trend[];
-    by_type: Record<string, number>;
-    by_severity: Record<string, number>;
+type Filters = {
+    tab: string;
+    q: string;
+    reach: string;
+    site_id: number | null;
 };
-
 type Props = {
-    errors: ErrorRow[];
-    stats: Stats;
+    errors: ErrorRecord[];
+    detail: ErrorRecord | null;
+    filters: Filters;
+    pagination: {
+        links: { url: string | null; active: boolean; label: string }[];
+        total: number;
+        from: number | null;
+        to: number | null;
+        last_page: number;
+    };
+    stats: {
+        triage: number;
+        investigating: number;
+        actions: number;
+        closed: number;
+        total_open: number;
+        recent: number;
+        reached: number;
+        near_miss: number;
+        unknown_reach: number;
+        trend: { week: string; count: number; near_miss: number }[];
+    };
     clients: { id: number; first_name: string; last_name: string }[];
-    staff: { id: number; name: string }[];
-    sites: { id: number; name: string }[];
-    active_site: { id: number; name: string } | null;
-    site_brand_colour: string | null;
+    staff: Person[];
+    sites: Person[];
+    export_period: { date_from: string; date_to: string };
     can: {
         record: boolean;
-        correct: boolean;
+        manage: boolean;
+        all: boolean;
+        export: boolean;
+        controlled: boolean;
     };
 };
-
-type Modal =
-    | { type: 'report' }
-    | { type: 'triage' | 'review' | 'resolve' | 'close'; error: ErrorRow }
-    | null;
-
-const initials = (n: string) =>
-    n
-        .split(' ')
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((p) => p[0])
-        .join('')
-        .toUpperCase() || '?';
-const fmtDate = (iso: string | null) =>
-    iso
-        ? new Date(iso).toLocaleDateString('en-NZ', {
-              day: 'numeric',
-              month: 'short',
-          })
-        : '—';
-const SEV_DOT: Record<string, string> = {
-    near_miss: 'bg-muted-foreground',
-    minor: 'bg-status-info',
-    moderate: 'bg-status-warning',
-    major: 'bg-status-warning',
-    critical: 'bg-status-critical',
-};
-/** Context-menu header tag colours (semantic token CSS vars), keyed by severity. */
-const SEV_CTX: Record<string, { bg: string; color: string }> = {
-    near_miss: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
-    minor: { bg: 'var(--status-info-bg)', color: 'var(--status-info)' },
-    moderate: {
-        bg: 'var(--status-warning-bg)',
-        color: 'var(--status-warning)',
-    },
-    major: { bg: 'var(--status-warning-bg)', color: 'var(--status-warning)' },
-    critical: {
-        bg: 'var(--status-critical-bg)',
-        color: 'var(--status-critical)',
-    },
-};
-
-type ErrAlert = {
-    kind: string;
-    tone: 'critical' | 'warning' | 'info';
-    icon: typeof AlertTriangle;
-    message: string;
-    tab: string;
-};
-
-const DISMISSED_ALERTS_KEY = 'err-dismissed-alerts';
-/** Per-session dismissed alert kinds (survives Inertia partial reloads + soft nav). */
-function readDismissedAlerts(): string[] {
-    if (typeof window === 'undefined') return [];
-    try {
-        const raw = window.sessionStorage.getItem(DISMISSED_ALERTS_KEY);
-        return raw ? (JSON.parse(raw) as string[]) : [];
-    } catch {
-        return [];
-    }
-}
-function persistDismissedAlerts(kinds: string[]): string[] {
-    const unique = Array.from(new Set(kinds));
-    if (typeof window !== 'undefined') {
-        try {
-            window.sessionStorage.setItem(
-                DISMISSED_ALERTS_KEY,
-                JSON.stringify(unique),
-            );
-        } catch {
-            /* sessionStorage unavailable — dismissal stays in-memory only */
-        }
-    }
-    return unique;
-}
-
+type ErrorView =
+    | 'triage'
+    | 'investigating'
+    | 'actions'
+    | 'closed'
+    | 'incidents'
+    | 'trends'
+    | 'mine';
+const views: ReadonlyArray<readonly [ErrorView, string]> = [
+    ['triage', 'To triage'],
+    ['investigating', 'Investigating'],
+    ['actions', 'Actions & close'],
+    ['closed', 'Closed'],
+    ['incidents', 'Incidents'],
+    ['trends', 'Trends'],
+    ['mine', 'Your reports'],
+];
 export default function MedicationErrors({
     errors,
+    detail,
+    filters,
+    pagination,
     stats,
     clients,
     staff,
     sites,
-    active_site: activeSite,
-    site_brand_colour: brandColour,
     can,
+    export_period,
 }: Props) {
-    const breadcrumbs = useEmarBreadcrumbs();
-    const [activeTab, setActiveTab] = useState('all');
-    const [search, setSearch] = useState('');
-    const [clientFilter, setClientFilter] = useState<number | null>(null);
-    const [severityFilter, setSeverityFilter] = useState<number | null>(null);
-    const [typeFilter, setTypeFilter] = useState<number | null>(null);
-    const [reporterFilter, setReporterFilter] = useState<number | null>(null);
-    const [month, setMonth] = useState<number | null>(null); // null = all time; else offset from current month
-    const [siteFilter, setSiteFilter] = useState<number | null>(
-        activeSite?.id ?? null,
-    );
-    // `/emar/errors?error=<id>` (the All Tasks link) opens that record's
-    // triage view — only when the server included it in this reader's register.
-    const [modal, setModal] = useState<Modal>(() => {
-        if (typeof window === 'undefined') return null;
-        const requested = Number(
-            new URLSearchParams(window.location.search).get('error'),
+    const [report, setReport] = useState(false);
+    const [query, setQuery] = useState(filters.q);
+    const ctx = useEntityContextMenu<ErrorRecord>();
+    const crumbs = useEmarBreadcrumbs();
+    const visit = (next: Partial<Filters>, error?: number | null) =>
+        router.get(
+            '/emar/errors',
+            { ...filters, ...next, error: error ?? null },
+            { preserveState: true, preserveScroll: true, replace: true },
         );
-        const match =
-            Number.isInteger(requested) && requested > 0
-                ? errors.find((e) => e.id === requested)
-                : undefined;
-        return match ? { type: 'triage', error: match } : null;
-    });
-    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
-
-    const monthLabel = useMemo(() => {
-        const d = new Date();
-        d.setMonth(d.getMonth() + (month ?? 0));
-        return d.toLocaleDateString('en-NZ', {
-            month: 'long',
-            year: 'numeric',
-        });
-    }, [month]);
-
-    const filtered = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        const sev =
-            severityFilter !== null ? SEVERITIES[severityFilter]?.value : null;
-        const typ = typeFilter !== null ? ERROR_TYPES[typeFilter]?.value : null;
-        return errors.filter((e) => {
-            if (clientFilter && e.client_id !== clientFilter) return false;
-            if (sev && e.severity !== sev) return false;
-            if (typ && e.error_type !== typ) return false;
-            if (reporterFilter && e.reported_by_user?.id !== reporterFilter)
-                return false;
-            if (month !== null && e.reported_at) {
-                const d = new Date();
-                d.setDate(1);
-                d.setMonth(d.getMonth() + month);
-                const ed = new Date(e.reported_at);
-                if (
-                    ed.getMonth() !== d.getMonth() ||
-                    ed.getFullYear() !== d.getFullYear()
-                )
-                    return false;
-            }
-            if (q) {
-                const name = e.client
-                    ? `${e.client.first_name} ${e.client.last_name}`
-                    : '';
-                if (
-                    !`${name} ${e.medication?.name ?? ''} ${e.ref}`
-                        .toLowerCase()
-                        .includes(q)
-                )
-                    return false;
-            }
-            return true;
-        });
-    }, [
-        errors,
-        search,
-        clientFilter,
-        severityFilter,
-        typeFilter,
-        reporterFilter,
-        month,
-    ]);
-
-    const byTab = (tab: string) =>
-        filtered.filter((e) =>
-            tab === 'open'
-                ? ['reported', 'investigating'].includes(e.status)
-                : tab === 'critical'
-                  ? e.severity === 'critical'
-                  : tab === 'nearmiss'
-                    ? e.severity === 'near_miss'
-                    : tab === 'resolved'
-                      ? ['resolved', 'closed'].includes(e.status)
-                      : true,
-        );
-    const rows = byTab(activeTab);
-    const hasFilters =
-        search ||
-        clientFilter ||
-        severityFilter !== null ||
-        typeFilter !== null ||
-        reporterFilter ||
-        month !== null;
-    const clearFilters = () => {
-        setSearch('');
-        setClientFilter(null);
-        setSeverityFilter(null);
-        setTypeFilter(null);
-        setReporterFilter(null);
-        setMonth(null);
-    };
-    const onSite = (id: number | null) => {
-        setSiteFilter(id);
-        router.get('/emar/errors', id ? { site_id: id } : {}, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    // Cross-module jumps + right-click row menu (parity with PRN/CD).
-    const viewClient = (id: number | null) => {
-        if (id) router.visit(`/operations/clients/${id}?tab=mar`);
-    };
-    const viewIncident = (id: number) => router.visit(`/incidents/${id}`);
-    // Post-report create-and-link: the errors endpoint creates the incident,
-    // links it and redirects into the incidents module (see ERRORS_GAP_ANALYSIS C).
-    const createAndLinkIncident = (err: ErrorRow) => {
-        if (
-            ['major', 'critical'].includes(err.severity) &&
-            !err.immediate_action?.trim()
-        ) {
-            setModal({ type: 'triage', error: err });
-            return;
-        }
-        router.post(`/emar/errors/${err.id}/link-incident`);
-    };
-    const openRowCtx = (ev: ReactMouseEvent, err: ErrorRow) => {
-        ev.preventDefault();
-        const sevm = severityMeta(err.severity);
-        const tag = SEV_CTX[err.severity] ?? SEV_CTX.near_miss;
-        const open =
-            err.status === 'reported' || err.status === 'investigating';
-        const criticalOpen =
-            open && (err.severity === 'critical' || err.severity === 'major');
-        const clientName = err.client
-            ? `${err.client.first_name} ${err.client.last_name}`
-            : 'Unknown client';
-        // One honest incident action: jump when linked, else create-and-link;
-        // for an open critical/major error with no incident it escalates (critical tone).
-        const incidentItem: ShiftCtxItem | null = err.incident
-            ? {
-                  icon: <Link2 className="h-3.5 w-3.5" />,
-                  label: `View linked incident ${err.incident.ref}`,
-                  onClick: () => viewIncident(err.incident!.id),
-              }
-            : can.correct && criticalOpen
-              ? {
-                    icon: <AlertTriangle className="h-3.5 w-3.5" />,
-                    label: 'Escalate — create & link incident',
-                    sub: 'Raise into the incident register',
-                    tone: 'critical',
-                    onClick: () => createAndLinkIncident(err),
+    const open = (e: ErrorRecord) => visit({}, e.id);
+    const menu = (e: ErrorRecord): MenuItem[] => [
+        { label: 'Open error record', icon: Eye, onClick: () => open(e) },
+        ...(e.incident
+            ? [
+                  {
+                      label: 'Open linked incident',
+                      icon: Siren,
+                      onClick: () =>
+                          router.visit(`/incidents/${e.incident!.id}`),
+                  },
+              ]
+            : []),
+    ];
+    const filtersNode = (
+        <div className="flex flex-wrap items-center gap-2.5">
+            {(can.all ? views : views.filter(([key]) => key === 'mine')).map(
+                ([key, label]: readonly [ErrorView, string]) => (
+                    <PageHeaderFilterButton
+                        key={key}
+                        active={filters.tab === key}
+                        onClick={() => visit({ tab: key })}
+                    >
+                        {label}
+                        {[
+                            'triage',
+                            'investigating',
+                            'actions',
+                            'closed',
+                        ].includes(key)
+                            ? ` · ${stats[key as 'triage']}`
+                            : ''}
+                    </PageHeaderFilterButton>
+                ),
+            )}
+            <PageHeaderFilterSelect
+                label="Reach"
+                value={filters.reach}
+                options={[
+                    { value: 'all', label: 'All reach states' },
+                    ...REACH.map(([value, label]) => ({ value, label })),
+                ]}
+                onChange={(reach) => visit({ reach })}
+            />
+            <PageHeaderFilterSelect
+                label="House"
+                value={filters.site_id ? String(filters.site_id) : 'all'}
+                options={[
+                    { value: 'all', label: 'All approved houses' },
+                    ...sites.map((site) => ({
+                        value: String(site.id),
+                        label: site.name,
+                    })),
+                ]}
+                onChange={(site) =>
+                    visit({ site_id: site === 'all' ? null : Number(site) })
                 }
-              : can.correct && open
-                ? {
-                      icon: <Link2 className="h-3.5 w-3.5" />,
-                      label: 'Create & link incident',
-                      sub: 'Raise into the incident register',
-                      onClick: () => createAndLinkIncident(err),
-                  }
-                : null;
-        const items: ShiftCtxItem[] = [
-            {
-                icon: <Eye className="h-3.5 w-3.5" />,
-                label: 'View / triage',
-                sub: `${typeLabel(err.error_type)} · ${sevm.label}`,
-                tone: 'primary',
-                onClick: () => setModal({ type: 'triage', error: err }),
-            },
-            ...(can.correct && err.status === 'reported'
-                ? [
-                      {
-                          icon: <ClipboardList className="h-3.5 w-3.5" />,
-                          label: 'Review',
-                          onClick: () =>
-                              setModal({ type: 'review', error: err }),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-            ...(can.correct && open
-                ? [
-                      {
-                          icon: <ShieldCheck className="h-3.5 w-3.5" />,
-                          label: 'Resolve',
-                          onClick: () =>
-                              setModal({ type: 'resolve', error: err }),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-            ...(can.correct && err.status === 'resolved'
-                ? [
-                      {
-                          icon: <Lock className="h-3.5 w-3.5" />,
-                          label: 'Close out',
-                          onClick: () =>
-                              setModal({ type: 'close', error: err }),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-            { sep: true },
-            ...(err.client_id
-                ? [
-                      {
-                          icon: <User className="h-3.5 w-3.5" />,
-                          label: 'View client',
-                          onClick: () => viewClient(err.client_id),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-            ...(err.mar_url
-                ? [
-                      {
-                          icon: <FileText className="h-3.5 w-3.5" />,
-                          label: 'Open on MAR chart',
-                          onClick: () => router.visit(err.mar_url!),
-                      } satisfies ShiftCtxItem,
-                  ]
-                : []),
-            ...(incidentItem ? [incidentItem] : []),
-        ];
-        setCtx({
-            x: ev.clientX,
-            y: ev.clientY,
-            tag: sevm.label,
-            tagBg: tag.bg,
-            tagColor: tag.color,
-            meta: `${err.ref} · ${clientName}${err.medication ? ` · ${err.medication.name}` : ''}`,
-            items,
-        });
-    };
-
-    // Stacked, dismissible (per session) alert strip built from the loaded register
-    // (stable regardless of search/month facets). Each row jumps to the right tab.
-    const [dismissed, setDismissed] = useState<string[]>(() =>
-        readDismissedAlerts(),
+            />
+        </div>
     );
-    const dismiss = (kind: string) =>
-        setDismissed((prev) => persistDismissedAlerts([...prev, kind]));
-    const criticalOpen = useMemo(
-        () =>
-            errors.filter(
-                (e) =>
-                    e.severity === 'critical' &&
-                    (e.status === 'reported' || e.status === 'investigating'),
-            ).length,
-        [errors],
-    );
-    const awaitingReview = useMemo(
-        () => errors.filter((e) => e.status === 'reported').length,
-        [errors],
-    );
-    const resolvedNotClosed = useMemo(
-        () => errors.filter((e) => e.status === 'resolved').length,
-        [errors],
-    );
-    const alerts: ErrAlert[] = [
-        criticalOpen > 0 && {
-            kind: 'critical',
-            tone: 'critical' as const,
-            icon: AlertTriangle,
-            message: `${criticalOpen} critical error${criticalOpen === 1 ? '' : 's'} still open — triage and resolve urgently.`,
-            tab: 'critical',
-        },
-        awaitingReview > 0 && {
-            kind: 'review',
-            tone: 'warning' as const,
-            icon: ClipboardList,
-            message: `${awaitingReview} error${awaitingReview === 1 ? '' : 's'} awaiting review.`,
-            tab: 'open',
-        },
-        resolvedNotClosed > 0 && {
-            kind: 'closeout',
-            tone: 'info' as const,
-            icon: CheckCircle2,
-            message: `${resolvedNotClosed} resolved error${resolvedNotClosed === 1 ? '' : 's'} awaiting close-out sign-off.`,
-            tab: 'resolved',
-        },
-    ].filter(
-        (a): a is ErrAlert =>
-            Boolean(a) && !dismissed.includes((a as ErrAlert).kind),
-    );
-
-    const TABS: RosterTabItem[] = [
-        {
-            id: 'all',
-            label: 'All errors',
-            icon: ListChecks,
-            tone: 'primary',
-            badge: filtered.length || undefined,
-        },
-        {
-            id: 'open',
-            label: 'Open',
-            icon: AlertTriangle,
-            tone: 'warning',
-            badge: byTab('open').length || undefined,
-        },
-        {
-            id: 'critical',
-            label: 'Critical',
-            icon: AlertTriangle,
-            tone: 'critical',
-            badge: byTab('critical').length || undefined,
-        },
-        {
-            id: 'nearmiss',
-            label: 'Near misses',
-            icon: CheckCircle2,
-            tone: 'info',
-            badge: byTab('nearmiss').length || undefined,
-        },
-        {
-            id: 'resolved',
-            label: 'Resolved',
-            icon: CheckCircle2,
-            tone: 'success',
-            badge: byTab('resolved').length || undefined,
-        },
-    ];
-    const heroStats: PageHeroStat[] = [
-        {
-            label: 'Open',
-            value: stats.total_open,
-            tone: stats.total_open > 0 ? 'warning' : 'neutral',
-        },
-        {
-            label: 'Critical',
-            value: stats.critical,
-            tone: stats.critical > 0 ? 'critical' : 'neutral',
-        },
-        { label: 'Near miss · 30d', value: stats.near_miss },
-        { label: 'Resolved · 30d', value: stats.resolved_this_month },
-    ];
-
-    const trendMax = Math.max(1, ...stats.trend.map((t) => t.count));
-    const trendTotal = stats.trend.reduce((s, t) => s + t.count, 0);
-    const trendNearMiss = stats.trend.reduce((s, t) => s + t.near_miss, 0);
-    const topTypes = Object.entries(stats.by_type ?? {});
-    const typeMax = Math.max(1, ...topTypes.map(([, n]) => n));
-    const sevEntries = Object.entries(stats.by_severity ?? {});
-    const sevTotal = Math.max(
-        1,
-        sevEntries.reduce((s, [, n]) => s + n, 0),
-    );
-
+    const trend = filters.tab === 'trends';
+    const actionView = filters.tab === 'actions';
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
+        <AppLayout breadcrumbs={crumbs}>
             <Head title="Medication errors" />
-            <div className="flex flex-col gap-6 p-6">
-                <PageHero
-                    rail={<EmarHubRail />}
-                    variant="hero"
-                    category="ops"
-                    brandColour={brandColour}
+            <div className="flex flex-col gap-5">
+                <PageHeader
                     icon={AlertTriangle}
-                    title={
-                        <span>
-                            <span className="flex items-center gap-2 text-[10.5px] font-semibold tracking-wide text-primary-foreground/80 uppercase">
-                                <span
-                                    aria-hidden
-                                    className="relative inline-flex h-2 w-2"
-                                >
-                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
-                                </span>
-                                Medication-safety register · live
-                            </span>
-                            <span className="mt-1 block text-[26px] leading-tight font-bold">
-                                Medication errors for{' '}
-                                <span className="border-b-2 border-primary-foreground/40">
-                                    {activeSite?.name ?? 'your services'}
-                                </span>
-                            </span>
-                        </span>
-                    }
-                    description="Report, triage and resolve medication errors and near misses. A no-blame register — every report strengthens the system."
-                    stats={heroStats}
+                    title="Medication errors"
+                    subline="Safety & oversight · report, triage and look into errors and near misses"
+                    rail={<EmarHubRail />}
+                    filters={filtersNode}
                     actions={
-                        can.record ? (
-                            <PageHeaderPrimaryButton
-                                icon={Plus}
-                                onClick={() => setModal({ type: 'report' })}
-                            >
-                                Report an error
-                            </PageHeaderPrimaryButton>
-                        ) : null
-                    }
-                    footer={
-                        <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() =>
-                                        setMonth((m) => (m ?? 0) - 1)
-                                    }
-                                    className="rounded-full border border-primary-foreground/20 bg-primary-foreground/10 p-1.5 text-primary-foreground hover:bg-primary-foreground/20"
-                                >
-                                    <ChevronLeft className="h-3.5 w-3.5" />
-                                </button>
-                                <span className="rounded-full border border-primary-foreground/30 bg-primary-foreground/15 px-3 py-1 text-xs font-medium text-primary-foreground">
-                                    {month === null ? 'All time' : monthLabel}
-                                </span>
-                                <button
-                                    onClick={() =>
-                                        setMonth((m) => (m ?? 0) + 1)
-                                    }
-                                    className="rounded-full border border-primary-foreground/20 bg-primary-foreground/10 p-1.5 text-primary-foreground hover:bg-primary-foreground/20"
-                                >
-                                    <ChevronRight className="h-3.5 w-3.5" />
-                                </button>
-                                {month !== null && (
-                                    <button
-                                        onClick={() => setMonth(null)}
-                                        className="rounded-full bg-primary-foreground px-3 py-1 text-xs font-medium text-primary-strong"
-                                    >
-                                        All time
-                                    </button>
-                                )}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                                <div className="relative w-full max-w-xs md:w-[240px]">
-                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                    <input
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                        placeholder="Search client, medication or ref…"
-                                        aria-label="Search medication errors"
-                                        className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-8 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
-                                    />
-                                    {search ? (
-                                        <button
-                                            type="button"
-                                            aria-label="Clear search"
-                                            onClick={() => setSearch('')}
-                                            className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"
-                                        >
-                                            <X className="h-3.5 w-3.5" />
-                                        </button>
-                                    ) : null}
-                                </div>
-                                <EntityFilter
-                                    label="Client"
-                                    allLabel="All clients"
-                                    items={clients.map((c) => ({
-                                        id: c.id,
-                                        name: `${c.first_name} ${c.last_name}`,
-                                    }))}
-                                    value={clientFilter}
-                                    onChange={setClientFilter}
-                                    onDark
-                                />
-                                {sites.length > 0 && (
-                                    <EntityFilter
-                                        label="Site"
-                                        allLabel="All sites"
-                                        items={sites}
-                                        value={siteFilter}
-                                        onChange={onSite}
-                                        onDark
-                                    />
-                                )}
-                            </div>
-                        </div>
-                    }
-                />
-
-                {alerts.length > 0 && (
-                    <div className="flex flex-col gap-2">
-                        {alerts.map((a) => (
-                            <AlertRow
-                                key={a.kind}
-                                alert={a}
-                                onReview={() => setActiveTab(a.tab)}
-                                onDismiss={() => dismiss(a.kind)}
+                        <>
+                            <PageHeaderSearch
+                                value={query}
+                                onChange={setQuery}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') visit({ q: query });
+                                }}
+                                placeholder="Search person or error reference"
                             />
-                        ))}
-                    </div>
-                )}
-
-                <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr_1fr]">
-                    <Card title="Reports · last 8 weeks">
-                        <div className="flex h-20 items-end gap-1.5">
-                            {stats.trend.map((t, i) => (
-                                <div
-                                    key={i}
-                                    className="flex flex-1 flex-col items-center gap-1"
+                            {can.export && (
+                                <MedicationExportButton
+                                    type="errors"
+                                    siteId={filters.site_id ?? undefined}
+                                    dateFrom={export_period.date_from}
+                                    dateTo={export_period.date_to}
                                 >
-                                    <div
-                                        className={`w-full rounded-t ${i === stats.trend.length - 1 ? 'bg-primary' : 'bg-primary/30'}`}
-                                        style={{
-                                            height: `${Math.max(4, (t.count / trendMax) * 64)}px`,
-                                        }}
-                                        title={`${t.week}: ${t.count}`}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                        <div className="mt-2 text-xs text-muted-foreground">
-                            {trendTotal} total · {trendNearMiss} near miss
-                        </div>
-                    </Card>
-                    <Card title="Top error types">
-                        {topTypes.length === 0 ? (
-                            <div className="py-4 text-center text-xs text-muted-foreground">
-                                No data.
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-2">
-                                {topTypes.map(([t, n]) => (
-                                    <div
-                                        key={t}
-                                        className="flex items-center gap-2 text-xs"
-                                    >
-                                        <span className="w-28 shrink-0 truncate">
-                                            {typeLabel(t)}
-                                        </span>
-                                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                                            <div
-                                                className="h-full rounded-full bg-primary"
-                                                style={{
-                                                    width: `${(n / typeMax) * 100}%`,
-                                                }}
-                                            />
-                                        </div>
-                                        <span className="w-5 text-right text-muted-foreground tabular-nums">
-                                            {n}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </Card>
-                    <Card title="By severity">
-                        <div className="flex h-2.5 overflow-hidden rounded-full">
-                            {sevEntries.map(
-                                ([s, n]) =>
-                                    n > 0 && (
-                                        <div
-                                            key={s}
-                                            className={SEV_DOT[s]}
-                                            style={{
-                                                width: `${(n / sevTotal) * 100}%`,
-                                            }}
-                                        />
-                                    ),
+                                    Export neutral CSV
+                                </MedicationExportButton>
                             )}
-                        </div>
-                        <div className="mt-2 flex flex-col gap-1">
-                            {sevEntries.map(([s, n]) => (
-                                <div
-                                    key={s}
-                                    className="flex items-center gap-2 text-xs"
+                            {can.record && (
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
+                                    onClick={() => setReport(true)}
                                 >
-                                    <span
-                                        className={`h-2 w-2 rounded-full ${SEV_DOT[s]}`}
-                                    />
-                                    <span className="flex-1 text-muted-foreground capitalize">
-                                        {s.replace('_', ' ')}
-                                    </span>
-                                    <span className="tabular-nums">{n}</span>
-                                </div>
+                                    Report an error
+                                </PageHeaderPrimaryButton>
+                            )}
+                        </>
+                    }
+                    meters={
+                        <>
+                            {(
+                                [
+                                    ['triage', 'To triage'],
+                                    ['investigating', 'Investigating'],
+                                    ['actions', 'Actions & close'],
+                                    ['closed', 'Closed'],
+                                ] as const
+                            ).map(([key, label]) => (
+                                <PageHeaderMeterBlock
+                                    key={key}
+                                    label={label}
+                                    onClick={() => visit({ tab: key })}
+                                    tone={
+                                        key === 'triage' && stats.triage
+                                            ? 'warning'
+                                            : 'brand'
+                                    }
+                                >
+                                    <PageHeaderMeterBig>
+                                        {stats[key]}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {key === 'actions'
+                                            ? 'Errors to finish or close'
+                                            : 'In your permitted scope'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
                             ))}
-                        </div>
-                    </Card>
-                </div>
-
-                <TabStrip
-                    value={activeTab}
-                    onChange={setActiveTab}
-                    items={TABS}
-                    ariaLabel="Error views"
+                            <PageHeaderMeterBlock
+                                label="Near misses · 90 days"
+                                onClick={() =>
+                                    visit({ tab: 'trends', reach: 'no' })
+                                }
+                                value={stats.near_miss}
+                            >
+                                <PageHeaderMeterDonut
+                                    percent={
+                                        stats.recent
+                                            ? (100 * stats.near_miss) /
+                                              stats.recent
+                                            : 0
+                                    }
+                                    caption={`${stats.near_miss} of ${stats.recent} reports`}
+                                />
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Reached · 90 days"
+                                onClick={() =>
+                                    visit({ tab: 'trends', reach: 'yes' })
+                                }
+                                value={stats.reached}
+                            >
+                                <PageHeaderMeterDonut
+                                    percent={
+                                        stats.recent
+                                            ? (100 * stats.reached) /
+                                              stats.recent
+                                            : 0
+                                    }
+                                    caption={`${stats.reached} of ${stats.recent} reports`}
+                                />
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
                 />
-
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-medium text-muted-foreground">
-                        Filter
-                    </span>
-                    <EntityFilter
-                        label="Severity"
-                        allLabel="All severities"
-                        items={SEVERITIES.map((s, i) => ({
-                            id: i,
-                            name: s.label,
-                        }))}
-                        value={severityFilter}
-                        onChange={setSeverityFilter}
-                    />
-                    <EntityFilter
-                        label="Type"
-                        allLabel="All types"
-                        items={ERROR_TYPES.map((t, i) => ({
-                            id: i,
-                            name: t.label,
-                        }))}
-                        value={typeFilter}
-                        onChange={setTypeFilter}
-                    />
-                    <EntityFilter
-                        label="Reporter"
-                        allLabel="Any reporter"
-                        items={staff}
-                        value={reporterFilter}
-                        onChange={setReporterFilter}
-                    />
-                    {hasFilters && (
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={clearFilters}
-                        >
-                            Clear
-                        </Button>
-                    )}
-                </div>
-
-                <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                    {rows.length === 0 ? (
-                        <div className="flex flex-col items-center gap-2 px-5 py-14 text-center">
-                            <CheckCircle2 className="h-8 w-8 text-muted-foreground/40" />
-                            <p className="text-sm font-medium">
-                                No errors to show
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                {hasFilters
-                                    ? 'No errors match the current filters — try clearing them.'
-                                    : 'Nothing in this view. A quiet register is a good sign.'}
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[940px] text-sm">
-                                <thead>
-                                    <tr className="bg-muted/50 text-left text-[11px] tracking-wide text-muted-foreground uppercase">
-                                        <th className="px-4 py-2.5">Date</th>
-                                        <th className="px-4 py-2.5">Client</th>
-                                        <th className="px-4 py-2.5">
-                                            Medication
-                                        </th>
-                                        <th className="px-4 py-2.5">Type</th>
-                                        <th className="px-4 py-2.5">
-                                            Severity
-                                        </th>
-                                        <th className="px-4 py-2.5">
-                                            Reported by
-                                        </th>
-                                        <th className="px-4 py-2.5">Status</th>
-                                        <th className="px-4 py-2.5 text-right">
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {rows.map((e) => {
-                                        const sev = severityMeta(e.severity);
-                                        const st = statusMeta(e.status);
-                                        return (
-                                            <tr
-                                                key={e.id}
-                                                tabIndex={0}
-                                                aria-label={`Triage ${e.ref} · ${e.client ? `${e.client.first_name} ${e.client.last_name}` : 'unknown client'}`}
-                                                className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
-                                                onClick={() =>
-                                                    setModal({
-                                                        type: 'triage',
-                                                        error: e,
-                                                    })
-                                                }
-                                                onContextMenu={(ev) =>
-                                                    openRowCtx(ev, e)
-                                                }
-                                                onKeyDown={(ev) => {
-                                                    if (
-                                                        ev.key === 'Enter' ||
-                                                        ev.key === ' '
-                                                    ) {
-                                                        ev.preventDefault();
-                                                        setModal({
-                                                            type: 'triage',
-                                                            error: e,
-                                                        });
-                                                    }
-                                                }}
-                                            >
-                                                <td className="px-4 py-3">
-                                                    <div>
-                                                        {fmtDate(e.reported_at)}
-                                                    </div>
-                                                    <div className="font-mono text-[10px] text-muted-foreground">
-                                                        {e.ref}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                                                            {initials(
-                                                                e.client
-                                                                    ? `${e.client.first_name} ${e.client.last_name}`
-                                                                    : '?',
+                {!can.controlled && (
+                    <p className="text-caption">
+                        Controlled-medicine records are omitted from this
+                        cross-person register and its counts.
+                    </p>
+                )}
+                {trend ? (
+                    <Card className="gap-5 p-5">
+                        <h2 className="text-section-title">
+                            Reports by when they happened
+                        </h2>
+                        <p className="text-subtle">
+                            The last 90 NZ calendar days: {stats.reached}{' '}
+                            reached the person, {stats.near_miss} near misses,{' '}
+                            {stats.unknown_reach} with reach not known.
+                            Historical records use reported time only where
+                            occurred time was not captured.
+                        </p>
+                        <ul className="flex flex-col gap-2.5">
+                            {stats.trend.map((week) => (
+                                <li
+                                    key={week.week}
+                                    className="flex flex-wrap items-center justify-between gap-2"
+                                >
+                                    <span>Week of {week.week}</span>
+                                    <span className="text-sm tabular-nums">
+                                        {week.count} reports · {week.near_miss}{' '}
+                                        near misses
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    </Card>
+                ) : (
+                    <>
+                        <ListCaption
+                            title={
+                                views.find(
+                                    ([key]) => key === filters.tab,
+                                )?.[1] ?? 'Medication errors'
+                            }
+                            caption={`${pagination.from ?? 0}–${pagination.to ?? 0} of ${pagination.total} errors · ${can.all ? 'permitted houses and people' : 'your own reports'}`}
+                        />
+                        {errors.length ? (
+                            <>
+                                <div className="hidden md:block">
+                                    <EntityTable
+                                        rows={errors}
+                                        rowKey={(e) => e.id}
+                                        identityLabel="Person & error"
+                                        identityWidth="1.6fr"
+                                        rowHeight="content"
+                                        minWidth={980}
+                                        identity={(e) => ({
+                                            icon: AlertTriangle,
+                                            name: personName(e),
+                                            subline: `${e.ref} · ${e.site_name}`,
+                                        })}
+                                        onOpen={open}
+                                        actionsFor={menu}
+                                        onRowContextMenu={ctx.open}
+                                        columns={[
+                                            {
+                                                key: 'what',
+                                                label: 'What happened',
+                                                width: '1.6fr',
+                                                cell: (e) => (
+                                                    <div className="py-2">
+                                                        <p className="text-sm font-medium">
+                                                            {labelFor(
+                                                                TYPES,
+                                                                e.error_type,
                                                             )}
-                                                        </span>
-                                                        <div>
-                                                            <div className="font-medium">
-                                                                {e.client
-                                                                    ? `${e.client.first_name} ${e.client.last_name}`
-                                                                    : 'Unknown'}
-                                                            </div>
-                                                            <div className="text-xs text-muted-foreground">
-                                                                {e.site_name ??
-                                                                    ''}
-                                                            </div>
-                                                        </div>
+                                                        </p>
+                                                        <p className="text-caption">
+                                                            {e.medication
+                                                                ?.name ??
+                                                                'No chart medicine linked'}
+                                                        </p>
+                                                        <p className="text-caption">
+                                                            {formatDateTime(
+                                                                e.occurred_at,
+                                                            )}
+                                                        </p>
                                                     </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-muted-foreground">
-                                                    {e.medication?.name ?? '—'}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
-                                                        {typeLabel(
-                                                            e.error_type,
-                                                        )}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span
-                                                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${sev.cls}`}
-                                                    >
-                                                        {sev.label}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-muted-foreground">
-                                                    {e.reported_by_user?.name ??
-                                                        '—'}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span
-                                                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${st.cls}`}
-                                                        >
-                                                            {st.label}
-                                                        </span>
-                                                        {e.attachments.length >
-                                                            0 && (
-                                                            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                                                                <Paperclip className="h-3 w-3" />
-                                                                {
-                                                                    e
-                                                                        .attachments
-                                                                        .length
-                                                                }
-                                                            </span>
-                                                        )}
-                                                        {e.incident && (
-                                                            <Link2 className="h-3 w-3 text-status-critical" />
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td
-                                                    className="px-4 py-3"
-                                                    onClick={(ev) =>
-                                                        ev.stopPropagation()
-                                                    }
-                                                >
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            onClick={() =>
-                                                                setModal({
-                                                                    type: 'triage',
-                                                                    error: e,
-                                                                })
+                                                ),
+                                            },
+                                            {
+                                                key: 'reach',
+                                                label: 'Reach & harm',
+                                                width: '1.2fr',
+                                                cell: (e) => (
+                                                    <div className="py-2">
+                                                        <StatusBadge
+                                                            variant={
+                                                                e.reached_client ===
+                                                                'no'
+                                                                    ? 'info'
+                                                                    : [
+                                                                            'severe',
+                                                                            'death',
+                                                                        ].includes(
+                                                                            e.harm_level ??
+                                                                                '',
+                                                                        )
+                                                                      ? 'critical'
+                                                                      : [
+                                                                              'minor',
+                                                                              'moderate',
+                                                                          ].includes(
+                                                                              e.harm_level ??
+                                                                                  '',
+                                                                          )
+                                                                        ? 'warning'
+                                                                        : 'neutral'
                                                             }
                                                         >
-                                                            View
-                                                        </Button>
-                                                        {can.correct &&
-                                                            e.status ===
-                                                                'reported' && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    onClick={() =>
-                                                                        setModal(
-                                                                            {
-                                                                                type: 'review',
-                                                                                error: e,
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    Review
-                                                                </Button>
+                                                            {labelFor(
+                                                                HARMS,
+                                                                e.harm_level,
                                                             )}
-                                                        {can.correct &&
-                                                            (e.status ===
-                                                                'reported' ||
-                                                                e.status ===
-                                                                    'investigating') && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    onClick={() =>
-                                                                        setModal(
-                                                                            {
-                                                                                type: 'resolve',
-                                                                                error: e,
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    Resolve
-                                                                </Button>
+                                                        </StatusBadge>
+                                                        <p className="text-caption">
+                                                            {labelFor(
+                                                                REACH,
+                                                                e.reached_client,
                                                             )}
-                                                        {can.correct &&
-                                                            e.status ===
-                                                                'resolved' && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    onClick={() =>
-                                                                        setModal(
-                                                                            {
-                                                                                type: 'close',
-                                                                                error: e,
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    Close out
-                                                                </Button>
-                                                            )}
+                                                        </p>
                                                     </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
+                                                ),
+                                            },
+                                            {
+                                                key: 'stage',
+                                                label: 'Where it’s at',
+                                                width: '1.5fr',
+                                                cell: (e) => (
+                                                    <div className="py-2">
+                                                        <Stage
+                                                            value={e.stage}
+                                                        />
+                                                        <p className="text-caption">
+                                                            {e.owner?.name ??
+                                                                'Owner to assign'}
+                                                        </p>
+                                                        <p className="text-caption">
+                                                            {formatDateTime(
+                                                                e.stage ===
+                                                                    'triage'
+                                                                    ? e.triage_due_at
+                                                                    : e.investigation_due_at,
+                                                            )}
+                                                        </p>
+                                                        {e.incident
+                                                            ?.ready_to_close && (
+                                                            <p className="text-caption">
+                                                                Incident ready
+                                                                for Incidents
+                                                                closure
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                ),
+                                            },
+                                        ]}
+                                    />
+                                </div>
+                                <ul className="flex flex-col gap-5 md:hidden">
+                                    {errors.map((e) => (
+                                        <li key={e.id}>
+                                            <Card
+                                                className="gap-3 p-4"
+                                                onContextMenu={(ev) =>
+                                                    ctx.open(ev, e)
+                                                }
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <Button
+                                                        className="frontline-tap min-w-0 flex-1 justify-start whitespace-normal text-left"
+                                                        variant="ghost"
+                                                        onClick={() => open(e)}
+                                                    >
+                                                        {personName(e)} ·{' '}
+                                                        {e.ref}
+                                                    </Button>
+                                                    <EntityKebab
+                                                        actions={menu(e)}
+                                                    />
+                                                </div>
+                                                <p className="text-sm">
+                                                    {labelFor(
+                                                        TYPES,
+                                                        e.error_type,
+                                                    )}{' '}
+                                                    ·{' '}
+                                                    {formatDateTime(
+                                                        e.occurred_at,
+                                                    )}
+                                                </p>
+                                                <p className="text-subtle">
+                                                    {labelFor(
+                                                        REACH,
+                                                        e.reached_client,
+                                                    )}{' '}
+                                                    ·{' '}
+                                                    {labelFor(
+                                                        HARMS,
+                                                        e.harm_level,
+                                                    )}
+                                                </p>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <Stage value={e.stage} />
+                                                    <span className="text-caption">
+                                                        {e.owner?.name ??
+                                                            'Owner to assign'}
+                                                    </span>
+                                                </div>
+                                                <Button
+                                                    variant="outline"
+                                                    className="frontline-tap"
+                                                    onClick={() => open(e)}
+                                                >
+                                                    Open error
+                                                </Button>
+                                            </Card>
+                                        </li>
+                                    ))}
+                                </ul>
+                                {actionView && (
+                                    <Card className="gap-3 p-5">
+                                        <h2 className="text-section-title">
+                                            Open actions on these errors
+                                        </h2>
+                                        {errors.flatMap((e) =>
+                                            e.actions
+                                                .filter((a) => !a.completed_at)
+                                                .map((a) => (
+                                                    <div
+                                                        key={a.id}
+                                                        className="flex flex-wrap items-center justify-between gap-2"
+                                                    >
+                                                        <div>
+                                                            <p className="text-sm font-medium">
+                                                                {a.description}
+                                                            </p>
+                                                            <p className="text-caption">
+                                                                {e.ref} ·{' '}
+                                                                {a.owner?.name}{' '}
+                                                                · due{' '}
+                                                                {formatDateTime(
+                                                                    a.due_at,
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <Button
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                open(e)
+                                                            }
+                                                        >
+                                                            Open actions
+                                                        </Button>
+                                                    </div>
+                                                )),
+                                        )}
+                                    </Card>
+                                )}
+                                <LaravelPagination
+                                    links={pagination.links}
+                                    lastPage={pagination.last_page}
+                                />
+                            </>
+                        ) : (
+                            <EmptyState
+                                icon={AlertTriangle}
+                                title="No errors in this view"
+                                description="Reports appear here once saved. Try another view or clear the filters."
+                                action={
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            setQuery('');
+                                            visit({ q: '', reach: 'all' });
+                                        }}
+                                    >
+                                        Clear filters
+                                    </Button>
+                                }
+                            />
+                        )}
+                    </>
+                )}
             </div>
-
+            {ctx.ctx && (
+                <EntityContextMenu
+                    x={ctx.ctx.x}
+                    y={ctx.ctx.y}
+                    title={ctx.ctx.record.ref}
+                    items={menu(ctx.ctx.record)}
+                    onClose={ctx.close}
+                />
+            )}
             <ReportErrorModal
-                open={modal?.type === 'report'}
-                onClose={() => setModal(null)}
+                open={report}
+                onClose={() => setReport(false)}
                 clients={clients.map((c) => ({
                     id: c.id,
                     name: `${c.first_name} ${c.last_name}`,
                     site: null,
                 }))}
             />
-            {modal?.type === 'triage' && (
-                <TriageDialog
-                    error={modal.error}
-                    canCorrect={can.correct}
-                    onDismiss={() => setModal(null)}
-                    onAction={(a: TriageAction) =>
-                        setModal({ type: a, error: modal.error })
-                    }
+            {detail && (
+                <ErrorDetail
+                    key={detail.id}
+                    error={detail}
+                    canManage={can.manage}
+                    canReadInvestigation={can.all}
+                    canRecord={can.record}
+                    staff={staff}
+                    onClose={() => visit({})}
                 />
             )}
-            {modal?.type === 'review' && (
-                <ReviewErrorDialog
-                    error={modal.error}
-                    onClose={() => setModal(null)}
-                />
-            )}
-            {modal?.type === 'resolve' && (
-                <ResolveErrorDialog
-                    error={modal.error}
-                    onClose={() => setModal(null)}
-                />
-            )}
-            {modal?.type === 'close' && (
-                <CloseErrorDialog
-                    error={modal.error}
-                    onClose={() => setModal(null)}
-                />
-            )}
-            {ctx && <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />}
         </AppLayout>
-    );
-}
-
-function Card({
-    title,
-    children,
-}: {
-    title: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="rounded-2xl border bg-card p-4 shadow-sm">
-            <div className="mb-3 text-sm font-semibold">{title}</div>
-            {children}
-        </div>
-    );
-}
-
-/** One row of the alert strip — icon + message + Review jump + per-session dismiss. */
-function AlertRow({
-    alert,
-    onReview,
-    onDismiss,
-}: {
-    alert: ErrAlert;
-    onReview: () => void;
-    onDismiss: () => void;
-}) {
-    const Icon = alert.icon;
-    const tone =
-        alert.tone === 'critical'
-            ? 'border-status-critical/30 bg-status-critical-bg/60 text-status-critical'
-            : alert.tone === 'warning'
-              ? 'border-status-warning/30 bg-status-warning-bg/60 text-status-warning'
-              : 'border-status-info/30 bg-status-info-bg/60 text-status-info';
-    return (
-        <div
-            className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${tone}`}
-        >
-            <span className="flex items-center gap-2 text-sm font-medium">
-                <Icon className="h-4 w-4 shrink-0" />
-                {alert.message}
-            </span>
-            <span className="flex items-center gap-1.5">
-                <Button size="sm" variant="outline" onClick={onReview}>
-                    Review
-                </Button>
-                <button
-                    type="button"
-                    aria-label="Dismiss alert"
-                    onClick={onDismiss}
-                    className="grid h-7 w-7 place-items-center rounded-md opacity-70 hover:bg-foreground/10 hover:opacity-100"
-                >
-                    <X className="h-4 w-4" />
-                </button>
-            </span>
-        </div>
     );
 }

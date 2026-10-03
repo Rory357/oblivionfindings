@@ -60,10 +60,25 @@ final class MedicationGovernanceScopeService
         'medications.controlled.view',
         'medications.controlled.record',
         'medications.controlled.witness',
+        'medications.controlled.manage',
+        'medications.controlled.override',
         'medications.stock.update',
         'medications.orders.manage',
+        // Reconciliation sign-off and prescriber responses re-check this on the locked actor.
+        'medications.orders.verify',
         'medications.breakglass',
+        'medications.breakglass.end',
         'medications.audit.view',
+        // Per-person medication readers re-check these capabilities on the locked actor.
+        'clients.viewAny',
+        'medications.reports.export',
+        'reports.viewAny',
+        // Error commands also check report-only chart access and linked
+        // Incidents closure from this bounded, current permission snapshot.
+        'medications.reports.view',
+        'incidents.approve',
+        'incidents.manage',
+        'healthSafety.viewAllSites',
         'fleet.manage',
         'fleet.medication.manage',
         'clinical.accessAllSites',
@@ -131,7 +146,7 @@ final class MedicationGovernanceScopeService
         bool $controlled = false,
     ): array {
         abort_unless(
-            $actor->canDo('medications.reports.export') || $actor->canDo('reports.viewAny'),
+            $actor->canDo('medications.reports.view'),
             403,
         );
         if ($controlled) {
@@ -442,13 +457,14 @@ final class MedicationGovernanceScopeService
         ?int $expectedClientId = null,
         array $authorizationUserIds = [],
         ?CarbonInterface $authorizationEffectiveAt = null,
+        bool $currentOnly = true,
     ): mixed {
-        return DB::transaction(function () use ($actor, $medicationId, $capability, $callback, $expectedClientId, $authorizationUserIds, $authorizationEffectiveAt) {
+        return DB::transaction(function () use ($actor, $medicationId, $capability, $callback, $expectedClientId, $authorizationUserIds, $authorizationEffectiveAt, $currentOnly) {
             $this->assertCapability($actor, $capability);
 
-            $snapshot = ClientMedication::query()
+            $snapshot = ClientMedication::withTrashed()
                 ->whereKey($medicationId)
-                ->whereNull('deleted_at')
+                ->when($currentOnly, fn ($q) => $q->whereNull('deleted_at'))
                 ->first(['id', 'client_id']);
             $this->notFoundUnless($snapshot !== null);
 
@@ -458,11 +474,10 @@ final class MedicationGovernanceScopeService
             $client = Client::query()->whereKey($clientId)->lockForUpdate()->first();
             $this->notFoundUnless($client !== null && $this->positiveId($client->site_id) !== null);
 
-            $medication = ClientMedication::query()
+            $medication = ClientMedication::withTrashed()
                 ->whereKey($medicationId)
                 ->where('client_id', $client->id)
-                ->whereNull('deleted_at')
-                ->whereNull('superseded_by')
+                ->when($currentOnly, fn ($q) => $q->whereNull('deleted_at')->whereNull('superseded_by'))
                 ->lockForUpdate()
                 ->first();
             $this->notFoundUnless($medication !== null);

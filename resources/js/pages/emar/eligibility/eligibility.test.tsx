@@ -217,7 +217,7 @@ describe('Safety & oversight › Staff eligibility', () => {
         expect(screen.queryByText(/Witness & PINs/)).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: /^Renewals/ }));
         expect(
-            screen.getByText('Can’t record given doses now'),
+            screen.getByRole('heading', { name: 'Given competency not met' }),
         ).toBeInTheDocument();
         expect(screen.getByText('Due within 30 days')).toBeInTheDocument();
     });

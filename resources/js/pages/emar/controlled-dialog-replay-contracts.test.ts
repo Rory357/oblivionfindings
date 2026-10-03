@@ -12,10 +12,22 @@ const preciseQuantitySources = [
     'resources/js/pages/meds/today/components/record-dose-wizard.tsx',
     'resources/js/pages/meds/today/components/prn-wizard.tsx',
     'resources/js/pages/emar/components/cd-register-modal.tsx',
-    'resources/js/pages/emar/components/guided-round-dialog.tsx',
 ].map((path) => readFileSync(resolve(process.cwd(), path), 'utf8'));
 const prnWizardSource = preciseQuantitySources[1];
-const guidedRoundSource = preciseQuantitySources[3];
+const guidedRoundSource = readFileSync(
+    resolve(
+        process.cwd(),
+        'resources/js/pages/emar/components/guided-round-dialog.tsx',
+    ),
+    'utf8',
+);
+const recordDoseSource = readFileSync(
+    resolve(
+        process.cwd(),
+        'resources/js/components/emar/record-dose/record-dose-dialog.tsx',
+    ),
+    'utf8',
+);
 const shiftMedicationSource = readFileSync(
     resolve(
         process.cwd(),
@@ -204,6 +216,25 @@ describe('controlled mutation dialog replay contracts', () => {
         expect(preciseQuantitySources[2].match(/step="0\.01"/g)).toHaveLength(
             3,
         );
+
+        // Guided rounds use the shared recorder's decimal text inputs, which
+        // allow hundredths without a browser number-input step restriction.
+        expect(guidedRoundSource).toContain('<RecordDoseDialog');
+        for (const id of ['rd-stockQuantity', 'rd-cdBalance']) {
+            const inputStart = recordDoseSource.indexOf(`id="${id}"`);
+            expect(inputStart).toBeGreaterThanOrEqual(0);
+            const input = recordDoseSource.slice(
+                inputStart,
+                recordDoseSource.indexOf('/>', inputStart),
+            );
+            expect(input).toContain('inputMode="decimal"');
+            expect(input).not.toMatch(/(?:min|step)=[{"]0\.(?:25|5)/);
+        }
+        expect(recordDoseSource).toContain('Number(f.stockQuantity)');
+        expect(recordDoseSource).toContain('Number(f.cdBalance)');
+        expect(recordDoseSource).toContain(
+            String.raw`/^\d+(\.\d{1,2})?$/.test(f.cdBalance.trim())`,
+        );
     });
 
     it('keeps one payload-aware PRN UUID for exact retries and rotates after material edits or reset', () => {
@@ -239,41 +270,84 @@ describe('controlled mutation dialog replay contracts', () => {
     });
 
     it('keeps guided and shift administration UUIDs stable across uncertain retries', () => {
-        for (const administrationSource of [
-            guidedRoundSource,
-            shiftMedicationSource,
-        ]) {
-            expect(administrationSource).toContain(
-                'uuid: createOfflineRequestUuid()',
-            );
-            expect(administrationSource).toContain(
-                'fingerprint: null as string | null',
-            );
-            expect(administrationSource).toContain('materialFingerprint');
-            expect(administrationSource).toContain(
-                'client_request_uuid: administrationReplay.current.uuid',
-            );
-            expect(administrationSource).not.toContain(
-                'client_request_uuid: crypto.randomUUID()',
-            );
-        }
-        expect(guidedRoundSource).toContain('witness_credential: undefined');
-        expect(guidedRoundSource).toContain('submitEmarMutation(');
         expect(guidedRoundSource).toContain(
-            'emarMutationWasAccepted(result.status)',
+            "import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog'",
         );
-        expect(shiftMedicationSource).toContain("witness_credential: ''");
-        expect(shiftMedicationSource).toContain('<WitnessPinInput');
+        expect(guidedRoundSource).toContain(
+            'orderId: recording.item.medication_id',
+        );
+        expect(guidedRoundSource).toContain(
+            'scheduledFor: recording.item.scheduled_for',
+        );
+        expect(guidedRoundSource).toContain('entry="round"');
+        expect(guidedRoundSource).toContain('roundId={round.id}');
+        expect(recordDoseSource).toContain(
+            'const replay = useRef(createMedicationMutationReplayState());',
+        );
+        expect(recordDoseSource).toContain(
+            'replay.current = prepareMedicationMutationReplayState(',
+        );
+        expect(recordDoseSource).toContain(
+            'delete material.witness_credential;',
+        );
+        expect(recordDoseSource).toContain(
+            'client_request_uuid: replay.current.uuid',
+        );
+        expect(recordDoseSource).toContain(
+            'submitEmarMutation<Record<string, unknown>>(',
+        );
+        const outcomeSource = recordDoseSource.slice(
+            recordDoseSource.indexOf('function handleOutcome('),
+            recordDoseSource.indexOf('function handleError('),
+        );
+        expect(outcomeSource).toContain("if (status === 'queued')");
+        expect(outcomeSource).toContain(
+            "onRecorded?.({ status: 'queued', administrationId: null });",
+        );
+        expect(outcomeSource).toMatch(
+            /status === 'processed'\s*\|\|\s*status === 'synced'\s*\|\|\s*status === 'duplicate'/,
+        );
+        expect(outcomeSource).toContain("status: 'recorded'");
+        for (const status of [
+            'requires_connection',
+            'storage_unavailable',
+            'requires_authentication',
+        ]) {
+            expect(outcomeSource).toContain(`status === '${status}'`);
+        }
+        expect(outcomeSource).toContain("setPhase('uncertain');");
+        expect(recordDoseSource).toContain(
+            'allowQueueWhenOffline: !needsPin && !body.witness_override_id',
+        );
+        expect(recordDoseSource).not.toContain(
+            'client_request_uuid: crypto.randomUUID()',
+        );
+        expect(shiftMedicationSource).toContain(
+            "import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog'",
+        );
+        expect(shiftMedicationSource).toContain('<RecordDoseDialog');
+        expect(shiftMedicationSource).toContain(
+            'orderId: activeRow.medication.id',
+        );
+        expect(shiftMedicationSource).toContain(
+            'scheduledFor: activeRow.scheduled_for!',
+        );
+        expect(shiftMedicationSource).toContain('entry="shift"');
+        expect(shiftMedicationSource).toContain('shiftContext={{');
+        expect(shiftMedicationSource).toContain('shiftId,');
+        expect(shiftMedicationSource).toContain(
+            'activeRow.medication.scan_verification',
+        );
+        expect(shiftMedicationSource).toContain(
+            "if (result.status !== 'queued')",
+        );
+        expect(shiftMedicationSource).toContain(
+            'router.reload({ preserveScroll: true })',
+        );
+        expect(shiftMedicationSource).not.toContain(
+            'client_request_uuid: crypto.randomUUID()',
+        );
         expect(shiftMedicationSource).not.toContain('password or PIN');
-        expect(shiftMedicationSource).toContain(
-            'witness_credential: witnessCredential',
-        );
-        expect(shiftMedicationSource).toContain(
-            'allowQueueWhenOffline: !needsWitness',
-        );
-        expect(shiftMedicationSource).toContain(
-            'if (!emarMutationWasAccepted(result.status))',
-        );
     });
 
     it('blocks witness-gated quick PRN actions and gives queueable actions a payload-aware UUID', () => {

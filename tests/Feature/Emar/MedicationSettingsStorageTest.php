@@ -42,6 +42,26 @@ class MedicationSettingsStorageTest extends TestCase
         $this->site = Site::factory()->create(['is_active' => true]);
     }
 
+    public function test_values_and_review_markers_see_subsequent_saves_without_reusing_an_earlier_read(): void
+    {
+        $store = app(MedicationSettingsStore::class);
+        $before = $store->valuesAndReviews([$this->site->id]);
+        $this->assertSame('off', $before['values']['safety']['restricted_competency']);
+        $this->assertNull($before['reviewed']['safety']['restricted_competency']);
+        $manager = $this->organisationManager();
+
+        $this->actingAs($manager)->put('/emar/settings/changes', [
+            'view' => 'rules',
+            'changes' => [['group' => 'safety', 'key' => 'restricted_competency', 'from' => 'off', 'value' => 'block']],
+        ])->assertSessionHasNoErrors();
+
+        $after = $store->valuesAndReviews([$this->site->id]);
+        $this->assertSame('block', $after['values']['safety']['restricted_competency']);
+        $this->assertSame($manager->name, $after['reviewed']['safety']['restricted_competency']['by']);
+        $this->assertNotNull($after['reviewed']['safety']['restricted_competency']['at']);
+        $this->assertNull($before['reviewed']['safety']['restricted_competency']);
+    }
+
     public function test_a_save_records_the_change_with_the_value_before_it(): void
     {
         $manager = $this->organisationManager();

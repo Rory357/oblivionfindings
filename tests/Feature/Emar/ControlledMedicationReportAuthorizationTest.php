@@ -15,10 +15,12 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\ReadsRetainedMedicationAuditEvidence;
 use Tests\TestCase;
 
 class ControlledMedicationReportAuthorizationTest extends TestCase
 {
+    use ReadsRetainedMedicationAuditEvidence;
     use RefreshDatabase;
 
     protected function tearDown(): void
@@ -43,15 +45,18 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
             $middleware = Route::getRoutes()->getByName($routeName)?->gatherMiddleware() ?? [];
 
             $this->assertContains(
-                'permission:medications.reports.export|reports.viewAny',
+                'permission:medications.reports.view',
                 $middleware,
                 $routeName,
             );
+            $this->assertContains('permission:medications.reports.export', $middleware, $routeName);
+            $this->assertNotContains('permission:medications.reports.export|reports.viewAny', $middleware, $routeName);
             $this->assertContains('permission:medications.controlled.view', $middleware, $routeName);
         }
 
         $pdfMiddleware = Route::getRoutes()->getByName('emar.pdf.cd_register')?->gatherMiddleware() ?? [];
-        $this->assertContains('permission:medications.reports.export|reports.viewAny', $pdfMiddleware);
+        $this->assertContains('permission:medications.reports.view', $pdfMiddleware);
+        $this->assertContains('permission:medications.reports.export', $pdfMiddleware);
         $this->assertContains('permission:medications.controlled.view', $pdfMiddleware);
 
         foreach ([
@@ -84,7 +89,7 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
             ->get(route('api.medications.reports.export', ['type' => 'controlled_discrepancies']))
             ->assertForbidden();
         $this->actingAs($actor)
-            ->get(route('emar.reports.export', ['report_type' => 'controlled']))
+            ->post(route('emar.reports.export'), ['type' => 'cd_register', 'purpose' => 'care'])
             ->assertForbidden();
         $this->actingAs($actor)
             ->get(route('emar.reports', ['report_type' => 'controlled']))
@@ -102,7 +107,8 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
     public function test_mixed_report_pages_omit_controlled_datasets_without_blocking_ordinary_reports(): void
     {
         $actor = $this->userWithPermissions([
-            'reports.viewAny',
+            'medications.reports.view',
+            'medications.reports.export',
             'sites.viewAll',
         ]);
         $this->assertFalse($actor->canDo('medications.view'));
@@ -181,32 +187,30 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
         ]);
 
         Carbon::setTestNow(Carbon::parse('2026-06-15 10:00', 'Pacific/Auckland')->utc());
-        $this->actingAs($actor)
-            ->get(route('reports.medications'))
+        $this->canonicalGet($actor, 'reports.medications', ['period' => 'today'])
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('reports/medications')
-                ->where('can_view_controlled', false)
-                ->has('discrepancies', 0)
-                ->has('administrations', 1)
-                ->where('administrations.0.medication.name', 'Ordinary MAR fixture')
-                ->where('administrations.0.medication.controlled_drug', false));
+                ->component('emar/reports/hub')
+                ->where('can.controlled', false)
+                ->where('data.totals.due', 2)
+                ->where('data.totals.given', 2));
 
         $this->actingAs($actor)
-            ->get(route('emar.reports'))
+            ->get(route('emar.reports', ['report' => 'doses', 'period' => 'today']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('emar/Reports')
-                ->where('can_view_controlled', false)
-                ->where('can_record_controlled', false)
+                ->component('emar/reports/hub')
+                ->where('can.controlled', false)
                 // P09 Q6: dose numbers count the controlled dose too; nothing names it.
-                ->where('adminSummary.total', 2)
-                ->where('adminSummary.given', 2)
-                ->has('cdMedications', 0)
-                ->where('controlledDrugs.administrations', 0)
-                ->where('controlledDrugs.destructions', 0)
-                ->where('controlledDrugs.discrepancies', 0)
-                ->has('controlledDrugs.byMedication', 0));
+                ->where('data.totals.due', 2)
+                ->where('data.totals.given', 2));
+        $this->actingAs($actor)
+            ->get(route('emar.reports', ['report' => 'controlled', 'period' => 'today']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('locked', fn ($message) => str_contains($message, 'controlled-medicine access'))
+                ->where('page', null)
+                ->has('data.rows', 0));
 
         $this->actingAs($actor)
             ->getJson(route('api.medications.reports', ['type' => 'mar']))
@@ -226,21 +230,23 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
             ->assertJsonMissingPath('safety_alerts.by_type.controlled_discrepancy');
 
         $emarCsv = $this->actingAs($actor)
-            ->get(route('emar.reports.export', ['report_type' => 'administration']))
+            ->post(route('emar.reports.export'), ['type' => 'doses', 'purpose' => 'care', 'period' => 'today'])
             ->assertOk();
-        $emarCsvContent = $emarCsv->streamedContent();
+        $emarCsvContent = $emarCsv->getContent();
         $this->assertStringContainsString('Ordinary MAR fixture', $emarCsvContent);
+        $this->assertStringContainsString('given', $emarCsvContent);
+        $this->assertStringContainsString('Controlled medicine', $emarCsvContent);
         $this->assertStringNotContainsString('Controlled MAR fixture', $emarCsvContent);
 
         $medicationsCsv = $this->actingAs($actor)
-            ->get(route('reports.medications.export_mar'))
+            ->get(route('reports.medications.export_mar', ['purpose' => 'care']))
             ->assertOk();
-        $medicationsCsvContent = $medicationsCsv->streamedContent();
+        $medicationsCsvContent = $medicationsCsv->getContent();
         $this->assertStringContainsString('Ordinary MAR fixture', $medicationsCsvContent);
         $this->assertStringNotContainsString('Controlled MAR fixture', $medicationsCsvContent);
 
         $this->actingAs($actor)
-            ->get(route('emar.pdf.mar', ['client_id' => $client->id]))
+            ->get(route('emar.pdf.mar', ['client_id' => $client->id, 'purpose' => 'care']))
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
     }
@@ -248,8 +254,16 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
     public function test_exact_reader_restores_controlled_reports_but_not_writer_affordances(): void
     {
         $actor = $this->userWithPermissions([
-            'reports.viewAny',
+            'medications.reports.view',
+            'medications.reports.export',
             'medications.controlled.view',
+            'sites.viewAll',
+        ]);
+        $site = Site::factory()->create(['is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $medicine = ClientMedication::factory()->create([
+            'client_id' => $client->id, 'name' => 'Controlled register fixture',
+            'controlled_drug' => true, 'approval_status' => 'verified', 'active' => true, 'state' => 'active',
         ]);
 
         $this->actingAs($actor)
@@ -259,24 +273,38 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
             ->getJson(route('api.medications.reports', ['type' => 'controlled_discrepancies']))
             ->assertOk();
         $this->actingAs($actor)
-            ->get(route('api.medications.reports.export', ['type' => 'controlled_discrepancies']))
+            ->get(route('api.medications.reports.export', ['type' => 'controlled_discrepancies', 'purpose' => 'care']))
             ->assertOk();
         $this->actingAs($actor)
-            ->get(route('emar.reports.export', ['report_type' => 'controlled']))
+            ->post(route('emar.reports.export'), ['type' => 'cd_register', 'purpose' => 'care', 'period' => 'today', 'site_id' => $site->id, 'client_id' => $client->id, 'medication_id' => $medicine->id])
+            ->assertOk()->assertHeader('content-type', 'application/pdf');
+        $this->actingAs($actor)
+            ->get(route('emar.reports.export_discrepancies', ['purpose' => 'care']))
             ->assertOk();
         $this->actingAs($actor)
-            ->get(route('emar.reports.export_discrepancies'))
-            ->assertOk();
-        $this->actingAs($actor)
-            ->get(route('reports.medications.export_discrepancies'))
+            ->get(route('reports.medications.export_discrepancies', ['purpose' => 'care']))
             ->assertOk();
 
         $this->actingAs($actor)
-            ->get(route('emar.reports', ['report_type' => 'controlled']))
+            ->get(route('emar.reports', ['report' => 'controlled', 'period' => 'today']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('can_view_controlled', true)
-                ->where('can_record_controlled', false));
+                ->where('can.controlled', true)
+                ->where('locked', null)
+                ->missing('can_record_controlled'));
+    }
+
+    public function test_exact_api_report_reader_does_not_need_export_authority_and_cannot_export(): void
+    {
+        $actor = $this->userWithPermissions(['medications.reports.view', 'sites.viewAll']);
+        $site = Site::factory()->create(['is_active' => true]);
+        Client::factory()->create(['site_id' => $site->id]);
+        $this->assertFalse($actor->canDo('medications.reports.export'));
+        $this->actingAs($actor)->getJson(route('api.medications.reports', ['type' => 'mar']))
+            ->assertOk()->assertJsonCount(0, 'records');
+        $this->actingAs($actor)->getJson(route('api.medications.reports.export', ['type' => 'mar', 'purpose' => 'care']))
+            ->assertForbidden();
+        $this->assertDatabaseCount('medication_events', 0);
     }
 
     /** @param list<string> $permissions */
@@ -295,6 +323,13 @@ class ControlledMedicationReportAuthorizationTest extends TestCase
             $medicationsViewId = Permission::query()->where('key', 'medications.view')->value('id');
             $this->assertNotNull($medicationsViewId, 'Missing medications.view permission in test setup.');
             $grants[(int) $medicationsViewId] = ['allowed' => false];
+        }
+        foreach (['medications.controlled.view', 'medications.reports.view', 'medications.reports.export'] as $key) {
+            if (! in_array($key, $permissions, true)) {
+                $id = Permission::query()->where('key', $key)->value('id');
+                $this->assertNotNull($id, 'Missing '.$key.' permission in test setup.');
+                $grants[(int) $id] = ['allowed' => false];
+            }
         }
         $user->permissionOverrides()->sync($grants);
         $user->unsetRelation('permissionOverrides')->unsetRelation('roles');

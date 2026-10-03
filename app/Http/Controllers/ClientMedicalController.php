@@ -16,6 +16,7 @@ use App\Notifications\AppEventNotification;
 use App\Services\AuditLogger;
 use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationOrderLifecycleService;
 use App\Services\Medication\MedicationScopeDecision;
@@ -30,6 +31,7 @@ use App\Support\Medication\MedicationStockQuantity;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
@@ -109,6 +111,9 @@ class ClientMedicalController extends Controller
         ]);
 
         foreach (['disabilities', 'allergies'] as $field) {
+            if ($field === 'allergies' && ! array_key_exists($field, $data)) {
+                continue;
+            }
             if (! array_key_exists($field, $data) || $data[$field] === null || $data[$field] === '') {
                 $data[$field] = [];
 
@@ -120,10 +125,25 @@ class ClientMedicalController extends Controller
                 : [(string) $data[$field]];
         }
 
-        $profile = ClientMedicalProfile::firstOrNew(['client_id' => $client->id]);
-        $profile->fill($data);
-        $profile->client_id = $client->id;
-        $profile->save();
+        [$profile, $client] = DB::transaction(function () use ($client, $data) {
+            // Canonical allergy copy takes these same locks, in this order.
+            // A copy either sees the saved labels, or this writer sees the
+            // completed copy before deciding whether labels may change.
+            $lockedClient = Client::query()->whereKey($client->id)->lockForUpdate()->firstOrFail();
+            $this->authorize('update', $lockedClient);
+            $profile = ClientMedicalProfile::query()->where('client_id', $lockedClient->id)->lockForUpdate()->first()
+                ?? new ClientMedicalProfile(['client_id' => $lockedClient->id]);
+            if (array_key_exists('allergies', $data)) {
+                app(ClientAllergyRecordService::class)->guardLegacyEdit($lockedClient, $data['allergies'], $profile);
+                if ($profile->allergies_canonical_at) {
+                    unset($data['allergies']);
+                }
+            }
+            $profile->fill($data);
+            $profile->saveOrFail();
+
+            return [$profile, $lockedClient];
+        }, 5);
 
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'medical profile', $profile, $client, [
             'title' => 'Medical profile updated',
@@ -465,6 +485,7 @@ class ClientMedicalController extends Controller
                         ->where('client_medication_id', $lockedMedication->id)
                         ->lockForUpdate()
                         ->first() ?? new ClientMedicationStock(['client_medication_id' => $lockedMedication->id]);
+                    $stock->rejectScalarWrite('on_hand');
                     $beforeOnHand = $stock->exists && $stock->on_hand !== null
                         ? MedicationStockQuantity::normalize($stock->on_hand)
                         : null;
